@@ -4,6 +4,91 @@
  */
 
 export interface paths {
+    "/api/account/auth-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the caller is signed in and still owes a passkey step-up; never cached. */
+        get: operations["auth_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/email-availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Normalizes the chosen handle or address to the Solace domain and says whether it can be used. */
+        get: operations["email_availability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/invite/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Links an invite to the chosen Solace address; sign-up must follow within 15 minutes. */
+        post: operations["claim_invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/invite/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Checks an invite token before sign-up; 30 requests a minute per client. */
+        get: operations["validate_invite"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/signup-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Solace domain new accounts choose their address in. */
+        get: operations["signup_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/get-session": {
         parameters: {
             query?: never;
@@ -50,6 +135,41 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's invites, newest first. */
+        get: operations["list"];
+        put?: never;
+        /** Invites someone outside Solace and mails them the link; a failed mail is a warning, not an error. */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revokes one of the caller's invites unless it was already accepted. */
+        delete: operations["revoke"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1006,6 +1126,12 @@ export interface components {
             message: string;
             success: boolean;
         };
+        OkFlag: {
+            ok: boolean;
+        };
+        OneTimeToken: {
+            token: string;
+        };
         /** @description A non-fatal problem attached to a successful mutation, such as an invite mail that could not be delivered. */
         OperationWarning: {
             code: string;
@@ -1018,7 +1144,25 @@ export interface components {
             role?: string | null;
             status?: string | null;
         };
+        /** @description A passkey row as the passkey plugin returns it: the COSE key in standard base64, the credential id in base64url. */
+        Passkey: {
+            aaguid: string | null;
+            backedUp: boolean;
+            /** Format: int32 */
+            counter: number;
+            createdAt: components["schemas"]["Timestamp"] | null;
+            credentialID: string;
+            deviceType: string;
+            id: components["schemas"]["PasskeyId"];
+            name: string | null;
+            publicKey: string;
+            transports: string | null;
+            userId: components["schemas"]["UserId"];
+        };
         PasskeyId: string;
+        PasskeyUpdated: {
+            passkey: components["schemas"]["Passkey"];
+        };
         PasswordEnvelope: {
             createdAt: components["schemas"]["Timestamp"];
             id: string;
@@ -1513,6 +1657,109 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    auth_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthStatus"];
+                };
+            };
+        };
+    };
+    email_availability: {
+        parameters: {
+            query: {
+                email: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailAvailability"];
+                };
+            };
+        };
+    };
+    claim_invite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimInviteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteClaimResult"];
+                };
+            };
+        };
+    };
+    validate_invite: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteValidation"];
+                };
+            };
+        };
+    };
+    signup_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupConfig"];
+                };
+            };
+        };
+    };
     get_session: {
         parameters: {
             query?: never;
@@ -1574,6 +1821,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MailHealthFailure"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteList"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInviteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"];
+                };
+            };
+        };
+    };
+    revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessFlag"];
                 };
             };
         };

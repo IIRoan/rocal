@@ -8,6 +8,7 @@ use crate::auth::cookies::CookieSettings;
 use crate::config::Config;
 use crate::http::origins::OriginPolicy;
 use crate::integrations::stalwart::gate::StalwartGate;
+use crate::integrations::stalwart::mailer::MailerConfig;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -19,6 +20,7 @@ pub struct AppState {
     pub origins: Arc<OriginPolicy>,
     pub cookies: Arc<CookieSettings>,
     pub stalwart_gate: Arc<StalwartGate>,
+    pub mailer: Option<Arc<MailerConfig>>,
 }
 
 impl AppState {
@@ -33,6 +35,7 @@ impl AppState {
                 &config.stalwart_base_url,
                 config.stalwart_gate_key.as_deref(),
             )),
+            mailer: config.mailer.clone().map(Arc::new),
             config: Arc::new(config),
             db,
             http: reqwest::Client::builder().build()?,

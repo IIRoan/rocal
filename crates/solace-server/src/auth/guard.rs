@@ -18,6 +18,7 @@ pub struct RouteUser {
     pub id: String,
     pub session_id: String,
     pub email: String,
+    pub name: String,
 }
 
 /// Resolved before validation runs but required after it, because Elysia validated the request before the guard answered.
@@ -44,6 +45,7 @@ impl FromRequestParts<AppState> for Auth {
                 id: active.user.id.clone(),
                 session_id: active.session.id.clone(),
                 email: active.user.email.clone(),
+                name: active.user.name.clone(),
             }
         })))
     }
@@ -84,8 +86,23 @@ async fn resolve(parts: &mut Parts, state: &AppState) -> Option<ActiveSession> {
 }
 
 async fn step_up(parts: &Parts, state: &AppState, active: &ActiveSession) -> Result<(), AppError> {
-    let request_cookies = cookies::parse_cookies(&parts.headers);
-    let verified = cookies::cookie(&request_cookies, STEP_UP_COOKIE)
+    if step_up_verified(state, &parts.headers, active)
+        || !has_passkeys(state, &active.user.id).await?
+    {
+        Ok(())
+    } else {
+        Err(AppError::StepUpRequired)
+    }
+}
+
+/// A genuine, unexpired step-up cookie bound to this user and session.
+pub fn step_up_verified(
+    state: &AppState,
+    headers: &axum::http::HeaderMap,
+    active: &ActiveSession,
+) -> bool {
+    let request_cookies = cookies::parse_cookies(headers);
+    cookies::cookie(&request_cookies, STEP_UP_COOKIE)
         .and_then(|raw| {
             state.cookies.verified_step_up(
                 raw,
@@ -94,17 +111,13 @@ async fn step_up(parts: &Parts, state: &AppState, active: &ActiveSession) -> Res
                 instant::unix_seconds(instant::now()),
             )
         })
-        .is_some();
-    if verified {
-        return Ok(());
-    }
-    let passkeys = passkey::Entity::find()
-        .filter(passkey::Column::UserId.eq(active.user.id.as_str()))
+        .is_some()
+}
+
+pub async fn has_passkeys(state: &AppState, user_id: &str) -> Result<bool, AppError> {
+    let count = passkey::Entity::find()
+        .filter(passkey::Column::UserId.eq(user_id))
         .count(&state.db)
         .await?;
-    if passkeys > 0 {
-        Err(AppError::StepUpRequired)
-    } else {
-        Ok(())
-    }
+    Ok(count > 0)
 }

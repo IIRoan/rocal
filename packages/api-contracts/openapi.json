@@ -10,6 +10,136 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/account/auth-status": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Whether the caller is signed in and still owes a passkey step-up; never cached.",
+        "operationId": "auth_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account/email-availability": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Normalizes the chosen handle or address to the Solace domain and says whether it can be used.",
+        "operationId": "email_availability",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailAvailability"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account/invite/claim": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Links an invite to the chosen Solace address; sign-up must follow within 15 minutes.",
+        "operationId": "claim_invite",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimInviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteClaimResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account/invite/validate": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Checks an invite token before sign-up; 30 requests a minute per client.",
+        "operationId": "validate_invite",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteValidation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account/signup-config": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "The Solace domain new accounts choose their address in.",
+        "operationId": "signup_config",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/get-session": {
       "get": {
         "tags": [
@@ -79,6 +209,84 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MailHealthFailure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invites": {
+      "get": {
+        "tags": [
+          "Invites"
+        ],
+        "summary": "The caller's invites, newest first.",
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Invites"
+        ],
+        "summary": "Invites someone outside Solace and mails them the link; a failed mail is a warning, not an error.",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invite"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invites/{id}": {
+      "delete": {
+        "tags": [
+          "Invites"
+        ],
+        "summary": "Revokes one of the caller's invites unless it was already accepted.",
+        "operationId": "revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessFlag"
                 }
               }
             }
@@ -3791,6 +3999,28 @@
           }
         }
       },
+      "OkFlag": {
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OneTimeToken": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
       "OperationWarning": {
         "type": "object",
         "description": "A non-fatal problem attached to a successful mutation, such as an invite mail that could not be delivered.",
@@ -3840,8 +4070,88 @@
         },
         "additionalProperties": false
       },
+      "Passkey": {
+        "type": "object",
+        "description": "A passkey row as the passkey plugin returns it: the COSE key in standard base64, the credential id in base64url.",
+        "required": [
+          "id",
+          "name",
+          "publicKey",
+          "userId",
+          "credentialID",
+          "counter",
+          "deviceType",
+          "backedUp",
+          "transports",
+          "createdAt",
+          "aaguid"
+        ],
+        "properties": {
+          "aaguid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backedUp": {
+            "type": "boolean"
+          },
+          "counter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "credentialID": {
+            "type": "string"
+          },
+          "deviceType": {
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/PasskeyId"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publicKey": {
+            "type": "string"
+          },
+          "transports": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        }
+      },
       "PasskeyId": {
         "type": "string"
+      },
+      "PasskeyUpdated": {
+        "type": "object",
+        "required": [
+          "passkey"
+        ],
+        "properties": {
+          "passkey": {
+            "$ref": "#/components/schemas/Passkey"
+          }
+        }
       },
       "PasswordEnvelope": {
         "type": "object",

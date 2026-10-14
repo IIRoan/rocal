@@ -1,13 +1,17 @@
 //! The Solace API: `router()` and `openapi()` are shared by `main`, the API suite and `cargo xtask openapi`.
 
+pub mod account;
+pub mod addresses;
 pub mod auth;
 pub mod config;
 pub mod db;
+pub mod email;
 pub mod error;
 pub mod health;
 pub mod http;
 pub mod instant;
 pub mod integrations;
+pub mod invites;
 pub mod state;
 pub mod telemetry;
 
@@ -40,6 +44,8 @@ fn api() -> OpenApiRouter<AppState> {
     OpenApiRouter::with_openapi(document)
         .merge(health::routes())
         .merge(auth::routes())
+        .merge(account::routes())
+        .merge(invites::routes())
 }
 
 /// Every route's OpenAPI entry, without a database.
@@ -56,6 +62,10 @@ pub fn router(state: AppState) -> Router {
         .method_not_allowed_fallback(not_found)
         .layer(DefaultBodyLimit::max(http::BODY_LIMIT_BYTES))
         .layer(middleware::from_fn(http::timeout))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::pipeline::middleware,
+        ))
         .layer(middleware::from_fn(http::response_cookies::middleware))
         .layer(middleware::from_fn_with_state(
             state.clone(),

@@ -1,15 +1,16 @@
-//! Request validation with Zod 3.25's semantics: the same issue messages, paths, order and dirty/aborted rules the clients see today.
+//! Request validation with Zod 3.25's semantics (issue order, dirty/aborted rules), rendering each issue as Zod 3 and as Zod 4 (Better Auth's endpoints) would.
 
 use std::sync::Arc;
 
 use regex_lite::Regex;
 use serde_json::{Map, Value};
 
-/// One Zod issue as the envelope carries it: a dotted path (`root` when empty) and the message.
+/// One issue: its path, Zod 3's message (app routes) and Zod 4's (Better Auth routes).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Issue {
     pub path: Vec<String>,
     pub message: String,
+    pub zod4: String,
 }
 
 impl Issue {
@@ -56,10 +57,11 @@ struct Ctx {
 }
 
 impl Ctx {
-    fn add(&mut self, path: &[String], message: String) {
+    fn add(&mut self, path: &[String], message: String, zod4: String) {
         self.issues.push(Issue {
             path: path.to_vec(),
             message,
+            zod4,
         });
     }
 }
@@ -74,9 +76,11 @@ impl RefineCtx<'_> {
     pub fn add_issue(&mut self, message: impl Into<String>, path: &[&str]) {
         let mut full = self.base.to_vec();
         full.extend(path.iter().map(|segment| (*segment).to_owned()));
+        let message = message.into();
         self.issues.push(Issue {
             path: full,
-            message: message.into(),
+            zod4: message.clone(),
+            message,
         });
     }
 }
@@ -94,6 +98,7 @@ enum StringCheck {
     Datetime(Option<String>),
     Url(Option<String>),
     StartsWith(String, Option<String>),
+    Email(Option<String>),
     Trim,
     ToLowerCase,
 }
@@ -127,7 +132,9 @@ enum Kind {
         strict: bool,
     },
     Union(Vec<Schema>),
+    Record,
     Optional(Box<Schema>),
+    NonOptional(Box<Schema>),
     Nullable(Box<Schema>),
     Default(Box<Schema>, Value),
     Preprocess(PreprocessFn, Box<Schema>),
@@ -212,6 +219,11 @@ pub fn object<const N: usize>(shape: [(&str, Schema); N]) -> Schema {
             strict: false,
         },
     }
+}
+
+/// `z.record(z.string(), z.any())`: any object, kept whole.
+pub fn record() -> Schema {
+    Schema { kind: Kind::Record }
 }
 
 pub fn union(options: Vec<Schema>) -> Schema {
@@ -319,6 +331,10 @@ impl Schema {
         self.with_string_check(StringCheck::Url(None))
     }
 
+    pub fn email(self) -> Self {
+        self.with_string_check(StringCheck::Email(None))
+    }
+
     pub fn starts_with(self, prefix: &str) -> Self {
         self.with_string_check(StringCheck::StartsWith(prefix.to_owned(), None))
     }
@@ -335,6 +351,7 @@ impl Schema {
                     | StringCheck::Regex(_, m)
                     | StringCheck::Datetime(m)
                     | StringCheck::Url(m)
+                    | StringCheck::Email(m)
                     | StringCheck::StartsWith(_, m),
                 ) = checks.last_mut()
                 {
@@ -382,6 +399,13 @@ impl Schema {
     pub fn optional(self) -> Self {
         Schema {
             kind: Kind::Optional(Box::new(self)),
+        }
+    }
+
+    /// Rejects `undefined` even for schemas that accept it, such as `any()`.
+    pub fn nonoptional(self) -> Self {
+        Schema {
+            kind: Kind::NonOptional(Box::new(self)),
         }
     }
 
@@ -459,7 +483,11 @@ impl Schema {
                 if input == Some(expected) {
                     Parsed::ok(input.cloned())
                 } else {
-                    ctx.add(path, format!("Invalid literal value, expected {expected}"));
+                    ctx.add(
+                        path,
+                        format!("Invalid literal value, expected {expected}"),
+                        format!("Invalid input: expected {expected}"),
+                    );
                     Parsed::aborted()
                 }
             }
@@ -467,8 +495,34 @@ impl Schema {
             Kind::Array { element, min, max } => parse_array(input, element, min, max, path, ctx),
             Kind::Object { shape, strict } => parse_object(input, shape, *strict, path, ctx),
             Kind::Union(options) => parse_union(input, options, path, ctx),
+            Kind::Record => match input {
+                Some(Value::Object(_)) => Parsed::ok(input.cloned()),
+                _ => {
+                    let message = match input {
+                        None => "Required".to_owned(),
+                        Some(_) => format!("Expected object, received {}", parsed_type(input)),
+                    };
+                    let zod4 = format!(
+                        "Invalid input: expected record, received {}",
+                        parsed_type(input)
+                    );
+                    ctx.add(path, message, zod4);
+                    Parsed::aborted()
+                }
+            },
             Kind::Optional(inner) => match input {
                 None => Parsed::ok(None),
+                Some(_) => inner.run(input, path, ctx),
+            },
+            Kind::NonOptional(inner) => match input {
+                None => {
+                    ctx.add(
+                        path,
+                        "Required".into(),
+                        "Invalid input: expected nonoptional, received undefined".into(),
+                    );
+                    Parsed::aborted()
+                }
                 Some(_) => inner.run(input, path, ctx),
             },
             Kind::Nullable(inner) => match input {
@@ -540,7 +594,11 @@ fn invalid_type(ctx: &mut Ctx, path: &[String], expected: &str, input: Option<&V
         None => "Required".to_owned(),
         Some(_) => format!("Expected {expected}, received {}", parsed_type(input)),
     };
-    ctx.add(path, message);
+    let zod4 = format!(
+        "Invalid input: expected {expected}, received {}",
+        parsed_type(input)
+    );
+    ctx.add(path, message, zod4);
     Parsed::aborted()
 }
 
@@ -576,6 +634,14 @@ fn is_js_whitespace(c: char) -> bool {
     )
 }
 
+/// A check's custom message replaces both dialects' defaults.
+fn messages(custom: &Option<String>, zod3: String, zod4: String) -> (String, String) {
+    match custom {
+        Some(message) => (message.clone(), message.clone()),
+        None => (zod3, zod4),
+    }
+}
+
 fn datetime_pattern() -> &'static Regex {
     static PATTERN: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
         let date = r"((\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-((0[13578]|1[02])-(0[1-9]|[12]\d|3[01])|(0[469]|11)-(0[1-9]|[12]\d|30)|(02)-(0[1-9]|1\d|2[0-8])))";
@@ -600,37 +666,67 @@ fn parse_string(
     for check in checks {
         let failure = match check {
             StringCheck::Min(min, message) => (js_length(&text) < *min).then(|| {
-                message
-                    .clone()
-                    .unwrap_or_else(|| format!("String must contain at least {min} character(s)"))
+                messages(
+                    message,
+                    format!("String must contain at least {min} character(s)"),
+                    format!("Too small: expected string to have >={min} characters"),
+                )
             }),
             StringCheck::Max(max, message) => (js_length(&text) > *max).then(|| {
-                message
-                    .clone()
-                    .unwrap_or_else(|| format!("String must contain at most {max} character(s)"))
+                messages(
+                    message,
+                    format!("String must contain at most {max} character(s)"),
+                    format!("Too big: expected string to have <={max} characters"),
+                )
             }),
             StringCheck::Length(exact, message) => {
                 let length = js_length(&text);
                 (length != *exact).then(|| {
-                    message.clone().unwrap_or_else(|| {
-                        format!("String must contain exactly {exact} character(s)")
-                    })
+                    let direction = if length < *exact {
+                        "Too small"
+                    } else {
+                        "Too big"
+                    };
+                    messages(
+                        message,
+                        format!("String must contain exactly {exact} character(s)"),
+                        format!("{direction}: expected string to have exactly {exact} characters"),
+                    )
                 })
             }
-            StringCheck::Regex(pattern, message) => (!pattern.is_match(&text))
-                .then(|| message.clone().unwrap_or_else(|| "Invalid".into())),
-            StringCheck::Datetime(message) => (!datetime_pattern().is_match(&text))
-                .then(|| message.clone().unwrap_or_else(|| "Invalid datetime".into())),
+            StringCheck::Regex(pattern, message) => (!pattern.is_match(&text)).then(|| {
+                messages(
+                    message,
+                    "Invalid".into(),
+                    format!("Invalid string: must match pattern /{}/", pattern.as_str()),
+                )
+            }),
+            StringCheck::Datetime(message) => (!datetime_pattern().is_match(&text)).then(|| {
+                messages(
+                    message,
+                    "Invalid datetime".into(),
+                    "Invalid ISO datetime".into(),
+                )
+            }),
             StringCheck::Url(message) => url::Url::parse(&text)
                 .is_err()
-                .then(|| message.clone().unwrap_or_else(|| "Invalid url".into())),
+                .then(|| messages(message, "Invalid url".into(), "Invalid URL".into())),
             StringCheck::StartsWith(prefix, message) => {
                 (!text.starts_with(prefix.as_str())).then(|| {
-                    message
-                        .clone()
-                        .unwrap_or_else(|| format!("Invalid input: must start with \"{prefix}\""))
+                    messages(
+                        message,
+                        format!("Invalid input: must start with \"{prefix}\""),
+                        format!("Invalid string: must start with \"{prefix}\""),
+                    )
                 })
             }
+            StringCheck::Email(message) => (!crate::addresses::is_zod_email(&text)).then(|| {
+                messages(
+                    message,
+                    "Invalid email".into(),
+                    "Invalid email address".into(),
+                )
+            }),
             StringCheck::Trim => {
                 text = js_trim(&text).to_owned();
                 None
@@ -640,8 +736,8 @@ fn parse_string(
                 None
             }
         };
-        if let Some(message) = failure {
-            ctx.add(path, message);
+        if let Some((message, zod4)) = failure {
+            ctx.add(path, message, zod4);
             status = Status::Dirty;
         }
     }
@@ -725,7 +821,11 @@ fn parse_number(
         }
     };
     if number.is_nan() {
-        ctx.add(path, "Expected number, received nan".into());
+        ctx.add(
+            path,
+            "Expected number, received nan".into(),
+            "Invalid input: expected number, received NaN".into(),
+        );
         return Parsed::aborted();
     }
     let mut status = Status::Valid;
@@ -733,9 +833,11 @@ fn parse_number(
         let failure = match check {
             NumberCheck::Int(message) => {
                 (number.fract() != 0.0 || !number.is_finite()).then(|| {
-                    message
-                        .clone()
-                        .unwrap_or_else(|| "Expected integer, received float".into())
+                    messages(
+                        message,
+                        "Expected integer, received float".into(),
+                        "Invalid input: expected int, received number".into(),
+                    )
                 })
             }
             NumberCheck::Min(min, inclusive, message) => {
@@ -745,14 +847,17 @@ fn parse_number(
                     number <= *min
                 };
                 fails.then(|| {
-                    message.clone().unwrap_or_else(|| {
-                        let bound = if *inclusive {
-                            "greater than or equal to"
-                        } else {
-                            "greater than"
-                        };
-                        format!("Number must be {bound} {}", js_number_string(*min))
-                    })
+                    let (bound, symbol) = if *inclusive {
+                        ("greater than or equal to", ">=")
+                    } else {
+                        ("greater than", ">")
+                    };
+                    let min = js_number_string(*min);
+                    messages(
+                        message,
+                        format!("Number must be {bound} {min}"),
+                        format!("Too small: expected number to be {symbol}{min}"),
+                    )
                 })
             }
             NumberCheck::Max(max, inclusive, message) => {
@@ -762,19 +867,22 @@ fn parse_number(
                     number >= *max
                 };
                 fails.then(|| {
-                    message.clone().unwrap_or_else(|| {
-                        let bound = if *inclusive {
-                            "less than or equal to"
-                        } else {
-                            "less than"
-                        };
-                        format!("Number must be {bound} {}", js_number_string(*max))
-                    })
+                    let (bound, symbol) = if *inclusive {
+                        ("less than or equal to", "<=")
+                    } else {
+                        ("less than", "<")
+                    };
+                    let max = js_number_string(*max);
+                    messages(
+                        message,
+                        format!("Number must be {bound} {max}"),
+                        format!("Too big: expected number to be {symbol}{max}"),
+                    )
                 })
             }
         };
-        if let Some(message) = failure {
-            ctx.add(path, message);
+        if let Some((message, zod4)) = failure {
+            ctx.add(path, message, zod4);
             status = Status::Dirty;
         }
     }
@@ -799,19 +907,36 @@ fn quoted_options(options: &[String]) -> String {
 }
 
 fn parse_enum(input: Option<&Value>, options: &[String], path: &[String], ctx: &mut Ctx) -> Parsed {
+    let zod4 = format!(
+        "Invalid option: expected one of {}",
+        options
+            .iter()
+            .map(|o| format!("\"{o}\""))
+            .collect::<Vec<_>>()
+            .join("|")
+    );
     match input {
         Some(Value::String(text)) if options.contains(text) => Parsed::ok(input.cloned()),
         Some(Value::String(text)) => {
-            ctx.add(
-                path,
-                format!(
-                    "Invalid enum value. Expected {}, received '{text}'",
-                    quoted_options(options)
-                ),
+            let message = format!(
+                "Invalid enum value. Expected {}, received '{text}'",
+                quoted_options(options)
             );
+            ctx.add(path, message, zod4);
             Parsed::aborted()
         }
-        _ => invalid_type(ctx, path, &quoted_options(options), input),
+        _ => {
+            let message = match input {
+                None => "Required".to_owned(),
+                Some(_) => format!(
+                    "Expected {}, received {}",
+                    quoted_options(options),
+                    parsed_type(input)
+                ),
+            };
+            ctx.add(path, message, zod4);
+            Parsed::aborted()
+        }
     }
 }
 
@@ -836,23 +961,23 @@ fn parse_array(
     if let Some((min, message)) = min
         && items.len() < *min
     {
-        ctx.add(
-            path,
-            message
-                .clone()
-                .unwrap_or_else(|| format!("Array must contain at least {min} element(s)")),
+        let (message, zod4) = messages(
+            message,
+            format!("Array must contain at least {min} element(s)"),
+            format!("Too small: expected array to have >={min} items"),
         );
+        ctx.add(path, message, zod4);
         status = Status::Dirty;
     }
     if let Some((max, message)) = max
         && items.len() > *max
     {
-        ctx.add(
-            path,
-            message
-                .clone()
-                .unwrap_or_else(|| format!("Array must contain at most {max} element(s)")),
+        let (message, zod4) = messages(
+            message,
+            format!("Array must contain at most {max} element(s)"),
+            format!("Too big: expected array to have <={max} items"),
         );
+        ctx.add(path, message, zod4);
         status = Status::Dirty;
     }
     let mut output = Vec::with_capacity(items.len());
@@ -900,15 +1025,23 @@ fn parse_object(
         }
     }
     if strict {
-        let extra: Vec<String> = object
+        let extra: Vec<&String> = object
             .keys()
             .filter(|key| !shape.iter().any(|(known, _)| known == *key))
-            .map(|key| format!("'{key}'"))
             .collect();
         if !extra.is_empty() {
+            let quoted = |quote: char| {
+                extra
+                    .iter()
+                    .map(|key| format!("{quote}{key}{quote}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            let plural = if extra.len() > 1 { "s" } else { "" };
             ctx.add(
                 path,
-                format!("Unrecognized key(s) in object: {}", extra.join(", ")),
+                format!("Unrecognized key(s) in object: {}", quoted('\'')),
+                format!("Unrecognized key{plural}: {}", quoted('"')),
             );
             status = Status::Dirty;
         }
@@ -942,7 +1075,7 @@ fn parse_union(
         ctx.issues.extend(issues);
         return result;
     }
-    ctx.add(path, "Invalid input".into());
+    ctx.add(path, "Invalid input".into(), "Invalid input".into());
     Parsed::aborted()
 }
 

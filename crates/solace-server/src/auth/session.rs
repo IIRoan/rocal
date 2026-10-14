@@ -23,8 +23,25 @@ pub struct Lookup {
     pub cookies: Vec<String>,
 }
 
-/// Reads the signed session cookie, deletes expired sessions, renews sessions older than a day, and renews a step-up cookie bound to them.
+/// `auth.api.getSession` as app routes and `/get-session` call it: its hooks also renew a step-up cookie bound to the session.
 pub async fn lookup(state: &AppState, headers: &HeaderMap) -> Result<Lookup, sea_orm::DbErr> {
+    resolve(state, headers, true).await
+}
+
+/// Better Auth's own session middleware, which runs no hooks and so leaves the step-up cookie alone.
+pub async fn lookup_without_step_up(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Lookup, sea_orm::DbErr> {
+    resolve(state, headers, false).await
+}
+
+/// Reads the signed session cookie, deletes expired sessions and renews sessions older than a day.
+async fn resolve(
+    state: &AppState,
+    headers: &HeaderMap,
+    renew_step_up: bool,
+) -> Result<Lookup, sea_orm::DbErr> {
     let settings = &state.cookies;
     let request_cookies = cookies::parse_cookies(headers);
     let mut set = Vec::new();
@@ -84,7 +101,7 @@ pub async fn lookup(state: &AppState, headers: &HeaderMap) -> Result<Lookup, sea
     } else {
         session
     };
-    if let Some(raw) = cookies::cookie(&request_cookies, STEP_UP_COOKIE) {
+    if renew_step_up && let Some(raw) = cookies::cookie(&request_cookies, STEP_UP_COOKIE) {
         let now_seconds = instant::unix_seconds(now);
         if let Some(payload) = settings.verified_step_up(raw, &user.id, &session.id, now_seconds)
             && payload.e - SESSION_LIFETIME_SECONDS + SESSION_UPDATE_AGE_SECONDS <= now_seconds

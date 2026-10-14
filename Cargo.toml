@@ -39,9 +39,16 @@ hex = "0.4"
 # Allocators, picked by `cargo xtask mem-budget`.
 mimalloc = { version = "0.1", default-features = false }
 tikv-jemallocator = "0.7"
+# Better Auth passwords: scrypt over the NFKC-normalized password.
+scrypt = { version = "0.12", default-features = false }
+unicode-normalization = "0.1"
 # Prisma `cuid()` ids.
 cuid = { version = "2", default-features = false, features = ["v1"] }
 subtle = "2"
+# Passkeys: WebAuthn ceremonies over the stored COSE keys; pinned because its expert API may change in minor versions. Needs OpenSSL.
+webauthn-rs-core = "=0.5.5"
+# The CBOR crate webauthn-rs-core reads COSE keys with.
+serde_cbor_2 = "0.13"
 anyhow = "1"
 base64 = "0.22"
 ciborium = "0.2"

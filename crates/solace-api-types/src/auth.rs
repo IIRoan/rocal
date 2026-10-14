@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::{SessionId, Timestamp, UserId};
+use crate::common::{PasskeyId, SessionId, Timestamp, UserId};
 
 /// The user as Better Auth returns it: core fields only.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -75,6 +75,46 @@ pub struct SuccessFlag {
 #[serde(rename_all = "camelCase")]
 pub struct StatusFlag {
     pub status: bool,
+}
+
+/// A passkey row as the passkey plugin returns it: the COSE key in standard base64, the credential id in base64url.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Passkey {
+    pub id: PasskeyId,
+    #[schema(required = true)]
+    pub name: Option<String>,
+    pub public_key: String,
+    pub user_id: UserId,
+    #[serde(rename = "credentialID")]
+    pub credential_id: String,
+    pub counter: i32,
+    pub device_type: String,
+    pub backed_up: bool,
+    #[schema(required = true)]
+    pub transports: Option<String>,
+    #[schema(required = true)]
+    pub created_at: Option<Timestamp>,
+    #[schema(required = true)]
+    pub aaguid: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PasskeyUpdated {
+    pub passkey: Passkey,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OneTimeToken {
+    pub token: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OkFlag {
+    pub ok: bool,
 }
 
 /// `GET /api/me`: the session user, or null without a session.

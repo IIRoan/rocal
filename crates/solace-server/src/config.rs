@@ -2,6 +2,8 @@
 
 use thiserror::Error;
 
+use crate::integrations::stalwart::mailer::MailerConfig;
+
 const DEV_BACKEND_URL: &str = "http://localhost:4001";
 const DEV_FRONTEND_URL: &str = "http://localhost:4000";
 const DEFAULT_STALWART_BASE_URL: &str = "https://mail.solace.onl";
@@ -62,6 +64,9 @@ pub struct Config {
     pub auth_secret: String,
     pub database_url: String,
     pub stalwart_base_url: String,
+    pub stalwart_default_domain: String,
+    /// The noreply identity app mail is sent as; mail is disabled without its credentials.
+    pub mailer: Option<MailerConfig>,
     /// The backend-gate key the Railway Stalwart domain requires (`apps/stalwart/backend-gate.cfg`).
     pub stalwart_gate_key: Option<String>,
     pub sentry_dsn: Option<String>,
@@ -108,12 +113,57 @@ impl Config {
             database_url: var("DATABASE_URL").ok_or(ConfigError::Missing("DATABASE_URL"))?,
             stalwart_base_url: var("STALWART_BASE_URL")
                 .unwrap_or_else(|| DEFAULT_STALWART_BASE_URL.into()),
+            stalwart_default_domain: var("STALWART_DEFAULT_DOMAIN")
+                .unwrap_or_else(|| "solace.onl".into()),
+            mailer: mailer(&var),
             stalwart_gate_key: var("STALWART_GATE_KEY")
                 .map(|key| key.trim().to_owned())
                 .filter(|key| !key.is_empty()),
             sentry_dsn: var("SENTRY_DSN").map(|dsn| dsn.trim().to_owned()),
             backend_url,
         })
+    }
+}
+
+/// `email-client.ts`: Stalwart JMAP credentials and the noreply address and name.
+fn mailer(var: &impl Fn(&str) -> Option<String>) -> Option<MailerConfig> {
+    let from = var("EMAIL_FROM")
+        .map(|from| from.trim().to_owned())
+        .filter(|from| !from.is_empty())
+        .or_else(|| {
+            var("AUTH_EMAIL_FROM")
+                .or_else(|| var("AUTH_RESET_EMAIL_FROM"))
+                .map(|header| address_of(&header))
+        })
+        .filter(|from| !from.is_empty())
+        .unwrap_or_else(|| "noreply@solace.onl".into());
+    let username = var("STALWART_JMAP_USERNAME")
+        .map(|u| u.trim().to_owned())
+        .filter(|u| !u.is_empty())?;
+    let password = var("STALWART_JMAP_PASSWORD")?;
+    let base_url = var("STALWART_JMAP_URL")
+        .or_else(|| var("STALWART_BASE_URL"))
+        .unwrap_or_else(|| DEFAULT_STALWART_BASE_URL.into())
+        .trim_end_matches('/')
+        .to_owned();
+    Some(MailerConfig {
+        base_url,
+        username,
+        password,
+        from,
+        from_name: var("EMAIL_FROM_NAME")
+            .map(|n| n.trim().to_owned())
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| "Solace".into()),
+    })
+}
+
+/// `Name <address>` → `address`.
+fn address_of(header: &str) -> String {
+    let trimmed = header.trim();
+    match (trimmed.rfind('<'), trimmed.ends_with('>')) {
+        (Some(open), true) => trimmed[open + 1..trimmed.len() - 1].trim().to_owned(),
+        _ => trimmed.to_owned(),
     }
 }
 
