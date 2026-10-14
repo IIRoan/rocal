@@ -6,6 +6,7 @@
 #[allow(dead_code)]
 mod helpers;
 
+mod calendar_sharing;
 mod calendars;
 mod categories;
 mod settings;
