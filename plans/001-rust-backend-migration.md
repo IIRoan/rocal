@@ -158,6 +158,13 @@ Railway currently has only `production`, and Vercel previews and `apps/backend/.
 - The suite and `xtask` refuse any production database, mailbox, bucket, secret, or URL.
 - When running the current backend locally against this environment, set every `STALWART_*` variable, because it otherwise falls back to production Stalwart.
 
+**Result (2026-10-14, done):**
+
+- Railway environment `test` (created empty): `test-postgres` (postgres-ssl:18, volume, TCP proxy), `test-stalwart` (`apps/stalwart/test-env`: no frp, remote delivery black-holed, backend gate on its Railway domain), `test-notifications` (the Go worker without APNs credentials, so push jobs end `skipped` in `notification_job`: that is the push sink) and bucket `solace-test-avatars`. The app database is `solace_test_seed`.
+- `cargo xtask test-env up|template|clone|seed|stalwart-key` runs the same setup locally in podman. `seed` creates the synthetic data through the TypeScript backend (`cargo xtask ts-backend --checkout <worktree without .env files>`), so passwords, sessions and passkeys are exactly what it writes. `cargo xtask deploy-test` uploads only a `git archive` to `test-*` services in `test`.
+- The guard: test secrets and database passwords are `solace-test-*`, databases `solace_test*`, buckets `solace-test-*`, the mail domain `.test`, and hosts loopback, `*.railway.internal` or `*-test.up.railway.app`.
+- Finding: the committed `solace-provisioner` role can't provision a mailbox on Stalwart 0.16.21. It also needs the User role (to grant it) and `impersonate` (keys, account settings), so the test provisioner has both. Production presumably still runs on the `STALWART_ADMIN_TOKEN` fallback. Production is unchanged.
+
 ### 2. Auth spike (go/no-go)
 
 Point better-auth-rs at a copy of the test database and prove four things:

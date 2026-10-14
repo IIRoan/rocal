@@ -42,6 +42,17 @@ pub struct TestEnv {
     pub better_auth_secret: String,
     pub mail_bridge_hmac_key: String,
     pub stalwart_webhook_secret: String,
+    /// The test avatar bucket (`TEST_AVATAR_BUCKET*`); uploads are disabled when unset, as in the backends.
+    pub avatar_bucket: Option<AvatarBucket>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AvatarBucket {
+    pub name: String,
+    pub endpoint: String,
+    pub region: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
 }
 
 impl TestEnv {
@@ -81,7 +92,19 @@ impl TestEnv {
                 "TEST_STALWART_WEBHOOK_SECRET",
                 LOCAL_SECRETS.stalwart_webhook.into(),
             ),
+            avatar_bucket: std::env::var("TEST_AVATAR_BUCKET")
+                .ok()
+                .map(|name| AvatarBucket {
+                    name,
+                    endpoint: var("TEST_AVATAR_BUCKET_ENDPOINT", String::new()),
+                    region: var("TEST_AVATAR_BUCKET_REGION", "auto".into()),
+                    access_key_id: var("TEST_AVATAR_BUCKET_ACCESS_KEY_ID", String::new()),
+                    secret_access_key: var("TEST_AVATAR_BUCKET_SECRET_ACCESS_KEY", String::new()),
+                }),
         };
+        if let Some(bucket) = &env.avatar_bucket {
+            guard::check_bucket("TEST_AVATAR_BUCKET", &bucket.name)?;
+        }
         guard::check_secret("TEST_BETTER_AUTH_SECRET", &env.better_auth_secret)?;
         guard::check_secret("TEST_MAIL_BRIDGE_HMAC_KEY", &env.mail_bridge_hmac_key)?;
         guard::check_secret("TEST_STALWART_WEBHOOK_SECRET", &env.stalwart_webhook_secret)?;

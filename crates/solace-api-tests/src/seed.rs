@@ -110,6 +110,13 @@ pub async fn seed(config: &SeedConfig<'_>) -> Result<SeedManifest> {
         seed_e2ee(&mut agent).await?;
         seed_calendar_data(&mut agent, &mut user).await?;
         seed_settings_and_push(&mut agent, index).await?;
+        if index == 0 {
+            let image = STANDARD.encode(std::fs::read(config.fixtures_dir.join("avatar.png"))?);
+            agent
+                .put("/api/profiles/me/avatar", json!({"image": image}))
+                .await?
+                .expect_status(200)?;
+        }
         if index < 2 {
             bootstrap_mailbox(&mut agent, config.fixtures_dir, index + 1).await?;
             user.has_mailbox = true;

@@ -71,6 +71,27 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         ("EMAIL_FROM", format!("noreply@{}", env.mail_domain)),
         ("EMAIL_FROM_NAME", "Solace Test".to_owned()),
     ];
+    let bucket = env.avatar_bucket.clone();
+    let bucket_vars = [
+        ("AVATAR_BUCKET", bucket.as_ref().map(|b| b.name.clone())),
+        (
+            "AVATAR_BUCKET_ENDPOINT",
+            bucket.as_ref().map(|b| b.endpoint.clone()),
+        ),
+        (
+            "AVATAR_BUCKET_REGION",
+            bucket.as_ref().map(|b| b.region.clone()),
+        ),
+        (
+            "AVATAR_BUCKET_ACCESS_KEY_ID",
+            bucket.as_ref().map(|b| b.access_key_id.clone()),
+        ),
+        (
+            "AVATAR_BUCKET_SECRET_ACCESS_KEY",
+            bucket.as_ref().map(|b| b.secret_access_key.clone()),
+        ),
+    ]
+    .map(|(name, value)| (name, value.unwrap_or_default()));
     for (name, value) in &vars {
         if name.ends_with("_URL") && !value.is_empty() && *name != "DATABASE_URL" {
             guard::check_service_url(name, value)?;
@@ -85,6 +106,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         .env("PATH", std::env::var("PATH").unwrap_or_default())
         .env("HOME", std::env::var("HOME").unwrap_or_default())
         .envs(vars)
+        .envs(bucket_vars)
         .args(["--no-env-file", "serve.ts"]);
     println!(
         "starting TypeScript backend at {backend_url} ({})",
