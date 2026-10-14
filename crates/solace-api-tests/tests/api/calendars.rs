@@ -1,14 +1,14 @@
 //! `/api/calendars`: default calendars, create/update/delete rules, encrypted names, and calendar access for events.
 
 use serde_json::{Value, json};
-use solace_api_tests::client::ApiResponse;
 use solace_api_types::calendars::{
     Calendar, CalendarDeleteResult, CalendarList, CreateCalendarRequest, UpdateCalendarRequest,
 };
 use sqlx::PgPool;
 
 use crate::helpers::{
-    TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+    TestApp, TestUser, count, expect_field_error, expect_invalid, expect_plain_error,
+    expect_unauthorized, expect_unknown_field, hex, ok,
 };
 
 pub const NAMED_COLORS: [&str; 12] = [
@@ -23,26 +23,6 @@ const ONLY_OWNED_UPDATE: &str = "Only owned calendars can be updated here. Manag
 const ONLY_OWNED_DELETE: &str = "Only owned calendars can be deleted here. Manage subscribed or public calendars from subscriptions instead.";
 /// Fixed `created_at`/`updated_at` of inserted events, so later bumps are visible.
 pub const EVENT_STAMP: &str = "2026-10-01T08:00:00";
-
-/// A zod issue: the envelope message is the first issue's, and its path is a dotted string.
-pub fn expect_issue(response: &ApiResponse, message: &str, path: &str) -> Value {
-    let body = ok(response.expect_error(400, "Validation Error", message));
-    assert_eq!(body["details"]["issues"][0]["path"], json!(path), "{body}");
-    body
-}
-
-/// A service `ValidationError` carrying `details.field`.
-pub fn expect_field_error(response: &ApiResponse, message: &str, field: &str) {
-    let body = ok(response.expect_error(400, "Validation Error", message));
-    assert_eq!(body["details"], json!({"field": field}), "{body}");
-    assert!(body["requestId"].is_string(), "{body}");
-}
-
-/// A service `ValidationError` without a field: no `details` at all.
-pub fn expect_plain_error(response: &ApiResponse, message: &str) {
-    let body = ok(response.expect_error(400, "Validation Error", message));
-    assert!(body.get("details").is_none(), "{body}");
-}
 
 /// One row as `row_to_json`, with snake_case column names.
 pub async fn db_json(db: &PgPool, sql: &str, bind: &str) -> Option<Value> {
@@ -471,14 +451,14 @@ async fn invalid_colors_are_rejected_with_the_allowed_list() {
         let created = user
             .post("/api/calendars", json!({"name": "Test", "color": color}))
             .await;
-        expect_issue(&created, COLOR_MESSAGE, "color");
+        expect_invalid(&created, COLOR_MESSAGE, "color");
         let updated = user
             .put(
                 &format!("/api/calendars/{}", target.id),
                 json!({"color": color}),
             )
             .await;
-        expect_issue(&updated, COLOR_MESSAGE, "color");
+        expect_invalid(&updated, COLOR_MESSAGE, "color");
     }
     assert_eq!(calendar_count(&app.db, &user.id).await, 1);
     let row = calendar_row(&app.db, &target.id.0).await.expect("row");
@@ -577,7 +557,7 @@ async fn a_plaintext_or_encrypted_name_is_required() {
         json!({"encryptedName": "  ", "color": "blue"}),
     ] {
         let response = user.post("/api/calendars", body).await;
-        expect_issue(&response, "Calendar name is required.", "encryptedName");
+        expect_invalid(&response, "Calendar name is required.", "encryptedName");
     }
     assert_eq!(calendar_count(&app.db, &user.id).await, 0);
 }
@@ -589,7 +569,7 @@ async fn every_issue_is_reported_in_schema_order() {
     let response = user
         .post("/api/calendars", json!({"color": "nope", "userId": "x"}))
         .await;
-    let body = expect_issue(&response, COLOR_MESSAGE, "color");
+    let body = expect_invalid(&response, COLOR_MESSAGE, "color");
     assert_eq!(
         body["details"]["issues"],
         json!([
@@ -612,14 +592,14 @@ async fn plaintext_names_beside_ciphertext_are_rejected() {
             json!({"name": "Therapy", "encryptedName": "ciphertext", "color": "blue"}),
         )
         .await;
-    expect_issue(&created, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
+    expect_invalid(&created, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
     let updated = user
         .put(
             &format!("/api/calendars/{}", target.id),
             json!({"name": "Therapy", "encryptedName": "ciphertext"}),
         )
         .await;
-    expect_issue(&updated, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
+    expect_invalid(&updated, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
 
     assert_eq!(calendar_count(&app.db, &user.id).await, 1);
     let row = calendar_row(&app.db, &target.id.0).await.expect("row");
@@ -1082,7 +1062,7 @@ async fn blank_names_on_update_fail_in_the_service() {
             json!({"name": "x".repeat(101)}),
         )
         .await;
-    expect_issue(
+    expect_invalid(
         &response,
         "String must contain at most 100 character(s)",
         "name",
@@ -1564,12 +1544,12 @@ async fn the_delete_query_is_validated() {
     create_calendar(&mut user, "Spare", "blue").await;
     let path = format!("/api/calendars/{}", calendar.id);
 
-    expect_issue(
+    expect_invalid(
         &user.delete(&format!("{path}?action=nope")).await,
         "Invalid enum value. Expected 'delete_events' | 'move_events', received 'nope'",
         "action",
     );
-    expect_issue(
+    expect_invalid(
         &user.delete(&format!("{path}?action=")).await,
         "Invalid enum value. Expected 'delete_events' | 'move_events', received ''",
         "action",

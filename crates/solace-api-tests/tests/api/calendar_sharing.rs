@@ -9,9 +9,12 @@ use solace_api_types::calendars::{
 
 use crate::calendars::{
     CalendarRow, EVENT_STAMP, EventRow, calendar_row, create_calendar, create_calendar_with,
-    event_row, expect_issue, expect_plain_error, insert_calendar, insert_event,
+    event_row, insert_calendar, insert_event,
 };
-use crate::helpers::{TestApp, TestUser, expect_unauthorized, expect_unknown_field, hex, ok};
+use crate::helpers::{
+    TestApp, TestUser, expect_invalid, expect_plain_error, expect_unauthorized,
+    expect_unknown_field, hex, ok,
+};
 
 const NOT_FOUND: &str = "Calendar not found or access denied";
 const FEED_NOT_FOUND: &str = "Shared calendar not found";
@@ -651,17 +654,17 @@ async fn the_share_link_body_is_validated() {
     let calendar = create_calendar(&mut user, "Team", "blue").await;
     let path = share_link_path(&calendar.id.0);
 
-    expect_issue(
+    expect_invalid(
         &user.post(&path, json!({"regenerate": "yes"})).await,
         "Expected boolean, received string",
         "regenerate",
     );
-    expect_issue(
+    expect_invalid(
         &user.post(&path, json!({"regenerate": null})).await,
         "Expected boolean, received null",
         "regenerate",
     );
-    expect_issue(
+    expect_invalid(
         &user.post(&path, json!([])).await,
         "Expected object, received array",
         "root",

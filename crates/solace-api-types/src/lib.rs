@@ -5,8 +5,12 @@ pub mod auth;
 pub mod calendars;
 pub mod categories;
 pub mod common;
+pub mod e2ee;
 pub mod mail_settings;
+pub mod profiles;
+pub mod push_devices;
 pub mod recent_contacts;
 pub mod settings;
+pub mod subscriptions;
 
 pub use common::{ErrorResponse, SuccessMessage, Timestamp};

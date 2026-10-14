@@ -7,10 +7,11 @@ use sqlx::PgPool;
 
 use crate::calendars::{
     COLOR_MESSAGE, EventRow, PLAINTEXT_BESIDE_CIPHERTEXT, add_encryption_device, create_calendar,
-    db_json, event_row, expect_field_error, expect_issue, insert_event, wire_timestamps,
+    db_json, event_row, insert_event, wire_timestamps,
 };
 use crate::helpers::{
-    TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+    TestApp, TestUser, count, expect_field_error, expect_invalid, expect_unauthorized,
+    expect_unknown_field, hex, ok,
 };
 
 const NOT_FOUND: &str = "Category not found or access denied";
@@ -154,14 +155,14 @@ async fn invalid_colors_are_rejected_with_the_allowed_list() {
         let created = user
             .post("/api/categories", json!({"name": "Work", "color": color}))
             .await;
-        expect_issue(&created, COLOR_MESSAGE, "color");
+        expect_invalid(&created, COLOR_MESSAGE, "color");
         let updated = user
             .put(
                 &format!("/api/categories/{}", target.id),
                 json!({"color": color}),
             )
             .await;
-        expect_issue(&updated, COLOR_MESSAGE, "color");
+        expect_invalid(&updated, COLOR_MESSAGE, "color");
     }
     assert_eq!(category_count(&app.db, &user.id).await, 1);
     let row = category_row(&app.db, &target.id.0).await.expect("row");
@@ -220,7 +221,7 @@ async fn create_validation_reports_zod_messages() {
     let blank = user
         .post("/api/categories", json!({"name": "", "color": ""}))
         .await;
-    let body = expect_issue(&blank, COLOR_MESSAGE, "color");
+    let body = expect_invalid(&blank, COLOR_MESSAGE, "color");
     assert_eq!(
         body["details"]["issues"],
         json!([
@@ -448,14 +449,14 @@ async fn plaintext_names_beside_ciphertext_are_rejected() {
             json!({"name": "Health", "encryptedName": "ciphertext", "color": "#123456"}),
         )
         .await;
-    expect_issue(&created, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
+    expect_invalid(&created, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
     let updated = user
         .put(
             &format!("/api/categories/{}", target.id),
             json!({"name": "Health", "encryptedName": "ciphertext"}),
         )
         .await;
-    expect_issue(&updated, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
+    expect_invalid(&updated, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
     assert_eq!(category_count(&app.db, &user.id).await, 1);
     let row = category_row(&app.db, &target.id.0).await.expect("row");
     assert_eq!(

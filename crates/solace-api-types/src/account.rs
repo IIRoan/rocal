@@ -82,3 +82,17 @@ pub struct ClaimInviteRequest {
     pub token: String,
     pub chosen_email: String,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteAccountResponse {
+    pub success: bool,
+    pub message: String,
+    pub deleted_user_id: UserId,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EmailAvailabilityQuery {
+    pub email: String,
+}

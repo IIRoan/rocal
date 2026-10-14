@@ -236,6 +236,18 @@ async fn mint_provision_key(env: &TestEnv) -> anyhow::Result<String> {
         .as_str()
         .context("solace-provisioner account missing; is the test plan applied?")?
         .to_owned();
+    let create = json!(["x:ApiKey/set", {
+        "accountId": account_id,
+        "create": {"k": {"description": "solace-test-provision", "permissions": {"@type": "Inherit"}}}
+    }, "s"]);
+    let response = admin_jmap(env, json!([create.clone()])).await?;
+    if let Some(secret) = response["methodResponses"][0][1]["created"]["k"]["secret"].as_str() {
+        return Ok(secret.to_owned());
+    }
+    // Only at the five-key quota are old keys revoked, since running backends may still hold them.
+    if response["methodResponses"][0][1]["notCreated"]["k"]["type"] != json!("overQuota") {
+        bail!("API key not created: {response}");
+    }
     let existing = admin_jmap(
         env,
         json!([["x:ApiKey/query", {"accountId": account_id}, "q"]]),
@@ -244,13 +256,7 @@ async fn mint_provision_key(env: &TestEnv) -> anyhow::Result<String> {
     let existing = existing["methodResponses"][0][1]["ids"].clone();
     let response = admin_jmap(
         env,
-        json!([
-            ["x:ApiKey/set", {"accountId": account_id, "destroy": existing}, "d"],
-            ["x:ApiKey/set", {
-                "accountId": account_id,
-                "create": {"k": {"description": "solace-test-provision", "permissions": {"@type": "Inherit"}}}
-            }, "s"]
-        ]),
+        json!([["x:ApiKey/set", {"accountId": account_id, "destroy": existing}, "d"], create]),
     )
     .await?;
     response["methodResponses"][1][1]["created"]["k"]["secret"]
