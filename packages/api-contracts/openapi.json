@@ -167,6 +167,106 @@
         }
       }
     },
+    "/api/e2ee/bootstrap": {
+      "get": {
+        "tags": [
+          "E2EE"
+        ],
+        "summary": "The caller's devices, password envelope and calendars, for unlocking on a device.",
+        "operationId": "bootstrap",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/E2eeBootstrap"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/e2ee/device": {
+      "put": {
+        "tags": [
+          "E2EE"
+        ],
+        "summary": "Registers or refreshes this device's wrapping public key and the account keys wrapped to it.",
+        "operationId": "register_device",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncryptionDevice"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/e2ee/password": {
+      "put": {
+        "tags": [
+          "E2EE"
+        ],
+        "summary": "Stores or rotates the password-wrapped account keys used to unlock a new device.",
+        "operationId": "store_password_envelope",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordEnvelopeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/e2ee/reset-snapshot": {
+      "get": {
+        "tags": [
+          "E2EE"
+        ],
+        "summary": "Raw owned calendars, active categories and unsynced events, so a client can re-wrap them on password reset.",
+        "operationId": "reset_snapshot",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetSnapshot"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [

@@ -5,6 +5,7 @@ pub mod addresses;
 pub mod auth;
 pub mod config;
 pub mod db;
+pub mod e2ee;
 pub mod email;
 pub mod error;
 pub mod health;
@@ -46,6 +47,7 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(auth::routes())
         .merge(account::routes())
         .merge(invites::routes())
+        .merge(e2ee::routes())
 }
 
 /// Every route's OpenAPI entry, without a database.
