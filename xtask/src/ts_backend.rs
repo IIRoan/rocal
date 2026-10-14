@@ -11,8 +11,13 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let mut checkout = None;
     let mut database = "solace_test_seed".to_owned();
     let mut port = "4101".to_owned();
+    let mut production = false;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
+        if *arg == "--production" {
+            production = true;
+            continue;
+        }
         let value = iter
             .next()
             .with_context(|| format!("{arg} needs a value"))?;
@@ -30,15 +35,28 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let env = TestEnv::from_env()?;
     let database_url = env.database_url_for(&database)?;
     let provision_token = crate::test_env::provision_key(&env).await?;
-    let backend_url = format!("http://localhost:{port}");
+    // Production mode uses unresolvable .test URLs: they only name cookie domains, origins and the passkey RP.
+    let (node_env, backend_url, frontend_url) = if production {
+        (
+            "production",
+            "https://api.solace.test".to_owned(),
+            "https://solace.test",
+        )
+    } else {
+        (
+            "development",
+            format!("http://localhost:{port}"),
+            "http://localhost:4100",
+        )
+    };
     guard::check_service_url("BACKEND_URL", &backend_url)?;
 
     let vars = [
-        ("NODE_ENV", "development".to_owned()),
+        ("NODE_ENV", node_env.to_owned()),
         ("PORT", port.clone()),
         ("BACKEND_URL", backend_url.clone()),
-        ("FRONTEND_URL", "http://localhost:4100".to_owned()),
-        ("PASSKEY_ORIGIN", "http://localhost:4100".to_owned()),
+        ("FRONTEND_URL", frontend_url.to_owned()),
+        ("PASSKEY_ORIGIN", frontend_url.to_owned()),
         ("DATABASE_URL", database_url),
         ("BETTER_AUTH_SECRET", env.better_auth_secret.clone()),
         ("MAIL_BRIDGE_HMAC_KEY", env.mail_bridge_hmac_key.clone()),

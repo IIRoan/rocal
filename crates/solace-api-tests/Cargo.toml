@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 base64.workspace = true
 ciborium.workspace = true
+hmac.workspace = true
 p256.workspace = true
 percent-encoding.workspace = true
 rand.workspace = true

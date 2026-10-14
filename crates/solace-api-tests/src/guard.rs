@@ -27,13 +27,14 @@ pub enum GuardError {
     NotTestMailDomain(&'static str),
 }
 
-/// Loopback, the container host, Railway private networking (scoped to one environment) and `*-test` Railway domains.
+/// Loopback, the container host, RFC 2606 `.test` names, Railway private networking (scoped to one environment) and `*-test` Railway domains.
 fn is_test_host(host: &str) -> bool {
     let host = host.trim_end_matches('.').to_ascii_lowercase();
     matches!(
         host.as_str(),
         "localhost" | "127.0.0.1" | "[::1]" | "::1" | "host.containers.internal"
-    ) || host.ends_with(".railway.internal")
+    ) || host.ends_with(".test")
+        || host.ends_with(".railway.internal")
         || host.ends_with("-test.up.railway.app")
 }
 
@@ -113,6 +114,7 @@ mod tests {
             "http://localhost:58080/jmap",
             "http://solace-api.railway.internal:8080",
             "https://solace-api-rust-test.up.railway.app",
+            "https://api.solace.test",
         ] {
             assert_eq!(check_service_url("URL", ok), Ok(()), "{ok}");
         }

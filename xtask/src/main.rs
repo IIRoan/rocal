@@ -23,7 +23,7 @@ tasks:
                           deploy committed files under <path> to a test-* service in Railway's test environment
   jest-destinations [--complete]
                           check crates/solace-api-tests/jest/*.tsv against the Jest case list
-  ts-backend --checkout <dir> [--database <name>] [--port <port>]
+  ts-backend --checkout <dir> [--database <name>] [--port <port>] [--production]
                           run the current TypeScript backend against the test env";
 
 #[tokio::main(flavor = "current_thread")]

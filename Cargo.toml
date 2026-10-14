@@ -26,6 +26,7 @@ print_stderr = "warn"
 anyhow = "1"
 base64 = "0.22"
 ciborium = "0.2"
+hmac = "0.13"
 p256 = { version = "0.14", features = ["ecdsa"] }
 percent-encoding = "2"
 rand = "0.10"

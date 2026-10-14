@@ -1,7 +1,5 @@
 //! An HTTP user agent for one test user: its own cookie jar, origin and client IP.
 
-use std::collections::BTreeMap;
-
 use reqwest::header::{COOKIE, HeaderMap, HeaderName, HeaderValue, ORIGIN, SET_COOKIE};
 use reqwest::{Method, StatusCode};
 use serde::de::DeserializeOwned;
@@ -22,9 +20,17 @@ pub struct Agent {
     base_url: String,
     origin: String,
     kind: ClientKind,
-    /// Rate limits key on this; each agent gets its own TEST-NET-3 / documentation-range address.
+    /// Rate limits key on this; each agent gets its own documentation-range address.
     client_ip: String,
-    cookies: BTreeMap<String, String>,
+    cookies: Vec<StoredCookie>,
+}
+
+/// A browser keys cookies by name and domain; the Expo client's jar keys them by name only.
+#[derive(Debug, Clone)]
+struct StoredCookie {
+    name: String,
+    domain: Option<String>,
+    value: String,
 }
 
 #[derive(Debug)]
@@ -45,7 +51,7 @@ impl Agent {
             origin: origin.to_owned(),
             kind,
             client_ip: random_test_ip(),
-            cookies: BTreeMap::new(),
+            cookies: Vec::new(),
         })
     }
 
@@ -54,15 +60,28 @@ impl Agent {
     }
 
     pub fn cookie(&self, name: &str) -> Option<&str> {
-        self.cookies.get(name).map(String::as_str)
+        self.cookies
+            .iter()
+            .find(|cookie| cookie.name == name)
+            .map(|cookie| cookie.value.as_str())
     }
 
-    pub fn cookies(&self) -> &BTreeMap<String, String> {
-        &self.cookies
+    /// Every stored cookie as (name, value), in the order they are sent.
+    pub fn cookies(&self) -> Vec<(String, String)> {
+        self.cookies
+            .iter()
+            .map(|cookie| (cookie.name.clone(), cookie.value.clone()))
+            .collect()
     }
 
+    /// Stores a host-only cookie, replacing any cookie of that name.
     pub fn set_cookie(&mut self, name: &str, value: &str) {
-        self.cookies.insert(name.to_owned(), value.to_owned());
+        self.cookies.retain(|cookie| cookie.name != name);
+        self.cookies.push(StoredCookie {
+            name: name.to_owned(),
+            domain: None,
+            value: value.to_owned(),
+        });
     }
 
     pub fn clear_cookies(&mut self) {
@@ -109,7 +128,7 @@ impl Agent {
             let cookie = self
                 .cookies
                 .iter()
-                .map(|(name, value)| format!("{name}={value}"))
+                .map(|cookie| format!("{}={}", cookie.name, cookie.value))
                 .collect::<Vec<_>>()
                 .join("; ");
             request = request.header(COOKIE, cookie);
@@ -144,15 +163,33 @@ impl Agent {
         let Some((name, value)) = parts.next().and_then(|pair| pair.split_once('=')) else {
             return;
         };
-        let expired = parts.any(|attribute| {
+        let mut expired = value.trim().is_empty();
+        let mut domain = None;
+        for attribute in parts {
             let attribute = attribute.trim().to_ascii_lowercase();
-            attribute == "max-age=0" || attribute.starts_with("max-age=-")
-        });
+            if attribute == "max-age=0" || attribute.starts_with("max-age=-") {
+                expired = true;
+            } else if let Some(value) = attribute.strip_prefix("domain=") {
+                domain = Some(value.trim_start_matches('.').to_owned());
+            }
+        }
         let name = name.trim().to_owned();
-        if expired || value.is_empty() {
-            self.cookies.remove(&name);
-        } else {
-            self.cookies.insert(name, value.trim().to_owned());
+        let same = |cookie: &StoredCookie| match self.kind {
+            ClientKind::Browser => cookie.name == name && cookie.domain == domain,
+            ClientKind::Expo => cookie.name == name,
+        };
+        if let Some(index) = self.cookies.iter().position(same) {
+            if expired {
+                self.cookies.remove(index);
+            } else if let Some(cookie) = self.cookies.get_mut(index) {
+                cookie.value = value.trim().to_owned();
+            }
+        } else if !expired {
+            self.cookies.push(StoredCookie {
+                name,
+                domain,
+                value: value.trim().to_owned(),
+            });
         }
     }
 }
@@ -230,6 +267,27 @@ impl ApiResponse {
                 body: self.text(),
             })
         }
+    }
+}
+
+/// Lets a request's `Result` be checked and decoded without unwrapping it first.
+pub trait ResponseResult {
+    fn expect_status(self, expected: u16) -> Result<ApiResponse>;
+    fn dto<T: DeserializeOwned + serde::Serialize>(self) -> Result<T>;
+    fn value(self) -> Result<Value>;
+}
+
+impl ResponseResult for Result<ApiResponse> {
+    fn expect_status(self, expected: u16) -> Result<ApiResponse> {
+        self.and_then(|response| response.expect_status(expected))
+    }
+
+    fn dto<T: DeserializeOwned + serde::Serialize>(self) -> Result<T> {
+        self.and_then(|response| response.dto())
+    }
+
+    fn value(self) -> Result<Value> {
+        self.and_then(|response| response.value())
     }
 }
 
