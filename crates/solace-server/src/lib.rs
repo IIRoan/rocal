@@ -12,6 +12,7 @@ pub mod http;
 pub mod instant;
 pub mod integrations;
 pub mod invites;
+pub mod notifications;
 pub mod push_devices;
 pub mod recent_contacts;
 pub mod settings;

@@ -9,7 +9,6 @@ use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
-use serde_json::json;
 use sha2::{Digest, Sha256};
 use solace_api_types::push_devices::{
     PushDevice, PushDeviceList, PushDeviceRegistration, PushDeviceUnregistration, PushTestResult,
@@ -26,6 +25,7 @@ use crate::http::extract::ValidJson;
 use crate::http::rate_limit::{self, Limit};
 use crate::http::zod;
 use crate::instant;
+use crate::notifications::job_payload::event_reminder_payload;
 use crate::request_schema;
 use crate::state::AppState;
 
@@ -201,7 +201,10 @@ mod service {
                 "No iPhone is registered for push yet. Open Solace on your phone with notifications allowed.",
             ));
         }
-        let job = queries::enqueue_reminder(state, &user.id).await?;
+        let payload =
+            event_reminder_payload(TEST_NOTIFICATION_EVENT_ID, TEST_NOTIFICATION_MINUTES_BEFORE)
+                .map_err(AppError::internal)?;
+        let job = queries::enqueue_reminder(state, &user.id, payload).await?;
         tracing::info!(job_id = %job.id, "Test push queued");
         Ok(PushTestResult {
             success: true,
@@ -318,21 +321,17 @@ mod queries {
             .map(|settings| settings.push_notifications))
     }
 
-    /// `eventReminderPayload`: opaque references only; the device resolves the content.
     pub async fn enqueue_reminder(
         state: &AppState,
         user_id: &str,
+        payload: serde_json::Value,
     ) -> Result<notification_job::Model, sea_orm::DbErr> {
         notification_job::ActiveModel {
             user_id: Set(user_id.to_owned()),
             kind: Set("event_reminder".into()),
             channel: Set("push".into()),
             event_id: Set(Some(TEST_NOTIFICATION_EVENT_ID.into())),
-            payload: Set(json!({
-                "kind": "event_reminder",
-                "eventId": TEST_NOTIFICATION_EVENT_ID,
-                "minutesBefore": TEST_NOTIFICATION_MINUTES_BEFORE,
-            })),
+            payload: Set(payload),
             status: Set("pending".into()),
             available_at: Set(instant::now()),
             ..Default::default()
