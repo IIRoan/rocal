@@ -12,7 +12,7 @@ export interface paths {
             cookie?: never;
         };
         /** Whether the caller is signed in and still owes a passkey step-up; never cached. */
-        get: operations["auth_status"];
+        get: operations["getAuthStatus"];
         put?: never;
         post?: never;
         delete?: never;
@@ -29,7 +29,7 @@ export interface paths {
             cookie?: never;
         };
         /** Normalizes the chosen handle or address to the Solace domain and says whether it can be used. */
-        get: operations["email_availability"];
+        get: operations["getEmailAvailability"];
         put?: never;
         post?: never;
         delete?: never;
@@ -48,7 +48,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Links an invite to the chosen Solace address; sign-up must follow within 15 minutes. */
-        post: operations["claim_invite"];
+        post: operations["claimInvite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -63,7 +63,7 @@ export interface paths {
             cookie?: never;
         };
         /** Checks an invite token before sign-up; 30 requests a minute per client. */
-        get: operations["validate_invite"];
+        get: operations["validateInvite"];
         put?: never;
         post?: never;
         delete?: never;
@@ -80,7 +80,7 @@ export interface paths {
             cookie?: never;
         };
         /** The Solace domain new accounts choose their address in. */
-        get: operations["signup_config"];
+        get: operations["getSignupConfig"];
         put?: never;
         post?: never;
         delete?: never;
@@ -97,10 +97,95 @@ export interface paths {
             cookie?: never;
         };
         /** The session and user behind the cookie, or null; renews sessions older than a day. */
-        get: operations["get_session"];
+        get: operations["getSession"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's calendars, default first, then by name; the first call creates the defaults. */
+        get: operations["listCalendars"];
+        put?: never;
+        post: operations["createCalendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendars/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateCalendar"];
+        post?: never;
+        /** Deletes an owned calendar, deleting its events (default) or moving them to another calendar. */
+        delete: operations["deleteCalendar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendars/{id}/share-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCalendarShareLink"];
+        put?: never;
+        /** Enables the public ICS link, or rotates its token with `regenerate`. */
+        post: operations["createCalendarShareLink"];
+        delete: operations["disableCalendarShareLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's active categories by name, each with how many events use it. */
+        get: operations["listCategories"];
+        put?: never;
+        post: operations["createCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateCategory"];
+        post?: never;
+        /** Deletes the category and clears it from the caller's events. */
+        delete: operations["deleteCategory"];
         options?: never;
         head?: never;
         patch?: never;
@@ -114,7 +199,7 @@ export interface paths {
             cookie?: never;
         };
         /** Liveness probe for uptime checks and deploys. */
-        get: operations["health"];
+        get: operations["getHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -131,7 +216,7 @@ export interface paths {
             cookie?: never;
         };
         /** One unauthenticated request to Stalwart's JMAP discovery; 503 when the API cannot reach the mail server. */
-        get: operations["mail_jmap"];
+        get: operations["getMailJmapHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -148,10 +233,10 @@ export interface paths {
             cookie?: never;
         };
         /** The caller's invites, newest first. */
-        get: operations["list"];
+        get: operations["listInvites"];
         put?: never;
         /** Invites someone outside Solace and mails them the link; a failed mail is a warning, not an error. */
-        post: operations["create"];
+        post: operations["createInvite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -169,7 +254,7 @@ export interface paths {
         put?: never;
         post?: never;
         /** Revokes one of the caller's invites unless it was already accepted. */
-        delete: operations["revoke"];
+        delete: operations["revokeInvite"];
         options?: never;
         head?: never;
         patch?: never;
@@ -183,7 +268,7 @@ export interface paths {
             cookie?: never;
         };
         /** The session user, or `{ user: null }` without a session. */
-        get: operations["me"];
+        get: operations["getMe"];
         put?: never;
         post?: never;
         delete?: never;
@@ -200,7 +285,7 @@ export interface paths {
             cookie?: never;
         };
         /** Confirms request routing and shows the server time. */
-        get: operations["connection_test"];
+        get: operations["testConnection"];
         put?: never;
         post?: never;
         delete?: never;
@@ -217,7 +302,7 @@ export interface paths {
             cookie?: never;
         };
         /** The session user; 401 without a session. */
-        get: operations["user"];
+        get: operations["getUser"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1660,7 +1745,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    auth_status: {
+    getAuthStatus: {
         parameters: {
             query?: never;
             header?: never;
@@ -1679,7 +1764,7 @@ export interface operations {
             };
         };
     };
-    email_availability: {
+    getEmailAvailability: {
         parameters: {
             query: {
                 email: string;
@@ -1700,7 +1785,7 @@ export interface operations {
             };
         };
     };
-    claim_invite: {
+    claimInvite: {
         parameters: {
             query?: never;
             header?: never;
@@ -1723,7 +1808,7 @@ export interface operations {
             };
         };
     };
-    validate_invite: {
+    validateInvite: {
         parameters: {
             query: {
                 token: string;
@@ -1744,7 +1829,7 @@ export interface operations {
             };
         };
     };
-    signup_config: {
+    getSignupConfig: {
         parameters: {
             query?: never;
             header?: never;
@@ -1763,7 +1848,7 @@ export interface operations {
             };
         };
     };
-    get_session: {
+    getSession: {
         parameters: {
             query?: never;
             header?: never;
@@ -1782,7 +1867,253 @@ export interface operations {
             };
         };
     };
-    health: {
+    listCalendars: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarList"];
+                };
+            };
+        };
+    };
+    createCalendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCalendarRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Calendar"];
+                };
+            };
+        };
+    };
+    updateCalendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCalendarRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Calendar"];
+                };
+            };
+        };
+    };
+    deleteCalendar: {
+        parameters: {
+            query?: {
+                action?: string;
+                targetCalendarId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarDeleteResult"];
+                };
+            };
+        };
+    };
+    getCalendarShareLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarShareLink"];
+                };
+            };
+        };
+    };
+    createCalendarShareLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateShareLinkRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarShareLink"];
+                };
+            };
+        };
+    };
+    disableCalendarShareLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisableShareLinkResponse"];
+                };
+            };
+        };
+    };
+    listCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryList"];
+                };
+            };
+        };
+    };
+    createCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCategoryRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+        };
+    };
+    updateCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCategoryRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+        };
+    };
+    deleteCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessMessage"];
+                };
+            };
+        };
+    };
+    getHealth: {
         parameters: {
             query?: never;
             header?: never;
@@ -1801,7 +2132,7 @@ export interface operations {
             };
         };
     };
-    mail_jmap: {
+    getMailJmapHealth: {
         parameters: {
             query?: never;
             header?: never;
@@ -1828,7 +2159,7 @@ export interface operations {
             };
         };
     };
-    list: {
+    listInvites: {
         parameters: {
             query?: never;
             header?: never;
@@ -1847,7 +2178,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    createInvite: {
         parameters: {
             query?: never;
             header?: never;
@@ -1870,7 +2201,7 @@ export interface operations {
             };
         };
     };
-    revoke: {
+    revokeInvite: {
         parameters: {
             query?: never;
             header?: never;
@@ -1891,7 +2222,7 @@ export interface operations {
             };
         };
     };
-    me: {
+    getMe: {
         parameters: {
             query?: never;
             header?: never;
@@ -1910,7 +2241,7 @@ export interface operations {
             };
         };
     };
-    connection_test: {
+    testConnection: {
         parameters: {
             query?: never;
             header?: never;
@@ -1929,7 +2260,7 @@ export interface operations {
             };
         };
     };
-    user: {
+    getUser: {
         parameters: {
             query?: never;
             header?: never;

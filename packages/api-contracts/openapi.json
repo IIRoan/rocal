@@ -16,7 +16,7 @@
           "Account"
         ],
         "summary": "Whether the caller is signed in and still owes a passkey step-up; never cached.",
-        "operationId": "auth_status",
+        "operationId": "getAuthStatus",
         "responses": {
           "200": {
             "content": {
@@ -36,7 +36,7 @@
           "Account"
         ],
         "summary": "Normalizes the chosen handle or address to the Solace domain and says whether it can be used.",
-        "operationId": "email_availability",
+        "operationId": "getEmailAvailability",
         "parameters": [
           {
             "name": "email",
@@ -66,7 +66,7 @@
           "Account"
         ],
         "summary": "Links an invite to the chosen Solace address; sign-up must follow within 15 minutes.",
-        "operationId": "claim_invite",
+        "operationId": "claimInvite",
         "requestBody": {
           "content": {
             "application/json": {
@@ -96,7 +96,7 @@
           "Account"
         ],
         "summary": "Checks an invite token before sign-up; 30 requests a minute per client.",
-        "operationId": "validate_invite",
+        "operationId": "validateInvite",
         "parameters": [
           {
             "name": "token",
@@ -126,7 +126,7 @@
           "Account"
         ],
         "summary": "The Solace domain new accounts choose their address in.",
-        "operationId": "signup_config",
+        "operationId": "getSignupConfig",
         "responses": {
           "200": {
             "content": {
@@ -146,7 +146,7 @@
           "Auth"
         ],
         "summary": "The session and user behind the cookie, or null; renews sessions older than a day.",
-        "operationId": "get_session",
+        "operationId": "getSession",
         "responses": {
           "200": {
             "content": {
@@ -167,13 +167,351 @@
         }
       }
     },
+    "/api/calendars": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "summary": "The caller's calendars, default first, then by name; the first call creates the defaults.",
+        "operationId": "listCalendars",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "createCalendar",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCalendarRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Calendar"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}": {
+      "put": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "updateCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCalendarRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Calendar"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Calendars"
+        ],
+        "summary": "Deletes an owned calendar, deleting its events (default) or moving them to another calendar.",
+        "operationId": "deleteCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetCalendarId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarDeleteResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}/share-link": {
+      "get": {
+        "tags": [
+          "ICS Sharing"
+        ],
+        "operationId": "getCalendarShareLink",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarShareLink"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ICS Sharing"
+        ],
+        "summary": "Enables the public ICS link, or rotates its token with `regenerate`.",
+        "operationId": "createCalendarShareLink",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShareLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarShareLink"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ICS Sharing"
+        ],
+        "operationId": "disableCalendarShareLink",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisableShareLinkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "The caller's active categories by name, each with how many events use it.",
+        "operationId": "listCategories",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Categories"
+        ],
+        "operationId": "createCategory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/categories/{id}": {
+      "put": {
+        "tags": [
+          "Categories"
+        ],
+        "operationId": "updateCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "Deletes the category and clears it from the caller's events.",
+        "operationId": "deleteCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
           "Health"
         ],
         "summary": "Liveness probe for uptime checks and deploys.",
-        "operationId": "health",
+        "operationId": "getHealth",
         "responses": {
           "200": {
             "content": {
@@ -193,7 +531,7 @@
           "Health"
         ],
         "summary": "One unauthenticated request to Stalwart's JMAP discovery; 503 when the API cannot reach the mail server.",
-        "operationId": "mail_jmap",
+        "operationId": "getMailJmapHealth",
         "responses": {
           "200": {
             "content": {
@@ -222,7 +560,7 @@
           "Invites"
         ],
         "summary": "The caller's invites, newest first.",
-        "operationId": "list",
+        "operationId": "listInvites",
         "responses": {
           "200": {
             "content": {
@@ -240,7 +578,7 @@
           "Invites"
         ],
         "summary": "Invites someone outside Solace and mails them the link; a failed mail is a warning, not an error.",
-        "operationId": "create",
+        "operationId": "createInvite",
         "requestBody": {
           "content": {
             "application/json": {
@@ -270,7 +608,7 @@
           "Invites"
         ],
         "summary": "Revokes one of the caller's invites unless it was already accepted.",
-        "operationId": "revoke",
+        "operationId": "revokeInvite",
         "parameters": [
           {
             "name": "id",
@@ -300,7 +638,7 @@
           "Auth"
         ],
         "summary": "The session user, or `{ user: null }` without a session.",
-        "operationId": "me",
+        "operationId": "getMe",
         "responses": {
           "200": {
             "content": {
@@ -320,7 +658,7 @@
           "Health"
         ],
         "summary": "Confirms request routing and shows the server time.",
-        "operationId": "connection_test",
+        "operationId": "testConnection",
         "responses": {
           "200": {
             "content": {
@@ -340,7 +678,7 @@
           "Auth"
         ],
         "summary": "The session user; 401 without a session.",
-        "operationId": "user",
+        "operationId": "getUser",
         "responses": {
           "200": {
             "content": {

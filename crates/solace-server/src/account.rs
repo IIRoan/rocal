@@ -64,7 +64,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
 }
 
 /// The Solace domain new accounts choose their address in.
-#[utoipa::path(get, path = "/api/account/signup-config", tag = "Account", responses((status = 200, body = SignupConfig)))]
+#[utoipa::path(get, path = "/api/account/signup-config", operation_id = "getSignupConfig", tag = "Account", responses((status = 200, body = SignupConfig)))]
 #[tracing::instrument(skip_all)]
 pub async fn signup_config(State(state): State<AppState>) -> Json<SignupConfig> {
     Json(SignupConfig {
@@ -73,7 +73,7 @@ pub async fn signup_config(State(state): State<AppState>) -> Json<SignupConfig> 
 }
 
 /// Normalizes the chosen handle or address to the Solace domain and says whether it can be used.
-#[utoipa::path(get, path = "/api/account/email-availability", tag = "Account", params(("email" = String, Query)), responses((status = 200, body = EmailAvailability)))]
+#[utoipa::path(get, path = "/api/account/email-availability", operation_id = "getEmailAvailability", tag = "Account", params(("email" = String, Query)), responses((status = 200, body = EmailAvailability)))]
 #[tracing::instrument(skip_all)]
 pub async fn email_availability(
     State(state): State<AppState>,
@@ -128,7 +128,7 @@ async fn availability(state: &AppState, email: &str) -> Result<EmailAvailability
 }
 
 /// Whether the caller is signed in and still owes a passkey step-up; never cached.
-#[utoipa::path(get, path = "/api/account/auth-status", tag = "Account", responses((status = 200, body = AuthStatus)))]
+#[utoipa::path(get, path = "/api/account/auth-status", operation_id = "getAuthStatus", tag = "Account", responses((status = 200, body = AuthStatus)))]
 #[tracing::instrument(skip_all)]
 pub async fn auth_status(
     State(state): State<AppState>,
@@ -167,7 +167,7 @@ async fn status(
 }
 
 /// Checks an invite token before sign-up; 30 requests a minute per client.
-#[utoipa::path(get, path = "/api/account/invite/validate", tag = "Account", params(("token" = String, Query)), responses((status = 200, body = InviteValidation)))]
+#[utoipa::path(get, path = "/api/account/invite/validate", operation_id = "validateInvite", tag = "Account", params(("token" = String, Query)), responses((status = 200, body = InviteValidation)))]
 #[tracing::instrument(skip_all)]
 pub async fn validate_invite(
     State(state): State<AppState>,
@@ -189,7 +189,7 @@ pub async fn validate_invite(
 }
 
 /// Links an invite to the chosen Solace address; sign-up must follow within 15 minutes.
-#[utoipa::path(post, path = "/api/account/invite/claim", tag = "Account", request_body = ClaimInviteRequest, responses((status = 200, body = InviteClaimResult)))]
+#[utoipa::path(post, path = "/api/account/invite/claim", operation_id = "claimInvite", tag = "Account", request_body = ClaimInviteRequest, responses((status = 200, body = InviteClaimResult)))]
 #[tracing::instrument(skip_all)]
 pub async fn claim_invite(
     State(state): State<AppState>,

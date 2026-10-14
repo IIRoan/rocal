@@ -20,7 +20,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
 }
 
 /// Liveness probe for uptime checks and deploys.
-#[utoipa::path(get, path = "/api/health", tag = "Health", responses((status = 200, body = HealthStatus)))]
+#[utoipa::path(get, path = "/api/health", operation_id = "getHealth", tag = "Health", responses((status = 200, body = HealthStatus)))]
 #[tracing::instrument(skip_all)]
 pub async fn health() -> Json<HealthStatus> {
     Json(HealthStatus {
@@ -32,6 +32,7 @@ pub async fn health() -> Json<HealthStatus> {
 #[utoipa::path(
     get,
     path = "/api/health/mail-jmap",
+    operation_id = "getMailJmapHealth",
     tag = "Health",
     responses((status = 200, body = HealthStatus), (status = 503, body = MailHealthFailure))
 )]
@@ -60,7 +61,7 @@ pub async fn mail_jmap(State(state): State<AppState>) -> Response {
 }
 
 /// Confirms request routing and shows the server time.
-#[utoipa::path(get, path = "/api/test", tag = "Health", responses((status = 200, body = ConnectionTest)))]
+#[utoipa::path(get, path = "/api/test", operation_id = "testConnection", tag = "Health", responses((status = 200, body = ConnectionTest)))]
 #[tracing::instrument(skip_all)]
 pub async fn connection_test() -> Json<ConnectionTest> {
     Json(ConnectionTest {

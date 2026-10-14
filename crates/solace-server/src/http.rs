@@ -7,6 +7,7 @@ pub mod origins;
 pub mod rate_limit;
 pub mod request_context;
 pub mod response_cookies;
+pub mod schemas;
 pub mod zod;
 
 use std::time::Duration;

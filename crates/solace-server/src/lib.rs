@@ -3,10 +3,15 @@
 pub mod account;
 pub mod addresses;
 pub mod auth;
+pub mod calendar_sharing;
+pub mod calendars;
+pub mod categories;
 pub mod config;
 pub mod db;
 pub mod email;
+pub mod entity_metadata;
 pub mod error;
+pub mod events;
 pub mod health;
 pub mod http;
 pub mod instant;
@@ -46,6 +51,9 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(auth::routes())
         .merge(account::routes())
         .merge(invites::routes())
+        .merge(calendars::routes())
+        .merge(categories::routes())
+        .merge(calendar_sharing::routes())
 }
 
 /// Every route's OpenAPI entry, without a database.

@@ -12,7 +12,30 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
     };
     let root = crate::repo_root();
     let package = root.join("packages/api-contracts");
-    let json = solace_server::openapi().to_pretty_json()?;
+    let document = solace_server::openapi();
+    let mut seen = std::collections::BTreeSet::new();
+    for (path, item) in &document.paths.paths {
+        let operations = [
+            &item.get,
+            &item.put,
+            &item.post,
+            &item.delete,
+            &item.options,
+            &item.head,
+            &item.patch,
+            &item.trace,
+        ];
+        for operation in operations.into_iter().flatten() {
+            let id = operation.operation_id.clone().unwrap_or_default();
+            // Duplicate ids become duplicate keys in the generated TypeScript `operations`.
+            if !seen.insert(id.clone()) {
+                bail!(
+                    "operation id `{id}` of {path} is not unique; give the route an explicit `operation_id`"
+                );
+            }
+        }
+    }
+    let json = document.to_pretty_json()?;
     std::fs::write(package.join("openapi.json"), format!("{json}\n"))?;
     // `--no-env-file`: nothing here may pick up a checkout's `.env` files.
     let status = Command::new("bun")

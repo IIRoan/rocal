@@ -12,20 +12,20 @@ pub fn cuid() -> String {
     cuid::cuid1()
 }
 
-/// Now, for required and nullable timestamp columns alike.
+/// One instant for required and nullable timestamp columns alike, so a new row's `created_at` equals its `updated_at` as with Prisma.
 trait Now {
-    fn now() -> Self;
+    fn at(now: time::PrimitiveDateTime) -> Self;
 }
 
 impl Now for time::PrimitiveDateTime {
-    fn now() -> Self {
-        instant::now()
+    fn at(now: time::PrimitiveDateTime) -> Self {
+        now
     }
 }
 
 impl Now for Option<time::PrimitiveDateTime> {
-    fn now() -> Self {
-        Some(instant::now())
+    fn at(now: time::PrimitiveDateTime) -> Self {
+        Some(now)
     }
 }
 
@@ -35,24 +35,26 @@ macro_rules! behavior {
         #[async_trait]
         impl ActiveModelBehavior for entities::$entity::ActiveModel {
             async fn before_save<C: ConnectionTrait>(mut self, _db: &C, insert: bool) -> Result<Self, DbErr> {
-                $(behavior!(@$column self, insert);)+
+                #[allow(unused_variables)]
+                let now = instant::now();
+                $(behavior!(@$column self, insert, now);)+
                 Ok(self)
             }
         }
     )+};
-    (@id $model:ident, $insert:ident) => {
+    (@id $model:ident, $insert:ident, $now:ident) => {
         if $insert && $model.id.is_not_set() {
             $model.id = Set(cuid());
         }
     };
-    (@created_at $model:ident, $insert:ident) => {
+    (@created_at $model:ident, $insert:ident, $now:ident) => {
         if $insert && $model.created_at.is_not_set() {
-            $model.created_at = Set(Now::now());
+            $model.created_at = Set(Now::at($now));
         }
     };
-    (@updated_at $model:ident, $insert:ident) => {
+    (@updated_at $model:ident, $insert:ident, $now:ident) => {
         if !$model.updated_at.is_set() {
-            $model.updated_at = Set(Now::now());
+            $model.updated_at = Set(Now::at($now));
         }
     };
 }

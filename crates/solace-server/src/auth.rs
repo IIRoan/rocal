@@ -101,7 +101,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
 }
 
 /// The session and user behind the cookie, or null; renews sessions older than a day.
-#[utoipa::path(get, path = "/api/auth/get-session", tag = "Auth", responses((status = 200, body = Option<SessionWithUser>)))]
+#[utoipa::path(get, path = "/api/auth/get-session", operation_id = "getSession", tag = "Auth", responses((status = 200, body = Option<SessionWithUser>)))]
 #[tracing::instrument(skip_all)]
 pub async fn get_session(MaybeSession(active): MaybeSession) -> Result<Response, AppError> {
     let body = active?.as_ref().map(session::session_dto);
@@ -109,7 +109,7 @@ pub async fn get_session(MaybeSession(active): MaybeSession) -> Result<Response,
 }
 
 /// The session user, or `{ user: null }` without a session.
-#[utoipa::path(get, path = "/api/me", tag = "Auth", responses((status = 200, body = MeResponse)))]
+#[utoipa::path(get, path = "/api/me", operation_id = "getMe", tag = "Auth", responses((status = 200, body = MeResponse)))]
 #[tracing::instrument(skip_all)]
 pub async fn me(MaybeSession(active): MaybeSession) -> Json<MeResponse> {
     Json(MeResponse {
@@ -124,6 +124,7 @@ pub async fn me(MaybeSession(active): MaybeSession) -> Json<MeResponse> {
 #[utoipa::path(
     get,
     path = "/api/user",
+    operation_id = "getUser",
     tag = "Auth",
     responses((status = 200, body = AuthUser), (status = 401, body = solace_api_types::ErrorResponse))
 )]

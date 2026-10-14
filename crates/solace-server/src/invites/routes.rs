@@ -32,7 +32,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
 }
 
 /// Invites someone outside Solace and mails them the link; a failed mail is a warning, not an error.
-#[utoipa::path(post, path = "/api/invites", tag = "Invites", request_body = CreateInviteRequest, responses((status = 200, body = Invite)))]
+#[utoipa::path(post, path = "/api/invites", operation_id = "createInvite", tag = "Invites", request_body = CreateInviteRequest, responses((status = 200, body = Invite)))]
 #[tracing::instrument(skip_all)]
 pub async fn create(
     State(state): State<AppState>,
@@ -44,7 +44,7 @@ pub async fn create(
 }
 
 /// The caller's invites, newest first.
-#[utoipa::path(get, path = "/api/invites", tag = "Invites", responses((status = 200, body = InviteList)))]
+#[utoipa::path(get, path = "/api/invites", operation_id = "listInvites", tag = "Invites", responses((status = 200, body = InviteList)))]
 #[tracing::instrument(skip_all)]
 pub async fn list(State(state): State<AppState>, auth: Auth) -> Result<Json<InviteList>, AppError> {
     let user = auth.require()?;
@@ -52,7 +52,7 @@ pub async fn list(State(state): State<AppState>, auth: Auth) -> Result<Json<Invi
 }
 
 /// Revokes one of the caller's invites unless it was already accepted.
-#[utoipa::path(delete, path = "/api/invites/{id}", tag = "Invites", params(("id" = String, Path)), responses((status = 200, body = SuccessFlag)))]
+#[utoipa::path(delete, path = "/api/invites/{id}", operation_id = "revokeInvite", tag = "Invites", params(("id" = String, Path)), responses((status = 200, body = SuccessFlag)))]
 #[tracing::instrument(skip_all)]
 pub async fn revoke(
     State(state): State<AppState>,
