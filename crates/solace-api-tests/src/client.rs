@@ -171,21 +171,17 @@ impl Agent {
     }
 
     fn store_cookie(&mut self, set_cookie: &str) {
-        let mut parts = set_cookie.split(';');
-        let Some((name, value)) = parts.next().and_then(|pair| pair.split_once('=')) else {
+        let Ok(parsed) = cookie::Cookie::parse(set_cookie) else {
             return;
         };
-        let mut expired = value.trim().is_empty();
-        let mut domain = None;
-        for attribute in parts {
-            let attribute = attribute.trim().to_ascii_lowercase();
-            if attribute == "max-age=0" || attribute.starts_with("max-age=-") {
-                expired = true;
-            } else if let Some(value) = attribute.strip_prefix("domain=") {
-                domain = Some(value.trim_start_matches('.').to_owned());
-            }
-        }
-        let name = name.trim().to_owned();
+        let expired = parsed.value().is_empty()
+            || parsed
+                .max_age()
+                .is_some_and(|age| age <= cookie::time::Duration::ZERO);
+        let name = parsed.name().to_owned();
+        let domain = parsed
+            .domain()
+            .map(|domain| domain.trim_start_matches('.').to_ascii_lowercase());
         let same = |cookie: &StoredCookie| match self.kind {
             ClientKind::Browser => cookie.name == name && cookie.domain == domain,
             ClientKind::Expo => cookie.name == name,
@@ -194,13 +190,13 @@ impl Agent {
             if expired {
                 self.cookies.remove(index);
             } else if let Some(cookie) = self.cookies.get_mut(index) {
-                cookie.value = value.trim().to_owned();
+                cookie.value = parsed.value().to_owned();
             }
         } else if !expired {
             self.cookies.push(StoredCookie {
                 name,
                 domain,
-                value: value.trim().to_owned(),
+                value: parsed.value().to_owned(),
             });
         }
     }
