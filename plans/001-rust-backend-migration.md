@@ -232,6 +232,35 @@ Each sub-step is done when its suite cases pass against Rust and the memory budg
   - session validation, daily renewal, and Set-Cookie forwarding, with sessions from the current backend accepted;
   - memory budgets locked;
   - both AGENTS files updated with the Rust conventions above and the privacy-gap exception.
+
+  **4a result (2026-10-14, done):**
+
+  - `crates/solace-server` covers:
+    - typed config from the TypeScript backend's variable names, failing fast on a weak `BETTER_AUTH_SECRET` in production;
+    - telemetry, whose redaction keys are read from `redaction-policy.js` at build time and whose Errex reports pass the `scrubErrorEvent` rules;
+    - the `lib/errors.ts` envelope;
+    - security headers, CORS and the runtime origin policy;
+    - a validator that reproduces Zod 3.25's messages, issue paths and order (and renders Zod 4's for Better Auth's endpoints);
+    - Vercel's limits as today's contract (4.5 MB bodies, 300 s per request);
+    - graceful shutdown;
+    - Better Auth session validation with daily renewal, step-up cookie renewal and Set-Cookie forwarding;
+    - the guard, the health routes and Better Auth's error page.
+  - Elysia validated requests before the auth guard answered, so the guard is an extractor that handlers `require()` after validation.
+  - `cargo xtask entities` generates `db/entities` from the 53 migrations. Ids and timestamps are defaulted in `db/behavior.rs`.
+  - `cargo xtask openapi` emits every DTO as a component (routes join as they land) into `packages/api-contracts` (openapi-typescript 7.13.0). Response fields that are always written are required and nullable.
+  - `calendar-client` is typed with the generated components, and web, native-core and both apps changed in the same merge. That switch found:
+    - missing DTOs for settings updates and invite validate/claim;
+    - optional fields the backend omits rather than nulls;
+    - client types that mistyped revived dates or claimed routes that don't exist.
+    - Still open: search hits carry trimmed calendar/category labels while `EventSearchResult` still claims full rows. Web also offers a "3 Days" default view that the backend's strict settings schema rejects, a current bug.
+  - The suite starts the Rust server in-process on a fresh clone of the template database unless `API_BASE_URL` is set.
+  - 4a's suite cases are those that need no account: they pass on Rust in both modes (`crates/solace-api-tests/rust-passing.txt`, 10 cases). Session cases move to 4b, because the suite creates accounts through sign-up.
+  - `cargo xtask check` runs everything CI needs and fails if a listed case regresses.
+  - **Memory budgets locked** at the values in the Memory table above, unchanged:
+    - On the skeleton, jemalloc measured 15.1 MiB idle and 18.1 MiB at steady peak, against mimalloc's 22.9 and 26.1 (glibc: 13.2 and 15.6), so jemalloc is the default allocator.
+    - The sign-in burst budget is measured once sign-in exists (4b).
+  - Both AGENTS files document the Rust conventions and the known-gap exception.
+  - For step 5: the TypeScript backend trusts `x-real-ip`/`x-forwarded-for` because Vercel's edge overwrites them, and Rust reads the same headers. Before Railway serves real traffic, verify which of them Railway's proxy controls.
 - **4b. Auth flows:**
   - sign-up with the invite gate, sign-in, sign-out, and session list and revoke;
   - password change and reset;
