@@ -16,8 +16,8 @@ import {
   formatPushDeviceLastSeen,
   getErrorMessage,
   getPushDevicesListStatus,
-  type PushDeviceSummary,
 } from "@workspace/calendar-core";
+import type { ApiResponse } from "@workspace/calendar-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { usePushDevices } from "@/hooks/use-push-devices";
 import { SettingToggleRow } from "./setting-toggle-row";
@@ -94,7 +94,7 @@ type NotificationSettingsViewProps = {
   goBack: () => void;
   isSendingTest: boolean;
   onSendTest: () => void;
-  devices: PushDeviceSummary[];
+  devices: ApiResponse<"PushDevice">[];
   devicesLoading: boolean;
   devicesError: boolean;
 };

@@ -20,7 +20,6 @@ import {
   CreateCategoryRequest,
   UpdateCategoryRequest,
   ApiError,
-  EventNotification as ApiEventNotification,
 } from "../lib/types/calendar";
 import { EventNotification } from "@workspace/ui/components/calendar";
 import {
@@ -557,7 +556,7 @@ export function useCalendarData(
   const loadNotifications = useCallback(async (eventId: string) => {
     try {
       const response = await calendarApiService.getEventNotifications(eventId);
-      return response.data.notifications.flatMap((n: ApiEventNotification) =>
+      return response.data.notifications.flatMap((n) =>
         n.notificationType === "email"
           ? [
               {

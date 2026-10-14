@@ -150,7 +150,7 @@ export interface CalendarEvent {
   stalwartCalendarId?: string | null;
   stalwartEventId?: string | null;
   stalwartUid?: string | null;
-  stalwartSyncedAt?: Date | null;
+  stalwartSyncedAt?: string | null;
   participants?: EventParticipant[];
 }
 
@@ -323,14 +323,6 @@ export interface EventsResponse {
   calendars: Calendar[];
 }
 
-export interface CalendarsResponse {
-  calendars: Calendar[];
-}
-
-export interface CategoriesResponse {
-  categories: EventCategory[];
-}
-
 /** Client shape before encryption; the wire schema in backend contracts accepts ciphertext-only bodies, so title/name are optional there. */
 export interface CreateEventRequest extends EventContentEncryptionShadowRequest {
   title: string;
@@ -426,18 +418,6 @@ export interface UpdateSettingsRequest extends Partial<
   userId?: string;
 }
 
-export interface RecentContactsRecord {
-  encryptedContent: string;
-  encryptionKeyVersion: number;
-  updatedAt: string;
-}
-
-export interface MailSettingsRecord {
-  encryptedContent: string;
-  encryptionKeyVersion: number;
-  updatedAt: string;
-}
-
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
 export type RecurrenceRule = SharedRecurrenceRule;
@@ -449,20 +429,6 @@ export interface RecurrencePreview {
   }>;
   description: string;
   totalInstances: number;
-}
-
-export interface RecurrenceValidation {
-  valid: boolean;
-  errors: string[];
-  description?: string;
-  rule?: RecurrenceRule;
-}
-
-export interface RecurrencePatterns {
-  [key: string]: {
-    rule: RecurrenceRule;
-    description: string;
-  };
 }
 
 export type RecurrenceEditScope = "this_only" | "this_and_future" | "all";
@@ -516,19 +482,6 @@ export interface CreateNotificationRequest {
 
 export interface NotificationTestRequest {
   eventId: string;
-}
-
-export interface NotificationStatus {
-  status: string;
-  message: string;
-  features: {
-    email: boolean;
-    browser: boolean;
-    reminders: boolean;
-    push: boolean;
-  };
-  checkInterval: string;
-  queueProcessInterval: string;
 }
 
 export type CalendarSubscription = CalendarSubscriptionSummary;

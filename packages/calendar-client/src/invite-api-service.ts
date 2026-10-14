@@ -1,50 +1,27 @@
-import { HttpClient } from "./http-client";
+import type { Schema } from "@workspace/api-contracts";
+import type { ApiResponse, HttpClient } from "./http-client";
 
-import type { WithOperationWarnings } from "@workspace/calendar-core";
+export type InviteRecord = ApiResponse<"Invite">;
 
-export type InviteStatus = "pending" | "claimed" | "accepted" | "revoked";
+export type ValidateInviteTokenResponse = Schema<"InviteValidation">;
 
-export type InviteRecord = {
-  id: string;
-  token: string;
-  email: string;
-  status: InviteStatus;
-  expiresAt: string;
-  createdAt: string;
-  invitedById: string;
-};
-
-export type ListInvitesResponse = {
-  invites: InviteRecord[];
-};
-
-export type CreateInviteResponse = WithOperationWarnings<InviteRecord>;
-
-export type RevokeInviteResponse = {
-  success: boolean;
-};
-
-export type ValidateInviteTokenResponse =
-  | { valid: true; inviteId: string; email: string; inviterName: string }
-  | { valid: false; reason: string };
-
-export type ClaimInviteResponse =
-  | { success: true; inviteId: string }
-  | { success: false; reason: string };
+export type ClaimInviteResponse = Schema<"InviteClaimResult">;
 
 export class InviteApiService {
   constructor(private readonly client: HttpClient) {}
 
-  async listInvites(): Promise<ListInvitesResponse> {
-    return this.client.get<ListInvitesResponse>("/api/invites");
+  async listInvites(): Promise<ApiResponse<"InviteList">> {
+    return this.client.get<Schema<"InviteList">>("/api/invites");
   }
 
-  async createInvite(email: string): Promise<CreateInviteResponse> {
-    return this.client.post<CreateInviteResponse>("/api/invites", { email });
+  async createInvite(email: string): Promise<InviteRecord> {
+    return this.client.post<Schema<"Invite">>("/api/invites", {
+      email,
+    } satisfies Schema<"CreateInviteRequest">);
   }
 
-  async revokeInvite(id: string): Promise<RevokeInviteResponse> {
-    return this.client.delete<RevokeInviteResponse>(
+  async revokeInvite(id: string): Promise<Schema<"SuccessFlag">> {
+    return this.client.delete<Schema<"SuccessFlag">>(
       `/api/invites/${encodeURIComponent(id)}`,
     );
   }
@@ -52,7 +29,7 @@ export class InviteApiService {
   async validateInviteToken(
     token: string,
   ): Promise<ValidateInviteTokenResponse> {
-    return this.client.get<ValidateInviteTokenResponse>(
+    return this.client.get<Schema<"InviteValidation">>(
       `/api/account/invite/validate?token=${encodeURIComponent(token)}`,
     );
   }
@@ -61,9 +38,9 @@ export class InviteApiService {
     token: string,
     chosenEmail: string,
   ): Promise<ClaimInviteResponse> {
-    return this.client.post<ClaimInviteResponse>("/api/account/invite/claim", {
-      token,
-      chosenEmail,
-    });
+    return this.client.post<Schema<"InviteClaimResult">>(
+      "/api/account/invite/claim",
+      { token, chosenEmail } satisfies Schema<"ClaimInviteRequest">,
+    );
   }
 }
