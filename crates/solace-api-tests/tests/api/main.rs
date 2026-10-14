@@ -7,4 +7,5 @@
 mod helpers;
 
 mod calendars;
+mod categories;
 mod settings;

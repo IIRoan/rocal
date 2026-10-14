@@ -68,3 +68,25 @@ apps/backend/__tests__/services/calendar.service.test.ts	CalendarService › ref
 apps/backend/__tests__/services/calendar.service.test.ts	CalendarService › refuses to move events into the invitations staging calendar	suite:calendars::moving_events_needs_an_own_target_other_than_the_staging_calendar
 apps/backend/__tests__/services/calendar.service.test.ts	CalendarService › rejects plaintext names once the account has an E2EE device	suite:calendars::accounts_with_an_e2ee_device_must_encrypt_calendar_names
 apps/backend/__tests__/services/calendar.service.test.ts	CalendarService › rejects plaintext names sent alongside ciphertext	suite:calendars::plaintext_names_beside_ciphertext_are_rejected
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes – encrypted names › blanks the stored name when ciphertext is uploaded on update	suite:categories::uploading_a_ciphertext_name_blanks_the_stored_name
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes – encrypted names › rejects a plaintext name sent alongside an encrypted name	suite:categories::plaintext_names_beside_ciphertext_are_rejected
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › creates a category with trimmed names	suite:categories::create_trims_plaintext_names
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › deletes a category after detaching orphaned events	suite:categories::delete_detaches_events_and_removes_the_category
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › lists active categories and exposes usageCount	suite:categories::the_list_holds_own_active_categories_by_name_with_usage_counts
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects delete requests for categories the user does not own	suite:categories::other_users_categories_behave_as_not_found
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects duplicate category names on create	suite:categories::duplicate_plaintext_names_are_rejected
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects invalid category colors	suite:categories::invalid_colors_are_rejected_with_the_allowed_list
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects invalid colors and duplicate names during update	suite:categories::duplicate_plaintext_names_are_rejected
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects missing or inaccessible categories during update	suite:categories::other_users_categories_behave_as_not_found
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects missing required category fields	suite:categories::create_validation_reports_zod_messages
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects unexpected category fields	suite:categories::create_validation_reports_zod_messages
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects unsupported encryptionState values	suite:categories::create_validation_reports_zod_messages
+apps/backend/__tests__/routes/categories.test.ts	categoriesRoutes › updates a category after checking ownership and duplicate names	suite:categories::updates_change_name_and_color
+apps/backend/__tests__/services/category.service.test.ts	CategoryService › creates encrypted categories without persisting the plaintext name	suite:categories::encrypted_names_are_stored_byte_for_byte_beside_a_blank_name
+apps/backend/__tests__/services/category.service.test.ts	CategoryService › detaches linked events before deleting a category	suite:categories::delete_detaches_events_and_removes_the_category
+apps/backend/__tests__/services/category.service.test.ts	CategoryService › normalizes plaintext names for accounts without E2EE	suite:categories::create_trims_plaintext_names
+apps/backend/__tests__/services/category.service.test.ts	CategoryService › rejects duplicate names during update	suite:categories::duplicate_plaintext_names_are_rejected
+apps/backend/__tests__/services/category.service.test.ts	CategoryService › rejects invalid colors during update	suite:categories::invalid_colors_are_rejected_with_the_allowed_list
+apps/backend/__tests__/services/category.service.test.ts	CategoryService › rejects plaintext names sent alongside ciphertext	suite:categories::plaintext_names_beside_ciphertext_are_rejected
+apps/backend/__tests__/services/category.service.test.ts	CategoryService › rejects invalid category names: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx	suite:categories::names_are_at_most_100_utf16_units_after_trimming
+apps/backend/__tests__/services/category.service.test.ts	CategoryService › rejects invalid category names:   	suite:categories::blank_names_on_update_fail_in_the_service
