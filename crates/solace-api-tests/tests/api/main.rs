@@ -5,4 +5,9 @@
 // Shared by every domain module; no single module uses every helper.
 #[allow(dead_code)]
 mod helpers;
+// Shared by the event modules; none uses every fixture.
+#[allow(dead_code)]
+mod event_fixtures;
+mod events;
+mod events_list;
 mod settings;
