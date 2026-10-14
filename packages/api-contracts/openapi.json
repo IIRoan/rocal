@@ -173,7 +173,7 @@
           "E2EE"
         ],
         "summary": "The caller's devices, password envelope and calendars, for unlocking on a device.",
-        "operationId": "bootstrap",
+        "operationId": "getE2eeBootstrap",
         "responses": {
           "200": {
             "content": {
@@ -193,7 +193,7 @@
           "E2EE"
         ],
         "summary": "Registers or refreshes this device's wrapping public key and the account keys wrapped to it.",
-        "operationId": "register_device",
+        "operationId": "putE2eeDevice",
         "requestBody": {
           "content": {
             "application/json": {
@@ -223,7 +223,7 @@
           "E2EE"
         ],
         "summary": "Stores or rotates the password-wrapped account keys used to unlock a new device.",
-        "operationId": "store_password_envelope",
+        "operationId": "putE2eePassword",
         "requestBody": {
           "content": {
             "application/json": {
@@ -253,7 +253,7 @@
           "E2EE"
         ],
         "summary": "Raw owned calendars, active categories and unsynced events, so a client can re-wrap them on password reset.",
-        "operationId": "reset_snapshot",
+        "operationId": "getE2eeResetSnapshot",
         "responses": {
           "200": {
             "content": {

@@ -47,7 +47,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
 }
 
 /// The caller's devices, password envelope and calendars, for unlocking on a device.
-#[utoipa::path(get, path = "/api/e2ee/bootstrap", tag = "E2EE", responses((status = 200, body = E2eeBootstrap)))]
+#[utoipa::path(get, path = "/api/e2ee/bootstrap", operation_id = "getE2eeBootstrap", tag = "E2EE", responses((status = 200, body = E2eeBootstrap)))]
 #[tracing::instrument(skip_all)]
 pub async fn bootstrap(
     State(state): State<AppState>,
@@ -58,7 +58,7 @@ pub async fn bootstrap(
 }
 
 /// Raw owned calendars, active categories and unsynced events, so a client can re-wrap them on password reset.
-#[utoipa::path(get, path = "/api/e2ee/reset-snapshot", tag = "E2EE", responses((status = 200, body = ResetSnapshot)))]
+#[utoipa::path(get, path = "/api/e2ee/reset-snapshot", operation_id = "getE2eeResetSnapshot", tag = "E2EE", responses((status = 200, body = ResetSnapshot)))]
 #[tracing::instrument(skip_all)]
 pub async fn reset_snapshot(
     State(state): State<AppState>,
@@ -69,7 +69,7 @@ pub async fn reset_snapshot(
 }
 
 /// Registers or refreshes this device's wrapping public key and the account keys wrapped to it.
-#[utoipa::path(put, path = "/api/e2ee/device", tag = "E2EE", request_body = RegisterDeviceRequest, responses((status = 200, body = EncryptionDevice)))]
+#[utoipa::path(put, path = "/api/e2ee/device", operation_id = "putE2eeDevice", tag = "E2EE", request_body = RegisterDeviceRequest, responses((status = 200, body = EncryptionDevice)))]
 #[tracing::instrument(skip_all)]
 pub async fn register_device(
     State(state): State<AppState>,
@@ -81,7 +81,7 @@ pub async fn register_device(
 }
 
 /// Stores or rotates the password-wrapped account keys used to unlock a new device.
-#[utoipa::path(put, path = "/api/e2ee/password", tag = "E2EE", request_body = PasswordEnvelopeRequest, responses((status = 200, body = PasswordEnvelope)))]
+#[utoipa::path(put, path = "/api/e2ee/password", operation_id = "putE2eePassword", tag = "E2EE", request_body = PasswordEnvelopeRequest, responses((status = 200, body = PasswordEnvelope)))]
 #[tracing::instrument(skip_all)]
 pub async fn store_password_envelope(
     State(state): State<AppState>,

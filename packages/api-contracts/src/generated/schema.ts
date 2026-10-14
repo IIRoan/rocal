@@ -114,7 +114,7 @@ export interface paths {
             cookie?: never;
         };
         /** The caller's devices, password envelope and calendars, for unlocking on a device. */
-        get: operations["bootstrap"];
+        get: operations["getE2eeBootstrap"];
         put?: never;
         post?: never;
         delete?: never;
@@ -132,7 +132,7 @@ export interface paths {
         };
         get?: never;
         /** Registers or refreshes this device's wrapping public key and the account keys wrapped to it. */
-        put: operations["register_device"];
+        put: operations["putE2eeDevice"];
         post?: never;
         delete?: never;
         options?: never;
@@ -149,7 +149,7 @@ export interface paths {
         };
         get?: never;
         /** Stores or rotates the password-wrapped account keys used to unlock a new device. */
-        put: operations["store_password_envelope"];
+        put: operations["putE2eePassword"];
         post?: never;
         delete?: never;
         options?: never;
@@ -165,7 +165,7 @@ export interface paths {
             cookie?: never;
         };
         /** Raw owned calendars, active categories and unsynced events, so a client can re-wrap them on password reset. */
-        get: operations["reset_snapshot"];
+        get: operations["getE2eeResetSnapshot"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1850,7 +1850,7 @@ export interface operations {
             };
         };
     };
-    bootstrap: {
+    getE2eeBootstrap: {
         parameters: {
             query?: never;
             header?: never;
@@ -1869,7 +1869,7 @@ export interface operations {
             };
         };
     };
-    register_device: {
+    putE2eeDevice: {
         parameters: {
             query?: never;
             header?: never;
@@ -1892,7 +1892,7 @@ export interface operations {
             };
         };
     };
-    store_password_envelope: {
+    putE2eePassword: {
         parameters: {
             query?: never;
             header?: never;
@@ -1915,7 +1915,7 @@ export interface operations {
             };
         };
     };
-    reset_snapshot: {
+    getE2eeResetSnapshot: {
         parameters: {
             query?: never;
             header?: never;
