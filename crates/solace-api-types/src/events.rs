@@ -266,13 +266,17 @@ pub struct RsvpDeleted {
     pub deleted: bool,
 }
 
-/// `POST /api/subscriptions/import-ics` with on-device encrypted events.
+/// `POST /api/subscriptions/import-ics`; `fileName` and `calendarName` only answer legacy plaintext imports.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct EncryptedIcsImportResult {
+pub struct IcsImportResult {
     pub success: bool,
     pub events_created: i64,
     pub events_total: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub errors: Option<Vec<String>>,
 }
