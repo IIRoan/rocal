@@ -3061,6 +3061,18 @@
           "revoked"
         ]
       },
+      "InviteTokenQuery": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "InviteValid": {
         "type": "object",
         "required": [

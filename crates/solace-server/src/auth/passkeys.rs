@@ -8,10 +8,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
-    QueryOrder, Set,
-};
+use sea_orm::Set;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use solace_api_types::auth::{OkFlag, Passkey, PasskeyUpdated, StatusFlag};
@@ -225,11 +222,7 @@ async fn consume_challenge(
 }
 
 async fn user_passkeys(state: &AppState, user_id: &str) -> Result<Vec<passkey::Model>, ApiError> {
-    Ok(passkey::Entity::find()
-        .filter(passkey::Column::UserId.eq(user_id))
-        .order_by_asc(passkey::Column::CreatedAt)
-        .all(&state.db)
-        .await?)
+    Ok(store::user_passkeys(&state.db, user_id).await?)
 }
 
 /// `excludeCredentials` / `allowCredentials` entries as simplewebauthn writes them.
@@ -393,7 +386,7 @@ pub async fn verify_registration(
                     registration_failed()
                 },
             )?;
-        let row = passkey::ActiveModel {
+        let row = store::insert_passkey(&state.db, passkey::ActiveModel {
             id: Set(generate_id()),
             name: Set(body.name.filter(|name| !name.is_empty())),
             public_key: Set(registered.public_key),
@@ -405,8 +398,7 @@ pub async fn verify_registration(
             transports: Set(Some(registered.transports)),
             created_at: Set(Some(instant::now())),
             aaguid: Set(Some(registered.aaguid)),
-        }
-        .insert(&state.db)
+        })
         .await
         .map_err(|error| {
             tracing::error!(error = %crate::telemetry::redact_pii(&error.to_string()), "Failed to store a passkey");
@@ -557,13 +549,8 @@ pub async fn verify_authentication(
         let body: AuthenticationBody = validate(&AUTHENTICATION, body.as_ref(), "body")?;
         let challenge = consume_challenge(&state, &headers, "authentication").await?;
         let credential_id = body.response.get("id").and_then(Value::as_str);
-        let row = match credential_id {
-            Some(id) => {
-                passkey::Entity::find()
-                    .filter(passkey::Column::CredentialId.eq(id))
-                    .one(&state.db)
-                    .await?
-            }
+        let (row, owner) = match credential_id {
+            Some(id) => store::passkey_by_credential(&state.db, id).await?,
             None => None,
         }
         .ok_or_else(|| passkey_not_found(StatusCode::UNAUTHORIZED))?;
@@ -575,10 +562,8 @@ pub async fn verify_authentication(
                     authentication_failed(StatusCode::BAD_REQUEST)
                 }
             })?;
-        let owner = row.find_related(user::Entity).one(&state.db).await?;
-        let mut stored = row.into_active_model();
-        stored.counter = Set(i32::try_from(counter).unwrap_or(i32::MAX));
-        stored.update(&state.db).await?;
+        store::set_passkey_counter(&state.db, row, i32::try_from(counter).unwrap_or(i32::MAX))
+            .await?;
         let owner = owner.ok_or_else(|| {
             ApiError::message(StatusCode::INTERNAL_SERVER_ERROR, "User not found")
         })?;
@@ -679,8 +664,7 @@ async fn owned(
     active: &ActiveSession,
     id: &str,
 ) -> Result<Option<passkey::Model>, ApiError> {
-    let row = passkey::Entity::find_by_id(id)
-        .one(&state.db)
+    let row = store::passkey_by_id(&state.db, id)
         .await?
         .ok_or_else(|| passkey_not_found(StatusCode::NOT_FOUND))?;
     Ok((row.user_id == active.user.id).then_some(row))
@@ -698,7 +682,7 @@ pub async fn delete(
         let Some(row) = owned(&state, &active, &body.id).await? else {
             return Ok(StatusCode::UNAUTHORIZED.into_response());
         };
-        row.delete(&state.db).await?;
+        store::delete_passkey(&state.db, row).await?;
         Ok(json(&StatusFlag { status: true }))
     }
     .await;
@@ -717,9 +701,7 @@ pub async fn update(
         let row = owned(&state, &active, &body.id)
             .await?
             .ok_or_else(not_allowed)?;
-        let mut renamed = row.into_active_model();
-        renamed.name = Set(Some(body.name));
-        let row = renamed.update(&state.db).await?;
+        let row = store::rename_passkey(&state.db, row, body.name).await?;
         Ok(json(&PasskeyUpdated {
             passkey: passkey_dto(&row),
         }))

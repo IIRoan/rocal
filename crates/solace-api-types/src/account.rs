@@ -148,3 +148,9 @@ pub struct DeleteAccountResponse {
 pub struct EmailAvailabilityQuery {
     pub email: String,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct InviteTokenQuery {
+    pub token: String,
+}

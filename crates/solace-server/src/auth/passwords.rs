@@ -5,7 +5,6 @@ use std::sync::LazyLock;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use solace_api_types::auth::{AuthUser, StatusFlag};
@@ -17,7 +16,7 @@ use super::pipeline::{AuthBody, is_trusted_target};
 use super::session;
 use super::sessions::require_session;
 use super::{password, store};
-use crate::db::entities::{account, user, verification};
+use crate::db::entities::user;
 use crate::email::{self, PasswordAction};
 use crate::http::zod::{self, Schema};
 use crate::instant;
@@ -149,9 +148,7 @@ pub async fn change_password(
         {
             return Err(codes::invalid_password());
         }
-        let mut updated: account::ActiveModel = credential.into();
-        updated.password = Set(Some(new_hash));
-        updated.update(&state.db).await?;
+        store::set_password(&state.db, credential, new_hash).await?;
         let mut token = None;
         if body.revoke_other_sessions == Some(true) {
             store::delete_user_sessions(&state.db, &active.user.id).await?;
@@ -233,11 +230,7 @@ pub async fn reset_password_callback(
             "{}/api/auth",
             state.config.backend_url.trim_end_matches('/')
         );
-        let found = verification::Entity::find()
-            .filter(verification::Column::Identifier.eq(format!("reset-password:{token}")))
-            .order_by_desc(verification::Column::CreatedAt)
-            .one(&state.db)
-            .await?;
+        let found = store::find_verification(&state.db, &format!("reset-password:{token}")).await?;
         let valid = found.is_some_and(|row| row.expires_at >= instant::now());
         let (key, value) = if valid {
             ("token", token.as_str())
@@ -303,8 +296,7 @@ pub async fn reset_password(
         let row = store::consume_verification(&state.db, &format!("reset-password:{token}"))
             .await?
             .ok_or_else(codes::invalid_token)?;
-        let found = user::Entity::find_by_id(row.value.as_str())
-            .one(&state.db)
+        let found = store::find_user(&state.db, &row.value)
             .await?
             .ok_or_else(|| {
                 ApiError::new(StatusCode::BAD_REQUEST, "USER_NOT_FOUND", "User not found")
@@ -313,11 +305,7 @@ pub async fn reset_password(
             .await
             .map_err(|_| ApiError::internal())?;
         match store::credential_account(&state.db, &found.id).await? {
-            Some(credential) => {
-                let mut updated: account::ActiveModel = credential.into();
-                updated.password = Set(Some(hash));
-                updated.update(&state.db).await?;
-            }
+            Some(credential) => store::set_password(&state.db, credential, hash).await?,
             None => {
                 store::link_credential(&state.db, &found.id, &hash).await?;
             }
@@ -385,17 +373,15 @@ pub async fn update_user(
                 "No fields to update",
             ));
         }
-        let mut updated: user::ActiveModel = active.user.clone().into();
-        if let Some(name) = name {
-            updated.name = Set(name
-                .as_str()
-                .map(str::to_owned)
-                .ok_or_else(ApiError::internal)?);
-        }
-        if let Some(image) = image {
-            updated.image = Set(image.as_str().map(str::to_owned));
-        }
-        updated.update(&state.db).await?;
+        let name = name
+            .map(|name| {
+                name.as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(ApiError::internal)
+            })
+            .transpose()?;
+        let image = image.map(|image| image.as_str().map(str::to_owned));
+        store::update_user(&state.db, active.user.clone(), name, image).await?;
         let dont_remember = hooks::dont_remember(&state, &headers);
         Ok(Reply::new(
             json(&StatusFlag { status: true }),

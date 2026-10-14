@@ -871,6 +871,9 @@ export interface components {
         };
         /** @enum {string} */
         InviteStatus: "pending" | "claimed" | "accepted" | "revoked";
+        InviteTokenQuery: {
+            token: string;
+        };
         InviteValid: {
             email: string;
             inviteId: components["schemas"]["InviteId"];

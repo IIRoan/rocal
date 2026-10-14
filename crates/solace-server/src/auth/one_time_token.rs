@@ -7,7 +7,6 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use solace_api_types::auth::OneTimeToken;
@@ -18,7 +17,6 @@ use super::pipeline::AuthBody;
 use super::session::{self, ActiveSession};
 use super::sessions::require_session;
 use super::store;
-use crate::db::entities::{session as session_entity, user};
 use crate::http::zod::{self, Schema};
 use crate::instant;
 use crate::state::AppState;
@@ -73,11 +71,7 @@ pub async fn verify(
         let row = store::consume_verification(&state.db, &identifier(&body.token))
             .await?
             .ok_or_else(|| bad_request("Invalid token"))?;
-        let found = session_entity::Entity::find()
-            .filter(session_entity::Column::Token.eq(row.value.as_str()))
-            .find_also_related(user::Entity)
-            .one(&state.db)
-            .await?;
+        let found = store::find_session_with_user(&state.db, &row.value).await?;
         let Some((session, Some(user))) = found else {
             return Err(bad_request("Session not found"));
         };

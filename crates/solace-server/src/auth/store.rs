@@ -1,16 +1,51 @@
-//! Better Auth's internal adapter over the existing tables: users, credential accounts and sessions.
+//! Better Auth's internal adapter over the existing tables: users, credential accounts, sessions, verifications and passkeys.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, ModelTrait,
+    QueryFilter, QueryOrder, Set,
 };
 
 use super::api::generate_id;
 use super::cookies::SESSION_LIFETIME_SECONDS;
-use crate::db::entities::{account, session, user, verification};
+use crate::db::entities::{account, passkey, session, user, verification};
 use crate::instant;
 
 /// A session that is not remembered lasts a day, as Better Auth's `createSession(..., dontRememberMe)` does.
 const DONT_REMEMBER_SECONDS: i64 = 24 * 60 * 60;
+
+pub async fn find_user<C: ConnectionTrait>(
+    db: &C,
+    id: &str,
+) -> Result<Option<user::Model>, sea_orm::DbErr> {
+    user::Entity::find_by_id(id).one(db).await
+}
+
+/// `updateUser`: a new name and, when given, a new image (`None` clears it).
+pub async fn update_user<C: ConnectionTrait>(
+    db: &C,
+    found: user::Model,
+    name: Option<String>,
+    image: Option<Option<String>>,
+) -> Result<user::Model, sea_orm::DbErr> {
+    let mut updated = found.into_active_model();
+    if let Some(name) = name {
+        updated.name = Set(name);
+    }
+    if let Some(image) = image {
+        updated.image = Set(image);
+    }
+    updated.update(db).await
+}
+
+pub async fn set_password<C: ConnectionTrait>(
+    db: &C,
+    credential: account::Model,
+    hash: String,
+) -> Result<(), sea_orm::DbErr> {
+    let mut updated = credential.into_active_model();
+    updated.password = Set(Some(hash));
+    updated.update(db).await.map(|_| ())
+}
 
 pub async fn find_user_by_email<C: ConnectionTrait>(
     db: &C,
@@ -102,6 +137,18 @@ pub async fn create_session<C: ConnectionTrait>(
     .await
 }
 
+/// `findSession`: the session row and its user, expired or not.
+pub async fn find_session_with_user<C: ConnectionTrait>(
+    db: &C,
+    token: &str,
+) -> Result<Option<(session::Model, Option<user::Model>)>, sea_orm::DbErr> {
+    session::Entity::find()
+        .filter(session::Column::Token.eq(token))
+        .find_also_related(user::Entity)
+        .one(db)
+        .await
+}
+
 pub async fn find_session<C: ConnectionTrait>(
     db: &C,
     token: &str,
@@ -181,4 +228,80 @@ pub async fn consume_verification<C: ConnectionTrait>(
         .into_iter()
         .max_by_key(|row| row.created_at)
         .filter(|row| row.expires_at >= now))
+}
+
+/// `findVerificationValue`: the newest row for the identifier, without consuming it.
+pub async fn find_verification<C: ConnectionTrait>(
+    db: &C,
+    identifier: &str,
+) -> Result<Option<verification::Model>, sea_orm::DbErr> {
+    verification::Entity::find()
+        .filter(verification::Column::Identifier.eq(identifier))
+        .order_by_desc(verification::Column::CreatedAt)
+        .one(db)
+        .await
+}
+
+pub async fn user_passkeys<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+) -> Result<Vec<passkey::Model>, sea_orm::DbErr> {
+    passkey::Entity::find()
+        .filter(passkey::Column::UserId.eq(user_id))
+        .order_by_asc(passkey::Column::CreatedAt)
+        .all(db)
+        .await
+}
+
+pub async fn passkey_by_id<C: ConnectionTrait>(
+    db: &C,
+    id: &str,
+) -> Result<Option<passkey::Model>, sea_orm::DbErr> {
+    passkey::Entity::find_by_id(id).one(db).await
+}
+
+/// The passkey a WebAuthn assertion names, with its owner.
+pub async fn passkey_by_credential<C: ConnectionTrait>(
+    db: &C,
+    credential_id: &str,
+) -> Result<Option<(passkey::Model, Option<user::Model>)>, sea_orm::DbErr> {
+    passkey::Entity::find()
+        .filter(passkey::Column::CredentialId.eq(credential_id))
+        .find_also_related(user::Entity)
+        .one(db)
+        .await
+}
+
+pub async fn insert_passkey<C: ConnectionTrait>(
+    db: &C,
+    row: passkey::ActiveModel,
+) -> Result<passkey::Model, sea_orm::DbErr> {
+    row.insert(db).await
+}
+
+pub async fn set_passkey_counter<C: ConnectionTrait>(
+    db: &C,
+    row: passkey::Model,
+    counter: i32,
+) -> Result<(), sea_orm::DbErr> {
+    let mut stored = row.into_active_model();
+    stored.counter = Set(counter);
+    stored.update(db).await.map(|_| ())
+}
+
+pub async fn rename_passkey<C: ConnectionTrait>(
+    db: &C,
+    row: passkey::Model,
+    name: String,
+) -> Result<passkey::Model, sea_orm::DbErr> {
+    let mut renamed = row.into_active_model();
+    renamed.name = Set(Some(name));
+    renamed.update(db).await
+}
+
+pub async fn delete_passkey<C: ConnectionTrait>(
+    db: &C,
+    row: passkey::Model,
+) -> Result<(), sea_orm::DbErr> {
+    row.delete(db).await.map(|_| ())
 }

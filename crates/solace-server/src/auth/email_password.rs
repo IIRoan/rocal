@@ -76,7 +76,7 @@ pub async fn sign_up(
     let Some(email) = email else {
         return ApiError::message(StatusCode::FORBIDDEN, INVITE_REQUIRED).into_response();
     };
-    match invites::signup_refusal(&state, &email).await {
+    match invites::service::signup_refusal(&state, &email).await {
         Ok(None) => {}
         Ok(Some(reason)) => {
             return ApiError::message(StatusCode::FORBIDDEN, reason).into_response();
@@ -85,7 +85,7 @@ pub async fn sign_up(
     }
     let outcome = create_account(&state, &headers, body.as_ref()).await;
     if let Ok((_, user)) = &outcome
-        && let Err(error) = invites::mark_accepted(&state, &user.id, &user.email).await
+        && let Err(error) = invites::service::mark_accepted(&state, &user.id, &user.email).await
     {
         tracing::error!(error = %crate::telemetry::redact_pii(&error.to_string()), "Could not mark the invite accepted");
     }

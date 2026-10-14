@@ -8,17 +8,17 @@ use axum::extract::State;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use regex_lite::Regex;
-use serde::Deserialize;
 use solace_api_types::account::{
     AuthStatus, ClaimInviteRequest, EmailAvailability, EmailAvailabilityCode,
-    EmailAvailabilityQuery, InviteClaimRefused, InviteClaimResult, InviteInvalid, InviteValidation,
-    SignupConfig,
+    EmailAvailabilityQuery, InviteClaimRefused, InviteClaimResult, InviteInvalid, InviteTokenQuery,
+    InviteValidation, SignupConfig,
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use crate::addresses;
 use crate::auth::guard::{MaybeSession, has_passkeys, step_up_verified};
+use crate::auth::session::ActiveSession;
 use crate::error::AppError;
 use crate::http::client_ip::client_ip;
 use crate::http::extract::{ValidJson, ValidQuery};
@@ -40,12 +40,19 @@ static LOCAL_PART: LazyLock<Regex> = LazyLock::new(|| {
 
 request_schema!(EmailAvailabilityQuery => zod::object([("email", zod::string().min(1).max(320))]).strict());
 
-#[derive(Debug, Deserialize)]
-pub struct InviteTokenQuery {
-    pub token: String,
-}
-
 request_schema!(InviteTokenQuery => zod::object([("token", zod::string().min(1).max(500))]).strict());
+
+request_schema!(ClaimInviteRequest => zod::object([
+    ("token", zod::string().min(1).max(500)),
+    (
+        "chosenEmail",
+        zod::string().min(1).max(320).refine(
+            |value| !value.as_str().is_some_and(|email| addresses::is_reserved_system_email(email, None)),
+            "Cannot claim a reserved system email address.",
+            &[],
+        ),
+    ),
+]).strict());
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -72,10 +79,14 @@ pub async fn email_availability(
     State(state): State<AppState>,
     ValidQuery(query): ValidQuery<EmailAvailabilityQuery>,
 ) -> Result<Json<EmailAvailability>, AppError> {
+    Ok(Json(availability(&state, &query.email).await?))
+}
+
+async fn availability(state: &AppState, email: &str) -> Result<EmailAvailability, AppError> {
     let domain = addresses::normalize(&state.config.stalwart_default_domain);
     let answer = |local_part: Option<String>, normalized_email: String, code, message: &str| {
         EmailAvailability {
-            email: query.email.clone(),
+            email: email.to_owned(),
             local_part,
             domain: domain.clone(),
             normalized_email,
@@ -84,7 +95,7 @@ pub async fn email_availability(
             message: message.to_owned(),
         }
     };
-    let desired = match desired_address(&query.email, &domain) {
+    let desired = match desired_address(email, &domain) {
         Ok(desired) => desired,
         Err(invalid) => {
             let code = if invalid.message.contains("reserved") {
@@ -92,28 +103,28 @@ pub async fn email_availability(
             } else {
                 EmailAvailabilityCode::InvalidEmail
             };
-            return Ok(Json(answer(
+            return Ok(answer(
                 invalid.local_part,
                 invalid.normalized_email,
                 code,
                 &invalid.message,
-            )));
+            ));
         }
     };
-    if invites::address_taken(&state, &desired.normalized_email).await? {
-        return Ok(Json(answer(
+    if invites::service::address_taken(state, &desired.normalized_email).await? {
+        return Ok(answer(
             Some(desired.local_part),
             desired.normalized_email,
             EmailAvailabilityCode::AlreadyInUse,
             "That email address is already in use.",
-        )));
+        ));
     }
-    Ok(Json(answer(
+    Ok(answer(
         Some(desired.local_part),
         desired.normalized_email,
         EmailAvailabilityCode::Available,
         "That email address is available.",
-    )))
+    ))
 }
 
 /// Whether the caller is signed in and still owes a passkey step-up; never cached.
@@ -124,28 +135,35 @@ pub async fn auth_status(
     headers: HeaderMap,
     MaybeSession(active): MaybeSession,
 ) -> Result<Response, AppError> {
-    let status = match active? {
+    let mut response = Json(status(&state, &headers, active?).await?).into_response();
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, max-age=0"),
+    );
+    Ok(response)
+}
+
+async fn status(
+    state: &AppState,
+    headers: &HeaderMap,
+    active: Option<ActiveSession>,
+) -> Result<AuthStatus, AppError> {
+    Ok(match active {
         None => AuthStatus {
             authenticated: false,
             has_passkeys: false,
             requires_passkey_step_up: false,
         },
         Some(active) => {
-            let has_passkeys = has_passkeys(&state, &active.user.id).await?;
-            let verified = step_up_verified(&state, &headers, &active);
+            let has_passkeys = has_passkeys(state, &active.user.id).await?;
+            let verified = step_up_verified(state, headers, &active);
             AuthStatus {
                 authenticated: true,
                 has_passkeys,
                 requires_passkey_step_up: has_passkeys && !verified,
             }
         }
-    };
-    let mut response = Json(status).into_response();
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("no-store, max-age=0"),
-    );
-    Ok(response)
+    })
 }
 
 /// Checks an invite token before sign-up; 30 requests a minute per client.
@@ -167,7 +185,7 @@ pub async fn validate_invite(
         });
         return Ok((StatusCode::TOO_MANY_REQUESTS, Json(body)).into_response());
     }
-    Ok(Json(invites::validate(&state, &query.token).await?).into_response())
+    Ok(Json(invites::service::validate(&state, &query.token).await?).into_response())
 }
 
 /// Links an invite to the chosen Solace address; sign-up must follow within 15 minutes.
@@ -189,7 +207,7 @@ pub async fn claim_invite(
         });
         return Ok((StatusCode::TOO_MANY_REQUESTS, Json(body)).into_response());
     }
-    Ok(Json(invites::claim(&state, &body).await?).into_response())
+    Ok(Json(invites::service::claim(&state, &body).await?).into_response())
 }
 
 struct Desired {

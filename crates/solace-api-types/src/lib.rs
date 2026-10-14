@@ -40,6 +40,7 @@ pub use common::{ErrorResponse, SuccessMessage, Timestamp};
     account::InviteClaimRefused,
     account::DeleteAccountResponse,
     account::EmailAvailabilityQuery,
+    account::InviteTokenQuery,
     auth::AuthUser,
     auth::AuthSession,
     auth::SessionWithUser,
