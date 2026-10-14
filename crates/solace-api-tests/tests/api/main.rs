@@ -6,6 +6,7 @@ mod account_public;
 mod auth_limits;
 mod auth_passwords;
 mod auth_sessions;
+mod e2e_security;
 mod edges;
 // Shared by every domain module; no single module uses every helper.
 #[allow(dead_code)]

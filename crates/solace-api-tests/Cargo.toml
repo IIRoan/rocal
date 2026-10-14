@@ -13,6 +13,7 @@ hmac.workspace = true
 p256.workspace = true
 percent-encoding.workspace = true
 rand.workspace = true
+regex-lite.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
