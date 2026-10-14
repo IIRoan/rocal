@@ -7,6 +7,7 @@
 mod helpers;
 mod settings;
 
+mod account_deletion;
 mod e2ee;
 mod profiles;
 mod push_devices;

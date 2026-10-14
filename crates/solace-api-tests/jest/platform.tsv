@@ -79,6 +79,10 @@ apps/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges 
 apps/backend/__tests__/lib/ssrf-host-policy.test.ts	ssrf-host-policy › blocks metadata and private IPv4-mapped addresses	suite:subscriptions::create_refuses_private_and_loopback_literals_before_connecting
 apps/backend/__tests__/lib/ssrf-host-policy.test.ts	ssrf-host-policy › maps dotted IPv4-mapped IPv6 to IPv4	unit:solace-server::integrations::safe_fetch::host_policy::tests::dotted_ipv4_mapped_ipv6_canonicalizes_to_ipv4
 apps/backend/__tests__/lib/ssrf-host-policy.test.ts	ssrf-host-policy › maps hex IPv4-mapped IPv6 to IPv4	unit:solace-server::integrations::safe_fetch::host_policy::tests::hex_ipv4_mapped_ipv6_canonicalizes_to_ipv4
+apps/backend/__tests__/routes/account.test.ts	accountRoutes › checks public sign-up email availability	suite:account_deletion::email_availability_normalizes_and_classifies_handles
+apps/backend/__tests__/routes/account.test.ts	accountRoutes › deletes the authenticated account	suite:account_deletion::deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns
+apps/backend/__tests__/routes/account.test.ts	accountRoutes › returns an uncached unauthenticated auth-status response	suite:account_deletion::auth_status_reports_the_session_and_is_never_cached
+apps/backend/__tests__/routes/account.test.ts	accountRoutes › returns the public signup config	suite:account_deletion::the_signup_config_is_public
 apps/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › rejects unexpected device fields	suite:e2ee::device_fields_are_validated
 apps/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › returns bootstrap metadata for the authenticated user	suite:e2ee::a_new_account_has_no_key_material
 apps/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › returns raw records for password reset re-encryption	suite:e2ee::the_reset_snapshot_returns_raw_owned_records_for_re_encryption
@@ -109,6 +113,15 @@ apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color
 apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color 'navy'	suite:subscriptions::update_rejects_invalid_colors_listing_every_allowed_one
 apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color 'rgb(0,0,0)'	suite:subscriptions::update_rejects_invalid_colors_listing_every_allowed_one
 apps/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects update for non-existent subscription	suite:subscriptions::missing_and_foreign_feeds_are_not_found
+apps/backend/__tests__/services/account.service.test.ts	AccountService › deletes non-cascading user references before removing the user	suite:account_deletion::deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns
+apps/backend/__tests__/services/account.service.test.ts	AccountService › does not delete the Solace user when linked mailbox removal fails	suite:account_deletion::a_failed_mailbox_deletion_keeps_the_account
+apps/backend/__tests__/services/account.service.test.ts	AccountService › does not discard the account when deleting its avatar fails	unit:solace-server::account::tests::a_failed_avatar_deletion_keeps_the_account
+apps/backend/__tests__/services/account.service.test.ts	AccountService › fails when the account no longer exists	unit:solace-server::account::tests::deleting_a_vanished_account_is_not_found
+apps/backend/__tests__/services/account.service.test.ts	AccountService › rejects invalid sign-up handles without querying the database	suite:account_deletion::email_availability_normalizes_and_classifies_handles
+apps/backend/__tests__/services/account.service.test.ts	AccountService › reports the address as unavailable when an account already exists	suite:account_deletion::email_availability_normalizes_and_classifies_handles
+apps/backend/__tests__/services/account.service.test.ts	AccountService › returns availability details for a valid unused sign-up handle	suite:account_deletion::email_availability_normalizes_and_classifies_handles
+apps/backend/__tests__/services/account.service.test.ts	AccountService › returns the configured signup domain	suite:account_deletion::the_signup_config_is_public
+apps/backend/__tests__/services/account.service.test.ts	AccountService › strictly rejects reserved handles like admin and alert without querying the database	suite:account_deletion::email_availability_normalizes_and_classifies_handles
 apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › includes the password envelope in bootstrap responses	suite:e2ee::the_password_envelope_is_created_then_rotated_in_place
 apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › parses blind-index tokens from bootstrap rows and falls back to empty arrays	suite:e2ee::unreadable_blind_index_tokens_become_an_empty_list
 apps/backend/__tests__/services/e2ee.service.test.ts	E2eeService › rejects invalid key versions before writing to prisma	suite:e2ee::device_fields_are_validated
