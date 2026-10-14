@@ -70,6 +70,18 @@ pub struct Config {
     /// The backend-gate key the Railway Stalwart domain requires (`apps/stalwart/backend-gate.cfg`).
     pub stalwart_gate_key: Option<String>,
     pub sentry_dsn: Option<String>,
+    /// The private profile-picture bucket; uploads are unavailable without it.
+    pub avatar_bucket: Option<AvatarBucketConfig>,
+}
+
+/// `env.avatarBucket`: an S3-compatible bucket (Railway) holding only re-encoded avatar variants.
+#[derive(Debug, Clone)]
+pub struct AvatarBucketConfig {
+    pub name: String,
+    pub endpoint: String,
+    pub region: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
 }
 
 impl Config {
@@ -120,6 +132,7 @@ impl Config {
                 .map(|key| key.trim().to_owned())
                 .filter(|key| !key.is_empty()),
             sentry_dsn: var("SENTRY_DSN").map(|dsn| dsn.trim().to_owned()),
+            avatar_bucket: avatar_bucket(&var),
             backend_url,
         })
     }
@@ -155,6 +168,21 @@ fn mailer(var: &impl Fn(&str) -> Option<String>) -> Option<MailerConfig> {
             .map(|n| n.trim().to_owned())
             .filter(|n| !n.is_empty())
             .unwrap_or_else(|| "Solace".into()),
+    })
+}
+
+fn avatar_bucket(var: &impl Fn(&str) -> Option<String>) -> Option<AvatarBucketConfig> {
+    let trimmed = |name: &str| {
+        var(name)
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+    };
+    Some(AvatarBucketConfig {
+        name: trimmed("AVATAR_BUCKET")?,
+        endpoint: trimmed("AVATAR_BUCKET_ENDPOINT")?,
+        region: trimmed("AVATAR_BUCKET_REGION").unwrap_or_else(|| "auto".into()),
+        access_key_id: trimmed("AVATAR_BUCKET_ACCESS_KEY_ID")?,
+        secret_access_key: trimmed("AVATAR_BUCKET_SECRET_ACCESS_KEY")?,
     })
 }
 

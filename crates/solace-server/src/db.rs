@@ -2,6 +2,8 @@
 
 mod behavior;
 pub mod entities;
+#[cfg(test)]
+pub mod scratch;
 
 pub use behavior::cuid;
 

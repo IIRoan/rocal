@@ -13,6 +13,7 @@ pub mod instant;
 pub mod integrations;
 pub mod invites;
 pub mod notifications;
+pub mod profiles;
 pub mod push_devices;
 pub mod recent_contacts;
 pub mod settings;
@@ -53,6 +54,7 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(settings::routes())
         .merge(recent_contacts::routes())
         .merge(push_devices::routes())
+        .merge(profiles::routes())
 }
 
 /// Every route's OpenAPI entry, without a database.

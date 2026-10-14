@@ -314,6 +314,172 @@
         }
       }
     },
+    "/api/profiles/avatar": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Streams a user's picture by email, fetching external ones through safe fetch; a bare 404 without one.",
+        "operationId": "getProfileAvatarByEmail",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The picture",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No picture"
+          }
+        }
+      }
+    },
+    "/api/profiles/avatars/{avatarId}": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Streams the smallest stored WebP variant covering `size` pixels (default 512) while the id is attached to an account.",
+        "operationId": "getUploadedAvatar",
+        "parameters": [
+          {
+            "name": "avatarId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The WebP variant",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No picture"
+          }
+        }
+      }
+    },
+    "/api/profiles/lookup": {
+      "post": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Avatar paths for Solace users with a usable picture, in request order.",
+        "operationId": "lookupProfiles",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileLookupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileLookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiles/me/avatar": {
+      "put": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Stores the caller's square crop as WebP variants (32–512px) and retires the previous picture.",
+        "operationId": "uploadProfileAvatar",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadAvatarRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Removes the caller's picture and deletes its stored variants.",
+        "operationId": "removeProfileAvatar",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/push/devices": {
       "get": {
         "tags": [
