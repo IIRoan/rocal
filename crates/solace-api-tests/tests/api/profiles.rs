@@ -427,20 +427,16 @@ async fn concurrent_uploads_leave_exactly_one_picture() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let picture = STANDARD.encode(fixture("avatar.png"));
-    let uploads = (0..4).map(|_| {
+    let mut uploads = tokio::task::JoinSet::new();
+    for _ in 0..4 {
         let mut agent = user.agent.clone();
         let body = json!({"image": picture});
-        async move {
-            agent
-                .put("/api/profiles/me/avatar", body)
-                .await
-                .expect("request")
-        }
-    });
-    let responses = futures_join(uploads).await;
+        uploads.spawn(async move { agent.put("/api/profiles/me/avatar", body).await });
+    }
+    let responses = uploads.join_all().await;
 
     let mut stored = Vec::new();
-    for response in &responses {
+    for response in responses.into_iter().map(ok) {
         match response.status.as_u16() {
             200 => {
                 let uploaded: AvatarResponse = ok(response.dto());
@@ -468,18 +464,6 @@ async fn concurrent_uploads_leave_exactly_one_picture() {
             "{retired}"
         );
     }
-}
-
-/// Runs the requests concurrently on the current runtime.
-async fn futures_join<F: std::future::Future<Output = ApiResponse> + Send + 'static>(
-    futures: impl Iterator<Item = F>,
-) -> Vec<ApiResponse> {
-    let handles: Vec<_> = futures.map(tokio::spawn).collect();
-    let mut responses = Vec::new();
-    for handle in handles {
-        responses.push(handle.await.expect("upload task"));
-    }
-    responses
 }
 
 #[tokio::test]

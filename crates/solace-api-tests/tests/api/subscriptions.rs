@@ -482,6 +482,13 @@ async fn list_returns_own_feeds_newest_first_with_calendar_and_sync_log_count() 
     assert_eq!(first.last_sync_at, Some(Timestamp(last_sync_at)));
     assert_eq!(first.created_at, Timestamp(created_at));
 
+    let forged: Vec<CalendarSubscription> = ok(owner
+        .get(&format!("/api/subscriptions?userId={}", other.id))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(forged, list, "a userId in the query is ignored");
+
     let empty: Vec<CalendarSubscription> = ok(app
         .user()
         .await

@@ -853,4 +853,16 @@ async fn key_material_is_scoped_to_its_owner() {
     let mine = bootstrap(&mut owner).await;
     assert_eq!(mine.devices, [owned]);
     assert!(mine.password_envelope.is_some());
+
+    for path in ["/api/e2ee/bootstrap", "/api/e2ee/reset-snapshot"] {
+        let forged = ok(other
+            .get(&format!("{path}?userId={}", owner.id))
+            .await
+            .expect_status(200)
+            .and_then(|r| r.value()));
+        assert!(
+            !forged.to_string().contains(&owner.id),
+            "a userId in the query is ignored: {forged}"
+        );
+    }
 }

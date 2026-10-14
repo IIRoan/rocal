@@ -198,6 +198,12 @@ async fn listing_shows_only_enabled_devices_most_recently_seen_first() {
         .map(|d| d.id.0)
         .collect();
     assert_eq!(ids, [newer.device_id.0, older.device_id.0]);
+    let forged: PushDeviceList = ok(other
+        .get(&format!("/api/push/devices?userId={}", user.id))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(forged.devices.len(), 1, "a userId in the query is ignored");
     assert_eq!(
         list(&mut app.user().await).await,
         PushDeviceList { devices: vec![] }
