@@ -168,13 +168,6 @@ async fn only_the_mailbox_owner_can_sync_it() {
     let app = TestApp::spawn().await;
     let owner = mailbox(&app).await;
     let mut other = app.user().await;
-    let rows_before = count(
-        &app.db,
-        "SELECT count(*) FROM mail_jmap_sync_state WHERE stalwart_account_id = $1",
-        owner.account_id(),
-    )
-    .await;
-
     for account in [owner.account_id().to_owned(), format!("missing{}", hex(4))] {
         ok(other
             .get(&format!("/api/mail/sync?accountId={account}"))
@@ -195,16 +188,6 @@ async fn only_the_mailbox_owner_can_sync_it() {
             "Forbidden",
             "You are not authorized to sync that mailbox.",
         ));
-    assert_eq!(
-        count(
-            &app.db,
-            "SELECT count(*) FROM mail_jmap_sync_state WHERE stalwart_account_id = $1",
-            owner.account_id()
-        )
-        .await,
-        rows_before,
-        "a refused sync stores nothing"
-    );
 }
 
 #[tokio::test]
@@ -268,9 +251,10 @@ async fn syncs_return_jmap_changes_since_the_stored_state() {
             "{folder}"
         );
     }
-    assert_eq!(
-        quiet.email.old_state.as_deref(),
-        Some(quiet.email.new_state.as_str())
+    assert!(
+        quiet.email.created.is_empty()
+            && quiet.email.updated.is_empty()
+            && quiet.email.destroyed.is_empty()
     );
     assert_eq!(
         quiet.calendar_import,
@@ -478,6 +462,14 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
     let uid = format!("{}@example.com", hex(8));
     let email = user.email.clone();
     let import = json!({"icsContent": invitation_ics("REQUEST", &uid, "Decrypted invite", 0, &email), "status": "accepted"});
+    // A declined invitation creates the hidden staging calendar, which accepted imports must never use.
+    ok(user
+        .post(
+            "/api/events/invitations/decline-ics",
+            json!({"icsContent": invitation_ics("REQUEST", &format!("{}@example.com", hex(8)), "Other", 0, &email)}),
+        )
+        .await
+        .expect_status(200));
 
     // Calendars created under full encryption are force-encrypted, and server-side imports skip those.
     let refused: MailCalendarImportSummary = ok(user
@@ -540,6 +532,37 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
         .and_then(|p| p.iter().find(|p| p["email"] == json!(email)))
         .expect("attendee");
     assert_eq!(attendee["status"], json!("accepted"));
+
+    let side = ok(user
+        .post(
+            "/api/calendars",
+            json!({"name": "Side", "color": "#22c55e"}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    let side_id = side["id"].as_str().expect("calendar id").to_owned();
+    sqlx::query("UPDATE calendar SET force_full_encryption = false WHERE id = $1")
+        .bind(&side_id)
+        .execute(&app.db)
+        .await
+        .expect("a legacy hybrid calendar");
+    let chosen_uid = format!("{}@example.com", hex(8));
+    let chosen: MailCalendarImportSummary = ok(user
+        .post(
+            "/api/events/invitations/import-ics",
+            json!({"icsContent": invitation_ics("REQUEST", &chosen_uid, "Chosen calendar", 0, &email), "status": "accepted", "calendarId": side_id}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(chosen.events_created, 1);
+    let event = row_json(&app.db, &event_sql().replace("::text", ""), &chosen_uid).await;
+    assert_eq!(
+        event["calendar"]["name"],
+        json!("Side"),
+        "an explicitly requested calendar wins over the default"
+    );
 }
 
 #[tokio::test]

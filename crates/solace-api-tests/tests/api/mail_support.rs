@@ -3,10 +3,14 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use base64::Engine;
-use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use base64::engine::DecodePaddingMode;
+use base64::engine::general_purpose::{
+    GeneralPurpose, GeneralPurposeConfig, STANDARD, URL_SAFE_NO_PAD,
+};
+use base64::{Engine, alphabet};
+use hmac::{Hmac, KeyInit, Mac};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use solace_api_tests::client::ApiResponse;
 use solace_api_tests::seed::fake_envelope;
 use solace_api_types::mail::{
@@ -146,16 +150,19 @@ pub async fn mailbox(app: &TestApp) -> Mailbox {
     Mailbox { user, signup }
 }
 
-/// Stalwart's own failed-login ban counts every rejected bridge login against the backend's address, so tests avoid them.
+const STALWART_ADMIN: [&str; 2] = ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"];
+
+/// Stalwart's failed-login ban counts every rejected bridge login against the backend's address, so tests avoid them.
 pub async fn set_bridge_password(app: &TestApp, account_id: &str, user_id: &str, email: &str) {
     let secret = bridge_secret(&app.env.mail_bridge_hmac_key, user_id, email);
-    let reply = admin_jmap(
-        app,
-        json!([["x:Account/set", {"update": {account_id: {"credentials/0": {
-            "@type": "Password", "secret": secret, "expiresAt": null, "allowedIps": {}
-        }}}}, "p"]]),
-    )
-    .await;
+    let reply = app
+        .stalwart_admin(
+            &STALWART_ADMIN,
+            json!([["x:Account/set", {"update": {account_id: {"credentials/0": {
+                "@type": "Password", "secret": secret, "expiresAt": null, "allowedIps": {}
+            }}}}, "p"]]),
+        )
+        .await;
     assert!(
         reply["methodResponses"][0][1]["updated"]
             .get(account_id)
@@ -173,70 +180,42 @@ pub fn bridge_secret(hmac_key: &str, user_id: &str, email: &str) -> String {
 
 /// Node and Bun `Buffer.from(s, "base64")`: both alphabets, other characters skipped, stops at `=`, leftover bits dropped.
 pub fn lenient_base64(input: &str) -> Vec<u8> {
-    let mut out = Vec::new();
-    let (mut acc, mut bits) = (0u32, 0u32);
-    for byte in input.bytes() {
-        let value = match byte {
-            b'A'..=b'Z' => byte - b'A',
-            b'a'..=b'z' => byte - b'a' + 26,
-            b'0'..=b'9' => byte - b'0' + 52,
-            b'+' | b'-' => 62,
-            b'/' | b'_' => 63,
-            b'=' => break,
-            _ => continue,
-        };
-        acc = (acc << 6) | u32::from(value);
-        bits += 6;
-        if bits >= 8 {
-            bits -= 8;
-            out.push((acc >> bits) as u8);
-            acc &= (1 << bits) - 1;
-        }
+    let mut normalized: String = input
+        .chars()
+        .take_while(|c| *c != '=')
+        .filter_map(|c| match c {
+            '-' => Some('+'),
+            '_' => Some('/'),
+            c if c.is_ascii_alphanumeric() || c == '+' || c == '/' => Some(c),
+            _ => None,
+        })
+        .collect();
+    if normalized.len() % 4 == 1 {
+        normalized.pop();
     }
-    out
-}
-
-pub fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
-    let mut block = [0u8; 64];
-    if key.len() > block.len() {
-        block[..32].copy_from_slice(&Sha256::digest(key));
-    } else {
-        block[..key.len()].copy_from_slice(key);
-    }
-    let mut inner = Sha256::new();
-    inner.update(block.map(|b| b ^ 0x36));
-    inner.update(message);
-    let mut outer = Sha256::new();
-    outer.update(block.map(|b| b ^ 0x5c));
-    outer.update(inner.finalize());
-    outer.finalize().into()
-}
-
-/// A JMAP request to the test Stalwart as its admin, for setup and inspection only.
-pub async fn admin_jmap(app: &TestApp, method_calls: Value) -> Value {
-    let mut request = reqwest::Client::new()
-        .post(format!("{}/jmap/", app.env.stalwart_url.trim_end_matches('/')))
-        .basic_auth("admin", Some(&app.env.stalwart_admin_password))
-        .json(&json!({"using": ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"], "methodCalls": method_calls}));
-    if let Some(key) = &app.env.stalwart_gate_key {
-        request = request.header("X-Solace-Gate", key);
-    }
-    let response = request.send().await.expect("Stalwart admin request");
-    assert!(
-        response.status().is_success(),
-        "Stalwart admin: {}",
-        response.status()
+    let lenient = GeneralPurpose::new(
+        &alphabet::STANDARD,
+        GeneralPurposeConfig::new()
+            .with_decode_allow_trailing_bits(true)
+            .with_decode_padding_mode(DecodePaddingMode::RequireNone),
     );
-    response.json().await.expect("Stalwart admin JSON")
+    lenient.decode(normalized).expect("normalized base64")
+}
+
+pub fn hmac_sha256(key: &[u8], message: &[u8]) -> Vec<u8> {
+    let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC accepts any key length");
+    mac.update(message);
+    mac.finalize().into_bytes().to_vec()
 }
 
 /// The Stalwart account as its admin sees it, or `None` once it is gone.
 pub async fn stalwart_account(app: &TestApp, account_id: &str) -> Option<Value> {
-    let reply = admin_jmap(
-        app,
-        json!([["x:Account/get", {"ids": [account_id], "properties": ["id", "name", "emailAddress", "encryptionAtRest"]}, "a"]]),
-    )
-    .await;
+    let reply = app
+        .stalwart_admin(
+            &STALWART_ADMIN,
+            json!([["x:Account/get", {"ids": [account_id], "properties": ["id", "name", "emailAddress", "encryptionAtRest"]}, "a"]]),
+        )
+        .await;
     reply["methodResponses"][0][1]["list"].get(0).cloned()
 }
 
@@ -420,4 +399,32 @@ pub async fn row_json(db: &sqlx::PgPool, sql: &str, bind: &str) -> Value {
         .await
         .unwrap_or_else(|e| panic!("{sql}: {e}"));
     serde_json::from_str(&text).expect("row JSON")
+}
+
+/// Expected values computed with Bun, which runs the TypeScript backend.
+#[test]
+fn bridge_secrets_match_the_typescript_derivation() {
+    let cases: [(&str, &[u8]); 10] = [
+        ("ab$cd", &[0x69, 0xb7, 0x1d]),
+        ("a b-c_d", &[0x69, 0xbf, 0x9c, 0xfd]),
+        ("QUJD=RA==", b"ABC"),
+        ("QU\nJD", b"ABC"),
+        ("Zm9v.YmFy", b"foobar"),
+        ("Q", b""),
+        ("QQ", b"A"),
+        ("QUI", b"AB"),
+        ("-_-_", &[0xfb, 0xff, 0xbf]),
+        ("Zm9vYg==Zm9v", b"foob"),
+    ];
+    for (input, expected) in cases {
+        assert_eq!(lenient_base64(input), expected, "{input:?}");
+    }
+    assert_eq!(
+        bridge_secret(
+            "solace-test-mail-bridge-hmac-local-0001",
+            "ar4Ag8MmriHudJFR5kZyWvOB0VqoiWSy",
+            " Probe4@solace.test"
+        ),
+        "6ANM1pRRqlml0QlZnkIJh5Pt_0zbBzvmSgmd71DtVH4"
+    );
 }

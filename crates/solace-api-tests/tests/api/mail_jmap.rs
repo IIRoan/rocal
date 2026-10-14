@@ -393,3 +393,11 @@ async fn the_proxy_is_rate_limited_per_client_address() {
         "the limit is per client address"
     );
 }
+
+#[tokio::test]
+async fn the_mail_server_reachability_probe_reports_ok() {
+    let app = TestApp::spawn().await;
+    let response = ok(app.anonymous().get("/api/health/mail-jmap").await);
+    assert_eq!(response.status.as_u16(), 200, "{}", response.text());
+    assert_eq!(ok(response.value()), json!({"status": "ok"}));
+}

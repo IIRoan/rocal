@@ -350,6 +350,29 @@ async fn reminder_mail_is_not_pushed_but_lookalikes_are() {
         ["611", "612", "613", "614", "615"]
     );
 
+    let mixed = post_signed(
+        &app,
+        &json!({"events": [
+            ingest(json!({"accountId": account, "documentId": "621", "from": noreply, "messageId": reminder_id("m")})),
+            ingest(json!({"accountId": account, "documentId": "622", "from": "sam@example.com"})),
+        ]}),
+    )
+    .await;
+    assert_eq!(
+        result(&mixed),
+        StalwartWebhookResult {
+            ok: true,
+            processed_count: 2,
+            enqueued_count: 1,
+            ignored_count: 0
+        },
+        "only the regular mail in a mixed batch is pushed"
+    );
+    assert_eq!(
+        email_ids(&new_mail_jobs(&app, &owner.user.id).await).last(),
+        Some(&"622".to_owned())
+    );
+
     // Resolved through JMAP as the owner: the stored message's own Message-ID decides, unless only a heuristic found it.
     let stored_reminder = owner
         .append(

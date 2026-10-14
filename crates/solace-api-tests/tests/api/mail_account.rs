@@ -942,6 +942,22 @@ async fn deleting_the_account_removes_the_mailbox_from_stalwart() {
         stalwart_account(&app, &account_id).await.is_none(),
         "the Stalwart account is destroyed"
     );
+
+    let mut without_mailbox = app.user().await;
+    ok(without_mailbox
+        .delete("/api/account")
+        .await
+        .expect_status(200));
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM \"user\" WHERE id = $1",
+            &without_mailbox.id
+        )
+        .await,
+        0,
+        "an account without a mailbox deletes too"
+    );
 }
 
 /// Which fixture key a fingerprint belongs to.
