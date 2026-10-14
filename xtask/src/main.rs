@@ -2,9 +2,11 @@
 // A CLI reports to the terminal.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
+mod check;
 mod deploy_test;
 mod entities;
 mod jest_destinations;
+mod mem_budget;
 mod openapi;
 mod test_env;
 mod ts_backend;
@@ -14,6 +16,7 @@ use std::path::PathBuf;
 const USAGE: &str = "usage: cargo xtask <task>
 
 tasks:
+  check [--skip-mem]      everything CI runs: fmt, clippy, tests, the suite on Rust, generated-code diffs, memory budgets
   test-env up             start local Postgres 18 and the test Stalwart (podman)
   test-env down           stop and remove them
   test-env template       rebuild solace_test_template from apps/backend/prisma/migrations
@@ -24,6 +27,8 @@ tasks:
   deploy-test <service> <path>
                           deploy committed files under <path> to a test-* service in Railway's test environment
   entities [--check]      regenerate (or check) the SeaORM entities from the migrations
+  mem-budget [--allocator default|system|mimalloc|jemalloc] [--steady-seconds N] [--soak-minutes N]
+                          measure a release build against the plan's memory budgets
   openapi [--check]       write packages/api-contracts/openapi.json and regenerate its TypeScript types
   jest-destinations [--complete] [--units]
                           check crates/solace-api-tests/jest/*.tsv against the Jest case list
@@ -41,6 +46,8 @@ async fn main() -> anyhow::Result<()> {
         ["jest-destinations", rest @ ..] => jest_destinations::run(rest),
         ["entities", rest @ ..] => entities::run(rest).await,
         ["openapi", rest @ ..] => openapi::run(rest),
+        ["mem-budget", rest @ ..] => mem_budget::run(rest).await,
+        ["check", rest @ ..] => check::run(rest).await,
         _ => {
             eprintln!("{USAGE}");
             std::process::exit(2);

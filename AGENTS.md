@@ -15,7 +15,8 @@ Solace is a privacy-first calendar + mail product: one web app and two native ap
 | `apps/notifications`  | Go worker: Postgres outbox → noreply mail via Stalwart JMAP + APNs push. Never reads user mailboxes. Reminder mail/push and new-mail push are generic; the iOS Notification Service Extension (`packages/native-core/plugins/notification-service-extension`); the worker routes `event_reminder` pushes to Calendar bundles and `new_mail` to Mail bundles (`internal/push/bundles.go`, mirrored in `calendar-core` `push-device.ts`) decrypts the reminder title / fetches sender+subject on-device. |
 | `apps/stalwart`       | Stalwart mail server, JMAP desired-state plan, VPS HAProxy/frp (`vps/README.md`), key-gated backend gate for the API (`backend-gate.cfg`). Containers join frp load-balancing groups on the VPS, so image and VPS deploy independently. |
 | `apps/gatus`, `apps/errex` | Status page; self-hosted Sentry-compatible error tracker. Railway IaC in `.railway/railway.ts` (web + API stay on Vercel).           |
-| `crates/`, `xtask`         | Rust backend rewrite (plan 001, in progress): `solace-api-types` (DTOs), `solace-api-tests` (black-box API suite run against either backend). `cargo xtask` sets up the podman/Railway test environment; it and the suite refuse production URLs, databases, buckets and secrets. |
+| `crates/`, `xtask`         | Rust backend rewrite (plan 001, in progress; `apps/backend` stays live until cutover): `solace-server` (axum + SeaORM API), `solace-api-types` (every request/response DTO), `solace-api-tests` (black-box API suite, in-process Rust by default, `API_BASE_URL` for a running backend). `cargo xtask` runs checks, codegen and the podman/Railway test environment; it and the suite refuse production URLs, databases, buckets and secrets. |
+| `packages/api-contracts`   | TypeScript wire types generated from the Rust API's OpenAPI document (`cargo xtask openapi`). Never edit `src/generated/`.        |
 | `packages/calendar-core`   | Shared types, Zod schemas, date/timezone helpers, search index, sanitizers — **all logic both apps need goes here**.               |
 | `packages/calendar-client` | Typed HTTP client and shared account query/mutation options (used by web and native).                                             |
 | `packages/e2ee`            | E2EE primitives (AES-GCM-256, RSA-OAEP-4096, HMAC-SHA-256) with platform crypto providers.                                        |
@@ -56,7 +57,7 @@ Default stance: **the server should not be able to read user content, and we sho
 - App sessions and verified passkey cookies last 14 days and renew daily during use; web checks hourly, native checks hourly while active and on resume. Forward renewal cookies and persist them on native without reviving a signed-out or previous session.
 - New deps: prefer none. Justify each one (maintenance, size, supply chain); no postinstall-heavy or unmaintained packages.
 
-**Known gaps — fix when you touch the area, never widen:** the per-user Stalwart bridge password is server-derived (`MAIL_BRIDGE_HMAC_KEY`), so the backend can mint a token for any mailbox; server-side invite ingestion reads plaintext mail bodies (as the owner) to auto-file invitations; legacy plaintext calendar/category names stay on the server until a signed-in device runs the name backfill (`backfillEncryptedNames`; subscription feed names and the `Invitations` staging label stay plaintext by design); PII in URLs: `GET /api/profiles/avatar` takes an email, `GET /api/events/search` a plaintext `q`, and `GET /api/mail/keys/:email` takes an email (emails in logged URL paths are redacted, the URLs themselves still carry them); the iOS NSE holds the full session cookie instead of a scoped push-fetch token; avatar fetches follow https→http redirects.
+**Known gaps — fix when you touch the area, never widen** (the Rust port of plan 001 reproduces them exactly so it can be checked against the TypeScript backend; they are fixed in its step 7): the per-user Stalwart bridge password is server-derived (`MAIL_BRIDGE_HMAC_KEY`), so the backend can mint a token for any mailbox; server-side invite ingestion reads plaintext mail bodies (as the owner) to auto-file invitations; legacy plaintext calendar/category names stay on the server until a signed-in device runs the name backfill (`backfillEncryptedNames`; subscription feed names and the `Invitations` staging label stay plaintext by design); PII in URLs: `GET /api/profiles/avatar` takes an email, `GET /api/events/search` a plaintext `q`, and `GET /api/mail/keys/:email` takes an email (emails in logged URL paths are redacted, the URLs themselves still carry them); the iOS NSE holds the full session cookie instead of a scoped push-fetch token; avatar fetches follow https→http redirects.
 
 **Accepted trade-off (decided):** `EventParticipant` email/display name stay plaintext server-side — invites (iMIP via Stalwart) and RSVP matching require them. Never log them, never copy them elsewhere.
 
@@ -69,6 +70,16 @@ Default stance: **the server should not be able to read user content, and we sho
 - Breaking changes must stay compatible with the **shipped native binary/OTA** (additive fields, optional new inputs, deprecate before removing).
 - Timezone-bearing payloads use `timezoneSchema`; instants are UTC ISO 8601.
 - HTTP from apps goes through `@workspace/calendar-client` (no axios/ky; enforced). `apps/web/lib/*-api-service.ts` re-exports are deprecated — import the package.
+
+### Rust backend (MUST)
+
+- Layout: one module per domain in `crates/solace-server/src` (`events.rs`, growing into `events/{routes,service,queries}.rs` past ~300 lines); `name.rs` beside `name/`, never `mod.rs`.
+- Handlers only extract, validate and call the service: `ValidJson`/`ValidQuery` (schemas via `request_schema!` and the Zod-compatible `http::zod`, so messages and issue paths match Zod 3), then `auth.require()?` (validation answers before the guard, as Elysia did), then `service::x(&state, &user, input)`, returning a DTO. No SeaORM in handlers; owner ids come from `RouteUser`, never the client.
+- DTOs live only in `solace-api-types` (serde + utoipa): camelCase, `deny_unknown_fields` on requests, `#[schema(required = true)]` on response fields that are always written, instants as `toISOString()` strings. After changing a DTO or route, run `cargo xtask openapi` and commit `packages/api-contracts`.
+- Errors are `thiserror` enums converted into `AppError` (the `lib/errors.ts` envelope); no `unwrap`/`expect` outside tests; `anyhow` only in `main.rs` and `xtask`.
+- Entities in `db/entities/` are generated (`cargo xtask entities`) and never edited; ids, `created_at` and `updated_at` defaults live in `db/behavior.rs`.
+- Logging: `tracing` with opaque ids only; messages through `telemetry::redact_pii`; Errex reports pass `telemetry::report` scrubbing.
+- Before every commit: `cargo xtask check` (fmt, clippy, tests, the suite on Rust in both modes against `crates/solace-api-tests/rust-passing.txt`, codegen diffs, Jest destinations, memory budgets).
 
 ## 4. Data layer: TanStack Query (MUST)
 
@@ -136,7 +147,8 @@ Verify only — **don't start dev servers, builds, tunnels, EAS builds, OTA publ
 - `bun run typecheck` / `bun run typecheck:native` (native-core + both apps)
 - `bun run test` runs every workspace with a `test` script, packages included (or `test:backend|native|ui|notifications`, single file paths)
 - `bun run lint:react-doctor`; Prisma: `cd apps/backend && bun run db:generate`
-- API suite (test environment only, `crates/solace-api-tests/README.md`): `cargo xtask test-env up`, `cargo xtask ts-backend --checkout <worktree without .env>`, then `API_BASE_URL=… TEST_DATABASE_URL=… cargo test -p solace-api-tests --test api`. Never point it at `apps/backend/.env`.
+- Rust: `cargo xtask check` (everything CI runs); `cargo xtask openapi`, `cargo xtask entities`, `cargo xtask mem-budget`. Local builds need `OPENSSL_DIR` where OpenSSL headers are not on the system path.
+- API suite (test environment only, `crates/solace-api-tests/README.md`): `cargo xtask test-env up`, then `cargo test -p solace-api-tests --test api` (in-process Rust); against the TypeScript backend, `cargo xtask ts-backend --checkout <worktree without .env>` and set `API_BASE_URL`/`TEST_DATABASE_URL`. Never point it at `apps/backend/.env`, and run TS checks for backend work from a worktree without `.env` files (`bun --no-env-file`).
 - Native OTA wrappers share `scripts/native-publish-update.ts`; keep build-profile validation and runtime pinning there.
 - `bun run check:rules` — offline AST/regex repo rules in `scripts/repo-rules/` (privacy, API, data, comments, strict TypeScript, React, WCAG, theme tokens, cross-browser motion; list in its `README.md`). Each rule self-tests its bad/good examples first. Narrow with `--rule=<id>`, file paths, or `--counts`. A reviewed exception is `// repo-rules-allow <rule-id>: <reason>` on the line or the line above; never allow-comment to silence a real violation.
 

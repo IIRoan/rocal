@@ -36,6 +36,9 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["f
 sentry = { version = "0.49", default-features = false, features = ["backtrace", "panic", "reqwest", "rustls"] }
 uuid = { version = "1", features = ["v4"] }
 hex = "0.4"
+# Allocators, picked by `cargo xtask mem-budget`.
+mimalloc = { version = "0.1", default-features = false }
+tikv-jemallocator = "0.7"
 # Prisma `cuid()` ids.
 cuid = { version = "2", default-features = false, features = ["v1"] }
 subtle = "2"

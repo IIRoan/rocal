@@ -1,0 +1,11 @@
+# Suite tests the Rust server passes in both modes; cargo xtask check fails if one regresses. Each sub-step adds its cases.
+e2e_security::api_sends_strict_security_headers
+e2e_security::cors_does_not_trust_localhost_in_production
+e2e_security::cors_trusts_the_app_origin
+e2e_security::web_sends_csp_and_security_headers
+edges::cors_reflects_only_trusted_origins
+edges::every_kind_of_response_carries_the_security_headers
+edges::health_and_root_routes
+edges::only_the_auth_error_page_may_use_inline_styles
+mail_jmap::the_mail_server_reachability_probe_reports_ok
+mail_support::bridge_secrets_match_the_typescript_derivation
