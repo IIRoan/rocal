@@ -94,3 +94,9 @@ apps/backend/__tests__/routes/calendar-sharing.test.ts	calendarSharingRoutes ›
 apps/backend/__tests__/routes/calendar-sharing.test.ts	calendarSharingRoutes › accepts POST /calendars/:id/share-link without a JSON body	suite:calendar_sharing::enabling_issues_a_public_url_and_keeps_its_token
 apps/backend/__tests__/services/calendar-sharing.service.test.ts	CalendarSharingService.disableShareLink › disables sharing and re-encrypts shadow-write events	suite:calendar_sharing::disabling_drops_plaintext_shadows_beside_ciphertext
 apps/backend/__tests__/services/calendar-sharing.service.test.ts	CalendarSharingService.disableShareLink › rejects disabling sharing for synced calendars	suite:calendar_sharing::synced_calendars_cannot_be_shared
+apps/backend/__tests__/routes/mail-settings.test.ts	mailSettingsRoutes › returns encrypted mail settings	suite:encrypted_blobs::uploads_create_then_replace_the_blob
+apps/backend/__tests__/routes/mail-settings.test.ts	mailSettingsRoutes › returns null when no mail settings exist	suite:encrypted_blobs::reads_null_before_the_first_upload
+apps/backend/__tests__/routes/mail-settings.test.ts	mailSettingsRoutes › upserts encrypted mail settings	suite:encrypted_blobs::uploads_create_then_replace_the_blob
+apps/backend/__tests__/routes/recent-contacts.test.ts	recentContactsRoutes › returns encrypted recent contacts	suite:encrypted_blobs::uploads_create_then_replace_the_blob
+apps/backend/__tests__/routes/recent-contacts.test.ts	recentContactsRoutes › returns null when no recent contacts exist	suite:encrypted_blobs::reads_null_before_the_first_upload
+apps/backend/__tests__/routes/recent-contacts.test.ts	recentContactsRoutes › upserts encrypted recent contacts	suite:encrypted_blobs::uploads_create_then_replace_the_blob

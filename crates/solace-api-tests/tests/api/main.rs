@@ -9,4 +9,5 @@ mod helpers;
 mod calendar_sharing;
 mod calendars;
 mod categories;
+mod encrypted_blobs;
 mod settings;
