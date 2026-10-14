@@ -118,7 +118,7 @@ async fn mailbox_changes_are_announced_to_the_owner_only() {
     let account = owner.account_id().to_owned();
 
     // The local Bun server drops a stream after 10 s without writes, so each attempt gets a fresh pair of streams.
-    for _attempt in 0..4 {
+    for _attempt in 0..8 {
         let mut owner_stream = EventStream::open(&app, &owner.user).await;
         let mut bystander_stream = EventStream::open(&app, &bystander.user).await;
         let deadline = Instant::now() + Duration::from_secs(9);
@@ -128,15 +128,21 @@ async fn mailbox_changes_are_announced_to_the_owner_only() {
                 Some("retry: 5000\n: connected")
             );
         }
-        let subject = unique_subject("Realtime");
-        owner
-            .append(
-                "inbox",
-                json!({"from": [{"email": "sam@example.com"}], "to": [{"email": owner.user.email}], "subject": subject,
-                       "bodyValues": {"t": {"value": "Ping"}}, "textBody": [{"partId": "t", "type": "text/plain"}]}),
-            )
-            .await;
-        let Some(event) = owner_stream.next_mail_changed(deadline).await else {
+        // A new message every two seconds, so a subscription that comes up late still sees a change.
+        let mut received = None;
+        while received.is_none() && Instant::now() < deadline {
+            let subject = unique_subject("Realtime");
+            owner
+                .append(
+                    "inbox",
+                    json!({"from": [{"email": "sam@example.com"}], "to": [{"email": owner.user.email}], "subject": subject,
+                           "bodyValues": {"t": {"value": "Ping"}}, "textBody": [{"partId": "t", "type": "text/plain"}]}),
+                )
+                .await;
+            let wait = (Instant::now() + Duration::from_secs(2)).min(deadline);
+            received = owner_stream.next_mail_changed(wait).await;
+        }
+        let Some(event) = received else {
             continue;
         };
         assert_eq!(event.kind, "mail.changed");

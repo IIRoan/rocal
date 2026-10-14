@@ -236,8 +236,8 @@ async fn new_invitees_get_a_noreply_invitation_with_an_ics_request() {
         assert!(mail.text.contains("\n\nAgenda\nItems\n\n"), "{}", mail.text);
         assert!(
             mail.text.ends_with(&format!(
-                "Open event: http://localhost:4100/calendar?eventId={}\n\nAn ICS calendar invite is attached.",
-                event.id
+                "Open event: {}/calendar?eventId={}\n\nAn ICS calendar invite is attached.",
+                app.origin, event.id
             )),
             "{}",
             mail.text

@@ -823,12 +823,12 @@ async fn mail_config_is_public() {
     assert_eq!(config.default_domain, app.env.mail_domain);
     assert_eq!(
         config.discovery_base_url,
-        format!("{}/api/mail/jmap", app.base_url)
+        format!("{}/api/mail/jmap", app.public_api_url)
     );
     assert!(config.signup_enabled);
     assert_eq!(
         config.oauth.mail_token_endpoint,
-        format!("{}/api/mail/oauth/access-token", app.base_url)
+        format!("{}/api/mail/oauth/access-token", app.public_api_url)
     );
     let limits = config.server_limits.expect("Stalwart limits");
     assert!(limits.max_blob_upload_bytes.unwrap_or_default() > 0);

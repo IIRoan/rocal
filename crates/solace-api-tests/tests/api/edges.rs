@@ -291,6 +291,16 @@ async fn unknown_routes_and_methods_are_not_found() {
 #[tokio::test]
 async fn only_the_auth_error_page_may_use_inline_styles() {
     let app = TestApp::spawn().await;
+    if app.mode == Mode::Production {
+        // Production Better Auth sends errors to the app instead of rendering its page.
+        let response = ok(app
+            .anonymous()
+            .get("/api/auth/error")
+            .await
+            .expect_status(302));
+        assert_eq!(header(&response, "location"), Some("/?error=UNKNOWN"));
+        return;
+    }
     let response = ok(app
         .anonymous()
         .get("/api/auth/error")

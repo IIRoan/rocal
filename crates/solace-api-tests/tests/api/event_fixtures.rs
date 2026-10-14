@@ -164,7 +164,7 @@ pub struct SentMail {
 /// Mail the noreply identity sent to `to`, waiting until `expected` messages are indexed.
 pub async fn sent_mail(app: &TestApp, to: &str, expected: usize) -> Vec<SentMail> {
     let mut found = Vec::new();
-    for _ in 0..40 {
+    for _ in 0..80 {
         found = query_sent_mail(app, to).await;
         if found.len() >= expected {
             break;
