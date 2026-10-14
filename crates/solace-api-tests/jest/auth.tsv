@@ -13,11 +13,11 @@ apps/backend/__tests__/lib/auth-cookie-migration.test.ts	auth cookie migration �
 apps/backend/__tests__/lib/auth-cookie-migration.test.ts	auth cookie migration › is a no-op outside production or when hostname equals root domain	suite:auth_sessions::production_expires_legacy_host_scoped_cookies_except_for_expo
 apps/backend/__tests__/lib/auth-email.test.ts	auth-email › builds a password changed email for the changed action branch	suite:auth_passwords::change_password_replaces_the_hash_and_mails_a_confirmation
 apps/backend/__tests__/lib/auth-email.test.ts	auth-email › builds a password updated email with the right action text	suite:auth_passwords::a_password_reset_round_trip
-apps/backend/__tests__/lib/auth-email.test.ts	auth-email › builds an escaped reset password email	unit:solace-server::auth::email::tests::reset_mail_escapes_the_name_in_html
+apps/backend/__tests__/lib/auth-email.test.ts	auth-email › builds an escaped reset password email	unit:solace-server::email::tests::reset_mail_escapes_the_name_in_html
 apps/backend/__tests__/lib/auth-email.test.ts	auth-email › extracts the password change recipient from a Better Auth response	n/a: Rust reads the recipient from the user row instead of parsing a Better Auth response; the confirmation mail is pinned by suite:auth_passwords::change_password_replaces_the_hash_and_mails_a_confirmation
-apps/backend/__tests__/lib/auth-email.test.ts	auth-email › keeps password update notifications best-effort when delivery fails	unit:solace-server::auth::email::tests::password_update_notices_are_best_effort
-apps/backend/__tests__/lib/auth-email.test.ts	auth-email › logs a fallback instead of throwing when a required email provider is missing in development	unit:solace-server::auth::email::tests::a_missing_mailer_is_logged_in_development
-apps/backend/__tests__/lib/auth-email.test.ts	auth-email › throws for required delivery failures from the email provider	unit:solace-server::auth::email::tests::required_mail_failures_are_errors
+apps/backend/__tests__/lib/auth-email.test.ts	auth-email › keeps password update notifications best-effort when delivery fails	unit:solace-server::email::tests::password_update_notices_are_best_effort
+apps/backend/__tests__/lib/auth-email.test.ts	auth-email › logs a fallback instead of throwing when a required email provider is missing in development	unit:solace-server::email::tests::a_missing_mailer_is_logged_in_development
+apps/backend/__tests__/lib/auth-email.test.ts	auth-email › throws for required delivery failures from the email provider	unit:solace-server::email::tests::required_mail_failures_are_errors
 apps/backend/__tests__/lib/auth-guard.test.ts	requireAuth › forwards renewed cookies without performing a second session read	suite:auth_sessions::app_routes_forward_every_renewal_cookie
 apps/backend/__tests__/lib/auth-guard.test.ts	requireAuth › resolves routeUser from better-auth session	suite:auth_sessions::me_and_user_report_the_session_user
 apps/backend/__tests__/lib/auth-guard.test.ts	requireAuth › returns 401 when no session is available	suite:invites::anonymous_callers_are_refused

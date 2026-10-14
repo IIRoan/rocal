@@ -18,6 +18,7 @@ mod event_fixtures;
 mod events;
 mod events_import;
 mod events_list;
+mod interop;
 mod invitations;
 mod invites;
 mod mail_account;

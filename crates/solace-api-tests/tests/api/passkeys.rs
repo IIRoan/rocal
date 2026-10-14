@@ -26,7 +26,11 @@ fn rp_id(app: &TestApp) -> String {
         .expect("origin host")
 }
 
-async fn register(app: &TestApp, user: &mut TestUser, name: &str) -> (SoftPasskey, Value) {
+pub(crate) async fn register(
+    app: &TestApp,
+    user: &mut TestUser,
+    name: &str,
+) -> (SoftPasskey, Value) {
     let options = ok(user
         .get("/api/auth/passkey/generate-register-options")
         .await

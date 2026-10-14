@@ -72,7 +72,14 @@ impl Drop for ScratchDatabase {
     }
 }
 
-/// Clones the template, then serves the Rust backend on a random port with the same settings the TypeScript backend gets.
+fn mode() -> Mode {
+    match std::env::var("TEST_BACKEND_MODE").as_deref() {
+        Ok("production") => Mode::Production,
+        _ => Mode::Development,
+    }
+}
+
+/// Clones the template, then serves the Rust backend on it.
 async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDatabase) {
     let name = format!("solace_test_run_{}", hex(8));
     let mut admin = sqlx::PgConnection::connect(&env.database_url)
@@ -83,6 +90,16 @@ async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDataba
         .await
         .expect("clone the template database (run `cargo xtask test-env template`)");
     let database_url = env.database_url_for(&name).expect("scratch database url");
+    let base_url = serve_rust(env, mode, &database_url).await;
+    let scratch = ScratchDatabase {
+        admin_url: env.database_url.clone(),
+        name,
+    };
+    (base_url, database_url, scratch)
+}
+
+/// Serves the Rust backend on a random port with the same settings the TypeScript backend gets.
+async fn serve_rust(env: &TestEnv, mode: Mode, database_url: &str) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind a port");
@@ -90,7 +107,7 @@ async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDataba
     let vars = env.backend_vars(&BackendTarget {
         port,
         production: mode == Mode::Production,
-        database_url: &database_url,
+        database_url,
         stalwart_provision_token: "",
     });
     let config = solace_server::config::Config::from_lookup(|wanted| {
@@ -99,7 +116,7 @@ async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDataba
             .map(|(_, value)| value.clone())
     })
     .expect("server config");
-    let pool = solace_server::db::connect(&database_url)
+    let pool = solace_server::db::connect(database_url)
         .await
         .expect("server pool");
     let state = solace_server::state::AppState::new(config, pool).expect("server state");
@@ -108,11 +125,7 @@ async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDataba
         state,
         std::future::pending(),
     ));
-    let scratch = ScratchDatabase {
-        admin_url: env.database_url.clone(),
-        name,
-    };
-    (format!("http://localhost:{port}"), database_url, scratch)
+    format!("http://localhost:{port}")
 }
 
 pub struct TestUser {
@@ -127,10 +140,7 @@ impl TestApp {
     /// The Rust server in-process on a random port with a fresh database, or `API_BASE_URL` (whose database is `TEST_DATABASE_URL`).
     pub async fn spawn() -> Self {
         let env = TestEnv::from_env().expect("test environment");
-        let mode = match std::env::var("TEST_BACKEND_MODE").as_deref() {
-            Ok("production") => Mode::Production,
-            _ => Mode::Development,
-        };
+        let mode = mode();
         let (base_url, backend, database_url, scratch) = match std::env::var("API_BASE_URL") {
             Ok(base_url) => {
                 guard::check_service_url("API_BASE_URL", &base_url).expect("API_BASE_URL");
@@ -145,6 +155,38 @@ impl TestApp {
                 (base_url, Backend::Rust, database_url, Some(scratch))
             }
         };
+        Self::connect(env, mode, base_url, backend, &database_url, scratch).await
+    }
+
+    /// The TypeScript backend at `INTEROP_TS_URL` and the Rust server in-process on its database (`TEST_DATABASE_URL`); `None` when unset.
+    pub async fn interop() -> Option<(Self, Self)> {
+        let ts_url = std::env::var("INTEROP_TS_URL").ok()?;
+        guard::check_service_url("INTEROP_TS_URL", &ts_url).expect("INTEROP_TS_URL");
+        let env = TestEnv::from_env().expect("test environment");
+        let mode = mode();
+        let database_url = env.database_url.clone();
+        let rust_url = serve_rust(&env, mode, &database_url).await;
+        let ts = Self::connect(
+            env.clone(),
+            mode,
+            ts_url,
+            Backend::TypeScript,
+            &database_url,
+            None,
+        )
+        .await;
+        let rust = Self::connect(env, mode, rust_url, Backend::Rust, &database_url, None).await;
+        Some((ts, rust))
+    }
+
+    async fn connect(
+        env: TestEnv,
+        mode: Mode,
+        base_url: String,
+        backend: Backend,
+        database_url: &str,
+        scratch: Option<ScratchDatabase>,
+    ) -> Self {
         let public_api_url = std::env::var("TEST_PUBLIC_API_URL").unwrap_or_else(|_| match mode {
             Mode::Development => base_url.trim_end_matches('/').to_owned(),
             Mode::Production => PRODUCTION_BACKEND_URL.into(),
@@ -158,7 +200,7 @@ impl TestApp {
         });
         let db = PgPoolOptions::new()
             .max_connections(2)
-            .connect(&database_url)
+            .connect(database_url)
             .await
             .expect("connect to the backend's test database");
 

@@ -749,9 +749,13 @@ async fn session_cookies_carry_the_documented_attributes() {
         }
     }
     if app.backend == Backend::Rust {
+        // Production's legacy host-scoped clears name session_data too; only a cache that is set would be wrong.
         assert!(
-            set_cookies_named(&response, &app.auth_cookie("session_data")).is_empty(),
-            "Rust has no session_data cookie cache"
+            set_cookies_named(&response, &app.auth_cookie("session_data"))
+                .iter()
+                .all(|c| c.contains("Max-Age=0")),
+            "Rust has no session_data cookie cache: {:?}",
+            response.set_cookies()
         );
     }
 }

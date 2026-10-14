@@ -267,6 +267,29 @@ Each sub-step is done when its suite cases pass against Rust and the memory budg
   - passkeys, with register, sign-in, list, update, delete, and step-up;
   - the fresh-session bridge, one-time tokens, Expo, rate limits, and legacy cookie cleanup.
   - Sessions, passwords, and passkeys created by either backend must work on the other.
+
+  **4b result (2026-10-14, done):**
+
+  - `solace-server` serves every Better Auth endpoint Solace uses, on the existing tables:
+    - email sign-up behind the invite gate (with `markInviteAccepted`), sign-in, sign-out, get-session, and session list and revoke;
+    - password change (with its notice mail), reset (mail, callback, reset) and verify, `update-user`, and the disabled `delete-user`;
+    - passkeys on webauthn-rs-core 0.5.5 over the stored COSE keys: options, register, sign-in, list, rename, delete, and the step-up cookie;
+    - the passkey bridge (`freshen-session`, and `complete-step-up` with its known gap) and one-time tokens (3 minutes, stored as SHA-256);
+    - Expo's origin override and `exp://` in development, the Postgres rate limits, and the legacy host-scoped cookie clears.
+  - It also serves Solace's own account routes (`signup-config`, `email-availability`, `auth-status`, invite validate and claim) and invites (create, list and revoke, with the invite mail). App mail goes out as the noreply identity over JMAP with the `auth-email.ts` templates.
+  - Behavior pinned while porting:
+    - better-call keeps the cookies set before an error, so Rust's error replies carry the session-renewal cookie too. Checked against TypeScript: a `SESSION_NOT_FRESH` 403 carries the renewed session cookie.
+    - Reset links, passkey challenges and one-time tokens are consumed with one `DELETE … RETURNING`, so concurrent requests use each one once.
+    - Not ported because nothing calls them: the JWT plugin (see the log check below), and Expo's OAuth proxy and redirect hooks (Solace has no social providers, magic links or email verification).
+  - **Interop:** `tests/api/interop.rs` runs the TypeScript backend (`INTEROP_TS_URL`) and the Rust server on one database. Sessions, password hashes, passkeys with their counters, and the step-up cookie made by either backend work on the other, in both modes. It skips without `INTEROP_TS_URL`, so it is not in the passing list.
+  - **Suite:** `rust-passing.txt` lists 76 cases that pass on Rust in both modes. Fourteen auth cases use an app route (`/api/settings`, `/api/calendars`, events) as the guarded route, so they move to 4c:
+    - `auth_limits::the_expo_apps_sign_in_with_their_schemes`;
+    - `auth_sessions::app_routes_forward_every_renewal_cookie` and `revoked_sessions_stop_working_on_app_routes`;
+    - `edges::error_envelopes_echo_the_request_id`;
+    - six `e2e_security` cases;
+    - `passkeys::signing_in_with_a_passkey_creates_a_session_with_step_up`, `accounts_with_a_passkey_need_step_up_after_a_password_sign_in`, `an_old_step_up_cookie_is_renewed_daily_during_use` and `complete_step_up_marks_any_session_verified_known_gap`.
+  - **Memory** (jemalloc): 18.3 MiB idle and 22.1 MiB at steady peak. Twenty concurrent sign-ins peaked at 86.8 MiB, against a budget of 98.3 (idle + 2 × 32 + 16). Sixty seconds later RSS was back to 22.6 MiB, 5% above the 21.5 before the burst (budget 10%).
+  - **JWT log check, continued:** nine samples between 14:14 and 19:37 UTC, each covering the hour before it, saw 0 hits on `/api/auth/token` and `/api/auth/jwks` (50 on the `/api/health` control). The plugin stays unported.
 - **4c. Calendar and account:**
   - settings, profile and avatars, calendars, categories, and recent contacts;
   - events (CRUD, bulk, recurring edits, search), participants and RSVP, and invitations;
