@@ -32,19 +32,24 @@ else
 fi
 chown -R stalwart:stalwart /etc/stalwart /var/lib/stalwart
 
-runuser -u stalwart -- /usr/local/bin/stalwart --config /etc/stalwart/config.json &
-STALWART_PID=$!
-trap 'kill "$STALWART_PID" ${GATE_PID:-} 2>/dev/null || true' EXIT
+start_stalwart() {
+	runuser -u stalwart -- /usr/local/bin/stalwart --config /etc/stalwart/config.json &
+	STALWART_PID=$!
+	i=0
+	until curl -fsS --max-time 2 -u "${STALWART_RECOVERY_ADMIN}" "${ADMIN_URL}/jmap/session" >/dev/null 2>&1; do
+		i=$((i + 1))
+		[ "$i" -lt 60 ] || die "Stalwart JMAP did not come up."
+		sleep 1
+	done
+}
+trap 'kill "${STALWART_PID:-}" ${GATE_PID:-} 2>/dev/null || true' EXIT
 trap 'exit 0' TERM INT
 
 # Admin calls use the container address: loopback needs PROXY v2 once the gate plan trusts it.
-ADMIN_URL="http://$(hostname -i | awk '{print $1}'):${STALWART_HTTP_PORT}"
-i=0
-until curl -fsS --max-time 2 -u "${STALWART_RECOVERY_ADMIN}" "${ADMIN_URL}/jmap/session" >/dev/null 2>&1; do
-	i=$((i + 1))
-	[ "$i" -lt 60 ] || die "Stalwart JMAP did not come up."
-	sleep 1
-done
+ADMIN_HOST="$(hostname -I | tr ' ' '\n' | grep -E '^[0-9]+\.' | grep -v '^127\.' | head -n 1)"
+[ -n "$ADMIN_HOST" ] || ADMIN_HOST="[$(hostname -I | tr ' ' '\n' | grep ':' | grep -v '^fe80' | head -n 1)]"
+ADMIN_URL="http://${ADMIN_HOST}:${STALWART_HTTP_PORT}"
+start_stalwart
 
 # Mailbox provisioning on Stalwart 0.16 needs more than the git role grants: the User role (to grant it) and impersonate (keys, settings).
 SOLACE_TEST_USER_ROLE_ID="$(curl -fsS -u "${STALWART_RECOVERY_ADMIN}" -H 'Content-Type: application/json' "${ADMIN_URL}/jmap/" \
@@ -64,6 +69,12 @@ stalwart-cli --url "$ADMIN_URL" --user admin --password "$SOLACE_TEST_ADMIN_PASS
 rm -f "$PLAN"
 stalwart-cli --url "$ADMIN_URL" --user admin --password "$SOLACE_TEST_ADMIN_PASSWORD" create Action/ReloadSettings >/dev/null 2>&1 || true
 log info "Test plan applied."
+
+if [ -n "$GATE_PLAN" ]; then
+	# Listeners only pick up the new PROXY trust on start.
+	kill "$STALWART_PID" && wait "$STALWART_PID" 2>/dev/null || true
+	start_stalwart
+fi
 
 if [ -n "${STALWART_GATE_KEY:-}" ]; then
 	require_test_secret STALWART_GATE_KEY

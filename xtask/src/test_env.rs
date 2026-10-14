@@ -145,7 +145,7 @@ async fn seed(env: &TestEnv, api: &str, database: &str) -> anyhow::Result<()> {
         fixtures_dir: &fixtures_dir,
     })
     .await?;
-    let path = seed_manifest_path(database);
+    let path = seed_manifest_path(env, database);
     std::fs::create_dir_all(path.parent().context("manifest dir")?)?;
     std::fs::write(&path, serde_json::to_vec_pretty(&manifest)?)?;
     println!(
@@ -156,8 +156,17 @@ async fn seed(env: &TestEnv, api: &str, database: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn seed_manifest_path(database: &str) -> std::path::PathBuf {
-    crate::repo_root().join(format!("target/solace-test-env/seed-{database}.json"))
+/// Per database server, so local and Railway seeds of the same database name do not overwrite each other.
+pub fn seed_manifest_path(env: &TestEnv, database: &str) -> std::path::PathBuf {
+    let server = url_host_port(
+        &env.database_url
+            .replace("postgresql://", "x://")
+            .replace("postgres://", "x://"),
+    );
+    let server = server.rsplit('@').next().unwrap_or_default().to_owned();
+    crate::repo_root().join(format!(
+        "target/solace-test-env/seed-{server}-{database}.json"
+    ))
 }
 
 /// Runs `apps/backend/prisma/migrations/*/migration.sql` in name order, as `prisma migrate deploy` does.
@@ -184,11 +193,13 @@ pub async fn provision_key(env: &TestEnv) -> anyhow::Result<String> {
     let host = url_host_port(&env.stalwart_url);
     let cache = crate::repo_root().join(format!("target/solace-test-env/provision-key-{host}"));
     if let Ok(key) = std::fs::read_to_string(&cache) {
-        let session = reqwest::Client::new()
+        let mut request = reqwest::Client::new()
             .get(format!("{}/jmap/session", env.stalwart_url))
-            .bearer_auth(key.trim())
-            .send()
-            .await?;
+            .bearer_auth(key.trim());
+        if let Some(gate) = &env.stalwart_gate_key {
+            request = request.header("X-Solace-Gate", gate);
+        }
+        let session = request.send().await?;
         if session.status().is_success() {
             return Ok(key.trim().to_owned());
         }
@@ -245,9 +256,13 @@ async fn mint_provision_key(env: &TestEnv) -> anyhow::Result<String> {
 }
 
 async fn admin_jmap(env: &TestEnv, method_calls: Value) -> anyhow::Result<Value> {
-    let response = reqwest::Client::new()
+    let mut request = reqwest::Client::new()
         .post(format!("{}/jmap/", env.stalwart_url))
-        .basic_auth("admin", Some(&env.stalwart_admin_password))
+        .basic_auth("admin", Some(&env.stalwart_admin_password));
+    if let Some(key) = &env.stalwart_gate_key {
+        request = request.header("X-Solace-Gate", key);
+    }
+    let response = request
         .json(&json!({
             "using": ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
             "methodCalls": method_calls,

@@ -36,6 +36,12 @@ pub struct TestEnv {
     pub stalwart_provisioner_password: String,
     pub stalwart_noreply_password: String,
     pub mail_domain: String,
+    /// Backend-gate key of an https test Stalwart (`TEST_STALWART_GATE_KEY`); unset for local plain HTTP.
+    pub stalwart_gate_key: Option<String>,
+    /// Secrets the backend under test runs with (`TEST_BETTER_AUTH_SECRET` etc.), defaulting to [`LOCAL_SECRETS`].
+    pub better_auth_secret: String,
+    pub mail_bridge_hmac_key: String,
+    pub stalwart_webhook_secret: String,
 }
 
 impl TestEnv {
@@ -65,7 +71,23 @@ impl TestEnv {
                 LOCAL_STALWART_NOREPLY_PASSWORD.into(),
             ),
             mail_domain: var("TEST_MAIL_DOMAIN", TEST_MAIL_DOMAIN.into()),
+            stalwart_gate_key: std::env::var("TEST_STALWART_GATE_KEY").ok(),
+            better_auth_secret: var("TEST_BETTER_AUTH_SECRET", LOCAL_SECRETS.better_auth.into()),
+            mail_bridge_hmac_key: var(
+                "TEST_MAIL_BRIDGE_HMAC_KEY",
+                LOCAL_SECRETS.mail_bridge_hmac.into(),
+            ),
+            stalwart_webhook_secret: var(
+                "TEST_STALWART_WEBHOOK_SECRET",
+                LOCAL_SECRETS.stalwart_webhook.into(),
+            ),
         };
+        guard::check_secret("TEST_BETTER_AUTH_SECRET", &env.better_auth_secret)?;
+        guard::check_secret("TEST_MAIL_BRIDGE_HMAC_KEY", &env.mail_bridge_hmac_key)?;
+        guard::check_secret("TEST_STALWART_WEBHOOK_SECRET", &env.stalwart_webhook_secret)?;
+        if let Some(key) = &env.stalwart_gate_key {
+            guard::check_secret("TEST_STALWART_GATE_KEY", key)?;
+        }
         guard::check_database_url("TEST_DATABASE_URL", &env.database_url)?;
         guard::check_service_url("TEST_STALWART_URL", &env.stalwart_url)?;
         guard::check_secret("TEST_STALWART_ADMIN_PASSWORD", &env.stalwart_admin_password)?;

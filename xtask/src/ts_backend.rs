@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, bail};
-use solace_api_tests::env::{LOCAL_SECRETS, TestEnv};
+use solace_api_tests::env::TestEnv;
 use solace_api_tests::guard;
 
 pub async fn run(args: &[&str]) -> anyhow::Result<()> {
@@ -40,14 +40,11 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         ("FRONTEND_URL", "http://localhost:4100".to_owned()),
         ("PASSKEY_ORIGIN", "http://localhost:4100".to_owned()),
         ("DATABASE_URL", database_url),
-        ("BETTER_AUTH_SECRET", LOCAL_SECRETS.better_auth.to_owned()),
-        (
-            "MAIL_BRIDGE_HMAC_KEY",
-            LOCAL_SECRETS.mail_bridge_hmac.to_owned(),
-        ),
+        ("BETTER_AUTH_SECRET", env.better_auth_secret.clone()),
+        ("MAIL_BRIDGE_HMAC_KEY", env.mail_bridge_hmac_key.clone()),
         (
             "STALWART_WEBHOOK_SECRET",
-            LOCAL_SECRETS.stalwart_webhook.to_owned(),
+            env.stalwart_webhook_secret.clone(),
         ),
         // Every STALWART_* variable is set: the backend otherwise falls back to production Stalwart.
         ("STALWART_BASE_URL", env.stalwart_url.clone()),
@@ -55,7 +52,10 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         ("STALWART_DEFAULT_DOMAIN", env.mail_domain.clone()),
         ("STALWART_PROVISION_TOKEN", provision_token),
         ("STALWART_ADMIN_TOKEN", String::new()),
-        ("STALWART_GATE_KEY", String::new()),
+        (
+            "STALWART_GATE_KEY",
+            env.stalwart_gate_key.clone().unwrap_or_default(),
+        ),
         (
             "STALWART_JMAP_USERNAME",
             format!("noreply@{}", env.mail_domain),
