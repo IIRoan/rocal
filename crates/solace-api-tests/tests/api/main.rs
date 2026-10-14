@@ -13,9 +13,14 @@ mod e2e_security;
 mod edges;
 mod encrypted_blobs;
 mod invites;
+mod mail_account;
+mod mail_jmap;
 mod passkeys;
 mod settings;
 
 // Shared by every domain module; no single module uses every helper.
 #[allow(dead_code)]
 mod helpers;
+// Shared by the mail modules; no single module uses every fixture.
+#[allow(dead_code)]
+mod mail_support;
