@@ -15,10 +15,16 @@ mod e2ee;
 mod edges;
 mod encrypted_blobs;
 mod invites;
+mod mail_account;
+mod mail_jmap;
+mod mail_realtime;
+mod mail_support;
+mod mail_sync;
 mod passkeys;
 mod profiles;
 mod push_devices;
 mod settings;
+mod stalwart_webhook;
 mod subscriptions;
 
 // Shared by every domain module; no single module uses every helper.

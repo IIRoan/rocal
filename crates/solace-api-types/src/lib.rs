@@ -6,6 +6,7 @@ pub mod calendars;
 pub mod categories;
 pub mod common;
 pub mod e2ee;
+pub mod mail;
 pub mod mail_settings;
 pub mod profiles;
 pub mod push_devices;
