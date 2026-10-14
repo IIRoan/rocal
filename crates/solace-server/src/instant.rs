@@ -25,6 +25,91 @@ pub fn seconds(seconds: i64) -> Duration {
     Duration::seconds(seconds)
 }
 
+/// Epoch milliseconds, the unit of JavaScript `Date` arithmetic.
+pub fn unix_millis(value: PrimitiveDateTime) -> i64 {
+    let at = value.assume_utc();
+    at.unix_timestamp() * 1000 + i64::from(at.millisecond())
+}
+
+/// Back from epoch milliseconds; `None` outside the range a timestamp column holds.
+pub fn from_unix_millis(millis: i64) -> Option<PrimitiveDateTime> {
+    let at = OffsetDateTime::from_unix_timestamp_nanos(i128::from(millis) * 1_000_000).ok()?;
+    Some(PrimitiveDateTime::new(at.date(), at.time()))
+}
+
+/// `new Date(text)` for the forms clients send: ISO 8601 (a date-time without offset is UTC, the servers' zone) and RFC 2822.
+pub fn parse_js_date(text: &str) -> Option<i64> {
+    let text = text.trim();
+    if let Ok(timestamp) = text.parse::<jiff::Timestamp>() {
+        return Some(timestamp.as_millisecond());
+    }
+    let utc = |datetime: jiff::civil::DateTime| {
+        datetime
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .ok()
+            .map(|zoned| zoned.timestamp().as_millisecond())
+    };
+    if let Ok(datetime) = text.parse::<jiff::civil::DateTime>() {
+        return utc(datetime);
+    }
+    if let Ok(date) = text.parse::<jiff::civil::Date>() {
+        return utc(date.to_datetime(jiff::civil::Time::midnight()));
+    }
+    jiff::fmt::rfc2822::parse(text)
+        .ok()
+        .map(|zoned| zoned.timestamp().as_millisecond())
+}
+
+/// `±HH`, `±HHMM` or `±HH:MM`, the offset zones `Intl.DateTimeFormat` accepts.
+fn utc_offset(name: &str) -> Option<jiff::tz::Offset> {
+    let sign = match name.as_bytes().first()? {
+        b'+' => 1,
+        b'-' => -1,
+        _ => return None,
+    };
+    let digits = &name[1..];
+    let (hours, minutes) = match digits.len() {
+        2 => (digits, "00"),
+        4 => (&digits[..2], &digits[2..]),
+        5 if digits.as_bytes().get(2) == Some(&b':') => (&digits[..2], &digits[3..]),
+        _ => return None,
+    };
+    if !hours
+        .bytes()
+        .chain(minutes.bytes())
+        .all(|b| b.is_ascii_digit())
+    {
+        return None;
+    }
+    let (hours, minutes): (i32, i32) = (hours.parse().ok()?, minutes.parse().ok()?);
+    if hours > 23 || minutes > 59 {
+        return None;
+    }
+    jiff::tz::Offset::from_seconds(sign * (hours * 3600 + minutes * 60)).ok()
+}
+
+/// A `timeZone` as Bun's `Intl` reads it: an IANA name in any case, or a UTC offset.
+pub fn time_zone(name: &str) -> Option<jiff::tz::TimeZone> {
+    if let Some(offset) = utc_offset(name) {
+        return Some(jiff::tz::TimeZone::fixed(offset));
+    }
+    // jiff also knows `Factory` and `Etc/Unknown`, which JavaScriptCore refuses.
+    if name.eq_ignore_ascii_case("factory") || name.eq_ignore_ascii_case("etc/unknown") {
+        return None;
+    }
+    jiff::tz::db().get(name).ok()
+}
+
+/// `resolveTimezone`: the trimmed zone, or the calendar default when it is blank.
+pub fn resolve_timezone(timezone: Option<&str>) -> String {
+    match timezone.map(str::trim).filter(|zone| !zone.is_empty()) {
+        Some(zone) => zone.to_owned(),
+        None => DEFAULT_TIMEZONE.to_owned(),
+    }
+}
+
+pub const DEFAULT_TIMEZONE: &str = "Europe/Amsterdam";
+
 /// Epoch seconds, as cookie payloads carry them.
 pub fn unix_seconds(value: PrimitiveDateTime) -> i64 {
     value.assume_utc().unix_timestamp()

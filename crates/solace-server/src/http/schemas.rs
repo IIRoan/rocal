@@ -1,8 +1,5 @@
 //! Request-schema pieces shared across routes, one per schema in `route-schemas.ts`, `_schemas.ts` and `_zod.ts`.
 
-use std::sync::LazyLock;
-
-use regex_lite::Regex;
 use serde_json::Value;
 
 use super::zod::{self, RefineCtx, Schema};
@@ -69,19 +66,9 @@ pub fn refine_encrypted_name_body(
     }
 }
 
-/// Offset zones `Intl.DateTimeFormat` accepts: `±HH`, `±HHMM`, `±HH:MM`.
-static UTC_OFFSET: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^[+-](?:[01][0-9]|2[0-3])(?::?[0-5][0-9])?$")
-        .unwrap_or_else(|error| panic!("offset pattern: {error}"))
-});
-
 /// What `Intl.DateTimeFormat(undefined, { timeZone })` accepts in Bun: IANA names in any case, or a UTC offset.
 pub fn is_valid_timezone(value: &str) -> bool {
-    // jiff also knows `Factory` and `Etc/Unknown`, which JavaScriptCore refuses.
-    UTC_OFFSET.is_match(value)
-        || (!value.eq_ignore_ascii_case("factory")
-            && !value.eq_ignore_ascii_case("etc/unknown")
-            && jiff::tz::db().get(value).is_ok())
+    crate::instant::time_zone(value).is_some()
 }
 
 /// `timezoneSchema`.
