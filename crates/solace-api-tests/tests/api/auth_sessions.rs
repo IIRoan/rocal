@@ -334,6 +334,21 @@ async fn sign_in_checks_the_origin_and_fetch_metadata() {
         .await
         .expect("request");
     assert_eq!(plain.status().as_u16(), 200);
+
+    // Localhost is trusted outside production only.
+    let localhost = ok(app
+        .anonymous()
+        .send(
+            reqwest::Method::POST,
+            "/api/auth/sign-in/email",
+            Some(body.clone()),
+            &[("origin", "http://localhost")],
+        )
+        .await);
+    match app.mode {
+        Mode::Production => auth_error(&localhost, 403, "INVALID_ORIGIN", "Invalid origin"),
+        Mode::Development => assert_eq!(localhost.status.as_u16(), 200, "{}", localhost.text()),
+    }
 }
 
 #[tokio::test]
@@ -794,6 +809,8 @@ async fn production_expires_legacy_host_scoped_cookies_except_for_expo() {
     }
     let body = json!({"email": user.email, "password": user.password});
     let mut browser = app.anonymous();
+    // A chunked cookie the request still carries is expired along with the default names.
+    browser.set_cookie(&app.auth_cookie("session_data.0"), "chunk");
     let response = ok(browser
         .post("/api/auth/sign-in/email", body.clone())
         .await
@@ -801,6 +818,7 @@ async fn production_expires_legacy_host_scoped_cookies_except_for_expo() {
     for suffix in [
         "session_token",
         "session_data",
+        "session_data.0",
         "dont_remember",
         "account_data",
     ] {
@@ -840,7 +858,13 @@ async fn production_expires_legacy_host_scoped_cookies_except_for_expo() {
 #[tokio::test]
 async fn app_routes_forward_every_renewal_cookie() {
     let app = TestApp::spawn().await;
-    let user = app.user().await;
+    let mut user = app.user().await;
+    let fresh = user.get("/api/settings").await;
+    assert!(
+        set_cookies_named(&fresh, &app.session_cookie()).is_empty(),
+        "a fresh session is not renewed: {:?}",
+        fresh.set_cookies()
+    );
     sqlx::query("UPDATE session SET expires_at = now() + interval '13 days' WHERE user_id = $1")
         .bind(&user.id)
         .execute(&app.db)

@@ -125,9 +125,14 @@ async fn cors_reflects_only_trusted_origins() {
         Some("Set-Cookie, Server-Timing")
     );
 
-    let mut untrusted = vec!["https://evil.example"];
+    let mut untrusted = vec!["https://evil.example", "http://192.0.2.1:8081"];
     if app.mode == Mode::Production {
-        untrusted.extend(["http://localhost:4000", "https://localhost"]);
+        untrusted.extend([
+            "http://localhost:4000",
+            "https://localhost",
+            "http://localhost:8081",
+            "http://127.0.0.1:8081",
+        ]);
     }
     for origin in untrusted {
         let response = get(origin).await.expect("request");
@@ -139,15 +144,22 @@ async fn cors_reflects_only_trusted_origins() {
         );
     }
     if app.mode == Mode::Development {
-        let response = get("http://localhost:4000").await.expect("request");
-        assert_eq!(
-            response
-                .headers()
-                .get("access-control-allow-origin")
-                .and_then(|v| v.to_str().ok()),
-            Some("http://localhost:4000"),
-            "localhost is trusted outside production"
-        );
+        // Expo web on any loopback port counts as the local host outside production.
+        for origin in [
+            "http://localhost:4000",
+            "http://localhost:8081",
+            "http://127.0.0.1:8081",
+        ] {
+            let response = get(origin).await.expect("request");
+            assert_eq!(
+                response
+                    .headers()
+                    .get("access-control-allow-origin")
+                    .and_then(|v| v.to_str().ok()),
+                Some(origin),
+                "localhost is trusted outside production"
+            );
+        }
     }
 
     let preflight = client

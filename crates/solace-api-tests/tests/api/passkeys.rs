@@ -104,6 +104,26 @@ fn expect_step_up_required(response: &ApiResponse) {
     assert!(body.get("requestId").is_none(), "{body}");
 }
 
+/// With this step-up cookie (or none), neither an app route nor the get-session renewal grants step-up.
+async fn expect_no_step_up(agent: &mut Agent, cookie: Option<&str>) {
+    for path in ["/api/settings", "/api/auth/get-session"] {
+        if let Some(cookie) = cookie {
+            agent.set_cookie(STEP_UP_COOKIE, cookie);
+        }
+        let response = ok(agent.get(path).await);
+        if path == "/api/settings" {
+            expect_step_up_required(&response);
+        }
+        assert!(
+            set_cookies_named(&response, STEP_UP_COOKIE)
+                .iter()
+                .all(|c| c.contains("Max-Age=0")),
+            "{path}: {:?}",
+            response.set_cookies()
+        );
+    }
+}
+
 #[tokio::test]
 async fn registration_options_follow_simplewebauthn() {
     let app = TestApp::spawn().await;
@@ -367,6 +387,14 @@ async fn signing_in_with_a_passkey_creates_a_session_with_step_up() {
         (&payload["u"], &payload["s"]),
         (&json!(user.id), &json!(body.session.id.0))
     );
+    let step_up = set_cookies_named(&response, STEP_UP_COOKIE);
+    let step_up = step_up.first().expect("step-up Set-Cookie");
+    for attribute in ["Max-Age=1209600", "Path=/", "HttpOnly"] {
+        assert!(
+            step_up.contains(attribute),
+            "{attribute} missing: {step_up}"
+        );
+    }
     let counter: i32 = sqlx::query_scalar("SELECT counter FROM passkey WHERE id = $1")
         .bind(created["id"].as_str())
         .fetch_one(&app.db)
@@ -454,6 +482,10 @@ async fn passkey_sign_in_rejects_unknown_replayed_and_forged_assertions() {
         "Authentication failed",
     );
     assert!(agent.cookie(&app.session_cookie()).is_none());
+    assert!(
+        agent.cookie(STEP_UP_COOKIE).is_none(),
+        "a failed assertion grants no step-up"
+    );
 }
 
 #[tokio::test]
@@ -464,7 +496,7 @@ async fn accounts_with_a_passkey_need_step_up_after_a_password_sign_in() {
 
     let mut password_only = password_agent(&app, &user).await;
     assert!(password_only.cookie(STEP_UP_COOKIE).is_none());
-    expect_step_up_required(&ok(password_only.get("/api/settings").await));
+    expect_no_step_up(&mut password_only, None).await;
     let status = ok(password_only
         .get("/api/account/auth-status")
         .await
@@ -481,10 +513,8 @@ async fn accounts_with_a_passkey_need_step_up_after_a_password_sign_in() {
         .cookie(STEP_UP_COOKIE)
         .expect("registering session's cookie")
         .to_owned();
-    password_only.set_cookie(STEP_UP_COOKIE, &borrowed);
-    expect_step_up_required(&ok(password_only.get("/api/settings").await));
-    password_only.set_cookie(STEP_UP_COOKIE, &format!("{}x", borrowed));
-    expect_step_up_required(&ok(password_only.get("/api/settings").await));
+    expect_no_step_up(&mut password_only, Some(&borrowed)).await;
+    expect_no_step_up(&mut password_only, Some(&format!("{borrowed}x"))).await;
     let sid = session_id(&mut password_only).await;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -492,8 +522,7 @@ async fn accounts_with_a_passkey_need_step_up_after_a_password_sign_in() {
         .as_secs() as i64;
     for (user_id, expires) in [("someone-else", now + 86_400), (user.id.as_str(), now - 1)] {
         let forged = forge_step_up(&app.env.better_auth_secret, user_id, &sid, expires);
-        password_only.set_cookie(STEP_UP_COOKIE, &forged);
-        expect_step_up_required(&ok(password_only.get("/api/settings").await));
+        expect_no_step_up(&mut password_only, Some(&forged)).await;
     }
 
     let mut passkey_agent = app.anonymous();

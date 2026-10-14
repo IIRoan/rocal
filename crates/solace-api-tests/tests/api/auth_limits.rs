@@ -156,6 +156,53 @@ async fn passkey_ceremonies_allow_ten_requests_a_minute() {
 }
 
 #[tokio::test]
+async fn account_recovery_endpoints_have_strict_budgets() {
+    let app = TestApp::spawn().await;
+    let email = format!("nobody-{}@solace.test", crate::helpers::hex(6));
+    let cases = [
+        (
+            Method::POST,
+            "/api/auth/request-password-reset",
+            Some(json!({"email": email, "redirectTo": format!("{}/reset-password", app.origin)})),
+            3,
+        ),
+        (
+            Method::POST,
+            "/api/auth/reset-password",
+            Some(json!({"newPassword": "solace-test-password", "token": "missing"})),
+            5,
+        ),
+        (
+            Method::POST,
+            "/api/auth/send-verification-email",
+            Some(json!({"email": email})),
+            3,
+        ),
+        (
+            Method::GET,
+            "/api/auth/verify-email?token=missing",
+            None,
+            10,
+        ),
+        (
+            Method::POST,
+            "/api/auth/one-time-token/verify",
+            Some(json!({"token": "missing"})),
+            10,
+        ),
+    ];
+    for (method, path, body, budget) in cases {
+        let mut agent = app.anonymous();
+        for attempt in 1..=budget {
+            let response = ok(agent.send(method.clone(), path, body.clone(), &[]).await);
+            assert_ne!(response.status.as_u16(), 429, "{path} attempt {attempt}");
+        }
+        let limited = ok(agent.send(method.clone(), path, body.clone(), &[]).await);
+        assert_eq!(limited.status.as_u16(), 429, "{path} after {budget}");
+    }
+}
+
+#[tokio::test]
 async fn the_expo_apps_sign_in_with_their_schemes() {
     let app = TestApp::spawn().await;
     let user = app.user().await;

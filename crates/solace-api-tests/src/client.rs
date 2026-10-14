@@ -145,12 +145,15 @@ impl Agent {
                 .join("; ");
             request = request.header(COOKIE, cookie);
         }
+        // Extra headers replace the defaults (a second Origin header would be a different request).
+        let mut extra = HeaderMap::new();
         for (name, value) in extra_headers {
-            request = request.header(
+            extra.append(
                 HeaderName::try_from(*name).map_err(|e| Error::Unexpected(e.to_string()))?,
                 HeaderValue::try_from(*value).map_err(|e| Error::Unexpected(e.to_string()))?,
             );
         }
+        request = request.headers(extra);
         if let Some(body) = body {
             request = request.json(&body);
         }
