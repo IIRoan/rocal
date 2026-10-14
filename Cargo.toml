@@ -73,3 +73,7 @@ time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "process", "signal", "net"] }
 url = "2"
 utoipa = "6"
+
+# Unoptimized scrypt takes seconds per hash, which dominated every suite run; only dependencies are optimized, so our crates still rebuild fast.
+[profile.dev.package."*"]
+opt-level = 3
