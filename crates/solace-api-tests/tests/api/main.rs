@@ -11,5 +11,6 @@ mod event_fixtures;
 mod events;
 mod events_list;
 mod invitations;
+mod notifications;
 mod recurring;
 mod settings;
