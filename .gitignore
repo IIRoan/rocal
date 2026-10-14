@@ -58,3 +58,6 @@ apps/stalwart/.local-certs/
 
 # Untracked third-party Bulwark (AGPL) reference; never commit.
 webmail/
+
+# Rust build output
+/target
