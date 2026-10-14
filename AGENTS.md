@@ -15,6 +15,7 @@ Solace is a privacy-first calendar + mail product: one web app and two native ap
 | `apps/notifications`  | Go worker: Postgres outbox → noreply mail via Stalwart JMAP + APNs push. Never reads user mailboxes. Reminder mail/push and new-mail push are generic; the iOS Notification Service Extension (`packages/native-core/plugins/notification-service-extension`); the worker routes `event_reminder` pushes to Calendar bundles and `new_mail` to Mail bundles (`internal/push/bundles.go`, mirrored in `calendar-core` `push-device.ts`) decrypts the reminder title / fetches sender+subject on-device. |
 | `apps/stalwart`       | Stalwart mail server, JMAP desired-state plan, VPS HAProxy/frp (`vps/README.md`), key-gated backend gate for the API (`backend-gate.cfg`). Containers join frp load-balancing groups on the VPS, so image and VPS deploy independently. |
 | `apps/gatus`, `apps/errex` | Status page; self-hosted Sentry-compatible error tracker. Railway IaC in `.railway/railway.ts` (web + API stay on Vercel).           |
+| `crates/`, `xtask`         | Rust backend rewrite (plan 001, in progress): `solace-api-types` (DTOs), `solace-api-tests` (black-box API suite run against either backend). `cargo xtask` sets up the podman/Railway test environment; it and the suite refuse production URLs, databases, buckets and secrets. |
 | `packages/calendar-core`   | Shared types, Zod schemas, date/timezone helpers, search index, sanitizers — **all logic both apps need goes here**.               |
 | `packages/calendar-client` | Typed HTTP client and shared account query/mutation options (used by web and native).                                             |
 | `packages/e2ee`            | E2EE primitives (AES-GCM-256, RSA-OAEP-4096, HMAC-SHA-256) with platform crypto providers.                                        |
@@ -89,7 +90,7 @@ Default stance: **the server should not be able to read user content, and we sho
 - Pure logic out of components (hooks/`lib`), components small; follow React Doctor (runs as a hook on edits, blocking on warnings). Fix findings in files you touch instead of adding ignores to `react-doctor.config.json`.
 - Define components at module scope, not inside rendering components; update props/state/query snapshots immutably. Fresh local arrays and native shared values are not React state snapshots.
 - **Comments are one line, never more** (MUST) — including JSDoc: `/** One line. */`. Write one only for a non-obvious business rule, security reason, or a "why" the code cannot show; never to restate what the code does, and never a banner, section divider, changelog or design essay. If one line cannot explain it, the code needs renaming or splitting, not a paragraph.
-- Tests: add/adjust tests for real behavior, especially security boundaries (authz, sanitization, crypto, SSRF, log redaction) and bug fixes (regression test first). Jest everywhere; Go `go test` in notifications.
+- Tests: add/adjust tests for real behavior, especially security boundaries (authz, sanitization, crypto, SSRF, log redaction) and bug fixes (regression test first). **Every backend change ships with a case in the API suite (`crates/solace-api-tests`)** (MUST). Jest everywhere; Go `go test` in notifications.
 - Dates/timezones: user's configured timezone is the source of truth (fallback `resolveTimezone()` → `Europe/Amsterdam`). Use `calendar-core` helpers (`wallClockToUtc`, `utcToPickerDate`, zoned day helpers); never `setHours`/`startOfDay`/`isToday`/`date-fns/format` on event times. No moment/dayjs/luxon (enforced).
 
 ## 6. Web ↔ native feature parity (MUST)
@@ -135,6 +136,7 @@ Verify only — **don't start dev servers, builds, tunnels, EAS builds, OTA publ
 - `bun run typecheck` / `bun run typecheck:native` (native-core + both apps)
 - `bun run test` runs every workspace with a `test` script, packages included (or `test:backend|native|ui|notifications`, single file paths)
 - `bun run lint:react-doctor`; Prisma: `cd apps/backend && bun run db:generate`
+- API suite (test environment only, `crates/solace-api-tests/README.md`): `cargo xtask test-env up`, `cargo xtask ts-backend --checkout <worktree without .env>`, then `API_BASE_URL=… TEST_DATABASE_URL=… cargo test -p solace-api-tests --test api`. Never point it at `apps/backend/.env`.
 - Native OTA wrappers share `scripts/native-publish-update.ts`; keep build-profile validation and runtime pinning there.
 - `bun run check:rules` — offline AST/regex repo rules in `scripts/repo-rules/` (privacy, API, data, comments, strict TypeScript, React, WCAG, theme tokens, cross-browser motion; list in its `README.md`). Each rule self-tests its bad/good examples first. Narrow with `--rule=<id>`, file paths, or `--counts`. A reviewed exception is `// repo-rules-allow <rule-id>: <reason>` on the line or the line above; never allow-comment to silence a real violation.
 

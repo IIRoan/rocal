@@ -20,7 +20,7 @@
 - Passwords are scrypt `N=16384, r=16, p=1, dkLen=64`, NFKC-normalized, stored as `hexSalt:hexKey`. The hex salt **string** is the scrypt salt. Each hash allocates 32 MiB.
 - Also preserve:
   - stored passkeys and the step-up flow (`passkey-step-up.ts`, `passkey-bridge-session.ts`);
-  - one-time tokens (3 seconds, stored hashed);
+  - one-time tokens (3 minutes, stored hashed);
   - Expo origin and cookie handling;
   - invite-gated sign-up with `markInviteAccepted` mailbox approval;
   - legacy cookie cleanup (`auth-cookie-migration.ts`);
@@ -201,6 +201,25 @@ Build `solace-api-tests`. By default it starts the Rust server in-process on a r
 - Give every Jest case a destination: a suite case, a Rust unit test, or "not applicable" with a reason. Build the starting list from Jest's `--json` output, which includes every parameterized row.
 - Run the suite against the current backend until it passes.
 - Add the "every backend change ships with a suite case" rule to both AGENTS files.
+
+**Result (2026-10-14, done):**
+
+- `crates/solace-api-tests`: one `tests/api` binary with 400 tests in 29 domain modules. Every route and method in `apps/backend/routes/` and every Better Auth endpoint Solace uses is hit, and responses deserialize through the `solace-api-types` DTOs. Until the Rust server exists the suite needs `API_BASE_URL` (the in-process default arrives with 4a).
+- It passes 400/400 against the TypeScript backend in development mode and with `TEST_BACKEND_MODE=production` (Secure cookie names, HSTS, production CORS and origins, legacy cookie clears), on the local podman environment with repeated parallel runs.
+- The 14 `api-security.e2e.ts` checks are ported one-to-one in `e2e_security.rs`. The web check runs only with `TEST_WEB_URL`.
+- All 796 Jest cases have a destination (`jest/*.tsv`, checked by `cargo xtask jest-destinations --complete`): 572 suite cases, 188 Rust unit tests to write in step 4, and 36 not applicable with a reason.
+- Both AGENTS files carry the suite rule.
+- Corrected above: one-time tokens last 3 minutes (Better Auth's `expiresIn` is in minutes), not 3 seconds.
+- The test Stalwart needed production's `maxConcurrentRequests: 32` (the default of 4 fails concurrent noreply sends) and no IP bans (every podman-forwarded request shares one address).
+- Findings in the current backend, pinned as today's behavior so Rust matches them until they are fixed on purpose:
+  - **Security:** `POST /api/auth/passkey-bridge/complete-step-up` marks any password-only session as passkey-verified, which bypasses the passkey second factor (`passkeys::complete_step_up_marks_any_session_verified_known_gap`).
+  - **Security:** the JMAP proxy serves a session that still needs passkey step-up, while `/api/mail/oauth/access-token` refuses the same session with 403.
+  - **Privacy:** the public ICS feed's `X-WR-CALDESC` names the owner and falls back to the owner's email.
+  - Body validation runs before auth, so an anonymous malformed body gets 400 instead of 401.
+  - The recurring list ignores deleted and modified occurrences, and an overdue reminder clamp hits a constraint and returns 500.
+  - Account deletion leaves orphaned `recurrence_exception` rows, passkey challenges in `verification`, and participant emails on other users' events.
+  - The TypeScript mailer doesn't retry Stalwart's per-account JMAP concurrency limit, so bursts of app mail beyond it fail as `email_delivery_failed`.
+  - TypeScript honors a `session_data` cookie for up to 5 minutes after the session is revoked or expires. Rust won't (see "Sessions and auth"), and the suite branches on the backend there.
 
 ### 4. Build the Rust backend
 
