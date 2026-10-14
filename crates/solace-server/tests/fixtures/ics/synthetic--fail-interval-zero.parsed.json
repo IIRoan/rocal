@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: Cannot create RRule: interval must be greater than 0"
+    ],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: Cannot create RRule: interval must be greater than 0"
+    ],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: Cannot create RRule: interval must be greater than 0"
+    ],
+    "method": "PUBLISH"
+  }
+}

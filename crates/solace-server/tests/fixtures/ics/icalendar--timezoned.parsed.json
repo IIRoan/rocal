@@ -1,0 +1,62 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "123456",
+        "sourceUid": "123456",
+        "title": "artsprint 2012",
+        "description": "sprinting at the artsprint",
+        "start": "2012-02-13T09:00:00.000Z",
+        "end": "2012-02-17T17:00:00.000Z",
+        "allDay": false,
+        "location": "aka bild, wien",
+        "timezone": "Europe/Vienna"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "test create calendar",
+    "calendarDescription": "icalendar test",
+    "calendarTimezone": "Europe/Vienna"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "123456",
+        "sourceUid": "123456",
+        "title": "artsprint 2012",
+        "description": "sprinting at the artsprint",
+        "start": "2012-02-13T09:00:00.000Z",
+        "end": "2012-02-17T17:00:00.000Z",
+        "allDay": false,
+        "location": "aka bild, wien",
+        "timezone": "Europe/Vienna"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "test create calendar",
+    "calendarDescription": "icalendar test",
+    "calendarTimezone": "Europe/Vienna"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "123456",
+        "sourceUid": "123456",
+        "title": "artsprint 2012",
+        "description": "sprinting at the artsprint",
+        "start": "2012-02-13T09:00:00.000Z",
+        "end": "2012-02-17T17:00:00.000Z",
+        "allDay": false,
+        "location": "aka bild, wien",
+        "timezone": "Europe/Vienna"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "test create calendar",
+    "calendarDescription": "icalendar test",
+    "calendarTimezone": "Europe/Vienna"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: invalid RFC 9557 string: 2024-13-01"
+    ],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: invalid RFC 9557 string: 2024-13-01"
+    ],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: invalid RFC 9557 string: 2024-13-01"
+    ],
+    "method": "PUBLISH"
+  }
+}

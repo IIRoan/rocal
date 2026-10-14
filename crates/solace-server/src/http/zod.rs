@@ -612,7 +612,7 @@ pub fn js_trim(text: &str) -> &str {
     text.trim_matches(is_js_whitespace)
 }
 
-fn is_js_whitespace(c: char) -> bool {
+pub fn is_js_whitespace(c: char) -> bool {
     matches!(
         c,
         '\u{0009}'

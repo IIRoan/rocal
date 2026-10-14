@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: value out of range: 0 <= 25 <= 23"
+    ],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: value out of range: 0 <= 25 <= 23"
+    ],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: value out of range: 0 <= 25 <= 23"
+    ],
+    "method": "PUBLISH"
+  }
+}

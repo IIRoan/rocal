@@ -1,0 +1,50 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "1961094_636238800000000000",
+        "sourceUid": "1961094_636238800000000000",
+        "title": "TESTIN",
+        "description": "TESTING",
+        "start": "2017-02-28T12:00:00.000Z",
+        "end": "2017-02-28T12:30:00.000Z",
+        "allDay": false,
+        "timezone": "UTC+11"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "1961094_636238800000000000",
+        "sourceUid": "1961094_636238800000000000",
+        "title": "TESTIN",
+        "description": "TESTING",
+        "start": "2017-02-28T12:00:00.000Z",
+        "end": "2017-02-28T12:30:00.000Z",
+        "allDay": false,
+        "timezone": "UTC+11"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "1961094_636238800000000000",
+        "sourceUid": "1961094_636238800000000000",
+        "title": "TESTIN",
+        "description": "TESTING",
+        "start": "2017-02-28T12:00:00.000Z",
+        "end": "2017-02-28T12:30:00.000Z",
+        "allDay": false,
+        "timezone": "UTC+11"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

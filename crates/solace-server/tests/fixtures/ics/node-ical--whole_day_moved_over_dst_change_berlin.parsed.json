@@ -1,0 +1,98 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "14nv8jl8d6dvdbl477lod4fftf@google.com",
+        "sourceUid": "14nv8jl8d6dvdbl477lod4fftf@google.com",
+        "title": "test whole day moved",
+        "start": "2024-10-27T00:00:00.000Z",
+        "end": "2024-10-27T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 3,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "14nv8jl8d6dvdbl477lod4fftf@google.com::RECURRENCE::2024-10-28T00:00:00.000Z",
+        "sourceUid": "14nv8jl8d6dvdbl477lod4fftf@google.com",
+        "recurrenceId": "2024-10-28T00:00:00.000Z",
+        "title": "test whole day moved",
+        "start": "2024-10-30T00:00:00.000Z",
+        "end": "2024-10-30T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "14nv8jl8d6dvdbl477lod4fftf@google.com",
+        "sourceUid": "14nv8jl8d6dvdbl477lod4fftf@google.com",
+        "title": "test whole day moved",
+        "start": "2024-10-26T22:00:00.000Z",
+        "end": "2024-10-27T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 3,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "14nv8jl8d6dvdbl477lod4fftf@google.com::RECURRENCE::2024-10-28T00:00:00.000Z",
+        "sourceUid": "14nv8jl8d6dvdbl477lod4fftf@google.com",
+        "recurrenceId": "2024-10-28T00:00:00.000Z",
+        "title": "test whole day moved",
+        "start": "2024-10-29T23:00:00.000Z",
+        "end": "2024-10-30T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "14nv8jl8d6dvdbl477lod4fftf@google.com",
+        "sourceUid": "14nv8jl8d6dvdbl477lod4fftf@google.com",
+        "title": "test whole day moved",
+        "start": "2024-10-27T07:00:00.000Z",
+        "end": "2024-10-28T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 3,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "14nv8jl8d6dvdbl477lod4fftf@google.com::RECURRENCE::2024-10-28T00:00:00.000Z",
+        "sourceUid": "14nv8jl8d6dvdbl477lod4fftf@google.com",
+        "recurrenceId": "2024-10-28T00:00:00.000Z",
+        "title": "test whole day moved",
+        "start": "2024-10-30T07:00:00.000Z",
+        "end": "2024-10-31T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

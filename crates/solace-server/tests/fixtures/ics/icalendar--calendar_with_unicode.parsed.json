@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "äöü ÄÖÜ €",
+    "calendarDescription": "test non ascii: äöü ÄÖÜ €"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "äöü ÄÖÜ €",
+    "calendarDescription": "test non ascii: äöü ÄÖÜ €"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "äöü ÄÖÜ €",
+    "calendarDescription": "test non ascii: äöü ÄÖÜ €"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "test-non-utc-until@example.com",
+        "sourceUid": "test-non-utc-until@example.com",
+        "title": "Weekly Meeting (Non-UTC UNTIL)",
+        "description": "This event has RRULE with UNTIL that is NOT in UTC format, which violates RFC 5545 but occurs in real-world CalDAV servers.",
+        "start": "2024-01-01T09:00:00.000Z",
+        "end": "2024-01-01T10:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "until": "2024-12-31T09:00:00.000Z",
+          "timezone": "Europe/Berlin"
+        },
+        "timezone": "Europe/Berlin",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2024-12-31T09:00:00.000Z\",\"timezone\":\"Europe/Berlin\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "test-non-utc-until@example.com",
+        "sourceUid": "test-non-utc-until@example.com",
+        "title": "Weekly Meeting (Non-UTC UNTIL)",
+        "description": "This event has RRULE with UNTIL that is NOT in UTC format, which violates RFC 5545 but occurs in real-world CalDAV servers.",
+        "start": "2024-01-01T09:00:00.000Z",
+        "end": "2024-01-01T10:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "until": "2024-12-31T09:00:00.000Z",
+          "timezone": "Europe/Berlin"
+        },
+        "timezone": "Europe/Berlin",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2024-12-31T09:00:00.000Z\",\"timezone\":\"Europe/Berlin\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "test-non-utc-until@example.com",
+        "sourceUid": "test-non-utc-until@example.com",
+        "title": "Weekly Meeting (Non-UTC UNTIL)",
+        "description": "This event has RRULE with UNTIL that is NOT in UTC format, which violates RFC 5545 but occurs in real-world CalDAV servers.",
+        "start": "2024-01-01T09:00:00.000Z",
+        "end": "2024-01-01T10:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "until": "2024-12-31T09:00:00.000Z",
+          "timezone": "Europe/Berlin"
+        },
+        "timezone": "Europe/Berlin",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2024-12-31T09:00:00.000Z\",\"timezone\":\"Europe/Berlin\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

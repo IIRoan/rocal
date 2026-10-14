@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: duplicate DTSTART encountered, line=DTSTART:20240102T100000Z"
+    ],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: duplicate DTSTART encountered, line=DTSTART:20240102T100000Z"
+    ],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: duplicate DTSTART encountered, line=DTSTART:20240102T100000Z"
+    ],
+    "method": "PUBLISH"
+  }
+}

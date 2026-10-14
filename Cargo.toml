@@ -54,6 +54,10 @@ base64 = "0.22"
 ciborium = "0.2"
 cookie = "0.18"
 hmac = "0.13"
+# `localeCompare(…, { sensitivity: "base" })`: ICU4X has the same CLDR root collation as Bun's ICU, and its base crates are already in the tree through `url`.
+icu_collator = "2"
+# Time zones for ICS feeds, from the bundled tzdb so results don't depend on the host's zoneinfo.
+jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
 p256 = { version = "0.14", features = ["ecdsa"] }
 percent-encoding = "2"
 rand = "0.10"

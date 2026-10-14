@@ -1,0 +1,224 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "078tk5i2t4all3kk0jcoi3mdmd@google.com",
+        "sourceUid": "078tk5i2t4all3kk0jcoi3mdmd@google.com",
+        "title": "Brain Break",
+        "start": "2020-09-03T15:40:00.000Z",
+        "end": "2020-09-03T15:50:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "byWeekDay": [
+            5,
+            1,
+            4,
+            2,
+            3
+          ],
+          "timezone": "America/Denver"
+        },
+        "timezone": "America/Denver",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[5,1,4,2,3],\"timezone\":\"America/Denver\"}"
+      },
+      {
+        "uid": "11le1ep09hvog7dbotn6foj38e@google.com",
+        "sourceUid": "11le1ep09hvog7dbotn6foj38e@google.com",
+        "title": "Academic Time",
+        "start": "2020-09-03T15:50:00.000Z",
+        "end": "2020-09-03T16:40:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "byWeekDay": [
+            5,
+            1,
+            4,
+            2,
+            3
+          ],
+          "timezone": "America/Denver"
+        },
+        "timezone": "America/Denver",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[5,1,4,2,3],\"timezone\":\"America/Denver\"}"
+      },
+      {
+        "uid": "*Masked away*",
+        "sourceUid": "*Masked away*",
+        "title": "Invalid RRULE property",
+        "start": "2020-11-02T06:20:00.000Z",
+        "end": "2020-11-02T06:20:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "byWeekDay": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "timezone": "Europe/Budapest"
+        },
+        "timezone": "Europe/Budapest",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[1,2,3,4,5],\"timezone\":\"Europe/Budapest\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "ANONYMOUS",
+    "calendarTimezone": "America/Denver"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "078tk5i2t4all3kk0jcoi3mdmd@google.com",
+        "sourceUid": "078tk5i2t4all3kk0jcoi3mdmd@google.com",
+        "title": "Brain Break",
+        "start": "2020-09-03T15:40:00.000Z",
+        "end": "2020-09-03T15:50:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "byWeekDay": [
+            5,
+            1,
+            4,
+            2,
+            3
+          ],
+          "timezone": "America/Denver"
+        },
+        "timezone": "America/Denver",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[5,1,4,2,3],\"timezone\":\"America/Denver\"}"
+      },
+      {
+        "uid": "11le1ep09hvog7dbotn6foj38e@google.com",
+        "sourceUid": "11le1ep09hvog7dbotn6foj38e@google.com",
+        "title": "Academic Time",
+        "start": "2020-09-03T15:50:00.000Z",
+        "end": "2020-09-03T16:40:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "byWeekDay": [
+            5,
+            1,
+            4,
+            2,
+            3
+          ],
+          "timezone": "America/Denver"
+        },
+        "timezone": "America/Denver",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[5,1,4,2,3],\"timezone\":\"America/Denver\"}"
+      },
+      {
+        "uid": "*Masked away*",
+        "sourceUid": "*Masked away*",
+        "title": "Invalid RRULE property",
+        "start": "2020-11-02T06:20:00.000Z",
+        "end": "2020-11-02T06:20:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "byWeekDay": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "timezone": "Europe/Budapest"
+        },
+        "timezone": "Europe/Budapest",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[1,2,3,4,5],\"timezone\":\"Europe/Budapest\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "ANONYMOUS",
+    "calendarTimezone": "America/Denver"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "078tk5i2t4all3kk0jcoi3mdmd@google.com",
+        "sourceUid": "078tk5i2t4all3kk0jcoi3mdmd@google.com",
+        "title": "Brain Break",
+        "start": "2020-09-03T15:40:00.000Z",
+        "end": "2020-09-03T15:50:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "byWeekDay": [
+            5,
+            1,
+            4,
+            2,
+            3
+          ],
+          "timezone": "America/Denver"
+        },
+        "timezone": "America/Denver",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[5,1,4,2,3],\"timezone\":\"America/Denver\"}"
+      },
+      {
+        "uid": "11le1ep09hvog7dbotn6foj38e@google.com",
+        "sourceUid": "11le1ep09hvog7dbotn6foj38e@google.com",
+        "title": "Academic Time",
+        "start": "2020-09-03T15:50:00.000Z",
+        "end": "2020-09-03T16:40:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "byWeekDay": [
+            5,
+            1,
+            4,
+            2,
+            3
+          ],
+          "timezone": "America/Denver"
+        },
+        "timezone": "America/Denver",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[5,1,4,2,3],\"timezone\":\"America/Denver\"}"
+      },
+      {
+        "uid": "*Masked away*",
+        "sourceUid": "*Masked away*",
+        "title": "Invalid RRULE property",
+        "start": "2020-11-02T06:20:00.000Z",
+        "end": "2020-11-02T06:20:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "weekly",
+          "interval": 1,
+          "byWeekDay": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "timezone": "Europe/Budapest"
+        },
+        "timezone": "Europe/Budapest",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[1,2,3,4,5],\"timezone\":\"Europe/Budapest\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "ANONYMOUS",
+    "calendarTimezone": "America/Denver"
+  }
+}

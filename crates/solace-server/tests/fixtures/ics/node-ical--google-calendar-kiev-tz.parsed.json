@@ -1,0 +1,104 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "6m2q7kb2l02798oagemrcgm6pk@google.com",
+        "sourceUid": "6m2q7kb2l02798oagemrcgm6pk@google.com",
+        "title": "repeated",
+        "start": "2016-08-25T11:00:00.000Z",
+        "end": "2016-08-25T12:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "until": "2016-08-28T11:00:00.000Z",
+          "timezone": "Europe/Kiev"
+        },
+        "timezone": "Europe/Kiev",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2016-08-28T11:00:00.000Z\",\"timezone\":\"Europe/Kiev\"}"
+      },
+      {
+        "uid": "6m2q7kb2l02798oagemrcgm6pk@google.com::RECURRENCE::2016-08-26T11:00:00.000Z",
+        "sourceUid": "6m2q7kb2l02798oagemrcgm6pk@google.com",
+        "recurrenceId": "2016-08-26T11:00:00.000Z",
+        "title": "bla bla",
+        "start": "2016-08-26T11:00:00.000Z",
+        "end": "2016-08-26T12:00:00.000Z",
+        "allDay": false,
+        "timezone": "Europe/Kiev"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "ical",
+    "calendarTimezone": "Europe/Kiev"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "6m2q7kb2l02798oagemrcgm6pk@google.com",
+        "sourceUid": "6m2q7kb2l02798oagemrcgm6pk@google.com",
+        "title": "repeated",
+        "start": "2016-08-25T11:00:00.000Z",
+        "end": "2016-08-25T12:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "until": "2016-08-28T11:00:00.000Z",
+          "timezone": "Europe/Kiev"
+        },
+        "timezone": "Europe/Kiev",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2016-08-28T11:00:00.000Z\",\"timezone\":\"Europe/Kiev\"}"
+      },
+      {
+        "uid": "6m2q7kb2l02798oagemrcgm6pk@google.com::RECURRENCE::2016-08-26T11:00:00.000Z",
+        "sourceUid": "6m2q7kb2l02798oagemrcgm6pk@google.com",
+        "recurrenceId": "2016-08-26T11:00:00.000Z",
+        "title": "bla bla",
+        "start": "2016-08-26T11:00:00.000Z",
+        "end": "2016-08-26T12:00:00.000Z",
+        "allDay": false,
+        "timezone": "Europe/Kiev"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "ical",
+    "calendarTimezone": "Europe/Kiev"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "6m2q7kb2l02798oagemrcgm6pk@google.com",
+        "sourceUid": "6m2q7kb2l02798oagemrcgm6pk@google.com",
+        "title": "repeated",
+        "start": "2016-08-25T11:00:00.000Z",
+        "end": "2016-08-25T12:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "until": "2016-08-28T11:00:00.000Z",
+          "timezone": "Europe/Kiev"
+        },
+        "timezone": "Europe/Kiev",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2016-08-28T11:00:00.000Z\",\"timezone\":\"Europe/Kiev\"}"
+      },
+      {
+        "uid": "6m2q7kb2l02798oagemrcgm6pk@google.com::RECURRENCE::2016-08-26T11:00:00.000Z",
+        "sourceUid": "6m2q7kb2l02798oagemrcgm6pk@google.com",
+        "recurrenceId": "2016-08-26T11:00:00.000Z",
+        "title": "bla bla",
+        "start": "2016-08-26T11:00:00.000Z",
+        "end": "2016-08-26T12:00:00.000Z",
+        "allDay": false,
+        "timezone": "Europe/Kiev"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "ical",
+    "calendarTimezone": "Europe/Kiev"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Default calendar"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Default calendar"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Default calendar"
+  }
+}

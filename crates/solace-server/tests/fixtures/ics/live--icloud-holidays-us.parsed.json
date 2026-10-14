@@ -1,0 +1,4148 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "237447d9-0387-3a3d-b47b-b6e13049edd9",
+        "sourceUid": "237447d9-0387-3a3d-b47b-b6e13049edd9",
+        "title": "New Year’s Day",
+        "start": "2025-01-01T00:00:00.000Z",
+        "end": "2025-01-01T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "54714bb2-d548-38cd-ae9d-e994ac984460",
+        "sourceUid": "54714bb2-d548-38cd-ae9d-e994ac984460",
+        "title": "Inauguration Day",
+        "start": "2025-01-20T00:00:00.000Z",
+        "end": "2025-01-20T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "642909f7-2888-37c3-bc8c-08dc32459152",
+        "sourceUid": "642909f7-2888-37c3-bc8c-08dc32459152",
+        "title": "Martin Luther King Jr. Day",
+        "start": "2025-01-20T00:00:00.000Z",
+        "end": "2025-01-20T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "19c7528b-a44e-3f70-800f-b22ee6be7bd0",
+        "sourceUid": "19c7528b-a44e-3f70-800f-b22ee6be7bd0",
+        "title": "Lunar New Year",
+        "start": "2025-01-29T00:00:00.000Z",
+        "end": "2025-01-29T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "d1cf3d8a-2bbe-3a9c-bbe8-16137a9f1d52",
+        "sourceUid": "d1cf3d8a-2bbe-3a9c-bbe8-16137a9f1d52",
+        "title": "Groundhog Day",
+        "start": "2025-02-02T00:00:00.000Z",
+        "end": "2025-02-02T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "beb94124-1c63-3017-9889-d3f817d62f7f",
+        "sourceUid": "beb94124-1c63-3017-9889-d3f817d62f7f",
+        "title": "Valentine’s Day",
+        "start": "2025-02-14T00:00:00.000Z",
+        "end": "2025-02-14T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "a1ae0724-c633-37a0-8269-4a7d4a0a2e7d",
+        "sourceUid": "a1ae0724-c633-37a0-8269-4a7d4a0a2e7d",
+        "title": "Presidents’ Day",
+        "start": "2025-02-17T00:00:00.000Z",
+        "end": "2025-02-17T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "780abb03-aade-3383-bf48-13aa6ca261a7",
+        "sourceUid": "780abb03-aade-3383-bf48-13aa6ca261a7",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2025-03-01T00:00:00.000Z",
+        "end": "2025-03-01T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "17afe996-164f-31f5-89a4-3e780451694b",
+        "sourceUid": "17afe996-164f-31f5-89a4-3e780451694b",
+        "title": "Ash Wednesday",
+        "start": "2025-03-05T00:00:00.000Z",
+        "end": "2025-03-05T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "733d5daf-099e-3559-a333-981206e7c3ef",
+        "sourceUid": "733d5daf-099e-3559-a333-981206e7c3ef",
+        "title": "Daylight Saving Time",
+        "start": "2025-03-09T00:00:00.000Z",
+        "end": "2025-03-09T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "881438c7-7b25-34f7-b1dc-e478381a86d5",
+        "sourceUid": "881438c7-7b25-34f7-b1dc-e478381a86d5",
+        "title": "Holi",
+        "start": "2025-03-14T00:00:00.000Z",
+        "end": "2025-03-14T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "21095316-3c1d-3316-a99f-56e0ffcf286d",
+        "sourceUid": "21095316-3c1d-3316-a99f-56e0ffcf286d",
+        "title": "St. Patrick’s Day",
+        "start": "2025-03-17T00:00:00.000Z",
+        "end": "2025-03-17T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "44da74a5-0985-35bd-91f4-e08c64c5ebe4",
+        "sourceUid": "44da74a5-0985-35bd-91f4-e08c64c5ebe4",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-03-30T00:00:00.000Z",
+        "end": "2025-03-30T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "d375d9e7-0d0c-3d65-b886-4ef60c20d897",
+        "sourceUid": "d375d9e7-0d0c-3d65-b886-4ef60c20d897",
+        "title": "Eid al-Fitr (observed)",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-03-31T00:00:00.000Z",
+        "end": "2025-03-31T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "e2b16772-0620-3f7e-8c69-20976a94cce0",
+        "sourceUid": "e2b16772-0620-3f7e-8c69-20976a94cce0",
+        "title": "April Fools’ Day",
+        "start": "2025-04-01T00:00:00.000Z",
+        "end": "2025-04-01T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "7f9bd4d9-3dbb-356e-93c0-6bf74268b352",
+        "sourceUid": "7f9bd4d9-3dbb-356e-93c0-6bf74268b352",
+        "title": "Passover",
+        "start": "2025-04-12T00:00:00.000Z",
+        "end": "2025-04-12T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "abcfb0eb-e57e-3712-962f-3e69cbdcac94",
+        "sourceUid": "abcfb0eb-e57e-3712-962f-3e69cbdcac94",
+        "title": "Palm Sunday",
+        "start": "2025-04-13T00:00:00.000Z",
+        "end": "2025-04-13T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "db1a63c5-21c9-3a64-a5c0-51e1f21de746",
+        "sourceUid": "db1a63c5-21c9-3a64-a5c0-51e1f21de746",
+        "title": "Tax Day",
+        "start": "2025-04-15T00:00:00.000Z",
+        "end": "2025-04-15T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "86f99fb5-d9be-3050-a892-29f632906a0f",
+        "sourceUid": "86f99fb5-d9be-3050-a892-29f632906a0f",
+        "title": "Good Friday",
+        "start": "2025-04-18T00:00:00.000Z",
+        "end": "2025-04-18T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
+        "sourceUid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
+        "title": "Easter",
+        "start": "2025-04-20T00:00:00.000Z",
+        "end": "2025-04-20T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "31c59d6e-f0ed-3834-beeb-879b6ec85222",
+        "sourceUid": "31c59d6e-f0ed-3834-beeb-879b6ec85222",
+        "title": "Orthodox Easter",
+        "start": "2025-04-20T00:00:00.000Z",
+        "end": "2025-04-20T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "cef88b72-fc8e-3985-bbfb-6993de0abfc7",
+        "sourceUid": "cef88b72-fc8e-3985-bbfb-6993de0abfc7",
+        "title": "Earth Day",
+        "start": "2025-04-22T00:00:00.000Z",
+        "end": "2025-04-22T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "ee515ee6-fd2c-35e5-91cd-e285295ef286",
+        "sourceUid": "ee515ee6-fd2c-35e5-91cd-e285295ef286",
+        "title": "Cinco de Mayo",
+        "start": "2025-05-05T00:00:00.000Z",
+        "end": "2025-05-05T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "9ab828d0-5935-3824-b570-b9703ee28e88",
+        "sourceUid": "9ab828d0-5935-3824-b570-b9703ee28e88",
+        "title": "Mother’s Day",
+        "start": "2025-05-11T00:00:00.000Z",
+        "end": "2025-05-11T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "991b560e-7963-314a-8520-e1f256b99ee1",
+        "sourceUid": "991b560e-7963-314a-8520-e1f256b99ee1",
+        "title": "Memorial Day",
+        "start": "2025-05-26T00:00:00.000Z",
+        "end": "2025-05-26T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "1831de42-74ac-39bc-83ae-3832144c68c4",
+        "sourceUid": "1831de42-74ac-39bc-83ae-3832144c68c4",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-06-07T00:00:00.000Z",
+        "end": "2025-06-07T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "1bb2d313-3740-3828-a463-773e76c922eb",
+        "sourceUid": "1bb2d313-3740-3828-a463-773e76c922eb",
+        "title": "Flag Day",
+        "start": "2025-06-14T00:00:00.000Z",
+        "end": "2025-06-14T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "714b554b-12a0-3e59-80e9-3a5f9e61f5ef",
+        "sourceUid": "714b554b-12a0-3e59-80e9-3a5f9e61f5ef",
+        "title": "Father’s Day",
+        "start": "2025-06-15T00:00:00.000Z",
+        "end": "2025-06-15T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "710e8dcf-62d9-39f1-a4ea-570dbb8a60fe",
+        "sourceUid": "710e8dcf-62d9-39f1-a4ea-570dbb8a60fe",
+        "title": "Juneteenth",
+        "start": "2025-06-19T00:00:00.000Z",
+        "end": "2025-06-19T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "9196d0f5-178c-3979-966c-d9c8f56304da",
+        "sourceUid": "9196d0f5-178c-3979-966c-d9c8f56304da",
+        "title": "Independence Day",
+        "start": "2025-07-04T00:00:00.000Z",
+        "end": "2025-07-04T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "a39cf1a4-87e4-3f09-978e-3ce0a82ddbc8",
+        "sourceUid": "a39cf1a4-87e4-3f09-978e-3ce0a82ddbc8",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-07-06T00:00:00.000Z",
+        "end": "2025-07-06T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "74172a6d-3773-375c-b130-3b71e92b7c5d",
+        "sourceUid": "74172a6d-3773-375c-b130-3b71e92b7c5d",
+        "title": "Labor Day",
+        "start": "2025-09-01T00:00:00.000Z",
+        "end": "2025-09-01T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "adc37f3c-38a3-3525-a963-5983b473bf91",
+        "sourceUid": "adc37f3c-38a3-3525-a963-5983b473bf91",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2025-09-23T00:00:00.000Z",
+        "end": "2025-09-23T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "05ce3f2c-bee7-381e-b7ba-73d277c01094",
+        "sourceUid": "05ce3f2c-bee7-381e-b7ba-73d277c01094",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2025-09-24T00:00:00.000Z",
+        "end": "2025-09-24T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "9c216877-727a-313e-97a9-d0253f9d141c",
+        "sourceUid": "9c216877-727a-313e-97a9-d0253f9d141c",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2025-10-02T00:00:00.000Z",
+        "end": "2025-10-02T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "05aae26c-02ef-3ffb-9373-698cee9a7985",
+        "sourceUid": "05aae26c-02ef-3ffb-9373-698cee9a7985",
+        "title": "Columbus Day",
+        "description": "This is not a nation-wide holiday; it may not be observed in your region.",
+        "start": "2025-10-13T00:00:00.000Z",
+        "end": "2025-10-13T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "44c8260c-b2e4-30cb-b4f6-5817bea86a30",
+        "sourceUid": "44c8260c-b2e4-30cb-b4f6-5817bea86a30",
+        "title": "Indigenous Peoples’ Day",
+        "description": "This is not a nation-wide holiday; it may not be observed in your region.",
+        "start": "2025-10-13T00:00:00.000Z",
+        "end": "2025-10-13T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "a58fb511-6e3b-3d5b-a8ac-a781d31d092e",
+        "sourceUid": "a58fb511-6e3b-3d5b-a8ac-a781d31d092e",
+        "title": "Diwali",
+        "start": "2025-10-21T00:00:00.000Z",
+        "end": "2025-10-21T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "48fa6175-2399-3bac-960a-fff947563ba7",
+        "sourceUid": "48fa6175-2399-3bac-960a-fff947563ba7",
+        "title": "Halloween",
+        "start": "2025-10-31T00:00:00.000Z",
+        "end": "2025-10-31T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "5ae40f05-65f9-3f69-beeb-ccb71986276c",
+        "sourceUid": "5ae40f05-65f9-3f69-beeb-ccb71986276c",
+        "title": "Day of the Dead",
+        "description": "This is not a nation-wide holiday; it may not be observed in your region.",
+        "start": "2025-11-02T00:00:00.000Z",
+        "end": "2025-11-02T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "4677270e-7cbc-39ad-a536-fea177cd16b0",
+        "sourceUid": "4677270e-7cbc-39ad-a536-fea177cd16b0",
+        "title": "Daylight Saving Time End",
+        "start": "2025-11-02T00:00:00.000Z",
+        "end": "2025-11-02T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "325fcebb-1a2b-34f5-b864-41863247debd",
+        "sourceUid": "325fcebb-1a2b-34f5-b864-41863247debd",
+        "title": "Election Day",
+        "description": "National Elections are held on even-numbered years, alternating between Presidential Elections and mid-terms Elections. Off-year elections are held on odd-numbered years in some States only.",
+        "start": "2025-11-04T00:00:00.000Z",
+        "end": "2025-11-04T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "61aaab27-ceae-3e2a-980e-f56f50bbd976",
+        "sourceUid": "61aaab27-ceae-3e2a-980e-f56f50bbd976",
+        "title": "Veterans Day",
+        "start": "2025-11-11T00:00:00.000Z",
+        "end": "2025-11-11T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "4d0c1cfb-0de6-3af5-892c-eb1d742a89fe",
+        "sourceUid": "4d0c1cfb-0de6-3af5-892c-eb1d742a89fe",
+        "title": "Thanksgiving",
+        "start": "2025-11-27T00:00:00.000Z",
+        "end": "2025-11-27T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            4
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[4],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "64945272-f8bf-375c-833f-3030911541c7",
+        "sourceUid": "64945272-f8bf-375c-833f-3030911541c7",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2025-12-15T00:00:00.000Z",
+        "end": "2025-12-15T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "d122d87d-5193-3745-a8db-76a74b78a118",
+        "sourceUid": "d122d87d-5193-3745-a8db-76a74b78a118",
+        "title": "Christmas Eve",
+        "start": "2025-12-24T00:00:00.000Z",
+        "end": "2025-12-24T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "94d3fbec-3769-3f04-92f3-60840a11da0a",
+        "sourceUid": "94d3fbec-3769-3f04-92f3-60840a11da0a",
+        "title": "Christmas Day",
+        "start": "2025-12-25T00:00:00.000Z",
+        "end": "2025-12-25T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "130416c0-f380-3b6c-b7e0-8fccb35f860f",
+        "sourceUid": "130416c0-f380-3b6c-b7e0-8fccb35f860f",
+        "title": "Kwanzaa",
+        "start": "2025-12-26T00:00:00.000Z",
+        "end": "2025-12-26T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "cc765417-5752-3a6b-827b-9ee6a0fdde05",
+        "sourceUid": "cc765417-5752-3a6b-827b-9ee6a0fdde05",
+        "title": "New Year’s Eve",
+        "start": "2025-12-31T00:00:00.000Z",
+        "end": "2025-12-31T23:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "d9b9df4f-bd94-3d1a-b757-0b173a59716d",
+        "sourceUid": "d9b9df4f-bd94-3d1a-b757-0b173a59716d",
+        "title": "Lunar New Year",
+        "start": "2026-02-17T00:00:00.000Z",
+        "end": "2026-02-17T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "7dd36b47-7a89-359d-a68c-9c818aee25c1",
+        "sourceUid": "7dd36b47-7a89-359d-a68c-9c818aee25c1",
+        "title": "Ash Wednesday",
+        "start": "2026-02-18T00:00:00.000Z",
+        "end": "2026-02-18T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "79d03cac-6b22-39b3-86c7-8556d3f44196",
+        "sourceUid": "79d03cac-6b22-39b3-86c7-8556d3f44196",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2026-02-18T00:00:00.000Z",
+        "end": "2026-02-18T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "445e44e9-e2a9-3122-8209-1d8f15669485",
+        "sourceUid": "445e44e9-e2a9-3122-8209-1d8f15669485",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2026-03-20T00:00:00.000Z",
+        "end": "2026-03-20T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "9917d958-6719-3949-a2bc-f343b59e6473",
+        "sourceUid": "9917d958-6719-3949-a2bc-f343b59e6473",
+        "title": "Palm Sunday",
+        "start": "2026-03-29T00:00:00.000Z",
+        "end": "2026-03-29T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "a6b5fc2d-30ec-37cd-ab60-808efb5e0954",
+        "sourceUid": "a6b5fc2d-30ec-37cd-ab60-808efb5e0954",
+        "title": "Passover",
+        "start": "2026-04-01T00:00:00.000Z",
+        "end": "2026-04-01T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "57378f6f-0614-3e7d-a908-0f05201a396c",
+        "sourceUid": "57378f6f-0614-3e7d-a908-0f05201a396c",
+        "title": "Good Friday",
+        "start": "2026-04-03T00:00:00.000Z",
+        "end": "2026-04-03T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
+        "sourceUid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
+        "title": "Easter",
+        "start": "2026-04-05T00:00:00.000Z",
+        "end": "2026-04-05T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "16fe3931-483e-3524-8796-eed12ad7786c",
+        "sourceUid": "16fe3931-483e-3524-8796-eed12ad7786c",
+        "title": "Orthodox Easter",
+        "start": "2026-04-12T00:00:00.000Z",
+        "end": "2026-04-12T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "992cb248-764f-38fd-8eec-86bfb35b889a",
+        "sourceUid": "992cb248-764f-38fd-8eec-86bfb35b889a",
+        "title": "Tax Day",
+        "start": "2026-04-15T00:00:00.000Z",
+        "end": "2026-04-15T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "9c5ed1e5-23d2-379e-84ce-e9eb5eacbaf4",
+        "sourceUid": "9c5ed1e5-23d2-379e-84ce-e9eb5eacbaf4",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2026-05-27T00:00:00.000Z",
+        "end": "2026-05-27T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "e88a9d77-00b0-3f81-aee1-3aa37424db0c",
+        "sourceUid": "e88a9d77-00b0-3f81-aee1-3aa37424db0c",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2026-06-26T00:00:00.000Z",
+        "end": "2026-06-26T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "f852539d-8148-38ac-afa8-72377037d298",
+        "sourceUid": "f852539d-8148-38ac-afa8-72377037d298",
+        "title": "Independence Day (observed)",
+        "start": "2026-07-03T00:00:00.000Z",
+        "end": "2026-07-03T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "99043429-0ede-3a82-ac07-86bc703941f6",
+        "sourceUid": "99043429-0ede-3a82-ac07-86bc703941f6",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2026-09-12T00:00:00.000Z",
+        "end": "2026-09-12T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "24849c2d-aebb-3d79-84cd-b6435c76abba",
+        "sourceUid": "24849c2d-aebb-3d79-84cd-b6435c76abba",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2026-09-13T00:00:00.000Z",
+        "end": "2026-09-13T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "c9bdf86e-b8bf-3d54-b45d-7557bd473875",
+        "sourceUid": "c9bdf86e-b8bf-3d54-b45d-7557bd473875",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2026-09-21T00:00:00.000Z",
+        "end": "2026-09-21T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "c823c12d-75c8-3120-a9b9-c16d6319478e",
+        "sourceUid": "c823c12d-75c8-3120-a9b9-c16d6319478e",
+        "title": "Election Day",
+        "description": "National Elections are held on even-numbered years, alternating between Presidential Elections and mid-terms Elections. Off-year elections are held on odd-numbered years in some States only.",
+        "start": "2026-11-03T00:00:00.000Z",
+        "end": "2026-11-03T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "561cabf0-ac35-332f-a5fc-5c23d687d069",
+        "sourceUid": "561cabf0-ac35-332f-a5fc-5c23d687d069",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2026-12-05T00:00:00.000Z",
+        "end": "2026-12-05T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "d0f4d0b3-0daa-3106-9eb7-bb31acd040c5",
+        "sourceUid": "d0f4d0b3-0daa-3106-9eb7-bb31acd040c5",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2027-02-07T00:00:00.000Z",
+        "end": "2027-02-07T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "ee8bdd09-87a1-3982-8595-487ec5b839f3",
+        "sourceUid": "ee8bdd09-87a1-3982-8595-487ec5b839f3",
+        "title": "Lunar New Year",
+        "start": "2027-02-07T00:00:00.000Z",
+        "end": "2027-02-07T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "6b6cbe27-34d6-35cf-b7c2-d694968b8f44",
+        "sourceUid": "6b6cbe27-34d6-35cf-b7c2-d694968b8f44",
+        "title": "Ash Wednesday",
+        "start": "2027-02-10T00:00:00.000Z",
+        "end": "2027-02-10T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "4778f918-ea21-3198-9311-18cae42a4789",
+        "sourceUid": "4778f918-ea21-3198-9311-18cae42a4789",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2027-03-09T00:00:00.000Z",
+        "end": "2027-03-09T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "196e76d7-415a-3966-ad60-ae885e06ee62",
+        "sourceUid": "196e76d7-415a-3966-ad60-ae885e06ee62",
+        "title": "Palm Sunday",
+        "start": "2027-03-21T00:00:00.000Z",
+        "end": "2027-03-21T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "c765379d-3c9d-38dc-8d34-083d59841260",
+        "sourceUid": "c765379d-3c9d-38dc-8d34-083d59841260",
+        "title": "Good Friday",
+        "start": "2027-03-26T00:00:00.000Z",
+        "end": "2027-03-26T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
+        "sourceUid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
+        "title": "Easter",
+        "start": "2027-03-28T00:00:00.000Z",
+        "end": "2027-03-28T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "d0176d32-9391-3f72-8e47-71f25e038a7f",
+        "sourceUid": "d0176d32-9391-3f72-8e47-71f25e038a7f",
+        "title": "Tax Day",
+        "start": "2027-04-15T00:00:00.000Z",
+        "end": "2027-04-15T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "b6087195-eb58-3a08-aefa-267c18dc5154",
+        "sourceUid": "b6087195-eb58-3a08-aefa-267c18dc5154",
+        "title": "Passover",
+        "start": "2027-04-21T00:00:00.000Z",
+        "end": "2027-04-21T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "3191b13d-6286-3425-b874-4b75f29108af",
+        "sourceUid": "3191b13d-6286-3425-b874-4b75f29108af",
+        "title": "Orthodox Easter",
+        "start": "2027-05-02T00:00:00.000Z",
+        "end": "2027-05-02T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "77bb16c3-9ddd-3e7c-9343-7e0296fe4fd7",
+        "sourceUid": "77bb16c3-9ddd-3e7c-9343-7e0296fe4fd7",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2027-05-17T00:00:00.000Z",
+        "end": "2027-05-17T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "fab18da6-c7fc-3cad-ad76-b25ba7f4e6ad",
+        "sourceUid": "fab18da6-c7fc-3cad-ad76-b25ba7f4e6ad",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2027-06-15T00:00:00.000Z",
+        "end": "2027-06-15T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "10647736-c8ce-3fb5-a62a-612674d86459",
+        "sourceUid": "10647736-c8ce-3fb5-a62a-612674d86459",
+        "title": "Independence Day (observed)",
+        "start": "2027-07-05T00:00:00.000Z",
+        "end": "2027-07-05T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "010c681c-a86e-3758-98ec-94c16f0f25fb",
+        "sourceUid": "010c681c-a86e-3758-98ec-94c16f0f25fb",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2027-10-02T00:00:00.000Z",
+        "end": "2027-10-02T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "f9681f26-d9ec-3879-b549-f8d26b4317ff",
+        "sourceUid": "f9681f26-d9ec-3879-b549-f8d26b4317ff",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2027-10-03T00:00:00.000Z",
+        "end": "2027-10-03T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "55892cef-fa54-328a-9e1b-ad6f89b15473",
+        "sourceUid": "55892cef-fa54-328a-9e1b-ad6f89b15473",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2027-10-11T00:00:00.000Z",
+        "end": "2027-10-11T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "38610e77-3046-3c39-8296-50719fc14968",
+        "sourceUid": "38610e77-3046-3c39-8296-50719fc14968",
+        "title": "Christmas Day (observed)",
+        "start": "2027-12-24T00:00:00.000Z",
+        "end": "2027-12-24T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "25b8984d-7515-328f-8ac6-4189806be269",
+        "sourceUid": "25b8984d-7515-328f-8ac6-4189806be269",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2027-12-25T00:00:00.000Z",
+        "end": "2027-12-25T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "f5058404-568d-3b57-99e9-1b1007f04b62",
+        "sourceUid": "f5058404-568d-3b57-99e9-1b1007f04b62",
+        "title": "Lunar New Year",
+        "start": "2028-01-26T00:00:00.000Z",
+        "end": "2028-01-26T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "b836f6a5-2032-3625-946d-8668f0aa5433",
+        "sourceUid": "b836f6a5-2032-3625-946d-8668f0aa5433",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2028-01-27T00:00:00.000Z",
+        "end": "2028-01-27T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "24e99297-d3fa-332c-8819-facdac5737d2",
+        "sourceUid": "24e99297-d3fa-332c-8819-facdac5737d2",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-02-26T00:00:00.000Z",
+        "end": "2028-02-26T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "bd315ec7-9fff-3af4-8ac9-e068343ea581",
+        "sourceUid": "bd315ec7-9fff-3af4-8ac9-e068343ea581",
+        "title": "Eid al-Fitr (observed)",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-02-28T00:00:00.000Z",
+        "end": "2028-02-28T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "f6e2e5c4-bb0a-3291-b4b2-4fabd1e2de89",
+        "sourceUid": "f6e2e5c4-bb0a-3291-b4b2-4fabd1e2de89",
+        "title": "Ash Wednesday",
+        "start": "2028-03-01T00:00:00.000Z",
+        "end": "2028-03-01T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "561dee30-3d9d-3d89-a3b5-14887a76986f",
+        "sourceUid": "561dee30-3d9d-3d89-a3b5-14887a76986f",
+        "title": "Palm Sunday",
+        "start": "2028-04-09T00:00:00.000Z",
+        "end": "2028-04-09T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "c262a2d2-ea66-38e0-bf27-7d359c700741",
+        "sourceUid": "c262a2d2-ea66-38e0-bf27-7d359c700741",
+        "title": "Passover",
+        "start": "2028-04-10T00:00:00.000Z",
+        "end": "2028-04-10T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "af26ac65-4781-3115-8b6f-4ca703471382",
+        "sourceUid": "af26ac65-4781-3115-8b6f-4ca703471382",
+        "title": "Good Friday",
+        "start": "2028-04-14T00:00:00.000Z",
+        "end": "2028-04-14T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
+        "sourceUid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
+        "title": "Easter",
+        "start": "2028-04-16T00:00:00.000Z",
+        "end": "2028-04-16T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "a09c3534-a8f5-300f-8fde-6013e7ecdfee",
+        "sourceUid": "a09c3534-a8f5-300f-8fde-6013e7ecdfee",
+        "title": "Orthodox Easter",
+        "start": "2028-04-16T00:00:00.000Z",
+        "end": "2028-04-16T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "dbd37dc5-a2e7-3e0b-bec6-25df70e35606",
+        "sourceUid": "dbd37dc5-a2e7-3e0b-bec6-25df70e35606",
+        "title": "Tax Day",
+        "start": "2028-04-17T00:00:00.000Z",
+        "end": "2028-04-17T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "e4a68947-97a1-3cc8-bc9c-2efe72c6ecc7",
+        "sourceUid": "e4a68947-97a1-3cc8-bc9c-2efe72c6ecc7",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-05-05T00:00:00.000Z",
+        "end": "2028-05-05T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "ec29de47-c568-33c5-b263-42c5ff636887",
+        "sourceUid": "ec29de47-c568-33c5-b263-42c5ff636887",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-06-03T00:00:00.000Z",
+        "end": "2028-06-03T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "af18fd9f-61af-3947-b26a-c52dce88271f",
+        "sourceUid": "af18fd9f-61af-3947-b26a-c52dce88271f",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2028-09-21T00:00:00.000Z",
+        "end": "2028-09-21T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "7dc063d4-8c3c-3cae-bc57-4c0867fa25c6",
+        "sourceUid": "7dc063d4-8c3c-3cae-bc57-4c0867fa25c6",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2028-09-22T00:00:00.000Z",
+        "end": "2028-09-22T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "c95b7565-5f7c-3e84-80c8-b67144fd07b7",
+        "sourceUid": "c95b7565-5f7c-3e84-80c8-b67144fd07b7",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2028-09-30T00:00:00.000Z",
+        "end": "2028-09-30T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "a8a06cbb-272d-3df4-b976-2c14abe07389",
+        "sourceUid": "a8a06cbb-272d-3df4-b976-2c14abe07389",
+        "title": "Election Day",
+        "description": "National Elections are held on even-numbered years, alternating between Presidential Elections and mid-terms Elections. Off-year elections are held on odd-numbered years in some States only.",
+        "start": "2028-11-07T00:00:00.000Z",
+        "end": "2028-11-07T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "8d719cfb-184b-3de9-bad8-b004a85786c2",
+        "sourceUid": "8d719cfb-184b-3de9-bad8-b004a85786c2",
+        "title": "Veterans Day (observed)",
+        "start": "2028-11-10T00:00:00.000Z",
+        "end": "2028-11-10T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "8cd0965b-6569-35c5-9ee3-62d47d72ae2e",
+        "sourceUid": "8cd0965b-6569-35c5-9ee3-62d47d72ae2e",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2028-12-13T00:00:00.000Z",
+        "end": "2028-12-13T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "e7251ef2-c9f2-375c-933a-1908a499beb9",
+        "sourceUid": "e7251ef2-c9f2-375c-933a-1908a499beb9",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2029-01-15T00:00:00.000Z",
+        "end": "2029-01-15T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "2870722d-429e-378b-a4d0-89c62a53febc",
+        "sourceUid": "2870722d-429e-378b-a4d0-89c62a53febc",
+        "title": "Inauguration Day",
+        "start": "2029-01-20T00:00:00.000Z",
+        "end": "2029-01-20T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "eefad852-47ac-3265-8c74-56830ba71fe1",
+        "sourceUid": "eefad852-47ac-3265-8c74-56830ba71fe1",
+        "title": "Lunar New Year",
+        "start": "2029-02-13T00:00:00.000Z",
+        "end": "2029-02-13T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "61dee9c2-843e-3a9d-8f8b-9db42fb6f5f9",
+        "sourceUid": "61dee9c2-843e-3a9d-8f8b-9db42fb6f5f9",
+        "title": "Ash Wednesday",
+        "start": "2029-02-14T00:00:00.000Z",
+        "end": "2029-02-14T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "7898f0cd-01bf-37a2-b222-4db2dcb2a9fd",
+        "sourceUid": "7898f0cd-01bf-37a2-b222-4db2dcb2a9fd",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2029-02-14T00:00:00.000Z",
+        "end": "2029-02-14T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "4082f8d5-a0ec-3336-b328-3b1c3efecc57",
+        "sourceUid": "4082f8d5-a0ec-3336-b328-3b1c3efecc57",
+        "title": "Palm Sunday",
+        "start": "2029-03-25T00:00:00.000Z",
+        "end": "2029-03-25T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
+        "sourceUid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
+        "title": "Good Friday",
+        "start": "2029-03-30T00:00:00.000Z",
+        "end": "2029-03-30T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "71652f1b-d80f-3f79-9fef-1200a7ec6e9b",
+        "sourceUid": "71652f1b-d80f-3f79-9fef-1200a7ec6e9b",
+        "title": "Passover",
+        "start": "2029-03-30T00:00:00.000Z",
+        "end": "2029-03-30T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
+        "sourceUid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
+        "title": "Easter",
+        "start": "2029-04-01T00:00:00.000Z",
+        "end": "2029-04-01T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "644d0a2e-2554-382d-9caf-d60d0f019219",
+        "sourceUid": "644d0a2e-2554-382d-9caf-d60d0f019219",
+        "title": "Orthodox Easter",
+        "start": "2029-04-08T00:00:00.000Z",
+        "end": "2029-04-08T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "dc574d80-2f44-3024-8965-c0714fd20220",
+        "sourceUid": "dc574d80-2f44-3024-8965-c0714fd20220",
+        "title": "Tax Day",
+        "start": "2029-04-16T00:00:00.000Z",
+        "end": "2029-04-16T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "988957bd-be3e-3781-bf82-73b5763dd861",
+        "sourceUid": "988957bd-be3e-3781-bf82-73b5763dd861",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2029-04-24T00:00:00.000Z",
+        "end": "2029-04-24T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "c8a05002-7b54-3cef-b2f1-95f321218562",
+        "sourceUid": "c8a05002-7b54-3cef-b2f1-95f321218562",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2029-05-24T00:00:00.000Z",
+        "end": "2029-05-24T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "21764f05-8b78-3eba-97fa-110b0d13b364",
+        "sourceUid": "21764f05-8b78-3eba-97fa-110b0d13b364",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2029-09-10T00:00:00.000Z",
+        "end": "2029-09-10T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "82d1c44f-b831-3e00-b3e1-efe4b5d82040",
+        "sourceUid": "82d1c44f-b831-3e00-b3e1-efe4b5d82040",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2029-09-11T00:00:00.000Z",
+        "end": "2029-09-11T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "b07533a0-fdb4-3f90-ae0a-f44901fed6be",
+        "sourceUid": "b07533a0-fdb4-3f90-ae0a-f44901fed6be",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2029-09-19T00:00:00.000Z",
+        "end": "2029-09-19T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "b9be8a7a-3c2a-3ab1-8304-a1430306e536",
+        "sourceUid": "b9be8a7a-3c2a-3ab1-8304-a1430306e536",
+        "title": "Veterans Day (observed)",
+        "start": "2029-11-12T00:00:00.000Z",
+        "end": "2029-11-12T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      },
+      {
+        "uid": "2143eba1-f9eb-354c-9b45-5b1fa98fd71c",
+        "sourceUid": "2143eba1-f9eb-354c-9b45-5b1fa98fd71c",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2029-12-02T00:00:00.000Z",
+        "end": "2029-12-02T23:59:59.999Z",
+        "allDay": true,
+        "timezone": "UTC"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "US Holidays"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "237447d9-0387-3a3d-b47b-b6e13049edd9",
+        "sourceUid": "237447d9-0387-3a3d-b47b-b6e13049edd9",
+        "title": "New Year’s Day",
+        "start": "2024-12-31T23:00:00.000Z",
+        "end": "2025-01-01T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "54714bb2-d548-38cd-ae9d-e994ac984460",
+        "sourceUid": "54714bb2-d548-38cd-ae9d-e994ac984460",
+        "title": "Inauguration Day",
+        "start": "2025-01-19T23:00:00.000Z",
+        "end": "2025-01-20T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "642909f7-2888-37c3-bc8c-08dc32459152",
+        "sourceUid": "642909f7-2888-37c3-bc8c-08dc32459152",
+        "title": "Martin Luther King Jr. Day",
+        "start": "2025-01-19T23:00:00.000Z",
+        "end": "2025-01-20T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "19c7528b-a44e-3f70-800f-b22ee6be7bd0",
+        "sourceUid": "19c7528b-a44e-3f70-800f-b22ee6be7bd0",
+        "title": "Lunar New Year",
+        "start": "2025-01-28T23:00:00.000Z",
+        "end": "2025-01-29T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "d1cf3d8a-2bbe-3a9c-bbe8-16137a9f1d52",
+        "sourceUid": "d1cf3d8a-2bbe-3a9c-bbe8-16137a9f1d52",
+        "title": "Groundhog Day",
+        "start": "2025-02-01T23:00:00.000Z",
+        "end": "2025-02-02T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "beb94124-1c63-3017-9889-d3f817d62f7f",
+        "sourceUid": "beb94124-1c63-3017-9889-d3f817d62f7f",
+        "title": "Valentine’s Day",
+        "start": "2025-02-13T23:00:00.000Z",
+        "end": "2025-02-14T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "a1ae0724-c633-37a0-8269-4a7d4a0a2e7d",
+        "sourceUid": "a1ae0724-c633-37a0-8269-4a7d4a0a2e7d",
+        "title": "Presidents’ Day",
+        "start": "2025-02-16T23:00:00.000Z",
+        "end": "2025-02-17T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "780abb03-aade-3383-bf48-13aa6ca261a7",
+        "sourceUid": "780abb03-aade-3383-bf48-13aa6ca261a7",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2025-02-28T23:00:00.000Z",
+        "end": "2025-03-01T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "17afe996-164f-31f5-89a4-3e780451694b",
+        "sourceUid": "17afe996-164f-31f5-89a4-3e780451694b",
+        "title": "Ash Wednesday",
+        "start": "2025-03-04T23:00:00.000Z",
+        "end": "2025-03-05T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "733d5daf-099e-3559-a333-981206e7c3ef",
+        "sourceUid": "733d5daf-099e-3559-a333-981206e7c3ef",
+        "title": "Daylight Saving Time",
+        "start": "2025-03-08T23:00:00.000Z",
+        "end": "2025-03-09T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "881438c7-7b25-34f7-b1dc-e478381a86d5",
+        "sourceUid": "881438c7-7b25-34f7-b1dc-e478381a86d5",
+        "title": "Holi",
+        "start": "2025-03-13T23:00:00.000Z",
+        "end": "2025-03-14T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "21095316-3c1d-3316-a99f-56e0ffcf286d",
+        "sourceUid": "21095316-3c1d-3316-a99f-56e0ffcf286d",
+        "title": "St. Patrick’s Day",
+        "start": "2025-03-16T23:00:00.000Z",
+        "end": "2025-03-17T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "44da74a5-0985-35bd-91f4-e08c64c5ebe4",
+        "sourceUid": "44da74a5-0985-35bd-91f4-e08c64c5ebe4",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-03-29T23:00:00.000Z",
+        "end": "2025-03-30T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "d375d9e7-0d0c-3d65-b886-4ef60c20d897",
+        "sourceUid": "d375d9e7-0d0c-3d65-b886-4ef60c20d897",
+        "title": "Eid al-Fitr (observed)",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-03-30T22:00:00.000Z",
+        "end": "2025-03-31T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "e2b16772-0620-3f7e-8c69-20976a94cce0",
+        "sourceUid": "e2b16772-0620-3f7e-8c69-20976a94cce0",
+        "title": "April Fools’ Day",
+        "start": "2025-03-31T22:00:00.000Z",
+        "end": "2025-04-01T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "7f9bd4d9-3dbb-356e-93c0-6bf74268b352",
+        "sourceUid": "7f9bd4d9-3dbb-356e-93c0-6bf74268b352",
+        "title": "Passover",
+        "start": "2025-04-11T22:00:00.000Z",
+        "end": "2025-04-12T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "abcfb0eb-e57e-3712-962f-3e69cbdcac94",
+        "sourceUid": "abcfb0eb-e57e-3712-962f-3e69cbdcac94",
+        "title": "Palm Sunday",
+        "start": "2025-04-12T22:00:00.000Z",
+        "end": "2025-04-13T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "db1a63c5-21c9-3a64-a5c0-51e1f21de746",
+        "sourceUid": "db1a63c5-21c9-3a64-a5c0-51e1f21de746",
+        "title": "Tax Day",
+        "start": "2025-04-14T22:00:00.000Z",
+        "end": "2025-04-15T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "86f99fb5-d9be-3050-a892-29f632906a0f",
+        "sourceUid": "86f99fb5-d9be-3050-a892-29f632906a0f",
+        "title": "Good Friday",
+        "start": "2025-04-17T22:00:00.000Z",
+        "end": "2025-04-18T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
+        "sourceUid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
+        "title": "Easter",
+        "start": "2025-04-19T22:00:00.000Z",
+        "end": "2025-04-20T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "31c59d6e-f0ed-3834-beeb-879b6ec85222",
+        "sourceUid": "31c59d6e-f0ed-3834-beeb-879b6ec85222",
+        "title": "Orthodox Easter",
+        "start": "2025-04-19T22:00:00.000Z",
+        "end": "2025-04-20T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "cef88b72-fc8e-3985-bbfb-6993de0abfc7",
+        "sourceUid": "cef88b72-fc8e-3985-bbfb-6993de0abfc7",
+        "title": "Earth Day",
+        "start": "2025-04-21T22:00:00.000Z",
+        "end": "2025-04-22T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "ee515ee6-fd2c-35e5-91cd-e285295ef286",
+        "sourceUid": "ee515ee6-fd2c-35e5-91cd-e285295ef286",
+        "title": "Cinco de Mayo",
+        "start": "2025-05-04T22:00:00.000Z",
+        "end": "2025-05-05T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "9ab828d0-5935-3824-b570-b9703ee28e88",
+        "sourceUid": "9ab828d0-5935-3824-b570-b9703ee28e88",
+        "title": "Mother’s Day",
+        "start": "2025-05-10T22:00:00.000Z",
+        "end": "2025-05-11T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "991b560e-7963-314a-8520-e1f256b99ee1",
+        "sourceUid": "991b560e-7963-314a-8520-e1f256b99ee1",
+        "title": "Memorial Day",
+        "start": "2025-05-25T22:00:00.000Z",
+        "end": "2025-05-26T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "1831de42-74ac-39bc-83ae-3832144c68c4",
+        "sourceUid": "1831de42-74ac-39bc-83ae-3832144c68c4",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-06-06T22:00:00.000Z",
+        "end": "2025-06-07T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "1bb2d313-3740-3828-a463-773e76c922eb",
+        "sourceUid": "1bb2d313-3740-3828-a463-773e76c922eb",
+        "title": "Flag Day",
+        "start": "2025-06-13T22:00:00.000Z",
+        "end": "2025-06-14T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "714b554b-12a0-3e59-80e9-3a5f9e61f5ef",
+        "sourceUid": "714b554b-12a0-3e59-80e9-3a5f9e61f5ef",
+        "title": "Father’s Day",
+        "start": "2025-06-14T22:00:00.000Z",
+        "end": "2025-06-15T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "710e8dcf-62d9-39f1-a4ea-570dbb8a60fe",
+        "sourceUid": "710e8dcf-62d9-39f1-a4ea-570dbb8a60fe",
+        "title": "Juneteenth",
+        "start": "2025-06-18T22:00:00.000Z",
+        "end": "2025-06-19T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "9196d0f5-178c-3979-966c-d9c8f56304da",
+        "sourceUid": "9196d0f5-178c-3979-966c-d9c8f56304da",
+        "title": "Independence Day",
+        "start": "2025-07-03T22:00:00.000Z",
+        "end": "2025-07-04T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "a39cf1a4-87e4-3f09-978e-3ce0a82ddbc8",
+        "sourceUid": "a39cf1a4-87e4-3f09-978e-3ce0a82ddbc8",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-07-05T22:00:00.000Z",
+        "end": "2025-07-06T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "74172a6d-3773-375c-b130-3b71e92b7c5d",
+        "sourceUid": "74172a6d-3773-375c-b130-3b71e92b7c5d",
+        "title": "Labor Day",
+        "start": "2025-08-31T22:00:00.000Z",
+        "end": "2025-09-01T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "adc37f3c-38a3-3525-a963-5983b473bf91",
+        "sourceUid": "adc37f3c-38a3-3525-a963-5983b473bf91",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2025-09-22T22:00:00.000Z",
+        "end": "2025-09-23T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "05ce3f2c-bee7-381e-b7ba-73d277c01094",
+        "sourceUid": "05ce3f2c-bee7-381e-b7ba-73d277c01094",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2025-09-23T22:00:00.000Z",
+        "end": "2025-09-24T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "9c216877-727a-313e-97a9-d0253f9d141c",
+        "sourceUid": "9c216877-727a-313e-97a9-d0253f9d141c",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2025-10-01T22:00:00.000Z",
+        "end": "2025-10-02T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "05aae26c-02ef-3ffb-9373-698cee9a7985",
+        "sourceUid": "05aae26c-02ef-3ffb-9373-698cee9a7985",
+        "title": "Columbus Day",
+        "description": "This is not a nation-wide holiday; it may not be observed in your region.",
+        "start": "2025-10-12T22:00:00.000Z",
+        "end": "2025-10-13T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "44c8260c-b2e4-30cb-b4f6-5817bea86a30",
+        "sourceUid": "44c8260c-b2e4-30cb-b4f6-5817bea86a30",
+        "title": "Indigenous Peoples’ Day",
+        "description": "This is not a nation-wide holiday; it may not be observed in your region.",
+        "start": "2025-10-12T22:00:00.000Z",
+        "end": "2025-10-13T21:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "a58fb511-6e3b-3d5b-a8ac-a781d31d092e",
+        "sourceUid": "a58fb511-6e3b-3d5b-a8ac-a781d31d092e",
+        "title": "Diwali",
+        "start": "2025-10-20T22:00:00.000Z",
+        "end": "2025-10-21T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "48fa6175-2399-3bac-960a-fff947563ba7",
+        "sourceUid": "48fa6175-2399-3bac-960a-fff947563ba7",
+        "title": "Halloween",
+        "start": "2025-10-30T23:00:00.000Z",
+        "end": "2025-10-31T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "5ae40f05-65f9-3f69-beeb-ccb71986276c",
+        "sourceUid": "5ae40f05-65f9-3f69-beeb-ccb71986276c",
+        "title": "Day of the Dead",
+        "description": "This is not a nation-wide holiday; it may not be observed in your region.",
+        "start": "2025-11-01T23:00:00.000Z",
+        "end": "2025-11-02T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "4677270e-7cbc-39ad-a536-fea177cd16b0",
+        "sourceUid": "4677270e-7cbc-39ad-a536-fea177cd16b0",
+        "title": "Daylight Saving Time End",
+        "start": "2025-11-01T23:00:00.000Z",
+        "end": "2025-11-02T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "325fcebb-1a2b-34f5-b864-41863247debd",
+        "sourceUid": "325fcebb-1a2b-34f5-b864-41863247debd",
+        "title": "Election Day",
+        "description": "National Elections are held on even-numbered years, alternating between Presidential Elections and mid-terms Elections. Off-year elections are held on odd-numbered years in some States only.",
+        "start": "2025-11-03T23:00:00.000Z",
+        "end": "2025-11-04T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "61aaab27-ceae-3e2a-980e-f56f50bbd976",
+        "sourceUid": "61aaab27-ceae-3e2a-980e-f56f50bbd976",
+        "title": "Veterans Day",
+        "start": "2025-11-10T23:00:00.000Z",
+        "end": "2025-11-11T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "4d0c1cfb-0de6-3af5-892c-eb1d742a89fe",
+        "sourceUid": "4d0c1cfb-0de6-3af5-892c-eb1d742a89fe",
+        "title": "Thanksgiving",
+        "start": "2025-11-26T23:00:00.000Z",
+        "end": "2025-11-27T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            4
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[4],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "64945272-f8bf-375c-833f-3030911541c7",
+        "sourceUid": "64945272-f8bf-375c-833f-3030911541c7",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2025-12-14T23:00:00.000Z",
+        "end": "2025-12-15T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "d122d87d-5193-3745-a8db-76a74b78a118",
+        "sourceUid": "d122d87d-5193-3745-a8db-76a74b78a118",
+        "title": "Christmas Eve",
+        "start": "2025-12-23T23:00:00.000Z",
+        "end": "2025-12-24T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "94d3fbec-3769-3f04-92f3-60840a11da0a",
+        "sourceUid": "94d3fbec-3769-3f04-92f3-60840a11da0a",
+        "title": "Christmas Day",
+        "start": "2025-12-24T23:00:00.000Z",
+        "end": "2025-12-25T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "130416c0-f380-3b6c-b7e0-8fccb35f860f",
+        "sourceUid": "130416c0-f380-3b6c-b7e0-8fccb35f860f",
+        "title": "Kwanzaa",
+        "start": "2025-12-25T23:00:00.000Z",
+        "end": "2025-12-26T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "cc765417-5752-3a6b-827b-9ee6a0fdde05",
+        "sourceUid": "cc765417-5752-3a6b-827b-9ee6a0fdde05",
+        "title": "New Year’s Eve",
+        "start": "2025-12-30T23:00:00.000Z",
+        "end": "2025-12-31T22:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "d9b9df4f-bd94-3d1a-b757-0b173a59716d",
+        "sourceUid": "d9b9df4f-bd94-3d1a-b757-0b173a59716d",
+        "title": "Lunar New Year",
+        "start": "2026-02-16T23:00:00.000Z",
+        "end": "2026-02-17T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "7dd36b47-7a89-359d-a68c-9c818aee25c1",
+        "sourceUid": "7dd36b47-7a89-359d-a68c-9c818aee25c1",
+        "title": "Ash Wednesday",
+        "start": "2026-02-17T23:00:00.000Z",
+        "end": "2026-02-18T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "79d03cac-6b22-39b3-86c7-8556d3f44196",
+        "sourceUid": "79d03cac-6b22-39b3-86c7-8556d3f44196",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2026-02-17T23:00:00.000Z",
+        "end": "2026-02-18T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "445e44e9-e2a9-3122-8209-1d8f15669485",
+        "sourceUid": "445e44e9-e2a9-3122-8209-1d8f15669485",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2026-03-19T23:00:00.000Z",
+        "end": "2026-03-20T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "9917d958-6719-3949-a2bc-f343b59e6473",
+        "sourceUid": "9917d958-6719-3949-a2bc-f343b59e6473",
+        "title": "Palm Sunday",
+        "start": "2026-03-28T23:00:00.000Z",
+        "end": "2026-03-29T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "a6b5fc2d-30ec-37cd-ab60-808efb5e0954",
+        "sourceUid": "a6b5fc2d-30ec-37cd-ab60-808efb5e0954",
+        "title": "Passover",
+        "start": "2026-03-31T22:00:00.000Z",
+        "end": "2026-04-01T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "57378f6f-0614-3e7d-a908-0f05201a396c",
+        "sourceUid": "57378f6f-0614-3e7d-a908-0f05201a396c",
+        "title": "Good Friday",
+        "start": "2026-04-02T22:00:00.000Z",
+        "end": "2026-04-03T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
+        "sourceUid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
+        "title": "Easter",
+        "start": "2026-04-04T22:00:00.000Z",
+        "end": "2026-04-05T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "16fe3931-483e-3524-8796-eed12ad7786c",
+        "sourceUid": "16fe3931-483e-3524-8796-eed12ad7786c",
+        "title": "Orthodox Easter",
+        "start": "2026-04-11T22:00:00.000Z",
+        "end": "2026-04-12T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "992cb248-764f-38fd-8eec-86bfb35b889a",
+        "sourceUid": "992cb248-764f-38fd-8eec-86bfb35b889a",
+        "title": "Tax Day",
+        "start": "2026-04-14T22:00:00.000Z",
+        "end": "2026-04-15T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "9c5ed1e5-23d2-379e-84ce-e9eb5eacbaf4",
+        "sourceUid": "9c5ed1e5-23d2-379e-84ce-e9eb5eacbaf4",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2026-05-26T22:00:00.000Z",
+        "end": "2026-05-27T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "e88a9d77-00b0-3f81-aee1-3aa37424db0c",
+        "sourceUid": "e88a9d77-00b0-3f81-aee1-3aa37424db0c",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2026-06-25T22:00:00.000Z",
+        "end": "2026-06-26T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "f852539d-8148-38ac-afa8-72377037d298",
+        "sourceUid": "f852539d-8148-38ac-afa8-72377037d298",
+        "title": "Independence Day (observed)",
+        "start": "2026-07-02T22:00:00.000Z",
+        "end": "2026-07-03T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "99043429-0ede-3a82-ac07-86bc703941f6",
+        "sourceUid": "99043429-0ede-3a82-ac07-86bc703941f6",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2026-09-11T22:00:00.000Z",
+        "end": "2026-09-12T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "24849c2d-aebb-3d79-84cd-b6435c76abba",
+        "sourceUid": "24849c2d-aebb-3d79-84cd-b6435c76abba",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2026-09-12T22:00:00.000Z",
+        "end": "2026-09-13T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "c9bdf86e-b8bf-3d54-b45d-7557bd473875",
+        "sourceUid": "c9bdf86e-b8bf-3d54-b45d-7557bd473875",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2026-09-20T22:00:00.000Z",
+        "end": "2026-09-21T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "c823c12d-75c8-3120-a9b9-c16d6319478e",
+        "sourceUid": "c823c12d-75c8-3120-a9b9-c16d6319478e",
+        "title": "Election Day",
+        "description": "National Elections are held on even-numbered years, alternating between Presidential Elections and mid-terms Elections. Off-year elections are held on odd-numbered years in some States only.",
+        "start": "2026-11-02T23:00:00.000Z",
+        "end": "2026-11-03T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "561cabf0-ac35-332f-a5fc-5c23d687d069",
+        "sourceUid": "561cabf0-ac35-332f-a5fc-5c23d687d069",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2026-12-04T23:00:00.000Z",
+        "end": "2026-12-05T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "d0f4d0b3-0daa-3106-9eb7-bb31acd040c5",
+        "sourceUid": "d0f4d0b3-0daa-3106-9eb7-bb31acd040c5",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2027-02-06T23:00:00.000Z",
+        "end": "2027-02-07T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "ee8bdd09-87a1-3982-8595-487ec5b839f3",
+        "sourceUid": "ee8bdd09-87a1-3982-8595-487ec5b839f3",
+        "title": "Lunar New Year",
+        "start": "2027-02-06T23:00:00.000Z",
+        "end": "2027-02-07T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "6b6cbe27-34d6-35cf-b7c2-d694968b8f44",
+        "sourceUid": "6b6cbe27-34d6-35cf-b7c2-d694968b8f44",
+        "title": "Ash Wednesday",
+        "start": "2027-02-09T23:00:00.000Z",
+        "end": "2027-02-10T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "4778f918-ea21-3198-9311-18cae42a4789",
+        "sourceUid": "4778f918-ea21-3198-9311-18cae42a4789",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2027-03-08T23:00:00.000Z",
+        "end": "2027-03-09T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "196e76d7-415a-3966-ad60-ae885e06ee62",
+        "sourceUid": "196e76d7-415a-3966-ad60-ae885e06ee62",
+        "title": "Palm Sunday",
+        "start": "2027-03-20T23:00:00.000Z",
+        "end": "2027-03-21T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "c765379d-3c9d-38dc-8d34-083d59841260",
+        "sourceUid": "c765379d-3c9d-38dc-8d34-083d59841260",
+        "title": "Good Friday",
+        "start": "2027-03-25T23:00:00.000Z",
+        "end": "2027-03-26T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
+        "sourceUid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
+        "title": "Easter",
+        "start": "2027-03-27T23:00:00.000Z",
+        "end": "2027-03-28T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "d0176d32-9391-3f72-8e47-71f25e038a7f",
+        "sourceUid": "d0176d32-9391-3f72-8e47-71f25e038a7f",
+        "title": "Tax Day",
+        "start": "2027-04-14T22:00:00.000Z",
+        "end": "2027-04-15T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "b6087195-eb58-3a08-aefa-267c18dc5154",
+        "sourceUid": "b6087195-eb58-3a08-aefa-267c18dc5154",
+        "title": "Passover",
+        "start": "2027-04-20T22:00:00.000Z",
+        "end": "2027-04-21T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "3191b13d-6286-3425-b874-4b75f29108af",
+        "sourceUid": "3191b13d-6286-3425-b874-4b75f29108af",
+        "title": "Orthodox Easter",
+        "start": "2027-05-01T22:00:00.000Z",
+        "end": "2027-05-02T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "77bb16c3-9ddd-3e7c-9343-7e0296fe4fd7",
+        "sourceUid": "77bb16c3-9ddd-3e7c-9343-7e0296fe4fd7",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2027-05-16T22:00:00.000Z",
+        "end": "2027-05-17T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "fab18da6-c7fc-3cad-ad76-b25ba7f4e6ad",
+        "sourceUid": "fab18da6-c7fc-3cad-ad76-b25ba7f4e6ad",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2027-06-14T22:00:00.000Z",
+        "end": "2027-06-15T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "10647736-c8ce-3fb5-a62a-612674d86459",
+        "sourceUid": "10647736-c8ce-3fb5-a62a-612674d86459",
+        "title": "Independence Day (observed)",
+        "start": "2027-07-04T22:00:00.000Z",
+        "end": "2027-07-05T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "010c681c-a86e-3758-98ec-94c16f0f25fb",
+        "sourceUid": "010c681c-a86e-3758-98ec-94c16f0f25fb",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2027-10-01T22:00:00.000Z",
+        "end": "2027-10-02T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "f9681f26-d9ec-3879-b549-f8d26b4317ff",
+        "sourceUid": "f9681f26-d9ec-3879-b549-f8d26b4317ff",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2027-10-02T22:00:00.000Z",
+        "end": "2027-10-03T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "55892cef-fa54-328a-9e1b-ad6f89b15473",
+        "sourceUid": "55892cef-fa54-328a-9e1b-ad6f89b15473",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2027-10-10T22:00:00.000Z",
+        "end": "2027-10-11T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "38610e77-3046-3c39-8296-50719fc14968",
+        "sourceUid": "38610e77-3046-3c39-8296-50719fc14968",
+        "title": "Christmas Day (observed)",
+        "start": "2027-12-23T23:00:00.000Z",
+        "end": "2027-12-24T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "25b8984d-7515-328f-8ac6-4189806be269",
+        "sourceUid": "25b8984d-7515-328f-8ac6-4189806be269",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2027-12-24T23:00:00.000Z",
+        "end": "2027-12-25T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "f5058404-568d-3b57-99e9-1b1007f04b62",
+        "sourceUid": "f5058404-568d-3b57-99e9-1b1007f04b62",
+        "title": "Lunar New Year",
+        "start": "2028-01-25T23:00:00.000Z",
+        "end": "2028-01-26T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "b836f6a5-2032-3625-946d-8668f0aa5433",
+        "sourceUid": "b836f6a5-2032-3625-946d-8668f0aa5433",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2028-01-26T23:00:00.000Z",
+        "end": "2028-01-27T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "24e99297-d3fa-332c-8819-facdac5737d2",
+        "sourceUid": "24e99297-d3fa-332c-8819-facdac5737d2",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-02-25T23:00:00.000Z",
+        "end": "2028-02-26T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "bd315ec7-9fff-3af4-8ac9-e068343ea581",
+        "sourceUid": "bd315ec7-9fff-3af4-8ac9-e068343ea581",
+        "title": "Eid al-Fitr (observed)",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-02-27T23:00:00.000Z",
+        "end": "2028-02-28T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "f6e2e5c4-bb0a-3291-b4b2-4fabd1e2de89",
+        "sourceUid": "f6e2e5c4-bb0a-3291-b4b2-4fabd1e2de89",
+        "title": "Ash Wednesday",
+        "start": "2028-02-29T23:00:00.000Z",
+        "end": "2028-03-01T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "561dee30-3d9d-3d89-a3b5-14887a76986f",
+        "sourceUid": "561dee30-3d9d-3d89-a3b5-14887a76986f",
+        "title": "Palm Sunday",
+        "start": "2028-04-08T22:00:00.000Z",
+        "end": "2028-04-09T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "c262a2d2-ea66-38e0-bf27-7d359c700741",
+        "sourceUid": "c262a2d2-ea66-38e0-bf27-7d359c700741",
+        "title": "Passover",
+        "start": "2028-04-09T22:00:00.000Z",
+        "end": "2028-04-10T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "af26ac65-4781-3115-8b6f-4ca703471382",
+        "sourceUid": "af26ac65-4781-3115-8b6f-4ca703471382",
+        "title": "Good Friday",
+        "start": "2028-04-13T22:00:00.000Z",
+        "end": "2028-04-14T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
+        "sourceUid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
+        "title": "Easter",
+        "start": "2028-04-15T22:00:00.000Z",
+        "end": "2028-04-16T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "a09c3534-a8f5-300f-8fde-6013e7ecdfee",
+        "sourceUid": "a09c3534-a8f5-300f-8fde-6013e7ecdfee",
+        "title": "Orthodox Easter",
+        "start": "2028-04-15T22:00:00.000Z",
+        "end": "2028-04-16T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "dbd37dc5-a2e7-3e0b-bec6-25df70e35606",
+        "sourceUid": "dbd37dc5-a2e7-3e0b-bec6-25df70e35606",
+        "title": "Tax Day",
+        "start": "2028-04-16T22:00:00.000Z",
+        "end": "2028-04-17T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "e4a68947-97a1-3cc8-bc9c-2efe72c6ecc7",
+        "sourceUid": "e4a68947-97a1-3cc8-bc9c-2efe72c6ecc7",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-05-04T22:00:00.000Z",
+        "end": "2028-05-05T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "ec29de47-c568-33c5-b263-42c5ff636887",
+        "sourceUid": "ec29de47-c568-33c5-b263-42c5ff636887",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-06-02T22:00:00.000Z",
+        "end": "2028-06-03T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "af18fd9f-61af-3947-b26a-c52dce88271f",
+        "sourceUid": "af18fd9f-61af-3947-b26a-c52dce88271f",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2028-09-20T22:00:00.000Z",
+        "end": "2028-09-21T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "7dc063d4-8c3c-3cae-bc57-4c0867fa25c6",
+        "sourceUid": "7dc063d4-8c3c-3cae-bc57-4c0867fa25c6",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2028-09-21T22:00:00.000Z",
+        "end": "2028-09-22T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "c95b7565-5f7c-3e84-80c8-b67144fd07b7",
+        "sourceUid": "c95b7565-5f7c-3e84-80c8-b67144fd07b7",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2028-09-29T22:00:00.000Z",
+        "end": "2028-09-30T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "a8a06cbb-272d-3df4-b976-2c14abe07389",
+        "sourceUid": "a8a06cbb-272d-3df4-b976-2c14abe07389",
+        "title": "Election Day",
+        "description": "National Elections are held on even-numbered years, alternating between Presidential Elections and mid-terms Elections. Off-year elections are held on odd-numbered years in some States only.",
+        "start": "2028-11-06T23:00:00.000Z",
+        "end": "2028-11-07T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "8d719cfb-184b-3de9-bad8-b004a85786c2",
+        "sourceUid": "8d719cfb-184b-3de9-bad8-b004a85786c2",
+        "title": "Veterans Day (observed)",
+        "start": "2028-11-09T23:00:00.000Z",
+        "end": "2028-11-10T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "8cd0965b-6569-35c5-9ee3-62d47d72ae2e",
+        "sourceUid": "8cd0965b-6569-35c5-9ee3-62d47d72ae2e",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2028-12-12T23:00:00.000Z",
+        "end": "2028-12-13T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "e7251ef2-c9f2-375c-933a-1908a499beb9",
+        "sourceUid": "e7251ef2-c9f2-375c-933a-1908a499beb9",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2029-01-14T23:00:00.000Z",
+        "end": "2029-01-15T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "2870722d-429e-378b-a4d0-89c62a53febc",
+        "sourceUid": "2870722d-429e-378b-a4d0-89c62a53febc",
+        "title": "Inauguration Day",
+        "start": "2029-01-19T23:00:00.000Z",
+        "end": "2029-01-20T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "eefad852-47ac-3265-8c74-56830ba71fe1",
+        "sourceUid": "eefad852-47ac-3265-8c74-56830ba71fe1",
+        "title": "Lunar New Year",
+        "start": "2029-02-12T23:00:00.000Z",
+        "end": "2029-02-13T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "61dee9c2-843e-3a9d-8f8b-9db42fb6f5f9",
+        "sourceUid": "61dee9c2-843e-3a9d-8f8b-9db42fb6f5f9",
+        "title": "Ash Wednesday",
+        "start": "2029-02-13T23:00:00.000Z",
+        "end": "2029-02-14T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "7898f0cd-01bf-37a2-b222-4db2dcb2a9fd",
+        "sourceUid": "7898f0cd-01bf-37a2-b222-4db2dcb2a9fd",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2029-02-13T23:00:00.000Z",
+        "end": "2029-02-14T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "4082f8d5-a0ec-3336-b328-3b1c3efecc57",
+        "sourceUid": "4082f8d5-a0ec-3336-b328-3b1c3efecc57",
+        "title": "Palm Sunday",
+        "start": "2029-03-24T23:00:00.000Z",
+        "end": "2029-03-25T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
+        "sourceUid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
+        "title": "Good Friday",
+        "start": "2029-03-29T22:00:00.000Z",
+        "end": "2029-03-30T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "71652f1b-d80f-3f79-9fef-1200a7ec6e9b",
+        "sourceUid": "71652f1b-d80f-3f79-9fef-1200a7ec6e9b",
+        "title": "Passover",
+        "start": "2029-03-29T22:00:00.000Z",
+        "end": "2029-03-30T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
+        "sourceUid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
+        "title": "Easter",
+        "start": "2029-03-31T22:00:00.000Z",
+        "end": "2029-04-01T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "644d0a2e-2554-382d-9caf-d60d0f019219",
+        "sourceUid": "644d0a2e-2554-382d-9caf-d60d0f019219",
+        "title": "Orthodox Easter",
+        "start": "2029-04-07T22:00:00.000Z",
+        "end": "2029-04-08T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "dc574d80-2f44-3024-8965-c0714fd20220",
+        "sourceUid": "dc574d80-2f44-3024-8965-c0714fd20220",
+        "title": "Tax Day",
+        "start": "2029-04-15T22:00:00.000Z",
+        "end": "2029-04-16T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "988957bd-be3e-3781-bf82-73b5763dd861",
+        "sourceUid": "988957bd-be3e-3781-bf82-73b5763dd861",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2029-04-23T22:00:00.000Z",
+        "end": "2029-04-24T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "c8a05002-7b54-3cef-b2f1-95f321218562",
+        "sourceUid": "c8a05002-7b54-3cef-b2f1-95f321218562",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2029-05-23T22:00:00.000Z",
+        "end": "2029-05-24T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "21764f05-8b78-3eba-97fa-110b0d13b364",
+        "sourceUid": "21764f05-8b78-3eba-97fa-110b0d13b364",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2029-09-09T22:00:00.000Z",
+        "end": "2029-09-10T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "82d1c44f-b831-3e00-b3e1-efe4b5d82040",
+        "sourceUid": "82d1c44f-b831-3e00-b3e1-efe4b5d82040",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2029-09-10T22:00:00.000Z",
+        "end": "2029-09-11T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "b07533a0-fdb4-3f90-ae0a-f44901fed6be",
+        "sourceUid": "b07533a0-fdb4-3f90-ae0a-f44901fed6be",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2029-09-18T22:00:00.000Z",
+        "end": "2029-09-19T21:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "b9be8a7a-3c2a-3ab1-8304-a1430306e536",
+        "sourceUid": "b9be8a7a-3c2a-3ab1-8304-a1430306e536",
+        "title": "Veterans Day (observed)",
+        "start": "2029-11-11T23:00:00.000Z",
+        "end": "2029-11-12T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      },
+      {
+        "uid": "2143eba1-f9eb-354c-9b45-5b1fa98fd71c",
+        "sourceUid": "2143eba1-f9eb-354c-9b45-5b1fa98fd71c",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2029-12-01T23:00:00.000Z",
+        "end": "2029-12-02T22:59:59.999Z",
+        "allDay": true,
+        "timezone": "Europe/Amsterdam"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "US Holidays"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "237447d9-0387-3a3d-b47b-b6e13049edd9",
+        "sourceUid": "237447d9-0387-3a3d-b47b-b6e13049edd9",
+        "title": "New Year’s Day",
+        "start": "2025-01-01T08:00:00.000Z",
+        "end": "2025-01-02T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "54714bb2-d548-38cd-ae9d-e994ac984460",
+        "sourceUid": "54714bb2-d548-38cd-ae9d-e994ac984460",
+        "title": "Inauguration Day",
+        "start": "2025-01-20T08:00:00.000Z",
+        "end": "2025-01-21T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "642909f7-2888-37c3-bc8c-08dc32459152",
+        "sourceUid": "642909f7-2888-37c3-bc8c-08dc32459152",
+        "title": "Martin Luther King Jr. Day",
+        "start": "2025-01-20T08:00:00.000Z",
+        "end": "2025-01-21T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "19c7528b-a44e-3f70-800f-b22ee6be7bd0",
+        "sourceUid": "19c7528b-a44e-3f70-800f-b22ee6be7bd0",
+        "title": "Lunar New Year",
+        "start": "2025-01-29T08:00:00.000Z",
+        "end": "2025-01-30T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "d1cf3d8a-2bbe-3a9c-bbe8-16137a9f1d52",
+        "sourceUid": "d1cf3d8a-2bbe-3a9c-bbe8-16137a9f1d52",
+        "title": "Groundhog Day",
+        "start": "2025-02-02T08:00:00.000Z",
+        "end": "2025-02-03T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "beb94124-1c63-3017-9889-d3f817d62f7f",
+        "sourceUid": "beb94124-1c63-3017-9889-d3f817d62f7f",
+        "title": "Valentine’s Day",
+        "start": "2025-02-14T08:00:00.000Z",
+        "end": "2025-02-15T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "a1ae0724-c633-37a0-8269-4a7d4a0a2e7d",
+        "sourceUid": "a1ae0724-c633-37a0-8269-4a7d4a0a2e7d",
+        "title": "Presidents’ Day",
+        "start": "2025-02-17T08:00:00.000Z",
+        "end": "2025-02-18T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "780abb03-aade-3383-bf48-13aa6ca261a7",
+        "sourceUid": "780abb03-aade-3383-bf48-13aa6ca261a7",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2025-03-01T08:00:00.000Z",
+        "end": "2025-03-02T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "17afe996-164f-31f5-89a4-3e780451694b",
+        "sourceUid": "17afe996-164f-31f5-89a4-3e780451694b",
+        "title": "Ash Wednesday",
+        "start": "2025-03-05T08:00:00.000Z",
+        "end": "2025-03-06T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "733d5daf-099e-3559-a333-981206e7c3ef",
+        "sourceUid": "733d5daf-099e-3559-a333-981206e7c3ef",
+        "title": "Daylight Saving Time",
+        "start": "2025-03-09T08:00:00.000Z",
+        "end": "2025-03-10T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "881438c7-7b25-34f7-b1dc-e478381a86d5",
+        "sourceUid": "881438c7-7b25-34f7-b1dc-e478381a86d5",
+        "title": "Holi",
+        "start": "2025-03-14T07:00:00.000Z",
+        "end": "2025-03-15T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "21095316-3c1d-3316-a99f-56e0ffcf286d",
+        "sourceUid": "21095316-3c1d-3316-a99f-56e0ffcf286d",
+        "title": "St. Patrick’s Day",
+        "start": "2025-03-17T07:00:00.000Z",
+        "end": "2025-03-18T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "44da74a5-0985-35bd-91f4-e08c64c5ebe4",
+        "sourceUid": "44da74a5-0985-35bd-91f4-e08c64c5ebe4",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-03-30T07:00:00.000Z",
+        "end": "2025-03-31T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "d375d9e7-0d0c-3d65-b886-4ef60c20d897",
+        "sourceUid": "d375d9e7-0d0c-3d65-b886-4ef60c20d897",
+        "title": "Eid al-Fitr (observed)",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-03-31T07:00:00.000Z",
+        "end": "2025-04-01T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "e2b16772-0620-3f7e-8c69-20976a94cce0",
+        "sourceUid": "e2b16772-0620-3f7e-8c69-20976a94cce0",
+        "title": "April Fools’ Day",
+        "start": "2025-04-01T07:00:00.000Z",
+        "end": "2025-04-02T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "7f9bd4d9-3dbb-356e-93c0-6bf74268b352",
+        "sourceUid": "7f9bd4d9-3dbb-356e-93c0-6bf74268b352",
+        "title": "Passover",
+        "start": "2025-04-12T07:00:00.000Z",
+        "end": "2025-04-13T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "abcfb0eb-e57e-3712-962f-3e69cbdcac94",
+        "sourceUid": "abcfb0eb-e57e-3712-962f-3e69cbdcac94",
+        "title": "Palm Sunday",
+        "start": "2025-04-13T07:00:00.000Z",
+        "end": "2025-04-14T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "db1a63c5-21c9-3a64-a5c0-51e1f21de746",
+        "sourceUid": "db1a63c5-21c9-3a64-a5c0-51e1f21de746",
+        "title": "Tax Day",
+        "start": "2025-04-15T07:00:00.000Z",
+        "end": "2025-04-16T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "86f99fb5-d9be-3050-a892-29f632906a0f",
+        "sourceUid": "86f99fb5-d9be-3050-a892-29f632906a0f",
+        "title": "Good Friday",
+        "start": "2025-04-18T07:00:00.000Z",
+        "end": "2025-04-19T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
+        "sourceUid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
+        "title": "Easter",
+        "start": "2025-04-20T07:00:00.000Z",
+        "end": "2025-04-21T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "31c59d6e-f0ed-3834-beeb-879b6ec85222",
+        "sourceUid": "31c59d6e-f0ed-3834-beeb-879b6ec85222",
+        "title": "Orthodox Easter",
+        "start": "2025-04-20T07:00:00.000Z",
+        "end": "2025-04-21T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "cef88b72-fc8e-3985-bbfb-6993de0abfc7",
+        "sourceUid": "cef88b72-fc8e-3985-bbfb-6993de0abfc7",
+        "title": "Earth Day",
+        "start": "2025-04-22T07:00:00.000Z",
+        "end": "2025-04-23T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "ee515ee6-fd2c-35e5-91cd-e285295ef286",
+        "sourceUid": "ee515ee6-fd2c-35e5-91cd-e285295ef286",
+        "title": "Cinco de Mayo",
+        "start": "2025-05-05T07:00:00.000Z",
+        "end": "2025-05-06T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "9ab828d0-5935-3824-b570-b9703ee28e88",
+        "sourceUid": "9ab828d0-5935-3824-b570-b9703ee28e88",
+        "title": "Mother’s Day",
+        "start": "2025-05-11T07:00:00.000Z",
+        "end": "2025-05-12T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "991b560e-7963-314a-8520-e1f256b99ee1",
+        "sourceUid": "991b560e-7963-314a-8520-e1f256b99ee1",
+        "title": "Memorial Day",
+        "start": "2025-05-26T07:00:00.000Z",
+        "end": "2025-05-27T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "1831de42-74ac-39bc-83ae-3832144c68c4",
+        "sourceUid": "1831de42-74ac-39bc-83ae-3832144c68c4",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-06-07T07:00:00.000Z",
+        "end": "2025-06-08T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "1bb2d313-3740-3828-a463-773e76c922eb",
+        "sourceUid": "1bb2d313-3740-3828-a463-773e76c922eb",
+        "title": "Flag Day",
+        "start": "2025-06-14T07:00:00.000Z",
+        "end": "2025-06-15T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "714b554b-12a0-3e59-80e9-3a5f9e61f5ef",
+        "sourceUid": "714b554b-12a0-3e59-80e9-3a5f9e61f5ef",
+        "title": "Father’s Day",
+        "start": "2025-06-15T07:00:00.000Z",
+        "end": "2025-06-16T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "710e8dcf-62d9-39f1-a4ea-570dbb8a60fe",
+        "sourceUid": "710e8dcf-62d9-39f1-a4ea-570dbb8a60fe",
+        "title": "Juneteenth",
+        "start": "2025-06-19T07:00:00.000Z",
+        "end": "2025-06-20T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "9196d0f5-178c-3979-966c-d9c8f56304da",
+        "sourceUid": "9196d0f5-178c-3979-966c-d9c8f56304da",
+        "title": "Independence Day",
+        "start": "2025-07-04T07:00:00.000Z",
+        "end": "2025-07-05T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "a39cf1a4-87e4-3f09-978e-3ce0a82ddbc8",
+        "sourceUid": "a39cf1a4-87e4-3f09-978e-3ce0a82ddbc8",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2025-07-06T07:00:00.000Z",
+        "end": "2025-07-07T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "74172a6d-3773-375c-b130-3b71e92b7c5d",
+        "sourceUid": "74172a6d-3773-375c-b130-3b71e92b7c5d",
+        "title": "Labor Day",
+        "start": "2025-09-01T07:00:00.000Z",
+        "end": "2025-09-02T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "adc37f3c-38a3-3525-a963-5983b473bf91",
+        "sourceUid": "adc37f3c-38a3-3525-a963-5983b473bf91",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2025-09-23T07:00:00.000Z",
+        "end": "2025-09-24T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "05ce3f2c-bee7-381e-b7ba-73d277c01094",
+        "sourceUid": "05ce3f2c-bee7-381e-b7ba-73d277c01094",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2025-09-24T07:00:00.000Z",
+        "end": "2025-09-25T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "9c216877-727a-313e-97a9-d0253f9d141c",
+        "sourceUid": "9c216877-727a-313e-97a9-d0253f9d141c",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2025-10-02T07:00:00.000Z",
+        "end": "2025-10-03T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "05aae26c-02ef-3ffb-9373-698cee9a7985",
+        "sourceUid": "05aae26c-02ef-3ffb-9373-698cee9a7985",
+        "title": "Columbus Day",
+        "description": "This is not a nation-wide holiday; it may not be observed in your region.",
+        "start": "2025-10-13T07:00:00.000Z",
+        "end": "2025-10-14T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "44c8260c-b2e4-30cb-b4f6-5817bea86a30",
+        "sourceUid": "44c8260c-b2e4-30cb-b4f6-5817bea86a30",
+        "title": "Indigenous Peoples’ Day",
+        "description": "This is not a nation-wide holiday; it may not be observed in your region.",
+        "start": "2025-10-13T07:00:00.000Z",
+        "end": "2025-10-14T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            1
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "a58fb511-6e3b-3d5b-a8ac-a781d31d092e",
+        "sourceUid": "a58fb511-6e3b-3d5b-a8ac-a781d31d092e",
+        "title": "Diwali",
+        "start": "2025-10-21T07:00:00.000Z",
+        "end": "2025-10-22T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "48fa6175-2399-3bac-960a-fff947563ba7",
+        "sourceUid": "48fa6175-2399-3bac-960a-fff947563ba7",
+        "title": "Halloween",
+        "start": "2025-10-31T07:00:00.000Z",
+        "end": "2025-11-01T06:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "5ae40f05-65f9-3f69-beeb-ccb71986276c",
+        "sourceUid": "5ae40f05-65f9-3f69-beeb-ccb71986276c",
+        "title": "Day of the Dead",
+        "description": "This is not a nation-wide holiday; it may not be observed in your region.",
+        "start": "2025-11-02T07:00:00.000Z",
+        "end": "2025-11-03T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "4677270e-7cbc-39ad-a536-fea177cd16b0",
+        "sourceUid": "4677270e-7cbc-39ad-a536-fea177cd16b0",
+        "title": "Daylight Saving Time End",
+        "start": "2025-11-02T07:00:00.000Z",
+        "end": "2025-11-03T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            0
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "325fcebb-1a2b-34f5-b864-41863247debd",
+        "sourceUid": "325fcebb-1a2b-34f5-b864-41863247debd",
+        "title": "Election Day",
+        "description": "National Elections are held on even-numbered years, alternating between Presidential Elections and mid-terms Elections. Off-year elections are held on odd-numbered years in some States only.",
+        "start": "2025-11-04T08:00:00.000Z",
+        "end": "2025-11-05T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "61aaab27-ceae-3e2a-980e-f56f50bbd976",
+        "sourceUid": "61aaab27-ceae-3e2a-980e-f56f50bbd976",
+        "title": "Veterans Day",
+        "start": "2025-11-11T08:00:00.000Z",
+        "end": "2025-11-12T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "4d0c1cfb-0de6-3af5-892c-eb1d742a89fe",
+        "sourceUid": "4d0c1cfb-0de6-3af5-892c-eb1d742a89fe",
+        "title": "Thanksgiving",
+        "start": "2025-11-27T08:00:00.000Z",
+        "end": "2025-11-28T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "byWeekDay": [
+            4
+          ],
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[4],\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "64945272-f8bf-375c-833f-3030911541c7",
+        "sourceUid": "64945272-f8bf-375c-833f-3030911541c7",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2025-12-15T08:00:00.000Z",
+        "end": "2025-12-16T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "d122d87d-5193-3745-a8db-76a74b78a118",
+        "sourceUid": "d122d87d-5193-3745-a8db-76a74b78a118",
+        "title": "Christmas Eve",
+        "start": "2025-12-24T08:00:00.000Z",
+        "end": "2025-12-25T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "94d3fbec-3769-3f04-92f3-60840a11da0a",
+        "sourceUid": "94d3fbec-3769-3f04-92f3-60840a11da0a",
+        "title": "Christmas Day",
+        "start": "2025-12-25T08:00:00.000Z",
+        "end": "2025-12-26T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "130416c0-f380-3b6c-b7e0-8fccb35f860f",
+        "sourceUid": "130416c0-f380-3b6c-b7e0-8fccb35f860f",
+        "title": "Kwanzaa",
+        "start": "2025-12-26T08:00:00.000Z",
+        "end": "2025-12-27T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "cc765417-5752-3a6b-827b-9ee6a0fdde05",
+        "sourceUid": "cc765417-5752-3a6b-827b-9ee6a0fdde05",
+        "title": "New Year’s Eve",
+        "start": "2025-12-31T08:00:00.000Z",
+        "end": "2026-01-01T07:59:59.999Z",
+        "allDay": true,
+        "recurrence": {
+          "frequency": "yearly",
+          "interval": 1,
+          "count": 5,
+          "timezone": "UTC"
+        },
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+      },
+      {
+        "uid": "d9b9df4f-bd94-3d1a-b757-0b173a59716d",
+        "sourceUid": "d9b9df4f-bd94-3d1a-b757-0b173a59716d",
+        "title": "Lunar New Year",
+        "start": "2026-02-17T08:00:00.000Z",
+        "end": "2026-02-18T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "7dd36b47-7a89-359d-a68c-9c818aee25c1",
+        "sourceUid": "7dd36b47-7a89-359d-a68c-9c818aee25c1",
+        "title": "Ash Wednesday",
+        "start": "2026-02-18T08:00:00.000Z",
+        "end": "2026-02-19T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "79d03cac-6b22-39b3-86c7-8556d3f44196",
+        "sourceUid": "79d03cac-6b22-39b3-86c7-8556d3f44196",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2026-02-18T08:00:00.000Z",
+        "end": "2026-02-19T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "445e44e9-e2a9-3122-8209-1d8f15669485",
+        "sourceUid": "445e44e9-e2a9-3122-8209-1d8f15669485",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2026-03-20T07:00:00.000Z",
+        "end": "2026-03-21T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "9917d958-6719-3949-a2bc-f343b59e6473",
+        "sourceUid": "9917d958-6719-3949-a2bc-f343b59e6473",
+        "title": "Palm Sunday",
+        "start": "2026-03-29T07:00:00.000Z",
+        "end": "2026-03-30T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "a6b5fc2d-30ec-37cd-ab60-808efb5e0954",
+        "sourceUid": "a6b5fc2d-30ec-37cd-ab60-808efb5e0954",
+        "title": "Passover",
+        "start": "2026-04-01T07:00:00.000Z",
+        "end": "2026-04-02T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "57378f6f-0614-3e7d-a908-0f05201a396c",
+        "sourceUid": "57378f6f-0614-3e7d-a908-0f05201a396c",
+        "title": "Good Friday",
+        "start": "2026-04-03T07:00:00.000Z",
+        "end": "2026-04-04T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
+        "sourceUid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
+        "title": "Easter",
+        "start": "2026-04-05T07:00:00.000Z",
+        "end": "2026-04-06T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "16fe3931-483e-3524-8796-eed12ad7786c",
+        "sourceUid": "16fe3931-483e-3524-8796-eed12ad7786c",
+        "title": "Orthodox Easter",
+        "start": "2026-04-12T07:00:00.000Z",
+        "end": "2026-04-13T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "992cb248-764f-38fd-8eec-86bfb35b889a",
+        "sourceUid": "992cb248-764f-38fd-8eec-86bfb35b889a",
+        "title": "Tax Day",
+        "start": "2026-04-15T07:00:00.000Z",
+        "end": "2026-04-16T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "9c5ed1e5-23d2-379e-84ce-e9eb5eacbaf4",
+        "sourceUid": "9c5ed1e5-23d2-379e-84ce-e9eb5eacbaf4",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2026-05-27T07:00:00.000Z",
+        "end": "2026-05-28T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "e88a9d77-00b0-3f81-aee1-3aa37424db0c",
+        "sourceUid": "e88a9d77-00b0-3f81-aee1-3aa37424db0c",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2026-06-26T07:00:00.000Z",
+        "end": "2026-06-27T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "f852539d-8148-38ac-afa8-72377037d298",
+        "sourceUid": "f852539d-8148-38ac-afa8-72377037d298",
+        "title": "Independence Day (observed)",
+        "start": "2026-07-03T07:00:00.000Z",
+        "end": "2026-07-04T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "99043429-0ede-3a82-ac07-86bc703941f6",
+        "sourceUid": "99043429-0ede-3a82-ac07-86bc703941f6",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2026-09-12T07:00:00.000Z",
+        "end": "2026-09-13T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "24849c2d-aebb-3d79-84cd-b6435c76abba",
+        "sourceUid": "24849c2d-aebb-3d79-84cd-b6435c76abba",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2026-09-13T07:00:00.000Z",
+        "end": "2026-09-14T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "c9bdf86e-b8bf-3d54-b45d-7557bd473875",
+        "sourceUid": "c9bdf86e-b8bf-3d54-b45d-7557bd473875",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2026-09-21T07:00:00.000Z",
+        "end": "2026-09-22T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "c823c12d-75c8-3120-a9b9-c16d6319478e",
+        "sourceUid": "c823c12d-75c8-3120-a9b9-c16d6319478e",
+        "title": "Election Day",
+        "description": "National Elections are held on even-numbered years, alternating between Presidential Elections and mid-terms Elections. Off-year elections are held on odd-numbered years in some States only.",
+        "start": "2026-11-03T08:00:00.000Z",
+        "end": "2026-11-04T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "561cabf0-ac35-332f-a5fc-5c23d687d069",
+        "sourceUid": "561cabf0-ac35-332f-a5fc-5c23d687d069",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2026-12-05T08:00:00.000Z",
+        "end": "2026-12-06T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "d0f4d0b3-0daa-3106-9eb7-bb31acd040c5",
+        "sourceUid": "d0f4d0b3-0daa-3106-9eb7-bb31acd040c5",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2027-02-07T08:00:00.000Z",
+        "end": "2027-02-08T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "ee8bdd09-87a1-3982-8595-487ec5b839f3",
+        "sourceUid": "ee8bdd09-87a1-3982-8595-487ec5b839f3",
+        "title": "Lunar New Year",
+        "start": "2027-02-07T08:00:00.000Z",
+        "end": "2027-02-08T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "6b6cbe27-34d6-35cf-b7c2-d694968b8f44",
+        "sourceUid": "6b6cbe27-34d6-35cf-b7c2-d694968b8f44",
+        "title": "Ash Wednesday",
+        "start": "2027-02-10T08:00:00.000Z",
+        "end": "2027-02-11T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "4778f918-ea21-3198-9311-18cae42a4789",
+        "sourceUid": "4778f918-ea21-3198-9311-18cae42a4789",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2027-03-09T08:00:00.000Z",
+        "end": "2027-03-10T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "196e76d7-415a-3966-ad60-ae885e06ee62",
+        "sourceUid": "196e76d7-415a-3966-ad60-ae885e06ee62",
+        "title": "Palm Sunday",
+        "start": "2027-03-21T07:00:00.000Z",
+        "end": "2027-03-22T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "c765379d-3c9d-38dc-8d34-083d59841260",
+        "sourceUid": "c765379d-3c9d-38dc-8d34-083d59841260",
+        "title": "Good Friday",
+        "start": "2027-03-26T07:00:00.000Z",
+        "end": "2027-03-27T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
+        "sourceUid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
+        "title": "Easter",
+        "start": "2027-03-28T07:00:00.000Z",
+        "end": "2027-03-29T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "d0176d32-9391-3f72-8e47-71f25e038a7f",
+        "sourceUid": "d0176d32-9391-3f72-8e47-71f25e038a7f",
+        "title": "Tax Day",
+        "start": "2027-04-15T07:00:00.000Z",
+        "end": "2027-04-16T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "b6087195-eb58-3a08-aefa-267c18dc5154",
+        "sourceUid": "b6087195-eb58-3a08-aefa-267c18dc5154",
+        "title": "Passover",
+        "start": "2027-04-21T07:00:00.000Z",
+        "end": "2027-04-22T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "3191b13d-6286-3425-b874-4b75f29108af",
+        "sourceUid": "3191b13d-6286-3425-b874-4b75f29108af",
+        "title": "Orthodox Easter",
+        "start": "2027-05-02T07:00:00.000Z",
+        "end": "2027-05-03T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "77bb16c3-9ddd-3e7c-9343-7e0296fe4fd7",
+        "sourceUid": "77bb16c3-9ddd-3e7c-9343-7e0296fe4fd7",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2027-05-17T07:00:00.000Z",
+        "end": "2027-05-18T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "fab18da6-c7fc-3cad-ad76-b25ba7f4e6ad",
+        "sourceUid": "fab18da6-c7fc-3cad-ad76-b25ba7f4e6ad",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2027-06-15T07:00:00.000Z",
+        "end": "2027-06-16T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "10647736-c8ce-3fb5-a62a-612674d86459",
+        "sourceUid": "10647736-c8ce-3fb5-a62a-612674d86459",
+        "title": "Independence Day (observed)",
+        "start": "2027-07-05T07:00:00.000Z",
+        "end": "2027-07-06T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "010c681c-a86e-3758-98ec-94c16f0f25fb",
+        "sourceUid": "010c681c-a86e-3758-98ec-94c16f0f25fb",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2027-10-02T07:00:00.000Z",
+        "end": "2027-10-03T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "f9681f26-d9ec-3879-b549-f8d26b4317ff",
+        "sourceUid": "f9681f26-d9ec-3879-b549-f8d26b4317ff",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2027-10-03T07:00:00.000Z",
+        "end": "2027-10-04T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "55892cef-fa54-328a-9e1b-ad6f89b15473",
+        "sourceUid": "55892cef-fa54-328a-9e1b-ad6f89b15473",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2027-10-11T07:00:00.000Z",
+        "end": "2027-10-12T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "38610e77-3046-3c39-8296-50719fc14968",
+        "sourceUid": "38610e77-3046-3c39-8296-50719fc14968",
+        "title": "Christmas Day (observed)",
+        "start": "2027-12-24T08:00:00.000Z",
+        "end": "2027-12-25T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "25b8984d-7515-328f-8ac6-4189806be269",
+        "sourceUid": "25b8984d-7515-328f-8ac6-4189806be269",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2027-12-25T08:00:00.000Z",
+        "end": "2027-12-26T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "f5058404-568d-3b57-99e9-1b1007f04b62",
+        "sourceUid": "f5058404-568d-3b57-99e9-1b1007f04b62",
+        "title": "Lunar New Year",
+        "start": "2028-01-26T08:00:00.000Z",
+        "end": "2028-01-27T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "b836f6a5-2032-3625-946d-8668f0aa5433",
+        "sourceUid": "b836f6a5-2032-3625-946d-8668f0aa5433",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2028-01-27T08:00:00.000Z",
+        "end": "2028-01-28T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "24e99297-d3fa-332c-8819-facdac5737d2",
+        "sourceUid": "24e99297-d3fa-332c-8819-facdac5737d2",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-02-26T08:00:00.000Z",
+        "end": "2028-02-27T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "bd315ec7-9fff-3af4-8ac9-e068343ea581",
+        "sourceUid": "bd315ec7-9fff-3af4-8ac9-e068343ea581",
+        "title": "Eid al-Fitr (observed)",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-02-28T08:00:00.000Z",
+        "end": "2028-02-29T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "f6e2e5c4-bb0a-3291-b4b2-4fabd1e2de89",
+        "sourceUid": "f6e2e5c4-bb0a-3291-b4b2-4fabd1e2de89",
+        "title": "Ash Wednesday",
+        "start": "2028-03-01T08:00:00.000Z",
+        "end": "2028-03-02T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "561dee30-3d9d-3d89-a3b5-14887a76986f",
+        "sourceUid": "561dee30-3d9d-3d89-a3b5-14887a76986f",
+        "title": "Palm Sunday",
+        "start": "2028-04-09T07:00:00.000Z",
+        "end": "2028-04-10T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "c262a2d2-ea66-38e0-bf27-7d359c700741",
+        "sourceUid": "c262a2d2-ea66-38e0-bf27-7d359c700741",
+        "title": "Passover",
+        "start": "2028-04-10T07:00:00.000Z",
+        "end": "2028-04-11T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "af26ac65-4781-3115-8b6f-4ca703471382",
+        "sourceUid": "af26ac65-4781-3115-8b6f-4ca703471382",
+        "title": "Good Friday",
+        "start": "2028-04-14T07:00:00.000Z",
+        "end": "2028-04-15T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
+        "sourceUid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
+        "title": "Easter",
+        "start": "2028-04-16T07:00:00.000Z",
+        "end": "2028-04-17T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "a09c3534-a8f5-300f-8fde-6013e7ecdfee",
+        "sourceUid": "a09c3534-a8f5-300f-8fde-6013e7ecdfee",
+        "title": "Orthodox Easter",
+        "start": "2028-04-16T07:00:00.000Z",
+        "end": "2028-04-17T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "dbd37dc5-a2e7-3e0b-bec6-25df70e35606",
+        "sourceUid": "dbd37dc5-a2e7-3e0b-bec6-25df70e35606",
+        "title": "Tax Day",
+        "start": "2028-04-17T07:00:00.000Z",
+        "end": "2028-04-18T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "e4a68947-97a1-3cc8-bc9c-2efe72c6ecc7",
+        "sourceUid": "e4a68947-97a1-3cc8-bc9c-2efe72c6ecc7",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-05-05T07:00:00.000Z",
+        "end": "2028-05-06T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "ec29de47-c568-33c5-b263-42c5ff636887",
+        "sourceUid": "ec29de47-c568-33c5-b263-42c5ff636887",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2028-06-03T07:00:00.000Z",
+        "end": "2028-06-04T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "af18fd9f-61af-3947-b26a-c52dce88271f",
+        "sourceUid": "af18fd9f-61af-3947-b26a-c52dce88271f",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2028-09-21T07:00:00.000Z",
+        "end": "2028-09-22T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "7dc063d4-8c3c-3cae-bc57-4c0867fa25c6",
+        "sourceUid": "7dc063d4-8c3c-3cae-bc57-4c0867fa25c6",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2028-09-22T07:00:00.000Z",
+        "end": "2028-09-23T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "c95b7565-5f7c-3e84-80c8-b67144fd07b7",
+        "sourceUid": "c95b7565-5f7c-3e84-80c8-b67144fd07b7",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2028-09-30T07:00:00.000Z",
+        "end": "2028-10-01T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "a8a06cbb-272d-3df4-b976-2c14abe07389",
+        "sourceUid": "a8a06cbb-272d-3df4-b976-2c14abe07389",
+        "title": "Election Day",
+        "description": "National Elections are held on even-numbered years, alternating between Presidential Elections and mid-terms Elections. Off-year elections are held on odd-numbered years in some States only.",
+        "start": "2028-11-07T08:00:00.000Z",
+        "end": "2028-11-08T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "8d719cfb-184b-3de9-bad8-b004a85786c2",
+        "sourceUid": "8d719cfb-184b-3de9-bad8-b004a85786c2",
+        "title": "Veterans Day (observed)",
+        "start": "2028-11-10T08:00:00.000Z",
+        "end": "2028-11-11T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "8cd0965b-6569-35c5-9ee3-62d47d72ae2e",
+        "sourceUid": "8cd0965b-6569-35c5-9ee3-62d47d72ae2e",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2028-12-13T08:00:00.000Z",
+        "end": "2028-12-14T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "e7251ef2-c9f2-375c-933a-1908a499beb9",
+        "sourceUid": "e7251ef2-c9f2-375c-933a-1908a499beb9",
+        "title": "First Night of Ramadan",
+        "description": "This date is approximate because it is based on a lunar calendar; the beginning of Ramadan is the day after the new moon.",
+        "start": "2029-01-15T08:00:00.000Z",
+        "end": "2029-01-16T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "2870722d-429e-378b-a4d0-89c62a53febc",
+        "sourceUid": "2870722d-429e-378b-a4d0-89c62a53febc",
+        "title": "Inauguration Day",
+        "start": "2029-01-20T08:00:00.000Z",
+        "end": "2029-01-21T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "eefad852-47ac-3265-8c74-56830ba71fe1",
+        "sourceUid": "eefad852-47ac-3265-8c74-56830ba71fe1",
+        "title": "Lunar New Year",
+        "start": "2029-02-13T08:00:00.000Z",
+        "end": "2029-02-14T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "61dee9c2-843e-3a9d-8f8b-9db42fb6f5f9",
+        "sourceUid": "61dee9c2-843e-3a9d-8f8b-9db42fb6f5f9",
+        "title": "Ash Wednesday",
+        "start": "2029-02-14T08:00:00.000Z",
+        "end": "2029-02-15T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "7898f0cd-01bf-37a2-b222-4db2dcb2a9fd",
+        "sourceUid": "7898f0cd-01bf-37a2-b222-4db2dcb2a9fd",
+        "title": "Eid al-Fitr",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2029-02-14T08:00:00.000Z",
+        "end": "2029-02-15T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "4082f8d5-a0ec-3336-b328-3b1c3efecc57",
+        "sourceUid": "4082f8d5-a0ec-3336-b328-3b1c3efecc57",
+        "title": "Palm Sunday",
+        "start": "2029-03-25T07:00:00.000Z",
+        "end": "2029-03-26T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
+        "sourceUid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
+        "title": "Good Friday",
+        "start": "2029-03-30T07:00:00.000Z",
+        "end": "2029-03-31T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "71652f1b-d80f-3f79-9fef-1200a7ec6e9b",
+        "sourceUid": "71652f1b-d80f-3f79-9fef-1200a7ec6e9b",
+        "title": "Passover",
+        "start": "2029-03-30T07:00:00.000Z",
+        "end": "2029-03-31T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
+        "sourceUid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
+        "title": "Easter",
+        "start": "2029-04-01T07:00:00.000Z",
+        "end": "2029-04-02T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "644d0a2e-2554-382d-9caf-d60d0f019219",
+        "sourceUid": "644d0a2e-2554-382d-9caf-d60d0f019219",
+        "title": "Orthodox Easter",
+        "start": "2029-04-08T07:00:00.000Z",
+        "end": "2029-04-09T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "dc574d80-2f44-3024-8965-c0714fd20220",
+        "sourceUid": "dc574d80-2f44-3024-8965-c0714fd20220",
+        "title": "Tax Day",
+        "start": "2029-04-16T07:00:00.000Z",
+        "end": "2029-04-17T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "988957bd-be3e-3781-bf82-73b5763dd861",
+        "sourceUid": "988957bd-be3e-3781-bf82-73b5763dd861",
+        "title": "Eid al-Adha",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2029-04-24T07:00:00.000Z",
+        "end": "2029-04-25T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "c8a05002-7b54-3cef-b2f1-95f321218562",
+        "sourceUid": "c8a05002-7b54-3cef-b2f1-95f321218562",
+        "title": "Ashura",
+        "description": "The exact date of this holiday is difficult to predict precisely; this is just an approximation.",
+        "start": "2029-05-24T07:00:00.000Z",
+        "end": "2029-05-25T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "21764f05-8b78-3eba-97fa-110b0d13b364",
+        "sourceUid": "21764f05-8b78-3eba-97fa-110b0d13b364",
+        "title": "Rosh Hashanah",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2029-09-10T07:00:00.000Z",
+        "end": "2029-09-11T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "82d1c44f-b831-3e00-b3e1-efe4b5d82040",
+        "sourceUid": "82d1c44f-b831-3e00-b3e1-efe4b5d82040",
+        "title": "Rosh Hashanah (day 2)",
+        "description": ".",
+        "start": "2029-09-11T07:00:00.000Z",
+        "end": "2029-09-12T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "b07533a0-fdb4-3f90-ae0a-f44901fed6be",
+        "sourceUid": "b07533a0-fdb4-3f90-ae0a-f44901fed6be",
+        "title": "Yom Kippur",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2029-09-19T07:00:00.000Z",
+        "end": "2029-09-20T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "b9be8a7a-3c2a-3ab1-8304-a1430306e536",
+        "sourceUid": "b9be8a7a-3c2a-3ab1-8304-a1430306e536",
+        "title": "Veterans Day (observed)",
+        "start": "2029-11-12T08:00:00.000Z",
+        "end": "2029-11-13T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "uid": "2143eba1-f9eb-354c-9b45-5b1fa98fd71c",
+        "sourceUid": "2143eba1-f9eb-354c-9b45-5b1fa98fd71c",
+        "title": "Hanukkah (1st day)",
+        "description": "Holiday starts at sundown on the day before.",
+        "start": "2029-12-02T08:00:00.000Z",
+        "end": "2029-12-03T07:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "US Holidays"
+  }
+}

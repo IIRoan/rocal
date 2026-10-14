@@ -1,0 +1,71 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "E689AEB8C02C4E2CADD8C7D3D303CEAD0",
+        "sourceUid": "E689AEB8C02C4E2CADD8C7D3D303CEAD0",
+        "title": "xxx xxxx",
+        "start": "2024-04-15T17:00:00.000Z",
+        "end": "2024-04-15T19:00:00.000Z",
+        "allDay": false,
+        "location": "albert heijn",
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "until": "2021-04-18T17:00:00.000Z",
+          "timezone": "Europe/Berlin"
+        },
+        "timezone": "Europe/Berlin",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2021-04-18T17:00:00.000Z\",\"timezone\":\"Europe/Berlin\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "E689AEB8C02C4E2CADD8C7D3D303CEAD0",
+        "sourceUid": "E689AEB8C02C4E2CADD8C7D3D303CEAD0",
+        "title": "xxx xxxx",
+        "start": "2024-04-15T17:00:00.000Z",
+        "end": "2024-04-15T19:00:00.000Z",
+        "allDay": false,
+        "location": "albert heijn",
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "until": "2021-04-18T17:00:00.000Z",
+          "timezone": "Europe/Berlin"
+        },
+        "timezone": "Europe/Berlin",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2021-04-18T17:00:00.000Z\",\"timezone\":\"Europe/Berlin\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "E689AEB8C02C4E2CADD8C7D3D303CEAD0",
+        "sourceUid": "E689AEB8C02C4E2CADD8C7D3D303CEAD0",
+        "title": "xxx xxxx",
+        "start": "2024-04-15T17:00:00.000Z",
+        "end": "2024-04-15T19:00:00.000Z",
+        "allDay": false,
+        "location": "albert heijn",
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "until": "2021-04-18T17:00:00.000Z",
+          "timezone": "Europe/Berlin"
+        },
+        "timezone": "Europe/Berlin",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2021-04-18T17:00:00.000Z\",\"timezone\":\"Europe/Berlin\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

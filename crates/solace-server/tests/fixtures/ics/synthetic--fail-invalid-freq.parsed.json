@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: Invalid FREQ value: FORTNIGHTLY"
+    ],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: Invalid FREQ value: FORTNIGHTLY"
+    ],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: Invalid FREQ value: FORTNIGHTLY"
+    ],
+    "method": "PUBLISH"
+  }
+}

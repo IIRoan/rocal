@@ -14,6 +14,8 @@ cookie.workspace = true
 cuid.workspace = true
 hex.workspace = true
 hmac.workspace = true
+icu_collator.workspace = true
+jiff.workspace = true
 mimalloc = { workspace = true, optional = true }
 percent-encoding.workspace = true
 rand.workspace = true

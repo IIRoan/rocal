@@ -1,0 +1,68 @@
+{
+  "UTC": {
+    "events": [
+      {
+        "uid": "0000001",
+        "sourceUid": "0000001",
+        "title": "Treasure Hunting",
+        "start": "2015-07-06T16:00:00.000Z",
+        "end": "2015-07-06T20:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 10,
+          "timezone": "America/New_York"
+        },
+        "timezone": "America/New_York",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":10,\"timezone\":\"America/New_York\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {
+        "uid": "0000001",
+        "sourceUid": "0000001",
+        "title": "Treasure Hunting",
+        "start": "2015-07-06T16:00:00.000Z",
+        "end": "2015-07-06T20:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 10,
+          "timezone": "America/New_York"
+        },
+        "timezone": "America/New_York",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":10,\"timezone\":\"America/New_York\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {
+        "uid": "0000001",
+        "sourceUid": "0000001",
+        "title": "Treasure Hunting",
+        "start": "2015-07-06T16:00:00.000Z",
+        "end": "2015-07-06T20:00:00.000Z",
+        "allDay": false,
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 10,
+          "timezone": "America/New_York"
+        },
+        "timezone": "America/New_York",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":10,\"timezone\":\"America/New_York\"}"
+      }
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}
