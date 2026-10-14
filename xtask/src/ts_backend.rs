@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, bail};
-use solace_api_tests::env::TestEnv;
+use solace_api_tests::env::{BackendTarget, TestEnv};
 use solace_api_tests::guard;
 
 pub async fn run(args: &[&str]) -> anyhow::Result<()> {
@@ -35,86 +35,23 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let env = TestEnv::from_env()?;
     let database_url = env.database_url_for(&database)?;
     let provision_token = crate::test_env::provision_key(&env).await?;
-    // Production mode uses unresolvable .test URLs: they only name cookie domains, origins and the passkey RP.
-    let (node_env, backend_url, frontend_url) = if production {
-        (
-            "production",
-            "https://api.solace.test".to_owned(),
-            "https://solace.test",
-        )
-    } else {
-        (
-            "development",
-            format!("http://localhost:{port}"),
-            "http://localhost:4100",
-        )
-    };
-    guard::check_service_url("BACKEND_URL", &backend_url)?;
-
-    let vars = [
-        ("NODE_ENV", node_env.to_owned()),
-        ("PORT", port.clone()),
-        ("BACKEND_URL", backend_url.clone()),
-        ("FRONTEND_URL", frontend_url.to_owned()),
-        ("PASSKEY_ORIGIN", frontend_url.to_owned()),
-        ("DATABASE_URL", database_url),
-        ("BETTER_AUTH_SECRET", env.better_auth_secret.clone()),
-        ("MAIL_BRIDGE_HMAC_KEY", env.mail_bridge_hmac_key.clone()),
-        (
-            "STALWART_WEBHOOK_SECRET",
-            env.stalwart_webhook_secret.clone(),
-        ),
-        // Every STALWART_* variable is set: the backend otherwise falls back to production Stalwart.
-        ("STALWART_BASE_URL", env.stalwart_url.clone()),
-        ("STALWART_JMAP_URL", env.stalwart_url.clone()),
-        ("STALWART_DEFAULT_DOMAIN", env.mail_domain.clone()),
-        ("STALWART_PROVISION_TOKEN", provision_token),
-        ("STALWART_ADMIN_TOKEN", String::new()),
-        (
-            "STALWART_GATE_KEY",
-            env.stalwart_gate_key.clone().unwrap_or_default(),
-        ),
-        (
-            "STALWART_JMAP_USERNAME",
-            format!("noreply@{}", env.mail_domain),
-        ),
-        (
-            "STALWART_JMAP_PASSWORD",
-            env.stalwart_noreply_password.clone(),
-        ),
-        (
-            "STALWART_WEBHOOK_URL",
-            format!("http://host.containers.internal:{port}/api/internal/stalwart/webhook"),
-        ),
-        ("EMAIL_FROM", format!("noreply@{}", env.mail_domain)),
-        ("EMAIL_FROM_NAME", "Solace Test".to_owned()),
-    ];
-    let bucket = env.avatar_bucket.clone();
-    let bucket_vars = [
-        ("AVATAR_BUCKET", bucket.as_ref().map(|b| b.name.clone())),
-        (
-            "AVATAR_BUCKET_ENDPOINT",
-            bucket.as_ref().map(|b| b.endpoint.clone()),
-        ),
-        (
-            "AVATAR_BUCKET_REGION",
-            bucket.as_ref().map(|b| b.region.clone()),
-        ),
-        (
-            "AVATAR_BUCKET_ACCESS_KEY_ID",
-            bucket.as_ref().map(|b| b.access_key_id.clone()),
-        ),
-        (
-            "AVATAR_BUCKET_SECRET_ACCESS_KEY",
-            bucket.as_ref().map(|b| b.secret_access_key.clone()),
-        ),
-    ]
-    .map(|(name, value)| (name, value.unwrap_or_default()));
+    let port_number: u16 = port.parse().context("--port must be a number")?;
+    let vars = env.backend_vars(&BackendTarget {
+        port: port_number,
+        production,
+        database_url: &database_url,
+        stalwart_provision_token: &provision_token,
+    });
     for (name, value) in &vars {
         if name.ends_with("_URL") && !value.is_empty() && *name != "DATABASE_URL" {
             guard::check_service_url(name, value)?;
         }
     }
+    let backend_url = vars
+        .iter()
+        .find(|(name, _)| *name == "BACKEND_URL")
+        .map(|(_, value)| value.clone())
+        .unwrap_or_default();
 
     let backend_dir = checkout.join("apps/backend");
     let mut command = Command::new(which_bun()?);
@@ -124,7 +61,6 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         .env("PATH", std::env::var("PATH").unwrap_or_default())
         .env("HOME", std::env::var("HOME").unwrap_or_default())
         .envs(vars)
-        .envs(bucket_vars)
         .args(["--no-env-file", "serve.ts"]);
     println!(
         "starting TypeScript backend at {backend_url} ({})",

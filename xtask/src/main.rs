@@ -3,7 +3,9 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 mod deploy_test;
+mod entities;
 mod jest_destinations;
+mod openapi;
 mod test_env;
 mod ts_backend;
 
@@ -21,7 +23,9 @@ tasks:
   test-env stalwart-key   mint a Stalwart API key for the solace-provisioner test account
   deploy-test <service> <path>
                           deploy committed files under <path> to a test-* service in Railway's test environment
-  jest-destinations [--complete]
+  entities [--check]      regenerate (or check) the SeaORM entities from the migrations
+  openapi [--check]       write packages/api-contracts/openapi.json and regenerate its TypeScript types
+  jest-destinations [--complete] [--units]
                           check crates/solace-api-tests/jest/*.tsv against the Jest case list
   ts-backend --checkout <dir> [--database <name>] [--port <port>] [--production]
                           run the current TypeScript backend against the test env";
@@ -35,6 +39,8 @@ async fn main() -> anyhow::Result<()> {
         ["ts-backend", rest @ ..] => ts_backend::run(rest).await,
         ["deploy-test", rest @ ..] => deploy_test::run(rest),
         ["jest-destinations", rest @ ..] => jest_destinations::run(rest),
+        ["entities", rest @ ..] => entities::run(rest).await,
+        ["openapi", rest @ ..] => openapi::run(rest),
         _ => {
             eprintln!("{USAGE}");
             std::process::exit(2);

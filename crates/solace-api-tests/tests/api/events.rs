@@ -2,9 +2,10 @@
 
 use serde_json::{Value, json};
 use solace_api_tests::seed::fake_envelope;
+use solace_api_types::common::OperationWarning;
 use solace_api_types::events::{
-    BulkEventRequest, BulkEventResult, Event, EventDeleted, OperationWarning,
-    SealEncryptionRequest, UpdateEventRequest,
+    BulkEventRequest, BulkEventResult, Event, EventDeleted, SealEncryptionRequest,
+    UpdateEventRequest,
 };
 
 use crate::event_fixtures::{

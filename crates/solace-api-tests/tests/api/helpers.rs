@@ -5,14 +5,13 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde_json::{Value, json};
 use solace_api_tests::Result;
 use solace_api_tests::client::{Agent, ApiResponse, ClientKind};
-use solace_api_tests::env::TestEnv;
+use solace_api_tests::env::{
+    BackendTarget, DEVELOPMENT_FRONTEND_URL, PRODUCTION_BACKEND_URL, PRODUCTION_FRONTEND_URL,
+    TEMPLATE_DATABASE, TestEnv,
+};
 use solace_api_tests::guard;
-use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
-
-/// The web origin browser agents send; the backend under test must trust it.
-const DEVELOPMENT_WEB_ORIGIN: &str = "http://localhost:4100";
-const PRODUCTION_WEB_ORIGIN: &str = "https://solace.test";
+use sqlx::{Connection, Executor, PgPool};
 
 /// `NODE_ENV` of the backend under test (`TEST_BACKEND_MODE`); production changes cookie names and attributes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +38,81 @@ pub struct TestApp {
     /// The backend's own database, for state checks.
     pub db: PgPool,
     root_user_id: String,
+    /// The in-process server's database, dropped with the app.
+    scratch: Option<ScratchDatabase>,
+}
+
+/// A database cloned from the template for one in-process test.
+struct ScratchDatabase {
+    admin_url: String,
+    name: String,
+}
+
+impl Drop for ScratchDatabase {
+    fn drop(&mut self) {
+        let (admin_url, name) = (self.admin_url.clone(), self.name.clone());
+        // Drop runs inside the test's runtime, so the cleanup gets a thread and runtime of its own.
+        let cleanup = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build();
+            if let Ok(runtime) = runtime {
+                runtime.block_on(async {
+                    if let Ok(mut admin) = sqlx::PgConnection::connect(&admin_url).await {
+                        let _ = admin
+                            .execute(
+                                format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)").as_str(),
+                            )
+                            .await;
+                    }
+                });
+            }
+        });
+        let _ = cleanup.join();
+    }
+}
+
+/// Clones the template, then serves the Rust backend on a random port with the same settings the TypeScript backend gets.
+async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDatabase) {
+    let name = format!("solace_test_run_{}", hex(8));
+    let mut admin = sqlx::PgConnection::connect(&env.database_url)
+        .await
+        .expect("connect to the test Postgres");
+    admin
+        .execute(format!("CREATE DATABASE {name} TEMPLATE {TEMPLATE_DATABASE}").as_str())
+        .await
+        .expect("clone the template database (run `cargo xtask test-env template`)");
+    let database_url = env.database_url_for(&name).expect("scratch database url");
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind a port");
+    let port = listener.local_addr().expect("local address").port();
+    let vars = env.backend_vars(&BackendTarget {
+        port,
+        production: mode == Mode::Production,
+        database_url: &database_url,
+        stalwart_provision_token: "",
+    });
+    let config = solace_server::config::Config::from_lookup(|wanted| {
+        vars.iter()
+            .find(|(name, _)| *name == wanted)
+            .map(|(_, value)| value.clone())
+    })
+    .expect("server config");
+    let pool = solace_server::db::connect(&database_url)
+        .await
+        .expect("server pool");
+    let state = solace_server::state::AppState::new(config, pool).expect("server state");
+    tokio::spawn(solace_server::serve(
+        listener,
+        state,
+        std::future::pending(),
+    ));
+    let scratch = ScratchDatabase {
+        admin_url: env.database_url.clone(),
+        name,
+    };
+    (format!("http://localhost:{port}"), database_url, scratch)
 }
 
 pub struct TestUser {
@@ -50,34 +124,41 @@ pub struct TestUser {
 }
 
 impl TestApp {
-    /// Targets `API_BASE_URL` (a running backend whose database is `TEST_DATABASE_URL`).
+    /// The Rust server in-process on a random port with a fresh database, or `API_BASE_URL` (whose database is `TEST_DATABASE_URL`).
     pub async fn spawn() -> Self {
         let env = TestEnv::from_env().expect("test environment");
-        let base_url = std::env::var("API_BASE_URL")
-            .expect("API_BASE_URL must point at the backend under test");
-        guard::check_service_url("API_BASE_URL", &base_url).expect("API_BASE_URL");
         let mode = match std::env::var("TEST_BACKEND_MODE").as_deref() {
             Ok("production") => Mode::Production,
             _ => Mode::Development,
         };
-        let backend = match std::env::var("TEST_BACKEND").as_deref() {
-            Ok("rust") => Backend::Rust,
-            _ => Backend::TypeScript,
+        let (base_url, backend, database_url, scratch) = match std::env::var("API_BASE_URL") {
+            Ok(base_url) => {
+                guard::check_service_url("API_BASE_URL", &base_url).expect("API_BASE_URL");
+                let backend = match std::env::var("TEST_BACKEND").as_deref() {
+                    Ok("rust") => Backend::Rust,
+                    _ => Backend::TypeScript,
+                };
+                (base_url, backend, env.database_url.clone(), None)
+            }
+            Err(_) => {
+                let (base_url, database_url, scratch) = in_process(&env, mode).await;
+                (base_url, Backend::Rust, database_url, Some(scratch))
+            }
         };
         let public_api_url = std::env::var("TEST_PUBLIC_API_URL").unwrap_or_else(|_| match mode {
             Mode::Development => base_url.trim_end_matches('/').to_owned(),
-            Mode::Production => "https://api.solace.test".into(),
+            Mode::Production => PRODUCTION_BACKEND_URL.into(),
         });
         let origin = std::env::var("TEST_WEB_ORIGIN").unwrap_or_else(|_| {
             match mode {
-                Mode::Development => DEVELOPMENT_WEB_ORIGIN,
-                Mode::Production => PRODUCTION_WEB_ORIGIN,
+                Mode::Development => DEVELOPMENT_FRONTEND_URL,
+                Mode::Production => PRODUCTION_FRONTEND_URL,
             }
             .into()
         });
         let db = PgPoolOptions::new()
             .max_connections(2)
-            .connect(&env.database_url)
+            .connect(&database_url)
             .await
             .expect("connect to the backend's test database");
 
@@ -102,6 +183,7 @@ impl TestApp {
             env,
             db,
             root_user_id,
+            scratch,
         }
     }
 

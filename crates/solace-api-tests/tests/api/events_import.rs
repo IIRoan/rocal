@@ -2,23 +2,23 @@
 
 use serde_json::{Value, json};
 use solace_api_tests::seed::fake_envelope;
-use solace_api_types::events::{
-    EncryptedIcsImportEvent, EncryptedIcsImportRequest, IcsImportResult, ParticipantInput,
-};
+use solace_api_types::Timestamp;
+use solace_api_types::events::{IcsImportResult, ParticipantInput};
+use solace_api_types::subscriptions::{EncryptedIcsEvent, EncryptedIcsImportRequest};
 
 use crate::event_fixtures::{
     StoredContent, calendar_id, insert_calendar, list_events, stored_content, to_json, unfold,
 };
 use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok};
 
-fn entry(external_id: &str) -> EncryptedIcsImportEvent {
-    EncryptedIcsImportEvent {
+fn entry(external_id: &str) -> EncryptedIcsEvent {
+    EncryptedIcsEvent {
         external_id: external_id.into(),
         series_external_id: None,
         occurrence_date: None,
         excluded_dates: None,
-        start: "2099-03-02T09:00:00.000Z".into(),
-        end: "2099-03-02T10:00:00.000Z".into(),
+        start: Timestamp("2099-03-02T09:00:00.000Z".into()),
+        end: Timestamp("2099-03-02T10:00:00.000Z".into()),
         all_day: false,
         timezone: "Europe/Amsterdam".into(),
         recurrence: None,
@@ -29,7 +29,7 @@ fn entry(external_id: &str) -> EncryptedIcsImportEvent {
     }
 }
 
-fn body(calendar: &str, events: Vec<EncryptedIcsImportEvent>) -> Value {
+fn body(calendar: &str, events: Vec<EncryptedIcsEvent>) -> Value {
     to_json(&EncryptedIcsImportRequest {
         calendar_id: calendar.to_owned().into(),
         encrypted_events: events,
@@ -234,12 +234,12 @@ async fn overrides_link_to_their_series() {
     let calendar = calendar_id(&mut owner, "Work").await;
     let mut series = entry("series-token");
     series.recurrence = Some(r#"{"frequency":"weekly","interval":1,"count":3}"#.into());
-    series.excluded_dates = Some(vec!["2099-03-16T09:00:00.000Z".into()]);
+    series.excluded_dates = Some(vec![Timestamp("2099-03-16T09:00:00.000Z".into())]);
     let mut moved = entry("override-token");
     moved.series_external_id = Some("series-token".into());
-    moved.occurrence_date = Some("2099-03-09T09:00:00.000Z".into());
-    moved.start = "2099-03-09T12:00:00.000Z".into();
-    moved.end = "2099-03-09T13:00:00.000Z".into();
+    moved.occurrence_date = Some(Timestamp("2099-03-09T09:00:00.000Z".into()));
+    moved.start = Timestamp("2099-03-09T12:00:00.000Z".into());
+    moved.end = Timestamp("2099-03-09T13:00:00.000Z".into());
     moved.recurrence = Some(r#"{"frequency":"daily","interval":1}"#.into());
 
     assert_eq!(
@@ -302,7 +302,7 @@ async fn overrides_link_to_their_series() {
 
     let mut orphan = entry("orphan-token");
     orphan.series_external_id = Some("missing-series".into());
-    orphan.occurrence_date = Some("2099-03-09T09:00:00.000Z".into());
+    orphan.occurrence_date = Some(Timestamp("2099-03-09T09:00:00.000Z".into()));
     assert_eq!(
         import(&mut owner, body(&calendar, vec![orphan])).await,
         result(
@@ -402,8 +402,7 @@ async fn encrypted_entries_are_strictly_validated() {
         error["details"]["issues"][0]["path"],
         json!("encryptedEvents")
     );
-    let many: Vec<EncryptedIcsImportEvent> =
-        (0..101).map(|i| entry(&format!("bulk-{i}"))).collect();
+    let many: Vec<EncryptedIcsEvent> = (0..101).map(|i| entry(&format!("bulk-{i}"))).collect();
     ok(owner
         .post("/api/subscriptions/import-ics", body(&calendar, many))
         .await

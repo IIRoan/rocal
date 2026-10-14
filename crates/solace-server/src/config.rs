@@ -1,0 +1,209 @@
+//! Typed configuration from the same environment variables as `apps/backend/lib/env.ts`, parsed once at boot.
+
+use thiserror::Error;
+
+const DEV_BACKEND_URL: &str = "http://localhost:4001";
+const DEV_FRONTEND_URL: &str = "http://localhost:4000";
+const DEFAULT_STALWART_BASE_URL: &str = "https://mail.solace.onl";
+const DEFAULT_MOBILE_AUTH_CALLBACK_URL: &str = "solace://api/auth";
+const AUTH_SECRET_MIN_LENGTH: usize = 32;
+const DEV_AUTH_SECRET: &str = "default-dev-secret-change-in-production";
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ConfigError {
+    #[error(
+        "BETTER_AUTH_SECRET must be set to at least {AUTH_SECRET_MIN_LENGTH} characters in production."
+    )]
+    WeakAuthSecret,
+    #[error("{0} must be set.")]
+    Missing(&'static str),
+    #[error("{0} is not a valid value.")]
+    Invalid(&'static str),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SameSite {
+    Lax,
+    Strict,
+    None,
+}
+
+impl SameSite {
+    /// Better Auth writes the attribute capitalized; the step-up cookie writes it as configured.
+    pub fn better_auth(self) -> &'static str {
+        match self {
+            Self::Lax => "Lax",
+            Self::Strict => "Strict",
+            Self::None => "None",
+        }
+    }
+
+    pub fn lowercase(self) -> &'static str {
+        match self {
+            Self::Lax => "lax",
+            Self::Strict => "strict",
+            Self::None => "none",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub port: u16,
+    pub backend_url: String,
+    pub frontend_url: String,
+    /// `NEXT_PUBLIC_APP_URL`, trusted beside the frontend.
+    pub app_url: Option<String>,
+    pub is_production: bool,
+    pub cookie_same_site: SameSite,
+    pub mobile_auth_callback_url: String,
+    pub trusted_origins: Vec<String>,
+    pub passkey_origin: String,
+    pub auth_secret: String,
+    pub database_url: String,
+    pub stalwart_base_url: String,
+    /// The backend-gate key the Railway Stalwart domain requires (`apps/stalwart/backend-gate.cfg`).
+    pub stalwart_gate_key: Option<String>,
+    pub sentry_dsn: Option<String>,
+}
+
+impl Config {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(|name| std::env::var(name).ok())
+    }
+
+    /// Reads variables through `lookup`, so tests build a config without touching the process environment.
+    pub fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
+        let var = |name: &str| lookup(name).filter(|value| !value.is_empty());
+        let is_production = var("NODE_ENV").as_deref() == Some("production");
+        let backend_url = var("BACKEND_URL").unwrap_or_else(|| DEV_BACKEND_URL.into());
+        let frontend_url = var("FRONTEND_URL")
+            .or_else(|| var("NEXT_PUBLIC_APP_URL"))
+            .unwrap_or_else(|| DEV_FRONTEND_URL.into());
+        let app_url = var("NEXT_PUBLIC_APP_URL");
+        let port = match var("PORT") {
+            Some(port) => port.parse().map_err(|_| ConfigError::Invalid("PORT"))?,
+            None => 4001,
+        };
+        let cookie_same_site = match var("AUTH_COOKIE_SAME_SITE").as_deref() {
+            Some("strict") => SameSite::Strict,
+            Some("none") => SameSite::None,
+            _ => SameSite::Lax,
+        };
+        let passkey_origin = var("PASSKEY_ORIGIN")
+            .or_else(|| app_url.clone())
+            .unwrap_or_else(|| frontend_url.clone());
+        Ok(Self {
+            port,
+            frontend_url,
+            app_url,
+            is_production,
+            cookie_same_site,
+            mobile_auth_callback_url: var("MOBILE_AUTH_CALLBACK_URL")
+                .or_else(|| var("NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL"))
+                .unwrap_or_else(|| DEFAULT_MOBILE_AUTH_CALLBACK_URL.into()),
+            trusted_origins: csv(var("TRUSTED_ORIGINS").as_deref()),
+            passkey_origin,
+            auth_secret: auth_secret(var("BETTER_AUTH_SECRET"), is_production)?,
+            database_url: var("DATABASE_URL").ok_or(ConfigError::Missing("DATABASE_URL"))?,
+            stalwart_base_url: var("STALWART_BASE_URL")
+                .unwrap_or_else(|| DEFAULT_STALWART_BASE_URL.into()),
+            stalwart_gate_key: var("STALWART_GATE_KEY")
+                .map(|key| key.trim().to_owned())
+                .filter(|key| !key.is_empty()),
+            sentry_dsn: var("SENTRY_DSN").map(|dsn| dsn.trim().to_owned()),
+            backend_url,
+        })
+    }
+}
+
+/// A padded secret is kept as is: changing it would sign out every session.
+fn auth_secret(secret: Option<String>, deployed: bool) -> Result<String, ConfigError> {
+    let secret = secret.unwrap_or_default();
+    if secret.trim().len() >= AUTH_SECRET_MIN_LENGTH {
+        return Ok(secret);
+    }
+    if deployed {
+        return Err(ConfigError::WeakAuthSecret);
+    }
+    Ok(if secret.trim().is_empty() {
+        DEV_AUTH_SECRET.into()
+    } else {
+        secret
+    })
+}
+
+fn csv(value: Option<&str>) -> Vec<String> {
+    value
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(vars: &[(&str, &str)]) -> Result<Config, ConfigError> {
+        let vars: Vec<(String, String)> = vars
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        Config::from_lookup(move |name| {
+            vars.iter()
+                .find(|(key, _)| key == name)
+                .map(|(_, value)| value.clone())
+        })
+    }
+
+    const DB: (&str, &str) = ("DATABASE_URL", "postgres://localhost/solace_test");
+
+    #[test]
+    fn a_missing_or_short_auth_secret_fails_when_deployed() {
+        let production = ("NODE_ENV", "production");
+        assert_eq!(
+            config(&[production, DB]).err(),
+            Some(ConfigError::WeakAuthSecret)
+        );
+        assert_eq!(
+            config(&[production, DB, ("BETTER_AUTH_SECRET", "short")]).err(),
+            Some(ConfigError::WeakAuthSecret)
+        );
+        let strong = "s".repeat(32);
+        let padded = format!(" {strong} ");
+        assert_eq!(
+            config(&[production, DB, ("BETTER_AUTH_SECRET", &padded)])
+                .map(|c| c.auth_secret)
+                .ok(),
+            Some(padded)
+        );
+    }
+
+    #[test]
+    fn only_local_runs_fall_back_to_a_development_auth_secret() {
+        assert_eq!(
+            config(&[DB]).map(|c| c.auth_secret).ok().as_deref(),
+            Some(DEV_AUTH_SECRET)
+        );
+        assert_eq!(
+            config(&[DB, ("BETTER_AUTH_SECRET", "local")])
+                .map(|c| c.auth_secret)
+                .ok()
+                .as_deref(),
+            Some("local")
+        );
+    }
+
+    #[test]
+    fn urls_fall_back_like_the_typescript_backend() {
+        let config = config(&[DB, ("NEXT_PUBLIC_APP_URL", "https://app.example")]).unwrap();
+        assert_eq!(config.backend_url, DEV_BACKEND_URL);
+        assert_eq!(config.frontend_url, "https://app.example");
+        assert_eq!(config.passkey_origin, "https://app.example");
+        assert!(!config.is_production);
+        assert_eq!(config.cookie_same_site, SameSite::Lax);
+    }
+}

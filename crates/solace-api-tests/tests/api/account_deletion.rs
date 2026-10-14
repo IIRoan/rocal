@@ -12,8 +12,9 @@ use solace_api_types::Timestamp;
 use solace_api_types::account::{
     AuthStatus, DeleteAccountResponse, EmailAvailability, EmailAvailabilityCode, SignupConfig,
 };
+use solace_api_types::events::ParticipantInput;
 use solace_api_types::subscriptions::{
-    EncryptedIcsEvent, EncryptedIcsImportRequest, ImportIcsRequest, ImportParticipant,
+    EncryptedIcsEvent, EncryptedIcsImportRequest, ImportIcsRequest,
 };
 use sqlx::PgPool;
 
@@ -248,7 +249,7 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
     );
     moved.series_external_id = Some("series".into());
     moved.occurrence_date = Some(Timestamp("2026-11-04T09:00:00.000Z".into()));
-    moved.participants = Some(vec![ImportParticipant {
+    moved.participants = Some(vec![ParticipantInput {
         email: "guest@example.com".into(),
         display_name: Some("Guest".into()),
         role: None,

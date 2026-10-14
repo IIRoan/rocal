@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::common::{CalendarId, SubscriptionId, Timestamp, UserId};
+use crate::events::ParticipantInput;
 
 /// A feed subscription with its mirrored calendar; only the list carries `_count`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -156,19 +157,7 @@ pub struct EncryptedIcsEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encryption_key_version: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub participants: Option<Vec<ImportParticipant>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ImportParticipant {
-    pub email: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub display_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub role: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub participants: Option<Vec<ParticipantInput>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

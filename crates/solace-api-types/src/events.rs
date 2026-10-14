@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::{CalendarId, CategoryId, EventId, SubscriptionId, Timestamp, UserId};
+use crate::common::{
+    CalendarId, CategoryId, EventId, OperationWarning, SubscriptionId, Timestamp, UserId,
+};
 
 crate::id_types!(EventParticipantId, RecurrenceExceptionId);
 
@@ -135,16 +137,6 @@ pub struct RecurrenceException {
     pub kind: String,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
-}
-
-/// A non-fatal problem of a mutation that otherwise succeeded.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct OperationWarning {
-    pub code: String,
-    pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub target: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -451,37 +443,4 @@ pub struct InvitationEncryptionEntry {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DeclineInvitationRequest {
     pub ics_content: String,
-}
-
-/// `POST /api/subscriptions/import-ics` body of current clients: ciphertext and keyed ids only.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct EncryptedIcsImportRequest {
-    pub calendar_id: CalendarId,
-    pub encrypted_events: Vec<EncryptedIcsImportEvent>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct EncryptedIcsImportEvent {
-    pub external_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub series_external_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub occurrence_date: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub excluded_dates: Option<Vec<String>>,
-    pub start: String,
-    pub end: String,
-    pub all_day: bool,
-    pub timezone: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub recurrence: Option<String>,
-    pub encrypted_content: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub blind_index_tokens: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub encryption_key_version: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub participants: Option<Vec<ParticipantInput>>,
 }

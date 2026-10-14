@@ -1,4 +1,4 @@
-//! Checks that every backend Jest case has exactly one destination and that suite destinations exist.
+//! Checks that every backend Jest case has exactly one destination, that suite tests exist, and that unit tests exist once their module does.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -6,6 +6,7 @@ use anyhow::{Context, bail};
 
 pub fn run(args: &[&str]) -> anyhow::Result<()> {
     let require_all = args.contains(&"--complete");
+    let require_units = args.contains(&"--units");
     let root = crate::repo_root();
     let dir = root.join("crates/solace-api-tests/jest");
     let cases: BTreeSet<(String, String)> = std::fs::read_to_string(dir.join("cases.tsv"))?
@@ -17,6 +18,7 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
 
     let mut destinations: BTreeMap<(String, String), (String, String)> = BTreeMap::new();
     let mut problems = Vec::new();
+    let mut pending_units = 0;
     for entry in std::fs::read_dir(&dir)? {
         let path = entry?.path();
         let file_name = path
@@ -52,9 +54,15 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
                     number + 1
                 ));
             }
-            check_destination(&root, destination)
-                .with_context(|| format!("{file_name}:{}", number + 1))
-                .unwrap_or_else(|error| problems.push(format!("{error:#}")));
+            match check_destination(&root, destination) {
+                Ok(Checked::Found) => {}
+                Ok(Checked::PendingModule) if !require_units => pending_units += 1,
+                Ok(Checked::PendingModule) => problems.push(format!(
+                    "{file_name}:{}: unit module not written yet: {destination}",
+                    number + 1
+                )),
+                Err(error) => problems.push(format!("{file_name}:{}: {error:#}", number + 1)),
+            }
         }
     }
 
@@ -63,7 +71,7 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
         .filter(|case| !destinations.contains_key(*case))
         .collect();
     println!(
-        "{} of {} Jest cases have a destination; {} problem(s)",
+        "{} of {} Jest cases have a destination; {pending_units} unit test(s) in modules not written yet; {} problem(s)",
         cases.len() - missing.len(),
         cases.len(),
         problems.len()
@@ -82,15 +90,21 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn check_destination(root: &std::path::Path, destination: &str) -> anyhow::Result<()> {
+enum Checked {
+    Found,
+    /// A unit test in a module that a later sub-step writes.
+    PendingModule,
+}
+
+fn check_destination(root: &std::path::Path, destination: &str) -> anyhow::Result<Checked> {
     if let Some(reason) = destination.strip_prefix("n/a: ") {
         if reason.trim().is_empty() {
             bail!("n/a needs a reason");
         }
-        return Ok(());
+        return Ok(Checked::Found);
     }
-    if destination.starts_with("unit:") {
-        return Ok(());
+    if let Some(target) = destination.strip_prefix("unit:") {
+        return check_unit(root, target);
     }
     let Some(target) = destination.strip_prefix("suite:") else {
         bail!("destination must start with suite:, unit: or n/a: ({destination})");
@@ -105,5 +119,25 @@ fn check_destination(root: &std::path::Path, destination: &str) -> anyhow::Resul
     if !source.contains(&format!("async fn {test}(")) {
         bail!("no test {test} in suite module {module}");
     }
-    Ok(())
+    Ok(Checked::Found)
+}
+
+/// `unit:<crate>::<module path>::tests::<name>`: the module file must hold `fn <name>(`.
+fn check_unit(root: &std::path::Path, target: &str) -> anyhow::Result<Checked> {
+    let segments: Vec<&str> = target.split("::").collect();
+    let [krate, modules @ .., "tests", test] = segments.as_slice() else {
+        bail!("unit destination is crate::module::tests::name ({target})");
+    };
+    let file = root
+        .join("crates")
+        .join(krate)
+        .join("src")
+        .join(format!("{}.rs", modules.join("/")));
+    let Ok(source) = std::fs::read_to_string(&file) else {
+        return Ok(Checked::PendingModule);
+    };
+    if !source.contains(&format!("fn {test}(")) {
+        bail!("no unit test {test} in {}", file.display());
+    }
+    Ok(Checked::Found)
 }

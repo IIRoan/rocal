@@ -11,6 +11,7 @@ anyhow.workspace = true
 reqwest.workspace = true
 serde_json.workspace = true
 solace-api-tests.workspace = true
+solace-server.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
 

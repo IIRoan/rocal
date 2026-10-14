@@ -46,7 +46,7 @@ apps/backend/__tests__/lib/auth-session.test.ts	request session renewal headers 
 apps/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › appends renewal cookies without losing existing headers: undefined	suite:auth_sessions::app_routes_forward_every_renewal_cookie
 apps/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › forwards clears from a revoked session without losing another cookie	suite:account_public::auth_status_forwards_session_cookie_changes
 apps/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › preserves response headers when no renewal is due	suite:auth_sessions::app_routes_forward_every_renewal_cookie
-apps/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › propagates an unavailable session check without clearing client cookies	unit:solace-server::http::auth::tests::a_failed_session_lookup_is_an_error_without_cookie_clears
+apps/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › propagates an unavailable session check without clearing client cookies	unit:solace-server::auth::session::tests::a_failed_session_lookup_is_an_error_without_cookie_clears
 apps/backend/__tests__/lib/better-auth-plugin.test.ts	createBetterAuthPlugin › forwards /api/auth to Better Auth with the original request	suite:auth_sessions::get_session_returns_the_session_and_user
 apps/backend/__tests__/lib/better-auth-plugin.test.ts	createBetterAuthPlugin › forwards nested Better Auth paths and POST bodies	suite:passkeys::registering_stores_the_cose_key_and_grants_step_up
 apps/backend/__tests__/lib/errors.test.ts	errorMessage / errorString helpers › errorString stringifies non-Error values	n/a: JavaScript helpers for untyped thrown values; Rust errors are typed and never stringified into responses
@@ -56,7 +56,7 @@ apps/backend/__tests__/lib/errors.test.ts	errorMessage / errorString helpers ›
 apps/backend/__tests__/lib/errors.test.ts	errorMessage / errorString helpers › returns the message of an Error instance	n/a: JavaScript helpers for untyped thrown values; Rust errors are typed and never stringified into responses
 apps/backend/__tests__/lib/errors.test.ts	errors › falls back to a generic internal server error with request id	unit:solace-server::error::tests::unexpected_errors_are_a_generic_500_with_the_request_id
 apps/backend/__tests__/lib/errors.test.ts	errors › includes structured issue details for validation errors when available	suite:events_list::search_paging_coerces_query_strings_like_zod
-apps/backend/__tests__/lib/errors.test.ts	errors › maps Prisma-style conflict and record-missing errors	unit:solace-server::error::tests::unique_violations_and_missing_rows_are_409_and_404
+apps/backend/__tests__/lib/errors.test.ts	errors › maps Prisma-style conflict and record-missing errors	suite:recurring::editing_one_occurrence_detaches_it_with_the_series_ciphertext
 apps/backend/__tests__/lib/errors.test.ts	errors › maps built-in Elysia error codes	suite:edges::malformed_json_is_a_parse_error
 apps/backend/__tests__/lib/errors.test.ts	errors › maps custom validation and authorization errors	unit:solace-server::error::tests::domain_errors_map_to_their_envelopes
 apps/backend/__tests__/lib/errors.test.ts	errors › maps database and notification wrapper errors	unit:solace-server::error::tests::database_and_notification_failures_are_500s
@@ -64,14 +64,14 @@ apps/backend/__tests__/lib/errors.test.ts	errors › maps rate limit errors with
 apps/backend/__tests__/lib/errors.test.ts	errors › omits validation details when the issue payload is malformed	unit:solace-server::error::tests::validation_errors_without_issues_have_no_details
 apps/backend/__tests__/lib/errors.test.ts	errors › resolves custom error labels from the error itself without changing responses	unit:solace-server::error::tests::domain_errors_map_to_their_envelopes
 apps/backend/__tests__/lib/errors.test.ts	errors › stores extra properties on custom error classes	n/a: JavaScript error-class mechanics; Rust error variants carry typed fields the compiler checks
-apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › exposes contract policy as the single source of truth	unit:solace-server::telemetry::tests::redaction_keys_come_from_the_shared_policy
-apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › extracts safe error details	unit:solace-server::telemetry::tests::error_details_carry_no_message_or_stack
-apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › hashes identifiers consistently without exposing raw values	unit:solace-server::telemetry::tests::log_refs_are_stable_and_opaque
-apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › redacts emails and urls from free-form text	unit:solace-server::telemetry::tests::free_text_loses_emails_and_urls
-apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › redacts query strings from request urls	unit:solace-server::telemetry::tests::request_urls_lose_their_query
-apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › sanitizes structured log context	unit:solace-server::telemetry::tests::structured_context_is_redacted_by_key
+apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › exposes contract policy as the single source of truth	unit:solace-server::telemetry::redaction::tests::redaction_keys_come_from_the_shared_policy
+apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › extracts safe error details	n/a: Rust logs typed fields and a redacted error message instead of an errorName/message pair; the redaction is pinned by unit:solace-server::telemetry::redaction::tests::free_text_loses_emails_and_urls
+apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › hashes identifiers consistently without exposing raw values	unit:solace-server::telemetry::redaction::tests::log_refs_are_stable_and_opaque
+apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › redacts emails and urls from free-form text	unit:solace-server::telemetry::redaction::tests::free_text_loses_emails_and_urls
+apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › redacts query strings from request urls	unit:solace-server::telemetry::redaction::tests::request_urls_lose_their_query
+apps/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › sanitizes structured log context	unit:solace-server::telemetry::redaction::tests::structured_context_is_redacted_by_key
 apps/backend/__tests__/lib/origin-policy.test.ts	buildMobileTrustedOriginVariants › expands a solace-dev callback into root and path prefixes	suite:auth_limits::the_expo_apps_sign_in_with_their_schemes
-apps/backend/__tests__/lib/origin-policy.test.ts	buildMobileTrustedOriginVariants › returns an empty list for missing values	unit:solace-server::config::tests::blank_mobile_callbacks_add_no_trusted_origins
+apps/backend/__tests__/lib/origin-policy.test.ts	buildMobileTrustedOriginVariants › returns an empty list for missing values	unit:solace-server::http::origins::tests::blank_mobile_callbacks_add_no_trusted_origins
 apps/backend/__tests__/lib/origin-policy.test.ts	getAuthTrustedOrigins › trusts production and development-client deep links for both apps by default	suite:auth_limits::the_expo_apps_sign_in_with_their_schemes
 apps/backend/__tests__/lib/origin-policy.test.ts	localhost trust › only includes localhost outside production	suite:auth_sessions::sign_in_checks_the_origin_and_fetch_metadata
 apps/backend/__tests__/lib/origin-policy.test.ts	localhost trust › rejects localhost origins in production but keeps mobile deep links	suite:edges::cors_reflects_only_trusted_origins
@@ -98,8 +98,8 @@ apps/backend/__tests__/lib/security-headers.test.ts	security headers › adds ha
 apps/backend/__tests__/lib/security-headers.test.ts	security headers › allows inline styles only on the Better Auth error page	suite:edges::only_the_auth_error_page_may_use_inline_styles
 apps/backend/__tests__/lib/security-headers.test.ts	security headers › lets the avatar proxy load cross-origin as an <img>	suite:edges::every_kind_of_response_carries_the_security_headers
 apps/backend/__tests__/lib/security-headers.test.ts	security headers › omits HSTS outside production	suite:edges::every_kind_of_response_carries_the_security_headers
-apps/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing › installs beforeSend/beforeBreadcrumb scrubbers	unit:solace-server::telemetry::tests::error_reports_and_breadcrumbs_are_scrubbed_before_sending
-apps/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing › sanitizes extras before attaching them to the scope	unit:solace-server::telemetry::tests::report_extras_are_sanitized
+apps/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing › installs beforeSend/beforeBreadcrumb scrubbers	unit:solace-server::telemetry::report::tests::error_reports_and_breadcrumbs_are_scrubbed_before_sending
+apps/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing › sanitizes extras before attaching them to the scope	unit:solace-server::telemetry::report::tests::report_extras_are_sanitized
 apps/backend/__tests__/lib/session-client-metadata.test.ts	stripSessionClientMetadata › nulls IP address and user agent before a session is stored	suite:auth_sessions::sign_up_creates_the_user_credential_session_and_accepts_the_invite
 apps/backend/__tests__/lib/time-constants.test.ts	time-constants › matches expected millisecond values	n/a: JavaScript millisecond constants; Rust uses std::time::Duration
 apps/backend/__tests__/lib/validation.test.ts	validation helpers › rejects unknown keys in strict zod objects	suite:calendar_sharing::the_share_link_body_is_validated

@@ -136,3 +136,102 @@ impl TestEnv {
         Ok(url)
     }
 }
+
+/// Where a backend under test listens and which mode it runs in.
+pub struct BackendTarget<'a> {
+    pub port: u16,
+    pub production: bool,
+    pub database_url: &'a str,
+    pub stalwart_provision_token: &'a str,
+}
+
+/// The production web origin the suite's browser agents send in production mode.
+pub const PRODUCTION_FRONTEND_URL: &str = "https://solace.test";
+/// Production mode uses unresolvable `.test` URLs: they only name cookie domains, origins and the passkey RP.
+pub const PRODUCTION_BACKEND_URL: &str = "https://api.solace.test";
+pub const DEVELOPMENT_FRONTEND_URL: &str = "http://localhost:4100";
+
+impl TestEnv {
+    /// The environment both backends run with, so the TypeScript and Rust servers see identical settings.
+    pub fn backend_vars(&self, target: &BackendTarget<'_>) -> Vec<(&'static str, String)> {
+        let (node_env, backend_url, frontend_url) = if target.production {
+            (
+                "production",
+                PRODUCTION_BACKEND_URL.to_owned(),
+                PRODUCTION_FRONTEND_URL,
+            )
+        } else {
+            (
+                "development",
+                format!("http://localhost:{}", target.port),
+                DEVELOPMENT_FRONTEND_URL,
+            )
+        };
+        let mut vars = vec![
+            ("NODE_ENV", node_env.to_owned()),
+            ("PORT", target.port.to_string()),
+            ("BACKEND_URL", backend_url),
+            ("FRONTEND_URL", frontend_url.to_owned()),
+            ("PASSKEY_ORIGIN", frontend_url.to_owned()),
+            ("DATABASE_URL", target.database_url.to_owned()),
+            ("BETTER_AUTH_SECRET", self.better_auth_secret.clone()),
+            ("MAIL_BRIDGE_HMAC_KEY", self.mail_bridge_hmac_key.clone()),
+            (
+                "STALWART_WEBHOOK_SECRET",
+                self.stalwart_webhook_secret.clone(),
+            ),
+            // Every STALWART_* variable is set: the TypeScript backend otherwise falls back to production Stalwart.
+            ("STALWART_BASE_URL", self.stalwart_url.clone()),
+            ("STALWART_JMAP_URL", self.stalwart_url.clone()),
+            ("STALWART_DEFAULT_DOMAIN", self.mail_domain.clone()),
+            (
+                "STALWART_PROVISION_TOKEN",
+                target.stalwart_provision_token.to_owned(),
+            ),
+            ("STALWART_ADMIN_TOKEN", String::new()),
+            (
+                "STALWART_GATE_KEY",
+                self.stalwart_gate_key.clone().unwrap_or_default(),
+            ),
+            (
+                "STALWART_JMAP_USERNAME",
+                format!("noreply@{}", self.mail_domain),
+            ),
+            (
+                "STALWART_JMAP_PASSWORD",
+                self.stalwart_noreply_password.clone(),
+            ),
+            (
+                "STALWART_WEBHOOK_URL",
+                format!(
+                    "http://host.containers.internal:{}/api/internal/stalwart/webhook",
+                    target.port
+                ),
+            ),
+            ("EMAIL_FROM", format!("noreply@{}", self.mail_domain)),
+            ("EMAIL_FROM_NAME", "Solace Test".to_owned()),
+        ];
+        let bucket = self.avatar_bucket.as_ref();
+        let bucket_var = |value: Option<&String>| value.cloned().unwrap_or_default();
+        vars.extend([
+            ("AVATAR_BUCKET", bucket_var(bucket.map(|b| &b.name))),
+            (
+                "AVATAR_BUCKET_ENDPOINT",
+                bucket_var(bucket.map(|b| &b.endpoint)),
+            ),
+            (
+                "AVATAR_BUCKET_REGION",
+                bucket_var(bucket.map(|b| &b.region)),
+            ),
+            (
+                "AVATAR_BUCKET_ACCESS_KEY_ID",
+                bucket_var(bucket.map(|b| &b.access_key_id)),
+            ),
+            (
+                "AVATAR_BUCKET_SECRET_ACCESS_KEY",
+                bucket_var(bucket.map(|b| &b.secret_access_key)),
+            ),
+        ]);
+        vars
+    }
+}

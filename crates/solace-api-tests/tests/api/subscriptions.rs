@@ -3,10 +3,11 @@
 use serde_json::{Value, json};
 use solace_api_tests::seed::{fake_envelope, fake_token};
 use solace_api_types::Timestamp;
+use solace_api_types::events::ParticipantInput;
 use solace_api_types::subscriptions::{
     CalendarSubscription, CreateSubscriptionRequest, DeleteSubscriptionResponse, EncryptedIcsEvent,
-    EncryptedIcsImportRequest, ImportIcsRequest, ImportIcsResponse, ImportParticipant,
-    LegacyIcsImportRequest, UpdateSubscriptionRequest,
+    EncryptedIcsImportRequest, ImportIcsRequest, ImportIcsResponse, LegacyIcsImportRequest,
+    UpdateSubscriptionRequest,
 };
 
 use crate::helpers::{
@@ -1329,7 +1330,7 @@ async fn encrypted_import_stores_ciphertext_as_sent_and_links_overrides() {
     moved.series_external_id = Some("series-1".into());
     moved.occurrence_date = Some(Timestamp("2026-11-03T09:00:00.000Z".into()));
     moved.recurrence = Some(r#"{"frequency":"daily","interval":1}"#.into());
-    moved.participants = Some(vec![ImportParticipant {
+    moved.participants = Some(vec![ParticipantInput {
         email: "guest2@example.com".into(),
         display_name: Some("Guest Two".into()),
         role: None,
