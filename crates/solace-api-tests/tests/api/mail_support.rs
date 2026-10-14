@@ -377,10 +377,19 @@ pub fn webhook_signature(secret: &str, body: &[u8]) -> String {
 
 /// Posts a raw webhook body as Stalwart would, from a fresh documentation-range address.
 pub async fn post_webhook(app: &TestApp, body: &[u8], signature: Option<&str>) -> ApiResponse {
+    post_webhook_from(app, &format!("2001:db8:5::{}", hex(2)), body, signature).await
+}
+
+pub async fn post_webhook_from(
+    app: &TestApp,
+    address: &str,
+    body: &[u8],
+    signature: Option<&str>,
+) -> ApiResponse {
     let mut request = reqwest::Client::new()
         .post(format!("{}/api/internal/stalwart/webhook", app.base_url))
         .header("content-type", "application/json")
-        .header("x-forwarded-for", format!("2001:db8:5::{}", hex(2)))
+        .header("x-forwarded-for", address)
         .body(body.to_vec());
     if let Some(signature) = signature {
         request = request.header("X-Signature", signature);

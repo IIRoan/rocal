@@ -17,6 +17,7 @@ mod mail_account;
 mod mail_jmap;
 mod passkeys;
 mod settings;
+mod stalwart_webhook;
 
 // Shared by every domain module; no single module uses every helper.
 #[allow(dead_code)]
