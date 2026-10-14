@@ -804,27 +804,28 @@ async fn writes_are_rate_limited_per_event_url() {
         };
         ok(response.expect_status(200));
     }
-    let limited = owner.delete(&path).await;
-    assert_eq!(
-        limited
+    for limited in [
+        owner.delete(&path).await,
+        owner
+            .put(&path, to_json(&update(vec![setting("email", 15, true)])))
+            .await,
+    ] {
+        let retry: u64 = limited
             .headers
             .get("retry-after")
-            .and_then(|v| v.to_str().ok()),
-        Some("60")
-    );
-    ok(limited.expect_error(
-        429,
-        "Too Many Requests",
-        "Rate limit exceeded. Try again in 60 seconds.",
-    ));
-    ok(owner
-        .put(&path, to_json(&update(vec![setting("email", 15, true)])))
-        .await
-        .expect_error(
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse().ok())
+            .expect("Retry-After seconds");
+        assert!(
+            (1..=60).contains(&retry),
+            "the rest of the 60 s window: {retry}"
+        );
+        ok(limited.expect_error(
             429,
             "Too Many Requests",
-            "Rate limit exceeded. Try again in 60 seconds.",
+            &format!("Rate limit exceeded. Try again in {retry} seconds."),
         ));
+    }
     get(&mut owner, &event).await;
     put(
         &mut owner,

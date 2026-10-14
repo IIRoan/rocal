@@ -7,7 +7,7 @@ use solace_api_types::events::{
 };
 
 use crate::event_fixtures::{
-    StoredContent, calendar_id, insert_calendar, list_events, stored_content, to_json,
+    StoredContent, calendar_id, insert_calendar, list_events, stored_content, to_json, unfold,
 };
 use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok};
 
@@ -489,4 +489,41 @@ async fn legacy_plaintext_imports_still_work() {
             ]),
         }
     );
+}
+
+#[tokio::test]
+async fn a_single_day_all_day_import_exports_as_one_day() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:single-day-holiday",
+        "DTSTART;VALUE=DATE:20990302",
+        "DTEND;VALUE=DATE:20990303",
+        "SUMMARY:Single-day holiday",
+        "END:VEVENT",
+        "END:VCALENDAR",
+    ]
+    .join("\r\n");
+    let imported = import(
+        &mut owner,
+        json!({"calendarId": calendar, "icsContent": ics}),
+    )
+    .await;
+    assert_eq!((imported.events_created, imported.calendar_name), (1, None));
+    let id = event_id(&app, &calendar, "single-day-holiday").await;
+    let exported = ok(owner
+        .get(&format!("/api/events/{id}/ics"))
+        .await
+        .expect_status(200))
+    .text();
+    let exported = unfold(&exported);
+    assert!(
+        exported.contains("DTSTART;VALUE=DATE:20990302\r\nDTEND;VALUE=DATE:20990303\r\n"),
+        "{exported}"
+    );
+    assert!(exported.contains("UID:single-day-holiday\r\n"));
 }

@@ -182,9 +182,17 @@ pub async fn assert_no_mail(app: &TestApp, to: &str) {
 }
 
 async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
-    let user = format!("noreply@{}", app.env.mail_domain);
     let base = app.env.stalwart_url.trim_end_matches('/');
-    let session = jmap_get(app, &format!("{base}/jmap/session"), &user).await;
+    let session: Value = serde_json::from_str(
+        &noreply_jmap(
+            app,
+            reqwest::Method::GET,
+            &format!("{base}/jmap/session"),
+            None,
+        )
+        .await,
+    )
+    .expect("JMAP session");
     let account = session["primaryAccounts"]["urn:ietf:params:jmap:mail"]
         .as_str()
         .expect("mail account")
@@ -197,20 +205,16 @@ async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
                 "properties": ["subject", "attachments", "textBody", "bodyValues"], "fetchTextBodyValues": true}, "g"],
         ],
     });
-    let mut request = reqwest::Client::new()
-        .post(format!("{base}/jmap/"))
-        .basic_auth(&user, Some(&app.env.stalwart_noreply_password))
-        .json(&calls);
-    if let Some(key) = &app.env.stalwart_gate_key {
-        request = request.header("X-Solace-Gate", key);
-    }
-    let response: Value = request
-        .send()
-        .await
-        .expect("JMAP call")
-        .json()
-        .await
-        .expect("JMAP body");
+    let response: Value = serde_json::from_str(
+        &noreply_jmap(
+            app,
+            reqwest::Method::POST,
+            &format!("{base}/jmap/"),
+            Some(&calls),
+        )
+        .await,
+    )
+    .expect("JMAP body");
     let list = response["methodResponses"][1][1]["list"]
         .as_array()
         .cloned()
@@ -221,10 +225,11 @@ async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
         let attachment = email["attachments"].get(0).cloned();
         let ics = match attachment.as_ref().and_then(|a| a["blobId"].as_str()) {
             Some(blob) => Some(
-                jmap_text(
+                noreply_jmap(
                     app,
+                    reqwest::Method::GET,
                     &format!("{base}/jmap/download/{account}/{blob}/invite.ics"),
-                    &user,
+                    None,
                 )
                 .await,
             ),
@@ -243,24 +248,40 @@ async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
     mail
 }
 
-async fn jmap_get(app: &TestApp, url: &str, user: &str) -> Value {
-    serde_json::from_str(&jmap_text(app, url, user).await).expect("JMAP JSON")
-}
+/// The backends send as noreply too, so the suite reads one request at a time under Stalwart's per-account concurrency limit.
+static NOREPLY_READS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
 
-async fn jmap_text(app: &TestApp, url: &str, user: &str) -> String {
-    let mut request = reqwest::Client::new()
-        .get(url)
-        .basic_auth(user, Some(&app.env.stalwart_noreply_password));
-    if let Some(key) = &app.env.stalwart_gate_key {
-        request = request.header("X-Solace-Gate", key);
+async fn noreply_jmap(
+    app: &TestApp,
+    method: reqwest::Method,
+    url: &str,
+    body: Option<&Value>,
+) -> String {
+    let _permit = NOREPLY_READS.acquire().await.expect("semaphore");
+    let user = format!("noreply@{}", app.env.mail_domain);
+    for _ in 0..50 {
+        let mut request = reqwest::Client::new()
+            .request(method.clone(), url)
+            .basic_auth(&user, Some(&app.env.stalwart_noreply_password));
+        if let Some(key) = &app.env.stalwart_gate_key {
+            request = request.header("X-Solace-Gate", key);
+        }
+        if let Some(body) = body {
+            request = request.json(body);
+        }
+        let text = request
+            .send()
+            .await
+            .expect("JMAP request")
+            .text()
+            .await
+            .expect("JMAP text");
+        if !text.contains("urn:ietf:params:jmap:error:limit") {
+            return text;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
-    request
-        .send()
-        .await
-        .expect("JMAP request")
-        .text()
-        .await
-        .expect("JMAP text")
+    panic!("Stalwart kept refusing noreply reads at its concurrency limit");
 }
 
 /// Unfolds RFC 5545 continuation lines so assertions can match whole properties.

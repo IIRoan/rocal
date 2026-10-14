@@ -1,5 +1,6 @@
 //! Participants, invitation mail, mailed-invitation imports, RSVP replies and attendee copies.
 
+use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use serde_json::json;
 use solace_api_tests::seed::fake_envelope;
 use solace_api_types::events::{
@@ -106,7 +107,7 @@ async fn lookup(user: &mut TestUser, uid: &str) -> Option<Event> {
 }
 
 fn percent_encode(value: &str) -> String {
-    value.replace('@', "%40")
+    utf8_percent_encode(value, NON_ALPHANUMERIC).to_string()
 }
 
 fn summary(created: i64, updated: i64, errors: &[&str]) -> InvitationImportSummary {
@@ -521,12 +522,13 @@ async fn mailbox_aliases_link_to_their_solace_user() {
     let mut owner = app.user().await;
     let attendee = app.user().await;
     let alias = format!("alias-{}@{}", hex(6), app.env.mail_domain);
+    let entry = format!("suitedir{}", hex(8));
     sqlx::query(
         "INSERT INTO mail_directory_entry (id, user_id, email, local_part, domain, stalwart_account_id, stalwart_domain_id, \
          public_key_armored, public_key_fingerprint, created_at, updated_at) \
          VALUES ($1, $2, $3, 'alias', $4, $5, 'domain', 'key', 'fingerprint', now(), now())",
     )
-    .bind(format!("suitedir{}", hex(8)))
+    .bind(&entry)
     .bind(&attendee.id)
     .bind(&alias)
     .bind(&app.env.mail_domain)
@@ -535,6 +537,12 @@ async fn mailbox_aliases_link_to_their_solace_user() {
     .await
     .expect("insert directory entry");
     let event = invite(&mut owner, &alias).await;
+    // Mail sync polls every linked directory row against Stalwart, so the fake account must not outlive the create.
+    sqlx::query("DELETE FROM mail_directory_entry WHERE id = $1")
+        .bind(&entry)
+        .execute(&app.db)
+        .await
+        .expect("remove directory entry");
     let linked = event
         .participants
         .clone()
