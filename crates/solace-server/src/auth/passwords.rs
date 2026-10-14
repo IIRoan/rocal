@@ -380,8 +380,20 @@ pub async fn update_user(
                     .ok_or_else(ApiError::internal)
             })
             .transpose()?;
-        let image = image.map(|image| image.as_str().map(str::to_owned));
-        store::update_user(&state.db, active.user.clone(), name, image).await?;
+        match image.map(|image| image.as_str().map(str::to_owned)) {
+            // Older clients still change pictures here, so an uploaded one is retired like a removal.
+            Some(image) => {
+                crate::profiles::avatars::update_user_image(&state, &active.user.id, name, image)
+                    .await
+                    .map_err(|error| {
+                        tracing::error!(error = %crate::telemetry::redact_pii(&error.to_string()), "Profile image update failed");
+                        ApiError::internal()
+                    })?
+            }
+            None => {
+                store::update_user(&state.db, active.user.clone(), name, None).await?;
+            }
+        }
         let dont_remember = hooks::dont_remember(&state, &headers);
         Ok(Reply::new(
             json(&StatusFlag { status: true }),

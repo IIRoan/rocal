@@ -1,7 +1,7 @@
 //! Validated bodies and queries: parsed the way Elysia parses them, checked by a Zod-compatible schema, then deserialized into the DTO.
 
 use axum::body::Bytes;
-use axum::extract::{FromRequest, FromRequestParts, Request};
+use axum::extract::{FromRequest, FromRequestParts, Path, Request};
 use axum::http::header;
 use axum::http::request::Parts;
 use serde::de::DeserializeOwned;
@@ -32,6 +32,9 @@ macro_rules! request_schema {
 pub struct ValidJson<T>(pub T);
 
 pub struct ValidQuery<T>(pub T);
+
+/// Path parameters as an object of strings, validated like Elysia's `params` schema.
+pub struct ValidPath<T>(pub T);
 
 /// The envelope's first message and every issue as `{ path, message }`.
 pub fn rejection(issues: &[Issue]) -> AppError {
@@ -115,6 +118,25 @@ where
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let query = form_object(parts.uri.query().unwrap_or_default().as_bytes());
         validate(Some(&Value::Object(query))).map(ValidQuery)
+    }
+}
+
+impl<S, T> FromRequestParts<S> for ValidPath<T>
+where
+    S: Send + Sync,
+    T: RequestSchema + DeserializeOwned,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let Path(params) = Path::<Vec<(String, String)>>::from_request_parts(parts, state)
+            .await
+            .map_err(|_| AppError::Parse)?;
+        let params = params
+            .into_iter()
+            .map(|(key, value)| (key, Value::String(value)))
+            .collect();
+        validate(Some(&Value::Object(params))).map(ValidPath)
     }
 }
 

@@ -16,7 +16,7 @@ TEST_DATABASE_URL=postgres://solace_test:solace-test-pg@127.0.0.1:55432/solace_t
   cargo test -p solace-api-tests --test api
 ```
 
-`TEST_DATABASE_URL` is the backend's own database; tests read it for state checks. Every URL, database, bucket and secret goes through `src/guard.rs`, which refuses anything that is not a test resource.
+`TEST_DATABASE_URL` is the backend's own database; tests read it for state checks. The profile and avatar cases need the Railway test bucket `solace-test-avatars`: export `TEST_AVATAR_BUCKET`, `TEST_AVATAR_BUCKET_ENDPOINT`, `TEST_AVATAR_BUCKET_REGION`, `TEST_AVATAR_BUCKET_ACCESS_KEY_ID` and `TEST_AVATAR_BUCKET_SECRET_ACCESS_KEY` before `cargo test` or `cargo xtask check` (the suite hands them to the in-process server as `AVATAR_BUCKET*`). Every URL, database, bucket and secret goes through `src/guard.rs`, which refuses anything that is not a test resource.
 
 ## Writing tests
 

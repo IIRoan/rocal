@@ -40,6 +40,13 @@ pub struct AvatarSizeQuery {
     pub size: Option<u32>,
 }
 
+/// Path of `GET /api/profiles/avatars/:avatarId`: 128 random bits as base64url.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AvatarIdParams {
+    pub avatar_id: String,
+}
+
 /// A base64 square crop; the API stores only re-encoded WebP variants of it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

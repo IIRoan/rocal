@@ -58,7 +58,18 @@ p256 = { version = "0.14", features = ["ecdsa"] }
 percent-encoding = "2"
 rand = "0.10"
 regex-lite = "0.1"
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "http2", "json", "query", "form", "stream"] }
+# Decompression matches Bun's fetch, and safe fetch caps bodies after decoding.
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "http2", "json", "query", "form", "stream", "gzip", "deflate", "brotli"] }
+# Gzip bodies for the safe-fetch decompression tests (already in the tree through reqwest).
+flate2 = "1"
+# Profile pictures: decode the uploaded PNG/JPEG/WebP crop and resize it into variants.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+# Lossy WebP (quality 80, as Bun.Image wrote it); `image` only encodes lossless WebP.
+webp = { version = "0.3", default-features = false }
+# SigV4-presigned requests to the S3-compatible avatar bucket over the existing reqwest client.
+rusty-s3 = { version = "0.10", default-features = false, features = ["rustcrypto"] }
+# IANA time zone validation with the tzdb bundled, so it does not depend on the image's zoneinfo.
+jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
 serde = { version = "1", features = ["derive"] }
 # Objects keep insertion order, so issues name unknown keys in the order clients sent them.
 serde_json = { version = "1", features = ["preserve_order"] }

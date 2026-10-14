@@ -652,6 +652,389 @@
         }
       }
     },
+    "/api/profiles/avatar": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Streams a user's picture by email, fetching external ones through safe fetch; a bare 404 without one.",
+        "operationId": "getProfileAvatarByEmail",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The picture",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No picture"
+          }
+        }
+      }
+    },
+    "/api/profiles/avatars/{avatarId}": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Streams the smallest stored WebP variant covering `size` pixels (default 512) while the id is attached to an account.",
+        "operationId": "getUploadedAvatar",
+        "parameters": [
+          {
+            "name": "avatarId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The WebP variant",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No picture"
+          }
+        }
+      }
+    },
+    "/api/profiles/lookup": {
+      "post": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Avatar paths for Solace users with a usable picture, in request order.",
+        "operationId": "lookupProfiles",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileLookupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileLookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiles/me/avatar": {
+      "put": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Stores the caller's square crop as WebP variants (32–512px) and retires the previous picture.",
+        "operationId": "uploadProfileAvatar",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadAvatarRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Removes the caller's picture and deletes its stored variants.",
+        "operationId": "removeProfileAvatar",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/push/devices": {
+      "get": {
+        "tags": [
+          "Push"
+        ],
+        "summary": "The caller's enabled devices, most recently seen first; tokens never leave the server.",
+        "operationId": "listPushDevices",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Push"
+        ],
+        "summary": "Stores or refreshes an APNs token; it moves to the caller if another user had it.",
+        "operationId": "registerPushDevice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPushDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceRegistration"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Push"
+        ],
+        "summary": "Deletes one of the caller's tokens, or every device without one.",
+        "operationId": "unregisterPushDevice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnregisterPushDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceUnregistration"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/push/test": {
+      "post": {
+        "tags": [
+          "Push"
+        ],
+        "summary": "Queues a metadata-only reminder push to the caller's devices.",
+        "operationId": "sendTestPush",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushTestResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recent-contacts": {
+      "get": {
+        "tags": [
+          "Recent contacts"
+        ],
+        "summary": "The caller's encrypted recent contacts, or `null` before the first upload.",
+        "operationId": "getRecentContacts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/RecentContacts"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Recent contacts"
+        ],
+        "summary": "Stores or replaces the caller's blob; an omitted key version keeps the stored one.",
+        "operationId": "putRecentContacts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutRecentContactsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentContacts"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "The caller's settings, created with the defaults if none exist.",
+        "operationId": "getSettings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Updates the given settings; choosing an encryption mode turns off calendar share links.",
+        "operationId": "updateSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Deletes the caller's settings, so the next read starts from the defaults.",
+        "operationId": "resetSettings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/test": {
       "get": {
         "tags": [
