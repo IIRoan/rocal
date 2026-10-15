@@ -852,7 +852,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::config::Config;
     use crate::db::scratch::ScratchDatabase;
-    use crate::integrations::safe_fetch::tests::{public_lookup, safe_fetch};
+    use crate::integrations::safe_fetch::tests::{public_lookup, safe_fetch, serve};
 
     const FEED: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:feed-1@example.com\r\nDTSTAMP:20261001T000000Z\r\nDTSTART:20261101T090000Z\r\nDTEND:20261101T100000Z\r\nSUMMARY:Planning\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
@@ -898,10 +898,7 @@ pub(crate) mod tests {
                         .into_response()
                 }),
             );
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        tokio::spawn(async move { axum::serve(listener, app).await });
-        format!("http://feeds.test:{port}")
+        format!("http://feeds.test:{}", serve(app).await)
     }
 
     pub(crate) async fn fixture() -> Fixture {

@@ -336,6 +336,16 @@ pub(crate) mod tests {
         (StatusCode::FOUND, [(header::LOCATION, to)]).into_response()
     }
 
+    /// Serves `app` on 127.0.0.1 and answers its port.
+    pub(crate) async fn serve(app: Router) -> u16 {
+        let listener = tokio::net::TcpListener::bind((TEST_PUBLIC_ADDRESS, 0))
+            .await
+            .unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move { axum::serve(listener, app).await });
+        port
+    }
+
     /// The test origin on 127.0.0.1 and the `host:port/path` of every request it saw.
     async fn server() -> (u16, Seen) {
         let seen = Seen::default();
@@ -343,12 +353,7 @@ pub(crate) mod tests {
             .route("/redirect", get(redirect))
             .fallback(record)
             .with_state(seen.clone());
-        let listener = tokio::net::TcpListener::bind((TEST_PUBLIC_ADDRESS, 0))
-            .await
-            .unwrap();
-        let port = listener.local_addr().unwrap().port();
-        tokio::spawn(async move { axum::serve(listener, app).await });
-        (port, seen)
+        (serve(app).await, seen)
     }
 
     fn encode(value: &str) -> String {
