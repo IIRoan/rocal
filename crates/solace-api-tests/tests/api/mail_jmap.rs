@@ -5,7 +5,9 @@ use serde_json::{Value, json};
 use solace_api_tests::client::ApiResponse;
 
 use crate::helpers::{TestApp, TestUser, ok};
-use crate::mail_support::{JMAP_MAIL, Mailbox, access_token, mailbox, method, unique_subject};
+use crate::mail_support::{
+    JMAP_MAIL, Mailbox, access_token, mailbox, method, set_bridge_password, unique_subject,
+};
 
 const PROXY_ROUTES: [&str; 4] = [
     "/api/mail/jmap/.well-known/jmap",
@@ -343,6 +345,63 @@ async fn uploads_and_downloads_relay_binary_bodies_unchanged() {
         .expect("download");
     assert_eq!(download.status().as_u16(), 200);
     assert_eq!(download.bytes().await.expect("bytes").to_vec(), bytes);
+}
+
+/// A session upload through the proxy, with an optional client bearer next to the session cookie.
+async fn session_upload(
+    app: &TestApp,
+    owner: &Mailbox,
+    bytes: &[u8],
+    bearer: Option<&str>,
+) -> ApiResponse {
+    let cookie = owner
+        .user
+        .agent
+        .cookies()
+        .iter()
+        .map(|(name, value)| format!("{name}={value}"))
+        .collect::<Vec<_>>()
+        .join("; ");
+    let mut request = reqwest::Client::new()
+        .post(format!(
+            "{}/api/mail/jmap/jmap/upload/{}/",
+            app.base_url,
+            owner.account_id()
+        ))
+        .header("cookie", cookie)
+        .header("origin", &app.origin)
+        .header("content-type", "application/octet-stream")
+        .header("x-forwarded-for", owner.user.agent.client_ip())
+        .body(bytes.to_vec());
+    if let Some(bearer) = bearer {
+        request = request.header("authorization", bearer);
+    }
+    let response = request.send().await.expect("upload");
+    ApiResponse {
+        status: response.status(),
+        headers: response.headers().clone(),
+        body: response.bytes().await.expect("upload body").to_vec(),
+    }
+}
+
+#[tokio::test]
+async fn large_uploads_with_a_refused_token_retry_with_a_fresh_one() {
+    let app = TestApp::spawn().await;
+    let owner = mailbox(&app).await;
+    // Past the 1 MiB the Rust proxy keeps for its 401 retry.
+    let bytes: Vec<u8> = (0..=255u8).cycle().take(1536 * 1024).collect();
+
+    // Setting the bridge password again revokes the bearer the backend cached while provisioning.
+    set_bridge_password(&app, owner.account_id(), &owner.user.id, &owner.user.email).await;
+    let cached = session_upload(&app, &owner, &bytes, None).await;
+    assert_eq!(cached.status.as_u16(), 200, "{}", cached.text());
+    assert_eq!(auth_source(&cached), ("session".into(), "1".into()));
+    assert_eq!(ok(cached.value())["size"], json!(bytes.len()));
+
+    // A refused client bearer falls back to the session, as smaller bodies do.
+    let stale = session_upload(&app, &owner, &bytes, Some("Bearer stale-token")).await;
+    assert_eq!(stale.status.as_u16(), 200, "{}", stale.text());
+    assert_eq!(auth_source(&stale), ("session".into(), "1".into()));
 }
 
 #[tokio::test]

@@ -1251,7 +1251,7 @@ pub mod tests {
 
     /// How the fake provisions: `adopt` finds the account by name, `refuse` rejects its creation.
     #[derive(Clone, Copy, Default)]
-    struct Plan {
+    pub struct Plan {
         local_part: &'static str,
         adopt: bool,
         refuse: Option<&'static str>,
@@ -1259,7 +1259,7 @@ pub mod tests {
     }
 
     /// Stalwart's registry for provisioning: domain `domain-1`, account `acct-1`, key `pk-1`, and the bridge login.
-    fn provisioning(plan: Plan) -> impl Fn(&Recorded) -> Reply {
+    pub fn provisioning(plan: Plan) -> impl Fn(&Recorded) -> Reply {
         move |request| {
             match request.path.as_str() {
                 "/api/auth" => {
