@@ -193,6 +193,18 @@ pub fn array_index(key: &str) -> Option<u32> {
         .filter(|index| canonical && !key.is_empty() && *index != u32::MAX)
 }
 
+/// JavaScript truthiness of a JSON value.
+pub fn truthy(value: &serde_json::Value) -> bool {
+    use serde_json::Value;
+    match value {
+        Value::Null => false,
+        Value::Bool(flag) => *flag,
+        Value::Number(n) => n.as_f64().is_some_and(|n| n != 0.0 && !n.is_nan()),
+        Value::String(text) => !text.is_empty(),
+        Value::Array(_) | Value::Object(_) => true,
+    }
+}
+
 /// The trimmed text, or `None` when it is blank.
 pub fn trimmed_text(value: Option<&str>) -> Option<String> {
     value

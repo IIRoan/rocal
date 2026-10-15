@@ -12,7 +12,7 @@ use time::PrimitiveDateTime;
 use super::build;
 use super::{
     Frequency, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, js,
-    normalize_email, pattern,
+    normalize_email, pattern, truthy,
 };
 use crate::http::zod::js_trim;
 
@@ -124,16 +124,6 @@ fn recurrence(raw: Option<&str>) -> Result<Option<RecurrenceRule>, InvalidUntil>
         by_month: integers("byMonth"),
         timezone,
     }))
-}
-
-fn truthy(value: &Value) -> bool {
-    match value {
-        Value::Null => false,
-        Value::Bool(flag) => *flag,
-        Value::Number(n) => n.as_f64().is_some_and(|n| n != 0.0),
-        Value::String(text) => !text.is_empty(),
-        Value::Array(_) | Value::Object(_) => true,
-    }
 }
 
 /// `mapEventParticipant`, as far as ICS reads it.

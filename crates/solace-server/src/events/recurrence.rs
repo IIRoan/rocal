@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use crate::integrations::ics::Frequency;
+use crate::integrations::ics::{Frequency, truthy};
 
 const MS_PER_DAY: f64 = 86_400_000.0;
 const MAX_ITERATIONS: usize = 1000;
@@ -47,17 +47,6 @@ pub enum RecurrenceError {
     TimeZone,
     #[error("invalid date")]
     InvalidDate,
-}
-
-/// JavaScript truthiness for the JSON values a rule holds.
-fn truthy(value: &Value) -> bool {
-    match value {
-        Value::Null => false,
-        Value::Bool(b) => *b,
-        Value::Number(n) => n.as_f64().is_some_and(|n| n != 0.0 && !n.is_nan()),
-        Value::String(s) => !s.is_empty(),
-        Value::Array(_) | Value::Object(_) => true,
-    }
 }
 
 /// `Number(value)` for the values a rule's numeric fields may hold.
