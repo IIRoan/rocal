@@ -6,7 +6,7 @@ use sea_orm::{
 };
 use solace_api_types::auth::{AuthSession, AuthUser, SessionWithUser};
 
-use super::cookies::{self, SESSION_LIFETIME_SECONDS, SESSION_UPDATE_AGE_SECONDS, STEP_UP_COOKIE};
+use super::cookies::{self, SESSION_LIFETIME_SECONDS, SESSION_UPDATE_AGE_SECONDS};
 use crate::db::entities::{session, user};
 use crate::instant;
 use crate::state::AppState;
@@ -101,7 +101,7 @@ async fn resolve(
     } else {
         session
     };
-    if renew_step_up && let Some(raw) = cookies::cookie(&request_cookies, STEP_UP_COOKIE) {
+    if renew_step_up && let Some(raw) = cookies::cookie(&request_cookies, settings.step_up_name()) {
         let now_seconds = instant::unix_seconds(now);
         if let Some(payload) = settings.verified_step_up(raw, &user.id, &session.id, now_seconds)
             && payload.e - SESSION_LIFETIME_SECONDS + SESSION_UPDATE_AGE_SECONDS <= now_seconds

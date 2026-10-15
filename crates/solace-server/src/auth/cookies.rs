@@ -18,7 +18,8 @@ pub const STEP_UP_COOKIE: &str = "solace-passkey-step-up";
 #[derive(Debug, Clone)]
 pub struct CookieSettings {
     secret: String,
-    prefix: &'static str,
+    prefix: String,
+    step_up_name: String,
     secure: bool,
     same_site: SameSite,
     /// `crossSubDomainCookies`: the RP ID domain in production, the backend host otherwise.
@@ -37,11 +38,14 @@ impl CookieSettings {
         let root = registrable_domain(&backend_host);
         Self {
             secret: config.auth_secret.clone(),
-            prefix: if config.is_production {
-                "__Secure-better-auth"
-            } else {
-                "better-auth"
+            prefix: match (config.is_production, config.auth_cookie_prefix.as_deref()) {
+                (true, base) => format!("__Secure-{}", base.unwrap_or("better-auth")),
+                (false, base) => base.unwrap_or("better-auth").to_owned(),
             },
+            step_up_name: config.auth_cookie_prefix.as_ref().map_or_else(
+                || STEP_UP_COOKIE.to_owned(),
+                |base| format!("{base}-passkey-step-up"),
+            ),
             secure: config.is_production || config.cookie_same_site == SameSite::None,
             same_site: config.cookie_same_site,
             domain: if config.is_production {
@@ -56,6 +60,17 @@ impl CookieSettings {
 
     pub fn name(&self, suffix: &str) -> String {
         format!("{}.{suffix}", self.prefix)
+    }
+
+    /// The prefix without `__Secure-`: `better-auth` unless `AUTH_COOKIE_PREFIX` renames it.
+    pub fn base(&self) -> &str {
+        self.prefix
+            .strip_prefix("__Secure-")
+            .unwrap_or(&self.prefix)
+    }
+
+    pub fn step_up_name(&self) -> &str {
+        &self.step_up_name
     }
 
     pub fn session_token(&self) -> String {
@@ -136,7 +151,8 @@ impl CookieSettings {
 
     fn step_up_cookie(&self, value: &str, max_age: i64) -> String {
         let mut cookie = format!(
-            "{STEP_UP_COOKIE}={value}; Path=/; Max-Age={max_age}; SameSite={}; HttpOnly",
+            "{}={value}; Path=/; Max-Age={max_age}; SameSite={}; HttpOnly",
+            self.step_up_name,
             self.same_site.lowercase()
         );
         if self.is_production {
@@ -254,6 +270,42 @@ mod tests {
             "http://localhost:4101".into()
         };
         CookieSettings::new(&config)
+    }
+
+    #[test]
+    fn a_cookie_prefix_renames_every_cookie_production_shares() {
+        let default = settings(true);
+        assert_eq!(
+            default.session_token(),
+            "__Secure-better-auth.session_token"
+        );
+        assert!(
+            default
+                .step_up_cleared()
+                .starts_with("solace-passkey-step-up=;")
+        );
+
+        let mut config = Config::from_lookup(|name| match name {
+            "DATABASE_URL" => Some("postgres://localhost/solace_test".into()),
+            "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
+            "AUTH_COOKIE_PREFIX" => Some("solace-test".into()),
+            _ => None,
+        })
+        .unwrap();
+        config.is_production = true;
+        config.backend_url = "https://api.solace.test".into();
+        let renamed = CookieSettings::new(&config);
+        assert_eq!(
+            renamed.session_token(),
+            "__Secure-solace-test.session_token"
+        );
+        assert_eq!(renamed.base(), "solace-test");
+        let cleared = renamed.step_up_cleared();
+        assert!(
+            cleared.starts_with("solace-test-passkey-step-up=;"),
+            "{cleared}"
+        );
+        assert!(cleared.contains("; Domain=solace.test"), "{cleared}");
     }
 
     #[test]

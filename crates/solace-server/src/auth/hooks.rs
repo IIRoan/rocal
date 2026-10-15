@@ -127,7 +127,11 @@ fn legacy_clears(state: &AppState, request: &HeaderMap) -> Vec<String> {
         .collect();
     for (name, _) in cookies::parse_cookies(request) {
         let unprefixed = name.strip_prefix("__Secure-").unwrap_or(&name);
-        if (unprefixed == "better-auth" || unprefixed.starts_with("better-auth."))
+        let base = state.cookies.base();
+        if (unprefixed == base
+            || unprefixed
+                .strip_prefix(base)
+                .is_some_and(|rest| rest.starts_with('.')))
             && !names.contains(&name)
         {
             names.push(name);

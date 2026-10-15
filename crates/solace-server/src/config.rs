@@ -58,6 +58,8 @@ pub struct Config {
     pub app_url: Option<String>,
     pub is_production: bool,
     pub cookie_same_site: SameSite,
+    /// `AUTH_COOKIE_PREFIX`: a test environment on a production subdomain renames its cookies so they never overwrite or clear production's.
+    pub auth_cookie_prefix: Option<String>,
     pub mobile_auth_callback_url: String,
     pub trusted_origins: Vec<String>,
     pub passkey_origin: String,
@@ -129,6 +131,7 @@ impl Config {
             app_url,
             is_production,
             cookie_same_site,
+            auth_cookie_prefix: var("AUTH_COOKIE_PREFIX").map(|prefix| prefix.trim().to_owned()),
             mobile_auth_callback_url: var("MOBILE_AUTH_CALLBACK_URL")
                 .or_else(|| var("NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL"))
                 .unwrap_or_else(|| DEFAULT_MOBILE_AUTH_CALLBACK_URL.into()),

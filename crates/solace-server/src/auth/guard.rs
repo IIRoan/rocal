@@ -4,7 +4,7 @@ use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 
-use super::cookies::{self, STEP_UP_COOKIE};
+use super::cookies;
 use super::session::{self, ActiveSession};
 use crate::db::entities::passkey;
 use crate::error::AppError;
@@ -107,7 +107,7 @@ pub fn step_up_verified(
     active: &ActiveSession,
 ) -> bool {
     let request_cookies = cookies::parse_cookies(headers);
-    cookies::cookie(&request_cookies, STEP_UP_COOKIE)
+    cookies::cookie(&request_cookies, state.cookies.step_up_name())
         .and_then(|raw| {
             state.cookies.verified_step_up(
                 raw,
