@@ -70,9 +70,13 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(test))
 }
 
-/// The limiter keys on the request URL, so each path and query string has its own budget.
+/// The limiter keys on the request path without its query, so a query string cannot start a fresh budget.
 fn enforce(user: &RouteUser, uri: &Uri, limit: Limit) -> Result<(), AppError> {
-    rate_limit::enforce("push-devices", &format!("{}:{uri}", user.id), limit)
+    rate_limit::enforce(
+        "push-devices",
+        &format!("{}:{}", user.id, uri.path()),
+        limit,
+    )
 }
 
 /// The caller's enabled devices, most recently seen first; tokens never leave the server.

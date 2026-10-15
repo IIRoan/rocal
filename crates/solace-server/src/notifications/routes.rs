@@ -59,7 +59,11 @@ pub fn routes() -> OpenApiRouter<AppState> {
 }
 
 fn enforce(user: &RouteUser, uri: &Uri, limit: Limit) -> Result<(), AppError> {
-    rate_limit::enforce("notifications", &format!("{}:{uri}", user.id), limit)
+    rate_limit::enforce(
+        "notifications",
+        &format!("{}:{}", user.id, uri.path()),
+        limit,
+    )
 }
 
 #[utoipa::path(get, path = "/api/notifications/event/{eventId}", operation_id = "getEventNotifications", tag = "Notifications", params(("eventId" = String, Path)), responses((status = 200, body = EventNotifications)))]
