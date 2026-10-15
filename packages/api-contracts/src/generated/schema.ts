@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deletes the caller's account with its Stalwart mailbox and stored avatar; any body or query is ignored. */
+        delete: operations["deleteAccount"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/auth-status": {
         parameters: {
             query?: never;
@@ -2224,6 +2241,25 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    deleteAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteAccountResponse"];
+                };
+            };
+        };
+    };
     getAuthStatus: {
         parameters: {
             query?: never;

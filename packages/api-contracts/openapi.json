@@ -10,6 +10,26 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/account": {
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Deletes the caller's account with its Stalwart mailbox and stored avatar; any body or query is ignored.",
+        "operationId": "deleteAccount",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/account/auth-status": {
       "get": {
         "tags": [

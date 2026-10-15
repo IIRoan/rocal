@@ -65,6 +65,8 @@ pub struct Config {
     pub database_url: String,
     pub stalwart_base_url: String,
     pub stalwart_default_domain: String,
+    /// Scoped to Stalwart's registry (`solace-provisioner`); it must never read mailbox data.
+    pub stalwart_provision_token: String,
     /// The noreply identity app mail is sent as; mail is disabled without its credentials.
     pub mailer: Option<MailerConfig>,
     /// The backend-gate key the Railway Stalwart domain requires (`apps/stalwart/backend-gate.cfg`).
@@ -127,6 +129,11 @@ impl Config {
                 .unwrap_or_else(|| DEFAULT_STALWART_BASE_URL.into()),
             stalwart_default_domain: var("STALWART_DEFAULT_DOMAIN")
                 .unwrap_or_else(|| "solace.onl".into()),
+            stalwart_provision_token: var("STALWART_PROVISION_TOKEN")
+                .map(|token| token.trim().to_owned())
+                .filter(|token| !token.is_empty())
+                .or_else(|| var("STALWART_ADMIN_TOKEN"))
+                .unwrap_or_default(),
             mailer: mailer(&var),
             stalwart_gate_key: var("STALWART_GATE_KEY")
                 .map(|key| key.trim().to_owned())

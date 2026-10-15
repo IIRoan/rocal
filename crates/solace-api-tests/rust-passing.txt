@@ -1,6 +1,8 @@
 # Suite tests the Rust server passes in both modes; cargo xtask check fails if one regresses. Each sub-step adds its cases.
+account_deletion::anonymous_callers_cannot_delete_an_account
 account_deletion::auth_status_reports_the_session_and_is_never_cached
 account_deletion::email_availability_normalizes_and_classifies_handles
+account_deletion::forged_user_ids_are_ignored_and_the_caller_is_deleted
 account_deletion::the_signup_config_is_public
 account_public::auth_status_forwards_session_cookie_changes
 account_public::auth_status_reports_the_session_and_is_never_cached
