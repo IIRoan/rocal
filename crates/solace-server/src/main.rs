@@ -11,6 +11,7 @@ static ALLOCATOR: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 use anyhow::Context;
 use solace_server::config::Config;
 use solace_server::state::AppState;
+use solace_server::subscriptions::scheduler;
 use solace_server::{db, telemetry};
 
 fn main() -> anyhow::Result<()> {
@@ -32,7 +33,12 @@ async fn run(config: Config) -> anyhow::Result<()> {
     let state = AppState::new(config, db)?;
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", port)).await?;
     tracing::info!(port, "Server is running");
-    solace_server::serve(listener, state, shutdown_signal()).await?;
+    let calendar_sync = scheduler::start(state.clone());
+    let shutdown = async move {
+        shutdown_signal().await;
+        calendar_sync.abort();
+    };
+    solace_server::serve(listener, state, shutdown).await?;
     Ok(())
 }
 

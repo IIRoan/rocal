@@ -49,6 +49,8 @@ webp.workspace = true
 
 [dev-dependencies]
 flate2.workspace = true
+# Paused time for the subscription scheduler's timer tests.
+tokio = { workspace = true, features = ["test-util"] }
 
 [features]
 default = ["jemalloc"]
