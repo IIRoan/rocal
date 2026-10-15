@@ -36,6 +36,8 @@ pub struct Rule {
     pub by_week_day: Option<Vec<f64>>,
     pub by_month_day: Option<Vec<f64>>,
     pub by_month: Option<Vec<f64>>,
+    /// The stored JSON, for `validateRecurrenceRule`'s checks on fields as they were written.
+    pub raw: Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -137,7 +139,55 @@ pub fn parse_rule(json: &str) -> Option<Rule> {
         by_week_day: number_array(field("byWeekDay")),
         by_month_day: number_array(field("byMonthDay")),
         by_month: number_array(field("byMonth")),
+        raw: rule.clone(),
     })
+}
+
+/// `validateRecurrenceRule`: the problems with a parsed rule, in TypeScript's order and words.
+pub fn validate_rule(rule: &Rule) -> Vec<String> {
+    let field = |name: &str| rule.raw.get(name).filter(|value| truthy(value));
+    let out_of = |name: &str, low: f64, high: f64| {
+        field(name).is_some_and(|value| match value.as_array() {
+            Some(items) => items.iter().map(to_number).any(|n| n < low || n > high),
+            None => true,
+        })
+    };
+    let frequency = rule.frequency;
+    let mut errors = Vec::new();
+    if rule.interval > 999.0 {
+        errors.push("Interval must be between 1 and 999".to_owned());
+    }
+    if field("count")
+        .map(to_number)
+        .is_some_and(|count| count < 1.0)
+    {
+        errors.push("Count must be greater than 0".into());
+    }
+    if field("count").is_some() && field("until").is_some() {
+        errors.push("Cannot specify both count and until date".into());
+    }
+    if field("byWeekDay").is_some() {
+        if !matches!(frequency, Frequency::Weekly | Frequency::Daily) {
+            errors.push("byWeekDay can only be used with weekly or daily frequency".into());
+        } else if out_of("byWeekDay", 0.0, 6.0) {
+            errors.push("byWeekDay must be an array of numbers 0-6 (Sunday-Saturday)".into());
+        }
+    }
+    if field("byMonthDay").is_some() {
+        if !matches!(frequency, Frequency::Monthly | Frequency::Yearly) {
+            errors.push("byMonthDay can only be used with monthly or yearly frequency".into());
+        } else if out_of("byMonthDay", 1.0, 31.0) {
+            errors.push("byMonthDay must be an array of numbers 1-31".into());
+        }
+    }
+    if field("byMonth").is_some() {
+        if frequency != Frequency::Yearly {
+            errors.push("byMonth can only be used with yearly frequency".into());
+        } else if out_of("byMonth", 1.0, 12.0) {
+            errors.push("byMonth must be an array of numbers 1-12".into());
+        }
+    }
+    errors
 }
 
 fn time_clip(time: f64) -> f64 {
@@ -622,6 +672,30 @@ mod tests {
         )
         .unwrap();
         assert_eq!(dates(&instances), ["2026-01-15T10:00:00.000Z"]);
+    }
+
+    #[test]
+    fn rules_validate_like_typescript() {
+        let errors = |json: &str| validate_rule(&parse_rule(json).unwrap());
+        assert!(errors(r#"{"frequency":"weekly","interval":2,"byWeekDay":[1,5]}"#).is_empty());
+        assert_eq!(
+            errors(
+                r#"{"frequency":"monthly","interval":1000,"count":-1,"until":"2026-01-01","byWeekDay":[1]}"#
+            ),
+            [
+                "Interval must be between 1 and 999",
+                "Count must be greater than 0",
+                "Cannot specify both count and until date",
+                "byWeekDay can only be used with weekly or daily frequency"
+            ]
+        );
+        assert_eq!(
+            errors(r#"{"frequency":"yearly","interval":1,"byMonth":[13],"byMonthDay":"x"}"#),
+            [
+                "byMonthDay must be an array of numbers 1-31",
+                "byMonth must be an array of numbers 1-12"
+            ]
+        );
     }
 
     #[test]

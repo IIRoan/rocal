@@ -5,7 +5,9 @@ use sea_orm::{
     QueryFilter, Set,
 };
 
-use crate::db::entities::{calendar, calendar_event};
+use sea_orm::QueryOrder;
+
+use crate::db::entities::{calendar, calendar_event, user};
 
 pub async fn find<C: ConnectionTrait>(
     db: &C,
@@ -51,4 +53,30 @@ pub async fn set_share<C: ConnectionTrait>(
     active.ics_share_enabled = Set(enabled);
     active.ics_share_token = Set(token);
     active.update(db).await
+}
+
+/// The calendar an enabled share token unlocks, with its owner.
+pub async fn shared<C: ConnectionTrait>(
+    db: &C,
+    token: &str,
+) -> Result<Option<(calendar::Model, Option<user::Model>)>, sea_orm::DbErr> {
+    calendar::Entity::find()
+        .filter(calendar::Column::IcsShareToken.eq(token))
+        .filter(calendar::Column::IcsShareEnabled.eq(true))
+        .find_also_related(user::Entity)
+        .one(db)
+        .await
+}
+
+/// The calendar's events without detached occurrences, by start.
+pub async fn top_level_events<C: ConnectionTrait>(
+    db: &C,
+    calendar_id: &str,
+) -> Result<Vec<calendar_event::Model>, sea_orm::DbErr> {
+    calendar_event::Entity::find()
+        .filter(calendar_event::Column::CalendarId.eq(calendar_id))
+        .filter(calendar_event::Column::ParentEventId.is_null())
+        .order_by_asc(calendar_event::Column::Start)
+        .all(db)
+        .await
 }

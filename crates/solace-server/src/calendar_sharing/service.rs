@@ -7,9 +7,11 @@ use crate::auth::api::{ALPHANUMERIC, random_string};
 use crate::auth::cookies::encode_uri_component;
 use crate::auth::guard::RouteUser;
 use crate::db::entities::calendar;
+use crate::entity_metadata::external_calendar_name;
 use crate::error::AppError;
 use crate::events::encryption::backfill_ciphertext_only;
 use crate::instant;
+use crate::integrations::ics::{build, export};
 use crate::state::AppState;
 
 const SHARE_TOKEN_LENGTH: usize = 40;
@@ -123,4 +125,81 @@ pub async fn disable(
     queries::set_share(&state.db, calendar, false, None).await?;
     backfill_ciphertext_only(&state.db, &user.id, &[&calendar_id], now).await?;
     Ok(DisableShareLinkResponse { success: true })
+}
+
+/// The public feed behind an enabled token (an `.ics` suffix and spaces are ignored): the calendar name and its ICS.
+pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String), AppError> {
+    let token = raw_token.trim();
+    let token = match token.len().checked_sub(4) {
+        Some(at) if token.is_char_boundary(at) && token[at..].eq_ignore_ascii_case(".ics") => {
+            &token[..at]
+        }
+        _ => token,
+    };
+    let not_found = || AppError::NotFound("Shared calendar not found".into());
+    if token.is_empty() {
+        return Err(not_found());
+    }
+    let (calendar, owner) = queries::shared(&state.db, token)
+        .await?
+        .ok_or_else(not_found)?;
+    let events = queries::top_level_events(&state.db, &calendar.id).await?;
+    if events
+        .iter()
+        .any(|event| event.encryption_state == "encrypted")
+    {
+        return Err(AppError::validation(
+            "This shared calendar contains encrypted event details and cannot be exported.",
+        ));
+    }
+    let zone = events
+        .iter()
+        .find(|event| !event.all_day && !event.timezone.is_empty())
+        .map(|event| event.timezone.as_str());
+    let owner_label = owner
+        .map(|owner| {
+            if owner.name.is_empty() {
+                owner.email
+            } else {
+                owner.name
+            }
+        })
+        .unwrap_or_default();
+    let built = events
+        .iter()
+        .map(|event| {
+            export::to_build_event(&export::ExportEvent {
+                id: &event.id,
+                external_id: event.external_id.as_deref(),
+                title: &event.title,
+                description: event.description.as_deref(),
+                start: event.start,
+                end: event.end,
+                all_day: event.all_day,
+                timezone: Some(&event.timezone),
+                location: event.location.as_deref(),
+                recurrence: event.recurrence.as_deref(),
+                created_at: event.created_at,
+                updated_at: event.updated_at,
+                participants: &[],
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| AppError::internal("recurrence until is not a valid instant"))?;
+    let name = external_calendar_name(&calendar.name);
+    let ics = build::build_calendar(
+        &build::Calendar {
+            name: Some(name.clone()),
+            description: Some(format!("Shared calendar from {owner_label}")),
+            timezone: Some(instant::resolve_timezone(zone)),
+            source_url: Some(format!(
+                "{}/api/calendars/shared/{}",
+                base_url(state),
+                encode_uri_component(raw_token)
+            )),
+            ..Default::default()
+        },
+        &built,
+    );
+    Ok((name, ics))
 }

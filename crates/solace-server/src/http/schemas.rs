@@ -66,6 +66,117 @@ pub fn refine_encrypted_name_body(
     }
 }
 
+pub fn event_participant_role_schema() -> Schema {
+    zod::enumeration(&["organizer", "attendee"])
+}
+
+pub fn event_participant_status_schema() -> Schema {
+    zod::enumeration(&["pending", "accepted", "declined", "tentative"])
+}
+
+pub fn rsvp_status_schema() -> Schema {
+    zod::enumeration(&["accepted", "declined", "tentative"])
+}
+
+pub fn bulk_event_action_schema() -> Schema {
+    zod::enumeration(&["move", "delete", "duplicate"])
+}
+
+/// `eventParticipantInputSchema`.
+pub fn event_participant_input_schema() -> Schema {
+    static EMAIL: std::sync::LazyLock<Option<regex_lite::Regex>> = std::sync::LazyLock::new(|| {
+        regex_lite::Regex::new(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$").ok()
+    });
+    let mut email = zod::string().min(3).max(320);
+    if let Some(pattern) = EMAIL.as_ref() {
+        email = email.regex(pattern);
+    }
+    zod::object([
+        (
+            "email",
+            email.refine(
+                |value| {
+                    !value.as_str().is_some_and(|email| {
+                        crate::addresses::is_reserved_system_email(email, None)
+                    })
+                },
+                "Cannot invite system or administrative email addresses",
+                &[],
+            ),
+        ),
+        ("displayName", zod::string().max(120).optional()),
+        ("role", event_participant_role_schema().optional()),
+        ("status", event_participant_status_schema().optional()),
+    ])
+    .strict()
+}
+
+/// `eventInvitationContentSchema`: the transient plaintext for invitation mail.
+pub fn event_invitation_content_schema() -> Schema {
+    zod::object([
+        ("title", zod::string().min(1).max(255)),
+        ("description", zod::string().max(1000).optional()),
+        ("location", zod::string().max(255).optional()),
+    ])
+    .strict()
+}
+
+/// `reminderFieldSchema`: minutes 0 to 43200, or `null`.
+pub fn reminder_field_schema() -> Schema {
+    zod::union(vec![
+        zod::number().int().gte(0.0).lte(43_200.0),
+        zod::null(),
+    ])
+}
+
+/// `eventContentEncryptionFieldsSchema.shape`.
+pub fn event_content_encryption_fields() -> [(&'static str, Schema); 3] {
+    [
+        ("encryptedContent", zod::string().optional()),
+        ("blindIndexTokens", zod::array(zod::string()).optional()),
+        (
+            "encryptionKeyVersion",
+            zod::number().int().gte(1.0).optional(),
+        ),
+    ]
+}
+
+/// `refineEncryptedEventContentBody`: no plaintext content beside ciphertext, a title without it, invitation copies only for encrypted invites.
+pub fn refine_encrypted_event_content_body(
+    require_title: bool,
+) -> impl Fn(&Value, &mut RefineCtx<'_>) + Send + Sync + 'static {
+    move |body, ctx| {
+        let text = |name: &str| {
+            body.get(name)
+                .and_then(Value::as_str)
+                .is_some_and(|v| !zod::js_trim(v).is_empty())
+        };
+        let has_ciphertext = has_encrypted_payload_value(body.get("encryptedContent"));
+        if has_ciphertext {
+            for field in ["title", "description", "location"] {
+                if text(field) {
+                    ctx.add_issue(
+                        crate::events::encryption::PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
+                        &[field],
+                    );
+                }
+            }
+        } else if require_title && !text("title") {
+            ctx.add_issue("Title is required and cannot be empty", &["title"]);
+        }
+        let has_participants = body
+            .get("participants")
+            .and_then(Value::as_array)
+            .is_some_and(|participants| !participants.is_empty());
+        if body.get("invitationContent").is_some() && (!has_ciphertext || !has_participants) {
+            ctx.add_issue(
+                "Invitation content is only accepted with encrypted content and participants.",
+                &["invitationContent"],
+            );
+        }
+    }
+}
+
 /// What `Intl.DateTimeFormat(undefined, { timeZone })` accepts in Bun: IANA names in any case, or a UTC offset.
 pub fn is_valid_timezone(value: &str) -> bool {
     crate::instant::time_zone(value).is_some()

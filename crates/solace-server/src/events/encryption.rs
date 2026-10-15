@@ -45,6 +45,63 @@ pub fn resolve_persistence_policy(
     }
 }
 
+pub const PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE: &str =
+    "Plaintext event content must not be sent alongside encrypted content.";
+
+/// `assertNoPlaintextEventContentWithCiphertext`: with ciphertext, the first non-blank plaintext field is refused.
+pub fn assert_no_plaintext_with_ciphertext(
+    encrypted_content: Option<&str>,
+    fields: [(&'static str, Option<&str>); 3],
+) -> Result<(), crate::error::AppError> {
+    if !encrypted_content.is_some_and(|content| !js_trim(content).is_empty()) {
+        return Ok(());
+    }
+    match fields
+        .into_iter()
+        .find(|(_, value)| value.is_some_and(|value| !js_trim(value).is_empty()))
+    {
+        Some((field, _)) => Err(crate::error::AppError::field(
+            PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
+            field,
+        )),
+        None => Ok(()),
+    }
+}
+
+/// What an invitation mail shows: the transient `invitationContent`, or plaintext an unencrypted event still has.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvitationContentSource {
+    pub title: String,
+    pub description: Option<String>,
+    pub location: Option<String>,
+}
+
+/// `resolveInvitationContent`.
+pub fn resolve_invitation_content(
+    has_encrypted_payload: bool,
+    invitation: Option<&solace_api_types::events::InvitationContent>,
+    title: Option<&str>,
+    description: Option<&str>,
+    location: Option<&str>,
+) -> Option<InvitationContentSource> {
+    if let Some(invitation) = invitation {
+        return Some(InvitationContentSource {
+            title: js_trim(&invitation.title).to_owned(),
+            description: normalize_optional_text(invitation.description.as_deref()),
+            location: normalize_optional_text(invitation.location.as_deref()),
+        });
+    }
+    let title = title.map(js_trim).filter(|title| !title.is_empty())?;
+    if has_encrypted_payload {
+        return None;
+    }
+    Some(InvitationContentSource {
+        title: title.to_owned(),
+        description: normalize_optional_text(description),
+        location: normalize_optional_text(location),
+    })
+}
+
 pub fn is_fully_encrypted(encryption_state: Option<&str>) -> bool {
     encryption_state == Some("encrypted")
 }
@@ -118,6 +175,50 @@ mod tests {
                 description: None,
                 location: None,
             }
+        );
+    }
+
+    #[test]
+    fn invitations_use_the_transient_copy_for_encrypted_events() {
+        let copy = solace_api_types::events::InvitationContent {
+            title: " Launch ".into(),
+            description: Some("  ".into()),
+            location: None,
+        };
+        assert_eq!(
+            resolve_invitation_content(true, Some(&copy), None, None, None),
+            Some(InvitationContentSource {
+                title: "Launch".into(),
+                description: None,
+                location: None,
+            })
+        );
+        assert_eq!(
+            resolve_invitation_content(true, None, Some("Launch"), None, None),
+            None
+        );
+        assert!(resolve_invitation_content(false, None, Some("Launch"), None, None).is_some());
+        assert!(
+            assert_no_plaintext_with_ciphertext(
+                Some("ct"),
+                [
+                    ("title", Some("x")),
+                    ("description", None),
+                    ("location", None)
+                ]
+            )
+            .is_err()
+        );
+        assert!(
+            assert_no_plaintext_with_ciphertext(
+                Some("ct"),
+                [
+                    ("title", Some(" ")),
+                    ("description", None),
+                    ("location", None)
+                ]
+            )
+            .is_ok()
         );
     }
 

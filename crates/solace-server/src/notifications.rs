@@ -2,3 +2,8 @@
 
 pub mod calculator;
 pub mod job_payload;
+mod queries;
+pub mod routes;
+pub mod service;
+
+pub use routes::routes;

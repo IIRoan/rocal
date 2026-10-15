@@ -321,6 +321,52 @@ pub struct IcsImportResult {
     pub errors: Option<Vec<String>>,
 }
 
+/// `GET /api/events`: an instant range, both required.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EventListQuery {
+    pub start: String,
+    pub end: String,
+}
+
+/// `GET /api/events/search`: plaintext `q`, or comma-separated blind-index tokens for encrypted events.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EventSearchQuery {
+    pub q: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blind_index_tokens: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_date: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_date: Option<String>,
+}
+
+/// `GET /api/events/search-corpus`: pages of the owner's events for on-device indexing.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EventSearchCorpusQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_after: Option<String>,
+}
+
+/// `GET /api/events/invitations/by-external-id`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct InvitationByExternalIdQuery {
+    pub external_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_remote: Option<bool>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateEventRequest {

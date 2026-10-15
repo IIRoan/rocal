@@ -65,6 +65,8 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(push_devices::routes())
         .merge(profiles::routes())
         .merge(e2ee::routes())
+        .merge(events::routes())
+        .merge(notifications::routes())
 }
 
 /// Every route's OpenAPI entry, without a database.
