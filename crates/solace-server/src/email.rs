@@ -1,7 +1,9 @@
 //! App mail from the noreply identity: the `auth-email.ts` templates, delivery modes, and the user-safe warnings for failed sends.
 
 use solace_api_types::common::OperationWarning;
+use time::macros::format_description;
 
+use crate::http::zod::js_trim;
 use crate::integrations::stalwart::mailer::{self, Attachment};
 use crate::state::AppState;
 use crate::telemetry;
@@ -10,6 +12,7 @@ const SHELL: &str = include_str!("email/shell.html");
 const PASSWORD_RESET: &str = include_str!("email/password_reset.html");
 const PASSWORD_UPDATED: &str = include_str!("email/password_updated.html");
 const INVITE: &str = include_str!("email/invite.html");
+const EVENT_INVITATION: &str = include_str!("email/event_invitation.html");
 const LOGO_URL: &str = "https://solace.onl/favicon-192x192.png";
 const APP_URL: &str = "https://solace.onl";
 const FOOTER_SEPARATOR: &str = "\n<!-- footer -->\n";
@@ -153,6 +156,106 @@ pub fn invite(inviter: &str, signup_url: &str, token: &str) -> Message {
     Message {
         subject: format!("{inviter} invited you to Solace"),
         text,
+        html,
+        attachments: Vec::new(),
+    }
+}
+
+/// One event the invitation mail describes.
+pub struct InvitedEvent<'a> {
+    pub title: &'a str,
+    pub description: Option<&'a str>,
+    pub location: Option<&'a str>,
+    pub start: time::PrimitiveDateTime,
+    pub end: time::PrimitiveDateTime,
+    pub all_day: bool,
+}
+
+/// `formatEventEmailDateRange`: en-US medium dates and short times in the server's zone, UTC.
+fn event_when(
+    start: time::PrimitiveDateTime,
+    end: time::PrimitiveDateTime,
+    all_day: bool,
+) -> String {
+    let date = format_description!("[month repr:short] [day padding:none], [year]");
+    let time = format_description!("[hour repr:12 padding:none]:[minute] [period]");
+    let format = |at: time::PrimitiveDateTime| {
+        let date = at.format(&date).unwrap_or_default();
+        if all_day {
+            return date;
+        }
+        format!("{date}, {}", at.format(&time).unwrap_or_default())
+    };
+    if all_day {
+        return format(start);
+    }
+    format!("{} - {}", format(start), format(end))
+}
+
+const DETAIL_LABEL: &str = r#"<p class="detail-label" style="margin:18px 0 4px;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:rgba(0,0,0,0.4)">"#;
+const DETAIL_VALUE: &str =
+    r#"<p class="detail-value" style="margin:0;font-size:15px;line-height:1.6;color:#1a1a1a">"#;
+
+fn detail(label: &str, value: &str) -> String {
+    format!("{DETAIL_LABEL}{label}</p>{DETAIL_VALUE}{value}</p>")
+}
+
+/// `buildEventInvitationEmail`.
+pub fn event_invitation(
+    attendee: &str,
+    inviter: &str,
+    event: &InvitedEvent<'_>,
+    open_url: &str,
+) -> Message {
+    let attendee = Some(js_trim(attendee))
+        .filter(|name| !name.is_empty())
+        .unwrap_or("there");
+    let when = event_when(event.start, event.end, event.all_day);
+    let location = event.location.filter(|text| !js_trim(text).is_empty());
+    let description = event.description.filter(|text| !js_trim(text).is_empty());
+    let mut details = detail("When", &escape_html(&when));
+    if let Some(location) = location {
+        details.push_str(&detail("Location", &escape_html(location)));
+    }
+    if let Some(description) = description {
+        details.push_str(&detail(
+            "Notes",
+            &escape_html(description).replace('\n', "<br />"),
+        ));
+    }
+    let html = layout(
+        EVENT_INVITATION,
+        "Event invitation",
+        &format!("{inviter} invited you to {}.", event.title),
+        &[
+            ("ATTENDEE", &escape_html(attendee)),
+            ("INVITER", &escape_html(inviter)),
+            ("TITLE", &escape_html(event.title)),
+            ("DETAILS", &details),
+            ("OPEN_URL", &escape_html(open_url)),
+        ],
+    );
+    let mut text = vec![
+        format!("Hi {attendee},"),
+        String::new(),
+        format!("{inviter} invited you to \"{}\".", event.title),
+        format!("When: {when}"),
+    ];
+    if let Some(location) = location {
+        text.push(format!("Location: {}", js_trim(location)));
+    }
+    if let Some(description) = description {
+        text.extend([String::new(), js_trim(description).to_owned()]);
+    }
+    text.extend([
+        String::new(),
+        format!("Open event: {open_url}"),
+        String::new(),
+        "An ICS calendar invite is attached.".into(),
+    ]);
+    Message {
+        subject: format!("{inviter} invited you to {}", event.title),
+        text: text.join("\n"),
         html,
         attachments: Vec::new(),
     }
@@ -356,6 +459,50 @@ mod tests {
             sent.unwrap_err().to_string(),
             "password reset email could not be delivered"
         );
+    }
+
+    #[test]
+    fn invitation_mail_formats_the_event_like_bun() {
+        let event = InvitedEvent {
+            title: "Planning <Q4>",
+            description: Some(" Agenda\nItems "),
+            location: Some(" Room 1 "),
+            start: time::macros::datetime!(2026-10-14 15:00),
+            end: time::macros::datetime!(2026-10-14 16:00),
+            all_day: false,
+        };
+        let message = event_invitation(
+            " ",
+            "Roan",
+            &event,
+            "https://solace.test/calendar?eventId=e1",
+        );
+        assert_eq!(message.subject, "Roan invited you to Planning <Q4>");
+        assert_eq!(
+            message.text,
+            "Hi there,\n\nRoan invited you to \"Planning <Q4>\".\nWhen: Oct 14, 2026, 3:00 PM - Oct 14, 2026, 4:00 PM\nLocation: Room 1\n\nAgenda\nItems\n\nOpen event: https://solace.test/calendar?eventId=e1\n\nAn ICS calendar invite is attached."
+        );
+        assert!(
+            message
+                .html
+                .contains("<strong>Planning &lt;Q4&gt;</strong>")
+        );
+        assert!(message.html.contains(" Agenda<br />Items "));
+        assert!(!message.html.contains("{{"), "every placeholder is filled");
+        let all_day = InvitedEvent {
+            all_day: true,
+            start: time::macros::datetime!(2026-10-04 00:00),
+            location: None,
+            description: None,
+            ..event
+        };
+        let message = event_invitation("Bee", "Roan", &all_day, "https://solace.test/x");
+        assert!(
+            message.text.contains("\nWhen: Oct 4, 2026\n\nOpen event"),
+            "{}",
+            message.text
+        );
+        assert!(!message.html.contains("Location"));
     }
 
     #[test]

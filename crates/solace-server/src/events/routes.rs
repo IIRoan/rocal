@@ -7,20 +7,21 @@ use axum::response::{IntoResponse, Response};
 use solace_api_types::events::{
     BulkEventRequest, BulkEventResult, CreateEventRequest, Event, EventDeleted, EventList,
     EventListQuery, EventSearchCorpus, EventSearchCorpusQuery, EventSearchQuery,
-    EventSearchResults, InvitationByExternalIdQuery, InvitationLookup, SealEncryptionRequest,
-    UpdateEventRequest,
+    EventSearchResults, InvitationByExternalIdQuery, InvitationLookup, RsvpRequest, RsvpResult,
+    SealEncryptionRequest, UpdateEventRequest,
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use super::{listing, service};
+use super::{listing, rsvp, service};
 use crate::auth::guard::Auth;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidQuery};
 use crate::http::schemas::{
     bulk_event_action_schema, calendar_color_schema, event_content_encryption_fields,
     event_invitation_content_schema, event_participant_input_schema,
-    refine_encrypted_event_content_body, reminder_field_schema, timezone_schema,
+    refine_encrypted_event_content_body, reminder_field_schema, rsvp_status_schema,
+    timezone_schema,
 };
 use crate::http::zod::{self, optional_query_boolean, optional_query_int};
 use crate::request_schema;
@@ -95,6 +96,8 @@ request_schema!(UpdateEventRequest => zod::object([
 .strict()
 .super_refine(refine_encrypted_event_content_body(false)));
 
+request_schema!(RsvpRequest => zod::object([("status", rsvp_status_schema())]).strict());
+
 request_schema!(SealEncryptionRequest => zod::object([
     ("encryptedContent", zod::string().min(1)),
     ("blindIndexTokens", zod::array(zod::string().min(1)).optional()),
@@ -116,6 +119,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(list, create))
         .routes(routes!(export_ics))
         .routes(routes!(invitation_by_external_id))
+        .routes(routes!(rsvp))
         .routes(routes!(seal))
         .routes(routes!(get, update, delete))
         .routes(routes!(bulk))
@@ -205,6 +209,19 @@ pub async fn invitation_by_external_id(
     Ok(Json(
         service::invitation_by_external_id(&state, &user, &query.external_id).await?,
     ))
+}
+
+/// Answers a mailed invitation; a decline hides the copy and answers `{ deleted: true }`.
+#[utoipa::path(post, path = "/api/events/{id}/rsvp", operation_id = "respondToInvitation", tag = "Events", params(("id" = String, Path)), request_body = RsvpRequest, responses((status = 200, body = RsvpResult)))]
+#[tracing::instrument(skip_all)]
+pub async fn rsvp(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    auth: Auth,
+    ValidJson(body): ValidJson<RsvpRequest>,
+) -> Result<Json<RsvpResult>, AppError> {
+    let user = auth.require()?;
+    Ok(Json(rsvp::answer(&state, &user, &id, &body).await?))
 }
 
 /// Stores ciphertext for an imported invitation without changing its schedule.

@@ -52,10 +52,9 @@ impl Relations {
         let mut exceptions: HashMap<String, Vec<_>> = HashMap::new();
         if with_exceptions {
             for exception in queries::exceptions(db, event_ids).await? {
-                exceptions
-                    .entry(exception.parent_event_id.clone())
-                    .or_default()
-                    .push(exception);
+                if let Some(event_id) = exception.modified_event_id.clone() {
+                    exceptions.entry(event_id).or_default().push(exception);
+                }
             }
         }
         Ok(Self {

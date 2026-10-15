@@ -10,10 +10,13 @@ use solace_api_types::events::{
     ParticipantInput, SealEncryptionRequest, UpdateEventRequest,
 };
 
-use super::encryption::{assert_no_plaintext_with_ciphertext, resolve_persistence_policy};
-use super::participants;
+use super::encryption::{
+    InvitationContentSource, assert_no_plaintext_with_ciphertext, resolve_invitation_content,
+    resolve_persistence_policy,
+};
 use super::view::{self, Relations};
 use super::{constraints, queries, recurrence};
+use super::{participants, rsvp};
 use crate::addresses::is_reserved_system_email;
 use crate::auth::guard::RouteUser;
 use crate::db::entities::{calendar, calendar_event, event_notification, user_settings};
@@ -23,6 +26,8 @@ use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
 use crate::integrations::ics::{build, export};
+use crate::invitations::request;
+use crate::invitations::rsvp_reply::RsvpStatus;
 use crate::notifications::calculator;
 use crate::notifications::job_payload::should_schedule_event_reminder;
 use crate::state::AppState;
@@ -371,10 +376,17 @@ pub async fn create(
         &state.db,
         &event.id,
         request.participants.as_deref().unwrap_or_default(),
-        &user.id,
+        Some(&user.id),
     )
     .await?;
-    let mut warnings: Vec<OperationWarning> = Vec::new();
+    let content = resolve_invitation_content(
+        has_encrypted,
+        request.invitation_content.as_ref(),
+        request.title.as_deref(),
+        request.description.as_deref(),
+        request.location.as_deref(),
+    );
+    let mut warnings = invite(state, &event, &synced, &calendar.name, content, &timezone).await?;
     if let Some(minutes) = reminder.filter(|m| *m > 0)
         && schedules_reminders(settings.as_ref())
         && let Err(error) = insert_reminder(
@@ -392,6 +404,37 @@ pub async fn create(
     created.participants = Some(synced.participants);
     created.warnings = (!warnings.is_empty()).then_some(warnings);
     Ok(created)
+}
+
+/// Mails the REQUEST to new invitees once their rows exist; without plaintext to put in it, nobody is mailed.
+async fn invite(
+    state: &AppState,
+    event: &calendar_event::Model,
+    synced: &participants::Synced,
+    calendar_name: &str,
+    content: Option<InvitationContentSource>,
+    timezone: &str,
+) -> Result<Vec<OperationWarning>, AppError> {
+    let Some(content) = content else {
+        return Ok(Vec::new());
+    };
+    let invitation = export::to_build_event(&export::ExportEvent {
+        id: &event.id,
+        external_id: event.external_id.as_deref(),
+        title: &content.title,
+        description: content.description.as_deref(),
+        start: event.start,
+        end: event.end,
+        all_day: event.all_day,
+        timezone: Some(timezone),
+        location: content.location.as_deref(),
+        recurrence: event.recurrence.as_deref(),
+        created_at: event.created_at,
+        updated_at: event.updated_at,
+        participants: &[],
+    })
+    .map_err(AppError::internal)?;
+    Ok(request::send_pending(state, &event.id, synced, calendar_name, &invitation).await)
 }
 
 pub async fn update(
@@ -587,10 +630,26 @@ pub async fn update(
                 "Event was modified by another process. Please refresh and try again.",
             )
         })?;
-    if let Some(given) = &request.participants {
-        participants::sync(&state.db, &updated.id, given, &user.id).await?;
-    }
     let mut warnings = Vec::new();
+    if let Some(given) = &request.participants {
+        let synced = participants::sync(&state.db, &updated.id, given, Some(&user.id)).await?;
+        let content = resolve_invitation_content(
+            has_encrypted,
+            request.invitation_content.as_ref(),
+            Some(&next_title),
+            next_description.as_deref(),
+            next_location.as_deref(),
+        );
+        warnings = invite(
+            state,
+            &updated,
+            &synced,
+            &final_calendar.name,
+            content,
+            &timezone,
+        )
+        .await?;
+    }
     if (start.is_some() || end.is_some() || request.reminder.is_some())
         && let Err(error) = reschedule_reminders(
             state,
@@ -676,6 +735,15 @@ pub async fn delete(
         queries::participants_with_users(&state.db, std::slice::from_ref(&existing.id)).await?;
     let attendee_invitation =
         has_text(existing.external_id.as_deref()) && attendee_copy(&user.id, &participants);
+    if attendee_invitation && !existing.is_cancelled {
+        rsvp::respond(state, user, &id, RsvpStatus::Declined).await?;
+        rsvp::purge(state, user, &id).await?;
+        return Ok(EventDeleted {
+            success: true,
+            message: "Invitation declined and removed from your calendar".into(),
+            deleted_event_id: id.into(),
+        });
+    }
     let transaction = state.db.begin().await?;
     let deleted_reminders = queries::delete_reminders(&transaction, vec![id.clone()]).await?;
     queries::delete_notification_logs(&transaction, Some(&user.id), vec![id.clone()]).await?;
@@ -778,10 +846,24 @@ pub async fn bulk(
             })
         }
         "delete" => {
-            let local: Vec<String> = events.iter().map(|e| e.id.clone()).collect();
-            queries::delete_reminders(&state.db, local.clone()).await?;
-            queries::delete_notification_logs(&state.db, None, local.clone()).await?;
-            let deleted = queries::delete(&state.db, &user.id, local).await?;
+            let invitation =
+                |e: &calendar_event::Model| has_text(e.external_id.as_deref()) && attendee(e);
+            let mut declined: u64 = 0;
+            for event in events.iter().filter(|e| invitation(e) && !e.is_cancelled) {
+                rsvp::respond(state, user, &event.id, RsvpStatus::Declined).await?;
+                declined += 1;
+            }
+            let local: Vec<String> = events
+                .iter()
+                .filter(|e| !invitation(e) || e.is_cancelled)
+                .map(|e| e.id.clone())
+                .collect();
+            let mut deleted = declined;
+            if !local.is_empty() {
+                queries::delete_reminders(&state.db, local.clone()).await?;
+                queries::delete_notification_logs(&state.db, None, local.clone()).await?;
+                deleted += queries::delete(&state.db, &user.id, local).await?;
+            }
             Ok(BulkEventResult {
                 success: true,
                 message: format!("Successfully deleted {deleted} events"),
@@ -862,7 +944,7 @@ async fn duplicate(
                 status: Some(row.status.clone()),
             })
             .collect();
-        let synced = participants::sync(&state.db, &copy.id, &attendees, &user.id).await?;
+        let synced = participants::sync(&state.db, &copy.id, &attendees, Some(&user.id)).await?;
         if let Some(minutes) = event.reminder.filter(|m| *m > 0)
             && schedules_reminders(settings.as_ref())
             && let Err(error) = insert_reminder(

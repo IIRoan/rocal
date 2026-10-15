@@ -177,12 +177,13 @@ pub async fn participants_with_users<C: ConnectionTrait>(
         .await
 }
 
+/// Prisma's `recurrenceExceptions` relation joins on `modified_event_id`, so a series never loads its own exceptions.
 pub async fn exceptions<C: ConnectionTrait>(
     db: &C,
     event_ids: Vec<String>,
 ) -> Result<Vec<recurrence_exception::Model>, sea_orm::DbErr> {
     recurrence_exception::Entity::find()
-        .filter(recurrence_exception::Column::ParentEventId.is_in(event_ids))
+        .filter(recurrence_exception::Column::ModifiedEventId.is_in(event_ids))
         .all(db)
         .await
 }
@@ -437,4 +438,31 @@ pub async fn corpus_page<C: ConnectionTrait>(
         .count(db)
         .await?;
     Ok((events, total))
+}
+
+/// The declined copy moves to the hidden staging calendar and forgets its Stalwart copy.
+pub async fn stage_declined<C: ConnectionTrait>(
+    db: &C,
+    id: &str,
+    staging_calendar_id: &str,
+    now: time::PrimitiveDateTime,
+) -> Result<(), sea_orm::DbErr> {
+    calendar_event::Entity::update_many()
+        .col_expr(
+            calendar_event::Column::CalendarId,
+            Expr::value(staging_calendar_id),
+        )
+        .col_expr(
+            calendar_event::Column::StalwartEventId,
+            Expr::value(None::<String>),
+        )
+        .col_expr(
+            calendar_event::Column::StalwartSyncedAt,
+            Expr::value(None::<time::PrimitiveDateTime>),
+        )
+        .col_expr(calendar_event::Column::UpdatedAt, Expr::value(now))
+        .filter(calendar_event::Column::Id.eq(id))
+        .exec(db)
+        .await
+        .map(|_| ())
 }

@@ -42,8 +42,6 @@ const HOLIDAY_SYNC_INTERVAL_MINUTES: i32 = 10080;
 const SYNC_INTERVAL_MINUTES: i32 = 15;
 const NOT_FOUND: &str = "Subscription not found";
 const CALENDAR_NOT_FOUND: &str = "Calendar not found or not owned by user";
-/// TypeScript passed no `ownerUserId` here, so synced and imported events get no organizer and send no invitations.
-const NO_OWNER: &str = "";
 
 fn fetch_error_message(error: SafeFetchError) -> String {
     match error {
@@ -517,7 +515,7 @@ async fn reconcile<C: ConnectionTrait>(
         let Some(existing) = by_uid.get(&parsed.uid) else {
             let row = parse::to_new_event(parsed, &feed.user_id, &feed.calendar_id, Some(&feed.id));
             let created = queries::insert_event(db, row).await?;
-            participants::sync(db, &created.id, &participant_inputs(parsed), NO_OWNER).await?;
+            participants::sync(db, &created.id, &participant_inputs(parsed), None).await?;
             counts.added += 1;
             continue;
         };
@@ -538,7 +536,7 @@ async fn reconcile<C: ConnectionTrait>(
             queries::update_feed_event(db, existing.clone(), parsed).await?;
         }
         if people_changed {
-            participants::sync(db, &existing.id, &participant_inputs(parsed), NO_OWNER).await?;
+            participants::sync(db, &existing.id, &participant_inputs(parsed), None).await?;
         }
         if changed || people_changed {
             counts.updated += 1;
@@ -604,13 +602,7 @@ async fn import_legacy(
         let row = parse::to_new_event(event, &user.id, calendar_id, None);
         let imported: Result<(), AppError> = async {
             let inserted = queries::insert_event(&state.db, row).await?;
-            participants::sync(
-                &state.db,
-                &inserted.id,
-                &participant_inputs(event),
-                NO_OWNER,
-            )
-            .await?;
+            participants::sync(&state.db, &inserted.id, &participant_inputs(event), None).await?;
             Ok(())
         }
         .await;
@@ -719,7 +711,7 @@ async fn import_encrypted(
         };
         let event = queries::insert_encrypted_event(&transaction, row).await?;
         let people = entry.participants.as_deref().unwrap_or_default();
-        participants::sync(&transaction, &event.id, people, NO_OWNER).await?;
+        participants::sync(&transaction, &event.id, people, None).await?;
         for date in entry.excluded_dates.iter().flatten() {
             queries::insert_deleted_exception(&transaction, &event.id, stored_instant(date)?)
                 .await?;

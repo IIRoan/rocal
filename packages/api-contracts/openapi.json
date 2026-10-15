@@ -788,6 +788,66 @@
         }
       }
     },
+    "/api/events/invitations/decline-ics": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Declines a mailed invitation without importing it: replies to the organizer and keeps a hidden declined copy.",
+        "operationId": "declineInvitationIcs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclineInvitationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationDeclined"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/invitations/import-ics": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Imports a decrypted mailed invitation: staged in the hidden Invitations calendar, or accepted onto a writable one.",
+        "operationId": "importInvitationIcs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportInvitationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationImportSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events/search": {
       "get": {
         "tags": [
@@ -1025,6 +1085,46 @@
               "text/calendar": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{id}/rsvp": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Answers a mailed invitation; a decline hides the copy and answers `{ deleted: true }`.",
+        "operationId": "respondToInvitation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RsvpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RsvpResult"
                 }
               }
             }
@@ -1623,6 +1723,170 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RecentContacts"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recurring/event/{id}": {
+      "put": {
+        "tags": [
+          "Recurring"
+        ],
+        "summary": "Edits one occurrence (detached), this and future occurrences (a split), or the whole series.",
+        "operationId": "editRecurringEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditRecurringRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Recurring"
+        ],
+        "summary": "Deletes one occurrence (an exception), this and future occurrences (ends the rule), or the series with its children.",
+        "operationId": "deleteRecurringEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deleteScope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "occurrenceDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringDeleted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recurring/patterns": {
+      "get": {
+        "tags": [
+          "Recurring"
+        ],
+        "summary": "The six fixed patterns the editors offer.",
+        "operationId": "listRecurrencePatterns",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurrencePatterns"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recurring/preview": {
+      "post": {
+        "tags": [
+          "Recurring"
+        ],
+        "summary": "The occurrences of a rule from the start through `previewDays` (90 by default) later.",
+        "operationId": "previewRecurrence",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRecurrenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurrencePreview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recurring/validate": {
+      "post": {
+        "tags": [
+          "Recurring"
+        ],
+        "summary": "Validates a rule object or rule text and describes it; the parsed rule echoes whatever rule text held, so it is JSON.",
+        "operationId": "validateRecurrenceRule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateRecurrenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurrenceValidation"
                 }
               }
             }
@@ -2893,6 +3157,27 @@
                 "type": "null"
               }
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeleteRecurringQuery": {
+        "type": "object",
+        "description": "Query of `DELETE /api/recurring/event/:id`.",
+        "required": [
+          "deleteScope"
+        ],
+        "properties": {
+          "deleteScope": {
+            "type": "string",
+            "description": "`this_only`, `this_and_future` or `all`."
+          },
+          "occurrenceDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The occurrence instant; required for `this_only` and `this_and_future`."
           }
         },
         "additionalProperties": false

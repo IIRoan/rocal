@@ -176,6 +176,7 @@ pub use common::{ErrorResponse, SuccessMessage, Timestamp};
     recurring::RecurrencePattern,
     recurring::EditRecurringRequest,
     recurring::RecurringUpdates,
+    recurring::DeleteRecurringQuery,
     recurring::RecurringDeleted,
     settings::UserSettings,
     settings::UpdateSettingsRequest,

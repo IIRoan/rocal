@@ -154,6 +154,17 @@ pub struct RecurringUpdates {
     pub encryption_key_version: Option<i32>,
 }
 
+/// Query of `DELETE /api/recurring/event/:id`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DeleteRecurringQuery {
+    /// `this_only`, `this_and_future` or `all`.
+    pub delete_scope: String,
+    /// The occurrence instant; required for `this_only` and `this_and_future`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occurrence_date: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RecurringDeleted {

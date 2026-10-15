@@ -7,6 +7,7 @@ pub mod participants;
 pub mod queries;
 pub mod recurrence;
 pub mod routes;
+pub mod rsvp;
 pub mod service;
 pub mod view;
 

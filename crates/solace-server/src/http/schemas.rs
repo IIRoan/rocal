@@ -158,6 +158,21 @@ pub fn timezone_schema() -> Schema {
     )
 }
 
+/// `recurrenceRuleSchema`: a rule object, or the JSON text of one.
+pub fn recurrence_rule_schema() -> Schema {
+    zod::union(vec![zod::string(), recurrence_rule_object_schema()])
+}
+
+/// `recurrenceScopeSchema`.
+pub fn recurrence_scope_schema() -> Schema {
+    zod::enumeration(&["this_only", "this_and_future", "all"])
+}
+
+/// `invitationImportStatusSchema`.
+pub fn invitation_import_status_schema() -> Schema {
+    zod::enumeration(&["accepted", "tentative"])
+}
+
 /// `eventEncryptionModeSchema`.
 pub fn event_encryption_mode_schema() -> Schema {
     zod::enumeration(&["hybrid", "full"])

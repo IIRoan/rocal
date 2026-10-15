@@ -297,14 +297,18 @@ pub struct Synced {
     pub owner: Option<Owner>,
 }
 
-/// `EventParticipantService.syncParticipants` without the mail: rows are created, updated and removed to match.
+/// `EventParticipantService.syncParticipants` without the mail: rows are created, updated and removed to match; without an owner no organizer row is added.
 pub async fn sync<C: sea_orm::ConnectionTrait>(
     db: &C,
     event_id: &str,
     participants: &[ParticipantInput],
-    owner_user_id: &str,
+    owner_user_id: Option<&str>,
 ) -> Result<Synced, sea_orm::DbErr> {
-    let owner = queries::user(db, owner_user_id).await?.and_then(|owner| {
+    let owner = match owner_user_id {
+        Some(id) => queries::user(db, id).await?,
+        None => None,
+    };
+    let owner = owner.and_then(|owner| {
         let email = normalize_email(Some(&owner.email));
         (!js_trim(&owner.email).is_empty()).then(|| Owner {
             name: trimmed_non_empty(Some(&owner.name))
