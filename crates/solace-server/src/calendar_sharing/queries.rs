@@ -7,7 +7,7 @@ use sea_orm::{
 
 use sea_orm::QueryOrder;
 
-use crate::db::entities::{calendar, calendar_event, user};
+use crate::db::entities::{calendar, calendar_event};
 
 pub async fn find<C: ConnectionTrait>(
     db: &C,
@@ -55,15 +55,14 @@ pub async fn set_share<C: ConnectionTrait>(
     active.update(db).await
 }
 
-/// The calendar an enabled share token unlocks, with its owner.
+/// The calendar an enabled share token unlocks.
 pub async fn shared<C: ConnectionTrait>(
     db: &C,
     token: &str,
-) -> Result<Option<(calendar::Model, Option<user::Model>)>, sea_orm::DbErr> {
+) -> Result<Option<calendar::Model>, sea_orm::DbErr> {
     calendar::Entity::find()
         .filter(calendar::Column::IcsShareToken.eq(token))
         .filter(calendar::Column::IcsShareEnabled.eq(true))
-        .find_also_related(user::Entity)
         .one(db)
         .await
 }
