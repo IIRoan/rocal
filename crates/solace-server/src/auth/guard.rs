@@ -21,33 +21,24 @@ pub struct RouteUser {
     pub name: String,
 }
 
-/// Resolved before validation runs but required after it, because Elysia validated the request before the guard answered.
-pub struct Auth(Result<RouteUser, AppError>);
-
-impl Auth {
-    pub fn require(self) -> Result<RouteUser, AppError> {
-        self.0
-    }
-}
-
-impl FromRequestParts<AppState> for Auth {
-    type Rejection = std::convert::Infallible;
+/// Handlers take it before their validated input, so the guard answers before validation does.
+impl FromRequestParts<AppState> for RouteUser {
+    type Rejection = AppError;
 
     async fn from_request_parts(
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let Some(active) = resolve(parts, state).await else {
-            return Ok(Self(Err(AppError::Unauthenticated)));
-        };
-        Ok(Self(step_up(state, &parts.headers, &active).await.map(
-            |()| RouteUser {
-                id: active.user.id.clone(),
-                session_id: active.session.id.clone(),
-                email: active.user.email.clone(),
-                name: active.user.name.clone(),
-            },
-        )))
+        let active = resolve(parts, state)
+            .await
+            .ok_or(AppError::Unauthenticated)?;
+        step_up(state, &parts.headers, &active).await?;
+        Ok(Self {
+            id: active.user.id,
+            session_id: active.session.id,
+            email: active.user.email,
+            name: active.user.name,
+        })
     }
 }
 

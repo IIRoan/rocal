@@ -9,7 +9,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::service;
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
 use crate::http::schemas::invitation_import_status_schema;
@@ -48,10 +48,9 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn import_ics(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<ImportInvitationRequest>,
 ) -> Result<Json<InvitationImportSummary>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::import_ics(&state, &user.id, body).await?))
 }
 
@@ -60,10 +59,9 @@ pub async fn import_ics(
 #[tracing::instrument(skip_all)]
 pub async fn decline_ics(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<DeclineInvitationRequest>,
 ) -> Result<Json<InvitationDeclined>, AppError> {
-    let user = auth.require()?;
     Ok(Json(
         service::decline_ics(&state, &user.id, &body.ics_content).await?,
     ))

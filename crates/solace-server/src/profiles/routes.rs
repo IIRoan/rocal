@@ -17,7 +17,7 @@ use utoipa_axum::routes;
 
 use super::avatars::{self, Picture};
 use super::service;
-use crate::auth::guard::{Auth, RouteUser};
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidPath, ValidQuery};
 use crate::http::rate_limit::{self, Limit};
@@ -78,10 +78,9 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn lookup(
     State(state): State<AppState>,
-    auth: Auth,
+    _: RouteUser,
     ValidJson(body): ValidJson<ProfileLookupRequest>,
 ) -> Result<Json<ProfileLookupResponse>, AppError> {
-    auth.require()?;
     Ok(Json(service::lookup(&state, &body.emails).await?))
 }
 
@@ -90,10 +89,9 @@ pub async fn lookup(
 #[tracing::instrument(skip_all)]
 pub async fn email_avatar(
     State(state): State<AppState>,
-    auth: Auth,
+    _: RouteUser,
     ValidQuery(query): ValidQuery<EmailAvatarQuery>,
 ) -> Result<Response, AppError> {
-    auth.require()?;
     let picture = avatars::stream_by_email(&state, &query.email, query.size).await?;
     Ok(served(picture, PROXY_CACHE))
 }
@@ -103,11 +101,10 @@ pub async fn email_avatar(
 #[tracing::instrument(skip_all)]
 pub async fn uploaded_avatar(
     State(state): State<AppState>,
-    auth: Auth,
+    _: RouteUser,
     ValidPath(params): ValidPath<AvatarIdParams>,
     ValidQuery(query): ValidQuery<AvatarSizeQuery>,
 ) -> Result<Response, AppError> {
-    auth.require()?;
     let picture = avatars::stream_uploaded(&state, &params.avatar_id, query.size).await?;
     Ok(served(picture, UPLOADED_CACHE))
 }
@@ -117,10 +114,9 @@ pub async fn uploaded_avatar(
 #[tracing::instrument(skip_all)]
 pub async fn upload_avatar(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<UploadAvatarRequest>,
 ) -> Result<Json<AvatarResponse>, AppError> {
-    let user = auth.require()?;
     enforce_write_limit(&user)?;
     Ok(Json(avatars::upload(&state, &user.id, &body.image).await?))
 }
@@ -130,9 +126,8 @@ pub async fn upload_avatar(
 #[tracing::instrument(skip_all)]
 pub async fn remove_avatar(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<AvatarResponse>, AppError> {
-    let user = auth.require()?;
     enforce_write_limit(&user)?;
     Ok(Json(avatars::remove(&state, &user.id).await?))
 }

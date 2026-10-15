@@ -14,7 +14,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::service;
-use crate::auth::guard::{Auth, MaybeSession};
+use crate::auth::guard::{MaybeSession, RouteUser};
 use crate::error::{AppError, plain_error};
 use crate::http::client_ip::client_ip;
 use crate::http::extract::ValidJson;
@@ -80,9 +80,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn account(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<MailAccountStatus>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::status(&state, &user).await?))
 }
 
@@ -91,10 +90,9 @@ pub async fn account(
 #[tracing::instrument(skip_all)]
 pub async fn bootstrap(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<MailBootstrapRequest>,
 ) -> Result<Json<MailSignup>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::bootstrap(&state, &user, body).await?))
 }
 
@@ -103,9 +101,8 @@ pub async fn bootstrap(
 #[tracing::instrument(skip_all)]
 pub async fn vault_backup(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<MailVaultBackup>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::vault_backup(&state, &user).await?))
 }
 
@@ -114,10 +111,9 @@ pub async fn vault_backup(
 #[tracing::instrument(skip_all)]
 pub async fn put_vault_backup(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<MailVaultBackupRequest>,
 ) -> Result<Json<MailVaultBackup>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::put_vault_backup(&state, &user, body).await?))
 }
 
@@ -175,8 +171,10 @@ pub async fn directory_key(
 /// A Stalwart bearer for the caller's own mailbox, minted server-side; refused while the session still needs passkey step-up.
 #[utoipa::path(get, path = "/api/mail/oauth/access-token", operation_id = "getMailAccessToken", tag = "Mail", responses((status = 200, body = MailAccessToken)))]
 #[tracing::instrument(skip_all)]
-pub async fn access_token(State(state): State<AppState>, auth: Auth) -> Result<Response, AppError> {
-    let user = auth.require()?;
+pub async fn access_token(
+    State(state): State<AppState>,
+    user: RouteUser,
+) -> Result<Response, AppError> {
     let email = user.email.trim();
     if email.is_empty() {
         return Ok(plain_error(

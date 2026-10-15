@@ -16,7 +16,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::{Owner, Subscription, subscribe};
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::mail::sync;
 use crate::state::AppState;
@@ -31,8 +31,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
 /// Signals that the caller's mailbox changed, with the synced deltas.
 #[utoipa::path(get, path = "/api/realtime/mail", operation_id = "streamMailEvents", tag = "Mail", responses((status = 200, content_type = "text/event-stream", body = String)))]
 #[tracing::instrument(skip_all)]
-pub async fn stream(State(state): State<AppState>, auth: Auth) -> Result<Response, AppError> {
-    let user = auth.require()?;
+pub async fn stream(State(state): State<AppState>, user: RouteUser) -> Result<Response, AppError> {
     let account_ids = sync::authorized_account_ids(&state, &user.id).await?;
     let subscriber_id = uuid::Uuid::new_v4().to_string();
     let (sender, events) = mpsc::unbounded_channel();

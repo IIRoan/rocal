@@ -9,7 +9,7 @@ use utoipa_axum::routes;
 
 use super::service;
 use crate::addresses;
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
 use crate::http::zod;
@@ -36,18 +36,19 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn create(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<CreateInviteRequest>,
 ) -> Result<Json<Invite>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::create(&state, &user, body).await?))
 }
 
 /// The caller's invites, newest first.
 #[utoipa::path(get, path = "/api/invites", operation_id = "listInvites", tag = "Invites", responses((status = 200, body = InviteList)))]
 #[tracing::instrument(skip_all)]
-pub async fn list(State(state): State<AppState>, auth: Auth) -> Result<Json<InviteList>, AppError> {
-    let user = auth.require()?;
+pub async fn list(
+    State(state): State<AppState>,
+    user: RouteUser,
+) -> Result<Json<InviteList>, AppError> {
     Ok(Json(service::list(&state, &user).await?))
 }
 
@@ -56,9 +57,8 @@ pub async fn list(State(state): State<AppState>, auth: Auth) -> Result<Json<Invi
 #[tracing::instrument(skip_all)]
 pub async fn revoke(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
 ) -> Result<Json<SuccessFlag>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::revoke(&state, &user, &id).await?))
 }

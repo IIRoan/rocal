@@ -11,7 +11,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::service;
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidQuery};
 use crate::http::schemas::{calendar_color_schema, encrypted_ics_import_body_schema};
@@ -62,9 +62,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn list(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<Vec<CalendarSubscription>>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::list(&state, &user).await?))
 }
 
@@ -73,10 +72,9 @@ pub async fn list(
 #[tracing::instrument(skip_all)]
 pub async fn create(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<CreateSubscriptionRequest>,
 ) -> Result<Json<CalendarSubscription>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::create(&state, &user, body).await?))
 }
 
@@ -85,11 +83,10 @@ pub async fn create(
 #[tracing::instrument(skip_all)]
 pub async fn update(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
     ValidJson(body): ValidJson<UpdateSubscriptionRequest>,
 ) -> Result<Json<CalendarSubscription>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::update(&state, &user, &id, body).await?))
 }
 
@@ -98,11 +95,10 @@ pub async fn update(
 #[tracing::instrument(skip_all)]
 pub async fn delete(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
     ValidQuery(query): ValidQuery<DeleteSubscriptionQuery>,
 ) -> Result<Json<DeleteSubscriptionResponse>, AppError> {
-    let user = auth.require()?;
     let delete_events = query.delete_events.unwrap_or(false);
     Ok(Json(
         service::delete(&state, &user, &id, delete_events).await?,
@@ -114,10 +110,9 @@ pub async fn delete(
 #[tracing::instrument(skip_all)]
 pub async fn sync(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
 ) -> Result<Json<SubscriptionSyncResult>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::sync(&state, &user, &id).await?))
 }
 
@@ -126,9 +121,8 @@ pub async fn sync(
 #[tracing::instrument(skip_all)]
 pub async fn import_ics(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<ImportIcsRequest>,
 ) -> Result<Json<ImportIcsResponse>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::import_ics(&state, &user, body).await?))
 }

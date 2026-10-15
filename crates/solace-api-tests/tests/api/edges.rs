@@ -4,7 +4,7 @@ use reqwest::Method;
 use serde_json::json;
 use solace_api_tests::client::{ApiResponse, ResponseResult};
 
-use crate::helpers::{Mode, TestApp, expect_unauthorized, ok};
+use crate::helpers::{Backend, Mode, TestApp, expect_unauthorized, ok};
 
 fn header<'a>(response: &'a ApiResponse, name: &str) -> Option<&'a str> {
     response.headers.get(name).and_then(|v| v.to_str().ok())
@@ -275,6 +275,63 @@ async fn malformed_json_is_a_parse_error() {
         )
     );
     assert!(body["requestId"].is_string() && body["timestamp"].is_string());
+}
+
+/// Rust's guard answers before a guarded route validates its body, query or path; Elysia validated first, so TypeScript answers 400.
+#[tokio::test]
+async fn guarded_routes_authenticate_before_they_validate() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    crate::passkeys::register(&app, &mut user, "Laptop").await;
+    let mut needs_step_up = app.anonymous();
+    ok(needs_step_up
+        .post(
+            "/api/auth/sign-in/email",
+            json!({"email": user.email, "password": user.password}),
+        )
+        .await
+        .and_then(|r| r.expect_status(200)));
+
+    for agent in [&mut app.anonymous(), &mut needs_step_up] {
+        let anonymous = agent.cookie(&app.session_cookie()).is_none();
+        let malformed = [
+            ok(agent.put("/api/settings", json!({"theme": 1})).await),
+            ok(agent.post("/api/events", json!({})).await),
+            ok(agent.get("/api/events/search").await),
+            ok(agent.get("/api/profiles/avatar").await),
+            ok(agent.get("/api/profiles/avatars/bad.id").await),
+        ];
+        for response in &malformed {
+            match (app.backend, anonymous) {
+                (Backend::TypeScript, _) => {
+                    assert_eq!(response.status.as_u16(), 400, "{}", response.text());
+                }
+                (Backend::Rust, true) => expect_unauthorized(response),
+                (Backend::Rust, false) => {
+                    ok(response.expect_error(403, "Forbidden", "Passkey verification required."));
+                }
+            }
+        }
+    }
+
+    let unparsable = reqwest::Client::new()
+        .put(format!("{}/api/settings", app.base_url))
+        .header("content-type", "application/json")
+        .body("{bad")
+        .send()
+        .await
+        .expect("request");
+    let expected = match app.backend {
+        Backend::TypeScript => 400,
+        Backend::Rust => 401,
+    };
+    assert_eq!(unparsable.status().as_u16(), expected);
+
+    let public = ok(app
+        .anonymous()
+        .post("/api/account/invite/claim", json!({}))
+        .await);
+    assert_eq!(public.status.as_u16(), 400, "{}", public.text());
 }
 
 #[tokio::test]

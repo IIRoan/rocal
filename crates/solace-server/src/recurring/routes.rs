@@ -12,7 +12,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::service;
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidQuery};
 use crate::http::schemas::{
@@ -77,10 +77,9 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[utoipa::path(post, path = "/api/recurring/validate", operation_id = "validateRecurrenceRule", tag = "Recurring", request_body = ValidateRecurrenceRequest, responses((status = 200, body = RecurrenceValidation)))]
 #[tracing::instrument(skip_all)]
 pub async fn validate(
-    auth: Auth,
+    _: RouteUser,
     ValidJson(body): ValidJson<ValidateRecurrenceRequest>,
 ) -> Result<Json<Value>, AppError> {
-    auth.require()?;
     Ok(Json(service::validate(&body.rule)))
 }
 
@@ -88,10 +87,9 @@ pub async fn validate(
 #[utoipa::path(post, path = "/api/recurring/preview", operation_id = "previewRecurrence", tag = "Recurring", request_body = PreviewRecurrenceRequest, responses((status = 200, body = RecurrencePreview)))]
 #[tracing::instrument(skip_all)]
 pub async fn preview(
-    auth: Auth,
+    _: RouteUser,
     ValidJson(body): ValidJson<PreviewRecurrenceRequest>,
 ) -> Result<Json<RecurrencePreview>, AppError> {
-    auth.require()?;
     Ok(Json(service::preview(&body)?))
 }
 
@@ -100,11 +98,10 @@ pub async fn preview(
 #[tracing::instrument(skip_all)]
 pub async fn edit(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
     ValidJson(body): ValidJson<EditRecurringRequest>,
 ) -> Result<Json<Event>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::edit(&state, &user, &id, &body).await?))
 }
 
@@ -113,18 +110,16 @@ pub async fn edit(
 #[tracing::instrument(skip_all)]
 pub async fn delete(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
     ValidQuery(query): ValidQuery<DeleteRecurringQuery>,
 ) -> Result<Json<RecurringDeleted>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::delete(&state, &user, &id, &query).await?))
 }
 
 /// The six fixed patterns the editors offer.
 #[utoipa::path(get, path = "/api/recurring/patterns", operation_id = "listRecurrencePatterns", tag = "Recurring", responses((status = 200, body = RecurrencePatterns)))]
 #[tracing::instrument(skip_all)]
-pub async fn patterns(auth: Auth) -> Result<Json<RecurrencePatterns>, AppError> {
-    auth.require()?;
+pub async fn patterns(_: RouteUser) -> Result<Json<RecurrencePatterns>, AppError> {
     Ok(Json(service::patterns()))
 }

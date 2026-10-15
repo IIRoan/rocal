@@ -43,15 +43,15 @@ async fn anonymous_callers_are_refused() {
         .await));
     expect_unauthorized(&ok(anon.get("/api/mail/oauth/access-token").await));
 
-    // Body validation runs before the session guard, so a malformed anonymous body gets the Zod answer.
-    let malformed = ok(anon
-        .put("/api/mail/account/vault-backup", json!({}))
-        .await
-        .and_then(|r| r.expect_error(400, "Validation Error", "Required")));
-    assert_eq!(
-        malformed["details"]["issues"][0]["path"],
-        json!("vaultVersion")
-    );
+    // Elysia validated before the guard, so TypeScript gives a malformed anonymous body the Zod answer; Rust's guard answers first.
+    let malformed = ok(anon.put("/api/mail/account/vault-backup", json!({})).await);
+    match app.backend {
+        Backend::TypeScript => {
+            let error = ok(malformed.expect_error(400, "Validation Error", "Required"));
+            assert_eq!(error["details"]["issues"][0]["path"], json!("vaultVersion"));
+        }
+        Backend::Rust => expect_unauthorized(&malformed),
+    }
 }
 
 #[tokio::test]
