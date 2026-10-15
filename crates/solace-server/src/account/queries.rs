@@ -10,13 +10,6 @@ use crate::db::entities::{
 use crate::events::queries as events;
 use crate::instant;
 
-pub async fn user<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-) -> Result<Option<user::Model>, sea_orm::DbErr> {
-    user::Entity::find_by_id(user_id).one(db).await
-}
-
 pub async fn mailbox<C: ConnectionTrait>(
     db: &C,
     user_id: &str,

@@ -29,7 +29,6 @@ impl<S: Send + Sync> FromRequestParts<S> for AuthBody {
     }
 }
 
-/// Applies to `/api/auth/*` only.
 pub async fn middleware(State(state): State<AppState>, request: Request, next: Next) -> Response {
     if !request.uri().path().starts_with("/api/auth/") {
         return next.run(request).await;
@@ -71,10 +70,11 @@ async fn prepare(state: &AppState, request: Request) -> Result<Request, Rejectio
     if let Some(rule) = rate_limit::rule_for(&path) {
         let ip = rate_limit::client_key_ip(request.headers(), state.config.is_production);
         let key = rate_limit::hashed_key(&state.config.auth_secret, &ip, &path);
-        match rate_limit::consume(&state.db, &key, rule).await {
-            Ok(None) => {}
-            Ok(Some(retry_after)) => return Err(Rejection::TooManyRequests(retry_after)),
-            Err(error) => return Err(ApiError::from(error).into()),
+        if let Some(retry_after) = rate_limit::consume(&state.db, &key, rule)
+            .await
+            .map_err(ApiError::from)?
+        {
+            return Err(Rejection::TooManyRequests(retry_after));
         }
     }
     let (mut parts, body) = request.into_parts();
@@ -101,12 +101,7 @@ async fn prepare(state: &AppState, request: Request) -> Result<Request, Rejectio
         check_origin(state, &parts.headers, parsed.as_ref(), parts.uri.query())?;
     }
     parts.extensions.insert(AuthBody(parsed));
-    let body = if reads_body {
-        Body::from(bytes)
-    } else {
-        Body::empty()
-    };
-    Ok(Request::from_parts(parts, body))
+    Ok(Request::from_parts(parts, Body::from(bytes)))
 }
 
 fn too_many_requests(retry_after: i64) -> Response {

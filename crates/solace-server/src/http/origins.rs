@@ -198,12 +198,7 @@ mod tests {
     use super::*;
 
     fn policy(production: bool, trusted: &[&str]) -> OriginPolicy {
-        let mut config = crate::config::Config::from_lookup(|name| match name {
-            "DATABASE_URL" => Some("postgres://localhost/solace_test".into()),
-            "BETTER_AUTH_SECRET" => Some("s".repeat(32)),
-            _ => None,
-        })
-        .unwrap();
+        let mut config = crate::config::Config::for_tests(&[]);
         config.is_production = production;
         config.backend_url = "http://localhost:4001".into();
         config.frontend_url = "http://localhost:4000".into();

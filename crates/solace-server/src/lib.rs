@@ -1,4 +1,4 @@
-//! The Solace API: `router()` and `openapi()` are shared by `main`, the API suite and `cargo xtask openapi`.
+//! The Solace API: `serve()` and `openapi()` are shared by `main`, the API suite and `cargo xtask openapi`.
 
 pub mod account;
 pub mod addresses;
@@ -84,8 +84,7 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
     api().split_for_parts().1
 }
 
-/// The full application with its middleware, as one router.
-pub fn router(state: AppState) -> Router {
+fn router(state: AppState) -> Router {
     let (routes, _) = api().split_for_parts();
     routes
         .route("/api", get(health::root_redirect))

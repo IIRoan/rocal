@@ -113,12 +113,10 @@ fn legacy_clears(state: &AppState, request: &HeaderMap) -> Vec<String> {
     let Some(host) = url::Url::parse(&state.config.backend_url)
         .ok()
         .and_then(|url| url.host_str().map(str::to_owned))
-        .filter(|host| host != "localhost")
     else {
         return Vec::new();
     };
-    let labels: Vec<&str> = host.split('.').collect();
-    if labels.len() < 2 || labels[labels.len() - 2..].join(".") == host {
+    if cookies::registrable_domain(&host).is_none_or(|root| root == host) {
         return Vec::new();
     }
     let mut names: Vec<String> = LEGACY_SUFFIXES

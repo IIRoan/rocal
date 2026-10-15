@@ -13,6 +13,7 @@ use super::queries;
 use crate::addresses;
 use crate::auth::guard::{RouteUser, has_passkeys, step_up_verified};
 use crate::auth::session::ActiveSession;
+use crate::auth::store;
 use crate::error::AppError;
 use crate::invites;
 use crate::mail;
@@ -94,22 +95,18 @@ pub async fn status(
 
 /// `deleteAccount`: the Stalwart mailbox first, so a failure there keeps the whole account for a retry.
 pub async fn delete(state: &AppState, user: &RouteUser) -> Result<DeleteAccountResponse, AppError> {
-    let existing = queries::user(&state.db, &user.id)
+    let existing = store::find_user(&state.db, &user.id)
         .await?
         .ok_or_else(|| AppError::NotFound("User account not found".into()))?;
     let mailbox = queries::mailbox(&state.db, &user.id).await?;
     // Read before the mailbox and its directory entry are removed.
-    let mut emails: Vec<String> = Vec::new();
-    for email in [Some(&existing.email), mailbox.as_ref().map(|m| &m.email)]
+    let mut emails: Vec<String> = [Some(&existing.email), mailbox.as_ref().map(|m| &m.email)]
         .into_iter()
         .flatten()
         .map(|email| email.trim().to_lowercase())
         .filter(|email| !email.is_empty())
-    {
-        if !emails.contains(&email) {
-            emails.push(email);
-        }
-    }
+        .collect();
+    emails.dedup();
     mail::service::delete_mailbox_for_user(state, &user.id).await?;
     let transaction = state.db.begin().await?;
     avatars::delete_current(state, &transaction, &user.id).await?;
@@ -208,35 +205,18 @@ mod tests {
     use sea_orm::{ConnectionTrait, Statement};
 
     use super::*;
-    use crate::config::Config;
     use crate::db::scratch::ScratchDatabase;
-    use crate::integrations::storage::tests::{LocalBucket, config as bucket_config};
+    use crate::integrations::storage::tests::LocalBucket;
+    use crate::profiles::avatars::tests::state_with_bucket;
 
     const USER: &str = "account-test-user";
 
     fn route_user() -> RouteUser {
         RouteUser {
             id: USER.into(),
-            session_id: "account-test-session".into(),
             email: "account-test@example.com".into(),
             name: "Account Test".into(),
         }
-    }
-
-    async fn state(database: &ScratchDatabase, bucket: &LocalBucket) -> AppState {
-        let endpoint = bucket.start().await;
-        let bucket_settings = bucket_config(&endpoint);
-        let config = Config::from_lookup(|name| match name {
-            "DATABASE_URL" => Some(database.url.clone()),
-            "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
-            "AVATAR_BUCKET" => Some(bucket_settings.name.clone()),
-            "AVATAR_BUCKET_ENDPOINT" => Some(bucket_settings.endpoint.clone()),
-            "AVATAR_BUCKET_ACCESS_KEY_ID" => Some(bucket_settings.access_key_id.clone()),
-            "AVATAR_BUCKET_SECRET_ACCESS_KEY" => Some(bucket_settings.secret_access_key.clone()),
-            _ => None,
-        })
-        .unwrap();
-        AppState::new(config, database.db.clone()).unwrap()
     }
 
     async fn users(state: &AppState) -> i64 {
@@ -256,7 +236,7 @@ mod tests {
     #[tokio::test]
     async fn deleting_a_vanished_account_is_not_found() {
         let database = ScratchDatabase::create().await;
-        let state = state(&database, &LocalBucket::default()).await;
+        let state = state_with_bucket(&database, &LocalBucket::default()).await;
         let error = delete(&state, &route_user()).await.unwrap_err();
         assert!(
             matches!(&error, AppError::NotFound(message) if message == "User account not found"),
@@ -268,7 +248,7 @@ mod tests {
     async fn a_failed_avatar_deletion_keeps_the_account() {
         let database = ScratchDatabase::create().await;
         let bucket = LocalBucket::default();
-        let state = state(&database, &bucket).await;
+        let state = state_with_bucket(&database, &bucket).await;
         state
             .db
             .execute_unprepared(&format!(

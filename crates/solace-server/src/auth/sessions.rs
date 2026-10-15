@@ -93,8 +93,8 @@ pub async fn list_sessions(State(state): State<AppState>, headers: HeaderMap) ->
         let active = require_fresh_session(&state, &headers, &mut cookies).await?;
         let sessions: Vec<AuthSession> = store::active_sessions(&state.db, &active.user.id)
             .await?
-            .into_iter()
-            .map(|session| session_dto(&session))
+            .iter()
+            .map(session::auth_session)
             .collect();
         Ok(json(&sessions))
     }
@@ -148,17 +148,4 @@ pub async fn revoke_other_sessions(State(state): State<AppState>, headers: Heade
     }
     .await;
     hooks::with_cookies(outcome, cookies)
-}
-
-fn session_dto(session: &crate::db::entities::session::Model) -> AuthSession {
-    AuthSession {
-        id: session.id.clone().into(),
-        token: session.token.clone(),
-        user_id: session.user_id.clone().into(),
-        expires_at: instant::iso(session.expires_at),
-        created_at: instant::iso(session.created_at),
-        updated_at: instant::iso(session.updated_at),
-        ip_address: None,
-        user_agent: None,
-    }
 }

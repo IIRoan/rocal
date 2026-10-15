@@ -104,7 +104,7 @@ pub fn scrub_breadcrumb(mut breadcrumb: Breadcrumb) -> Option<Breadcrumb> {
             })
             .collect()
     } else if HTTP_BREADCRUMB_CATEGORIES.contains(&category.as_str()) {
-        let mut rest = data.clone();
+        let mut rest = data;
         let url = rest.remove("url");
         let mut sanitized = sanitize_map(&rest);
         if let Some(url) = url.as_ref().and_then(Value::as_str) {

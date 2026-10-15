@@ -14,7 +14,7 @@ pub mod pipeline;
 mod rate_limit;
 pub mod session;
 mod sessions;
-mod store;
+pub(crate) mod store;
 
 use axum::Json;
 use axum::http::{HeaderValue, StatusCode, header};

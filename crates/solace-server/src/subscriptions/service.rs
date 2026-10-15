@@ -917,7 +917,6 @@ pub(crate) mod tests {
         state.safe_fetch = safe_fetch(public_lookup());
         let user = RouteUser {
             id: "feed-test-user".into(),
-            session_id: "feed-test-session".into(),
             email: "feed-test@example.com".into(),
             name: "Feed Test".into(),
         };

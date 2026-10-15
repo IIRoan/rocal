@@ -15,6 +15,15 @@ pub struct Limit {
     pub window: Duration,
 }
 
+impl Limit {
+    pub const fn per_minute(requests: u32) -> Self {
+        Self {
+            requests,
+            window: Duration::from_secs(60),
+        }
+    }
+}
+
 struct Entry {
     count: u32,
     reset: Instant,
@@ -85,10 +94,7 @@ mod tests {
 
     #[test]
     fn requests_past_the_limit_wait_for_the_window() {
-        let limit = Limit {
-            requests: 2,
-            window: Duration::from_secs(60),
-        };
+        let limit = Limit::per_minute(2);
         assert!(enforce("test-store", "a", limit).is_ok());
         assert!(enforce("test-store", "a", limit).is_ok());
         match enforce("test-store", "a", limit) {
@@ -109,10 +115,7 @@ mod tests {
 
     #[test]
     fn a_key_resets_once_its_window_has_passed() {
-        let limit = Limit {
-            requests: 1,
-            window: Duration::from_secs(60),
-        };
+        let limit = Limit::per_minute(1);
         let start = Instant::now();
         let at = |offset: Duration| enforce_at("window-store", "a", limit, start + offset);
         assert!(at(Duration::ZERO).is_ok());

@@ -5,45 +5,20 @@ use std::sync::LazyLock;
 
 use icu_collator::options::{CollatorOptions, Strength};
 use icu_collator::{Collator, CollatorBorrowed};
-use regex_lite::Regex;
 use solace_api_types::events::{EventParticipant, ParticipantInput};
 
 use super::queries;
 use crate::addresses::is_reserved_system_email;
-use crate::auth::cookies::encode_uri_component;
 use crate::db::entities::{event_participant, user};
 use crate::http::zod::js_trim;
 use crate::instant;
-
-const UPLOADED_AVATAR_PATH_PREFIX: &str = "/api/profiles/avatars/";
-const MAX_PUBLIC_IMAGE_URL_LENGTH: usize = 2048;
+use crate::profiles::service::participant_image;
 
 /// `localeCompare(…, { sensitivity: "base" })`: ICU root collation, ignoring case and accents.
 static COLLATOR: LazyLock<Option<CollatorBorrowed<'static>>> = LazyLock::new(|| {
     let mut options = CollatorOptions::default();
     options.strength = Some(Strength::Primary);
     Collator::try_new(Default::default(), options).ok()
-});
-
-static BLOCKED_IMAGE_HOSTS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
-    [
-        r"(?i)^localhost$",
-        r"^127\.",
-        r"^0\.",
-        r"^10\.",
-        r"^192\.168\.",
-        r"^172\.(1[6-9]|2\d|3[0-1])\.",
-        r"^169\.254\.",
-        r"^::1$",
-        r"^\[::1\]$",
-        r"(?i)\.localhost$",
-        r"(?i)\.local$",
-        r"(?i)\.internal$",
-        r"(?i)^metadata\.google\.internal$",
-    ]
-    .iter()
-    .filter_map(|pattern| Regex::new(pattern).ok())
-    .collect()
 });
 
 /// The values a participant row or input is resolved to.
@@ -176,54 +151,6 @@ pub fn resolve_inputs(owner: Option<&Owner>, participants: &[ParticipantInput]) 
         .into_iter()
         .filter_map(|email| deduped.remove(&email))
         .collect()
-}
-
-/// `sanitizePublicImageUrl`: only public HTTPS URLs without credentials survive.
-fn is_public_image_url(value: Option<&str>) -> bool {
-    let Some(trimmed) = value.map(js_trim).filter(|v| !v.is_empty()) else {
-        return false;
-    };
-    if crate::http::zod::js_length(trimmed) > MAX_PUBLIC_IMAGE_URL_LENGTH {
-        return false;
-    }
-    let Ok(url) = url::Url::parse(trimmed) else {
-        return false;
-    };
-    if url.scheme() != "https" || !url.username().is_empty() || url.password().is_some() {
-        return false;
-    }
-    let Some(host) = url.host_str().map(str::trim).filter(|h| !h.is_empty()) else {
-        return false;
-    };
-    if BLOCKED_IMAGE_HOSTS
-        .iter()
-        .any(|pattern| pattern.is_match(host))
-    {
-        return false;
-    }
-    let ipv6 = host
-        .trim_start_matches('[')
-        .trim_end_matches(']')
-        .to_lowercase();
-    !(ipv6.contains(':')
-        && (ipv6.starts_with("fc")
-            || ipv6.starts_with("fd")
-            || ipv6.starts_with("fe80")
-            || ipv6 == "::1"))
-}
-
-/// The participant's picture as a Solace path, never a remote URL.
-fn participant_image(image: Option<&str>, email: &str) -> Option<String> {
-    if image.is_some_and(|image| image.starts_with(UPLOADED_AVATAR_PATH_PREFIX)) {
-        return image.map(str::to_owned);
-    }
-    let email = normalize_email(Some(email));
-    (is_public_image_url(image) && !email.is_empty()).then(|| {
-        format!(
-            "/api/profiles/avatar?email={}",
-            encode_uri_component(&email)
-        )
-    })
 }
 
 /// `mapEventParticipant`.

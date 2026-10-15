@@ -4,11 +4,7 @@ use reqwest::Method;
 use serde_json::json;
 use solace_api_tests::client::{ApiResponse, ResponseResult};
 
-use crate::helpers::{Backend, Mode, TestApp, expect_unauthorized, ok};
-
-fn header<'a>(response: &'a ApiResponse, name: &str) -> Option<&'a str> {
-    response.headers.get(name).and_then(|v| v.to_str().ok())
-}
+use crate::helpers::{Backend, Mode, TestApp, expect_unauthorized, header, ok};
 
 fn assert_security_headers(app: &TestApp, response: &ApiResponse, corp: &str) {
     assert_eq!(header(response, "x-content-type-options"), Some("nosniff"));

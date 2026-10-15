@@ -293,7 +293,7 @@ pub async fn delete_current<C: ConnectionTrait>(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::collections::BTreeSet;
     use std::sync::atomic::Ordering;
 
@@ -336,23 +336,28 @@ mod tests {
         _database: ScratchDatabase,
     }
 
+    /// App state on `database` with `bucket`, started here, as the avatar bucket.
+    pub(crate) async fn state_with_bucket(
+        database: &ScratchDatabase,
+        bucket: &LocalBucket,
+    ) -> AppState {
+        let endpoint = bucket.start().await;
+        let bucket = bucket_config(&endpoint);
+        let config = Config::for_tests(&[
+            ("DATABASE_URL", &database.url),
+            ("AVATAR_BUCKET", &bucket.name),
+            ("AVATAR_BUCKET_ENDPOINT", &bucket.endpoint),
+            ("AVATAR_BUCKET_ACCESS_KEY_ID", &bucket.access_key_id),
+            ("AVATAR_BUCKET_SECRET_ACCESS_KEY", &bucket.secret_access_key),
+        ]);
+        AppState::new(config, database.db.clone()).unwrap()
+    }
+
     /// A user whose current picture is `previous`, stored in a local bucket, on a fresh database.
     async fn fixture() -> Fixture {
         let database = ScratchDatabase::create().await;
         let bucket = LocalBucket::default();
-        let endpoint = bucket.start().await;
-        let bucket_settings = bucket_config(&endpoint);
-        let config = Config::from_lookup(|name| match name {
-            "DATABASE_URL" => Some(database.url.clone()),
-            "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
-            "AVATAR_BUCKET" => Some(bucket_settings.name.clone()),
-            "AVATAR_BUCKET_ENDPOINT" => Some(bucket_settings.endpoint.clone()),
-            "AVATAR_BUCKET_ACCESS_KEY_ID" => Some(bucket_settings.access_key_id.clone()),
-            "AVATAR_BUCKET_SECRET_ACCESS_KEY" => Some(bucket_settings.secret_access_key.clone()),
-            _ => None,
-        })
-        .unwrap();
-        let state = AppState::new(config, database.db.clone()).unwrap();
+        let state = state_with_bucket(&database, &bucket).await;
         state
             .db
             .execute_unprepared(&format!(

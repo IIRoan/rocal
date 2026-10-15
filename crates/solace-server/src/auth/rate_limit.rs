@@ -8,6 +8,7 @@ use hmac::{KeyInit, Mac};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, FromQueryResult, Statement};
 
 use crate::http::client_ip::TRUSTED_HEADERS;
+use crate::instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rule {
@@ -20,129 +21,31 @@ const DEFAULT: Rule = Rule {
     max: 100,
 };
 
+const fn rule(window: i64, max: i64) -> Option<Rule> {
+    Some(Rule { window, max })
+}
+
 /// Per-path rules relative to `/api/auth`; `None` disables limiting (session checks write nothing).
 const RULES: [(&str, Option<Rule>); 19] = [
     ("/get-session", None),
-    ("/sign-in/*", Some(Rule { window: 60, max: 5 })),
-    (
-        "/sign-up/*",
-        Some(Rule {
-            window: 3600,
-            max: 5,
-        }),
-    ),
-    (
-        "/passkey/generate-authenticate-options",
-        Some(Rule {
-            window: 60,
-            max: 10,
-        }),
-    ),
-    (
-        "/passkey/verify-authentication",
-        Some(Rule {
-            window: 60,
-            max: 10,
-        }),
-    ),
-    (
-        "/passkey/generate-register-options",
-        Some(Rule {
-            window: 60,
-            max: 10,
-        }),
-    ),
-    (
-        "/passkey/verify-registration",
-        Some(Rule {
-            window: 60,
-            max: 10,
-        }),
-    ),
-    (
-        "/one-time-token/verify",
-        Some(Rule {
-            window: 60,
-            max: 10,
-        }),
-    ),
-    (
-        "/request-password-reset",
-        Some(Rule {
-            window: 900,
-            max: 3,
-        }),
-    ),
-    (
-        "/forget-password",
-        Some(Rule {
-            window: 900,
-            max: 3,
-        }),
-    ),
-    (
-        "/reset-password",
-        Some(Rule {
-            window: 900,
-            max: 5,
-        }),
-    ),
-    (
-        "/reset-password/*",
-        Some(Rule {
-            window: 900,
-            max: 10,
-        }),
-    ),
-    (
-        "/send-verification-email",
-        Some(Rule {
-            window: 900,
-            max: 3,
-        }),
-    ),
-    (
-        "/verify-email",
-        Some(Rule {
-            window: 900,
-            max: 10,
-        }),
-    ),
-    (
-        "/change-password",
-        Some(Rule {
-            window: 900,
-            max: 5,
-        }),
-    ),
-    (
-        "/change-email",
-        Some(Rule {
-            window: 900,
-            max: 3,
-        }),
-    ),
-    (
-        "/verify-password",
-        Some(Rule {
-            window: 900,
-            max: 5,
-        }),
-    ),
-    (
-        "/delete-user",
-        Some(Rule {
-            window: 900,
-            max: 3,
-        }),
-    ),
-    (
-        "/delete-user/callback",
-        Some(Rule {
-            window: 900,
-            max: 5,
-        }),
-    ),
+    ("/sign-in/*", rule(60, 5)),
+    ("/sign-up/*", rule(3600, 5)),
+    ("/passkey/generate-authenticate-options", rule(60, 10)),
+    ("/passkey/verify-authentication", rule(60, 10)),
+    ("/passkey/generate-register-options", rule(60, 10)),
+    ("/passkey/verify-registration", rule(60, 10)),
+    ("/one-time-token/verify", rule(60, 10)),
+    ("/request-password-reset", rule(900, 3)),
+    ("/forget-password", rule(900, 3)),
+    ("/reset-password", rule(900, 5)),
+    ("/reset-password/*", rule(900, 10)),
+    ("/send-verification-email", rule(900, 3)),
+    ("/verify-email", rule(900, 10)),
+    ("/change-password", rule(900, 5)),
+    ("/change-email", rule(900, 3)),
+    ("/verify-password", rule(900, 5)),
+    ("/delete-user", rule(900, 3)),
+    ("/delete-user/callback", rule(900, 5)),
 ];
 
 /// Better Auth's built-in stricter defaults, which Solace's rules override where both match.
@@ -209,17 +112,8 @@ fn normalize(address: IpAddr) -> String {
         IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
             Some(v4) => v4.to_string(),
             None => {
-                let segments = v6.segments();
-                (0..8)
-                    .map(|i| {
-                        if i < 4 {
-                            format!("{:04x}", segments[i])
-                        } else {
-                            "0000".into()
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(":")
+                let [a, b, c, d, ..] = v6.segments();
+                format!("{a:04x}:{b:04x}:{c:04x}:{d:04x}:0000:0000:0000:0000")
             }
         },
     }
@@ -249,8 +143,7 @@ pub async fn consume(
     key: &str,
     rule: Rule,
 ) -> Result<Option<i64>, sea_orm::DbErr> {
-    let now = time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000;
-    let now = i64::try_from(now).unwrap_or(i64::MAX);
+    let now = instant::unix_millis(instant::now());
     let window_start = now - rule.window * 1000;
     // In ON CONFLICT … SET, column references are the pre-update values.
     let row = Counter::find_by_statement(Statement::from_sql_and_values(

@@ -2,8 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use axum::extract::{FromRequestParts, Request};
-use axum::http::request::Parts;
+use axum::extract::Request;
 use axum::http::{HeaderValue, header};
 use axum::middleware::Next;
 use axum::response::Response;
@@ -12,15 +11,9 @@ use axum::response::Response;
 pub struct ResponseCookies(Arc<Mutex<Vec<String>>>);
 
 impl ResponseCookies {
-    pub fn push(&self, cookie: String) {
-        if let Ok(mut cookies) = self.0.lock() {
-            cookies.push(cookie);
-        }
-    }
-
     pub fn extend(&self, cookies: impl IntoIterator<Item = String>) {
-        for cookie in cookies {
-            self.push(cookie);
+        if let Ok(mut collected) = self.0.lock() {
+            collected.extend(cookies);
         }
     }
 
@@ -42,12 +35,4 @@ pub async fn middleware(mut request: Request, next: Next) -> Response {
         }
     }
     response
-}
-
-impl<S: Send + Sync> FromRequestParts<S> for ResponseCookies {
-    type Rejection = std::convert::Infallible;
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(parts.extensions.get::<Self>().cloned().unwrap_or_default())
-    }
 }

@@ -8,16 +8,6 @@ use sea_orm::{
 use crate::db::entities::{invite, mail_directory_entry, user};
 use crate::instant;
 
-pub async fn user_with_email<C: ConnectionTrait>(
-    db: &C,
-    email: &str,
-) -> Result<Option<user::Model>, sea_orm::DbErr> {
-    user::Entity::find()
-        .filter(user::Column::Email.eq(email))
-        .one(db)
-        .await
-}
-
 pub async fn directory_entry_exists<C: ConnectionTrait>(
     db: &C,
     email: &str,

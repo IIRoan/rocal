@@ -59,10 +59,17 @@ fn policy_list(name: &str) -> HashSet<String> {
 /// Emails, encoded emails, bearer tokens and URLs out of free-form text.
 pub fn redact_pii(text: &str) -> String {
     let patterns = &*PATTERNS;
-    let text = patterns.email.replace_all(text, "[email]");
-    let text = patterns.encoded_email.replace_all(&text, "[email]");
+    let text = redact_emails(text);
     let text = patterns.bearer.replace_all(&text, "Bearer [redacted]");
     patterns.url.replace_all(&text, "[url]").into_owned()
+}
+
+fn redact_emails(text: &str) -> String {
+    let text = PATTERNS.email.replace_all(text, "[email]");
+    PATTERNS
+        .encoded_email
+        .replace_all(&text, "[email]")
+        .into_owned()
 }
 
 /// Strips the query string and emails in path params, for absolute and relative URLs.
@@ -71,15 +78,7 @@ pub fn sanitize_request_url(raw: &str) -> String {
         if url.query().is_some() {
             url.set_query(Some("[redacted]"));
         }
-        let patterns = &*PATTERNS;
-        let path = patterns
-            .email
-            .replace_all(url.path(), "[email]")
-            .into_owned();
-        let path = patterns
-            .encoded_email
-            .replace_all(&path, "[email]")
-            .into_owned();
+        let path = redact_emails(url.path());
         url.set_path(&path);
         return url.to_string();
     }

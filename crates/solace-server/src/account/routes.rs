@@ -1,7 +1,5 @@
 //! `/api/account`: the public sign-up helpers, the session's auth status, and deleting the account.
 
-use std::time::Duration;
-
 use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
@@ -26,10 +24,7 @@ use crate::invites;
 use crate::request_schema;
 use crate::state::AppState;
 
-const PUBLIC_INVITE_LIMIT: Limit = Limit {
-    requests: 30,
-    window: Duration::from_secs(60),
-};
+const PUBLIC_INVITE_LIMIT: Limit = Limit::per_minute(30);
 
 request_schema!(EmailAvailabilityQuery => zod::object([("email", zod::string().min(1).max(320))]).strict());
 
@@ -100,11 +95,7 @@ pub async fn validate_invite(
     headers: HeaderMap,
     ValidQuery(query): ValidQuery<InviteTokenQuery>,
 ) -> Result<Response, AppError> {
-    if let Err(AppError::RateLimited { message, .. }) = rate_limit::enforce(
-        "account-invite-public",
-        &format!("validate:{}", client_ip(&headers)),
-        PUBLIC_INVITE_LIMIT,
-    ) {
+    if let Some(message) = over_public_invite_limit(&headers, "validate") {
         let body = InviteValidation::Invalid(InviteInvalid {
             valid: false,
             reason: message,
@@ -122,11 +113,7 @@ pub async fn claim_invite(
     headers: HeaderMap,
     ValidJson(body): ValidJson<ClaimInviteRequest>,
 ) -> Result<Response, AppError> {
-    if let Err(AppError::RateLimited { message, .. }) = rate_limit::enforce(
-        "account-invite-public",
-        &format!("claim:{}", client_ip(&headers)),
-        PUBLIC_INVITE_LIMIT,
-    ) {
+    if let Some(message) = over_public_invite_limit(&headers, "claim") {
         let body = InviteClaimResult::Refused(InviteClaimRefused {
             success: false,
             reason: message,
@@ -134,6 +121,18 @@ pub async fn claim_invite(
         return Ok((StatusCode::TOO_MANY_REQUESTS, Json(body)).into_response());
     }
     Ok(Json(invites::service::claim(&state, &body).await?).into_response())
+}
+
+/// The limiter's message when this client is over its budget for `action`; the public invite routes answer it in their own shape.
+fn over_public_invite_limit(headers: &HeaderMap, action: &str) -> Option<String> {
+    match rate_limit::enforce(
+        "account-invite-public",
+        &format!("{action}:{}", client_ip(headers)),
+        PUBLIC_INVITE_LIMIT,
+    ) {
+        Err(AppError::RateLimited { message, .. }) => Some(message),
+        _ => None,
+    }
 }
 
 /// Deletes the caller's account with its Stalwart mailbox and stored avatar; any body or query is ignored.

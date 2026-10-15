@@ -1221,7 +1221,6 @@ pub mod tests {
     fn owner(email: &str) -> RouteUser {
         RouteUser {
             id: OWNER.into(),
-            session_id: "mail-test-session".into(),
             email: email.into(),
             name: "Alice Example".into(),
         }

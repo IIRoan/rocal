@@ -16,7 +16,6 @@ use crate::state::AppState;
 #[derive(Debug, Clone)]
 pub struct RouteUser {
     pub id: String,
-    pub session_id: String,
     pub email: String,
     pub name: String,
 }
@@ -29,13 +28,17 @@ impl FromRequestParts<AppState> for RouteUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let active = resolve(parts, state)
+        // A failed lookup is no session here, as `resolveAuthenticatedSession` treats it.
+        let active = lookup(parts, state)
             .await
+            .unwrap_or_else(|error| {
+                tracing::debug!(error = %crate::telemetry::redact_pii(&error.to_string()), "Session resolution failed");
+                None
+            })
             .ok_or(AppError::Unauthenticated)?;
         step_up(state, &parts.headers, &active).await?;
         Ok(Self {
             id: active.user.id,
-            session_id: active.session.id,
             email: active.user.email,
             name: active.user.name,
         })
@@ -77,14 +80,6 @@ pub async fn optional_session(
         response_cookies.extend(lookup.cookies);
     }
     Ok(lookup.session)
-}
-
-/// The guard treats a failed lookup as no session, as `resolveAuthenticatedSession` does.
-async fn resolve(parts: &mut Parts, state: &AppState) -> Option<ActiveSession> {
-    lookup(parts, state).await.unwrap_or_else(|error| {
-        tracing::debug!(error = %crate::telemetry::redact_pii(&error.to_string()), "Session resolution failed");
-        None
-    })
 }
 
 /// The guard's 403 for a session of an account with a passkey that has not used one.

@@ -6,12 +6,12 @@ use solace_api_types::settings::{UpdateSettingsRequest, UserSettings};
 
 use super::queries;
 use crate::auth::guard::RouteUser;
-use crate::db::entities::{calendar, user_settings};
+use crate::db::entities::user_settings;
+use crate::entity_metadata::is_mail_invitation_staging_calendar;
 use crate::error::AppError;
 use crate::instant;
 use crate::state::AppState;
 
-/// The caller's settings, created with the defaults if none exist.
 pub async fn get(state: &AppState, user: &RouteUser) -> Result<UserSettings, AppError> {
     let settings = match queries::find(&state.db, &user.id).await? {
         Some(settings) => settings,
@@ -57,7 +57,14 @@ pub async fn update(
                 "defaultCalendarId",
             ));
         };
-        if calendar.kind != "owned" || is_invitation_staging(&calendar) {
+        if calendar.kind != "owned"
+            || is_mail_invitation_staging_calendar(
+                &calendar.kind,
+                calendar.is_sync_only,
+                calendar.is_visible,
+                &calendar.name,
+            )
+        {
             return Err(AppError::field(
                 "The default calendar must be one of your editable calendars.",
                 "defaultCalendarId",
@@ -65,14 +72,12 @@ pub async fn update(
         }
     }
     let now = instant::now();
-    if request.event_encryption_mode.is_none() {
-        return Ok(record(
-            queries::upsert(&state.db, &user.id, request, now).await?,
-        ));
-    }
-    Ok(record(
-        queries::upsert_closing_share_links(&state.db, &user.id, request, now).await?,
-    ))
+    let settings = if request.event_encryption_mode.is_none() {
+        queries::upsert(&state.db, &user.id, request, now).await?
+    } else {
+        queries::upsert_closing_share_links(&state.db, &user.id, request, now).await?
+    };
+    Ok(record(settings))
 }
 
 fn check_working_days(days: &str) -> Result<(), AppError> {
@@ -94,14 +99,6 @@ fn check_working_days(days: &str) -> Result<(), AppError> {
             "workingDays",
         ))
     }
-}
-
-/// `isMailInvitationStagingCalendar`: the hidden `Invitations` calendar invites are filed into.
-fn is_invitation_staging(calendar: &calendar::Model) -> bool {
-    calendar.kind == "owned"
-        && !calendar.is_sync_only
-        && !calendar.is_visible
-        && calendar.name == "Invitations"
 }
 
 pub async fn reset(state: &AppState, user: &RouteUser) -> Result<SuccessMessage, AppError> {

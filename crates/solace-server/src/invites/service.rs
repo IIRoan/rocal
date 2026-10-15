@@ -12,6 +12,7 @@ use solace_api_types::auth::SuccessFlag;
 use super::queries;
 use crate::addresses;
 use crate::auth::guard::RouteUser;
+use crate::auth::store;
 use crate::db::entities::invite;
 use crate::email;
 use crate::error::AppError;
@@ -23,7 +24,6 @@ const EXPIRY_DAYS: i64 = 7;
 /// Sign-up must follow the claim within this window.
 const CLAIM_WINDOW_MINUTES: i64 = 15;
 
-/// Invites someone outside Solace and mails them the link; a failed mail is a warning, not an error.
 pub async fn create(
     state: &AppState,
     user: &RouteUser,
@@ -77,7 +77,10 @@ async fn insert(state: &AppState, invited_by: &str, email: &str) -> Result<Invit
             "Cannot send an invite to a reserved system email address.",
         ));
     }
-    if queries::user_with_email(&state.db, &email).await?.is_some() {
+    if store::find_user_by_email(&state.db, &email)
+        .await?
+        .is_some()
+    {
         return Err(AppError::Conflict(
             "That email address already has an account.".into(),
         ));
@@ -97,7 +100,6 @@ async fn insert(state: &AppState, invited_by: &str, email: &str) -> Result<Invit
     Ok(record(created))
 }
 
-/// The caller's invites, newest first.
 pub async fn list(state: &AppState, user: &RouteUser) -> Result<InviteList, AppError> {
     let invites = queries::sent_by(&state.db, &user.id).await?;
     Ok(InviteList {
@@ -105,7 +107,6 @@ pub async fn list(state: &AppState, user: &RouteUser) -> Result<InviteList, AppE
     })
 }
 
-/// Revokes one of the caller's invites unless it was already accepted.
 pub async fn revoke(state: &AppState, user: &RouteUser, id: &str) -> Result<SuccessFlag, AppError> {
     let Some(found) = queries::by_id(&state.db, id).await? else {
         return Err(AppError::NotFound("Invite not found.".into()));
@@ -208,7 +209,7 @@ pub async fn claim(
     if addresses::is_reserved_system_email(&chosen, None) {
         return Ok(refuse("That email address is reserved."));
     }
-    if queries::user_with_email(&state.db, &chosen)
+    if store::find_user_by_email(&state.db, &chosen)
         .await?
         .is_some()
     {
@@ -241,12 +242,9 @@ pub async fn signup_refusal(
     if addresses::is_reserved_system_email(&normalized, None) {
         return Ok(Some("That email address is reserved."));
     }
-    Ok(match claimed_invite(state, &normalized).await? {
-        Some(_) => None,
-        None => Some(
-            "An invite is required to create an account. Please use your invite token before signing up.",
-        ),
-    })
+    Ok(claimed_invite(state, &normalized).await?.is_none().then_some(
+        "An invite is required to create an account. Please use your invite token before signing up.",
+    ))
 }
 
 /// `markInviteAccepted`: accepting the invite approves the account for a mailbox, so nobody approves by hand.
@@ -267,7 +265,7 @@ pub async fn mark_accepted(
 
 /// Whether an address is free as a Solace account or mailbox, for the sign-up form.
 pub async fn address_taken(state: &AppState, email: &str) -> Result<bool, sea_orm::DbErr> {
-    if queries::user_with_email(&state.db, email).await?.is_some() {
+    if store::find_user_by_email(&state.db, email).await?.is_some() {
         return Ok(true);
     }
     queries::directory_entry_exists(&state.db, email).await

@@ -32,8 +32,6 @@ pub enum AppError {
     #[error("{0}")]
     NotFound(String),
     #[error("{0}")]
-    Unauthorized(String),
-    #[error("{0}")]
     Forbidden(String),
     #[error("{0}")]
     Conflict(String),
@@ -41,10 +39,6 @@ pub enum AppError {
     RateLimited { message: String, retry_after: u64 },
     #[error("{message}")]
     Upstream { status: StatusCode, message: String },
-    #[error("{0}")]
-    Database(String),
-    #[error("{0}")]
-    Notification(String),
     /// Anything unexpected; the client only sees the generic 500.
     #[error("{0}")]
     Internal(String),
@@ -80,13 +74,10 @@ impl AppError {
             Self::StepUpRequired => "FORBIDDEN",
             Self::Parse => "PARSE",
             Self::NotFound(_) => "NOT_FOUND",
-            Self::Unauthorized(_) => "UNAUTHORIZED",
             Self::Forbidden(_) => "FORBIDDEN",
             Self::Conflict(_) => "CONFLICT",
             Self::RateLimited { .. } => "RATE_LIMIT",
             Self::Upstream { .. } => "UPSTREAM_SERVICE",
-            Self::Database(_) => "DATABASE",
-            Self::Notification(_) => "NOTIFICATION",
             Self::Internal(_) => "UNKNOWN",
         }
     }
@@ -98,13 +89,10 @@ impl AppError {
             Self::StepUpRequired => (StatusCode::FORBIDDEN, "Forbidden"),
             Self::Parse => (StatusCode::BAD_REQUEST, "Parse Error"),
             Self::NotFound(_) => (StatusCode::NOT_FOUND, "Not Found"),
-            Self::Unauthorized(_) => (StatusCode::UNAUTHORIZED, "Unauthorized"),
             Self::Forbidden(_) => (StatusCode::FORBIDDEN, "Forbidden"),
             Self::Conflict(_) => (StatusCode::CONFLICT, "Conflict"),
             Self::RateLimited { .. } => (StatusCode::TOO_MANY_REQUESTS, "Too Many Requests"),
             Self::Upstream { status, .. } => (*status, "Upstream Service Error"),
-            Self::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database Error"),
-            Self::Notification(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Notification Error"),
             Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"),
         }
     }
@@ -282,12 +270,6 @@ mod tests {
                 "Missing thing",
             ),
             (
-                AppError::Unauthorized("Unauthorized access".into()),
-                401,
-                "Unauthorized",
-                "Unauthorized access",
-            ),
-            (
                 AppError::Forbidden("Access forbidden".into()),
                 403,
                 "Forbidden",
@@ -333,20 +315,6 @@ mod tests {
         })
         .await;
         assert_eq!((status.as_u16(), retry_after.as_deref()), (429, Some("30")));
-    }
-
-    #[tokio::test]
-    async fn database_and_notification_failures_are_500s() {
-        let (status, _, _, body) = render(AppError::Database("Write failed".into())).await;
-        assert_eq!(
-            (status.as_u16(), &body["error"], &body["message"]),
-            (500, &json!("Database Error"), &json!("Write failed"))
-        );
-        let (status, _, _, body) = render(AppError::Notification("Send failed".into())).await;
-        assert_eq!(
-            (status.as_u16(), &body["error"]),
-            (500, &json!("Notification Error"))
-        );
     }
 
     #[tokio::test]

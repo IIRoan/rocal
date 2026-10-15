@@ -14,6 +14,7 @@ use super::api::{ApiError, codes, json, validate};
 use super::hooks::{self, Reply};
 use super::pipeline::{AuthBody, form_csrf};
 use super::{password, session, store};
+use crate::addresses;
 use crate::http::zod::{self, Schema};
 use crate::invites;
 use crate::state::AppState;
@@ -103,7 +104,7 @@ async fn create_account(
 ) -> Result<(Reply, crate::db::entities::user::Model), ApiError> {
     let body: SignUpBody = validate(&SIGN_UP, body, "body")?;
     form_csrf(state, headers)?;
-    if !super::api::is_email(&body.email) {
+    if !addresses::is_zod_email(&body.email) {
         return Err(codes::invalid_email());
     }
     check_length(&body.password)?;
@@ -150,7 +151,7 @@ async fn password_sign_in(
 ) -> Result<Reply, ApiError> {
     let body: SignInBody = validate(&SIGN_IN, body, "body")?;
     form_csrf(state, headers)?;
-    if !super::api::is_email(&body.email) {
+    if !addresses::is_zod_email(&body.email) {
         return Err(codes::invalid_email());
     }
     if body.password.chars().count() > password::MAX_LENGTH {
