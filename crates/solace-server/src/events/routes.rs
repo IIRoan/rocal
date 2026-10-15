@@ -179,17 +179,30 @@ pub async fn export_ics(
     Path(id): Path<String>,
 ) -> Result<Response, AppError> {
     let (ics, filename) = service::export_ics(&state, &user, &id).await?;
+    Ok(ics_response(ics, "attachment", &filename, "no-store"))
+}
+
+/// An `.ics` body served `attachment` or `inline` under `filename`.
+pub fn ics_response(
+    ics: String,
+    disposition: &str,
+    filename: &str,
+    cache_control: &'static str,
+) -> Response {
     let mut response = ics.into_response();
     let headers = response.headers_mut();
     headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("text/calendar; charset=utf-8"),
     );
-    if let Ok(value) = HeaderValue::from_str(&format!("attachment; filename=\"{filename}\"")) {
+    if let Ok(value) = HeaderValue::from_str(&format!("{disposition}; filename=\"{filename}\"")) {
         headers.insert(header::CONTENT_DISPOSITION, value);
     }
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    Ok(response)
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(cache_control),
+    );
+    response
 }
 
 /// The local copy of a mailed invitation by its UID, or `null`.

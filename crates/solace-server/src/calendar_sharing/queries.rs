@@ -9,18 +9,6 @@ use sea_orm::QueryOrder;
 
 use crate::db::entities::{calendar, calendar_event};
 
-pub async fn find<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-    id: &str,
-) -> Result<Option<calendar::Model>, sea_orm::DbErr> {
-    calendar::Entity::find()
-        .filter(calendar::Column::Id.eq(id))
-        .filter(calendar::Column::UserId.eq(user_id))
-        .one(db)
-        .await
-}
-
 pub async fn count_encrypted_events<C: ConnectionTrait>(
     db: &C,
     user_id: &str,

@@ -9,7 +9,7 @@ use time::PrimitiveDateTime;
 use super::reader::{self, Obj, Val};
 use super::{
     Frequency, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, external_id, js,
-    normalize_email, normalize_timezone, resolve_timezone, zones,
+    normalize_email, normalize_timezone, pattern, resolve_timezone, trimmed_text, zones,
 };
 use crate::http::zod::js_trim;
 use crate::instant;
@@ -25,12 +25,8 @@ const NAME_KEYS: [&str; 5] = [
 const DESCRIPTION_KEYS: [&str; 4] = ["WR-CALDESC", "X-WR-CALDESC", "x-wr-caldesc", "description"];
 const TIMEZONE_KEYS: [&str; 3] = ["WR-TIMEZONE", "X-WR-TIMEZONE", "x-wr-timezone"];
 
-static GOOGLE_SEPARATOR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^-[-:~]{10,}$").unwrap_or_else(|error| panic!("separator pattern: {error}"))
-});
-static BLANK_RUNS: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\n{3,}").unwrap_or_else(|error| panic!("blank pattern: {error}"))
-});
+static GOOGLE_SEPARATOR: LazyLock<Regex> = LazyLock::new(|| pattern(r"^-[-:~]{10,}$"));
+static BLANK_RUNS: LazyLock<Regex> = LazyLock::new(|| pattern(r"\n{3,}"));
 
 /// `IcsParseResult`.
 #[derive(Debug, Clone, PartialEq)]
@@ -90,7 +86,7 @@ pub fn parse(content: &str, user_timezone: &str) -> ParseResult {
         }
         let first = |keys: &[&str]| {
             keys.iter().find_map(|key| match calendar.get(key) {
-                Some(Val::Str(text)) if !js_trim(text).is_empty() => Some(js_trim(text).to_owned()),
+                Some(Val::Str(text)) => trimmed_text(Some(text)),
                 _ => None,
             })
         };
@@ -148,11 +144,10 @@ pub fn parse(content: &str, user_timezone: &str) -> ParseResult {
 
 /// `getTextValue`: a trimmed, non-empty string or `{ val }`.
 fn text_value(value: Option<&Val>) -> Option<String> {
-    let text = match value? {
-        Val::Str(text) | Val::Param(_, text) => js_trim(text),
-        _ => return None,
-    };
-    (!text.is_empty()).then(|| text.to_owned())
+    match value? {
+        Val::Str(text) | Val::Param(_, text) => trimmed_text(Some(text)),
+        _ => None,
+    }
 }
 
 /// `coerceDate`: a valid `Date`, or a string `new Date` accepts.
@@ -162,12 +157,6 @@ fn date_value(value: Option<&Val>) -> Option<i64> {
         Val::Str(text) => js::parse_date_string(text),
         _ => None,
     }
-}
-
-fn utc(ms: i64) -> Option<PrimitiveDateTime> {
-    let moment =
-        time::OffsetDateTime::from_unix_timestamp_nanos(i128::from(ms) * 1_000_000).ok()?;
-    Some(PrimitiveDateTime::new(moment.date(), moment.time()))
 }
 
 /// `getEventTimezone`: the start's (else the end's) TZID; floating times have none.
@@ -194,10 +183,10 @@ fn occurrence_start(value: &Val, all_day_zone: &str) -> Option<PrimitiveDateTime
     };
     let ms = date.ms?;
     if !date.date_only {
-        return utc(ms);
+        return instant::from_unix_millis(ms);
     }
     let day = js::fields(ms);
-    utc(day_boundary(day.year, day.month, day.day, all_day_zone, false).ok()?)
+    instant::from_unix_millis(day_boundary(day.year, day.month, day.day, all_day_zone, false).ok()?)
 }
 
 /// `buildUtcDateFromTimeZoneDateParts`: the first (or last) millisecond of a calendar day in `zone`.
@@ -338,8 +327,7 @@ fn participant(value: &Val, organizer: bool) -> Option<Participant> {
         return None;
     }
     let email = match value {
-        Val::Str(text) => normalize_email(text),
-        Val::Param(_, text) => normalize_email(js_trim(text)),
+        Val::Str(text) | Val::Param(_, text) => normalize_email(text),
         Val::Obj(obj) => text_value(obj.get("val").or(obj.get("email")))
             .map(|text| normalize_email(&text))
             .unwrap_or_default(),
@@ -471,7 +459,10 @@ fn parse_event(
         .get("recurrenceid")
         .and_then(|date| occurrence_start(date, &all_day_timezone));
     // ponytail: instants beyond year 9999 (only reachable through field rollover) are skipped; widen if a feed ever needs them.
-    let (Some(start), Some(end)) = (utc(start), utc(end)) else {
+    let (Some(start), Some(end)) = (
+        instant::from_unix_millis(start),
+        instant::from_unix_millis(end),
+    ) else {
         return Ok(None);
     };
     Ok(Some(ParsedEvent {
@@ -510,8 +501,7 @@ fn clean_invite_description(value: Option<&str>) -> Option<String> {
     let joined = BLANK_RUNS
         .replace_all(&kept.join("\n"), "\n\n")
         .into_owned();
-    let cleaned = js_trim(&joined);
-    (!cleaned.is_empty()).then(|| cleaned.to_owned())
+    trimmed_text(Some(&joined))
 }
 
 /// `convertParsedEventToCalendarEvent`: the plaintext row a feed sync creates.

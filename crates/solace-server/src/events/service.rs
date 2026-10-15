@@ -19,6 +19,7 @@ use super::{constraints, queries, recurrence};
 use super::{participants, rsvp};
 use crate::addresses::is_reserved_system_email;
 use crate::auth::guard::RouteUser;
+use crate::calendars::queries as calendars;
 use crate::db::entities::{
     calendar, calendar_event, event_notification, recurrence_exception, user_settings,
 };
@@ -27,7 +28,7 @@ use crate::entity_metadata::{CALENDAR_COLORS, external_calendar_name, is_valid_c
 use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
-use crate::integrations::ics::{build, export};
+use crate::integrations::ics::{build, export, trimmed_text};
 use crate::invitations::request;
 use crate::invitations::rsvp_reply::RsvpStatus;
 use crate::notifications::calculator;
@@ -91,7 +92,7 @@ async fn own_calendar(
     user: &RouteUser,
     id: &str,
 ) -> Result<calendar::Model, AppError> {
-    queries::calendar(&state.db, &user.id, id)
+    calendars::find(&state.db, &user.id, id)
         .await?
         .ok_or_else(|| {
             AppError::field(
@@ -157,6 +158,11 @@ fn parse_instant(text: &str, field: &str) -> Result<time::PrimitiveDateTime, App
                 field,
             )
         })
+}
+
+fn checked_reminder(minutes: Option<i32>) -> Result<Option<i32>, AppError> {
+    constraints::validate_reminder_minutes(minutes.map(f64::from))?;
+    Ok(minutes)
 }
 
 fn tokens_json(tokens: &[String]) -> Result<String, AppError> {
@@ -321,12 +327,7 @@ pub async fn create(
         &calendar,
         "Cannot create events in a read-only calendar. This calendar is managed by a subscription or public feed.",
     )?;
-    let reminder = match request.reminder.flatten() {
-        Some(minutes) => {
-            constraints::validate_reminder_minutes(Some(f64::from(minutes)))?.map(|_| minutes)
-        }
-        None => None,
-    };
+    let reminder = checked_reminder(request.reminder.flatten())?;
     let settings = queries::settings(&state.db, &user.id).await?;
     let timezone = instant::resolve_timezone(
         request
@@ -392,7 +393,7 @@ pub async fn create(
         request.description.as_deref(),
         request.location.as_deref(),
     );
-    let mut warnings = invite(state, &event, &synced, &calendar.name, content, &timezone).await?;
+    let mut warnings = invite(state, &event, &synced, &calendar.name, content).await?;
     if let Some(minutes) = reminder.filter(|m| *m > 0)
         && schedules_reminders(settings.as_ref())
         && let Err(error) = insert_reminder(
@@ -419,28 +420,26 @@ async fn invite(
     synced: &participants::Synced,
     calendar_name: &str,
     content: Option<InvitationContentSource>,
-    timezone: &str,
 ) -> Result<Vec<OperationWarning>, AppError> {
     let Some(content) = content else {
         return Ok(Vec::new());
     };
-    let invitation = export::to_build_event(&export::ExportEvent {
-        id: &event.id,
-        external_id: event.external_id.as_deref(),
+    let invitation = invitation_event(event, &content)?;
+    Ok(request::send_pending(state, &event.id, synced, calendar_name, &invitation).await)
+}
+
+/// The REQUEST a new invitee is mailed: the stored event with the invitation's plaintext.
+pub fn invitation_event(
+    event: &calendar_event::Model,
+    content: &InvitationContentSource,
+) -> Result<build::Event, AppError> {
+    export::to_build_event(&export::ExportEvent {
         title: &content.title,
         description: content.description.as_deref(),
-        start: event.start,
-        end: event.end,
-        all_day: event.all_day,
-        timezone: Some(timezone),
         location: content.location.as_deref(),
-        recurrence: event.recurrence.as_deref(),
-        created_at: event.created_at,
-        updated_at: event.updated_at,
-        participants: &[],
+        ..export_event(event, &[])
     })
-    .map_err(AppError::internal)?;
-    Ok(request::send_pending(state, &event.id, synced, calendar_name, &invitation).await)
+    .map_err(AppError::internal)
 }
 
 pub async fn update(
@@ -508,12 +507,7 @@ pub async fn update(
     if request.location.is_some() {
         constraints::validate_location_length(request.location.as_deref())?;
     }
-    let reminder_value = match request.reminder.flatten() {
-        Some(minutes) => {
-            constraints::validate_reminder_minutes(Some(f64::from(minutes)))?.map(|_| minutes)
-        }
-        None => None,
-    };
+    let reminder_value = checked_reminder(request.reminder.flatten())?;
     if let Some(color) = request.color.as_deref().filter(|c| !c.is_empty())
         && !is_valid_calendar_color(color)
     {
@@ -567,7 +561,7 @@ pub async fn update(
         None => existing.title.clone(),
     };
     let optional = |given: &Option<String>, current: &Option<String>| match given {
-        Some(value) => Some(js_trim(value).to_owned()).filter(|v| !v.is_empty()),
+        Some(value) => trimmed_text(Some(value)),
         None => current.clone(),
     };
     let next_description = optional(&request.description, &existing.description);
@@ -646,15 +640,7 @@ pub async fn update(
             next_description.as_deref(),
             next_location.as_deref(),
         );
-        warnings = invite(
-            state,
-            &updated,
-            &synced,
-            &final_calendar.name,
-            content,
-            &timezone,
-        )
-        .await?;
+        warnings = invite(state, &updated, &synced, &final_calendar.name, content).await?;
     }
     if (start.is_some() || end.is_some() || request.reminder.is_some())
         && let Err(error) = reschedule_reminders(
@@ -819,7 +805,7 @@ pub async fn bulk(
                     "targetCalendarId",
                 ));
             };
-            let target = queries::calendar(&state.db, &user.id, &target_id.0)
+            let target = calendars::find(&state.db, &user.id, &target_id.0)
                 .await?
                 .ok_or_else(|| {
                     AppError::field(

@@ -9,8 +9,8 @@ use super::queries::{self, AvatarOwner};
 use crate::addresses;
 use crate::auth::cookies::encode_uri_component;
 use crate::error::AppError;
-use crate::events::participants::normalize_email;
 use crate::http::zod::{js_length, js_trim};
+use crate::integrations::ics::normalize_email;
 use crate::state::AppState;
 
 /// `SOLACE_PROFILE_LOOKUP_MAX_EMAILS`.
@@ -45,7 +45,7 @@ static BLOCKED_IMAGE_HOSTS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
 /// `normalizeSolaceProfileLookupEmails`: normalized, deduplicated addresses, at most 50.
 fn lookup_emails(emails: &[String]) -> Vec<String> {
     let mut result: Vec<String> = Vec::new();
-    for email in emails.iter().map(|email| normalize_email(Some(email))) {
+    for email in emails.iter().map(|email| normalize_email(email)) {
         if email.is_empty() || !email.contains('@') || result.contains(&email) {
             continue;
         }
@@ -95,7 +95,7 @@ pub fn uploaded_avatar_path(avatar_id: &str) -> String {
 
 /// `buildSolaceProfileAvatarPath`; carries the email (a known privacy gap, ported as is).
 fn email_avatar_path(email: &str) -> Option<String> {
-    let normalized = normalize_email(Some(email));
+    let normalized = normalize_email(email);
     (!normalized.is_empty()).then(|| {
         format!(
             "/api/profiles/avatar?email={}",
@@ -115,7 +115,7 @@ pub fn participant_image(image: Option<&str>, email: &str) -> Option<String> {
 
 /// `findAvatarOwner`: the account or mailbox alias with this address that has a picture.
 pub async fn avatar_owner(state: &AppState, email: &str) -> Result<Option<AvatarOwner>, AppError> {
-    let normalized = normalize_email(Some(email));
+    let normalized = normalize_email(email);
     if normalized.is_empty() || addresses::is_reserved_system_email(&normalized, None) {
         return Ok(None);
     }

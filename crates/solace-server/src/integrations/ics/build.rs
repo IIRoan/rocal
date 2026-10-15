@@ -6,7 +6,7 @@ use time::PrimitiveDateTime;
 
 use super::{
     DEFAULT_METHOD, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, js,
-    normalize_timezone, vtimezone, zones,
+    normalize_timezone, trimmed_text, vtimezone, zones,
 };
 use crate::http::zod::js_trim;
 use crate::instant;
@@ -59,11 +59,6 @@ pub struct Event {
     pub excluded_dates: Vec<PrimitiveDateTime>,
 }
 
-/// `buildIcsEventFile`.
-pub fn event_file(calendar: &Calendar, event: Event) -> String {
-    build_calendar(calendar, &[event])
-}
-
 /// `buildIcsCalendar`, stamped now.
 pub fn build_calendar(calendar: &Calendar, events: &[Event]) -> String {
     build_calendar_at(calendar, events, instant::now())
@@ -75,19 +70,12 @@ pub fn build_calendar_at(
     events: &[Event],
     stamp: PrimitiveDateTime,
 ) -> String {
-    let trimmed = |value: &Option<String>| {
-        value
-            .as_deref()
-            .map(js_trim)
-            .filter(|v| !v.is_empty())
-            .map(str::to_owned)
-    };
     let mut lines = vec![
         "BEGIN:VCALENDAR".to_owned(),
         "VERSION:2.0".into(),
         format!(
             "PRODID:{}",
-            trimmed(&calendar.product_id)
+            trimmed_text(calendar.product_id.as_deref())
                 .as_deref()
                 .unwrap_or(DEFAULT_PRODUCT_ID)
         ),
@@ -101,16 +89,20 @@ pub fn build_calendar_at(
         ),
         format!(
             "X-WR-CALNAME:{}",
-            escape_text(trimmed(&calendar.name).as_deref().unwrap_or("Calendar"))
+            escape_text(
+                trimmed_text(calendar.name.as_deref())
+                    .as_deref()
+                    .unwrap_or("Calendar")
+            )
         ),
     ];
-    if let Some(description) = trimmed(&calendar.description) {
+    if let Some(description) = trimmed_text(calendar.description.as_deref()) {
         lines.push(format!("X-WR-CALDESC:{}", escape_text(&description)));
     }
-    if let Some(timezone) = trimmed(&calendar.timezone) {
+    if let Some(timezone) = trimmed_text(calendar.timezone.as_deref()) {
         lines.push(format!("X-WR-TIMEZONE:{}", escape_text(&timezone)));
     }
-    if let Some(url) = trimmed(&calendar.source_url) {
+    if let Some(url) = trimmed_text(calendar.source_url.as_deref()) {
         lines.push(format!("URL:{}", sanitize_uri(&url)));
     }
     let mut zones: std::collections::BTreeMap<String, (TimeZone, i64)> =
@@ -183,11 +175,6 @@ fn fold(line: &str) -> Vec<String> {
     segments
 }
 
-fn ms(value: PrimitiveDateTime) -> i64 {
-    let nanos = value.assume_utc().unix_timestamp_nanos();
-    i64::try_from(nanos / 1_000_000).unwrap_or_default()
-}
-
 fn date_stamp(ms: i64) -> String {
     let f = js::fields(ms);
     format!("{}{:02}{:02}", f.year, f.month, f.day)
@@ -245,12 +232,12 @@ fn wall_clock_zones(event: &Event) -> Vec<(String, TimeZone, i64)> {
         let earliest = event
             .excluded_dates
             .iter()
-            .map(|at| ms(*at))
-            .fold(ms(event.start), i64::min);
+            .map(|at| instant::unix_millis(*at))
+            .fold(instant::unix_millis(event.start), i64::min);
         used.push((name, tz, earliest));
     }
     if let (Some((name, tz)), Some(at)) = (override_zone(event), event.recurrence_id) {
-        used.push((name, tz, ms(at)));
+        used.push((name, tz, instant::unix_millis(at)));
     }
     used
 }
@@ -309,8 +296,8 @@ fn event_lines(
     stamp: PrimitiveDateTime,
     calendar_timezone: Option<&str>,
 ) {
-    let start = ms(event.start);
-    let mut end = ms(event.end);
+    let start = instant::unix_millis(event.start);
+    let mut end = instant::unix_millis(event.end);
     if event.all_day {
         end = end.max(start);
     } else if end <= start {
@@ -325,7 +312,7 @@ fn event_lines(
             || format!("{}@solace-calendar.local", uuid::Uuid::new_v4()),
             str::to_owned,
         );
-    let stamp = ms(stamp);
+    let stamp = instant::unix_millis(stamp);
     let title = js_trim(&event.title);
     lines.extend([
         "BEGIN:VEVENT".to_owned(),
@@ -333,11 +320,11 @@ fn event_lines(
         format!("DTSTAMP:{}", date_time_stamp(stamp)),
         format!(
             "CREATED:{}",
-            date_time_stamp(event.created_at.map_or(stamp, ms))
+            date_time_stamp(event.created_at.map_or(stamp, instant::unix_millis))
         ),
         format!(
             "LAST-MODIFIED:{}",
-            date_time_stamp(event.updated_at.map_or(stamp, ms))
+            date_time_stamp(event.updated_at.map_or(stamp, instant::unix_millis))
         ),
         format!(
             "SUMMARY:{}",
@@ -353,9 +340,12 @@ fn event_lines(
     let series_zone = series_zone(event);
     let occurrence = |at: PrimitiveDateTime, wall: Option<&(String, TimeZone)>| {
         if event.all_day {
-            (";VALUE=DATE".to_owned(), date_stamp_in(ms(at), &zone))
+            (
+                ";VALUE=DATE".to_owned(),
+                date_stamp_in(instant::unix_millis(at), &zone),
+            )
         } else {
-            date_time_parts(wall, ms(at))
+            date_time_parts(wall, instant::unix_millis(at))
         }
     };
     if event.all_day {
@@ -377,17 +367,10 @@ fn event_lines(
         let (params, value) = occurrence(at, override_zone(event).as_ref());
         lines.push(format!("RECURRENCE-ID{params}:{value}"));
     }
-    let present = |value: &Option<String>| {
-        value
-            .as_deref()
-            .map(js_trim)
-            .filter(|v| !v.is_empty())
-            .map(str::to_owned)
-    };
-    if let Some(description) = present(&event.description) {
+    if let Some(description) = trimmed_text(event.description.as_deref()) {
         lines.push(format!("DESCRIPTION:{}", escape_text(&description)));
     }
-    if let Some(location) = present(&event.location) {
+    if let Some(location) = trimmed_text(event.location.as_deref()) {
         lines.push(format!("LOCATION:{}", escape_text(&location)));
     }
     let participants = event.participants.as_deref().unwrap_or_default();
@@ -395,7 +378,7 @@ fn event_lines(
         .iter()
         .find(|p| p.role == Some(ParticipantRole::Organizer) && !js_trim(&p.email).is_empty());
     if let Some(organizer) = organizer {
-        let name = present(&organizer.display_name)
+        let name = trimmed_text(organizer.display_name.as_deref())
             .map_or_else(String::new, |name| format!(";CN={}", escape_param(&name)));
         lines.push(format!(
             "ORGANIZER{name}:mailto:{}",
@@ -408,7 +391,7 @@ fn event_lines(
             continue;
         }
         let mut params = Vec::new();
-        if let Some(name) = present(&participant.display_name) {
+        if let Some(name) = trimmed_text(participant.display_name.as_deref()) {
             params.push(format!("CN={}", escape_param(&name)));
         }
         match participant.status {
@@ -434,7 +417,7 @@ fn event_lines(
     if let Some(sequence) = event.sequence {
         lines.push(format!("SEQUENCE:{}", sequence.max(0)));
     }
-    if let Some(url) = present(&event.source_url) {
+    if let Some(url) = trimmed_text(event.source_url.as_deref()) {
         lines.push(format!("URL:{}", sanitize_uri(&url)));
     }
     if let Some(rule) = &event.recurrence {
@@ -626,10 +609,7 @@ pub(super) mod tests {
     }
 
     pub(crate) fn date(value: &Value) -> Option<PrimitiveDateTime> {
-        let ms = js::parse_date_string(value.as_str()?)?;
-        let moment =
-            time::OffsetDateTime::from_unix_timestamp_nanos(i128::from(ms) * 1_000_000).ok()?;
-        Some(PrimitiveDateTime::new(moment.date(), moment.time()))
+        js::parse_date_string(value.as_str()?).and_then(crate::instant::from_unix_millis)
     }
 
     fn text(value: &Value) -> Option<String> {

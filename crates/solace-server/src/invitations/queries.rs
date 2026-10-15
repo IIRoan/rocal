@@ -1,10 +1,7 @@
 //! Invitation copies, their participants and the calendars they land in, always scoped to the attendee.
 
 use sea_orm::sea_query::{Condition, Expr, Func};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, Set,
-};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder};
 
 use crate::db::entities::{calendar, calendar_event, event_participant, mail_directory_entry};
 use crate::entity_metadata::MAIL_INVITATION_STAGING_CALENDAR_NAME;
@@ -50,16 +47,6 @@ pub async fn first_writable_calendar<C: ConnectionTrait>(
         .await
 }
 
-pub async fn count_calendars<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-) -> Result<u64, sea_orm::DbErr> {
-    calendar::Entity::find()
-        .filter(calendar::Column::UserId.eq(user_id))
-        .count(db)
-        .await
-}
-
 pub async fn staging_calendar<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
@@ -71,13 +58,6 @@ pub async fn staging_calendar<C: ConnectionTrait>(
         .filter(calendar::Column::IsSyncOnly.eq(false))
         .one(db)
         .await
-}
-
-pub async fn insert_calendar<C: ConnectionTrait>(
-    db: &C,
-    row: calendar::ActiveModel,
-) -> Result<calendar::Model, sea_orm::DbErr> {
-    row.insert(db).await
 }
 
 pub async fn stalwart_account_id<C: ConnectionTrait>(
@@ -101,16 +81,6 @@ pub async fn copies<C: ConnectionTrait>(
         .filter(calendar_event::Column::UserId.eq(user_id))
         .filter(calendar_event::Column::ExternalId.is_in(external_ids))
         .filter(calendar_event::Column::SubscriptionId.is_null())
-        .all(db)
-        .await
-}
-
-pub async fn participants<C: ConnectionTrait>(
-    db: &C,
-    event_ids: Vec<String>,
-) -> Result<Vec<event_participant::Model>, sea_orm::DbErr> {
-    event_participant::Entity::find()
-        .filter(event_participant::Column::EventId.is_in(event_ids))
         .all(db)
         .await
 }
@@ -150,24 +120,4 @@ pub async fn set_status_by_email<C: ConnectionTrait>(
         .exec(db)
         .await
         .map(|_| ())
-}
-
-pub fn new_calendar(
-    user_id: &str,
-    name: &str,
-    color: &str,
-    visible: bool,
-    default: bool,
-) -> calendar::ActiveModel {
-    calendar::ActiveModel {
-        name: Set(name.to_owned()),
-        color: Set(color.to_owned()),
-        kind: Set("owned".into()),
-        is_public: Set(false),
-        is_visible: Set(visible),
-        is_default: Set(default),
-        force_full_encryption: Set(false),
-        user_id: Set(user_id.to_owned()),
-        ..Default::default()
-    }
 }

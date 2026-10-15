@@ -9,9 +9,15 @@ mod rrule;
 mod vtimezone;
 mod zones;
 
+use regex_lite::Regex;
 use serde::Serialize;
 
 use crate::http::zod::js_trim;
+
+/// A compiled built-in pattern; these are fixed, so a failure is a programming error.
+fn pattern(source: &str) -> Regex {
+    Regex::new(source).unwrap_or_else(|error| panic!("ics pattern {source}: {error}"))
+}
 
 const METHODS: [&str; 8] = [
     "PUBLISH",
@@ -176,6 +182,35 @@ pub fn normalize_email(email: &str) -> String {
         _ => trimmed,
     };
     without_scheme.to_lowercase()
+}
+
+/// A canonical array index, which JavaScript lists before every other object key.
+pub fn array_index(key: &str) -> Option<u32> {
+    let canonical =
+        key == "0" || (!key.starts_with('0') && key.bytes().all(|b| b.is_ascii_digit()));
+    key.parse::<u32>()
+        .ok()
+        .filter(|index| canonical && !key.is_empty() && *index != u32::MAX)
+}
+
+/// JavaScript truthiness of a JSON value.
+pub fn truthy(value: &serde_json::Value) -> bool {
+    use serde_json::Value;
+    match value {
+        Value::Null => false,
+        Value::Bool(flag) => *flag,
+        Value::Number(n) => n.as_f64().is_some_and(|n| n != 0.0 && !n.is_nan()),
+        Value::String(text) => !text.is_empty(),
+        Value::Array(_) | Value::Object(_) => true,
+    }
+}
+
+/// The trimmed text, or `None` when it is blank.
+pub fn trimmed_text(value: Option<&str>) -> Option<String> {
+    value
+        .map(js_trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_owned)
 }
 
 /// `normalizeIcsTimezone`: Windows and Exchange names of a few common zones mapped to IANA.

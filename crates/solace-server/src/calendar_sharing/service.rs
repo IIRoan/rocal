@@ -6,6 +6,7 @@ use super::queries;
 use crate::auth::api::{ALPHANUMERIC, random_string};
 use crate::auth::cookies::encode_uri_component;
 use crate::auth::guard::RouteUser;
+use crate::calendars::queries as calendars;
 use crate::db::entities::calendar;
 use crate::entity_metadata::external_calendar_name;
 use crate::error::AppError;
@@ -22,13 +23,12 @@ fn not_found() -> AppError {
     AppError::validation("Calendar not found or access denied")
 }
 
-fn base_url(state: &AppState) -> String {
-    state
-        .config
-        .backend_url
-        .trim()
-        .trim_end_matches('/')
-        .to_owned()
+fn share_url(state: &AppState, token: &str) -> String {
+    let base = state.config.backend_url.trim().trim_end_matches('/');
+    format!(
+        "{base}/api/calendars/shared/{}",
+        encode_uri_component(token)
+    )
 }
 
 fn link(state: &AppState, calendar: &calendar::Model) -> CalendarShareLink {
@@ -40,13 +40,7 @@ fn link(state: &AppState, calendar: &calendar::Model) -> CalendarShareLink {
         calendar_id: calendar.id.clone().into(),
         calendar_name: calendar.name.clone(),
         enabled: token.is_some(),
-        share_url: token.map(|token| {
-            format!(
-                "{}/api/calendars/shared/{}",
-                base_url(state),
-                encode_uri_component(token)
-            )
-        }),
+        share_url: token.map(|token| share_url(state, token)),
     }
 }
 
@@ -55,7 +49,7 @@ async fn shareable(
     user: &RouteUser,
     id: &str,
 ) -> Result<calendar::Model, AppError> {
-    let calendar = queries::find(&state.db, &user.id, id)
+    let calendar = calendars::find(&state.db, &user.id, id)
         .await?
         .ok_or_else(not_found)?;
     if calendar.is_sync_only {
@@ -114,7 +108,7 @@ pub async fn disable(
     user: &RouteUser,
     id: &str,
 ) -> Result<DisableShareLinkResponse, AppError> {
-    let calendar = queries::find(&state.db, &user.id, id)
+    let calendar = calendars::find(&state.db, &user.id, id)
         .await?
         .ok_or_else(not_found)?;
     if calendar.is_sync_only {
@@ -179,11 +173,7 @@ pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String),
         &build::Calendar {
             name: Some(name.clone()),
             timezone: Some(instant::resolve_timezone(zone)),
-            source_url: Some(format!(
-                "{}/api/calendars/shared/{}",
-                base_url(state),
-                encode_uri_component(raw_token)
-            )),
+            source_url: Some(share_url(state, raw_token)),
             ..Default::default()
         },
         &built,

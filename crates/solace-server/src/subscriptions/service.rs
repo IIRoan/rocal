@@ -28,8 +28,10 @@ use crate::events::participants;
 use crate::events::queries as events_queries;
 use crate::http::zod::{js_length, js_trim};
 use crate::instant;
+use crate::integrations::ics::Participant;
 use crate::integrations::ics::parse::{self, ParsedEvent, StoredEvent, StoredParticipant};
 use crate::integrations::safe_fetch::{SafeFetchError, SafeRequest, SafeResponse};
+use crate::recurring::queries as recurring;
 use crate::state::AppState;
 use crate::telemetry::redact_pii;
 
@@ -467,11 +469,11 @@ struct Counts {
     deleted: i32,
 }
 
-fn participant_inputs(event: &ParsedEvent) -> Vec<ParticipantInput> {
-    event
-        .participants
+/// A parsed file's people as the participant sync takes them.
+pub(crate) fn participant_inputs(participants: Option<&[Participant]>) -> Vec<ParticipantInput> {
+    participants
+        .unwrap_or_default()
         .iter()
-        .flatten()
         .map(|participant| ParticipantInput {
             email: participant.email.clone(),
             display_name: participant.display_name.clone(),
@@ -481,7 +483,18 @@ fn participant_inputs(event: &ParsedEvent) -> Vec<ParticipantInput> {
         .collect()
 }
 
-fn stored(event: &calendar_event::Model) -> StoredEvent<'_> {
+pub(crate) fn stored_participants(rows: &[event_participant::Model]) -> Vec<StoredParticipant<'_>> {
+    rows.iter()
+        .map(|row| StoredParticipant {
+            email: &row.email,
+            display_name: row.display_name.as_deref(),
+            role: &row.role,
+            status: &row.status,
+        })
+        .collect()
+}
+
+pub(crate) fn stored(event: &calendar_event::Model) -> StoredEvent<'_> {
     StoredEvent {
         title: &event.title,
         description: event.description.as_deref(),
@@ -502,42 +515,28 @@ async fn reconcile<C: ConnectionTrait>(
 ) -> Result<Counts, AppError> {
     let current = queries::feed_events(db, &feed.id).await?;
     let ids = current.iter().map(|event| event.id.clone()).collect();
-    let mut people: HashMap<String, Vec<event_participant::Model>> = HashMap::new();
-    for row in queries::participants_of(db, ids).await? {
-        people.entry(row.event_id.clone()).or_default().push(row);
-    }
-    let by_uid: HashMap<String, calendar_event::Model> = current
-        .into_iter()
-        .map(|event| (event.external_id.clone().unwrap_or_default(), event))
-        .collect();
+    let people = events_queries::participants_by_event(db, ids).await?;
+    let by_uid = rows_by_uid(current);
     let incoming: HashSet<&str> = events.iter().map(|event| event.uid.as_str()).collect();
     let mut counts = Counts::default();
     for parsed in events {
         let Some(existing) = by_uid.get(&parsed.uid) else {
             let row = parse::to_new_event(parsed, &feed.user_id, &feed.calendar_id, Some(&feed.id));
             let created = queries::insert_event(db, row).await?;
-            participants::sync(db, &created.id, &participant_inputs(parsed), None).await?;
+            let inputs = participant_inputs(parsed.participants.as_deref());
+            participants::sync(db, &created.id, &inputs, None).await?;
             counts.added += 1;
             continue;
         };
         let changed = parse::is_modified(&stored(existing), parsed);
-        let rows: Vec<StoredParticipant<'_>> = people
-            .get(&existing.id)
-            .into_iter()
-            .flatten()
-            .map(|row| StoredParticipant {
-                email: &row.email,
-                display_name: row.display_name.as_deref(),
-                role: &row.role,
-                status: &row.status,
-            })
-            .collect();
+        let rows = stored_participants(people.get(&existing.id).map_or(&[], Vec::as_slice));
         let people_changed = parse::participants_differ(&rows, parsed.participants.as_deref());
         if changed {
             queries::update_feed_event(db, existing.clone(), parsed).await?;
         }
         if people_changed {
-            participants::sync(db, &existing.id, &participant_inputs(parsed), None).await?;
+            let inputs = participant_inputs(parsed.participants.as_deref());
+            participants::sync(db, &existing.id, &inputs, None).await?;
         }
         if changed || people_changed {
             counts.updated += 1;
@@ -664,10 +663,11 @@ async fn import_target(
     user: &RouteUser,
     calendar_id: &str,
 ) -> Result<calendar::Model, AppError> {
-    let Some(calendar) = queries::owned_calendar(&state.db, calendar_id, &user.id).await? else {
+    let Some(calendar) = crate::calendars::queries::find(&state.db, &user.id, calendar_id).await?
+    else {
         return Err(AppError::NotFound(CALENDAR_NOT_FOUND.into()));
     };
-    if calendar.kind != "owned" || calendar.is_sync_only {
+    if !crate::events::service::is_writable(&calendar) {
         return Err(AppError::field(
             "Cannot import events into a read-only calendar.",
             "calendarId",
@@ -709,7 +709,8 @@ async fn import_legacy(
         let row = parse::to_new_event(event, &user.id, calendar_id, None);
         let imported: Result<calendar_event::Model, AppError> = async {
             let inserted = queries::insert_event(&state.db, row).await?;
-            participants::sync(&state.db, &inserted.id, &participant_inputs(event), None).await?;
+            let inputs = participant_inputs(event.participants.as_deref());
+            participants::sync(&state.db, &inserted.id, &inputs, None).await?;
             Ok(inserted)
         }
         .await;
@@ -812,12 +813,12 @@ async fn import_encrypted(
             parent_event_id: Set(parent.as_ref().map(|parent| parent.id.clone())),
             ..Default::default()
         };
-        let event = queries::insert_encrypted_event(&transaction, row).await?;
+        let event = events_queries::insert(&transaction, row).await?;
         let people = entry.participants.as_deref().unwrap_or_default();
         participants::sync(&transaction, &event.id, people, None).await?;
         for date in entry.excluded_dates.iter().flatten() {
-            queries::insert_deleted_exception(&transaction, &event.id, stored_instant(date)?)
-                .await?;
+            let date = stored_instant(date)?;
+            recurring::insert_exception(&transaction, &event.id, date, "deleted", None).await?;
         }
         if let (Some(parent), Some(date)) = (&parent, &entry.occurrence_date) {
             queries::upsert_modified_exception(
@@ -852,7 +853,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::config::Config;
     use crate::db::scratch::ScratchDatabase;
-    use crate::integrations::safe_fetch::tests::{public_lookup, safe_fetch};
+    use crate::integrations::safe_fetch::tests::{public_lookup, safe_fetch, serve};
 
     const FEED: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:feed-1@example.com\r\nDTSTAMP:20261001T000000Z\r\nDTSTART:20261101T090000Z\r\nDTEND:20261101T100000Z\r\nSUMMARY:Planning\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
@@ -898,10 +899,7 @@ pub(crate) mod tests {
                         .into_response()
                 }),
             );
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        tokio::spawn(async move { axum::serve(listener, app).await });
-        format!("http://feeds.test:{port}")
+        format!("http://feeds.test:{}", serve(app).await)
     }
 
     pub(crate) async fn fixture() -> Fixture {

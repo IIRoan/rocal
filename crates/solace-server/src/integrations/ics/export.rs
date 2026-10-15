@@ -11,7 +11,8 @@ use time::PrimitiveDateTime;
 
 use super::build;
 use super::{
-    Frequency, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, js, normalize_email,
+    Frequency, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, js,
+    normalize_email, pattern, truthy,
 };
 use crate::http::zod::js_trim;
 
@@ -22,11 +23,8 @@ static BASE_COLLATOR: LazyLock<Option<CollatorBorrowed<'static>>> = LazyLock::ne
     Collator::try_new(Default::default(), options).ok()
 });
 
-static UNSAFE_FILENAME: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"[^a-z0-9._-]+").unwrap_or_else(|error| panic!("filename pattern: {error}"))
-});
-static DASH_RUNS: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"-{2,}").unwrap_or_else(|error| panic!("dash pattern: {error}")));
+static UNSAFE_FILENAME: LazyLock<Regex> = LazyLock::new(|| pattern(r"[^a-z0-9._-]+"));
+static DASH_RUNS: LazyLock<Regex> = LazyLock::new(|| pattern(r"-{2,}"));
 
 /// A stored event's columns that go into ICS.
 #[derive(Debug, Clone)]
@@ -126,16 +124,6 @@ fn recurrence(raw: Option<&str>) -> Result<Option<RecurrenceRule>, InvalidUntil>
         by_month: integers("byMonth"),
         timezone,
     }))
-}
-
-fn truthy(value: &Value) -> bool {
-    match value {
-        Value::Null => false,
-        Value::Bool(flag) => *flag,
-        Value::Number(n) => n.as_f64().is_some_and(|n| n != 0.0),
-        Value::String(text) => !text.is_empty(),
-        Value::Array(_) | Value::Object(_) => true,
-    }
 }
 
 /// `mapEventParticipant`, as far as ICS reads it.
@@ -250,7 +238,7 @@ pub fn safe_filename(base: &str) -> String {
 }
 
 /// Orders two labels the way `localeCompare` with base sensitivity does.
-fn compare_base(left: &str, right: &str) -> Ordering {
+pub fn compare_base(left: &str, right: &str) -> Ordering {
     BASE_COLLATOR
         .as_ref()
         .map_or_else(|| left.cmp(right), |collator| collator.compare(left, right))

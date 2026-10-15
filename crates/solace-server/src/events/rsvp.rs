@@ -7,6 +7,7 @@ use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
+use crate::integrations::ics::export;
 use crate::invitations::rsvp_reply::{self, Reply, RsvpStatus};
 use crate::invitations::{
     resolve_accepted_invitation_target_calendar, resolve_invitation_staging_calendar,
@@ -75,11 +76,7 @@ pub async fn respond(
         )
         .await?;
     }
-    let uid = event
-        .external_id
-        .clone()
-        .filter(|uid| !uid.is_empty())
-        .unwrap_or_else(|| format!("{}@solace-calendar.local", event.id));
+    let uid = export::uid(&event.id, event.external_id.as_deref());
     queries::set_participant_status(&state.db, attendee.clone(), status.as_str()).await?;
     let organizer = participants
         .iter()

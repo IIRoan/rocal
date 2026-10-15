@@ -1,6 +1,8 @@
 //! `EventService.list`, `search` and `searchCorpus`: the calendar range with recurring instances, and the two search paths.
 
-use sea_orm::{ConnectionTrait, FromQueryResult, Statement, Value as SqlValue};
+use std::collections::HashMap;
+
+use sea_orm::ConnectionTrait;
 use solace_api_types::events::{
     Event, EventList, EventParticipant, EventSearchCorpus, EventSearchCorpusQuery,
     EventSearchQuery, EventSearchResults, SearchEvent, SearchLabel,
@@ -12,10 +14,11 @@ use super::view::{self, Relations};
 use crate::addresses::is_reserved_system_email;
 use crate::auth::guard::RouteUser;
 use crate::calendars::service::ensure_user_calendars;
-use crate::db::entities::{calendar_event, event_participant, user};
+use crate::db::entities::calendar_event;
 use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
+use crate::integrations::ics::trimmed_text;
 use crate::state::AppState;
 
 /// The rule an empty recurrence gets when the title says it repeats on weekdays.
@@ -64,8 +67,8 @@ pub async fn list(
         queries::regular_in_range(db, &user.id, range_start, range_end),
         queries::recurring(db, &user.id),
         queries::modified_in_range(db, &user.id, range_start, range_end),
-        queries::active_categories(db, &user.id),
-        queries::calendars_of(db, &user.id),
+        crate::categories::queries::active(db, &user.id),
+        crate::calendars::queries::owned_by(db, &user.id),
     )?;
     let all: Vec<&calendar_event::Model> =
         regular.iter().chain(&recurring).chain(&modified).collect();
@@ -75,9 +78,7 @@ pub async fn list(
         events.push((model.start, view::with_participants(model, &relations)?));
     }
     for series in &recurring {
-        for (start, event) in expand(series, &relations, range_start, range_end)? {
-            events.push((start, event));
-        }
+        events.extend(expand(series, &relations, range_start, range_end)?);
     }
     for model in &modified {
         events.push((model.start, view::with_participants(model, &relations)?));
@@ -185,44 +186,6 @@ fn expand(
     Ok(rows)
 }
 
-#[derive(FromQueryResult)]
-struct SearchRow {
-    id: String,
-    title: String,
-    description: Option<String>,
-    start: time::PrimitiveDateTime,
-    end: time::PrimitiveDateTime,
-    all_day: bool,
-    location: Option<String>,
-    color: Option<String>,
-    calendar_id: String,
-    category_id: Option<String>,
-    timezone: String,
-    recurrence: Option<String>,
-    user_id: String,
-    created_at: time::PrimitiveDateTime,
-    updated_at: time::PrimitiveDateTime,
-    encrypted_content: Option<String>,
-    blind_index_tokens: Option<String>,
-    encryption_state: String,
-    encryption_key_version: i32,
-    calendar_label_id: Option<String>,
-    calendar_label_name: Option<String>,
-    calendar_label_color: Option<String>,
-    calendar_label_encrypted_name: Option<String>,
-    calendar_label_key_version: Option<i32>,
-    category_label_id: Option<String>,
-    category_label_name: Option<String>,
-    category_label_color: Option<String>,
-    category_label_encrypted_name: Option<String>,
-    category_label_key_version: Option<i32>,
-}
-
-#[derive(FromQueryResult)]
-struct Total {
-    total: i32,
-}
-
 fn label(
     id: Option<String>,
     name: Option<String>,
@@ -252,8 +215,7 @@ pub async fn search(
         .map(|tokens| {
             tokens
                 .split(',')
-                .map(|t| js_trim(t).to_owned())
-                .filter(|t| !t.is_empty())
+                .filter_map(|t| trimmed_text(Some(t)))
                 .collect()
         })
         .unwrap_or_default();
@@ -263,37 +225,13 @@ pub async fn search(
             total: 0,
         });
     }
-    let has_text = !text.is_empty();
-    let vector = "to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))";
-    let text_filter = if has_text {
-        format!("{vector} @@ plainto_tsquery('english', $2) OR e.title ILIKE '%' || $2 || '%'")
-    } else {
-        "FALSE".into()
-    };
-    let rank = if has_text {
-        format!("ts_rank({vector}, plainto_tsquery('english', $2))")
-    } else {
-        "0".into()
-    };
     let limit = query
         .limit
         .filter(|limit| *limit != 0)
         .unwrap_or(20)
         .clamp(1, 50);
     let offset = query.offset.unwrap_or(0).max(0);
-    let mut values: Vec<SqlValue> = vec![user.id.clone().into(), text.clone().into()];
-    let mut token_filter = String::new();
-    if !tokens.is_empty() {
-        let placeholders: Vec<String> = (0..tokens.len())
-            .map(|i| format!("${}", values.len() + i + 1))
-            .collect();
-        token_filter = format!(
-            "OR (e.blind_index_tokens IS NOT NULL AND e.blind_index_tokens::jsonb ?| ARRAY[{}])",
-            placeholders.join(", ")
-        );
-        values.extend(tokens.into_iter().map(SqlValue::from));
-    }
-    let mut date_filter = String::new();
+    let mut dates = None;
     if let (Some(start), Some(end)) = (
         query.start_date.as_deref().filter(|s| !s.is_empty()),
         query.end_date.as_deref().filter(|s| !s.is_empty()),
@@ -302,51 +240,10 @@ pub async fn search(
         let (Some(start), Some(end)) = (parse(start), parse(end)) else {
             return Err(AppError::internal("search dates are not valid instants"));
         };
-        date_filter = format!(
-            "AND e.start <= ${}::timestamp AND e.end >= ${}::timestamp",
-            values.len() + 1,
-            values.len() + 2
-        );
-        values.push(start.into());
-        values.push(end.into());
+        dates = Some((start, end));
     }
-    let where_clause =
-        format!("WHERE e.user_id = $1 AND ({text_filter} {token_filter}) {date_filter}");
-    let count_values = values.clone();
-    let (limit_at, offset_at) = (values.len() + 1, values.len() + 2);
-    values.push(limit.into());
-    values.push(offset.into());
-    let backend = state.db.get_database_backend();
-    let rows = SearchRow::find_by_statement(Statement::from_sql_and_values(
-        backend,
-        format!(
-            r#"SELECT e.id, e.title, e.description, e.start, e."end", e.all_day, e.location, e.color,
-                e.calendar_id, e.category_id, e.timezone, e.recurrence, e.user_id, e.created_at, e.updated_at,
-                e.encrypted_content, e.blind_index_tokens, e.encryption_state, e.encryption_key_version,
-                c.id AS calendar_label_id, c.name AS calendar_label_name, c.color AS calendar_label_color,
-                c.encrypted_name AS calendar_label_encrypted_name, c.encryption_key_version AS calendar_label_key_version,
-                cat.id AS category_label_id, cat.name AS category_label_name, cat.color AS category_label_color,
-                cat.encrypted_name AS category_label_encrypted_name, cat.encryption_key_version AS category_label_key_version,
-                {rank} AS rank
-            FROM calendar_event e
-            LEFT JOIN calendar c ON e.calendar_id = c.id
-            LEFT JOIN event_category cat ON e.category_id = cat.id
-            {where_clause}
-            ORDER BY rank DESC, e.start DESC
-            LIMIT ${limit_at} OFFSET ${offset_at}"#
-        ),
-        values,
-    ))
-    .all(&state.db)
-    .await?;
-    let total = Total::find_by_statement(Statement::from_sql_and_values(
-        backend,
-        format!("SELECT count(*)::int AS total FROM calendar_event e {where_clause}"),
-        count_values,
-    ))
-    .one(&state.db)
-    .await?
-    .map_or(0, |row| i64::from(row.total));
+    let (rows, total) =
+        queries::search(&state.db, &user.id, &text, tokens, dates, limit, offset).await?;
     let ids: Vec<String> = rows.iter().map(|row| row.id.clone()).collect();
     let participants = participant_map(&state.db, &ids).await?;
     let mut events = Vec::new();
@@ -399,21 +296,18 @@ pub async fn search(
 async fn participant_map<C: ConnectionTrait>(
     db: &C,
     event_ids: &[String],
-) -> Result<std::collections::HashMap<String, Vec<EventParticipant>>, sea_orm::DbErr> {
-    let mut grouped: std::collections::HashMap<
-        String,
-        Vec<(event_participant::Model, Option<user::Model>)>,
-    > = std::collections::HashMap::new();
+) -> Result<HashMap<String, Vec<EventParticipant>>, sea_orm::DbErr> {
     if event_ids.is_empty() {
-        return Ok(std::collections::HashMap::new());
+        return Ok(HashMap::new());
     }
+    let mut grouped: HashMap<String, Vec<_>> = HashMap::new();
     for (row, owner) in queries::participants_with_users(db, event_ids).await? {
         let email = if row.email.is_empty() {
-            owner.as_ref().map(|u| u.email.clone())
+            owner.as_ref().map(|u| u.email.as_str())
         } else {
-            Some(row.email.clone())
+            Some(row.email.as_str())
         };
-        if email.is_some_and(|email| is_reserved_system_email(&email, None)) {
+        if email.is_some_and(|email| is_reserved_system_email(email, None)) {
             continue;
         }
         grouped
@@ -439,13 +333,17 @@ pub async fn search_corpus(
         .unwrap_or(100)
         .clamp(1, 200);
     let offset = query.offset.unwrap_or(0).max(0);
-    let updated_after = match query.updated_after.as_deref().filter(|s| !s.is_empty()) {
-        Some(text) => Some(instant_or(
-            text,
-            "Invalid updatedAfter date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)",
-        )?),
-        None => None,
-    };
+    let updated_after = query
+        .updated_after
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|text| {
+            instant_or(
+                text,
+                "Invalid updatedAfter date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)",
+            )
+        })
+        .transpose()?;
     let (rows, total) = queries::corpus_page(
         &state.db,
         &user.id,

@@ -6,12 +6,8 @@ use std::sync::LazyLock;
 use regex_lite::Regex;
 
 use super::zones::strip_quotes;
-use super::{js, rrule, vtimezone, zones};
+use super::{array_index, js, pattern, rrule, vtimezone, zones};
 use crate::http::zod::{js_number, js_number_string};
-
-fn pattern(source: &str) -> Regex {
-    Regex::new(source).unwrap_or_else(|error| panic!("ics pattern {source}: {error}"))
-}
 
 static LINE: LazyLock<Regex> = LazyLock::new(|| {
     pattern(
@@ -111,14 +107,6 @@ pub struct Obj {
     positions: HashMap<String, usize>,
 }
 
-fn array_index(key: &str) -> Option<u32> {
-    let canonical =
-        key == "0" || (!key.starts_with('0') && key.bytes().all(|b| b.is_ascii_digit()));
-    key.parse::<u32>()
-        .ok()
-        .filter(|index| canonical && !key.is_empty() && *index != u32::MAX)
-}
-
 impl Obj {
     pub fn with_type(kind: &str) -> Self {
         let mut obj = Self::default();
@@ -139,10 +127,10 @@ impl Obj {
     fn get_mut(&mut self, key: &str) -> Option<&mut Val> {
         match array_index(key) {
             Some(index) => self.indexed.get_mut(&index),
-            None => match self.positions.get(key) {
-                Some(&at) => self.named[at].1.as_mut(),
-                None => None,
-            },
+            None => self
+                .positions
+                .get(key)
+                .and_then(|&at| self.named[at].1.as_mut()),
         }
     }
 
@@ -505,10 +493,10 @@ pub fn parse(content: &str, user_timezone: &str) -> Result<Obj, String> {
 }
 
 fn read(content: &str, user_timezone: Option<&str>, zones: Vec<FileZone>) -> Result<Obj, String> {
-    let mut lines: Vec<&str> = content.split('\n').collect();
-    for line in &mut lines {
-        *line = line.strip_suffix('\r').unwrap_or(line);
-    }
+    let lines: Vec<&str> = content
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        .collect();
     let mut reader = Reader {
         stack: Vec::new(),
         next_id: 0,
@@ -1122,7 +1110,7 @@ fn convert_rrule(curr: &mut Obj) -> Result<(), String> {
         let Some(date) = start_date else {
             return Err("curr.start.getTime is not a function. (In 'curr.start.getTime()', 'curr.start.getTime' is undefined)".into());
         };
-        let ms = date.ms.ok_or("Invalid epoch milliseconds")?;
+        date.ms.ok_or("Invalid epoch milliseconds")?;
         let zone = date
             .tz
             .as_deref()
@@ -1131,7 +1119,7 @@ fn convert_rrule(curr: &mut Obj) -> Result<(), String> {
             .and_then(|info| info.iana.or(info.offset))
             .and_then(|zone| zones::temporal_id(&zone))
             .unwrap_or_else(|| "UTC".into());
-        rrule::with_start(&rule_only, ms, &zone)?
+        rrule::with_start(&rule_only, &zone)?
     };
     curr.set("rrule", Val::Rrule(Box::new(options)));
     Ok(())

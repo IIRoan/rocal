@@ -5,9 +5,11 @@ use solace_api_types::common::OperationWarning;
 use crate::addresses::is_reserved_system_email;
 use crate::auth::cookies::encode_uri_component;
 use crate::email::{self, InvitedEvent, Message};
-use crate::events::participants::{self, Synced};
+use crate::events::participants::Synced;
 use crate::integrations::ics::build::{self, Calendar};
-use crate::integrations::ics::{Participant, ParticipantRole, ParticipantStatus, resolve_timezone};
+use crate::integrations::ics::{
+    Participant, ParticipantRole, ParticipantStatus, normalize_email, resolve_timezone,
+};
 use crate::integrations::stalwart::mailer::Attachment;
 use crate::state::AppState;
 use crate::telemetry::log_ref;
@@ -28,7 +30,7 @@ pub async fn send_pending(
     if synced.new_invitees.is_empty() {
         return Vec::new();
     }
-    let ics = build::event_file(
+    let ics = build::build_calendar(
         &Calendar {
             name: Some(
                 if calendar_name.is_empty() {
@@ -42,7 +44,7 @@ pub async fn send_pending(
             method: Some("REQUEST"),
             ..Calendar::default()
         },
-        build::Event {
+        &[build::Event {
             participants: Some(
                 synced
                     .resolved
@@ -60,7 +62,7 @@ pub async fn send_pending(
                     .collect(),
             ),
             ..invitation.clone()
-        },
+        }],
     );
     let open_url = open_url(state, event_id);
     let event = InvitedEvent {
@@ -109,7 +111,7 @@ fn open_url(state: &AppState, event_id: &str) -> Option<String> {
 
 /// `sendEventInvitationEmail`: best effort, and never to a reserved system address.
 async fn deliver(state: &AppState, to: &str, message: &Message) -> bool {
-    let email = participants::normalize_email(Some(to));
+    let email = normalize_email(to);
     if is_reserved_system_email(&email, None) {
         tracing::warn!(
             recipient_ref = log_ref(&email),
