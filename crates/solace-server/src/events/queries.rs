@@ -4,8 +4,9 @@ use std::collections::HashMap;
 
 use sea_orm::sea_query::{Condition, Expr, Query, SelectStatement};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, FromQueryResult,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Statement,
+    Value as SqlValue,
 };
 
 use super::participants::Resolved;
@@ -450,6 +451,129 @@ pub async fn corpus_page<C: ConnectionTrait>(
         .count(db)
         .await?;
     Ok((events, total))
+}
+
+/// A search hit with its calendar's and category's labels.
+#[derive(FromQueryResult)]
+pub struct SearchRow {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub start: time::PrimitiveDateTime,
+    pub end: time::PrimitiveDateTime,
+    pub all_day: bool,
+    pub location: Option<String>,
+    pub color: Option<String>,
+    pub calendar_id: String,
+    pub category_id: Option<String>,
+    pub timezone: String,
+    pub recurrence: Option<String>,
+    pub user_id: String,
+    pub created_at: time::PrimitiveDateTime,
+    pub updated_at: time::PrimitiveDateTime,
+    pub encrypted_content: Option<String>,
+    pub blind_index_tokens: Option<String>,
+    pub encryption_state: String,
+    pub encryption_key_version: i32,
+    pub calendar_label_id: Option<String>,
+    pub calendar_label_name: Option<String>,
+    pub calendar_label_color: Option<String>,
+    pub calendar_label_encrypted_name: Option<String>,
+    pub calendar_label_key_version: Option<i32>,
+    pub category_label_id: Option<String>,
+    pub category_label_name: Option<String>,
+    pub category_label_color: Option<String>,
+    pub category_label_encrypted_name: Option<String>,
+    pub category_label_key_version: Option<i32>,
+}
+
+#[derive(FromQueryResult)]
+struct Total {
+    total: i32,
+}
+
+/// Full-text matches of `text` (or a title substring) and blind-index token matches, best first, with the total.
+pub async fn search<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+    text: &str,
+    tokens: Vec<String>,
+    dates: Option<(time::PrimitiveDateTime, time::PrimitiveDateTime)>,
+    limit: i64,
+    offset: i64,
+) -> Result<(Vec<SearchRow>, i64), sea_orm::DbErr> {
+    let has_text = !text.is_empty();
+    let vector = "to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))";
+    let text_filter = if has_text {
+        format!("{vector} @@ plainto_tsquery('english', $2) OR e.title ILIKE '%' || $2 || '%'")
+    } else {
+        "FALSE".into()
+    };
+    let rank = if has_text {
+        format!("ts_rank({vector}, plainto_tsquery('english', $2))")
+    } else {
+        "0".into()
+    };
+    let mut values: Vec<SqlValue> = vec![user_id.into(), text.into()];
+    let mut token_filter = String::new();
+    if !tokens.is_empty() {
+        let placeholders: Vec<String> = (0..tokens.len())
+            .map(|i| format!("${}", values.len() + i + 1))
+            .collect();
+        token_filter = format!(
+            "OR (e.blind_index_tokens IS NOT NULL AND e.blind_index_tokens::jsonb ?| ARRAY[{}])",
+            placeholders.join(", ")
+        );
+        values.extend(tokens.into_iter().map(SqlValue::from));
+    }
+    let mut date_filter = String::new();
+    if let Some((start, end)) = dates {
+        date_filter = format!(
+            "AND e.start <= ${}::timestamp AND e.end >= ${}::timestamp",
+            values.len() + 1,
+            values.len() + 2
+        );
+        values.push(start.into());
+        values.push(end.into());
+    }
+    let where_clause =
+        format!("WHERE e.user_id = $1 AND ({text_filter} {token_filter}) {date_filter}");
+    let count_values = values.clone();
+    let (limit_at, offset_at) = (values.len() + 1, values.len() + 2);
+    values.push(limit.into());
+    values.push(offset.into());
+    let backend = db.get_database_backend();
+    let rows = SearchRow::find_by_statement(Statement::from_sql_and_values(
+        backend,
+        format!(
+            r#"SELECT e.id, e.title, e.description, e.start, e."end", e.all_day, e.location, e.color,
+                e.calendar_id, e.category_id, e.timezone, e.recurrence, e.user_id, e.created_at, e.updated_at,
+                e.encrypted_content, e.blind_index_tokens, e.encryption_state, e.encryption_key_version,
+                c.id AS calendar_label_id, c.name AS calendar_label_name, c.color AS calendar_label_color,
+                c.encrypted_name AS calendar_label_encrypted_name, c.encryption_key_version AS calendar_label_key_version,
+                cat.id AS category_label_id, cat.name AS category_label_name, cat.color AS category_label_color,
+                cat.encrypted_name AS category_label_encrypted_name, cat.encryption_key_version AS category_label_key_version,
+                {rank} AS rank
+            FROM calendar_event e
+            LEFT JOIN calendar c ON e.calendar_id = c.id
+            LEFT JOIN event_category cat ON e.category_id = cat.id
+            {where_clause}
+            ORDER BY rank DESC, e.start DESC
+            LIMIT ${limit_at} OFFSET ${offset_at}"#
+        ),
+        values,
+    ))
+    .all(db)
+    .await?;
+    let total = Total::find_by_statement(Statement::from_sql_and_values(
+        backend,
+        format!("SELECT count(*)::int AS total FROM calendar_event e {where_clause}"),
+        count_values,
+    ))
+    .one(db)
+    .await?
+    .map_or(0, |row| i64::from(row.total));
+    Ok((rows, total))
 }
 
 /// The declined copy moves to the hidden staging calendar and forgets its Stalwart copy.
