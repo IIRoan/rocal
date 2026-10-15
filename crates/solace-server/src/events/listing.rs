@@ -18,6 +18,7 @@ use crate::db::entities::calendar_event;
 use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
+use crate::integrations::ics::trimmed_text;
 use crate::state::AppState;
 
 /// The rule an empty recurrence gets when the title says it repeats on weekdays.
@@ -214,8 +215,7 @@ pub async fn search(
         .map(|tokens| {
             tokens
                 .split(',')
-                .map(|t| js_trim(t).to_owned())
-                .filter(|t| !t.is_empty())
+                .filter_map(|t| trimmed_text(Some(t)))
                 .collect()
         })
         .unwrap_or_default();

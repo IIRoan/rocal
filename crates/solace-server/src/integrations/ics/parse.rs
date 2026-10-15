@@ -9,7 +9,7 @@ use time::PrimitiveDateTime;
 use super::reader::{self, Obj, Val};
 use super::{
     Frequency, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, external_id, js,
-    normalize_email, normalize_timezone, pattern, resolve_timezone, zones,
+    normalize_email, normalize_timezone, pattern, resolve_timezone, trimmed_text, zones,
 };
 use crate::http::zod::js_trim;
 use crate::instant;
@@ -86,7 +86,7 @@ pub fn parse(content: &str, user_timezone: &str) -> ParseResult {
         }
         let first = |keys: &[&str]| {
             keys.iter().find_map(|key| match calendar.get(key) {
-                Some(Val::Str(text)) if !js_trim(text).is_empty() => Some(js_trim(text).to_owned()),
+                Some(Val::Str(text)) => trimmed_text(Some(text)),
                 _ => None,
             })
         };
@@ -144,11 +144,10 @@ pub fn parse(content: &str, user_timezone: &str) -> ParseResult {
 
 /// `getTextValue`: a trimmed, non-empty string or `{ val }`.
 fn text_value(value: Option<&Val>) -> Option<String> {
-    let text = match value? {
-        Val::Str(text) | Val::Param(_, text) => js_trim(text),
-        _ => return None,
-    };
-    (!text.is_empty()).then(|| text.to_owned())
+    match value? {
+        Val::Str(text) | Val::Param(_, text) => trimmed_text(Some(text)),
+        _ => None,
+    }
 }
 
 /// `coerceDate`: a valid `Date`, or a string `new Date` accepts.
@@ -502,8 +501,7 @@ fn clean_invite_description(value: Option<&str>) -> Option<String> {
     let joined = BLANK_RUNS
         .replace_all(&kept.join("\n"), "\n\n")
         .into_owned();
-    let cleaned = js_trim(&joined);
-    (!cleaned.is_empty()).then(|| cleaned.to_owned())
+    trimmed_text(Some(&joined))
 }
 
 /// `convertParsedEventToCalendarEvent`: the plaintext row a feed sync creates.

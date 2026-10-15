@@ -28,7 +28,7 @@ use crate::entity_metadata::{CALENDAR_COLORS, external_calendar_name, is_valid_c
 use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
-use crate::integrations::ics::{build, export};
+use crate::integrations::ics::{build, export, trimmed_text};
 use crate::invitations::request;
 use crate::invitations::rsvp_reply::RsvpStatus;
 use crate::notifications::calculator;
@@ -561,7 +561,7 @@ pub async fn update(
         None => existing.title.clone(),
     };
     let optional = |given: &Option<String>, current: &Option<String>| match given {
-        Some(value) => Some(js_trim(value).to_owned()).filter(|v| !v.is_empty()),
+        Some(value) => trimmed_text(Some(value)),
         None => current.clone(),
     };
     let next_description = optional(&request.description, &existing.description);
