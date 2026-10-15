@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 use regex_lite::Regex;
 
 use super::zones::strip_quotes;
-use super::{js, pattern, rrule, vtimezone, zones};
+use super::{array_index, js, pattern, rrule, vtimezone, zones};
 use crate::http::zod::{js_number, js_number_string};
 
 static LINE: LazyLock<Regex> = LazyLock::new(|| {
@@ -105,14 +105,6 @@ pub struct Obj {
     indexed: BTreeMap<u32, Val>,
     named: Vec<(String, Option<Val>)>,
     positions: HashMap<String, usize>,
-}
-
-fn array_index(key: &str) -> Option<u32> {
-    let canonical =
-        key == "0" || (!key.starts_with('0') && key.bytes().all(|b| b.is_ascii_digit()));
-    key.parse::<u32>()
-        .ok()
-        .filter(|index| canonical && !key.is_empty() && *index != u32::MAX)
 }
 
 impl Obj {

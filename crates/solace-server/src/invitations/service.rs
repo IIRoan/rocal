@@ -19,7 +19,7 @@ use crate::events::{participants, queries as events};
 use crate::http::zod::js_trim;
 use crate::instant;
 use crate::integrations::ics::parse::{self, ParsedEvent};
-use crate::integrations::ics::{ParticipantRole, RecurrenceRule, resolve_timezone};
+use crate::integrations::ics::{ParticipantRole, RecurrenceRule, array_index, resolve_timezone};
 use crate::state::AppState;
 use crate::subscriptions::service::{
     self as subscriptions, link_series, participant_inputs, rows_by_uid, stored_participants,
@@ -223,13 +223,6 @@ fn collect_calendar_parts(part: Option<&BodyPart>, ids: &mut Vec<String>) {
     for sub in &part.sub_parts {
         collect_calendar_parts(Some(sub), ids);
     }
-}
-
-/// A canonical array index, which JavaScript lists before every other object key.
-fn array_index(key: &str) -> Option<u32> {
-    key.parse::<u32>()
-        .ok()
-        .filter(|index| *index != u32::MAX && index.to_string() == key)
 }
 
 /// `extractIcsPayloads`: calendar parts first, then any other decoded part that holds a VCALENDAR.

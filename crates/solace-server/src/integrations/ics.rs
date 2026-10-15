@@ -184,6 +184,15 @@ pub fn normalize_email(email: &str) -> String {
     without_scheme.to_lowercase()
 }
 
+/// A canonical array index, which JavaScript lists before every other object key.
+pub fn array_index(key: &str) -> Option<u32> {
+    let canonical =
+        key == "0" || (!key.starts_with('0') && key.bytes().all(|b| b.is_ascii_digit()));
+    key.parse::<u32>()
+        .ok()
+        .filter(|index| canonical && !key.is_empty() && *index != u32::MAX)
+}
+
 /// The trimmed text, or `None` when it is blank.
 pub fn trimmed_text(value: Option<&str>) -> Option<String> {
     value
