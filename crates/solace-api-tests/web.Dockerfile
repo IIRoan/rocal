@@ -1,6 +1,7 @@
 # The web app as a Railway test service against a test API; never deployed to production.
 FROM docker.io/oven/bun:1.4.3-debian@sha256:923bedb355f7746666659f71e724998159a5c8c54bd1cb1030e1975a0698415b
 WORKDIR /src
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 RUN bun install --frozen-lockfile
 # Next inlines NEXT_PUBLIC_* at build time; Railway passes the service variables as build arguments.
