@@ -105,87 +105,71 @@ pub async fn set(
     let mut created = Vec::new();
     let mut rows = Vec::new();
     let mut skipped = Vec::new();
-    if !in_past {
-        for setting in &settings {
-            let skip = |reason: &str| SkippedNotification {
-                notification_type: setting.notification_type.clone(),
-                minutes_before: setting.minutes_before,
-                reason: reason.into(),
-            };
-            if !setting.is_enabled {
-                skipped.push(skip("disabled"));
-                continue;
-            }
-            let schedule = calculator::schedule_upcoming_reminder(
-                instant::unix_millis(event.start),
-                f64::from(setting.minutes_before),
-                Some(&event.timezone),
-                instant::unix_millis(now),
-            )
-            .map_err(AppError::internal)?;
-            let Some(schedule) = schedule else {
-                skipped.push(skip("notification_time_in_past"));
-                continue;
-            };
-            let notification_time = instant::from_unix_millis(schedule.notification_time_ms)
-                .ok_or_else(|| AppError::internal("reminder time out of range"))?;
-            let id = uuid::Uuid::new_v4().to_string();
-            rows.push(event_notification::ActiveModel {
-                id: Set(id.clone()),
-                event_id: Set(event_id.to_owned()),
-                notification_type: Set(setting.notification_type.clone()),
-                minutes_before: Set(setting.minutes_before),
-                notification_time: Set(notification_time),
-                notification_date_local: Set(schedule.notification_date_local.clone()),
-                notification_timezone: Set(schedule.notification_timezone.clone()),
-                is_enabled: Set(true),
-                is_sent: Set(false),
-                encrypted_display_title: Set(display_title.clone()),
-                created_at: Set(now),
-                updated_at: Set(now),
-            });
-            created.push(CreatedNotification {
-                id: id.into(),
-                kind: setting.notification_type.clone(),
-                minutes_before: setting.minutes_before,
-                notification_time: instant::iso(notification_time),
-                notification_date_local: schedule.notification_date_local,
-                notification_timezone: schedule.notification_timezone,
-                is_enabled: true,
-            });
+    for setting in &settings {
+        let skip = |reason: &str| SkippedNotification {
+            notification_type: setting.notification_type.clone(),
+            minutes_before: setting.minutes_before,
+            reason: reason.into(),
+        };
+        if in_past {
+            skipped.push(skip("event_in_past"));
+            continue;
         }
+        if !setting.is_enabled {
+            skipped.push(skip("disabled"));
+            continue;
+        }
+        let schedule = calculator::schedule_upcoming_reminder(
+            instant::unix_millis(event.start),
+            f64::from(setting.minutes_before),
+            Some(&event.timezone),
+            instant::unix_millis(now),
+        )
+        .map_err(AppError::internal)?;
+        let Some(schedule) = schedule else {
+            skipped.push(skip("notification_time_in_past"));
+            continue;
+        };
+        let notification_time = instant::from_unix_millis(schedule.notification_time_ms)
+            .ok_or_else(|| AppError::internal("reminder time out of range"))?;
+        let id = uuid::Uuid::new_v4().to_string();
+        rows.push(event_notification::ActiveModel {
+            id: Set(id.clone()),
+            event_id: Set(event_id.to_owned()),
+            notification_type: Set(setting.notification_type.clone()),
+            minutes_before: Set(setting.minutes_before),
+            notification_time: Set(notification_time),
+            notification_date_local: Set(schedule.notification_date_local.clone()),
+            notification_timezone: Set(schedule.notification_timezone.clone()),
+            is_enabled: Set(true),
+            is_sent: Set(false),
+            encrypted_display_title: Set(display_title.clone()),
+            created_at: Set(now),
+            updated_at: Set(now),
+        });
+        created.push(CreatedNotification {
+            id: id.into(),
+            kind: setting.notification_type.clone(),
+            minutes_before: setting.minutes_before,
+            notification_time: instant::iso(notification_time),
+            notification_date_local: schedule.notification_date_local,
+            notification_timezone: schedule.notification_timezone,
+            is_enabled: true,
+        });
     }
     let transaction = state.db.begin().await?;
     queries::set_event_reminder(&transaction, &user.id, &event.id, reminder_minutes).await?;
     queries::delete_for_event(&transaction, event_id).await?;
     queries::insert(&transaction, rows).await?;
     transaction.commit().await?;
-    if in_past {
-        let skipped: Vec<SkippedNotification> = settings
-            .iter()
-            .map(|s| SkippedNotification {
-                notification_type: s.notification_type.clone(),
-                minutes_before: s.minutes_before,
-                reason: "event_in_past".into(),
-            })
-            .collect();
-        return Ok(NotificationUpdateResult {
-            success: true,
-            message: "Event is in the past; notifications skipped".into(),
-            data: Some(NotificationUpdateData {
-                event_id: event_id.to_owned().into(),
-                created: 0,
-                skipped: i64::try_from(skipped.len()).unwrap_or(i64::MAX),
-                details: NotificationUpdateDetails {
-                    created_notifications: Vec::new(),
-                    skipped_configurations: skipped,
-                },
-            }),
-        });
-    }
+    let message = if in_past {
+        "Event is in the past; notifications skipped"
+    } else {
+        "Event notifications updated successfully"
+    };
     Ok(NotificationUpdateResult {
         success: true,
-        message: "Event notifications updated successfully".into(),
+        message: message.into(),
         data: Some(NotificationUpdateData {
             event_id: event_id.to_owned().into(),
             created: i64::try_from(created.len()).unwrap_or(i64::MAX),

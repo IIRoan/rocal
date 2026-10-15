@@ -221,10 +221,6 @@ async fn consume_challenge(
     Ok(challenge)
 }
 
-async fn user_passkeys(state: &AppState, user_id: &str) -> Result<Vec<passkey::Model>, ApiError> {
-    Ok(store::user_passkeys(&state.db, user_id).await?)
-}
-
 /// `excludeCredentials` / `allowCredentials` entries as simplewebauthn writes them.
 fn descriptors(passkeys: &[passkey::Model]) -> Vec<Value> {
     passkeys
@@ -315,7 +311,7 @@ pub async fn registration_options(
             "pubKeyCredParams": OFFERED_ALGORITHMS.map(|alg| json!({"alg": alg, "type": "public-key"})),
             "timeout": TIMEOUT_MS,
             "attestation": "none",
-            "excludeCredentials": descriptors(&user_passkeys(&state, &user.id).await?),
+            "excludeCredentials": descriptors(&store::user_passkeys(&state.db, &user.id).await?),
             "authenticatorSelection": selection,
             "extensions": {"credProps": true},
             "hints": [],
@@ -342,7 +338,7 @@ pub async fn authentication_options(State(state): State<AppState>, headers: Head
         let mut options =
             json!({"rpId": rp_id(&state.config.passkey_origin), "challenge": challenge});
         let passkeys = match &lookup.session {
-            Some(active) => user_passkeys(&state, &active.user.id).await?,
+            Some(active) => store::user_passkeys(&state.db, &active.user.id).await?,
             None => Vec::new(),
         };
         if !passkeys.is_empty() {
@@ -654,7 +650,7 @@ pub async fn list(State(state): State<AppState>, headers: HeaderMap) -> Response
     let mut cookies = Vec::new();
     let outcome = async {
         let active = require_session(&state, &headers, &mut cookies).await?;
-        let passkeys: Vec<Passkey> = user_passkeys(&state, &active.user.id)
+        let passkeys: Vec<Passkey> = store::user_passkeys(&state.db, &active.user.id)
             .await?
             .iter()
             .map(passkey_dto)
