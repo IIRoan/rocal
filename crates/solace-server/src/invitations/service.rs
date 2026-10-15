@@ -12,6 +12,7 @@ use solace_api_types::events::{
 
 use super::queries;
 use super::rsvp_reply::{self, Reply, RsvpStatus};
+use crate::calendars::queries as calendars;
 use crate::db::entities::{calendar, calendar_event, event_participant};
 use crate::error::AppError;
 use crate::events::encryption::resolve_persistence_policy;
@@ -56,11 +57,11 @@ pub async fn resolve_accepted_invitation_target_calendar<C: ConnectionTrait>(
     if let Some(existing) = queries::first_writable_calendar(db, user_id).await? {
         return Ok(Some(existing));
     }
-    if queries::count_calendars(db, user_id).await? > 0 {
+    if calendars::count_owned_by(db, user_id).await? > 0 {
         return Ok(None);
     }
-    let personal = queries::new_calendar(user_id, "Personal", "#10b981", true, true);
-    queries::insert_calendar(db, personal).await.map(Some)
+    let personal = calendars::new_calendar(user_id, "Personal", "#10b981", true, true);
+    calendars::insert(db, personal).await.map(Some)
 }
 
 /// `resolveInvitationStagingCalendar`: the hidden Invitations calendar, created on first use.
@@ -71,14 +72,14 @@ pub async fn resolve_invitation_staging_calendar<C: ConnectionTrait>(
     if let Some(existing) = queries::staging_calendar(db, user_id).await? {
         return Ok(existing);
     }
-    let staging = queries::new_calendar(
+    let staging = calendars::new_calendar(
         user_id,
         crate::entity_metadata::MAIL_INVITATION_STAGING_CALENDAR_NAME,
         "#78716c",
         false,
         false,
     );
-    queries::insert_calendar(db, staging).await
+    calendars::insert(db, staging).await
 }
 
 /// A JMAP `Email` as mail sync fetches it: the body structure and the decoded text parts.
@@ -572,12 +573,9 @@ async fn upsert(
         .map(|event| event.uid.clone())
         .collect();
     let existing = queries::copies(&state.db, user_id, uids).await?;
-    let mut rows: HashMap<String, Vec<event_participant::Model>> = HashMap::new();
-    for row in
-        queries::participants(&state.db, existing.iter().map(|e| e.id.clone()).collect()).await?
-    {
-        rows.entry(row.event_id.clone()).or_default().push(row);
-    }
+    let rows =
+        events::participants_by_event(&state.db, existing.iter().map(|e| e.id.clone()).collect())
+            .await?;
     let by_uid: HashMap<&str, &calendar_event::Model> = existing
         .iter()
         .filter_map(|event| event.external_id.as_deref().map(|uid| (uid, event)))

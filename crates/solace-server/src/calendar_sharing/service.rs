@@ -6,6 +6,7 @@ use super::queries;
 use crate::auth::api::{ALPHANUMERIC, random_string};
 use crate::auth::cookies::encode_uri_component;
 use crate::auth::guard::RouteUser;
+use crate::calendars::queries as calendars;
 use crate::db::entities::calendar;
 use crate::entity_metadata::external_calendar_name;
 use crate::error::AppError;
@@ -55,7 +56,7 @@ async fn shareable(
     user: &RouteUser,
     id: &str,
 ) -> Result<calendar::Model, AppError> {
-    let calendar = queries::find(&state.db, &user.id, id)
+    let calendar = calendars::find(&state.db, &user.id, id)
         .await?
         .ok_or_else(not_found)?;
     if calendar.is_sync_only {
@@ -114,7 +115,7 @@ pub async fn disable(
     user: &RouteUser,
     id: &str,
 ) -> Result<DisableShareLinkResponse, AppError> {
-    let calendar = queries::find(&state.db, &user.id, id)
+    let calendar = calendars::find(&state.db, &user.id, id)
         .await?
         .ok_or_else(not_found)?;
     if calendar.is_sync_only {

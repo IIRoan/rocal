@@ -57,21 +57,8 @@ pub async fn ensure_user_calendars(state: &AppState, user_id: &str) {
             return Ok(());
         }
         for (name, color, is_default) in DEFAULT_CALENDARS {
-            queries::insert(
-                &state.db,
-                calendar::ActiveModel {
-                    name: Set(name.into()),
-                    color: Set(color.into()),
-                    kind: Set("owned".into()),
-                    is_public: Set(false),
-                    is_visible: Set(true),
-                    is_default: Set(is_default),
-                    force_full_encryption: Set(false),
-                    user_id: Set(user_id.to_owned()),
-                    ..Default::default()
-                },
-            )
-            .await?;
+            let row = queries::new_calendar(user_id, name, color, true, is_default);
+            queries::insert(&state.db, row).await?;
         }
         tracing::info!("Created default calendars");
         Ok(())

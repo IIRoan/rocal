@@ -11,8 +11,8 @@ use sea_orm::{
 
 use crate::db::cuid;
 use crate::db::entities::{
-    calendar, calendar_event, calendar_subscription, calendar_sync_log, event_participant,
-    recurrence_exception, user_settings,
+    calendar, calendar_event, calendar_subscription, calendar_sync_log, recurrence_exception,
+    user_settings,
 };
 use crate::events::queries as events;
 use crate::instant;
@@ -388,16 +388,6 @@ pub async fn feed_events<C: ConnectionTrait>(
         .await
 }
 
-pub async fn participants_of<C: ConnectionTrait>(
-    db: &C,
-    event_ids: Vec<String>,
-) -> Result<Vec<event_participant::Model>, sea_orm::DbErr> {
-    event_participant::Entity::find()
-        .filter(event_participant::Column::EventId.is_in(event_ids))
-        .all(db)
-        .await
-}
-
 pub async fn insert_event<C: ConnectionTrait>(
     db: &C,
     event: NewEvent,
@@ -496,17 +486,6 @@ pub async fn replace_exceptions<C: ConnectionTrait>(
     Ok(())
 }
 
-pub async fn owned_calendar<C: ConnectionTrait>(
-    db: &C,
-    id: &str,
-    user_id: &str,
-) -> Result<Option<calendar::Model>, sea_orm::DbErr> {
-    calendar::Entity::find_by_id(id)
-        .filter(calendar::Column::UserId.eq(user_id))
-        .one(db)
-        .await
-}
-
 /// External ids among `external_ids` that already name a non-feed event in the calendar.
 pub async fn taken_external_ids<C: ConnectionTrait>(
     db: &C,
@@ -542,13 +521,6 @@ pub async fn imported_event<C: ConnectionTrait>(
         query = query.filter(calendar_event::Column::Recurrence.is_not_null());
     }
     query.one(db).await
-}
-
-pub async fn insert_encrypted_event<C: ConnectionTrait>(
-    db: &C,
-    row: calendar_event::ActiveModel,
-) -> Result<calendar_event::Model, sea_orm::DbErr> {
-    row.insert(db).await
 }
 
 pub async fn insert_deleted_exception<C: ConnectionTrait>(

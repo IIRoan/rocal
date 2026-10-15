@@ -20,9 +20,7 @@ use solace_api_types::subscriptions::{
 use super::holidays;
 use super::queries::{self, FeedChanges, SyncOutcome};
 use crate::auth::guard::RouteUser;
-use crate::db::entities::{
-    calendar, calendar_event, calendar_subscription, calendar_sync_log, event_participant,
-};
+use crate::db::entities::{calendar, calendar_event, calendar_subscription, calendar_sync_log};
 use crate::error::AppError;
 use crate::events::participants;
 use crate::events::queries as events_queries;
@@ -502,10 +500,7 @@ async fn reconcile<C: ConnectionTrait>(
 ) -> Result<Counts, AppError> {
     let current = queries::feed_events(db, &feed.id).await?;
     let ids = current.iter().map(|event| event.id.clone()).collect();
-    let mut people: HashMap<String, Vec<event_participant::Model>> = HashMap::new();
-    for row in queries::participants_of(db, ids).await? {
-        people.entry(row.event_id.clone()).or_default().push(row);
-    }
+    let people = events_queries::participants_by_event(db, ids).await?;
     let by_uid: HashMap<String, calendar_event::Model> = current
         .into_iter()
         .map(|event| (event.external_id.clone().unwrap_or_default(), event))
@@ -664,10 +659,11 @@ async fn import_target(
     user: &RouteUser,
     calendar_id: &str,
 ) -> Result<calendar::Model, AppError> {
-    let Some(calendar) = queries::owned_calendar(&state.db, calendar_id, &user.id).await? else {
+    let Some(calendar) = crate::calendars::queries::find(&state.db, &user.id, calendar_id).await?
+    else {
         return Err(AppError::NotFound(CALENDAR_NOT_FOUND.into()));
     };
-    if calendar.kind != "owned" || calendar.is_sync_only {
+    if !crate::events::service::is_writable(&calendar) {
         return Err(AppError::field(
             "Cannot import events into a read-only calendar.",
             "calendarId",
@@ -812,7 +808,7 @@ async fn import_encrypted(
             parent_event_id: Set(parent.as_ref().map(|parent| parent.id.clone())),
             ..Default::default()
         };
-        let event = queries::insert_encrypted_event(&transaction, row).await?;
+        let event = events_queries::insert(&transaction, row).await?;
         let people = entry.participants.as_deref().unwrap_or_default();
         participants::sync(&transaction, &event.id, people, None).await?;
         for date in entry.excluded_dates.iter().flatten() {

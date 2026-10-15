@@ -64,8 +64,8 @@ pub async fn list(
         queries::regular_in_range(db, &user.id, range_start, range_end),
         queries::recurring(db, &user.id),
         queries::modified_in_range(db, &user.id, range_start, range_end),
-        queries::active_categories(db, &user.id),
-        queries::calendars_of(db, &user.id),
+        crate::categories::queries::active(db, &user.id),
+        crate::calendars::queries::owned_by(db, &user.id),
     )?;
     let all: Vec<&calendar_event::Model> =
         regular.iter().chain(&recurring).chain(&modified).collect();

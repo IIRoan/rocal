@@ -19,6 +19,7 @@ use crate::db::entities::{calendar_event, event_participant, user};
 use crate::error::AppError;
 use crate::events::encryption::resolve_invitation_content;
 use crate::events::recurrence::{generate_instances, validate_rule};
+use crate::events::service::is_writable;
 use crate::events::view::{Relations, event_dto};
 use crate::events::{participants, queries as events};
 use crate::http::zod::js_trim;
@@ -191,7 +192,7 @@ async fn assert_targets_owned(
     updates: &RecurringUpdates,
 ) -> Result<(), AppError> {
     if let Some(id) = updates.calendar_id.as_ref().filter(|id| !id.0.is_empty()) {
-        let calendar = events::calendar(&state.db, user_id, &id.0)
+        let calendar = crate::calendars::queries::find(&state.db, user_id, &id.0)
             .await?
             .ok_or_else(|| {
                 AppError::field(
@@ -199,7 +200,7 @@ async fn assert_targets_owned(
                     "calendarId",
                 )
             })?;
-        if calendar.kind != "owned" || calendar.is_sync_only {
+        if !is_writable(&calendar) {
             return Err(AppError::field(
                 "Cannot move events to a read-only calendar.",
                 "calendarId",

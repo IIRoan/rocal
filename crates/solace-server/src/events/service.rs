@@ -19,6 +19,7 @@ use super::{constraints, queries, recurrence};
 use super::{participants, rsvp};
 use crate::addresses::is_reserved_system_email;
 use crate::auth::guard::RouteUser;
+use crate::calendars::queries as calendars;
 use crate::db::entities::{
     calendar, calendar_event, event_notification, recurrence_exception, user_settings,
 };
@@ -91,7 +92,7 @@ async fn own_calendar(
     user: &RouteUser,
     id: &str,
 ) -> Result<calendar::Model, AppError> {
-    queries::calendar(&state.db, &user.id, id)
+    calendars::find(&state.db, &user.id, id)
         .await?
         .ok_or_else(|| {
             AppError::field(
@@ -819,7 +820,7 @@ pub async fn bulk(
                     "targetCalendarId",
                 ));
             };
-            let target = queries::calendar(&state.db, &user.id, &target_id.0)
+            let target = calendars::find(&state.db, &user.id, &target_id.0)
                 .await?
                 .ok_or_else(|| {
                     AppError::field(

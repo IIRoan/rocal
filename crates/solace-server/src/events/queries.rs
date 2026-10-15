@@ -177,6 +177,22 @@ pub async fn participants_with_users<C: ConnectionTrait>(
         .await
 }
 
+/// The events' participant rows, by event id.
+pub async fn participants_by_event<C: ConnectionTrait>(
+    db: &C,
+    event_ids: Vec<String>,
+) -> Result<HashMap<String, Vec<event_participant::Model>>, sea_orm::DbErr> {
+    let mut grouped: HashMap<String, Vec<event_participant::Model>> = HashMap::new();
+    for row in event_participant::Entity::find()
+        .filter(event_participant::Column::EventId.is_in(event_ids))
+        .all(db)
+        .await?
+    {
+        grouped.entry(row.event_id.clone()).or_default().push(row);
+    }
+    Ok(grouped)
+}
+
 /// The series' own exceptions (Prisma's relation joined on `modified_event_id`, so TypeScript never applied them).
 pub async fn exceptions<C: ConnectionTrait>(
     db: &C,
@@ -185,18 +201,6 @@ pub async fn exceptions<C: ConnectionTrait>(
     recurrence_exception::Entity::find()
         .filter(recurrence_exception::Column::ParentEventId.is_in(series_ids))
         .order_by_asc(recurrence_exception::Column::ExceptionDate)
-        .all(db)
-        .await
-}
-
-pub async fn active_categories<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-) -> Result<Vec<event_category::Model>, sea_orm::DbErr> {
-    event_category::Entity::find()
-        .filter(event_category::Column::UserId.eq(user_id))
-        .filter(event_category::Column::IsActive.eq(true))
-        .order_by_asc(event_category::Column::Name)
         .all(db)
         .await
 }
@@ -211,30 +215,6 @@ pub async fn active_category<C: ConnectionTrait>(
         .filter(event_category::Column::UserId.eq(user_id))
         .filter(event_category::Column::IsActive.eq(true))
         .one(db)
-        .await
-}
-
-pub async fn calendar<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-    id: &str,
-) -> Result<Option<calendar::Model>, sea_orm::DbErr> {
-    calendar::Entity::find()
-        .filter(calendar::Column::Id.eq(id))
-        .filter(calendar::Column::UserId.eq(user_id))
-        .one(db)
-        .await
-}
-
-pub async fn calendars_of<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-) -> Result<Vec<calendar::Model>, sea_orm::DbErr> {
-    calendar::Entity::find()
-        .filter(calendar::Column::UserId.eq(user_id))
-        .order_by_desc(calendar::Column::IsDefault)
-        .order_by_asc(calendar::Column::Name)
-        .all(db)
         .await
 }
 
