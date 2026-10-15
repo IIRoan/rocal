@@ -8146,7 +8146,7 @@
               "string",
               "null"
             ],
-            "description": "`month`, `week`, `day` or `agenda`."
+            "description": "`month`, `week`, `3day`, `day` or `agenda`."
           },
           "emailNotifications": {
             "type": [

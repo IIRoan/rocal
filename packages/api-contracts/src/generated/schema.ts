@@ -2462,7 +2462,7 @@ export interface components {
             defaultCalendarId?: components["schemas"]["CalendarId"] | null;
             /** Format: int32 */
             defaultEventDuration?: number | null;
-            /** @description `month`, `week`, `day` or `agenda`. */
+            /** @description `month`, `week`, `3day`, `day` or `agenda`. */
             defaultView?: string | null;
             emailNotifications?: boolean | null;
             /** @description `hybrid` or `full`. */

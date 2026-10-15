@@ -177,6 +177,31 @@ async fn updates_are_stored_and_returned() {
     );
 }
 
+/// Web and native offer the 3-day view as the default; TypeScript's schema still rejects it.
+#[tokio::test]
+async fn the_three_day_view_can_be_the_default_view() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let response = user
+        .put("/api/settings", json!({"defaultView": "3day"}))
+        .await;
+    match app.backend {
+        Backend::TypeScript => {
+            ok(response.expect_error(
+                400,
+                "Validation Error",
+                "Invalid enum value. Expected 'month' | 'week' | 'day' | 'agenda', received '3day'",
+            ));
+        }
+        Backend::Rust => {
+            let updated: UserSettings = ok(response.expect_status(200).and_then(|r| r.dto()));
+            assert_eq!(updated.default_view, "3day");
+            let read: UserSettings = ok(user.get("/api/settings").await.dto());
+            assert_eq!(read.default_view, "3day");
+        }
+    }
+}
+
 #[tokio::test]
 async fn an_update_without_a_row_creates_it() {
     let app = TestApp::spawn().await;
@@ -194,6 +219,11 @@ async fn an_update_without_a_row_creates_it() {
 async fn invalid_values_are_rejected_with_the_zod_message() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
+    let views = match app.backend {
+        Backend::TypeScript => "'month' | 'week' | 'day' | 'agenda'",
+        Backend::Rust => "'month' | 'week' | '3day' | 'day' | 'agenda'",
+    };
+    let view_message = format!("Invalid enum value. Expected {views}, received 'year'");
     let cases = [
         (
             json!({"theme": "x"}),
@@ -202,7 +232,7 @@ async fn invalid_values_are_rejected_with_the_zod_message() {
         ),
         (
             json!({"defaultView": "year"}),
-            "Invalid enum value. Expected 'month' | 'week' | 'day' | 'agenda', received 'year'",
+            view_message.as_str(),
             "defaultView",
         ),
         (

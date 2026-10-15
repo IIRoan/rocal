@@ -40,7 +40,7 @@ pub struct UpdateSettingsRequest {
     /// `light`, `dark` or `system`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
-    /// `month`, `week`, `day` or `agenda`.
+    /// `month`, `week`, `3day`, `day` or `agenda`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_view: Option<String>,
     /// 0 is Sunday.
