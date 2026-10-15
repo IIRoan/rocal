@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use solace_api_tests::client::ApiResponse;
 use solace_api_types::mail::StalwartWebhookResult;
 
-use crate::helpers::{TestApp, hex, ok};
+use crate::helpers::{Backend, TestApp, hex, ok};
 use crate::mail_support::{
     Mailbox, mailbox, method, post_signed, post_webhook, post_webhook_from, row_json,
     webhook_signature,
@@ -51,6 +51,22 @@ fn email_ids(jobs: &[Value]) -> Vec<String> {
     jobs.iter()
         .filter_map(|job| job["emailId"].as_str().map(str::to_owned))
         .collect()
+}
+
+/// Posts `payload`, which holds one linked ingest event; returns the email ids of the owner's push jobs.
+async fn deliver(app: &TestApp, owner: &Mailbox, payload: &Value) -> Vec<String> {
+    assert_eq!(result(&post_signed(app, payload).await).enqueued_count, 1);
+    email_ids(&new_mail_jobs(app, &owner.user.id).await)
+}
+
+/// Marks the owner's push jobs as the notifications worker would.
+async fn set_job_status(app: &TestApp, owner: &Mailbox, status: &str) {
+    sqlx::query("UPDATE notification_job SET status = $2 WHERE user_id = $1")
+        .bind(&owner.user.id)
+        .bind(status)
+        .execute(&app.db)
+        .await
+        .expect("job status");
 }
 
 #[tokio::test]
@@ -307,6 +323,32 @@ async fn linked_mailboxes_get_one_opaque_push_job_per_message() {
     .await;
     assert_eq!(result(&muted).enqueued_count, 1);
     assert_eq!(new_mail_jobs(&app, &owner.user.id).await.len(), 3);
+}
+
+#[tokio::test]
+async fn a_redelivered_message_is_pushed_again_only_after_its_push_was_skipped() {
+    let app = TestApp::spawn().await;
+    let owner = mailbox(&app).await;
+    let delivery =
+        json!({"events": [ingest(json!({"accountId": owner.account_id(), "documentId": "601"}))]});
+    assert_eq!(deliver(&app, &owner, &delivery).await, ["601"]);
+    assert_eq!(
+        deliver(&app, &owner, &delivery).await,
+        ["601"],
+        "a pending push is not queued twice"
+    );
+    set_job_status(&app, &owner, "sent").await;
+    assert_eq!(
+        deliver(&app, &owner, &delivery).await,
+        ["601"],
+        "a sent push is not repeated"
+    );
+    set_job_status(&app, &owner, "skipped").await;
+    let after_skip = deliver(&app, &owner, &delivery).await;
+    match app.backend {
+        Backend::TypeScript => assert_eq!(after_skip, ["601"]),
+        Backend::Rust => assert_eq!(after_skip, ["601", "601"]),
+    }
 }
 
 #[tokio::test]

@@ -229,20 +229,31 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
-    async fn an_email_is_queued_once_whatever_became_of_its_job() {
+    async fn only_a_skipped_push_is_queued_again() {
         let database = ScratchDatabase::create().await;
         seed_user(&database.db).await;
         let ids = [" in-1 ".to_owned(), "in-2".into(), "in-1".into()];
         enqueue(&database.db, "acct-1", USER, &ids).await.unwrap();
         assert_eq!(email_ids(&database.db).await, ["in-1", "in-2"]);
+        let all = ["in-1".to_owned(), "in-2".into(), "in-3".into()];
+        enqueue(&database.db, "acct-1", USER, &all[..2])
+            .await
+            .unwrap();
+        assert_eq!(
+            email_ids(&database.db).await,
+            ["in-1", "in-2"],
+            "pending pushes"
+        );
         database
             .db
-            .execute_unprepared("UPDATE notification_job SET status = 'sent'")
+            .execute_unprepared(
+                "UPDATE notification_job SET status = CASE payload->>'emailId' WHEN 'in-1' THEN 'sent' ELSE 'skipped' END",
+            )
             .await
             .unwrap();
-        enqueue(&database.db, "acct-1", USER, &["in-1".into()])
-            .await
-            .unwrap();
-        assert_eq!(email_ids(&database.db).await, ["in-1", "in-2"]);
+        enqueue(&database.db, "acct-1", USER, &all).await.unwrap();
+        let mut queued = email_ids(&database.db).await;
+        queued.sort();
+        assert_eq!(queued, ["in-1", "in-2", "in-2", "in-3"]);
     }
 }

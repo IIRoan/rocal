@@ -18,6 +18,7 @@ use crate::instant;
 
 /// What provisioning writes to an entry and its vault.
 pub struct Provisioned<'a> {
+    pub stalwart_account_id: &'a str,
     pub email: &'a str,
     pub local_part: &'a str,
     pub domain: &'a str,
@@ -175,16 +176,13 @@ pub async fn upsert_vault<C: ConnectionTrait>(
 
 pub async fn insert_entry<C: ConnectionTrait>(
     db: &C,
-    stalwart_account_id: &str,
     user_id: &str,
     provisioned: Provisioned<'_>,
 ) -> Result<(), DbErr> {
     let vault = provisioned.vault.clone();
-    let entry = entry_columns(provisioned);
     let entry = mail_directory_entry::ActiveModel {
-        stalwart_account_id: Set(stalwart_account_id.to_owned()),
         user_id: Set(Some(user_id.to_owned())),
-        ..entry
+        ..entry_columns(provisioned)
     }
     .insert(db)
     .await?;
@@ -213,6 +211,7 @@ pub async fn update_entry<C: ConnectionTrait>(
 
 fn entry_columns(provisioned: Provisioned<'_>) -> mail_directory_entry::ActiveModel {
     mail_directory_entry::ActiveModel {
+        stalwart_account_id: Set(provisioned.stalwart_account_id.to_owned()),
         email: Set(provisioned.email.to_owned()),
         local_part: Set(provisioned.local_part.to_owned()),
         domain: Set(provisioned.domain.to_owned()),
@@ -286,7 +285,7 @@ pub async fn push_notifications<C: ConnectionTrait>(
         .await
 }
 
-/// Whether any `new_mail` push for this email was ever queued, whatever became of it.
+/// Whether a `new_mail` push for this email is queued, in flight or retrying (the worker keeps those `pending`) or was sent; a `skipped` one may be queued again.
 pub async fn new_mail_job_exists<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
@@ -298,6 +297,7 @@ pub async fn new_mail_job_exists<C: ConnectionTrait>(
         .filter(notification_job::Column::UserId.eq(user_id))
         .filter(notification_job::Column::Kind.eq("new_mail"))
         .filter(notification_job::Column::Channel.eq("push"))
+        .filter(notification_job::Column::Status.is_in(["pending", "sent"]))
         .filter(
             Expr::col(notification_job::Column::Payload)
                 .cast_json_field("emailId")

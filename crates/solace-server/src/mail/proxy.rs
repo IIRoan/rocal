@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use utoipa_axum::router::OpenApiRouter;
 
-use crate::auth::guard::optional_session;
+use crate::auth::guard::{has_passkeys, optional_session, step_up_verified};
 use crate::error::AppError;
 use crate::http::BODY_LIMIT_BYTES;
 use crate::http::client_ip::client_ip;
@@ -28,7 +28,7 @@ const RATE_LIMIT: Limit = Limit {
     window: Duration::from_secs(60),
 };
 const MAX_REDIRECT_HOPS: usize = 5;
-/// Bodies up to this size are kept for the retry with a session-minted token after a 401; larger uploads stream once.
+/// Bodies up to this size are kept for the retry with a session-minted token after a 401; larger uploads stream once, after their token passed a session check.
 const RETRY_BUFFER_BYTES: u64 = 1024 * 1024;
 const SLOW_UPSTREAM: Duration = Duration::from_millis(400);
 
@@ -153,7 +153,7 @@ fn proxy_error(status: StatusCode, error: &str, message: &str) -> Response {
 enum Outgoing {
     Empty,
     Buffered(Bytes),
-    /// Read once, so a 401 or a 307 can't be replayed.
+    /// Read once, so a 401 or a 307 after it went out can't be replayed.
     Streamed(Option<Body>),
 }
 
@@ -170,7 +170,7 @@ impl Outgoing {
     }
 
     fn replayable(&self) -> bool {
-        !matches!(self, Self::Streamed(_))
+        !matches!(self, Self::Streamed(None))
     }
 
     /// The JMAP method names of a buffered request, for logs and `Server-Timing`.
@@ -381,7 +381,17 @@ impl Attempt<'_> {
             }
         };
         let upstream_started = Instant::now();
-        let response = match self.fetch(&base, url, &authorization, outgoing).await {
+        // A streamed body goes out once, so a token Stalwart refuses takes the 401 retry before the upload starts.
+        let refused = if retry_after.is_none() && matches!(outgoing, Outgoing::Streamed(Some(_))) {
+            self.refused(&base, &authorization).await
+        } else {
+            None
+        };
+        let fetched = match refused {
+            Some(refusal) => Ok(refusal),
+            None => self.fetch(&base, url, &authorization, outgoing).await,
+        };
+        let response = match fetched {
             Ok(response) => response,
             Err(Upstream::Path(error)) => {
                 return Sent::Early(proxy_error(
@@ -427,7 +437,16 @@ impl Attempt<'_> {
                 None
             });
         timings.session = session_started.elapsed();
-        let user = active.map(|active| active.user)?;
+        let active = active?;
+        // Like `/api/mail/oauth/access-token`, a session that still owes its passkey step-up gets no mail token.
+        if !step_up_verified(self.state, self.headers, &active)
+            && has_passkeys(self.state, &active.user.id)
+                .await
+                .unwrap_or(true)
+        {
+            return None;
+        }
+        let user = active.user;
         let email = user.email.trim();
         if email.is_empty() {
             return None;
@@ -446,6 +465,24 @@ impl Attempt<'_> {
                 None
             }
         }
+    }
+
+    /// Stalwart's 401 when it refuses `authorization` on the JMAP session; anything else lets the upload go ahead.
+    async fn refused(&self, base: &str, authorization: &str) -> Option<reqwest::Response> {
+        let url = upstream_url(base, "/jmap/session", None).ok()?;
+        let request = self
+            .state
+            .http_no_redirect
+            .get(&url)
+            .header(header::AUTHORIZATION, authorization);
+        let response = self
+            .state
+            .stalwart_gate
+            .apply(request, &url)
+            .send()
+            .await
+            .ok()?;
+        (response.status() == StatusCode::UNAUTHORIZED).then_some(response)
     }
 
     /// `fetchJmapUpstream`: same-origin redirects are followed here, so a 307 never reaches the client.
@@ -769,6 +806,73 @@ mod tests {
             relayed.get(header::CONTENT_TYPE).unwrap(),
             "application/json"
         );
+    }
+
+    #[tokio::test]
+    async fn large_uploads_never_stream_on_a_token_stalwart_refuses() {
+        use crate::db::scratch::ScratchDatabase;
+        use crate::integrations::stalwart::fake::{FakeStalwart, Reply};
+        use crate::mail::service::tests::{
+            OWNER, Plan, cache_token, mail_state, provisioning, seed_mailbox,
+        };
+        use sea_orm::ConnectionTrait;
+
+        let database = ScratchDatabase::create().await;
+        let registry = provisioning(Plan::default());
+        // Only the bearer the bridge login mints is good; the cached one was revoked.
+        let fake = FakeStalwart::start(move |request| {
+            let fresh = request.authorization.as_deref() == Some("Bearer stalwart-access-token");
+            match request.path.as_str() {
+                "/jmap/session" | "/jmap/upload/acct-1/" if !fresh => Reply::status(401),
+                "/jmap/session" => Reply::json(json!({"username": "alice@solace.test"})),
+                "/jmap/upload/acct-1/" => Reply::json(json!({"blobId": "blob-1"})),
+                _ => registry(request),
+            }
+        })
+        .await;
+        let state = mail_state(&database, &fake).await;
+        seed_mailbox(&state, "acct-1").await;
+        cache_token(&state, "revoked-token");
+        state
+            .db
+            .execute_unprepared(&format!(
+                "INSERT INTO session (id, token, user_id, expires_at, created_at, updated_at) \
+                 VALUES ('session-1', 'session-token', '{OWNER}', now() + interval '7 days', now(), now())"
+            ))
+            .await
+            .unwrap();
+        let signed = state
+            .cookies
+            .signed(&state.cookies.session_token(), "session-token", None);
+        let cookie = signed.split(';').next().unwrap().to_owned();
+        let size = usize::try_from(RETRY_BUFFER_BYTES).unwrap() + 512 * 1024;
+
+        let response = routes()
+            .split_for_parts()
+            .0
+            .with_state(state)
+            .oneshot(
+                HttpRequest::post("/api/mail/jmap/jmap/upload/acct-1/")
+                    .header(header::COOKIE, cookie)
+                    .header(header::CONTENT_TYPE, "application/octet-stream")
+                    .header(header::CONTENT_LENGTH, size)
+                    .body(Body::from(vec![7u8; size]))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let uploads: Vec<_> = fake
+            .requests()
+            .into_iter()
+            .filter(|r| r.path == "/jmap/upload/acct-1/")
+            .collect();
+        assert_eq!(uploads.len(), 1, "the body went out once");
+        assert_eq!(
+            uploads[0].authorization.as_deref(),
+            Some("Bearer stalwart-access-token")
+        );
+        assert_eq!(uploads[0].body.len(), size);
     }
 
     #[tokio::test]

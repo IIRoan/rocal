@@ -8,7 +8,9 @@ use solace_api_types::mail::{
     MailSignup, MailVaultBackup, MailVaultBackupRequest, MailVaultKdfParams,
 };
 
-use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok};
+use crate::helpers::{
+    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+};
 use crate::mail_support::{
     access_token, bootstrap, bootstrap_request, bridge_secret, kdf_params, mailbox, pgp_key,
     provision, provisioning_turn, row_json, stalwart_account, to_json,
@@ -502,6 +504,54 @@ async fn an_incomplete_mailbox_is_repaired_by_a_second_bootstrap() {
 }
 
 #[tokio::test]
+async fn repairing_an_entry_without_an_account_id_stores_the_new_account() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let (local_part, domain) = user.email.split_once('@').expect("email");
+    // A TypeScript run keeps its entry's empty id, which the unique index would refuse the next run.
+    sqlx::query("DELETE FROM mail_directory_entry WHERE stalwart_account_id = ''")
+        .execute(&app.db)
+        .await
+        .expect("clear empty ids");
+    sqlx::query(
+        "INSERT INTO mail_directory_entry (id, email, local_part, domain, stalwart_account_id, stalwart_domain_id, \
+         public_key_armored, public_key_fingerprint, created_at, updated_at, user_id) \
+         VALUES ($1, $2, $3, $4, '', '', 'old-key', 'OLD', now(), now(), $5)",
+    )
+    .bind(format!("entry-{}", hex(8)))
+    .bind(&user.email)
+    .bind(local_part)
+    .bind(domain)
+    .bind(&user.id)
+    .execute(&app.db)
+    .await
+    .expect("entry without an account");
+
+    let turn = provisioning_turn().await;
+    let signup: MailSignup = ok(bootstrap(&mut user, &bootstrap_request(3))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    drop(turn);
+    let account_id = signup.stalwart_account_id.0;
+    assert!(
+        stalwart_account(&app, &account_id).await.is_some(),
+        "the repair created a Stalwart account"
+    );
+    let stored: String = sqlx::query_scalar(
+        "SELECT stalwart_account_id FROM mail_directory_entry WHERE user_id = $1",
+    )
+    .bind(&user.id)
+    .fetch_one(&app.db)
+    .await
+    .expect("entry");
+    match app.backend {
+        Backend::TypeScript => assert_eq!(stored, ""),
+        Backend::Rust => assert_eq!(stored, account_id),
+    }
+}
+
+#[tokio::test]
 async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
     let app = TestApp::spawn().await;
     let mut owner = mailbox(&app).await;
@@ -778,7 +828,7 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
 }
 
 #[tokio::test]
-async fn passkey_step_up_gates_the_mail_token_but_not_the_proxy() {
+async fn passkey_step_up_gates_the_mail_token_and_the_proxy() {
     let app = TestApp::spawn().await;
     let mut owner = mailbox(&app).await;
     let mut passkey = register_passkey(&app, &mut owner.user).await;
@@ -798,13 +848,24 @@ async fn passkey_step_up_gates_the_mail_token_but_not_the_proxy() {
         .await
         .expect_status(403));
 
-    // Pinned gap: the proxy mints from the bare session without the step-up check.
-    let discovery = ok(password_session
+    let discovery = password_session
         .get("/api/mail/jmap/.well-known/jmap")
-        .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    assert_eq!(discovery["username"], json!(owner.user.email));
+        .await;
+    match app.backend {
+        // TypeScript's proxy mints from the bare session without the step-up check (step 3).
+        Backend::TypeScript => {
+            assert_eq!(discovery.status.as_u16(), 200, "{}", discovery.text());
+            assert_eq!(ok(discovery.value())["username"], json!(owner.user.email));
+        }
+        Backend::Rust => {
+            let refused = ok(discovery.value());
+            assert_eq!(discovery.status.as_u16(), 401, "{refused}");
+            assert_eq!(
+                refused["message"],
+                json!("Mailbox authorization is required.")
+            );
+        }
+    }
 
     let mut stepped_up = app.anonymous();
     ok(solace_api_tests::seed::passkey_sign_in(&mut stepped_up, &mut passkey, &app.origin).await);
@@ -814,6 +875,12 @@ async fn passkey_step_up_gates_the_mail_token_but_not_the_proxy() {
         .and_then(|r| r.expect_status(200))
         .and_then(|r| r.dto()));
     assert!(!token.access_token.is_empty());
+    let discovery = ok(stepped_up
+        .get("/api/mail/jmap/.well-known/jmap")
+        .await
+        .and_then(|r| r.expect_status(200))
+        .and_then(|r| r.value()));
+    assert_eq!(discovery["username"], json!(owner.user.email));
 }
 
 #[tokio::test]

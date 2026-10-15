@@ -13,7 +13,7 @@ use crate::event_fixtures::{
     FUTURE_END, FUTURE_START, StoredContent, assert_no_mail, calendar_id, create_event,
     encrypted_event, list_events, row_snapshot, sent_mail, stored_content, to_json, unfold,
 };
-use crate::helpers::{TestApp, TestUser, count, expect_unknown_field, hex, ok};
+use crate::helpers::{Backend, TestApp, TestUser, count, expect_unknown_field, hex, ok};
 
 const NOT_FOUND: &str = "Event not found or access denied";
 
@@ -266,6 +266,31 @@ async fn new_invitees_get_a_noreply_invitation_with_an_ics_request() {
         }
     }
     assert_no_mail(&app, &owner.email).await;
+}
+
+#[tokio::test]
+async fn invitation_bursts_wait_out_stalwarts_concurrency_limit() {
+    let app = TestApp::spawn().await;
+    // TypeScript drops mail past the limit (step 3), and its burst would also fail mail that concurrent cases send.
+    if app.backend == Backend::TypeScript {
+        return;
+    }
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let mut creates = tokio::task::JoinSet::new();
+    for _ in 0..64 {
+        let mut request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
+        request.participants = Some(vec![participant(&guest())]);
+        request.invitation_content = Some(invitation("Burst"));
+        let mut agent = owner.agent.clone();
+        creates.spawn(async move { agent.post("/api/events", to_json(&request)).await });
+    }
+    for response in creates.join_all().await {
+        let event: Event = ok(response
+            .and_then(|r| r.expect_status(200))
+            .and_then(|r| r.dto()));
+        assert_eq!(event.warnings, None, "every invitation went out");
+    }
 }
 
 #[tokio::test]

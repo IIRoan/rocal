@@ -17,6 +17,10 @@ const USING: [&str; 3] = [
     "urn:ietf:params:jmap:submission",
 ];
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+/// Resends after a concurrency-limit refusal, with full-jitter backoff that sums to at most 2.35 s.
+const LIMIT_RETRIES: u32 = 6;
+const LIMIT_BACKOFF: Duration = Duration::from_millis(50);
+const LIMIT_BACKOFF_CAP: Duration = Duration::from_millis(800);
 
 #[derive(Debug, Clone)]
 pub struct MailerConfig {
@@ -140,6 +144,28 @@ impl Jmap<'_> {
         self.gate.apply(request, url)
     }
 
+    /// Sends `request` and reads its body, resending it while Stalwart refuses it at a concurrency limit.
+    async fn send(
+        &self,
+        mut request: reqwest::RequestBuilder,
+    ) -> Result<(reqwest::StatusCode, String), MailerError> {
+        let mut attempt = 0;
+        loop {
+            let retry = request.try_clone();
+            let response = request.send().await?;
+            let status = response.status();
+            let text = response.text().await?;
+            match retry {
+                Some(next) if attempt < LIMIT_RETRIES && is_concurrency_limit(status, &text) => {
+                    tokio::time::sleep(backoff(attempt)).await;
+                    request = next;
+                    attempt += 1;
+                }
+                _ => return Ok((status, text)),
+            }
+        }
+    }
+
     /// `/jmap/session`, then `/.well-known/jmap`; 401 fails at once.
     async fn discover(&self, base_url: &str) -> Result<Discovered, MailerError> {
         let base = base_url.trim_end_matches('/');
@@ -148,19 +174,20 @@ impl Jmap<'_> {
             format!("{base}/jmap/session"),
             format!("{base}/.well-known/jmap"),
         ] {
-            let response = self
-                .request(reqwest::Method::GET, &url)
-                .header(reqwest::header::ACCEPT, "application/json")
-                .send()
+            let (status, text) = self
+                .send(
+                    self.request(reqwest::Method::GET, &url)
+                        .header(reqwest::header::ACCEPT, "application/json"),
+                )
                 .await?;
-            if response.status().as_u16() == 401 {
+            if status.as_u16() == 401 {
                 return Err(MailerError::Unauthorized);
             }
-            if !response.status().is_success() {
-                last_status = response.status().as_u16();
+            if !status.is_success() {
+                last_status = status.as_u16();
                 continue;
             }
-            let session: Session = response.json().await.unwrap_or_default();
+            let session: Session = serde_json::from_str(&text).unwrap_or_default();
             let primary = |capability: &str| {
                 session
                     .primary_accounts
@@ -184,13 +211,12 @@ impl Jmap<'_> {
     }
 
     async fn call(&self, api_url: &str, method_calls: Value) -> Result<Value, MailerError> {
-        let response = self
-            .request(reqwest::Method::POST, api_url)
-            .json(&json!({"using": USING, "methodCalls": method_calls}))
-            .send()
+        let (status, text) = self
+            .send(
+                self.request(reqwest::Method::POST, api_url)
+                    .json(&json!({"using": USING, "methodCalls": method_calls})),
+            )
             .await?;
-        let status = response.status();
-        let text = response.text().await?;
         if !status.is_success() {
             return Err(MailerError::Request(status.as_u16()));
         }
@@ -254,17 +280,16 @@ impl Jmap<'_> {
             .filter(|t| !t.is_empty())
             .unwrap_or("application/octet-stream")
             .to_owned();
-        let response = self
-            .request(
-                reqwest::Method::POST,
-                &resolve_upload_url(&session.upload_url, &session.mail_account),
+        let (status, text) = self
+            .send(
+                self.request(
+                    reqwest::Method::POST,
+                    &resolve_upload_url(&session.upload_url, &session.mail_account),
+                )
+                .header(reqwest::header::CONTENT_TYPE, media)
+                .body(bytes),
             )
-            .header(reqwest::header::CONTENT_TYPE, media)
-            .body(bytes)
-            .send()
             .await?;
-        let status = response.status();
-        let text = response.text().await?;
         if !status.is_success() {
             return Err(MailerError::Upload(status.as_u16()));
         }
@@ -283,6 +308,31 @@ impl Jmap<'_> {
             "disposition": "attachment",
         }))
     }
+}
+
+/// RFC 8620's `limit` request error for the per-account concurrency limits; Stalwart processed nothing, so resending can't send twice.
+fn is_concurrency_limit(status: reqwest::StatusCode, body: &str) -> bool {
+    #[derive(Deserialize)]
+    struct Problem {
+        #[serde(rename = "type")]
+        kind: String,
+        limit: Option<String>,
+    }
+    status == reqwest::StatusCode::BAD_REQUEST
+        && serde_json::from_str::<Problem>(body).is_ok_and(|problem| {
+            problem.kind == "urn:ietf:params:jmap:error:limit"
+                && matches!(
+                    problem.limit.as_deref(),
+                    Some("maxConcurrentRequests" | "maxConcurrentUpload")
+                )
+        })
+}
+
+fn backoff(attempt: u32) -> Duration {
+    LIMIT_BACKOFF
+        .saturating_mul(1 << attempt)
+        .min(LIMIT_BACKOFF_CAP)
+        .mul_f64(rand::random::<f64>())
 }
 
 async fn upload_all(
@@ -462,7 +512,7 @@ mod tests {
     use super::*;
     use axum::Json;
     use axum::extract::State;
-    use axum::http::HeaderMap;
+    use axum::http::{HeaderMap, StatusCode};
     use std::sync::{Arc, Mutex};
 
     #[test]
@@ -520,12 +570,19 @@ mod tests {
         assert_eq!(pick_identity(&identities, "other@solace.test"), None);
     }
 
-    /// A local JMAP server: records each request's gate header and answers like Stalwart.
+    /// A local JMAP server: records each request's gate header and answers like Stalwart, first refusing calls listed in `refusals`.
     #[derive(Clone, Default)]
     struct Fake {
         identities: Arc<Vec<Value>>,
         gate_headers: Arc<Mutex<Vec<Option<String>>>>,
         calls: Arc<Mutex<Vec<Value>>>,
+        refusals: Arc<Mutex<Vec<(&'static str, Value)>>>,
+        submitted: Arc<Mutex<usize>>,
+    }
+
+    /// Stalwart's answer past its per-account `maxConcurrentRequests`.
+    fn concurrency_limit() -> Value {
+        json!({"type": "urn:ietf:params:jmap:error:limit", "status": 400, "detail": "The request exceeds the maximum number of concurrent requests.", "limit": "maxConcurrentRequests"})
     }
 
     async fn fake_server(fake: Fake) -> String {
@@ -556,16 +613,24 @@ mod tests {
                     record(&fake, &headers).await;
                     fake.calls.lock().unwrap().push(body.clone());
                     let first = body["methodCalls"][0][0].as_str().unwrap_or_default().to_owned();
-                    if first == "Mailbox/get" {
-                        Json(json!({"methodResponses": [
+                    let refusal = {
+                        let mut refusals = fake.refusals.lock().unwrap();
+                        let next = refusals.first().is_some_and(|(method, _)| *method == first);
+                        next.then(|| refusals.remove(0).1)
+                    };
+                    if let Some(problem) = refusal {
+                        (StatusCode::BAD_REQUEST, Json(problem))
+                    } else if first == "Mailbox/get" {
+                        (StatusCode::OK, Json(json!({"methodResponses": [
                             ["Mailbox/get", {"list": [{"id": "d", "role": "drafts"}, {"id": "s", "role": "sent"}]}, "m"],
                             ["Identity/get", {"list": fake.identities.as_ref()}, "i"],
-                        ]}))
+                        ]})))
                     } else {
-                        Json(json!({"methodResponses": [
+                        *fake.submitted.lock().unwrap() += 1;
+                        (StatusCode::OK, Json(json!({"methodResponses": [
                             ["Email/set", {"created": {"draft1": {"id": "e1"}}}, "c1"],
                             ["EmailSubmission/set", {"created": {"s1": {"id": "sub1"}}}, "c2"],
-                        ]}))
+                        ]})))
                     }
                 }),
             )
@@ -623,6 +688,70 @@ mod tests {
             submit[1][1]["onSuccessUpdateEmail"]["#s1"]["mailboxIds/s"],
             json!(true)
         );
+    }
+
+    fn noreply() -> Fake {
+        Fake {
+            identities: Arc::new(vec![json!({"id": "id1", "email": "noreply@solace.test"})]),
+            ..Default::default()
+        }
+    }
+
+    async fn send_with(fake: &Fake) -> Result<String, MailerError> {
+        let base = fake_server(fake.clone()).await;
+        send(
+            &Client::new(),
+            &StalwartGate::new(&base, None),
+            &config(&base),
+            "friend@example.com",
+            &message(),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn resends_calls_refused_at_the_concurrency_limit_and_submits_once() {
+        let fake = noreply();
+        *fake.refusals.lock().unwrap() = vec![
+            ("Mailbox/get", concurrency_limit()),
+            ("Email/set", concurrency_limit()),
+            ("Email/set", concurrency_limit()),
+        ];
+        assert_eq!(send_with(&fake).await.unwrap(), "sub1");
+        assert_eq!(fake.calls.lock().unwrap().len(), 5);
+        assert_eq!(*fake.submitted.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn gives_up_after_bounded_retries_at_the_concurrency_limit() {
+        let fake = noreply();
+        let attempts = usize::try_from(LIMIT_RETRIES).unwrap() + 1;
+        *fake.refusals.lock().unwrap() = vec![("Mailbox/get", concurrency_limit()); attempts + 1];
+        let started = std::time::Instant::now();
+        let error = send_with(&fake).await;
+        assert!(matches!(error, Err(MailerError::Request(400))), "{error:?}");
+        assert!(
+            started.elapsed() < Duration::from_secs(4),
+            "{:?}",
+            started.elapsed()
+        );
+        assert_eq!(fake.calls.lock().unwrap().len(), attempts);
+        assert_eq!(*fake.submitted.lock().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn other_request_errors_are_not_resent() {
+        let fake = noreply();
+        let too_big = json!({"type": "urn:ietf:params:jmap:error:limit", "status": 400, "limit": "maxSizeRequest"});
+        let not_request = json!({"type": "urn:ietf:params:jmap:error:notRequest", "status": 400});
+        for problem in [too_big, not_request] {
+            fake.calls.lock().unwrap().clear();
+            *fake.refusals.lock().unwrap() = vec![("Email/set", problem)];
+            let error = send_with(&fake).await;
+            assert!(matches!(error, Err(MailerError::Request(400))), "{error:?}");
+            assert_eq!(fake.calls.lock().unwrap().len(), 2, "sent once");
+        }
+        assert_eq!(*fake.submitted.lock().unwrap(), 0);
     }
 
     #[tokio::test]
