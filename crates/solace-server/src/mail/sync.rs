@@ -271,19 +271,17 @@ pub(super) fn unique(values: impl IntoIterator<Item = String>) -> Vec<String> {
         .collect()
 }
 
-fn list(response: Value) -> Vec<Value> {
-    match response {
-        Value::Object(mut object) => match object.remove("list") {
-            Some(Value::Array(list)) => list,
-            _ => Vec::new(),
-        },
+fn list(mut response: Value) -> Vec<Value> {
+    match response.get_mut("list").map(Value::take) {
+        Some(Value::Array(list)) => list,
         _ => Vec::new(),
     }
 }
 
-fn state_of(response: &Value) -> String {
+/// A string field of a JMAP result, empty when absent.
+fn text(response: &Value, key: &str) -> String {
     response
-        .get("state")
+        .get(key)
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_owned()
@@ -357,19 +355,11 @@ async fn collect_changes(
             json!({"accountId": account_id, "sinceState": request_state, "maxChanges": 200}),
         )
         .await?;
-        let old_state = response
-            .get("oldState")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned();
+        let old_state = text(&response, "oldState");
         changes.created.extend(strings(response.get("created")));
         changes.updated.extend(strings(response.get("updated")));
         changes.destroyed.extend(strings(response.get("destroyed")));
-        let new_state = response
-            .get("newState")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned();
+        let new_state = text(&response, "newState");
         if !response
             .get("hasMoreChanges")
             .and_then(Value::as_bool)
@@ -559,9 +549,9 @@ async fn initialize(
         ),
     )?;
     let (mailbox_state, email_state, thread_state) = (
-        state_of(&mailboxes),
-        state_of(&email_state),
-        state_of(&thread_state),
+        text(&mailboxes, "state"),
+        text(&email_state, "state"),
+        text(&thread_state, "state"),
     );
     let stored = queries::store_initial(
         &state.db,

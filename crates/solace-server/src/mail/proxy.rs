@@ -574,14 +574,12 @@ enum Upstream {
 /// The transport failure without the upstream URL, which would name the internal Stalwart host.
 fn network_message(error: reqwest::Error) -> String {
     let error = error.without_url();
-    let mut message = error.to_string();
-    let mut source = std::error::Error::source(&error);
-    while let Some(cause) = source {
-        message.push_str(": ");
-        message.push_str(&cause.to_string());
-        source = cause.source();
-    }
-    message
+    std::iter::successors(Some(&error as &dyn std::error::Error), |cause| {
+        cause.source()
+    })
+    .map(ToString::to_string)
+    .collect::<Vec<_>>()
+    .join(": ")
 }
 
 impl Sent {
