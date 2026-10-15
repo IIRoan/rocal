@@ -523,22 +523,6 @@ pub async fn imported_event<C: ConnectionTrait>(
     query.one(db).await
 }
 
-pub async fn insert_deleted_exception<C: ConnectionTrait>(
-    db: &C,
-    parent_event_id: &str,
-    exception_date: TimeDateTime,
-) -> Result<(), sea_orm::DbErr> {
-    recurrence_exception::ActiveModel {
-        parent_event_id: Set(parent_event_id.to_owned()),
-        exception_date: Set(exception_date),
-        r#type: Set("deleted".into()),
-        ..Default::default()
-    }
-    .insert(db)
-    .await
-    .map(|_| ())
-}
-
 /// Points the series' occurrence at its override, replacing an exception already there.
 pub async fn upsert_modified_exception<C: ConnectionTrait>(
     db: &C,

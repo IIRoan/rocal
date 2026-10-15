@@ -31,6 +31,7 @@ use crate::instant;
 use crate::integrations::ics::Participant;
 use crate::integrations::ics::parse::{self, ParsedEvent, StoredEvent, StoredParticipant};
 use crate::integrations::safe_fetch::{SafeFetchError, SafeRequest, SafeResponse};
+use crate::recurring::queries as recurring;
 use crate::state::AppState;
 use crate::telemetry::redact_pii;
 
@@ -816,8 +817,8 @@ async fn import_encrypted(
         let people = entry.participants.as_deref().unwrap_or_default();
         participants::sync(&transaction, &event.id, people, None).await?;
         for date in entry.excluded_dates.iter().flatten() {
-            queries::insert_deleted_exception(&transaction, &event.id, stored_instant(date)?)
-                .await?;
+            let date = stored_instant(date)?;
+            recurring::insert_exception(&transaction, &event.id, date, "deleted", None).await?;
         }
         if let (Some(parent), Some(date)) = (&parent, &entry.occurrence_date) {
             queries::upsert_modified_exception(
