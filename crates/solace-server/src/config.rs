@@ -65,6 +65,7 @@ pub struct Config {
     pub passkey_origin: String,
     pub auth_secret: String,
     pub database_url: String,
+    pub database_pool_size: u32,
     pub stalwart_base_url: String,
     pub stalwart_default_domain: String,
     /// Scoped to Stalwart's registry (`solace-provisioner`); it must never read mailbox data.
@@ -139,6 +140,14 @@ impl Config {
             passkey_origin,
             auth_secret: auth_secret(var("BETTER_AUTH_SECRET"), is_production)?,
             database_url: var("DATABASE_URL").ok_or(ConfigError::Missing("DATABASE_URL"))?,
+            database_pool_size: match var("DATABASE_POOL_SIZE") {
+                Some(size) => size
+                    .parse()
+                    .ok()
+                    .filter(|size| *size > 0)
+                    .ok_or(ConfigError::Invalid("DATABASE_POOL_SIZE"))?,
+                None => crate::db::DEFAULT_POOL_SIZE,
+            },
             stalwart_base_url: var("STALWART_BASE_URL")
                 .unwrap_or_else(|| DEFAULT_STALWART_BASE_URL.into()),
             stalwart_default_domain: var("STALWART_DEFAULT_DOMAIN")

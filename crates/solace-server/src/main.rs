@@ -28,7 +28,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn run(config: Config) -> anyhow::Result<()> {
-    let db = db::connect(&config.database_url)
+    let db = db::connect(&config.database_url, config.database_pool_size)
         .await
         .context("connect to the database")?;
     let port = config.port;

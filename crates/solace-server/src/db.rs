@@ -11,13 +11,13 @@ use std::time::Duration;
 
 use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbErr};
 
-/// Small on purpose: memory per connection is part of the budget.
-const MAX_CONNECTIONS: u32 = 10;
+/// Small on purpose: memory per connection is part of the budget. `DATABASE_POOL_SIZE` overrides it.
+pub const DEFAULT_POOL_SIZE: u32 = 10;
 
-pub async fn connect(url: &str) -> Result<DatabaseConnection, DbErr> {
+pub async fn connect(url: &str, pool_size: u32) -> Result<DatabaseConnection, DbErr> {
     let mut options = ConnectOptions::new(url);
     options
-        .max_connections(MAX_CONNECTIONS)
+        .max_connections(pool_size)
         .min_connections(0)
         .acquire_timeout(Duration::from_secs(10))
         .idle_timeout(Duration::from_secs(300))

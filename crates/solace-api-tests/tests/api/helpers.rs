@@ -121,7 +121,7 @@ async fn serve_rust(env: &TestEnv, mode: Mode, database_url: &str) -> String {
             .map(|(_, value)| value.clone())
     })
     .expect("server config");
-    let pool = solace_server::db::connect(database_url)
+    let pool = solace_server::db::connect(database_url, solace_server::db::DEFAULT_POOL_SIZE)
         .await
         .expect("server pool");
     let state = solace_server::state::AppState::new(config, pool).expect("server state");
