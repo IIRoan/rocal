@@ -8,7 +8,9 @@ use solace_api_types::mail::{
     MailSignup, MailVaultBackup, MailVaultBackupRequest, MailVaultKdfParams,
 };
 
-use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok};
+use crate::helpers::{
+    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+};
 use crate::mail_support::{
     access_token, bootstrap, bootstrap_request, bridge_secret, kdf_params, mailbox, pgp_key,
     provision, provisioning_turn, row_json, stalwart_account, to_json,
@@ -499,6 +501,54 @@ async fn an_incomplete_mailbox_is_repaired_by_a_second_bootstrap() {
         remote["encryptionAtRest"]["publicKey"],
         json!(repaired.stalwart_public_key_id)
     );
+}
+
+#[tokio::test]
+async fn repairing_an_entry_without_an_account_id_stores_the_new_account() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let (local_part, domain) = user.email.split_once('@').expect("email");
+    // A TypeScript run keeps its entry's empty id, which the unique index would refuse the next run.
+    sqlx::query("DELETE FROM mail_directory_entry WHERE stalwart_account_id = ''")
+        .execute(&app.db)
+        .await
+        .expect("clear empty ids");
+    sqlx::query(
+        "INSERT INTO mail_directory_entry (id, email, local_part, domain, stalwart_account_id, stalwart_domain_id, \
+         public_key_armored, public_key_fingerprint, created_at, updated_at, user_id) \
+         VALUES ($1, $2, $3, $4, '', '', 'old-key', 'OLD', now(), now(), $5)",
+    )
+    .bind(format!("entry-{}", hex(8)))
+    .bind(&user.email)
+    .bind(local_part)
+    .bind(domain)
+    .bind(&user.id)
+    .execute(&app.db)
+    .await
+    .expect("entry without an account");
+
+    let turn = provisioning_turn().await;
+    let signup: MailSignup = ok(bootstrap(&mut user, &bootstrap_request(3))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    drop(turn);
+    let account_id = signup.stalwart_account_id.0;
+    assert!(
+        stalwart_account(&app, &account_id).await.is_some(),
+        "the repair created a Stalwart account"
+    );
+    let stored: String = sqlx::query_scalar(
+        "SELECT stalwart_account_id FROM mail_directory_entry WHERE user_id = $1",
+    )
+    .bind(&user.id)
+    .fetch_one(&app.db)
+    .await
+    .expect("entry");
+    match app.backend {
+        Backend::TypeScript => assert_eq!(stored, ""),
+        Backend::Rust => assert_eq!(stored, account_id),
+    }
 }
 
 #[tokio::test]

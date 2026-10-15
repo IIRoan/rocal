@@ -542,6 +542,7 @@ impl Stalwart {
 
     fn provisioned<'a>(&'a self, address: &'a Address, p: &'a Provisioning) -> Provisioned<'a> {
         Provisioned {
+            stalwart_account_id: &self.account_id,
             email: &address.email,
             local_part: &address.local_part,
             domain: &address.domain,
@@ -640,7 +641,6 @@ async fn persist_new(
     let savepoint = transaction.begin().await?;
     let inserted = queries::insert_entry(
         &savepoint,
-        &remote.account_id,
         user_id,
         remote.provisioned(address, provisioning),
     )
@@ -1555,6 +1555,31 @@ pub mod tests {
             "the stale sync state is reset"
         );
         assert_eq!(count(&state, "mail_directory_entry").await, 1);
+    }
+
+    #[tokio::test]
+    async fn repair_stores_the_account_it_creates_for_an_entry_without_one() {
+        let database = ScratchDatabase::create().await;
+        let fake = FakeStalwart::start(provisioning(Plan {
+            local_part: "alice",
+            ..Plan::default()
+        }))
+        .await;
+        let state = mail_state(&database, &fake).await;
+        seed_mailbox(&state, "").await;
+        let signup = bootstrap(&state, &owner("alice@solace.test"), request())
+            .await
+            .unwrap();
+        assert_eq!(signup.stalwart_account_id.0, "acct-1");
+        let entry = queries::entry_by_user(&state.db, OWNER)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (entry.id.as_str(), entry.stalwart_account_id.as_str()),
+            ("entry-1", "acct-1")
+        );
+        assert!(!destroyed(&fake), "the stored account is kept");
     }
 
     #[tokio::test]

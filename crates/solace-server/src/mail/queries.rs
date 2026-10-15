@@ -18,6 +18,7 @@ use crate::instant;
 
 /// What provisioning writes to an entry and its vault.
 pub struct Provisioned<'a> {
+    pub stalwart_account_id: &'a str,
     pub email: &'a str,
     pub local_part: &'a str,
     pub domain: &'a str,
@@ -175,16 +176,13 @@ pub async fn upsert_vault<C: ConnectionTrait>(
 
 pub async fn insert_entry<C: ConnectionTrait>(
     db: &C,
-    stalwart_account_id: &str,
     user_id: &str,
     provisioned: Provisioned<'_>,
 ) -> Result<(), DbErr> {
     let vault = provisioned.vault.clone();
-    let entry = entry_columns(provisioned);
     let entry = mail_directory_entry::ActiveModel {
-        stalwart_account_id: Set(stalwart_account_id.to_owned()),
         user_id: Set(Some(user_id.to_owned())),
-        ..entry
+        ..entry_columns(provisioned)
     }
     .insert(db)
     .await?;
@@ -213,6 +211,7 @@ pub async fn update_entry<C: ConnectionTrait>(
 
 fn entry_columns(provisioned: Provisioned<'_>) -> mail_directory_entry::ActiveModel {
     mail_directory_entry::ActiveModel {
+        stalwart_account_id: Set(provisioned.stalwart_account_id.to_owned()),
         email: Set(provisioned.email.to_owned()),
         local_part: Set(provisioned.local_part.to_owned()),
         domain: Set(provisioned.domain.to_owned()),
