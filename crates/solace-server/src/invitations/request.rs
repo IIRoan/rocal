@@ -30,7 +30,7 @@ pub async fn send_pending(
     if synced.new_invitees.is_empty() {
         return Vec::new();
     }
-    let ics = build::event_file(
+    let ics = build::build_calendar(
         &Calendar {
             name: Some(
                 if calendar_name.is_empty() {
@@ -44,7 +44,7 @@ pub async fn send_pending(
             method: Some("REQUEST"),
             ..Calendar::default()
         },
-        build::Event {
+        &[build::Event {
             participants: Some(
                 synced
                     .resolved
@@ -62,7 +62,7 @@ pub async fn send_pending(
                     .collect(),
             ),
             ..invitation.clone()
-        },
+        }],
     );
     let open_url = open_url(state, event_id);
     let event = InvitedEvent {

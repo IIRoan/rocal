@@ -71,14 +71,14 @@ pub struct Reply<'a> {
 
 /// `buildEventRsvpReplyIcs`: organizers match a reply by UID and PARTSTAT, so a sealed title stays opaque.
 fn reply_ics(reply: &Reply<'_>, organizer: &str, attendee: &str) -> String {
-    build::event_file(
+    build::build_calendar(
         &Calendar {
             name: Some("Solace".into()),
             timezone: Some(resolve_timezone(reply.timezone)),
             method: Some("REPLY"),
             ..Calendar::default()
         },
-        build::Event {
+        &[build::Event {
             uid: Some(reply.uid.to_owned()),
             title: reply.title.to_owned(),
             description: None,
@@ -110,7 +110,7 @@ fn reply_ics(reply: &Reply<'_>, organizer: &str, attendee: &str) -> String {
             recurrence_id: None,
             recurrence_zone: None,
             excluded_dates: Vec::new(),
-        },
+        }],
     )
 }
 

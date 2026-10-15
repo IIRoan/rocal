@@ -59,11 +59,6 @@ pub struct Event {
     pub excluded_dates: Vec<PrimitiveDateTime>,
 }
 
-/// `buildIcsEventFile`.
-pub fn event_file(calendar: &Calendar, event: Event) -> String {
-    build_calendar(calendar, &[event])
-}
-
 /// `buildIcsCalendar`, stamped now.
 pub fn build_calendar(calendar: &Calendar, events: &[Event]) -> String {
     build_calendar_at(calendar, events, instant::now())
