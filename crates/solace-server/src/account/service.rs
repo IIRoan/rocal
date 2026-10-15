@@ -13,6 +13,7 @@ use super::queries;
 use crate::addresses;
 use crate::auth::guard::{RouteUser, has_passkeys, step_up_verified};
 use crate::auth::session::ActiveSession;
+use crate::auth::store;
 use crate::error::AppError;
 use crate::invites;
 use crate::mail;
@@ -94,7 +95,7 @@ pub async fn status(
 
 /// `deleteAccount`: the Stalwart mailbox first, so a failure there keeps the whole account for a retry.
 pub async fn delete(state: &AppState, user: &RouteUser) -> Result<DeleteAccountResponse, AppError> {
-    let existing = queries::user(&state.db, &user.id)
+    let existing = store::find_user(&state.db, &user.id)
         .await?
         .ok_or_else(|| AppError::NotFound("User account not found".into()))?;
     let mailbox = queries::mailbox(&state.db, &user.id).await?;
