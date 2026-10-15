@@ -487,6 +487,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's feeds, newest first, with their calendars and sync log counts. */
+        get: operations["listSubscriptions"];
+        put?: never;
+        /** Subscribes to a feed that answers, in a new read-only calendar, and syncs it in the background. */
+        post: operations["createSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscriptions/import-ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Imports client-encrypted events into an owned calendar; the legacy raw ICS body stays for shipped clients. */
+        post: operations["importSubscriptionIcs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscriptions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Renames, recolors, pauses or re-times a feed; name and color also change its calendar. */
+        put: operations["updateSubscription"];
+        post?: never;
+        /** Deletes a feed; `deleteEvents=true` also deletes its events and calendar, otherwise both become the owner's. */
+        delete: operations["deleteSubscription"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscriptions/{id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Syncs a feed now, paused or not; a failed fetch is recorded and answered as an error. */
+        post: operations["syncSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/test": {
         parameters: {
             query?: never;
@@ -2844,6 +2914,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessMessage"];
+                };
+            };
+        };
+    };
+    listSubscriptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSubscription"][];
+                };
+            };
+        };
+    };
+    createSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubscriptionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSubscription"];
+                };
+            };
+        };
+    };
+    importSubscriptionIcs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportIcsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportIcsResponse"];
+                };
+            };
+        };
+    };
+    updateSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSubscriptionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSubscription"];
+                };
+            };
+        };
+    };
+    deleteSubscription: {
+        parameters: {
+            query?: {
+                deleteEvents?: boolean;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteSubscriptionResponse"];
+                };
+            };
+        };
+    };
+    syncSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionSyncResult"];
                 };
             };
         };

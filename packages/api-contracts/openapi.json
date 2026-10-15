@@ -1135,6 +1135,193 @@
         }
       }
     },
+    "/api/subscriptions": {
+      "get": {
+        "tags": [
+          "Calendar Subscriptions"
+        ],
+        "summary": "The caller's feeds, newest first, with their calendars and sync log counts.",
+        "operationId": "listSubscriptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarSubscription"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Calendar Subscriptions"
+        ],
+        "summary": "Subscribes to a feed that answers, in a new read-only calendar, and syncs it in the background.",
+        "operationId": "createSubscription",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscription"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subscriptions/import-ics": {
+      "post": {
+        "tags": [
+          "Calendar Subscriptions"
+        ],
+        "summary": "Imports client-encrypted events into an owned calendar; the legacy raw ICS body stays for shipped clients.",
+        "operationId": "importSubscriptionIcs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportIcsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportIcsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subscriptions/{id}": {
+      "put": {
+        "tags": [
+          "Calendar Subscriptions"
+        ],
+        "summary": "Renames, recolors, pauses or re-times a feed; name and color also change its calendar.",
+        "operationId": "updateSubscription",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscription"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Calendar Subscriptions"
+        ],
+        "summary": "Deletes a feed; `deleteEvents=true` also deletes its events and calendar, otherwise both become the owner's.",
+        "operationId": "deleteSubscription",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deleteEvents",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteSubscriptionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subscriptions/{id}/sync": {
+      "post": {
+        "tags": [
+          "Calendar Subscriptions"
+        ],
+        "summary": "Syncs a feed now, paused or not; a failed fetch is recorded and answered as an error.",
+        "operationId": "syncSubscription",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionSyncResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/test": {
       "get": {
         "tags": [

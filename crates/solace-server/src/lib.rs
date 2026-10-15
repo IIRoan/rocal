@@ -24,6 +24,7 @@ pub mod push_devices;
 pub mod recent_contacts;
 pub mod settings;
 pub mod state;
+pub mod subscriptions;
 pub mod telemetry;
 
 use std::future::Future;
@@ -65,6 +66,7 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(push_devices::routes())
         .merge(profiles::routes())
         .merge(e2ee::routes())
+        .merge(subscriptions::routes())
 }
 
 /// Every route's OpenAPI entry, without a database.
