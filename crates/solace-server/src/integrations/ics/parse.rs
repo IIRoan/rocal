@@ -59,6 +59,10 @@ pub struct ParsedEvent {
     pub recurrence: Option<RecurrenceRule>,
     pub timezone: Option<String>,
     pub participants: Option<Vec<Participant>>,
+    /// The start of the occurrence an override replaces, as the series' instances start.
+    pub occurrence: Option<PrimitiveDateTime>,
+    /// EXDATE occurrences, as the series' instances start.
+    pub excluded_dates: Vec<PrimitiveDateTime>,
 }
 
 /// `parseICSFile` in `lib/ics-parser.ts`: the package parser, with Google's invite boilerplate removed from descriptions.
@@ -175,6 +179,19 @@ fn event_timezone(event: &Obj) -> Option<String> {
     zone("start")
         .or_else(|| zone("end"))
         .and_then(|tz| normalize_timezone(Some(tz)))
+}
+
+/// An EXDATE or RECURRENCE-ID as the instance it names starts: a DATE at midnight in the all-day zone, a DATE-TIME as is.
+fn occurrence_start(value: &Val, all_day_zone: &str) -> Option<PrimitiveDateTime> {
+    let Val::Date(date) = value else {
+        return None;
+    };
+    let ms = date.ms?;
+    if !date.date_only {
+        return utc(ms);
+    }
+    let day = js::fields(ms);
+    utc(day_boundary(day.year, day.month, day.day, all_day_zone, false).ok()?)
 }
 
 /// `buildUtcDateFromTimeZoneDateParts`: the first (or last) millisecond of a calendar day in `zone`.
@@ -435,6 +452,16 @@ fn parse_event(
             rule.timezone = timezone.clone().filter(|tz| !tz.is_empty());
         }
     }
+    let excluded_dates = match event.get("exdate") {
+        Some(Val::List(dates)) => dates
+            .iter()
+            .filter_map(|date| occurrence_start(date, &all_day_timezone))
+            .collect(),
+        _ => Vec::new(),
+    };
+    let occurrence = event
+        .get("recurrenceid")
+        .and_then(|date| occurrence_start(date, &all_day_timezone));
     // ponytail: instants beyond year 9999 (only reachable through field rollover) are skipped; widen if a feed ever needs them.
     let (Some(start), Some(end)) = (utc(start), utc(end)) else {
         return Ok(None);
@@ -452,6 +479,8 @@ fn parse_event(
         recurrence,
         timezone,
         participants: participants(event),
+        occurrence,
+        excluded_dates,
     }))
 }
 
@@ -620,6 +649,8 @@ mod tests {
             recurrence: None,
             timezone: None,
             participants: None,
+            occurrence: None,
+            excluded_dates: Vec::new(),
         }
     }
 
@@ -891,6 +922,53 @@ mod tests {
         assert!(
             event(&result, "revised").recurrence.is_some(),
             "the newer rule wins"
+        );
+    }
+
+    #[test]
+    fn excluded_dates_and_overrides_name_their_instances() {
+        let result = parse(
+            &feed(&[
+                "BEGIN:VEVENT",
+                "UID:weekly",
+                "DTSTART:20240101T090000Z",
+                "SUMMARY:Weekly",
+                "RRULE:FREQ=WEEKLY;COUNT=4",
+                "EXDATE:20240108T090000Z,nonsense",
+                "EXDATE;TZID=Europe/Amsterdam:20240115T100000",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:weekly",
+                "RECURRENCE-ID:20240122T090000Z",
+                "DTSTART:20240122T140000Z",
+                "SUMMARY:Moved",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:daily",
+                "DTSTART;VALUE=DATE:20240101",
+                "SUMMARY:Daily",
+                "RRULE:FREQ=DAILY;COUNT=3",
+                "EXDATE;VALUE=DATE:20240102",
+                "END:VEVENT",
+            ]),
+            "Europe/Amsterdam",
+        );
+        let iso = |dates: &[PrimitiveDateTime]| -> Vec<String> {
+            dates.iter().map(|at| instant::iso(*at).0).collect()
+        };
+        assert_eq!(
+            iso(&event(&result, "weekly").excluded_dates),
+            ["2024-01-08T09:00:00.000Z", "2024-01-15T09:00:00.000Z"]
+        );
+        let moved = event(&result, "weekly::RECURRENCE::2024-01-22T09:00:00.000Z");
+        assert_eq!(
+            moved.occurrence.map(|at| instant::iso(at).0).as_deref(),
+            Some("2024-01-22T09:00:00.000Z")
+        );
+        assert_eq!(
+            iso(&event(&result, "daily").excluded_dates),
+            ["2024-01-01T23:00:00.000Z"],
+            "a DATE names midnight in the user's zone"
         );
     }
 

@@ -512,7 +512,11 @@ impl Reader {
                 return Ok(curr);
             }
             // Stored by node-ical but never read by parse-ics, and they cannot fail.
-            "EXDATE" | "GEO" | "CATEGORIES" | "FREEBUSY" => return Ok(curr),
+            "GEO" | "CATEGORIES" | "FREEBUSY" => return Ok(curr),
+            "EXDATE" => {
+                self.excluded_dates(&mut curr, value, &parameters);
+                return Ok(curr);
+            }
             "SEQUENCE" => {
                 curr.set("sequence", parse_value(value));
                 return Ok(curr);
@@ -618,6 +622,30 @@ impl Reader {
         };
         store_value(curr, name, Val::Date(date));
         Ok(())
+    }
+
+    /// Each date of an EXDATE line, read like DTSTART, onto the `exdate` list; an unreadable one is skipped.
+    fn excluded_dates(&self, curr: &mut Obj, value: &str, parameters: &[String]) {
+        for part in value.split(',') {
+            let mut read = Obj::default();
+            let mut parameters = parameters.to_vec();
+            if self
+                .date_parameter(&mut read, "exdate", part, &mut parameters)
+                .is_err()
+            {
+                continue;
+            }
+            let Some(date) = read
+                .remove("exdate")
+                .filter(|date| matches!(date, Val::Date(_)))
+            else {
+                continue;
+            };
+            match curr.get_mut("exdate") {
+                Some(Val::List(dates)) => dates.push(date),
+                _ => curr.set("exdate", Val::List(vec![date])),
+            }
+        }
     }
 
     /// A DATE-TIME with a TZID parameter.

@@ -25,6 +25,7 @@ use crate::db::entities::{
 };
 use crate::error::AppError;
 use crate::events::participants;
+use crate::events::queries as events_queries;
 use crate::http::zod::{js_length, js_trim};
 use crate::instant;
 use crate::integrations::ics::parse::{self, ParsedEvent, StoredEvent, StoredParticipant};
@@ -548,7 +549,77 @@ async fn reconcile<C: ConnectionTrait>(
             counts.deleted += 1;
         }
     }
+    link_series(db, feed, events).await?;
     Ok(counts)
+}
+
+/// Overrides hang under their series, and a series' EXDATEs and overrides become its exceptions, so the list shows each occurrence once.
+async fn link_series<C: ConnectionTrait>(
+    db: &C,
+    feed: &calendar_subscription::Model,
+    events: &[ParsedEvent],
+) -> Result<(), AppError> {
+    let rows: HashMap<String, calendar_event::Model> = queries::feed_events(db, &feed.id)
+        .await?
+        .into_iter()
+        .map(|row| (row.external_id.clone().unwrap_or_default(), row))
+        .collect();
+    let series_of = |uid: &str| rows.get(uid).filter(|row| row.recurrence.is_some());
+    // By date: an override of an excluded occurrence still shows, once.
+    let mut wanted: HashMap<
+        &str,
+        std::collections::BTreeMap<time::PrimitiveDateTime, (String, Option<String>)>,
+    > = HashMap::new();
+    for parsed in events.iter().filter(|parsed| parsed.recurrence.is_some()) {
+        if let Some(series) = series_of(&parsed.uid) {
+            let dates = wanted.entry(series.id.as_str()).or_default();
+            for at in &parsed.excluded_dates {
+                dates.insert(*at, ("deleted".into(), None));
+            }
+        }
+    }
+    for parsed in events {
+        let (Some(at), Some(row)) = (parsed.occurrence, rows.get(&parsed.uid)) else {
+            continue;
+        };
+        let series = series_of(&parsed.source_uid);
+        let parent = series.map(|series| series.id.clone());
+        if row.parent_event_id != parent {
+            queries::set_parent(db, row.clone(), parent).await?;
+        }
+        if let Some(series) = series {
+            wanted
+                .entry(series.id.as_str())
+                .or_default()
+                .insert(at, ("modified".into(), Some(row.id.clone())));
+        }
+    }
+    let series: Vec<&calendar_event::Model> = rows
+        .values()
+        .filter(|row| row.recurrence.is_some())
+        .collect();
+    let mut stored: HashMap<String, queries::ExceptionSet> = HashMap::new();
+    for exception in
+        events_queries::exceptions(db, series.iter().map(|row| row.id.clone()).collect()).await?
+    {
+        stored.entry(exception.parent_event_id).or_default().push((
+            exception.exception_date,
+            exception.r#type,
+            exception.modified_event_id,
+        ));
+    }
+    for row in series {
+        let wanted: queries::ExceptionSet = wanted
+            .remove(row.id.as_str())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(at, (kind, modified))| (at, kind, modified))
+            .collect();
+        if stored.remove(&row.id).unwrap_or_default() != wanted {
+            queries::replace_exceptions(db, &row.id, wanted).await?;
+        }
+    }
+    Ok(())
 }
 
 /// Imports client-encrypted events, or a legacy plaintext ICS file from shipped clients.
@@ -755,6 +826,12 @@ pub(crate) mod tests {
 
     const FEED: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:feed-1@example.com\r\nDTSTAMP:20261001T000000Z\r\nDTSTART:20261101T090000Z\r\nDTEND:20261101T100000Z\r\nSUMMARY:Planning\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
+    const SERIES_FEED: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n\
+        BEGIN:VEVENT\r\nUID:weekly@example.com\r\nDTSTART:20991102T090000Z\r\nDTEND:20991102T100000Z\r\nSUMMARY:Weekly\r\nRRULE:FREQ=WEEKLY;COUNT=4\r\nEXDATE:20991109T090000Z\r\nEND:VEVENT\r\n\
+        BEGIN:VEVENT\r\nUID:weekly@example.com\r\nRECURRENCE-ID:20991116T090000Z\r\nDTSTART:20991116T140000Z\r\nDTEND:20991116T150000Z\r\nSUMMARY:Moved\r\nEND:VEVENT\r\n\
+        BEGIN:VEVENT\r\nUID:daily@example.com\r\nDTSTART;VALUE=DATE:20991102\r\nSUMMARY:Daily\r\nRRULE:FREQ=DAILY;COUNT=3\r\nEXDATE;VALUE=DATE:20991103\r\nEND:VEVENT\r\n\
+        END:VCALENDAR\r\n";
+
     /// A scratch database with one user, and a feed server that safe fetch may reach.
     pub(crate) struct Fixture {
         pub state: AppState,
@@ -769,6 +846,7 @@ pub(crate) mod tests {
                 "/feed.ics",
                 get(|| async { ([(header::ETAG, "\"v1\"")], FEED).into_response() }),
             )
+            .route("/series.ics", get(|| async { SERIES_FEED.into_response() }))
             .route(
                 "/missing.ics",
                 get(|| async { StatusCode::NOT_FOUND.into_response() }),
@@ -959,6 +1037,57 @@ pub(crate) mod tests {
         assert_eq!(
             fixture.feed_state(&feed.id).await,
             ("error".to_owned(), Some(message.to_owned()), None)
+        );
+    }
+
+    #[tokio::test]
+    async fn synced_series_skip_their_excluded_and_overridden_occurrences() {
+        let fixture = fixture().await;
+        let feed = fixture.feed("/series.ics", None, 15).await;
+        let starts = || async {
+            crate::events::listing::list(
+                &fixture.state,
+                &fixture.user,
+                "2099-11-01T00:00:00.000Z",
+                "2099-11-30T23:59:59.000Z",
+            )
+            .await
+            .unwrap()
+            .events
+            .into_iter()
+            .map(|event| (event.title, event.start.0))
+            .collect::<Vec<_>>()
+        };
+        let exceptions = || async {
+            let db = &fixture.state.db;
+            db.query_all_raw(Statement::from_string(
+                db.get_database_backend(),
+                "SELECT id FROM recurrence_exception ORDER BY id".to_owned(),
+            ))
+            .await
+            .unwrap()
+            .iter()
+            .map(|row| row.try_get::<String>("", "id").unwrap())
+            .collect::<Vec<_>>()
+        };
+        sync_feed(&fixture.state, &feed).await.unwrap();
+        let expected = [
+            ("Daily", "2099-11-02T00:00:00.000Z"),
+            ("Weekly", "2099-11-02T09:00:00.000Z"),
+            ("Daily", "2099-11-04T00:00:00.000Z"),
+            ("Moved", "2099-11-16T14:00:00.000Z"),
+            ("Weekly", "2099-11-23T09:00:00.000Z"),
+        ]
+        .map(|(title, start)| (title.to_owned(), start.to_owned()));
+        assert_eq!(starts().await, expected);
+        let first = exceptions().await;
+        assert_eq!(first.len(), 3, "two EXDATEs and one override");
+        sync_feed(&fixture.state, &feed).await.unwrap();
+        assert_eq!(starts().await, expected);
+        assert_eq!(
+            exceptions().await,
+            first,
+            "an unchanged feed rewrites nothing"
         );
     }
 
