@@ -10,7 +10,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::service;
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
 use crate::http::schemas::{
@@ -47,9 +47,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn list(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<CategoryList>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::list(&state, &user).await?))
 }
 
@@ -57,10 +56,9 @@ pub async fn list(
 #[tracing::instrument(skip_all)]
 pub async fn create(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<CreateCategoryRequest>,
 ) -> Result<Json<Category>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::create(&state, &user, body).await?))
 }
 
@@ -68,11 +66,10 @@ pub async fn create(
 #[tracing::instrument(skip_all)]
 pub async fn update(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
     ValidJson(body): ValidJson<UpdateCategoryRequest>,
 ) -> Result<Json<Category>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::update(&state, &user, &id, body).await?))
 }
 
@@ -81,9 +78,8 @@ pub async fn update(
 #[tracing::instrument(skip_all)]
 pub async fn delete(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
 ) -> Result<Json<SuccessMessage>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::delete(&state, &user, &id).await?))
 }

@@ -506,7 +506,7 @@ export class CalendarApiService {
       );
       return {
         ...response,
-        // Hits embed trimmed calendar/category labels (`SearchLabel`), not the full rows `CalendarEvent` declares.
+        // Hydration rewrites only content and label-name fields, so the trimmed `SearchLabel`s pass through it as `EventSearchHit` labels.
         events: await this.hydrateEncryptedEvents(
           response.events as CalendarEvent[],
         ),

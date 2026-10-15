@@ -4,7 +4,7 @@ use serde_json::json;
 use solace_api_types::SuccessMessage;
 use solace_api_types::settings::UserSettings;
 
-use crate::helpers::{TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
+use crate::helpers::{Backend, TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
 
 #[tokio::test]
 async fn anonymous_callers_are_refused() {
@@ -82,6 +82,42 @@ async fn first_read_creates_the_defaults() {
     assert_eq!(again, settings, "a second read returns the same row");
 }
 
+/// Rust creates the row idempotently; TypeScript's find-then-create can answer the losers of the race 409.
+#[tokio::test]
+async fn concurrent_first_reads_all_get_the_same_defaults() {
+    let app = TestApp::spawn().await;
+    let user = app.user().await;
+    let mut reads = tokio::task::JoinSet::new();
+    for _ in 0..10 {
+        let mut agent = user.agent.clone();
+        reads.spawn(async move { agent.get("/api/settings").await });
+    }
+    let responses: Vec<_> = reads.join_all().await.into_iter().map(ok).collect();
+
+    let mut created = Vec::new();
+    for response in &responses {
+        match (app.backend, response.status.as_u16()) {
+            (_, 200) => created.push(ok(response.dto::<UserSettings>())),
+            (Backend::TypeScript, 409) => {}
+            (_, status) => panic!("{status}: {}", response.text()),
+        }
+    }
+    assert!(!created.is_empty());
+    if app.backend == Backend::Rust {
+        assert_eq!(created.len(), 10);
+    }
+    assert!(created.iter().all(|settings| *settings == created[0]));
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM user_settings WHERE user_id = $1",
+            &user.id
+        )
+        .await,
+        1
+    );
+}
+
 #[tokio::test]
 async fn updates_are_stored_and_returned() {
     let app = TestApp::spawn().await;
@@ -141,6 +177,31 @@ async fn updates_are_stored_and_returned() {
     );
 }
 
+/// Web and native offer the 3-day view as the default; TypeScript's schema still rejects it.
+#[tokio::test]
+async fn the_three_day_view_can_be_the_default_view() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let response = user
+        .put("/api/settings", json!({"defaultView": "3day"}))
+        .await;
+    match app.backend {
+        Backend::TypeScript => {
+            ok(response.expect_error(
+                400,
+                "Validation Error",
+                "Invalid enum value. Expected 'month' | 'week' | 'day' | 'agenda', received '3day'",
+            ));
+        }
+        Backend::Rust => {
+            let updated: UserSettings = ok(response.expect_status(200).and_then(|r| r.dto()));
+            assert_eq!(updated.default_view, "3day");
+            let read: UserSettings = ok(user.get("/api/settings").await.dto());
+            assert_eq!(read.default_view, "3day");
+        }
+    }
+}
+
 #[tokio::test]
 async fn an_update_without_a_row_creates_it() {
     let app = TestApp::spawn().await;
@@ -158,6 +219,11 @@ async fn an_update_without_a_row_creates_it() {
 async fn invalid_values_are_rejected_with_the_zod_message() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
+    let views = match app.backend {
+        Backend::TypeScript => "'month' | 'week' | 'day' | 'agenda'",
+        Backend::Rust => "'month' | 'week' | '3day' | 'day' | 'agenda'",
+    };
+    let view_message = format!("Invalid enum value. Expected {views}, received 'year'");
     let cases = [
         (
             json!({"theme": "x"}),
@@ -166,7 +232,7 @@ async fn invalid_values_are_rejected_with_the_zod_message() {
         ),
         (
             json!({"defaultView": "year"}),
-            "Invalid enum value. Expected 'month' | 'week' | 'day' | 'agenda', received 'year'",
+            view_message.as_str(),
             "defaultView",
         ),
         (

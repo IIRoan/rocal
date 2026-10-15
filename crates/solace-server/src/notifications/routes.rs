@@ -14,7 +14,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::service;
-use crate::auth::guard::{Auth, RouteUser};
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
 use crate::http::rate_limit::{self, Limit};
@@ -66,11 +66,10 @@ fn enforce(user: &RouteUser, uri: &Uri, limit: Limit) -> Result<(), AppError> {
 #[tracing::instrument(skip_all)]
 pub async fn get(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(event_id): Path<String>,
     uri: Uri,
-    auth: Auth,
 ) -> Result<Json<EventNotifications>, AppError> {
-    let user = auth.require()?;
     enforce(&user, &uri, READ_LIMIT)?;
     Ok(Json(service::get(&state, &user, &event_id).await?))
 }
@@ -80,12 +79,11 @@ pub async fn get(
 #[tracing::instrument(skip_all)]
 pub async fn set(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(event_id): Path<String>,
     uri: Uri,
-    auth: Auth,
     ValidJson(body): ValidJson<UpdateEventNotificationsRequest>,
 ) -> Result<Json<NotificationUpdateResult>, AppError> {
-    let user = auth.require()?;
     enforce(&user, &uri, WRITE_LIMIT)?;
     Ok(Json(
         service::set(
@@ -103,11 +101,10 @@ pub async fn set(
 #[tracing::instrument(skip_all)]
 pub async fn delete(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(event_id): Path<String>,
     uri: Uri,
-    auth: Auth,
 ) -> Result<Json<NotificationDeleteResult>, AppError> {
-    let user = auth.require()?;
     enforce(&user, &uri, WRITE_LIMIT)?;
     Ok(Json(service::delete(&state, &user, &event_id).await?))
 }

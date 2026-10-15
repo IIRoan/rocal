@@ -2,7 +2,7 @@ import {
   mergeUnifiedSearchResults,
   searchTitleIndex,
   titleHitToUnifiedResult,
-  type CalendarEvent,
+  type EventSearchHit,
   type TitleIndexDocument,
   type UnifiedCalendarSearchResult,
   type UnifiedSearchResult,
@@ -20,7 +20,7 @@ function isCalendarResult(
 export function mergePaletteSearchResults(input: {
   titleDocuments: TitleIndexDocument[];
   query: string;
-  events: CalendarEvent[];
+  events: EventSearchHit[];
   limit: number;
 }): NativePaletteSearchResult[] {
   const localHits = searchTitleIndex(

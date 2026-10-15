@@ -8,7 +8,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::service;
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
 use crate::http::schemas::{
@@ -49,9 +49,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn get(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<UserSettings>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::get(&state, &user).await?))
 }
 
@@ -60,10 +59,9 @@ pub async fn get(
 #[tracing::instrument(skip_all)]
 pub async fn update(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<UpdateSettingsRequest>,
 ) -> Result<Json<UserSettings>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::update(&state, &user, body).await?))
 }
 
@@ -72,8 +70,7 @@ pub async fn update(
 #[tracing::instrument(skip_all)]
 pub async fn reset(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<SuccessMessage>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::reset(&state, &user).await?))
 }

@@ -1,12 +1,14 @@
 import type {
-  CalendarEvent,
+  EventSearchHit,
   UnifiedCalendarSearchResult,
 } from "@workspace/calendar-core";
 
 export function toCalendarSearchResult(
-  event: CalendarEvent,
+  hit: EventSearchHit,
   index: number,
 ): UnifiedCalendarSearchResult {
+  // The palette never shows the hit's trimmed labels, and they are not the full rows `CalendarEvent` carries.
+  const { calendar: _calendar, category: _category, ...event } = hit;
   const encryptionStatus =
     event.encryptionState === "encrypted"
       ? "encrypted-indexed"

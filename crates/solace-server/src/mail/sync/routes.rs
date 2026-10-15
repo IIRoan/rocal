@@ -6,7 +6,7 @@ use solace_api_types::mail::{MailSyncQuery, MailSyncResult};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidQuery;
 use crate::http::zod;
@@ -24,10 +24,9 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn sync(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidQuery(query): ValidQuery<MailSyncQuery>,
 ) -> Result<Json<MailSyncResult>, AppError> {
-    let user = auth.require()?;
     Ok(Json(
         super::sync_for_user(&state, &user.id, &query.account_id.0).await?,
     ))

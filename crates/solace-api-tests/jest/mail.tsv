@@ -83,8 +83,8 @@ apps/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › rejects
 apps/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › returns mailbox status for the authenticated Solace account	suite:mail_account::an_invited_account_is_approved_but_not_provisioned
 apps/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › returns the authenticated user's encrypted vault backup	suite:mail_account::vault_backups_round_trip_and_keep_the_seal_unless_replaced
 apps/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › updates the authenticated user's encrypted vault backup	suite:mail_account::vault_backups_round_trip_and_keep_the_seal_unless_replaced
-apps/backend/__tests__/routes/mail-routes.test.ts	mailRoutes passkey step-up › blocks the mail token when passkey step-up is required	suite:mail_account::passkey_step_up_gates_the_mail_token_but_not_the_proxy
-apps/backend/__tests__/routes/mail-routes.test.ts	mailRoutes passkey step-up › returns a mail token when passkey step-up is satisfied	suite:mail_account::passkey_step_up_gates_the_mail_token_but_not_the_proxy
+apps/backend/__tests__/routes/mail-routes.test.ts	mailRoutes passkey step-up › blocks the mail token when passkey step-up is required	suite:mail_account::passkey_step_up_gates_the_mail_token_and_the_proxy_session
+apps/backend/__tests__/routes/mail-routes.test.ts	mailRoutes passkey step-up › returns a mail token when passkey step-up is satisfied	suite:mail_account::passkey_step_up_gates_the_mail_token_and_the_proxy_session
 apps/backend/__tests__/routes/mail-sync.test.ts	mailSyncRoutes › syncs mail changes for the authenticated user and requested account	suite:mail_sync::syncs_return_jmap_changes_since_the_stored_state
 apps/backend/__tests__/routes/mail.test.ts	mailRoutes › does not invalidate the token cache when falling back from client Bearer	suite:mail_jmap::the_session_or_a_bearer_opens_the_callers_own_mailbox
 apps/backend/__tests__/routes/mail.test.ts	mailRoutes › exchanges the authenticated session for a backend-issued mail token	suite:mail_account::mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox

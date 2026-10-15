@@ -17,7 +17,7 @@ use solace_api_types::push_devices::{
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use crate::auth::guard::{Auth, RouteUser};
+use crate::auth::guard::RouteUser;
 use crate::db::cuid;
 use crate::db::entities::{notification_job, push_device, user_settings};
 use crate::error::AppError;
@@ -80,10 +80,9 @@ fn enforce(user: &RouteUser, uri: &Uri, limit: Limit) -> Result<(), AppError> {
 #[tracing::instrument(skip_all)]
 pub async fn list(
     State(state): State<AppState>,
+    user: RouteUser,
     uri: Uri,
-    auth: Auth,
 ) -> Result<Json<PushDeviceList>, AppError> {
-    let user = auth.require()?;
     enforce(&user, &uri, LIST_LIMIT)?;
     Ok(Json(service::list(&state, &user).await?))
 }
@@ -93,11 +92,10 @@ pub async fn list(
 #[tracing::instrument(skip_all)]
 pub async fn register(
     State(state): State<AppState>,
+    user: RouteUser,
     uri: Uri,
-    auth: Auth,
     ValidJson(body): ValidJson<RegisterPushDeviceRequest>,
 ) -> Result<Json<PushDeviceRegistration>, AppError> {
-    let user = auth.require()?;
     enforce(&user, &uri, REGISTER_LIMIT)?;
     Ok(Json(service::register(&state, &user, body).await?))
 }
@@ -107,11 +105,10 @@ pub async fn register(
 #[tracing::instrument(skip_all)]
 pub async fn unregister(
     State(state): State<AppState>,
+    user: RouteUser,
     uri: Uri,
-    auth: Auth,
     ValidJson(body): ValidJson<UnregisterPushDeviceRequest>,
 ) -> Result<Json<PushDeviceUnregistration>, AppError> {
-    let user = auth.require()?;
     enforce(&user, &uri, UNREGISTER_LIMIT)?;
     Ok(Json(service::unregister(&state, &user, body).await?))
 }
@@ -121,10 +118,9 @@ pub async fn unregister(
 #[tracing::instrument(skip_all)]
 pub async fn test(
     State(state): State<AppState>,
+    user: RouteUser,
     uri: Uri,
-    auth: Auth,
 ) -> Result<Json<PushTestResult>, AppError> {
-    let user = auth.require()?;
     enforce(&user, &uri, TEST_LIMIT)?;
     Ok(Json(service::enqueue_test(&state, &user).await?))
 }

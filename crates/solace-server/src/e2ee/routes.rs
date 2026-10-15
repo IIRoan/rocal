@@ -10,7 +10,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::service;
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
 use crate::http::zod;
@@ -51,9 +51,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn bootstrap(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<E2eeBootstrap>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::bootstrap(&state, &user).await?))
 }
 
@@ -62,9 +61,8 @@ pub async fn bootstrap(
 #[tracing::instrument(skip_all)]
 pub async fn reset_snapshot(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<ResetSnapshot>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::reset_snapshot(&state, &user).await?))
 }
 
@@ -73,10 +71,9 @@ pub async fn reset_snapshot(
 #[tracing::instrument(skip_all)]
 pub async fn register_device(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<RegisterDeviceRequest>,
 ) -> Result<Json<EncryptionDevice>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::register_device(&state, &user, body).await?))
 }
 
@@ -85,10 +82,9 @@ pub async fn register_device(
 #[tracing::instrument(skip_all)]
 pub async fn store_password_envelope(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<PasswordEnvelopeRequest>,
 ) -> Result<Json<PasswordEnvelope>, AppError> {
-    let user = auth.require()?;
     Ok(Json(
         service::store_password_envelope(&state, &user, body).await?,
     ))

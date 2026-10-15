@@ -16,7 +16,7 @@ use utoipa_axum::routes;
 
 use super::service;
 use crate::addresses;
-use crate::auth::guard::{Auth, MaybeSession};
+use crate::auth::guard::{MaybeSession, RouteUser};
 use crate::error::AppError;
 use crate::http::client_ip::client_ip;
 use crate::http::extract::{ValidJson, ValidQuery};
@@ -141,8 +141,7 @@ pub async fn claim_invite(
 #[tracing::instrument(skip_all)]
 pub async fn delete_account(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<DeleteAccountResponse>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::delete(&state, &user).await?))
 }

@@ -13,7 +13,7 @@ use crate::event_fixtures::{
     insert_calendar, insert_plaintext_event, iso_from_now, row_snapshot, stored_content, to_json,
     unfold,
 };
-use crate::helpers::{TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
+use crate::helpers::{Backend, TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
 
 const COLOR_MESSAGE: &str = "Color must be one of: blue, orange, violet, rose, emerald, red, cyan, lime, amber, indigo, pink, teal or a valid hex color (e.g., #FF0000)";
 const PLAINTEXT_BESIDE_CIPHERTEXT: &str =
@@ -90,13 +90,15 @@ async fn anonymous_callers_are_refused() {
         .await));
     expect_unauthorized(&ok(anon.delete(&format!("/api/events/{id}")).await));
 
-    // The body schema runs before the session guard, so a malformed body answers 400 even anonymously.
-    let error = ok(ok(anon.post("/api/events", json!({})).await).expect_error(
-        400,
-        "Validation Error",
-        "Required",
-    ));
-    assert_eq!(issue_paths(&error), ["start", "end", "calendarId"]);
+    // Elysia validated before the guard, so TypeScript answers a malformed anonymous body 400; Rust's guard answers first.
+    let response = ok(anon.post("/api/events", json!({})).await);
+    match app.backend {
+        Backend::TypeScript => {
+            let error = ok(response.expect_error(400, "Validation Error", "Required"));
+            assert_eq!(issue_paths(&error), ["start", "end", "calendarId"]);
+        }
+        Backend::Rust => expect_unauthorized(&response),
+    }
 }
 
 #[tokio::test]

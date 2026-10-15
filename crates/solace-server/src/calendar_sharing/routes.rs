@@ -12,7 +12,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::service;
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
 use crate::http::zod;
@@ -64,10 +64,9 @@ pub async fn feed(
 #[tracing::instrument(skip_all)]
 pub async fn get(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
 ) -> Result<Json<CalendarShareLink>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::get(&state, &user, &id).await?))
 }
 
@@ -76,11 +75,10 @@ pub async fn get(
 #[tracing::instrument(skip_all)]
 pub async fn create(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
     ValidJson(body): ValidJson<CreateShareLinkRequest>,
 ) -> Result<Json<CalendarShareLink>, AppError> {
-    let user = auth.require()?;
     let regenerate = body.regenerate.unwrap_or(false);
     Ok(Json(service::create(&state, &user, &id, regenerate).await?))
 }
@@ -89,9 +87,8 @@ pub async fn create(
 #[tracing::instrument(skip_all)]
 pub async fn disable(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
 ) -> Result<Json<DisableShareLinkResponse>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::disable(&state, &user, &id).await?))
 }

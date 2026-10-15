@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CalendarEvent } from "@workspace/calendar-core";
+import type { CalendarEvent, EventSearchHit } from "@workspace/calendar-core";
 import { mergePaletteSearchResults } from "./palette-search";
 
 const event = (overrides: Partial<CalendarEvent> = {}): CalendarEvent => ({
@@ -63,5 +63,31 @@ describe("mergePaletteSearchResults", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.id).toBe("calendar:event-old");
+  });
+
+  it("keeps a server hit's event without its trimmed calendar and category labels", () => {
+    const label = {
+      id: "cal-1",
+      name: "Work",
+      color: "blue",
+      encryptedName: null,
+      encryptionKeyVersion: 1,
+    };
+    const hit: EventSearchHit = {
+      ...event({ title: "Board offsite", location: "Lisbon" }),
+      calendar: label,
+      category: { ...label, id: "cat-1", name: "Focus" },
+    };
+    const [result] = mergePaletteSearchResults({
+      titleDocuments: [],
+      query: "offsite",
+      events: [hit],
+      limit: 8,
+    });
+
+    expect(result?.snippet).toBe("Lisbon");
+    expect(result?.event).not.toHaveProperty("calendar");
+    expect(result?.event).not.toHaveProperty("category");
+    expect(result?.event.calendarId).toBe("cal-1");
   });
 });

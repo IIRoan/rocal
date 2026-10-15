@@ -8,7 +8,7 @@ use solace_api_types::recent_contacts::{PutRecentContactsRequest, RecentContacts
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use crate::auth::guard::{Auth, RouteUser};
+use crate::auth::guard::RouteUser;
 use crate::db::cuid;
 use crate::db::entities::user_recent_contacts;
 use crate::error::AppError;
@@ -43,9 +43,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn get(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
 ) -> Result<Json<Option<RecentContacts>>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::get(&state, &user).await?))
 }
 
@@ -54,10 +53,9 @@ pub async fn get(
 #[tracing::instrument(skip_all)]
 pub async fn put(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<PutRecentContactsRequest>,
 ) -> Result<Json<RecentContacts>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::upsert(&state, &user, body).await?))
 }
 

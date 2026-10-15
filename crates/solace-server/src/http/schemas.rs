@@ -183,9 +183,9 @@ pub fn theme_schema() -> Schema {
     zod::enumeration(&["light", "dark", "system"])
 }
 
-/// `defaultViewSchema`.
+/// `defaultViewSchema` plus `3day`, which web and native both render and offer as the default.
 pub fn default_view_schema() -> Schema {
-    zod::enumeration(&["month", "week", "day", "agenda"])
+    zod::enumeration(&["month", "week", "3day", "day", "agenda"])
 }
 
 /// `timeFormatSchema`.

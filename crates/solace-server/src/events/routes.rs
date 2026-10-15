@@ -14,7 +14,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::{listing, rsvp, service};
-use crate::auth::guard::Auth;
+use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidQuery};
 use crate::http::schemas::{
@@ -130,10 +130,9 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[tracing::instrument(skip_all)]
 pub async fn search(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidQuery(query): ValidQuery<EventSearchQuery>,
 ) -> Result<Json<EventSearchResults>, AppError> {
-    let user = auth.require()?;
     Ok(Json(listing::search(&state, &user, query).await?))
 }
 
@@ -142,10 +141,9 @@ pub async fn search(
 #[tracing::instrument(skip_all)]
 pub async fn search_corpus(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidQuery(query): ValidQuery<EventSearchCorpusQuery>,
 ) -> Result<Json<EventSearchCorpus>, AppError> {
-    let user = auth.require()?;
     Ok(Json(listing::search_corpus(&state, &user, query).await?))
 }
 
@@ -154,10 +152,9 @@ pub async fn search_corpus(
 #[tracing::instrument(skip_all)]
 pub async fn list(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidQuery(query): ValidQuery<EventListQuery>,
 ) -> Result<Json<EventList>, AppError> {
-    let user = auth.require()?;
     Ok(Json(
         listing::list(&state, &user, &query.start, &query.end).await?,
     ))
@@ -167,10 +164,9 @@ pub async fn list(
 #[tracing::instrument(skip_all)]
 pub async fn create(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<CreateEventRequest>,
 ) -> Result<Json<Event>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::create(&state, &user, body).await?))
 }
 
@@ -179,10 +175,9 @@ pub async fn create(
 #[tracing::instrument(skip_all)]
 pub async fn export_ics(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
 ) -> Result<Response, AppError> {
-    let user = auth.require()?;
     let (ics, filename) = service::export_ics(&state, &user, &id).await?;
     let mut response = ics.into_response();
     let headers = response.headers_mut();
@@ -202,10 +197,9 @@ pub async fn export_ics(
 #[tracing::instrument(skip_all)]
 pub async fn invitation_by_external_id(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidQuery(query): ValidQuery<InvitationByExternalIdQuery>,
 ) -> Result<Json<InvitationLookup>, AppError> {
-    let user = auth.require()?;
     Ok(Json(
         service::invitation_by_external_id(&state, &user, &query.external_id).await?,
     ))
@@ -216,11 +210,10 @@ pub async fn invitation_by_external_id(
 #[tracing::instrument(skip_all)]
 pub async fn rsvp(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
     ValidJson(body): ValidJson<RsvpRequest>,
 ) -> Result<Json<RsvpResult>, AppError> {
-    let user = auth.require()?;
     Ok(Json(rsvp::answer(&state, &user, &id, &body).await?))
 }
 
@@ -229,11 +222,10 @@ pub async fn rsvp(
 #[tracing::instrument(skip_all)]
 pub async fn seal(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
     ValidJson(body): ValidJson<SealEncryptionRequest>,
 ) -> Result<Json<Event>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::seal(&state, &user, &id, body).await?))
 }
 
@@ -241,10 +233,9 @@ pub async fn seal(
 #[tracing::instrument(skip_all)]
 pub async fn get(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
 ) -> Result<Json<Event>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::get(&state, &user, &id).await?))
 }
 
@@ -253,11 +244,10 @@ pub async fn get(
 #[tracing::instrument(skip_all)]
 pub async fn update(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
     ValidJson(body): ValidJson<UpdateEventRequest>,
 ) -> Result<Json<Event>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::update(&state, &user, &id, body).await?))
 }
 
@@ -265,10 +255,9 @@ pub async fn update(
 #[tracing::instrument(skip_all)]
 pub async fn delete(
     State(state): State<AppState>,
+    user: RouteUser,
     Path(id): Path<String>,
-    auth: Auth,
 ) -> Result<Json<EventDeleted>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::delete(&state, &user, &id).await?))
 }
 
@@ -277,9 +266,8 @@ pub async fn delete(
 #[tracing::instrument(skip_all)]
 pub async fn bulk(
     State(state): State<AppState>,
-    auth: Auth,
+    user: RouteUser,
     ValidJson(body): ValidJson<BulkEventRequest>,
 ) -> Result<Json<BulkEventResult>, AppError> {
-    let user = auth.require()?;
     Ok(Json(service::bulk(&state, &user, body).await?))
 }
