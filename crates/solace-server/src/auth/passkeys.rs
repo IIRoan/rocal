@@ -405,7 +405,7 @@ pub async fn verify_registration(
             return Ok(Reply::new(json(&created), vec![step_up(&state, &active)]));
         }
         let mut set = Vec::new();
-        let fresh = new_session(&state, &headers, active.user.clone(), &mut set).await?;
+        let fresh = new_session(&state, &headers, active.user, &mut set).await?;
         set.push(step_up(&state, &fresh));
         let mut body = serde_json::to_value(&created).map_err(|_| ApiError::internal())?;
         let with_user = serde_json::to_value(session::session_dto(&fresh))

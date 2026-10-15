@@ -101,12 +101,7 @@ async fn prepare(state: &AppState, request: Request) -> Result<Request, Rejectio
         check_origin(state, &parts.headers, parsed.as_ref(), parts.uri.query())?;
     }
     parts.extensions.insert(AuthBody(parsed));
-    let body = if reads_body {
-        Body::from(bytes)
-    } else {
-        Body::empty()
-    };
-    Ok(Request::from_parts(parts, body))
+    Ok(Request::from_parts(parts, Body::from(bytes)))
 }
 
 fn too_many_requests(retry_after: i64) -> Response {
