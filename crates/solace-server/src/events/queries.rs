@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use sea_orm::sea_query::{Condition, Expr};
+use sea_orm::sea_query::{Condition, Expr, Query, SelectStatement};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, PaginatorTrait,
     QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
@@ -369,11 +369,42 @@ pub async fn insert_reminder<C: ConnectionTrait>(
     row.insert(db).await.map(|_| ())
 }
 
+/// `SELECT id FROM calendar_event WHERE …`, the series whose exceptions a delete must take along.
+pub fn ids_where(condition: Condition) -> SelectStatement {
+    Query::select()
+        .column(calendar_event::Column::Id)
+        .from(calendar_event::Entity)
+        .cond_where(condition)
+        .to_owned()
+}
+
+/// Recurrence exceptions have no foreign key, so they are deleted with the series `series` selects.
+pub async fn delete_exceptions_of<C: ConnectionTrait>(
+    db: &C,
+    series: SelectStatement,
+) -> Result<u64, sea_orm::DbErr> {
+    Ok(recurrence_exception::Entity::delete_many()
+        .filter(recurrence_exception::Column::ParentEventId.in_subquery(series))
+        .exec(db)
+        .await?
+        .rows_affected)
+}
+
+/// The owner's events by id, with their exceptions.
 pub async fn delete<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
     ids: Vec<String>,
 ) -> Result<u64, sea_orm::DbErr> {
+    delete_exceptions_of(
+        db,
+        ids_where(
+            Condition::all()
+                .add(calendar_event::Column::Id.is_in(ids.clone()))
+                .add(calendar_event::Column::UserId.eq(user_id)),
+        ),
+    )
+    .await?;
     Ok(calendar_event::Entity::delete_many()
         .filter(calendar_event::Column::Id.is_in(ids))
         .filter(calendar_event::Column::UserId.eq(user_id))

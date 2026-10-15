@@ -5,8 +5,9 @@ use sea_orm::{ColumnTrait, Condition, ConnectionTrait, EntityTrait, ExprTrait, Q
 
 use crate::db::entities::{
     calendar_event, calendar_sharing, event_participant, invite, mail_directory_entry,
-    notification_log, recurrence_exception, session, user, verification,
+    notification_log, session, user, verification,
 };
+use crate::events::queries as events;
 use crate::instant;
 
 pub async fn user<C: ConnectionTrait>(
@@ -32,18 +33,11 @@ pub async fn delete_user<C: ConnectionTrait>(
     user_id: &str,
     emails: &[String],
 ) -> Result<(), sea_orm::DbErr> {
-    recurrence_exception::Entity::delete_many()
-        .filter(
-            recurrence_exception::Column::ParentEventId.in_subquery(
-                Query::select()
-                    .column(calendar_event::Column::Id)
-                    .from(calendar_event::Entity)
-                    .and_where(calendar_event::Column::UserId.eq(user_id))
-                    .to_owned(),
-            ),
-        )
-        .exec(db)
-        .await?;
+    events::delete_exceptions_of(
+        db,
+        events::ids_where(Condition::all().add(calendar_event::Column::UserId.eq(user_id))),
+    )
+    .await?;
     // Reset tokens and passkey challenges hold the user id; one-time tokens hold a session token.
     verification::Entity::delete_many()
         .filter(
