@@ -181,6 +181,12 @@ fn event_timezone(event: &Obj) -> Option<String> {
         .and_then(|tz| normalize_timezone(Some(tz)))
 }
 
+/// The zone an event or rule is stored in, never a label: `zones::iana_zone`, else `fallback` (the user's zone).
+fn storable_zone(zone: Option<&str>, fallback: &str) -> String {
+    zone.and_then(zones::iana_zone)
+        .unwrap_or_else(|| fallback.to_owned())
+}
+
 /// An EXDATE or RECURRENCE-ID as the instance it names starts: a DATE at midnight in the all-day zone, a DATE-TIME as is.
 fn occurrence_start(value: &Val, all_day_zone: &str) -> Option<PrimitiveDateTime> {
     let Val::Date(date) = value else {
@@ -435,7 +441,7 @@ fn parse_event(
         (start, end) = all_day_range(start, end, &all_day_timezone)?;
     }
     let recurrence_id = date_value(event.get("recurrenceid")).map(js::iso_string);
-    let timezone = event_timezone(event).or_else(|| {
+    let written = event_timezone(event).or_else(|| {
         if all_day {
             Some(all_day_timezone.clone())
         } else if let Some(calendar) = calendar_timezone {
@@ -444,12 +450,14 @@ fn parse_event(
             Some(user_timezone.to_owned())
         }
     });
+    let timezone = Some(storable_zone(written.as_deref(), &all_day_timezone));
     let mut recurrence = recurrence_rule(event.get("rrule"));
     if let Some(rule) = recurrence.as_mut() {
         if all_day {
             floating_dates(rule, &all_day_timezone)?;
-        } else if rule.timezone.is_none() {
-            rule.timezone = timezone.clone().filter(|tz| !tz.is_empty());
+        } else {
+            let zone = rule.timezone.take().or_else(|| timezone.clone());
+            rule.timezone = Some(storable_zone(zone.as_deref(), &all_day_timezone));
         }
     }
     let excluded_dates = match event.get("exdate") {
@@ -1091,7 +1099,71 @@ mod tests {
         );
         assert_eq!(
             at("half"),
-            ("2024-07-15T03:30:00.000Z".into(), Some("+05:30".into()))
+            ("2024-07-15T03:30:00.000Z".into(), Some("UTC".into())),
+            "no IANA zone keeps +05:30, so the event is filed in the user's"
+        );
+    }
+
+    #[test]
+    fn zones_are_stored_as_iana_names_never_as_labels() {
+        let lines = [
+            (
+                "windows",
+                "DTSTART;TZID=Romance Standard Time:20240715T090000",
+            ),
+            (
+                "label",
+                "DTSTART;TZID=\"(UTC+01:00) Brussels, Copenhagen, Madrid, Paris\":20240715T090000",
+            ),
+            ("lowercase", "DTSTART;TZID=europe/amsterdam:20240715T090000"),
+            (
+                "hour",
+                "DTSTART;TZID=\"(UTC+03:00) Nowhere\":20240715T090000",
+            ),
+            ("unknown", "DTSTART;TZID=Mars/Olympus_Mons:20240715T090000"),
+        ];
+        let mut feed_lines = Vec::new();
+        for (uid, start) in lines {
+            feed_lines.extend([
+                "BEGIN:VEVENT",
+                start,
+                "SUMMARY:Zone",
+                "RRULE:FREQ=DAILY;COUNT=2",
+            ]);
+            feed_lines.push(Box::leak(format!("UID:{uid}").into_boxed_str()));
+            feed_lines.push("END:VEVENT");
+        }
+        let result = parse(&feed(&feed_lines), "America/Los_Angeles");
+        let zones = |uid: &str| {
+            let found = event(&result, uid);
+            (
+                found.timezone.clone().unwrap_or_default(),
+                found
+                    .recurrence
+                    .as_ref()
+                    .and_then(|rule| rule.timezone.clone())
+                    .unwrap_or_default(),
+                instant::iso(found.start).0,
+            )
+        };
+        let expect = |zone: &str, start: &str| (zone.to_owned(), zone.to_owned(), start.to_owned());
+        assert_eq!(
+            zones("windows"),
+            expect("Europe/Paris", "2024-07-15T07:00:00.000Z")
+        );
+        assert_eq!(
+            zones("label"),
+            expect("Europe/Paris", "2024-07-15T07:00:00.000Z")
+        );
+        assert_eq!(zones("lowercase").0, "europe/amsterdam");
+        assert_eq!(
+            zones("hour"),
+            expect("Etc/GMT-3", "2024-07-15T06:00:00.000Z")
+        );
+        assert_eq!(
+            zones("unknown"),
+            expect("America/Los_Angeles", "2024-07-15T16:00:00.000Z"),
+            "an unknown name falls back to the user's zone, which also reads the time"
         );
     }
 

@@ -18,6 +18,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./recurrence": "./src/recurrence.ts",
-    "./parse-ics": "./src/parse-ics.ts"
+    "./parse-ics": "./src/parse-ics.ts",
+    "./windows-zones": "./src/windows-zones.ts"
   }
 }

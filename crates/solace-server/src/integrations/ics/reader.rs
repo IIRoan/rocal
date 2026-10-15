@@ -691,7 +691,8 @@ impl Reader {
         } else if let Some(iana) = &info.iana {
             zones::parse_date_time_in_zone(value, iana)
         } else {
-            local()
+            // A TZID no table knows reads like a floating time, in the zone the event will be filed under.
+            return Ok(self.floating_date(value, local));
         };
         let tz = parse_parameters(parameters)
             .get("TZID")
@@ -729,7 +730,7 @@ impl Reader {
         let Some(Val::Str(zone)) = calendar.get("WR-TIMEZONE") else {
             return None;
         };
-        super::normalize_timezone(Some(zone)).filter(|zone| zones::lookup(zone).is_some())
+        super::normalize_timezone(Some(zone)).and_then(|zone| zones::iana_zone(&zone))
     }
 
     fn next_id(&mut self) -> String {

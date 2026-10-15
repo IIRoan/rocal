@@ -10,6 +10,8 @@ COPY crates crates
 COPY xtask xtask
 # Telemetry compiles in the redaction keys shared with the TypeScript apps.
 COPY packages/calendar-core/src/redaction-policy.js packages/calendar-core/src/redaction-policy.js
+# The ICS reader compiles in the Windows zone table shared with the on-device import.
+COPY packages/calendar-ics/src/windows-zones.json packages/calendar-ics/src/windows-zones.json
 ENV RUSTFLAGS="-C target-cpu=x86-64-v3"
 RUN cargo build --release --locked -p solace-server \
  && cp target/release/solace-server /solace-server

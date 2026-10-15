@@ -1,5 +1,8 @@
 import ICAL from "ical.js";
-import { normalizeIcsTimezone } from "@workspace/calendar-ics";
+import {
+  type IcsEventZone,
+  resolveIcsEventZone,
+} from "@workspace/calendar-ics/windows-zones";
 import {
   eventParticipantInputSchema,
   recurrenceRuleObjectSchema,
@@ -21,17 +24,20 @@ function text(component: IcsComponent, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function eventTimezone(component: IcsComponent, fallback: string): string {
+function eventZone(component: IcsComponent, fallback: string): IcsEventZone {
   const start = component.getFirstPropertyValue("dtstart");
   if (
     start instanceof ICAL.Time &&
     !start.isDate &&
     start.zone === ICAL.Timezone.utcTimezone
   )
-    return "UTC";
+    return { timezone: "UTC", readIn: "UTC" };
   const tzid = component.getFirstProperty("dtstart")?.getParameter("tzid");
-  const zone = normalizeIcsTimezone(typeof tzid === "string" ? tzid : fallback);
-  return timezoneSchema.parse(zone ?? fallback);
+  const zone = resolveIcsEventZone(
+    typeof tzid === "string" ? tzid : fallback,
+    fallback,
+  );
+  return { timezone: timezoneSchema.parse(zone.timezone), readIn: zone.readIn };
 }
 
 function instant(time: IcsTime, timezone: string): Date {
@@ -56,6 +62,7 @@ const DEFERRED_RRULE = "x-solace-rrule";
 function recurrence(
   component: IcsComponent,
   timezone: string,
+  readIn: string,
 ): string | undefined {
   const value = component.getFirstPropertyValue(DEFERRED_RRULE);
   if (typeof value !== "string") return undefined;
@@ -72,7 +79,7 @@ function recurrence(
     frequency: rule.freq.toLowerCase(),
     interval: rule.interval,
     count: rule.count ?? undefined,
-    until: rule.until ? instant(rule.until, timezone).toISOString() : undefined,
+    until: rule.until ? instant(rule.until, readIn).toISOString() : undefined,
     timezone,
     byWeekDay: rule.parts.BYDAY?.map((day) => weekdays.indexOf(day)),
     byMonthDay: rule.parts.BYMONTHDAY,
@@ -121,9 +128,9 @@ function parseEvent(
     component.hasProperty("rdate")
   )
     throw new Error("Unsupported event");
-  const timezone = eventTimezone(component, fallback);
-  const start = instant(event.startDate, timezone);
-  const end = instant(event.endDate, timezone);
+  const { timezone, readIn } = eventZone(component, fallback);
+  const start = instant(event.startDate, readIn);
+  const end = instant(event.endDate, readIn);
   if (
     !event.startDate.isDate &&
     !component.hasProperty("dtend") &&
@@ -142,7 +149,7 @@ function parseEvent(
     sourceUid: event.uid,
     occurrenceDate:
       override instanceof ICAL.Time
-        ? instant(override, timezone).toISOString()
+        ? instant(override, readIn).toISOString()
         : undefined,
     title: event.summary || "Untitled event",
     description: event.description || undefined,
@@ -151,7 +158,7 @@ function parseEvent(
     end: end.toISOString(),
     allDay: event.startDate.isDate,
     timezone,
-    recurrence: recurrence(component, timezone),
+    recurrence: recurrence(component, timezone, readIn),
     participants: participants(component),
     excludedDates: [
       ...new Set(
@@ -162,7 +169,7 @@ function parseEvent(
               .getValues()
               .flatMap((value: unknown) =>
                 value instanceof ICAL.Time
-                  ? [instant(value, timezone).toISOString()]
+                  ? [instant(value, readIn).toISOString()]
                   : [],
               ),
           ),
@@ -182,9 +189,10 @@ export function parseIcsImport(content: string, timezone?: string | null) {
   } catch {
     throw new Error("Invalid calendar file");
   }
-  const fallback =
-    normalizeIcsTimezone(text(calendar, "x-wr-timezone")) ??
-    resolveTimezone(timezone);
+  const fallback = resolveIcsEventZone(
+    text(calendar, "x-wr-timezone") || undefined,
+    resolveTimezone(timezone),
+  ).timezone;
   const events: ParsedImportEvent[] = [];
   const errors: string[] = [];
   const components = calendar.getAllSubcomponents("vevent");

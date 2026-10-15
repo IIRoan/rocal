@@ -14,8 +14,9 @@ use crate::http::zod::{is_js_whitespace, js_trim};
 /// Bun 1.4's `Intl.supportedValuesOf('timeZone')`, in its order: VTIMEZONE rules resolve to the first zone that fits.
 const BUN_TIME_ZONES: &str = include_str!("bun_time_zones.txt");
 
-/// node-ical's `windowsZones.json`: CLDR's Windows labels and their IANA zone.
-const WINDOWS_ZONES: &str = include_str!("windows_zones.json");
+/// Windows zone ids and display labels to IANA, shared with the on-device import: node-ical 0.26.1's table from CLDR windowsZones.xml, plus CLDR's ids up to c4bb2c19 (2026-10-09).
+const WINDOWS_ZONES: &str =
+    include_str!("../../../../../packages/calendar-ics/src/windows-zones.json");
 
 fn pattern(source: &str) -> Regex {
     Regex::new(source).unwrap_or_else(|error| panic!("zone pattern {source}: {error}"))
@@ -39,7 +40,7 @@ struct WindowsZones {
 
 static WINDOWS: LazyLock<WindowsZones> = LazyLock::new(|| {
     let source: serde_json::Map<String, serde_json::Value> = serde_json::from_str(WINDOWS_ZONES)
-        .unwrap_or_else(|error| panic!("windows_zones.json: {error}"));
+        .unwrap_or_else(|error| panic!("windows-zones.json: {error}"));
     let mut zones = WindowsZones {
         exact: HashMap::new(),
         index: HashMap::new(),
@@ -162,6 +163,24 @@ pub fn lookup(zone: &str) -> Option<TimeZone> {
         return Offset::from_seconds(seconds).ok().map(TimeZone::fixed);
     }
     jiff::tz::db().get(zone).ok().filter(|tz| !tz.is_unknown())
+}
+
+/// A zone of the tz database (any case), not a bare offset.
+pub fn is_named_zone(zone: &str) -> bool {
+    lookup(zone).is_some_and(|tz| tz.iana_name().is_some())
+}
+
+/// A label as a tz database zone: an IANA name as written, a Windows name or "(UTC±hh:mm) City" label through CLDR's table, a whole-hour offset as `Etc/GMT±N`.
+pub fn iana_zone(label: &str) -> Option<String> {
+    let label = js_trim(label);
+    if label.is_empty() {
+        return None;
+    }
+    if is_named_zone(label) {
+        return Some(label.to_owned());
+    }
+    let info = resolve_tzid(label);
+    info.iana.filter(|iana| is_named_zone(iana)).or(info.etc)
 }
 
 pub fn is_valid_iana(zone: &str) -> bool {
@@ -405,6 +424,26 @@ mod tests {
         );
         assert_eq!(resolve_tzid("Foo/Bar").iana, None);
         assert_eq!(temporal_id("+0100").as_deref(), Some("+01:00"));
+    }
+
+    #[test]
+    fn labels_become_tz_database_zones() {
+        assert_eq!(
+            iana_zone("Romance Standard Time").as_deref(),
+            Some("Europe/Paris")
+        );
+        assert_eq!(
+            iana_zone("Manitoba Standard Time").as_deref(),
+            Some("America/Winnipeg"),
+            "CLDR's newer ids are in the table"
+        );
+        assert_eq!(
+            iana_zone("(UTC+01:00) Brussels, Copenhagen, Madrid, Paris").as_deref(),
+            Some("Europe/Paris")
+        );
+        assert_eq!(iana_zone("UTC+11").as_deref(), Some("Etc/GMT-11"));
+        assert_eq!(iana_zone("(UTC+05:45) Somewhere new"), None);
+        assert_eq!(iana_zone("custom_Pacific/Fiji"), None);
     }
 
     #[test]
