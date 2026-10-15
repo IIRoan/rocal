@@ -3,7 +3,7 @@
 use serde_json::json;
 use solace_api_types::account::{Invite, InviteList, InviteStatus};
 
-use crate::helpers::{TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
+use crate::helpers::{Backend, TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
 
 #[tokio::test]
 async fn anonymous_callers_are_refused() {
@@ -14,6 +14,29 @@ async fn anonymous_callers_are_refused() {
         .await));
     expect_unauthorized(&ok(anon.get("/api/invites").await));
     expect_unauthorized(&ok(anon.delete("/api/invites/whatever").await));
+}
+
+#[tokio::test]
+async fn invite_mail_bursts_wait_out_stalwarts_concurrency_limit() {
+    let app = TestApp::spawn().await;
+    // TypeScript drops mail past the limit (step 3), and its burst would also fail mail that concurrent cases send.
+    if app.backend == Backend::TypeScript {
+        return;
+    }
+    let user = app.user().await;
+    // Invite mail has no attachment, so the burst spends none of noreply's blob upload quota.
+    let mut creates = tokio::task::JoinSet::new();
+    for _ in 0..64 {
+        let mut agent = user.agent.clone();
+        let email = format!("burst-{}@example.com", hex(6));
+        creates.spawn(async move { agent.post("/api/invites", json!({"email": email})).await });
+    }
+    for response in creates.join_all().await {
+        let invite: Invite = ok(response
+            .and_then(|r| r.expect_status(200))
+            .and_then(|r| r.dto()));
+        assert_eq!(invite.warnings, None, "every invite went out");
+    }
 }
 
 #[tokio::test]
