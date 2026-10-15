@@ -102,7 +102,10 @@ pub fn time_zone(name: &str) -> Option<jiff::tz::TimeZone> {
 
 /// `resolveTimezone`: the trimmed zone, or the calendar default when it is blank.
 pub fn resolve_timezone(timezone: Option<&str>) -> String {
-    match timezone.map(str::trim).filter(|zone| !zone.is_empty()) {
+    match timezone
+        .map(crate::http::zod::js_trim)
+        .filter(|zone| !zone.is_empty())
+    {
         Some(zone) => zone.to_owned(),
         None => DEFAULT_TIMEZONE.to_owned(),
     }
@@ -119,6 +122,17 @@ pub fn unix_seconds(value: PrimitiveDateTime) -> i64 {
 mod tests {
     use super::*;
     use time::macros::datetime;
+
+    #[test]
+    fn time_zones_are_trimmed_like_javascript() {
+        assert_eq!(
+            resolve_timezone(Some("\u{feff} Europe/Berlin ")),
+            "Europe/Berlin"
+        );
+        assert_eq!(resolve_timezone(Some("\u{0085}")), "\u{0085}");
+        assert_eq!(resolve_timezone(Some(" \t")), DEFAULT_TIMEZONE);
+        assert_eq!(resolve_timezone(None), DEFAULT_TIMEZONE);
+    }
 
     #[test]
     fn instants_render_like_to_iso_string() {
