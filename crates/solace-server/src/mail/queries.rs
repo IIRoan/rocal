@@ -285,7 +285,7 @@ pub async fn push_notifications<C: ConnectionTrait>(
         .await
 }
 
-/// Whether any `new_mail` push for this email was ever queued, whatever became of it.
+/// Whether a `new_mail` push for this email is queued, in flight or retrying (the worker keeps those `pending`) or was sent; a `skipped` one may be queued again.
 pub async fn new_mail_job_exists<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
@@ -297,6 +297,7 @@ pub async fn new_mail_job_exists<C: ConnectionTrait>(
         .filter(notification_job::Column::UserId.eq(user_id))
         .filter(notification_job::Column::Kind.eq("new_mail"))
         .filter(notification_job::Column::Channel.eq("push"))
+        .filter(notification_job::Column::Status.is_in(["pending", "sent"]))
         .filter(
             Expr::col(notification_job::Column::Payload)
                 .cast_json_field("emailId")
