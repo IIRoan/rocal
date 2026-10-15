@@ -1066,6 +1066,10 @@ pub fn attach_exceptions(
             Some(at) => {
                 built[at].uid = built[series].uid.clone();
                 built[at].recurrence_id = Some(exception.exception_date);
+                built[at].recurrence_zone = built[series]
+                    .recurrence
+                    .as_ref()
+                    .and_then(|rule| rule.timezone.clone());
             }
             None => built[series].excluded_dates.push(exception.exception_date),
         }

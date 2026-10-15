@@ -225,6 +225,7 @@ pub fn to_build_event(event: &ExportEvent<'_>) -> Result<build::Event, InvalidUn
                 .collect()
         }),
         recurrence_id: None,
+        recurrence_zone: None,
         excluded_dates: Vec::new(),
     })
 }

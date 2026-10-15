@@ -6,6 +6,7 @@ mod js;
 pub mod parse;
 mod reader;
 mod rrule;
+mod vtimezone;
 mod zones;
 
 use serde::Serialize;
