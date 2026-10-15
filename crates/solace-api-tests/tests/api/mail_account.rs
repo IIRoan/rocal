@@ -13,7 +13,7 @@ use crate::helpers::{
 };
 use crate::mail_support::{
     access_token, bootstrap, bootstrap_request, bridge_secret, kdf_params, mailbox, pgp_key,
-    provision, provisioning_turn, row_json, stalwart_account, to_json,
+    provision, provisioning_turn, row_json, set_bridge_password, stalwart_account, to_json,
 };
 
 const ENTRY_COUNT: &str = "SELECT count(*) FROM mail_directory_entry WHERE user_id = $1";
@@ -468,8 +468,8 @@ async fn an_incomplete_mailbox_is_repaired_by_a_second_bootstrap() {
         ));
 
     let request = bootstrap_request(2);
-    let turn = provisioning_turn().await;
-    let repaired: MailSignup = ok(bootstrap(&mut owner.user, &request)
+    let turn = provisioning_turn(&app).await;
+    let repaired: MailSignup = ok(bootstrap(&app, &mut owner.user, &request)
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
@@ -527,8 +527,8 @@ async fn repairing_an_entry_without_an_account_id_stores_the_new_account() {
     .await
     .expect("entry without an account");
 
-    let turn = provisioning_turn().await;
-    let signup: MailSignup = ok(bootstrap(&mut user, &bootstrap_request(3))
+    let turn = provisioning_turn(&app).await;
+    let signup: MailSignup = ok(bootstrap(&app, &mut user, &bootstrap_request(3))
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
@@ -762,12 +762,51 @@ async fn mailboxes_resolve_by_owner_and_never_attach_to_another_account() {
 }
 
 #[tokio::test]
+async fn provisioning_and_first_mint_bursts_wait_out_stalwarts_concurrency_limit() {
+    let app = TestApp::spawn().await;
+    // TypeScript answers the limit with 503 (its suite serializes provisioning), and its burst would fail concurrent cases' provisioning too.
+    if app.backend == Backend::TypeScript {
+        return;
+    }
+    let mut users = Vec::new();
+    for _ in 0..48 {
+        users.push(app.user().await);
+    }
+    let mut bootstraps = tokio::task::JoinSet::new();
+    for (index, mut user) in users.into_iter().enumerate() {
+        bootstraps.spawn(async move {
+            let response = user
+                .post(
+                    "/api/mail/account/bootstrap",
+                    to_json(&bootstrap_request(index)),
+                )
+                .await;
+            (user, response)
+        });
+    }
+    let mut provisioned = Vec::new();
+    for (user, response) in bootstraps.join_all().await {
+        let signup: MailSignup = ok(response.expect_status(200).and_then(|r| r.dto()));
+        set_bridge_password(&app, &signup.stalwart_account_id.0, &user.id, &user.email).await;
+        provisioned.push(user);
+    }
+    let mut mints = tokio::task::JoinSet::new();
+    for mut user in provisioned {
+        mints.spawn(async move { user.get("/api/mail/oauth/access-token").await });
+    }
+    for response in mints.join_all().await {
+        let token: MailAccessToken = ok(response.expect_status(200).and_then(|r| r.dto()));
+        assert!(!token.access_token.is_empty());
+    }
+}
+
+#[tokio::test]
 async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let turn = provisioning_turn().await;
+    let turn = provisioning_turn(&app).await;
     // No preset bridge password: the first mint logs in, is refused, sets the derived password and retries.
-    let signup: MailSignup = ok(bootstrap(&mut user, &bootstrap_request(3))
+    let signup: MailSignup = ok(bootstrap(&app, &mut user, &bootstrap_request(3))
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
@@ -777,7 +816,7 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_secs();
-    let token: MailAccessToken = access_token(&mut user).await;
+    let token: MailAccessToken = access_token(&app, &mut user).await;
     drop(turn);
     assert!(!token.access_token.is_empty());
     assert!(token.expires_in > 60, "{token:?}");
@@ -786,7 +825,7 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
             && token.expires_at <= before + token.expires_in + 300,
         "{token:?}"
     );
-    let again = access_token(&mut user).await;
+    let again = access_token(&app, &mut user).await;
     assert_eq!(again, token, "a valid token is reused, not reminted");
 
     // An https test Stalwart sits behind the backend gate, which these direct reads must pass too.

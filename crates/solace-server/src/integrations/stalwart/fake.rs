@@ -48,6 +48,19 @@ impl Reply {
         }
     }
 
+    /// Stalwart's answer past its per-account `maxConcurrentRequests`.
+    pub fn concurrency_limit() -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            body: Some(serde_json::json!({
+                "type": "urn:ietf:params:jmap:error:limit",
+                "status": 400,
+                "detail": "The request exceeds the maximum number of concurrent requests.",
+                "limit": "maxConcurrentRequests",
+            })),
+        }
+    }
+
     pub fn status(status: u16) -> Self {
         Self {
             status: StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),

@@ -1,6 +1,7 @@
 //! `lib/stalwart-user-jmap.ts`: JMAP as the mailbox owner with their mail token, so server-side mail work needs no admin rights.
 
-use reqwest::{Client, RequestBuilder, Response};
+use axum::body::Bytes;
+use reqwest::{Client, RequestBuilder};
 use serde_json::{Value, json};
 
 use super::admin::parse_envelope;
@@ -18,18 +19,18 @@ pub async fn call(
     method_calls: Value,
 ) -> Result<Value, AppError> {
     let body = json!({"using": using, "methodCalls": method_calls});
-    let mut response = post(state, user_id, email, &body).await?;
-    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+    let (mut status, mut reply) = post(state, user_id, email, &body).await?;
+    if status == reqwest::StatusCode::UNAUTHORIZED {
         mail::invalidate_access_token(state, user_id);
-        response = post(state, user_id, email, &body).await?;
+        (status, reply) = post(state, user_id, email, &body).await?;
     }
-    if !response.status().is_success() {
+    if !status.is_success() {
         return Err(AppError::Internal(format!(
             "Stalwart JMAP request failed with status {}.",
-            response.status().as_u16()
+            status.as_u16()
         )));
     }
-    let envelope: Value = response.json().await.map_err(AppError::internal)?;
+    let envelope: Value = serde_json::from_slice(&reply).map_err(AppError::internal)?;
     Ok(parse_envelope(envelope))
 }
 
@@ -38,16 +39,17 @@ async fn post(
     user_id: &str,
     email: &str,
     body: &Value,
-) -> Result<Response, AppError> {
+) -> Result<(reqwest::StatusCode, Bytes), AppError> {
     let token = mail::access_token_for_user(state, user_id, email).await?;
-    request(
-        &state.http,
-        &state.stalwart_gate,
-        &state.config.stalwart_base_url,
-        &token.access_token,
+    super::send(
+        request(
+            &state.http,
+            &state.stalwart_gate,
+            &state.config.stalwart_base_url,
+            &token.access_token,
+        )
+        .json(body),
     )
-    .json(body)
-    .send()
     .await
     .map_err(AppError::internal)
 }
@@ -127,6 +129,46 @@ mod tests {
             jmap[1].json(),
             json!({"using": ["urn:ietf:params:jmap:core"], "methodCalls": calls()})
         );
+    }
+
+    #[tokio::test]
+    async fn resends_calls_refused_at_the_concurrency_limit() {
+        let database = ScratchDatabase::create().await;
+        let refusals = std::sync::atomic::AtomicUsize::new(2);
+        let fake = FakeStalwart::start(move |request| {
+            let refuse = refusals
+                .fetch_update(
+                    std::sync::atomic::Ordering::SeqCst,
+                    std::sync::atomic::Ordering::SeqCst,
+                    |left| left.checked_sub(1),
+                )
+                .is_ok();
+            if refuse {
+                Reply::concurrency_limit()
+            } else {
+                assert_eq!(request.authorization.as_deref(), Some("Bearer owner-token"));
+                Reply::json(json!({"methodResponses": [["Email/get", {"list": []}, "c1"]]}))
+            }
+        })
+        .await;
+        let state = mail_state(&database, &fake).await;
+        seed_mailbox(&state, "acct-1").await;
+        mail::tests::cache_token(&state, "owner-token");
+
+        let envelope = call(
+            &state,
+            OWNER,
+            "alice@solace.test",
+            &["urn:ietf:params:jmap:core"],
+            calls(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            envelope,
+            json!({"methodResponses": [["Email/get", {"list": []}, "c1"]]})
+        );
+        assert_eq!(fake.requests().len(), 3, "resent with the same token");
     }
 
     #[tokio::test]

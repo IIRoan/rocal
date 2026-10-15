@@ -138,30 +138,30 @@ impl<'a> Admin<'a> {
 
     /// One registry request; the answer is the parsed envelope.
     pub async fn call_jmap(&self, method_calls: Value) -> Result<Value, AdminError> {
-        let response = self
-            .post("/jmap/")
-            .bearer_auth(self.token)
-            .json(&json!({"using": USING, "methodCalls": method_calls}))
-            .send()
-            .await?;
-        if !response.status().is_success() {
-            return Err(AdminError::Status(response.status().as_u16()));
+        let (status, body) = super::send(
+            self.post("/jmap/")
+                .bearer_auth(self.token)
+                .json(&json!({"using": USING, "methodCalls": method_calls})),
+        )
+        .await?;
+        if !status.is_success() {
+            return Err(AdminError::Status(status.as_u16()));
         }
-        Ok(parse_envelope(read_json(response).await?))
+        Ok(parse_envelope(read_json(&body)?))
     }
 
     pub async fn get_session(&self) -> Result<Value, AdminError> {
         let url = format!("{}/jmap/session", self.base_url);
-        let response = self
-            .gate
-            .apply(self.http.get(&url), &url)
-            .bearer_auth(self.token)
-            .send()
-            .await?;
-        if !response.status().is_success() {
-            return Err(AdminError::SessionStatus(response.status().as_u16()));
+        let (status, body) = super::send(
+            self.gate
+                .apply(self.http.get(&url), &url)
+                .bearer_auth(self.token),
+        )
+        .await?;
+        if !status.is_success() {
+            return Err(AdminError::SessionStatus(status.as_u16()));
         }
-        Ok(parse_envelope(read_json(response).await?))
+        Ok(parse_envelope(read_json(&body)?))
     }
 
     /// One method call and its result's arguments.
@@ -900,9 +900,8 @@ async fn json_or_null(response: reqwest::Response) -> Value {
     response.json().await.unwrap_or(Value::Null)
 }
 
-async fn read_json(response: reqwest::Response) -> Result<Value, AdminError> {
-    let bytes = response.bytes().await?;
-    serde_json::from_slice(&bytes).map_err(|_| AdminError::NotJson)
+fn read_json(body: &[u8]) -> Result<Value, AdminError> {
+    serde_json::from_slice(body).map_err(|_| AdminError::NotJson)
 }
 
 fn str_field<'v>(value: &'v Value, key: &str) -> Option<&'v str> {
@@ -1062,6 +1061,58 @@ mod tests {
         assert_eq!(
             requests[1].json()["methodCalls"][0],
             json!(["x:Domain/get", {"ids": ["domain-1"]}, "c1"])
+        );
+    }
+
+    #[tokio::test]
+    async fn resends_registry_calls_refused_at_the_concurrency_limit() {
+        let fake = FakeStalwart::scripted(vec![
+            Reply::concurrency_limit(),
+            Reply::concurrency_limit(),
+            envelope("x:Domain/query", json!({"ids": ["domain-1"]}), "c1"),
+            Reply::concurrency_limit(),
+            Reply::json(json!({"primaryAccounts": {"urn:stalwart:jmap": "a"}})),
+        ])
+        .await;
+        let admin = admin(&fake);
+        let envelope = admin
+            .call_jmap(json!([["x:Domain/query", {}, "c1"]]))
+            .await
+            .unwrap();
+        assert_eq!(
+            envelope,
+            json!({"methodResponses": [["x:Domain/query", {"ids": ["domain-1"]}, "c1"]]})
+        );
+        assert_eq!(
+            admin.get_session().await.unwrap(),
+            json!({"primaryAccounts": {"urn:stalwart:jmap": "a"}})
+        );
+        assert_eq!(fake.requests().len(), 5);
+    }
+
+    #[tokio::test]
+    async fn gives_up_on_the_concurrency_limit_and_never_resends_other_errors() {
+        let attempts = usize::try_from(super::super::LIMIT_RETRIES).unwrap() + 1;
+        let fake = FakeStalwart::scripted(
+            std::iter::repeat_with(Reply::concurrency_limit)
+                .take(attempts)
+                .chain([Reply::status(400)])
+                .collect(),
+        )
+        .await;
+        let admin = admin(&fake);
+        let busy = admin.call_jmap(json!([["x:Domain/query", {}, "c1"]])).await;
+        assert!(matches!(busy, Err(AdminError::Status(400))), "{busy:?}");
+        assert_eq!(fake.requests().len(), attempts);
+        let refused = admin.call_jmap(json!([["x:Domain/query", {}, "c1"]])).await;
+        assert!(
+            matches!(refused, Err(AdminError::Status(400))),
+            "{refused:?}"
+        );
+        assert_eq!(
+            fake.requests().len(),
+            attempts + 1,
+            "a plain 400 is sent once"
         );
     }
 
