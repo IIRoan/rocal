@@ -237,9 +237,13 @@ async fn ensure_bridge_password(
 }
 
 fn upstream(error: AdminError) -> AppError {
+    unavailable(error.to_string())
+}
+
+fn unavailable(message: impl Into<String>) -> AppError {
     AppError::Upstream {
         status: StatusCode::SERVICE_UNAVAILABLE,
-        message: error.to_string(),
+        message: message.into(),
     }
 }
 
@@ -294,7 +298,7 @@ pub async fn bootstrap(
             "This account is not approved for a mailbox yet.".into(),
         ));
     }
-    if optional_text(request.wrapped_secret.clone().flatten().as_deref()).is_none() {
+    if optional_text(request.wrapped_secret.as_ref().and_then(|s| s.as_deref())).is_none() {
         return Err(AppError::field(
             "A vault secret sealed to your account key is required.",
             "wrappedSecret",
@@ -599,10 +603,9 @@ async fn create(
         || remote.account_id.is_empty()
         || remote.public_key_id.is_empty()
     {
-        return Err(AppError::Upstream {
-            status: StatusCode::SERVICE_UNAVAILABLE,
-            message: "Mailbox provisioning did not complete successfully.".into(),
-        });
+        return Err(unavailable(
+            "Mailbox provisioning did not complete successfully.",
+        ));
     }
     if let Err(error) = persist_new(state, user_id, address, &provisioning, &remote).await {
         delete_orphan(state, &admin, &remote).await?;
@@ -820,19 +823,15 @@ fn provisioning_error(error: &AdminError) -> AppError {
             r"account creation failed|public-key registration failed|admin session|admin jmap request failed|encryption",
         )
     });
-    let unavailable = |message: String| AppError::Upstream {
-        status: StatusCode::SERVICE_UNAVAILABLE,
-        message,
-    };
     let message = error.to_string().trim().to_owned();
     if message.is_empty() {
-        return unavailable("Mailbox provisioning failed for an unknown reason.".into());
+        return unavailable("Mailbox provisioning failed for an unknown reason.");
     }
     if CONFLICT.is_match(&message) {
         return AppError::Conflict("That mailbox already exists on the mail server.".into());
     }
     if NO_DOMAIN.is_match(&message) {
-        return unavailable("The configured mail domain was not found on the mail server.".into());
+        return unavailable("The configured mail domain was not found on the mail server.");
     }
     if SHOWN.is_match(&message) {
         return unavailable(message);
@@ -1066,10 +1065,9 @@ pub async fn delete_mailbox_for_user(state: &AppState, user_id: &str) -> Result<
             error = %telemetry::redact_pii(&error.to_string()),
             "Failed to delete linked Stalwart account during Solace account deletion"
         );
-        return Err(AppError::Upstream {
-            status: StatusCode::SERVICE_UNAVAILABLE,
-            message: "Could not delete the linked Stalwart mailbox. Try again in a moment.".into(),
-        });
+        return Err(unavailable(
+            "Could not delete the linked Stalwart mailbox. Try again in a moment.",
+        ));
     }
     queries::delete_entry(&state.db, &mailbox.id).await?;
     tracing::info!(

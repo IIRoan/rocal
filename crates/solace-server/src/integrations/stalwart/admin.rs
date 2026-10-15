@@ -226,17 +226,16 @@ impl<'a> Admin<'a> {
             error_type = refused.and_then(|e| str_field(e, "type")),
             "Stalwart createAccount response"
         );
-        let account_id = match created_id {
-            Some(id) => Some(id.to_owned()),
-            None => recovered_account_id(refused),
-        }
-        .filter(|id| !id.is_empty())
-        .ok_or_else(|| {
-            AdminError::Failed(format!(
-                "Stalwart account creation failed: {}",
-                description_of(refused).unwrap_or("Unknown error")
-            ))
-        })?;
+        let account_id = created_id
+            .map(str::to_owned)
+            .or_else(|| recovered_account_id(refused))
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| {
+                AdminError::Failed(format!(
+                    "Stalwart account creation failed: {}",
+                    description_of(refused).unwrap_or("Unknown error")
+                ))
+            })?;
         let verified = self.account(&account_id).await?;
         let verified_name = str_field(&verified, "name").unwrap_or_default();
         let verified_domain = str_field(&verified, "domainId").unwrap_or_default();
@@ -663,21 +662,21 @@ impl<'a> Admin<'a> {
         refused: Option<&Value>,
     ) -> Result<Option<String>, AdminError> {
         let keys = self.public_keys(account_id).await?;
-        let matching = keys.iter().find(|key| key_matches_email(key, email));
-        let key = match matching {
-            Some(key) => Some(key),
-            None => keys
-                .first()
-                .filter(|key| str_field(key, "id").is_some())
-                .inspect(|key| {
-                    tracing::warn!(
-                        account_id,
-                        recipient_ref = telemetry::log_ref(email),
-                        existing_public_key_id = str_field(key, "id"),
-                        "Adopting the first Stalwart public key for mailbox recovery"
-                    );
-                }),
-        };
+        let key = keys
+            .iter()
+            .find(|key| key_matches_email(key, email))
+            .or_else(|| {
+                keys.first()
+                    .filter(|key| str_field(key, "id").is_some())
+                    .inspect(|key| {
+                        tracing::warn!(
+                            account_id,
+                            recipient_ref = telemetry::log_ref(email),
+                            existing_public_key_id = str_field(key, "id"),
+                            "Adopting the first Stalwart public key for mailbox recovery"
+                        );
+                    })
+            });
         let Some(key_id) = key
             .and_then(|key| str_field(key, "id"))
             .filter(|id| !id.is_empty())
