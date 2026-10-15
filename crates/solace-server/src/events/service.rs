@@ -785,30 +785,24 @@ pub async fn bulk(
             "eventIds",
         ));
     }
-    let synced: Vec<&str> = events
-        .iter()
-        .filter(|e| e.is_synced)
-        .map(|e| e.title.as_str())
-        .collect();
-    if !synced.is_empty() {
+    // Counts, not titles: an error message must not carry user content.
+    let synced = events.iter().filter(|e| e.is_synced).count();
+    if synced > 0 {
         return Err(AppError::validation(format!(
-            "Cannot modify synced events. The following synced events are read-only: {}",
-            synced.join(", ")
+            "Cannot modify synced events. Synced events are read-only ({synced} selected)."
         )));
     }
     let relations = Relations::load(&state.db, &events.iter().collect::<Vec<_>>(), false).await?;
     let attendee = |event: &calendar_event::Model| {
         attendee_copy(&user.id, relations.participants_of(&event.id))
     };
-    let read_only: Vec<&str> = events
+    let read_only = events
         .iter()
         .filter(|e| attendee(e) && !e.is_cancelled)
-        .map(|e| e.title.as_str())
-        .collect();
-    if !read_only.is_empty() && request.action != "delete" {
+        .count();
+    if read_only > 0 && request.action != "delete" {
         return Err(AppError::validation(format!(
-            "Imported invitation events are read-only for attendees: {}",
-            read_only.join(", ")
+            "Imported invitation events are read-only for attendees ({read_only} selected)."
         )));
     }
     match request.action.as_str() {

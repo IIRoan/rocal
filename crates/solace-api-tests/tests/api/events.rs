@@ -1652,7 +1652,15 @@ async fn synced_events_are_read_only() {
         .expect_error(
             400,
             "Validation Error",
-            "Cannot modify synced events. The following synced events are read-only: Holiday",
+            match app.backend {
+                // TypeScript names the events by title, which is user content in the message.
+                Backend::TypeScript => {
+                    "Cannot modify synced events. The following synced events are read-only: Holiday"
+                }
+                Backend::Rust => {
+                    "Cannot modify synced events. Synced events are read-only (1 selected)."
+                }
+            },
         ));
     assert_eq!(
         row_snapshot(&app.db, "calendar_event", &event).await,
