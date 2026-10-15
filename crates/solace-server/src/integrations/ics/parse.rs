@@ -226,7 +226,18 @@ fn positive_int(value: f64) -> Option<i64> {
     (value.is_finite() && value > 0.0).then(|| value.floor() as i64)
 }
 
-/// `parseRecurrenceRule`: only what node-ical's options expose under the names parse-ics reads (BYMONTH and BYMONTHDAY never are).
+/// `parseNumberArray`: the integers inside `[min, max]`, each once, or none.
+fn numbers_within(values: Option<&Vec<f64>>, min: f64, max: f64) -> Option<Vec<i64>> {
+    let mut kept: Vec<i64> = Vec::new();
+    for value in values.into_iter().flatten() {
+        if value.fract() == 0.0 && (min..=max).contains(value) && !kept.contains(&(*value as i64)) {
+            kept.push(*value as i64);
+        }
+    }
+    (!kept.is_empty()).then_some(kept)
+}
+
+/// `parseRecurrenceRule` over rrule-temporal's options, BYMONTHDAY and BYMONTH included (parse-ics read them under lowercase keys and lost them).
 fn recurrence_rule(value: Option<&Val>) -> Option<RecurrenceRule> {
     let Some(Val::Rrule(options)) = value else {
         return None;
@@ -260,10 +271,22 @@ fn recurrence_rule(value: Option<&Val>) -> Option<RecurrenceRule> {
         count: options.count.and_then(positive_int),
         until: options.until_ms.map(js::iso_string),
         by_week_day: (!by_week_day.is_empty()).then_some(by_week_day),
-        by_month_day: None,
-        by_month: None,
+        by_month_day: numbers_within(options.by_month_day.as_ref(), 1.0, 31.0),
+        by_month: numbers_within(options.by_month.as_ref(), 1.0, 12.0),
         timezone: normalize_timezone(Some(&options.tzid)),
     })
+}
+
+/// A DATE rule repeats on calendar days in the zone the all-day range was read in, through midnight of its UNTIL date there.
+fn floating_dates(rule: &mut RecurrenceRule, zone: &str) -> Result<(), String> {
+    rule.timezone = Some(zone.to_owned());
+    if let Some(until) = rule.until.as_deref().and_then(js::parse_date_string) {
+        let day = js::fields(until);
+        rule.until = Some(js::iso_string(day_boundary(
+            day.year, day.month, day.day, zone, false,
+        )?));
+    }
+    Ok(())
 }
 
 /// `getParameterValue`: a parameter of an ORGANIZER/ATTENDEE value, read from the value itself or its `params`.
@@ -382,6 +405,9 @@ fn parse_event(
     let Some(mut start) = date_value(event.get("start")) else {
         return Ok(None);
     };
+    if let Some(Val::Str(message)) = event.get(reader::RRULE_ERROR) {
+        return Err(message.clone());
+    }
     let date_only_start = matches!(event.get("start"), Some(Val::Date(date)) if date.date_only);
     let all_day =
         matches!(event.get("datetype"), Some(Val::Str(kind)) if kind == "date") || date_only_start;
@@ -402,8 +428,12 @@ fn parse_event(
         }
     });
     let mut recurrence = recurrence_rule(event.get("rrule"));
-    if let Some(rule) = recurrence.as_mut().filter(|rule| rule.timezone.is_none()) {
-        rule.timezone = timezone.clone().filter(|tz| !tz.is_empty());
+    if let Some(rule) = recurrence.as_mut() {
+        if all_day {
+            floating_dates(rule, &all_day_timezone)?;
+        } else if rule.timezone.is_none() {
+            rule.timezone = timezone.clone().filter(|tz| !tz.is_empty());
+        }
     }
     // ponytail: instants beyond year 9999 (only reachable through field rollover) are skipped; widen if a feed ever needs them.
     let (Some(start), Some(end)) = (utc(start), utc(end)) else {
@@ -783,6 +813,255 @@ mod tests {
         }];
         assert!(participants_differ(&existing, Some(&parsed)));
         assert!(participants_differ(&existing, None));
+    }
+
+    fn feed(lines: &[&str]) -> String {
+        let mut all = vec!["BEGIN:VCALENDAR", "VERSION:2.0"];
+        all.extend_from_slice(lines);
+        all.push("END:VCALENDAR");
+        all.join("\r\n")
+    }
+
+    fn event<'a>(result: &'a ParseResult, uid: &str) -> &'a ParsedEvent {
+        result
+            .events
+            .iter()
+            .find(|event| event.uid == uid)
+            .unwrap_or_else(|| panic!("{uid} in {result:?}"))
+    }
+
+    #[test]
+    fn by_month_day_and_by_month_are_honored() {
+        let result = parse(
+            &feed(&[
+                "BEGIN:VEVENT",
+                "UID:yearly",
+                "DTSTART:20240715T090000Z",
+                "SUMMARY:Yearly",
+                "RRULE:FREQ=YEARLY;BYMONTH=7,5L,13;BYMONTHDAY=15,15,-1,0,x",
+                "END:VEVENT",
+            ]),
+            "UTC",
+        );
+        let rule = event(&result, "yearly").recurrence.as_ref().unwrap();
+        assert_eq!(
+            (rule.by_month_day.as_deref(), rule.by_month.as_deref()),
+            (Some(&[15][..]), Some(&[7][..]))
+        );
+    }
+
+    #[test]
+    fn an_unreadable_rule_fails_only_its_event() {
+        let result = parse(
+            &feed(&[
+                "BEGIN:VEVENT",
+                "UID:fine",
+                "DTSTART:20240101T080000Z",
+                "SUMMARY:Fine",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:broken",
+                "DTSTART:20240101T100000Z",
+                "SUMMARY:Broken",
+                "RRULE:FREQ=FORTNIGHTLY",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:revised",
+                "DTSTART:20240102T100000Z",
+                "SUMMARY:Revised",
+                "RRULE:FREQ=FORTNIGHTLY",
+                "SEQUENCE:1",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:revised",
+                "DTSTART:20240102T100000Z",
+                "SUMMARY:Revised",
+                "RRULE:FREQ=WEEKLY",
+                "SEQUENCE:2",
+                "END:VEVENT",
+            ]),
+            "UTC",
+        );
+        let uids: Vec<&str> = result.events.iter().map(|e| e.uid.as_str()).collect();
+        assert_eq!(uids, ["fine", "revised"]);
+        assert_eq!(
+            result.errors,
+            ["Failed to parse event broken: Invalid FREQ value: FORTNIGHTLY"]
+        );
+        assert!(
+            event(&result, "revised").recurrence.is_some(),
+            "the newer rule wins"
+        );
+    }
+
+    #[test]
+    fn a_repeated_dtstart_or_dtend_keeps_the_first() {
+        let result = parse(
+            &feed(&[
+                "BEGIN:VEVENT",
+                "UID:twice",
+                "DTSTART:20240101T100000Z",
+                "DTEND:20240101T110000Z",
+                "DTSTART:20240102T100000Z",
+                "DTEND:20240102T120000Z",
+                "SUMMARY:Twice",
+                "END:VEVENT",
+            ]),
+            "UTC",
+        );
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        let twice = event(&result, "twice");
+        assert_eq!(
+            (instant::iso(twice.start).0, instant::iso(twice.end).0),
+            (
+                "2024-01-01T10:00:00.000Z".to_owned(),
+                "2024-01-01T11:00:00.000Z".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn an_override_replaces_its_instance_whatever_its_sequence() {
+        let result = parse(
+            &feed(&[
+                "BEGIN:VEVENT",
+                "UID:series",
+                "DTSTART:20240101T090000Z",
+                "SUMMARY:Series",
+                "RRULE:FREQ=DAILY;COUNT=5",
+                "SEQUENCE:3",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:series",
+                "RECURRENCE-ID:20240102T150000Z",
+                "DTSTART:20240102T160000Z",
+                "SUMMARY:Afternoon",
+                "SEQUENCE:2",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:series",
+                "RECURRENCE-ID:20240102T090000Z",
+                "DTSTART:20240102T100000Z",
+                "SUMMARY:Morning without a sequence",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:series",
+                "RECURRENCE-ID:20240102T150000Z",
+                "DTSTART:20240102T180000Z",
+                "SUMMARY:Older afternoon revision",
+                "SEQUENCE:1",
+                "END:VEVENT",
+            ]),
+            "UTC",
+        );
+        let titles: Vec<&str> = result.events.iter().map(|e| e.title.as_str()).collect();
+        assert_eq!(
+            titles,
+            ["Series", "Morning without a sequence", "Afternoon"]
+        );
+    }
+
+    #[test]
+    fn all_day_rules_repeat_on_the_users_calendar_days() {
+        let lines = [
+            "BEGIN:VEVENT",
+            "UID:holiday",
+            "DTSTART;VALUE=DATE:20240301",
+            "SUMMARY:Holiday",
+            "RRULE:FREQ=YEARLY;UNTIL=20280301",
+            "END:VEVENT",
+        ];
+        for (zone, until) in [
+            ("UTC", "2028-03-01T00:00:00.000Z"),
+            ("Europe/Amsterdam", "2028-02-29T23:00:00.000Z"),
+            ("America/Los_Angeles", "2028-03-01T08:00:00.000Z"),
+        ] {
+            let result = parse(&feed(&lines), zone);
+            let rule = event(&result, "holiday").recurrence.clone().unwrap();
+            assert_eq!(
+                (rule.timezone.as_deref(), rule.until.as_deref()),
+                (Some(zone), Some(until)),
+                "{zone}"
+            );
+        }
+    }
+
+    #[test]
+    fn offset_tzids_are_fixed_offsets() {
+        let result = parse(
+            &feed(&[
+                "BEGIN:VEVENT",
+                "UID:plus",
+                "DTSTART;TZID=+0100:20240715T090000",
+                "SUMMARY:Plus",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:half",
+                "DTSTART;TZID=+0530:20240715T090000",
+                "SUMMARY:Half",
+                "END:VEVENT",
+            ]),
+            "UTC",
+        );
+        let at = |uid: &str| {
+            let found = event(&result, uid);
+            (instant::iso(found.start).0, found.timezone.clone())
+        };
+        assert_eq!(
+            at("plus"),
+            ("2024-07-15T08:00:00.000Z".into(), Some("Etc/GMT-1".into()))
+        );
+        assert_eq!(
+            at("half"),
+            ("2024-07-15T03:30:00.000Z".into(), Some("+05:30".into()))
+        );
+    }
+
+    #[test]
+    fn floating_times_use_the_calendar_zone_or_stay_floating() {
+        let vtimezone = [
+            "BEGIN:VTIMEZONE",
+            "TZID:Asia/Tokyo",
+            "BEGIN:STANDARD",
+            "DTSTART:19700101T000000",
+            "TZOFFSETFROM:+0900",
+            "TZOFFSETTO:+0900",
+            "END:STANDARD",
+            "END:VTIMEZONE",
+        ];
+        let floating = [
+            "BEGIN:VEVENT",
+            "UID:floating",
+            "DTSTART:20240715T090000",
+            "SUMMARY:Floating",
+            "END:VEVENT",
+        ];
+        let start = |extra: &[&str]| {
+            let lines: Vec<&str> = extra
+                .iter()
+                .chain(&vtimezone)
+                .chain(&floating)
+                .copied()
+                .collect();
+            let result = parse(&feed(&lines), "Europe/Amsterdam");
+            let found = event(&result, "floating");
+            (instant::iso(found.start).0, found.timezone.clone())
+        };
+        assert_eq!(
+            start(&["X-WR-TIMEZONE:America/New_York"]),
+            (
+                "2024-07-15T13:00:00.000Z".into(),
+                Some("America/New_York".into())
+            )
+        );
+        assert_eq!(
+            start(&[]),
+            (
+                "2024-07-15T09:00:00.000Z".into(),
+                Some("Europe/Amsterdam".into())
+            ),
+            "a VTIMEZONE alone does not claim floating times"
+        );
     }
 
     /// `JSON.stringify` of a result, as the golden files hold it.

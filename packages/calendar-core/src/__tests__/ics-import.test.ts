@@ -61,6 +61,34 @@ END:VEVENT`),
     });
   });
 
+  it("skips only the event whose recurrence rule cannot be read", () => {
+    const result = parseIcsImport(
+      wrap(`BEGIN:VEVENT
+UID:fortnightly
+DTSTART:20260601T090000Z
+SUMMARY:Unreadable rule
+RRULE:FREQ=FORTNIGHTLY
+END:VEVENT
+BEGIN:VEVENT
+UID:weekly
+DTSTART:20260602T090000Z
+SUMMARY:Readable rule
+rrule;x-note=1:FREQ=WEEKLY;COUNT=2;BYDAY=TU
+END:VEVENT`),
+      "UTC",
+    );
+    expect(result.eventsTotal).toBe(2);
+    expect(result.errors).toEqual([
+      "Event 1 has invalid dates, participants, or an unsupported recurrence rule.",
+    ]);
+    expect(result.events.map((event) => event.sourceUid)).toEqual(["weekly"]);
+    expect(JSON.parse(result.events[0]?.recurrence ?? "{}")).toMatchObject({
+      frequency: "weekly",
+      count: 2,
+      byWeekDay: [2],
+    });
+  });
+
   it("rejects malformed input without echoing its contents", () => {
     expect(() => parseIcsImport("private garbage", "UTC")).toThrow(
       "Invalid calendar file",

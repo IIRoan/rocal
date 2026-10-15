@@ -1,22 +1,52 @@
 {
   "UTC": {
-    "events": [],
+    "events": [
+      {
+        "uid": "fine@example.com",
+        "sourceUid": "fine@example.com",
+        "title": "Fine",
+        "start": "2024-01-01T08:00:00.000Z",
+        "end": "2024-01-01T08:00:00.000Z",
+        "allDay": false,
+        "timezone": "Etc/UTC"
+      }
+    ],
     "errors": [
-      "Failed to parse ICS file: Invalid WKST value: XX"
+      "Failed to parse event fail@example.com: Invalid WKST value: XX"
     ],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
-    "events": [],
+    "events": [
+      {
+        "uid": "fine@example.com",
+        "sourceUid": "fine@example.com",
+        "title": "Fine",
+        "start": "2024-01-01T08:00:00.000Z",
+        "end": "2024-01-01T08:00:00.000Z",
+        "allDay": false,
+        "timezone": "Etc/UTC"
+      }
+    ],
     "errors": [
-      "Failed to parse ICS file: Invalid WKST value: XX"
+      "Failed to parse event fail@example.com: Invalid WKST value: XX"
     ],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
-    "events": [],
+    "events": [
+      {
+        "uid": "fine@example.com",
+        "sourceUid": "fine@example.com",
+        "title": "Fine",
+        "start": "2024-01-01T08:00:00.000Z",
+        "end": "2024-01-01T08:00:00.000Z",
+        "allDay": false,
+        "timezone": "Etc/UTC"
+      }
+    ],
     "errors": [
-      "Failed to parse ICS file: Invalid WKST value: XX"
+      "Failed to parse event fail@example.com: Invalid WKST value: XX"
     ],
     "method": "PUBLISH"
   }

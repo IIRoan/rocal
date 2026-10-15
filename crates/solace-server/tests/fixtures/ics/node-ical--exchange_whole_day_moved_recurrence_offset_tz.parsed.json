@@ -48,15 +48,15 @@
         "recurrence": {
           "frequency": "weekly",
           "interval": 1,
-          "until": "2026-08-17T00:00:00.000Z",
+          "until": "2026-08-16T22:00:00.000Z",
           "byWeekDay": [
             2,
             4
           ],
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2026-08-17T00:00:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2026-08-16T22:00:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "exchange-moved-recurrence-offset-tz::RECURRENCE::2026-02-25T23:00:00.000Z",
@@ -85,15 +85,15 @@
         "recurrence": {
           "frequency": "weekly",
           "interval": 1,
-          "until": "2026-08-17T00:00:00.000Z",
+          "until": "2026-08-17T07:00:00.000Z",
           "byWeekDay": [
             2,
             4
           ],
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2026-08-17T00:00:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2026-08-17T07:00:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "exchange-moved-recurrence-offset-tz::RECURRENCE::2026-02-25T23:00:00.000Z",

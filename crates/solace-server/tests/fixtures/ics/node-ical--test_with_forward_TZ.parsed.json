@@ -40,10 +40,10 @@
           "byWeekDay": [
             6
           ],
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[6],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[6],\"timezone\":\"Europe/Amsterdam\"}"
       }
     ],
     "errors": [],
@@ -66,10 +66,10 @@
           "byWeekDay": [
             6
           ],
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[6],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[6],\"timezone\":\"America/Los_Angeles\"}"
       }
     ],
     "errors": [],

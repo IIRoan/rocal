@@ -1,4 +1,4 @@
-//! node-ical 0.26's parser (`ical.js`): lines into the object tree parse-ics reads, with its merging, date handling and whole-feed failures.
+//! node-ical 0.26's parser (`ical.js`): lines into the object tree parse-ics reads, with its merging and date handling, minus the quirks Rust fixes.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::LazyLock;
@@ -28,6 +28,9 @@ static MILLIS: LazyLock<Regex> = LazyLock::new(|| pattern(r"\.\d{3}"));
 static UNTIL: LazyLock<Regex> = LazyLock::new(|| pattern(r"UNTIL=(\d{8})(T\d{6})?(Z)?"));
 static UNTIL_DATE_TIME: LazyLock<Regex> = LazyLock::new(|| pattern(r"UNTIL=\d{8}T\d{6}Z?"));
 static UNTIL_LOCAL: LazyLock<Regex> = LazyLock::new(|| pattern(r"UNTIL=\d{8}T\d{6}"));
+
+/// Set on a component whose RRULE could not be read, so only that event fails instead of the whole feed.
+pub const RRULE_ERROR: &str = "\u{0}rrule-error";
 
 /// A JavaScript `Date` with node-ical's `tz` and `dateOnly` metadata; `ms` is `None` for an invalid date.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -270,8 +273,8 @@ fn number(captures: &regex_lite::Captures<'_>, index: usize) -> i64 {
         .unwrap_or(0)
 }
 
-/// The first VTIMEZONE in the parser stack, or the one with this (quote-stripped) TZID.
-fn find_vtimezone<'a>(stack: &'a [Obj], tzid: Option<&str>) -> Option<&'a Obj> {
+/// The VTIMEZONE in the parser stack with this (quote-stripped) TZID.
+fn find_vtimezone<'a>(stack: &'a [Obj], tzid: &str) -> Option<&'a Obj> {
     stack
         .iter()
         .flat_map(Obj::values)
@@ -280,9 +283,6 @@ fn find_vtimezone<'a>(stack: &'a [Obj], tzid: Option<&str>) -> Option<&'a Obj> {
             if component.kind() != Some("VTIMEZONE") {
                 return false;
             }
-            let Some(tzid) = tzid else {
-                return true;
-            };
             let ids: Vec<String> = match component.get("tzid") {
                 Some(Val::List(items)) => items.iter().map(Val::js_string).collect(),
                 Some(other) => vec![other.js_string()],
@@ -354,6 +354,22 @@ fn date_key(date: &JsDate) -> Result<String, String> {
     }
     let iso = js::iso_string(date.ms.ok_or_else(invalid)?);
     Ok(iso.chars().take(10).collect())
+}
+
+/// A TZID written as a UTC offset (`+0100`, which `parseParameters` reads as the number 100): the offset and the fixed zone to file it under.
+fn offset_tzid(parameters: &[String]) -> Option<(String, String)> {
+    let raw = strip_quotes(
+        parameters
+            .iter()
+            .rev()
+            .find_map(|p| p.strip_prefix("TZID="))?,
+    );
+    if !raw.starts_with(['+', '-']) {
+        return None;
+    }
+    let info = zones::resolve_tzid(raw);
+    let offset = info.offset?;
+    Some((offset.clone(), info.etc.unwrap_or(offset)))
 }
 
 /// `new Date(value)`.
@@ -463,8 +479,9 @@ impl Reader {
             "TRANSP" => "transparency",
             "PERCENT-COMPLETE" => "completion",
             "DTSTART" => {
+                // A repeated DTSTART is ignored (node-ical failed the whole feed on it).
                 if curr.get("start").is_some() {
-                    return Err(format!("duplicate DTSTART encountered, line={line}"));
+                    return Ok(curr);
                 }
                 self.date_parameter(&mut curr, "start", value, &mut parameters)?;
                 let kind = if is_date_only(value, &parameters) {
@@ -478,7 +495,7 @@ impl Reader {
             "DTEND" | "DUE" => {
                 let key = if name == "DTEND" { "end" } else { "due" };
                 if curr.get(key).is_some() {
-                    return Err(format!("duplicate {name} encountered, line={line}"));
+                    return Ok(curr);
                 }
                 self.date_parameter(&mut curr, key, value, &mut parameters)?;
                 return Ok(curr);
@@ -581,6 +598,12 @@ impl Reader {
                 ),
                 ..JsDate::default()
             }
+        } else if let Some((offset, zone)) = offset_tzid(parameters) {
+            JsDate {
+                ms: zones::parse_with_offset(&value, &offset)?,
+                tz: Some(zone),
+                date_only: false,
+            }
         } else {
             match parse_parameters(parameters)
                 .get("TZID")
@@ -590,7 +613,7 @@ impl Reader {
                     let tz = strip_quotes(&tz.js_string()).to_owned();
                     self.zoned_date(&value, tz, year, parameters, local)?
                 }
-                None => self.floating_date(&value, year, local)?,
+                None => self.floating_date(&value, local),
             }
         };
         store_value(curr, name, Val::Date(date));
@@ -611,7 +634,7 @@ impl Reader {
             || tz.starts_with("Customized Time Zone")
             || tz.starts_with("tzone://Microsoft/")
         {
-            match find_vtimezone(&self.stack, Some(&tz)) {
+            match find_vtimezone(&self.stack, &tz) {
                 Some(vtimezone) => {
                     let (iana, offset) = resolve_vtimezone(vtimezone, year);
                     if let Some(resolved) = iana.or(offset) {
@@ -649,48 +672,32 @@ impl Reader {
         })
     }
 
-    /// A DATE-TIME without a TZID: in the calendar's first VTIMEZONE when there is one, else host-local (UTC).
-    fn floating_date(
-        &self,
-        value: &str,
-        year: i64,
-        local: impl Fn() -> Option<i64>,
-    ) -> Result<JsDate, String> {
-        let floating = || JsDate {
-            ms: local(),
-            ..JsDate::default()
-        };
-        let Some(vtimezone) = find_vtimezone(&self.stack, None) else {
-            return Ok(floating());
-        };
-        let tzid = match vtimezone.get("tzid") {
-            Some(Val::List(items)) => items.last().cloned(),
-            other => other.cloned(),
-        };
-        let Some(tzid) = tzid.filter(Val::truthy) else {
-            return Ok(floating());
-        };
-        let mut resolved = strip_quotes(&tzid.js_string()).to_owned();
-        let (iana, offset) = resolve_vtimezone(vtimezone, year);
-        if let Some(zone) = iana.or(offset) {
-            resolved = zone;
-        }
-        let info = zones::resolve_tzid(&resolved);
-        if let Some(offset) = info.offset {
-            return Ok(JsDate {
-                ms: zones::parse_with_offset(value, &offset)?,
-                tz: Some(offset),
+    /// A DATE-TIME without a TZID: in the calendar's X-WR-TIMEZONE when it names a zone, else floating (host-local, UTC).
+    fn floating_date(&self, value: &str, local: impl Fn() -> Option<i64>) -> JsDate {
+        match self.calendar_zone() {
+            Some(zone) => JsDate {
+                ms: zones::parse_date_time_in_zone(value, &zone),
+                tz: Some(zone),
                 date_only: false,
-            });
+            },
+            None => JsDate {
+                ms: local(),
+                ..JsDate::default()
+            },
         }
-        if let Some(iana) = info.iana {
-            return Ok(JsDate {
-                ms: zones::parse_date_time_in_zone(value, &iana),
-                tz: Some(iana),
-                date_only: false,
-            });
-        }
-        Ok(floating())
+    }
+
+    /// The enclosing calendar's X-WR-TIMEZONE, as parse-ics normalizes it, when it is a zone.
+    fn calendar_zone(&self) -> Option<String> {
+        let calendar = self
+            .stack
+            .iter()
+            .rev()
+            .find(|obj| obj.kind() == Some("VCALENDAR"))?;
+        let Some(Val::Str(zone)) = calendar.get("WR-TIMEZONE") else {
+            return None;
+        };
+        super::normalize_timezone(Some(zone)).filter(|zone| zones::lookup(zone).is_some())
     }
 
     fn next_id(&mut self) -> String {
@@ -702,8 +709,9 @@ impl Reader {
     fn end(&mut self, component: &str, mut curr: Obj) -> Result<Obj, String> {
         if matches!(component, "VEVENT" | "VTODO" | "VJOURNAL")
             && curr.get("rrule").is_some_and(Val::truthy)
+            && let Err(message) = convert_rrule(&mut curr)
         {
-            convert_rrule(&mut curr)?;
+            curr.set(RRULE_ERROR, Val::Str(message));
         }
         if component == "VCALENDAR" {
             let strings: Vec<String> = curr
@@ -808,6 +816,9 @@ fn file_by_uid(parent: &mut Obj, key: &str, mut curr: Obj) -> Result<(), String>
             existing.get("recurrenceid").is_some() && curr.get("rrule").is_some();
         let newer = Val::finite(curr.get("sequence")) >= Val::finite(existing.get("sequence"));
         if override_then_series || newer {
+            if curr.get("rrule").is_some() {
+                existing.remove(RRULE_ERROR);
+            }
             for (field, val) in curr.entries() {
                 existing.set(&field, val.clone());
             }
@@ -835,7 +846,7 @@ fn file_by_uid(parent: &mut Obj, key: &str, mut curr: Obj) -> Result<(), String>
     Ok(())
 }
 
-/// `storeRecurrenceOverride`: keyed by date and, for DATE-TIMEs, by ISO instant; a lower SEQUENCE never replaces.
+/// `storeRecurrenceOverride`: keyed by date and, for DATE-TIMEs, by ISO instant; only a lower SEQUENCE for the same RECURRENCE-ID is dropped.
 fn store_override(
     recurrences: &mut Obj,
     recurrence_id: Option<&Val>,
@@ -850,10 +861,8 @@ fn store_override(
     } else {
         Some(js::iso_string(date.ms.ok_or("Invalid Date")?))
     };
-    let existing = instant
-        .as_deref()
-        .and_then(|key| recurrences.get(key))
-        .or_else(|| recurrences.get(&day));
+    // RFC 5545: an override replaces its own instance; another override on the same day is a different instance.
+    let existing = recurrences.get(instant.as_deref().unwrap_or(&day));
     if let Some(Val::Obj(existing)) = existing
         && Val::finite(copy.get("sequence")) < Val::finite(existing.get("sequence"))
     {

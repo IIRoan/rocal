@@ -34,10 +34,10 @@
           "frequency": "daily",
           "interval": 1,
           "count": 30,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"Europe/Amsterdam\"}"
       }
     ],
     "errors": [],
@@ -56,10 +56,10 @@
           "frequency": "daily",
           "interval": 1,
           "count": 30,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"America/Los_Angeles\"}"
       }
     ],
     "errors": [],

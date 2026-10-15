@@ -11,7 +11,7 @@ use solace_api_types::subscriptions::{
 };
 
 use crate::helpers::{
-    TestApp, TestUser, count, expect_field_error, expect_invalid, expect_unauthorized,
+    Backend, TestApp, TestUser, count, expect_field_error, expect_invalid, expect_unauthorized,
     expect_unknown_field, hex, json_body, ok,
 };
 
@@ -1235,6 +1235,100 @@ async fn legacy_ics_import_reports_events_already_in_the_calendar() {
         .await,
         2
     );
+}
+
+#[tokio::test]
+async fn an_unreadable_rule_fails_only_its_event() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar_id = owned_calendar(&mut user).await;
+    let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:broken@example.com",
+        "DTSTART:20261101T090000Z",
+        "SUMMARY:Broken",
+        "RRULE:FREQ=FORTNIGHTLY",
+        "END:VEVENT",
+        "BEGIN:VEVENT",
+        "UID:yearly@example.com",
+        "DTSTART:20260715T090000Z",
+        "DTSTART:20260716T090000Z",
+        "SUMMARY:Yearly",
+        "RRULE:FREQ=YEARLY;BYMONTH=7;BYMONTHDAY=15",
+        "END:VEVENT",
+        "BEGIN:VEVENT",
+        "UID:offset@example.com",
+        "DTSTART;TZID=+0100:20261102T090000",
+        "SUMMARY:Offset",
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+    ]
+    .join("\r\n");
+    let response = user
+        .post(
+            "/api/subscriptions/import-ics",
+            json!({"calendarId": calendar_id, "icsContent": ics}),
+        )
+        .await;
+    let stored = || async {
+        let rows: Vec<(String, Option<String>, String, String)> = sqlx::query_as(&format!(
+            "SELECT external_id, recurrence, timezone, {} FROM calendar_event WHERE calendar_id = $1 ORDER BY external_id",
+            iso("start")
+        ))
+        .bind(&calendar_id)
+        .fetch_all(&app.db)
+        .await
+        .expect("imported events");
+        rows
+    };
+    match app.backend {
+        // node-ical fails the whole file on one bad RRULE (or a repeated DTSTART).
+        Backend::TypeScript => {
+            ok(response.expect_error(400, "Validation Error", "No valid events found in ICS file"));
+            assert!(stored().await.is_empty());
+        }
+        Backend::Rust => {
+            let imported: ImportIcsResponse = ok(response.expect_status(200).and_then(|r| r.dto()));
+            assert_eq!((imported.events_created, imported.events_total), (2, 2));
+            assert_eq!(
+                imported.errors,
+                Some(vec![
+                    "Failed to parse event broken@example.com: Invalid FREQ value: FORTNIGHTLY"
+                        .into()
+                ])
+            );
+            let rows = stored().await;
+            assert_eq!(
+                (
+                    rows[0].0.as_str(),
+                    &rows[0].1,
+                    rows[0].2.as_str(),
+                    rows[0].3.as_str()
+                ),
+                (
+                    "offset@example.com",
+                    &None,
+                    "Etc/GMT-1",
+                    "2026-11-02T08:00:00.000Z"
+                ),
+                "an offset TZID is a fixed offset"
+            );
+            let rule: Value =
+                serde_json::from_str(rows[1].1.as_deref().expect("rule")).expect("rule json");
+            assert_eq!(
+                (rows[1].0.as_str(), rows[1].3.as_str()),
+                ("yearly@example.com", "2026-07-15T09:00:00.000Z"),
+                "the first DTSTART wins"
+            );
+            assert_eq!(
+                (&rule["byMonth"], &rule["byMonthDay"]),
+                (&json!([7]), &json!([15]))
+            );
+        }
+    }
 }
 
 #[tokio::test]
