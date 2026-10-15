@@ -1,5 +1,7 @@
 //! `EventService.list`, `search` and `searchCorpus`: the calendar range with recurring instances, and the two search paths.
 
+use std::collections::HashMap;
+
 use sea_orm::ConnectionTrait;
 use solace_api_types::events::{
     Event, EventList, EventParticipant, EventSearchCorpus, EventSearchCorpusQuery,
@@ -12,7 +14,7 @@ use super::view::{self, Relations};
 use crate::addresses::is_reserved_system_email;
 use crate::auth::guard::RouteUser;
 use crate::calendars::service::ensure_user_calendars;
-use crate::db::entities::{calendar_event, event_participant, user};
+use crate::db::entities::calendar_event;
 use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
@@ -75,9 +77,7 @@ pub async fn list(
         events.push((model.start, view::with_participants(model, &relations)?));
     }
     for series in &recurring {
-        for (start, event) in expand(series, &relations, range_start, range_end)? {
-            events.push((start, event));
-        }
+        events.extend(expand(series, &relations, range_start, range_end)?);
     }
     for model in &modified {
         events.push((model.start, view::with_participants(model, &relations)?));
@@ -296,21 +296,18 @@ pub async fn search(
 async fn participant_map<C: ConnectionTrait>(
     db: &C,
     event_ids: &[String],
-) -> Result<std::collections::HashMap<String, Vec<EventParticipant>>, sea_orm::DbErr> {
-    let mut grouped: std::collections::HashMap<
-        String,
-        Vec<(event_participant::Model, Option<user::Model>)>,
-    > = std::collections::HashMap::new();
+) -> Result<HashMap<String, Vec<EventParticipant>>, sea_orm::DbErr> {
     if event_ids.is_empty() {
-        return Ok(std::collections::HashMap::new());
+        return Ok(HashMap::new());
     }
+    let mut grouped: HashMap<String, Vec<_>> = HashMap::new();
     for (row, owner) in queries::participants_with_users(db, event_ids).await? {
         let email = if row.email.is_empty() {
-            owner.as_ref().map(|u| u.email.clone())
+            owner.as_ref().map(|u| u.email.as_str())
         } else {
-            Some(row.email.clone())
+            Some(row.email.as_str())
         };
-        if email.is_some_and(|email| is_reserved_system_email(&email, None)) {
+        if email.is_some_and(|email| is_reserved_system_email(email, None)) {
             continue;
         }
         grouped
@@ -336,13 +333,17 @@ pub async fn search_corpus(
         .unwrap_or(100)
         .clamp(1, 200);
     let offset = query.offset.unwrap_or(0).max(0);
-    let updated_after = match query.updated_after.as_deref().filter(|s| !s.is_empty()) {
-        Some(text) => Some(instant_or(
-            text,
-            "Invalid updatedAfter date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)",
-        )?),
-        None => None,
-    };
+    let updated_after = query
+        .updated_after
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|text| {
+            instant_or(
+                text,
+                "Invalid updatedAfter date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)",
+            )
+        })
+        .transpose()?;
     let (rows, total) = queries::corpus_page(
         &state.db,
         &user.id,

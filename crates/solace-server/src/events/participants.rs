@@ -391,11 +391,7 @@ async fn resolve<C: sea_orm::ConnectionTrait>(
         .into_iter()
         .map(|input| {
             let user = users.get(&input.email);
-            let role = if input.role == "organizer" {
-                "organizer"
-            } else {
-                "attendee"
-            };
+            let role = input.role;
             Resolved {
                 display_name: trimmed_text(input.display_name.as_deref())
                     .or_else(|| user.and_then(|user| trimmed_text(Some(&user.name))))

@@ -38,12 +38,10 @@ pub fn validate(input: &RecurrenceRuleInput) -> Value {
     };
     let errors = validate_rule(&parsed.rule);
     let description = if errors.is_empty() {
-        match rules::describe(&parsed) {
-            Some(description) => Some(description),
-            None => {
-                return json!({"valid": false, "errors": ["Failed to parse recurrence rule"], "description": null});
-            }
-        }
+        let Some(description) = rules::describe(&parsed) else {
+            return json!({"valid": false, "errors": ["Failed to parse recurrence rule"], "description": null});
+        };
+        Some(description)
     } else {
         None
     };

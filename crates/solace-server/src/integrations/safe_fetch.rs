@@ -183,25 +183,20 @@ async fn read(
     headers.remove(CONTENT_ENCODING);
     headers.remove(CONTENT_LENGTH);
     let mut body = Vec::new();
-    if matches!(status.as_u16(), 101 | 103 | 204 | 205 | 304) {
-        return Ok(SafeResponse {
-            status,
-            headers,
-            body,
-        });
-    }
-    // Decoded bodies have no declared length here, so only plain ones are refused up front.
-    if response
-        .content_length()
-        .is_some_and(|length| length > max_bytes as u64)
-    {
-        return Err(SafeFetchError::ResponseTooLarge);
-    }
-    while let Some(chunk) = response.chunk().await.map_err(|error| classify(&error))? {
-        if body.len() + chunk.len() > max_bytes {
+    if !matches!(status.as_u16(), 101 | 103 | 204 | 205 | 304) {
+        // Decoded bodies have no declared length here, so only plain ones are refused up front.
+        if response
+            .content_length()
+            .is_some_and(|length| length > max_bytes as u64)
+        {
             return Err(SafeFetchError::ResponseTooLarge);
         }
-        body.extend_from_slice(&chunk);
+        while let Some(chunk) = response.chunk().await.map_err(|error| classify(&error))? {
+            if body.len() + chunk.len() > max_bytes {
+                return Err(SafeFetchError::ResponseTooLarge);
+            }
+            body.extend_from_slice(&chunk);
+        }
     }
     Ok(SafeResponse {
         status,

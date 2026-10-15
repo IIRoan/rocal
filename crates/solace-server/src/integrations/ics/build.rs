@@ -180,11 +180,6 @@ fn fold(line: &str) -> Vec<String> {
     segments
 }
 
-fn ms(value: PrimitiveDateTime) -> i64 {
-    let nanos = value.assume_utc().unix_timestamp_nanos();
-    i64::try_from(nanos / 1_000_000).unwrap_or_default()
-}
-
 fn date_stamp(ms: i64) -> String {
     let f = js::fields(ms);
     format!("{}{:02}{:02}", f.year, f.month, f.day)
@@ -242,12 +237,12 @@ fn wall_clock_zones(event: &Event) -> Vec<(String, TimeZone, i64)> {
         let earliest = event
             .excluded_dates
             .iter()
-            .map(|at| ms(*at))
-            .fold(ms(event.start), i64::min);
+            .map(|at| instant::unix_millis(*at))
+            .fold(instant::unix_millis(event.start), i64::min);
         used.push((name, tz, earliest));
     }
     if let (Some((name, tz)), Some(at)) = (override_zone(event), event.recurrence_id) {
-        used.push((name, tz, ms(at)));
+        used.push((name, tz, instant::unix_millis(at)));
     }
     used
 }
@@ -306,8 +301,8 @@ fn event_lines(
     stamp: PrimitiveDateTime,
     calendar_timezone: Option<&str>,
 ) {
-    let start = ms(event.start);
-    let mut end = ms(event.end);
+    let start = instant::unix_millis(event.start);
+    let mut end = instant::unix_millis(event.end);
     if event.all_day {
         end = end.max(start);
     } else if end <= start {
@@ -322,7 +317,7 @@ fn event_lines(
             || format!("{}@solace-calendar.local", uuid::Uuid::new_v4()),
             str::to_owned,
         );
-    let stamp = ms(stamp);
+    let stamp = instant::unix_millis(stamp);
     let title = js_trim(&event.title);
     lines.extend([
         "BEGIN:VEVENT".to_owned(),
@@ -330,11 +325,11 @@ fn event_lines(
         format!("DTSTAMP:{}", date_time_stamp(stamp)),
         format!(
             "CREATED:{}",
-            date_time_stamp(event.created_at.map_or(stamp, ms))
+            date_time_stamp(event.created_at.map_or(stamp, instant::unix_millis))
         ),
         format!(
             "LAST-MODIFIED:{}",
-            date_time_stamp(event.updated_at.map_or(stamp, ms))
+            date_time_stamp(event.updated_at.map_or(stamp, instant::unix_millis))
         ),
         format!(
             "SUMMARY:{}",
@@ -350,9 +345,12 @@ fn event_lines(
     let series_zone = series_zone(event);
     let occurrence = |at: PrimitiveDateTime, wall: Option<&(String, TimeZone)>| {
         if event.all_day {
-            (";VALUE=DATE".to_owned(), date_stamp_in(ms(at), &zone))
+            (
+                ";VALUE=DATE".to_owned(),
+                date_stamp_in(instant::unix_millis(at), &zone),
+            )
         } else {
-            date_time_parts(wall, ms(at))
+            date_time_parts(wall, instant::unix_millis(at))
         }
     };
     if event.all_day {
@@ -616,10 +614,7 @@ pub(super) mod tests {
     }
 
     pub(crate) fn date(value: &Value) -> Option<PrimitiveDateTime> {
-        let ms = js::parse_date_string(value.as_str()?)?;
-        let moment =
-            time::OffsetDateTime::from_unix_timestamp_nanos(i128::from(ms) * 1_000_000).ok()?;
-        Some(PrimitiveDateTime::new(moment.date(), moment.time()))
+        js::parse_date_string(value.as_str()?).and_then(crate::instant::from_unix_millis)
     }
 
     fn text(value: &Value) -> Option<String> {

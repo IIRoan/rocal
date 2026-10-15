@@ -139,10 +139,10 @@ impl Obj {
     fn get_mut(&mut self, key: &str) -> Option<&mut Val> {
         match array_index(key) {
             Some(index) => self.indexed.get_mut(&index),
-            None => match self.positions.get(key) {
-                Some(&at) => self.named[at].1.as_mut(),
-                None => None,
-            },
+            None => self
+                .positions
+                .get(key)
+                .and_then(|&at| self.named[at].1.as_mut()),
         }
     }
 
@@ -505,10 +505,10 @@ pub fn parse(content: &str, user_timezone: &str) -> Result<Obj, String> {
 }
 
 fn read(content: &str, user_timezone: Option<&str>, zones: Vec<FileZone>) -> Result<Obj, String> {
-    let mut lines: Vec<&str> = content.split('\n').collect();
-    for line in &mut lines {
-        *line = line.strip_suffix('\r').unwrap_or(line);
-    }
+    let lines: Vec<&str> = content
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        .collect();
     let mut reader = Reader {
         stack: Vec::new(),
         next_id: 0,

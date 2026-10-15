@@ -83,20 +83,12 @@ fn strip_offset_prefix<'a>(label: &'a str, head: &str) -> &'a str {
 }
 
 fn normalize_windows_label(label: &str) -> String {
-    let mut collapsed = String::with_capacity(label.len());
-    let mut in_space = false;
-    for c in label.chars() {
-        if is_js_whitespace(c) {
-            if !in_space {
-                collapsed.push(' ');
-            }
-            in_space = true;
-        } else {
-            collapsed.push(c);
-            in_space = false;
-        }
-    }
-    js_trim(&collapsed).to_lowercase()
+    label
+        .split(is_js_whitespace)
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
 /// A Windows name or "(UTC±hh:mm) City" label as the tz database zone CLDR maps it to.
@@ -106,18 +98,16 @@ pub fn windows_zone(label: &str) -> Option<String> {
 
 fn map_windows_zone(label: &str) -> Option<String> {
     let zones = &*WINDOWS;
-    if let Some(iana) = zones.exact.get(label) {
-        return Some(iana.clone());
-    }
-    if let Some(iana) = zones.index.get(&normalize_windows_label(label)) {
-        return Some(iana.clone());
-    }
-    if label.contains(',') {
-        return label
-            .split(',')
-            .find_map(|segment| zones.index.get(&normalize_windows_label(segment)).cloned());
-    }
-    None
+    zones
+        .exact
+        .get(label)
+        .or_else(|| zones.index.get(&normalize_windows_label(label)))
+        .or_else(|| {
+            label
+                .split(',')
+                .find_map(|segment| zones.index.get(&normalize_windows_label(segment)))
+        })
+        .cloned()
 }
 
 /// `"+05:30"`, `"UTC-4"` and `"(UTC+02:00)"` as signed minutes, within ±14:00.

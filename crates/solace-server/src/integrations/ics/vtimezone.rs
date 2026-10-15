@@ -236,30 +236,20 @@ pub fn basic_date_time(value: &str) -> Option<(DateTime, bool)> {
         None => (value, false),
     };
     let number = |range: std::ops::Range<usize>| value.get(range)?.parse::<i16>().ok();
-    let civil = if value.len() == 8 {
-        DateTime::new(
-            number(0..4)?,
-            number(4..6)? as i8,
-            number(6..8)? as i8,
-            0,
-            0,
-            0,
-            0,
-        )
-    } else {
-        if value.len() != 15 || value.as_bytes()[8] != b'T' {
-            return None;
-        }
-        DateTime::new(
-            number(0..4)?,
-            number(4..6)? as i8,
-            number(6..8)? as i8,
-            number(9..11)? as i8,
-            number(11..13)? as i8,
-            number(13..15)? as i8,
-            0,
-        )
+    let (hour, minute, second) = match value.len() {
+        8 => (0, 0, 0),
+        15 if value.as_bytes()[8] == b'T' => (number(9..11)?, number(11..13)?, number(13..15)?),
+        _ => return None,
     };
+    let civil = DateTime::new(
+        number(0..4)?,
+        number(4..6)? as i8,
+        number(6..8)? as i8,
+        hour as i8,
+        minute as i8,
+        second as i8,
+        0,
+    );
     Some((civil.ok()?, utc))
 }
 

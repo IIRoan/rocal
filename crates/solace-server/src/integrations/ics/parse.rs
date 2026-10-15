@@ -164,12 +164,6 @@ fn date_value(value: Option<&Val>) -> Option<i64> {
     }
 }
 
-fn utc(ms: i64) -> Option<PrimitiveDateTime> {
-    let moment =
-        time::OffsetDateTime::from_unix_timestamp_nanos(i128::from(ms) * 1_000_000).ok()?;
-    Some(PrimitiveDateTime::new(moment.date(), moment.time()))
-}
-
 /// `getEventTimezone`: the start's (else the end's) TZID; floating times have none.
 fn event_timezone(event: &Obj) -> Option<String> {
     let zone = |key| match event.get(key) {
@@ -194,10 +188,10 @@ fn occurrence_start(value: &Val, all_day_zone: &str) -> Option<PrimitiveDateTime
     };
     let ms = date.ms?;
     if !date.date_only {
-        return utc(ms);
+        return instant::from_unix_millis(ms);
     }
     let day = js::fields(ms);
-    utc(day_boundary(day.year, day.month, day.day, all_day_zone, false).ok()?)
+    instant::from_unix_millis(day_boundary(day.year, day.month, day.day, all_day_zone, false).ok()?)
 }
 
 /// `buildUtcDateFromTimeZoneDateParts`: the first (or last) millisecond of a calendar day in `zone`.
@@ -338,8 +332,7 @@ fn participant(value: &Val, organizer: bool) -> Option<Participant> {
         return None;
     }
     let email = match value {
-        Val::Str(text) => normalize_email(text),
-        Val::Param(_, text) => normalize_email(js_trim(text)),
+        Val::Str(text) | Val::Param(_, text) => normalize_email(text),
         Val::Obj(obj) => text_value(obj.get("val").or(obj.get("email")))
             .map(|text| normalize_email(&text))
             .unwrap_or_default(),
@@ -471,7 +464,10 @@ fn parse_event(
         .get("recurrenceid")
         .and_then(|date| occurrence_start(date, &all_day_timezone));
     // ponytail: instants beyond year 9999 (only reachable through field rollover) are skipped; widen if a feed ever needs them.
-    let (Some(start), Some(end)) = (utc(start), utc(end)) else {
+    let (Some(start), Some(end)) = (
+        instant::from_unix_millis(start),
+        instant::from_unix_millis(end),
+    ) else {
         return Ok(None);
     };
     Ok(Some(ParsedEvent {
