@@ -59,7 +59,7 @@ apps/backend/__tests__/lib/errors.test.ts	errors › includes structured issue d
 apps/backend/__tests__/lib/errors.test.ts	errors › maps Prisma-style conflict and record-missing errors	suite:recurring::editing_one_occurrence_detaches_it_with_the_series_ciphertext
 apps/backend/__tests__/lib/errors.test.ts	errors › maps built-in Elysia error codes	suite:edges::malformed_json_is_a_parse_error
 apps/backend/__tests__/lib/errors.test.ts	errors › maps custom validation and authorization errors	unit:solace-server::error::tests::domain_errors_map_to_their_envelopes
-apps/backend/__tests__/lib/errors.test.ts	errors › maps database and notification wrapper errors	unit:solace-server::error::tests::database_and_notification_failures_are_500s
+apps/backend/__tests__/lib/errors.test.ts	errors › maps database and notification wrapper errors	unit:solace-server::error::tests::database_failures_are_generic_500s
 apps/backend/__tests__/lib/errors.test.ts	errors › maps rate limit errors with Retry-After	suite:profiles::avatar_writes_are_rate_limited_per_user
 apps/backend/__tests__/lib/errors.test.ts	errors › omits validation details when the issue payload is malformed	unit:solace-server::error::tests::validation_errors_without_issues_have_no_details
 apps/backend/__tests__/lib/errors.test.ts	errors › resolves custom error labels from the error itself without changing responses	unit:solace-server::error::tests::domain_errors_map_to_their_envelopes

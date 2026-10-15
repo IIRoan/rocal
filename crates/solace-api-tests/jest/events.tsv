@@ -29,7 +29,7 @@ apps/backend/__tests__/lib/event-encryption.test.ts	ciphertext-only event conten
 apps/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › always normalizes to full mode	suite:settings::switching_to_full_encryption_drops_plaintext_beside_ciphertext_in_shared_calendars
 apps/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › keeps plaintext when no encrypted payload exists	suite:invitations::staged_invitations_land_in_the_hidden_invitations_calendar
 apps/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › normalizes optional plaintext fields before encryption	unit:solace-server::events::encryption::tests::plaintext_policy_trims_and_nulls_blank_fields
-apps/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › recognizes fully encrypted rows	unit:solace-server::events::encryption::tests::only_encrypted_state_counts_as_fully_encrypted
+apps/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › recognizes fully encrypted rows	n/a: isEventFullyEncrypted has no caller in the backend, so the Rust port has no such helper
 apps/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › stores encrypted events as ciphertext only	suite:events::an_encrypted_event_is_stored_as_ciphertext_only
 apps/backend/__tests__/lib/event-invitation-delivery.test.ts	sendEventInvitationEmail › never invites a reserved system address	suite:events::participant_addresses_are_validated
 apps/backend/__tests__/lib/event-invitation-delivery.test.ts	sendEventInvitationEmail › submits internal recipients as noreply, not by importing into their mailbox	suite:invitations::new_invitees_get_a_noreply_invitation_with_an_ics_request

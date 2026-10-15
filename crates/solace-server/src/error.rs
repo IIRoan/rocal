@@ -255,6 +255,15 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn database_failures_are_generic_500s() {
+        let error = sea_orm::DbErr::Custom("relation \"user\" does not exist".into());
+        let (status, _, _, body) = render(AppError::from(error)).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body["message"], json!(GENERIC_SERVER_ERROR));
+        assert!(!body.to_string().contains("relation"));
+    }
+
+    #[tokio::test]
     async fn domain_errors_map_to_their_envelopes() {
         let cases = [
             (
