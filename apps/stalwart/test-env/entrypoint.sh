@@ -67,14 +67,11 @@ GATE_PLAN=""
 stalwart-cli --url "$ADMIN_URL" --user admin --password "$SOLACE_TEST_ADMIN_PASSWORD" apply --file "$PLAN" --quiet \
 	|| die "Test plan apply failed."
 rm -f "$PLAN"
-stalwart-cli --url "$ADMIN_URL" --user admin --password "$SOLACE_TEST_ADMIN_PASSWORD" create Action/ReloadSettings >/dev/null 2>&1 || true
 log info "Test plan applied."
 
-if [ -n "$GATE_PLAN" ]; then
-	# Listeners only pick up the new PROXY trust on start.
-	kill "$STALWART_PID" && wait "$STALWART_PID" 2>/dev/null || true
-	start_stalwart
-fi
+# Reloading settings fails on a built-in expression (bit_and), and listeners only pick up PROXY trust on start, so restart.
+kill "$STALWART_PID" && wait "$STALWART_PID" 2>/dev/null || true
+start_stalwart
 
 if [ -n "${STALWART_GATE_KEY:-}" ]; then
 	require_test_secret STALWART_GATE_KEY
