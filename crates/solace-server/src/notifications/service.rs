@@ -120,7 +120,7 @@ pub async fn set(
                 instant::unix_millis(event.start),
                 f64::from(setting.minutes_before),
                 Some(&event.timezone),
-                instant::unix_millis(instant::now()),
+                instant::unix_millis(now),
             )
             .map_err(AppError::internal)?;
             let Some(schedule) = schedule else {

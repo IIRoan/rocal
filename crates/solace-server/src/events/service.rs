@@ -185,11 +185,12 @@ pub async fn insert_reminder<C: sea_orm::ConnectionTrait>(
     encrypted_display_title: Option<String>,
     notification_type: &str,
 ) -> Result<bool, AppError> {
+    let now = instant::now();
     let schedule = calculator::schedule_upcoming_reminder(
         instant::unix_millis(start),
         f64::from(minutes_before),
         Some(timezone),
-        instant::unix_millis(instant::now()),
+        instant::unix_millis(now),
     )
     .map_err(AppError::internal)?;
     let Some(schedule) = schedule else {
@@ -209,6 +210,9 @@ pub async fn insert_reminder<C: sea_orm::ConnectionTrait>(
             is_enabled: Set(true),
             is_sent: Set(false),
             encrypted_display_title: Set(encrypted_display_title),
+            // The schedule is after this instant, which chk_notification_time_future requires of created_at.
+            created_at: Set(now),
+            updated_at: Set(now),
             ..Default::default()
         },
     )
