@@ -12,7 +12,6 @@ use crate::error::AppError;
 use crate::instant;
 use crate::state::AppState;
 
-/// The caller's settings, created with the defaults if none exist.
 pub async fn get(state: &AppState, user: &RouteUser) -> Result<UserSettings, AppError> {
     let settings = match queries::find(&state.db, &user.id).await? {
         Some(settings) => settings,

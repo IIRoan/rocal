@@ -84,7 +84,6 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
     api().split_for_parts().1
 }
 
-/// The full application with its middleware, as one router.
 fn router(state: AppState) -> Router {
     let (routes, _) = api().split_for_parts();
     routes
