@@ -42,29 +42,42 @@ impl Relations {
         category_ids.sort();
         category_ids.dedup();
         let event_ids: Vec<String> = events.iter().map(|e| e.id.clone()).collect();
+        // Independent reads run concurrently on the pool; a transaction serializes them on its connection.
+        let (participant_rows, exception_rows, calendars, categories) = tokio::try_join!(
+            queries::participants_with_users(db, &event_ids),
+            async {
+                if with_exceptions {
+                    queries::exceptions(db, event_ids.clone()).await
+                } else {
+                    Ok(Vec::new())
+                }
+            },
+            queries::calendars_by_id(db, calendar_ids),
+            async {
+                if category_ids.is_empty() {
+                    Ok(HashMap::new())
+                } else {
+                    queries::categories_by_id(db, category_ids).await
+                }
+            },
+        )?;
         let mut participants: HashMap<String, Vec<_>> = HashMap::new();
-        for entry in queries::participants_with_users(db, &event_ids).await? {
+        for entry in participant_rows {
             participants
                 .entry(entry.0.event_id.clone())
                 .or_default()
                 .push(entry);
         }
         let mut exceptions: HashMap<String, Vec<_>> = HashMap::new();
-        if with_exceptions {
-            for exception in queries::exceptions(db, event_ids).await? {
-                exceptions
-                    .entry(exception.parent_event_id.clone())
-                    .or_default()
-                    .push(exception);
-            }
+        for exception in exception_rows {
+            exceptions
+                .entry(exception.parent_event_id.clone())
+                .or_default()
+                .push(exception);
         }
         Ok(Self {
-            calendars: queries::calendars_by_id(db, calendar_ids).await?,
-            categories: if category_ids.is_empty() {
-                HashMap::new()
-            } else {
-                queries::categories_by_id(db, category_ids).await?
-            },
+            calendars,
+            categories,
             participants,
             exceptions,
         })

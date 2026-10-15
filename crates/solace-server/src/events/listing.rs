@@ -60,9 +60,13 @@ pub async fn list(
         return Err(AppError::validation("End date must be after start date"));
     }
     let db = &state.db;
-    let regular = queries::regular_in_range(db, &user.id, range_start, range_end).await?;
-    let recurring = queries::recurring(db, &user.id).await?;
-    let modified = queries::modified_in_range(db, &user.id, range_start, range_end).await?;
+    let (regular, recurring, modified, categories, calendars) = tokio::try_join!(
+        queries::regular_in_range(db, &user.id, range_start, range_end),
+        queries::recurring(db, &user.id),
+        queries::modified_in_range(db, &user.id, range_start, range_end),
+        queries::active_categories(db, &user.id),
+        queries::calendars_of(db, &user.id),
+    )?;
     let all: Vec<&calendar_event::Model> =
         regular.iter().chain(&recurring).chain(&modified).collect();
     let relations = Relations::load(db, &all, true).await?;
@@ -85,8 +89,6 @@ pub async fn list(
             .is_some_and(|p| declined_by(&user.id, p))
     });
     events.sort_by_key(|(start, _)| *start);
-    let categories = queries::active_categories(db, &user.id).await?;
-    let calendars = queries::calendars_of(db, &user.id).await?;
     Ok(EventList {
         events: events.into_iter().map(|(_, event)| event).collect(),
         categories: categories.iter().map(view::category_dto).collect(),
