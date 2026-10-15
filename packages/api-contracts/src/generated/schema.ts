@@ -514,6 +514,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/internal/stalwart/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accepts signed Stalwart `message-ingest.ham` events and queues native pushes for linked Solace mailboxes. */
+        post: operations["receiveStalwartWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/invites": {
         parameters: {
             query?: never;
@@ -544,6 +561,24 @@ export interface paths {
         post?: never;
         /** Revokes one of the caller's invites unless it was already accepted. */
         delete: operations["revokeInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mail-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's encrypted mail settings, or `null` before the first upload. */
+        get: operations["getMailSettings"];
+        /** Stores or replaces the caller's blob; an omitted key version keeps the stored one. */
+        put: operations["putMailSettings"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -644,6 +679,23 @@ export interface paths {
         };
         /** A Stalwart bearer for the caller's own mailbox, minted server-side; refused while the session still needs passkey step-up. */
         get: operations["getMailAccessToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mail/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** JMAP Email, Mailbox and Thread changes for the caller's own mailbox, read with server-side credentials. */
+        get: operations["syncMail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -785,6 +837,23 @@ export interface paths {
         put?: never;
         /** Queues a metadata-only reminder push to the caller's devices. */
         post: operations["sendTestPush"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/realtime/mail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Signals that the caller's mailbox changed, with the synced deltas. */
+        get: operations["streamMailEvents"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2258,6 +2327,11 @@ export interface components {
             email: string;
             image: string;
         };
+        /** @description The webhook's refusals, which are not the API envelope. */
+        StalwartWebhookError: {
+            error: string;
+            message: string;
+        };
         /** @description `POST /api/internal/stalwart/webhook`; `enqueuedCount` counts events handed to the push outbox, duplicates included. */
         StalwartWebhookResult: {
             /** Format: int32 */
@@ -3332,6 +3406,65 @@ export interface operations {
             };
         };
     };
+    receiveStalwartWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
+                };
+            };
+        };
+    };
     listInvites: {
         parameters: {
             query?: never;
@@ -3391,6 +3524,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessFlag"];
+                };
+            };
+        };
+    };
+    getMailSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailSettings"] | null;
+                };
+            };
+        };
+    };
+    putMailSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutMailSettingsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailSettings"];
                 };
             };
         };
@@ -3534,6 +3709,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MailAccessToken"];
+                };
+            };
+        };
+    };
+    syncMail: {
+        parameters: {
+            query: {
+                accountId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailSyncResult"];
                 };
             };
         };
@@ -3830,6 +4026,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PushTestResult"];
+                };
+            };
+        };
+    };
+    streamMailEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
                 };
             };
         };

@@ -31,10 +31,13 @@ pub async fn timeout(request: Request, next: Next) -> Response {
     }
 }
 
-/// Elysia matches `/api/health/` like `/api/health`, so a trailing slash is dropped before routing.
+/// Elysia matches `/api/health/` like `/api/health`, so a trailing slash is dropped before routing; JMAP proxy paths keep theirs for Stalwart.
 pub fn normalize_path(mut request: Request) -> Request {
     let path = request.uri().path();
-    if path.len() > 1 && path.ends_with('/') {
+    let proxied = path
+        .strip_prefix("/api/mail/jmap/jmap/")
+        .is_some_and(|rest| !rest.is_empty());
+    if path.len() > 1 && path.ends_with('/') && !proxied {
         let trimmed = path.trim_end_matches('/');
         let trimmed = if trimmed.is_empty() { "/" } else { trimmed };
         let rebuilt = match request.uri().query() {

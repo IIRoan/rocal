@@ -25,6 +25,8 @@ print_stderr = "warn"
 [workspace.dependencies]
 # HTTP server and middleware.
 axum = { version = "0.8", features = ["macros"] }
+# The frame type for hand-written streaming bodies (mail SSE); already in the tree through axum and hyper.
+http-body = "1"
 tower = { version = "0.5", features = ["util"] }
 # One pool for everything, over SQLx; `time` because SeaORM has no jiff support.
 sea-orm = { version = "=2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-json"] }

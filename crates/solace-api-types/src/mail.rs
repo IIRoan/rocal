@@ -265,3 +265,11 @@ pub struct StalwartWebhookResult {
     pub enqueued_count: u32,
     pub ignored_count: u32,
 }
+
+/// The webhook's refusals, which are not the API envelope.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StalwartWebhookError {
+    pub error: String,
+    pub message: String,
+}

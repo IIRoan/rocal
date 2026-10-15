@@ -11,6 +11,7 @@ static ALLOCATOR: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 use anyhow::Context;
 use solace_server::config::Config;
 use solace_server::integrations::stalwart::admin::Admin;
+use solace_server::mail::realtime;
 use solace_server::state::AppState;
 use solace_server::subscriptions::scheduler;
 use solace_server::{db, telemetry};
@@ -36,9 +37,13 @@ async fn run(config: Config) -> anyhow::Result<()> {
     tracing::info!(port, "Server is running");
     tokio::spawn(ensure_stalwart_webhook(state.clone()));
     let calendar_sync = scheduler::start(state.clone());
+    let receipt_poll = realtime::start(state.clone());
+    let stopping = state.clone();
     let shutdown = async move {
         shutdown_signal().await;
         calendar_sync.abort();
+        receipt_poll.abort();
+        realtime::stop(&stopping);
     };
     solace_server::serve(listener, state, shutdown).await?;
     Ok(())
@@ -47,14 +52,14 @@ async fn run(config: Config) -> anyhow::Result<()> {
 /// Registers the signed mail-ingest webhook with Stalwart; best effort, as a boot without it still serves.
 async fn ensure_stalwart_webhook(state: AppState) {
     let config = &state.config;
-    if config.stalwart_webhook_secret.is_empty() || config.stalwart_provision_token.is_empty() {
+    let Some(secret) = config.stalwart_webhook_secret.as_deref() else {
+        return;
+    };
+    if config.stalwart_provision_token.is_empty() {
         return;
     }
     if let Err(error) = Admin::new(&state)
-        .ensure_mail_ingest_webhook(
-            &config.stalwart_webhook_url,
-            &config.stalwart_webhook_secret,
-        )
+        .ensure_mail_ingest_webhook(&config.stalwart_webhook_url, secret)
         .await
     {
         tracing::warn!(error = %telemetry::redact_pii(&error.to_string()), "Failed to ensure Stalwart mail ingest webhook");

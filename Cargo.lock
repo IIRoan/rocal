@@ -4773,6 +4773,7 @@ dependencies = [
  "flate2",
  "hex",
  "hmac 0.13.0",
+ "http-body",
  "icu_collator",
  "image",
  "jiff",

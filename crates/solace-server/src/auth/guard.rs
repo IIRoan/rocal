@@ -67,13 +67,24 @@ impl FromRequestParts<AppState> for MaybeSession {
 
 /// Looks the session up and forwards its Set-Cookie values; a failed lookup forwards nothing.
 async fn lookup(parts: &mut Parts, state: &AppState) -> Result<Option<ActiveSession>, AppError> {
-    let response_cookies = parts
-        .extensions
-        .get::<ResponseCookies>()
-        .cloned()
-        .unwrap_or_default();
-    let lookup = session::lookup(state, &parts.headers).await?;
-    response_cookies.extend(lookup.cookies);
+    optional_session(
+        state,
+        &parts.headers,
+        parts.extensions.get::<ResponseCookies>(),
+    )
+    .await
+}
+
+/// `getRequestAuthSession` for a handler that needs the session only on some paths.
+pub async fn optional_session(
+    state: &AppState,
+    headers: &axum::http::HeaderMap,
+    response_cookies: Option<&ResponseCookies>,
+) -> Result<Option<ActiveSession>, AppError> {
+    let lookup = session::lookup(state, headers).await?;
+    if let Some(response_cookies) = response_cookies {
+        response_cookies.extend(lookup.cookies);
+    }
     Ok(lookup.session)
 }
 

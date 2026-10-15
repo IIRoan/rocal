@@ -69,6 +69,10 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(config))
         .routes(routes!(directory_key))
         .routes(routes!(access_token))
+        .merge(super::proxy::routes())
+        .merge(super::sync::routes())
+        .merge(super::realtime::routes())
+        .merge(super::webhook::routes())
 }
 
 /// Whether the caller's Solace account has a linked mailbox, and its address.

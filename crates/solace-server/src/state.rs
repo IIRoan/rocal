@@ -11,7 +11,9 @@ use crate::integrations::safe_fetch::SafeFetch;
 use crate::integrations::stalwart::gate::StalwartGate;
 use crate::integrations::stalwart::mailer::MailerConfig;
 use crate::integrations::storage::AvatarStorage;
+use crate::mail::realtime::Realtime;
 use crate::mail::service::MailCache;
+use crate::mail::sync::SyncCache;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -30,6 +32,9 @@ pub struct AppState {
     pub avatar_storage: Option<Arc<AvatarStorage>>,
     /// Mail tokens per user, bridge passwords already set, and Stalwart's limits.
     pub mail_cache: Arc<MailCache>,
+    /// SSE subscribers and the Stalwart EventSource listeners they keep open.
+    pub mail_realtime: Arc<Realtime>,
+    pub mail_sync: Arc<SyncCache>,
 }
 
 impl AppState {
@@ -53,6 +58,8 @@ impl AppState {
             )),
             mailer: config.mailer.clone().map(Arc::new),
             mail_cache: Arc::default(),
+            mail_realtime: Arc::default(),
+            mail_sync: Arc::default(),
             config: Arc::new(config),
             db,
             http,

@@ -67,12 +67,15 @@ pub struct Config {
     pub stalwart_default_domain: String,
     /// Scoped to Stalwart's registry (`solace-provisioner`); it must never read mailbox data.
     pub stalwart_provision_token: String,
+    /// `noreplyEmail`: the address app mail comes from, known even without mailer credentials.
+    pub noreply_email: String,
     /// The noreply identity app mail is sent as; mail is disabled without its credentials.
     pub mailer: Option<MailerConfig>,
+    /// Verifies Stalwart's signed webhooks; the webhook answers 503 without it.
+    pub stalwart_webhook_secret: Option<String>,
     /// The backend-gate key the Railway Stalwart domain requires (`apps/stalwart/backend-gate.cfg`).
     pub stalwart_gate_key: Option<String>,
-    /// Signs Stalwart's mail-ingest webhook; the webhook is not registered at boot without it.
-    pub stalwart_webhook_secret: String,
+    /// Where Stalwart posts its signed mail-ingest webhook; registered at boot when the secret is set.
     pub stalwart_webhook_url: String,
     /// Base64 HMAC key for the per-user Stalwart bridge passwords; mail tokens fail without it.
     pub mail_bridge_hmac_key: Option<String>,
@@ -114,6 +117,7 @@ impl Config {
             Some("none") => SameSite::None,
             _ => SameSite::Lax,
         };
+        let noreply_email = noreply_email(&var);
         let passkey_origin = var("PASSKEY_ORIGIN")
             .or_else(|| app_url.clone())
             .unwrap_or_else(|| frontend_url.clone());
@@ -139,13 +143,14 @@ impl Config {
                 .filter(|token| !token.is_empty())
                 .or_else(|| var("STALWART_ADMIN_TOKEN"))
                 .unwrap_or_default(),
-            mailer: mailer(&var),
+            mailer: mailer(&var, &noreply_email),
+            noreply_email,
+            stalwart_webhook_secret: var("STALWART_WEBHOOK_SECRET")
+                .map(|secret| secret.trim().to_owned())
+                .filter(|secret| !secret.is_empty()),
             stalwart_gate_key: var("STALWART_GATE_KEY")
                 .map(|key| key.trim().to_owned())
                 .filter(|key| !key.is_empty()),
-            stalwart_webhook_secret: var("STALWART_WEBHOOK_SECRET")
-                .map(|secret| secret.trim().to_owned())
-                .unwrap_or_default(),
             stalwart_webhook_url: var("STALWART_WEBHOOK_URL")
                 .map(|url| url.trim().to_owned())
                 .filter(|url| !url.is_empty())
@@ -160,9 +165,8 @@ impl Config {
     }
 }
 
-/// `email-client.ts`: Stalwart JMAP credentials and the noreply address and name.
-fn mailer(var: &impl Fn(&str) -> Option<String>) -> Option<MailerConfig> {
-    let from = var("EMAIL_FROM")
+fn noreply_email(var: &impl Fn(&str) -> Option<String>) -> String {
+    var("EMAIL_FROM")
         .map(|from| from.trim().to_owned())
         .filter(|from| !from.is_empty())
         .or_else(|| {
@@ -171,7 +175,11 @@ fn mailer(var: &impl Fn(&str) -> Option<String>) -> Option<MailerConfig> {
                 .map(|header| address_of(&header))
         })
         .filter(|from| !from.is_empty())
-        .unwrap_or_else(|| "noreply@solace.onl".into());
+        .unwrap_or_else(|| "noreply@solace.onl".into())
+}
+
+/// `email-client.ts`: Stalwart JMAP credentials and the noreply address and name.
+fn mailer(var: &impl Fn(&str) -> Option<String>, from: &str) -> Option<MailerConfig> {
     let username = var("STALWART_JMAP_USERNAME")
         .map(|u| u.trim().to_owned())
         .filter(|u| !u.is_empty())?;
@@ -185,7 +193,7 @@ fn mailer(var: &impl Fn(&str) -> Option<String>) -> Option<MailerConfig> {
         base_url,
         username,
         password,
-        from,
+        from: from.to_owned(),
         from_name: var("EMAIL_FROM_NAME")
             .map(|n| n.trim().to_owned())
             .filter(|n| !n.is_empty())

@@ -1221,6 +1221,71 @@
         }
       }
     },
+    "/api/internal/stalwart/webhook": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "summary": "Accepts signed Stalwart `message-ingest.ham` events and queues native pushes for linked Solace mailboxes.",
+        "operationId": "receiveStalwartWebhook",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/invites": {
       "get": {
         "tags": [
@@ -1292,6 +1357,61 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessFlag"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mail-settings": {
+      "get": {
+        "tags": [
+          "Mail settings"
+        ],
+        "summary": "The caller's encrypted mail settings, or `null` before the first upload.",
+        "operationId": "getMailSettings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/MailSettings"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Mail settings"
+        ],
+        "summary": "Stores or replaces the caller's blob; an omitted key version keeps the stored one.",
+        "operationId": "putMailSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutMailSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailSettings"
                 }
               }
             }
@@ -1460,6 +1580,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MailAccessToken"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mail/sync": {
+      "get": {
+        "tags": [
+          "Mail"
+        ],
+        "summary": "JMAP Email, Mailbox and Thread changes for the caller's own mailbox, read with server-side credentials.",
+        "operationId": "syncMail",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailSyncResult"
                 }
               }
             }
@@ -1836,6 +1986,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PushTestResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/realtime/mail": {
+      "get": {
+        "tags": [
+          "Mail"
+        ],
+        "summary": "Signals that the caller's mailbox changed, with the synced deltas.",
+        "operationId": "streamMailEvents",
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -7403,6 +7573,22 @@
             "type": "string"
           },
           "image": {
+            "type": "string"
+          }
+        }
+      },
+      "StalwartWebhookError": {
+        "type": "object",
+        "description": "The webhook's refusals, which are not the API envelope.",
+        "required": [
+          "error",
+          "message"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
             "type": "string"
           }
         }
