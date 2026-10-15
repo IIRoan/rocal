@@ -12,6 +12,8 @@
 
 ## Behavior the rewrite must match exactly
 
+The bugs listed under step 5's "Fixed before cutover" are the exception: Rust fixes them on purpose, and the suite asserts per backend there.
+
 **Sessions and auth** (`apps/backend/lib/auth.ts`)
 
 - Cookie names `__Secure-better-auth.session_token` (production) and `better-auth.session_token` (development), the HMAC-signed value format, and `crossSubDomainCookies` on the RP ID domain stay permanently. Changing them signs out every native install.
@@ -245,7 +247,7 @@ Each sub-step is done when its suite cases pass against Rust and the memory budg
     - graceful shutdown;
     - Better Auth session validation with daily renewal, step-up cookie renewal and Set-Cookie forwarding;
     - the guard, the health routes and Better Auth's error page.
-  - Elysia validated requests before the auth guard answered, so the guard is an extractor that handlers `require()` after validation.
+  - Elysia validated requests before the auth guard answered, so the guard was first an extractor that handlers `require()` after validation. Since the fixes after step 5, guarded routes authenticate first (see "Fixed before cutover").
   - `cargo xtask entities` generates `db/entities` from the 53 migrations. Ids and timestamps are defaulted in `db/behavior.rs`.
   - `cargo xtask openapi` emits every DTO as a component (routes join as they land) into `packages/api-contracts` (openapi-typescript 7.13.0). Response fields that are always written are required and nullable.
   - `calendar-client` is typed with the generated components, and web, native-core and both apps changed in the same merge. That switch found:
@@ -387,6 +389,39 @@ Each sub-step is done when its suite cases pass against Rust and the memory budg
   - concurrent first requests for a new account race on the settings row (find, then create) and answer 409 on either backend, as TypeScript's `SettingsService.get` does.
 - **Not done:** the web app and both native apps through sign-in, calendar and mail, with a passkey on a real device. That needs a person and devices.
 - **Test resources:** `test-api`, `test-api-ts` and `test-suite` services, and the `solace_test_api` and `solace_test_mem` databases, all in `test`. Production is unchanged.
+
+**Fixed before cutover (2026-10-15, at the user's request):** the user asked to fix the findings in Rust before cutover, not in step 7. TypeScript stays as it is (it is production until cutover), so each fixed case in the suite asserts per backend (`Backend::TypeScript` keeps today's behavior), and everything else must still match TypeScript. The AGENTS §2 known gaps are unchanged and stay for step 7.
+
+- **Security:**
+  - `complete-step-up` needs proof of a passkey sign-in: `verify-authentication` writes a 5-minute `passkey-bridge-step-up:<session id>` verification row, which `complete-step-up` consumes once; without it, 403 `PASSKEY_STEP_UP_REQUIRED`. The native bridge flow (password session, browser passkey sign-in, one-time token back) passes end to end. An app mid-flow at cutover gets the 403 once and retries.
+  - The JMAP proxy's session path (no bearer, or the retry after a stale bearer) answers the same 403 as `/api/mail/oauth/access-token` for a session that owes step-up. Bearer relay is unchanged.
+  - Guarded routes authenticate before they validate: `RouteUser` is a rejecting extractor taken before `ValidJson`/`ValidQuery`/`ValidPath`, so an anonymous malformed request gets 401 (TypeScript: 400). AGENTS §3 says so.
+  - The push-device and notification limiters key on the path without its query, so a query string no longer starts a fresh budget.
+- **Privacy:**
+  - The share feed leaves out `X-WR-CALDESC`, which named the owner or their email.
+  - Bulk event errors, the legacy import's errors and the bulk move message carry counts, never titles or calendar names.
+  - Account deletion also deletes the user's recurrence exceptions, verification rows (passkey challenges, reset tokens, one-time tokens) and their contribution to other users' events: participant rows linked by user id or matching the account's addresses keep the organizer's email but lose the user id, display name and RSVP state.
+- **Correctness:**
+  - The event list applies a series' own exceptions (they were loaded by `modified_event_id`). Single-event, bulk, calendar and feed deletes take a series' exceptions in the same transaction.
+  - An overdue reminder fires on the next minute instead of failing `chk_notification_time_future` with a 500.
+  - Concurrent first settings reads all get 200 (`INSERT … ON CONFLICT DO NOTHING`).
+  - `3day` is accepted as the default view, which web and native-calendar already offered. calendar-core's `defaultViewSchema` is TypeScript's and unchanged.
+  - Search hits are typed as what both backends return (`EventSearchHit`, trimmed labels) in calendar-core; native-calendar's palette and web's mappers follow. The wire format is unchanged.
+  - Mail: app mail, admin and owner JMAP calls resend Stalwart's concurrency-limit refusal (at most 6 times, jittered, 2.35 s in total; nothing else is resent). A repair stores the Stalwart account it creates. A skipped new-mail push is queued again. In-memory limiter keys reset after one window. Proxy uploads over 1 MiB check their token before streaming. The mailer and the admin client keep at most 16 calls in flight per shared Stalwart account (noreply, provisioner) and queue the rest, so a burst can't outlast the resends (Railway's test Stalwart lost mail to 48- and 64-wide bursts without it).
+  - The subscription feed reader honors `BYMONTHDAY`/`BYMONTH` and `EXDATE`, skips only an event with an unreadable rule, keeps the first of a duplicate `DTSTART`/`DTEND`, applies an override whatever its `SEQUENCE` and links it to its series, repeats all-day rules on the user's days, reads offset TZIDs as fixed offsets, reads floating times in `X-WR-TIMEZONE` or the user's zone, and files every event under a tz database zone (Windows names and "(UTC±hh:mm)" labels through CLDR's windowsZones table, now shared with the on-device import as `packages/calendar-ics/src/windows-zones.json`). Golden feeds changed only for these items.
+  - The share feed carries a series' exceptions (`EXDATE`, `RECURRENCE-ID` overrides) and this-and-future halves.
+  - The legacy ICS import refuses read-only calendars like the encrypted import does.
+  - The on-device import (calendar-core) no longer rejects a whole file for one unreadable `RRULE`, and maps every Windows zone.
+  - Exports and invitations: the share feed, the single-event `.ics` export and invitation mail write a zoned series as `DTSTART;TZID=` with a VTIMEZONE generated from jiff's tz database, so occurrences keep their wall-clock time across DST, and they carry the series' exceptions (`EXDATE`, `RECURRENCE-ID` overrides) in the same zone. A series without a zone stays UTC.
+  - A custom TZID is read through the file's own VTIMEZONE (offsets, RDATEs and yearly rules), whatever its prefix; IANA names keep the tz database.
+  - The legacy plaintext import and mailed invitations link overrides to their series and apply `EXDATE` through the same code as sync.
+- **Suite:** `cargo xtask check` passes at `7f008c7d`: 424 cases on Rust in both modes, all 420 listed in `rust-passing.txt`. Against the TypeScript backends, the full suite passed in development mode (414) and 413 of 414 in production mode before round 2; the one failure was Prisma's 5 s interactive-transaction timeout (P2028) under parallel load, and it passed alone. The agents ran their modules on both backends in both modes for every later fix. On Railway, `test-suite` against `test-api` passed 419 of 419 in production mode at `af9d1fb0`, interop with `test-api-ts` included, so the rollback drill still holds.
+- **Memory:** jemalloc purges freed pages only on allocation, so an idle server kept its last peak (47.6 MiB idle on the production clone). The image sets `_RJEM_MALLOC_CONF=background_thread:true`: on the clone, idle 24.6 MiB, steady peak 32.6 MiB, and 28.5 MiB ten idle minutes after the load. With the setting in the image, the clone measured 24.9 MiB idle and a 28.1 MiB steady peak.
+- **Production clone in the test environment:** the user dumped production read-only (`pg_dump`, 390 KB) and it was restored as `solace_test_clone` (12 MB: 31 users, 179 events, 70 calendars), with sessions, verification rows, rate limits, OAuth tokens, push devices and outbox jobs deleted. `test-app-api` (Rust, production mode) serves it at `https://test-app-api-test.up.railway.app`, and `test-web` (`crates/solace-api-tests/web.Dockerfile`, Bun and `next start`) at `https://test-web-test-2272.up.railway.app`. Railway's `up.railway.app` is a public suffix, so the production-mode session cookie (`Domain=railway.app`) is refused by browsers and sign-in doesn't stick there; the user accepted that for a size reference.
+- **Test environment notes:**
+  - Stalwart caps pending blob uploads per account (`maxUploadCount` 1000 per `uploadTtl` of an hour, as in production). Every invitation uploads its ICS, so parallel full suites run the noreply account out, and in production the noreply account can send about 1000 invitations an hour on either backend. Inlining the ICS as a `text/calendar` body value would avoid the upload; it needs checking in real mail clients first.
+  - The test Stalwart's entrypoint reloaded settings after applying its plan, but the reload fails on a built-in expression (`bit_and` in condition #3) and `|| true` hid it, so without the gate the running settings stayed at Stalwart's defaults until a restart. The entrypoint now restarts Stalwart instead. The production entrypoint also reloads settings and is worth checking for the same error. The test plan turns off the HTTP rate limits and raises the upload count, since every suite request arrives from one forwarded address.
+- **Still open (minor):** the on-device import files a custom-TZID event under CLDR's zone or the user's, where the server may pick the VTIMEZONE's `X-LIC-LOCATION` (same instants); an override downloaded on its own exports standalone under its own UID.
 
 ### 6. Cutover
 
