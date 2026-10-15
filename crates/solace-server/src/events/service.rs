@@ -837,7 +837,7 @@ pub async fn bulk(
                     .await?;
             Ok(BulkEventResult {
                 success: true,
-                message: format!("Successfully moved {moved} events to {}", target.name),
+                message: format!("Successfully moved {moved} events"),
                 events_processed: i64::try_from(moved).unwrap_or(i64::MAX),
                 action: "move".into(),
                 created_events: None,

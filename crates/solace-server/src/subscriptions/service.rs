@@ -592,11 +592,9 @@ async fn import_legacy(
     let mut errors = parsed.errors.clone();
     let mut created = 0;
     for event in &parsed.events {
+        // Messages never carry titles or UIDs: those are the file's content.
         if taken.contains(&event.uid) {
-            errors.push(format!(
-                "Event \"{}\" with UID {} already exists in calendar",
-                event.title, event.uid
-            ));
+            errors.push("An event already exists in this calendar.".to_owned());
             continue;
         }
         let row = parse::to_new_event(event, &user.id, calendar_id, None);
@@ -609,8 +607,7 @@ async fn import_legacy(
         match imported {
             Ok(()) => created += 1,
             Err(error) => errors.push(format!(
-                "Failed to create event \"{}\": {}",
-                event.title,
+                "An event could not be created: {}",
                 error.client_message()
             )),
         }

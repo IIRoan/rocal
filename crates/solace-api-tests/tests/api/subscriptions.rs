@@ -1220,10 +1220,16 @@ async fn legacy_ics_import_reports_events_already_in_the_calendar() {
             events_total: 2,
             file_name: Some("unknown.ics".into()),
             calendar_name: Some("Team Cal".into()),
-            errors: Some(vec![
-                "Event \"Planning\" with UID evt-1@example.com already exists in calendar".into(),
-                "Event \"Offsite\" with UID evt-2@example.com already exists in calendar".into(),
-            ]),
+            errors: Some(match app.backend {
+                // TypeScript names each event by title, which is the file's content.
+                Backend::TypeScript => vec![
+                    "Event \"Planning\" with UID evt-1@example.com already exists in calendar"
+                        .into(),
+                    "Event \"Offsite\" with UID evt-2@example.com already exists in calendar"
+                        .into(),
+                ],
+                Backend::Rust => vec!["An event already exists in this calendar.".into(); 2],
+            }),
         }
     );
     assert_eq!(

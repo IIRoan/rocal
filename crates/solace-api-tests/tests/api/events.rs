@@ -1896,7 +1896,12 @@ async fn bulk_move_checks_the_target_calendar() {
         moved,
         BulkEventResult {
             success: true,
-            message: "Successfully moved 2 events to Family".into(),
+            message: match app.backend {
+                // TypeScript names the target calendar, which is user content.
+                Backend::TypeScript => "Successfully moved 2 events to Family",
+                Backend::Rust => "Successfully moved 2 events",
+            }
+            .into(),
             events_processed: 2,
             action: "move".into(),
             created_events: None,
