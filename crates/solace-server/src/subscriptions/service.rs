@@ -20,12 +20,15 @@ use solace_api_types::subscriptions::{
 use super::holidays;
 use super::queries::{self, FeedChanges, SyncOutcome};
 use crate::auth::guard::RouteUser;
-use crate::db::entities::{calendar, calendar_event, calendar_subscription, calendar_sync_log};
+use crate::db::entities::{
+    calendar, calendar_event, calendar_subscription, calendar_sync_log, event_participant,
+};
 use crate::error::AppError;
 use crate::events::participants;
 use crate::events::queries as events_queries;
 use crate::http::zod::{js_length, js_trim};
 use crate::instant;
+use crate::integrations::ics::Participant;
 use crate::integrations::ics::parse::{self, ParsedEvent, StoredEvent, StoredParticipant};
 use crate::integrations::safe_fetch::{SafeFetchError, SafeRequest, SafeResponse};
 use crate::state::AppState;
@@ -465,11 +468,11 @@ struct Counts {
     deleted: i32,
 }
 
-fn participant_inputs(event: &ParsedEvent) -> Vec<ParticipantInput> {
-    event
-        .participants
+/// A parsed file's people as the participant sync takes them.
+pub(crate) fn participant_inputs(participants: Option<&[Participant]>) -> Vec<ParticipantInput> {
+    participants
+        .unwrap_or_default()
         .iter()
-        .flatten()
         .map(|participant| ParticipantInput {
             email: participant.email.clone(),
             display_name: participant.display_name.clone(),
@@ -479,7 +482,18 @@ fn participant_inputs(event: &ParsedEvent) -> Vec<ParticipantInput> {
         .collect()
 }
 
-fn stored(event: &calendar_event::Model) -> StoredEvent<'_> {
+pub(crate) fn stored_participants(rows: &[event_participant::Model]) -> Vec<StoredParticipant<'_>> {
+    rows.iter()
+        .map(|row| StoredParticipant {
+            email: &row.email,
+            display_name: row.display_name.as_deref(),
+            role: &row.role,
+            status: &row.status,
+        })
+        .collect()
+}
+
+pub(crate) fn stored(event: &calendar_event::Model) -> StoredEvent<'_> {
     StoredEvent {
         title: &event.title,
         description: event.description.as_deref(),
@@ -501,38 +515,27 @@ async fn reconcile<C: ConnectionTrait>(
     let current = queries::feed_events(db, &feed.id).await?;
     let ids = current.iter().map(|event| event.id.clone()).collect();
     let people = events_queries::participants_by_event(db, ids).await?;
-    let by_uid: HashMap<String, calendar_event::Model> = current
-        .into_iter()
-        .map(|event| (event.external_id.clone().unwrap_or_default(), event))
-        .collect();
+    let by_uid = rows_by_uid(current);
     let incoming: HashSet<&str> = events.iter().map(|event| event.uid.as_str()).collect();
     let mut counts = Counts::default();
     for parsed in events {
         let Some(existing) = by_uid.get(&parsed.uid) else {
             let row = parse::to_new_event(parsed, &feed.user_id, &feed.calendar_id, Some(&feed.id));
             let created = queries::insert_event(db, row).await?;
-            participants::sync(db, &created.id, &participant_inputs(parsed), None).await?;
+            let inputs = participant_inputs(parsed.participants.as_deref());
+            participants::sync(db, &created.id, &inputs, None).await?;
             counts.added += 1;
             continue;
         };
         let changed = parse::is_modified(&stored(existing), parsed);
-        let rows: Vec<StoredParticipant<'_>> = people
-            .get(&existing.id)
-            .into_iter()
-            .flatten()
-            .map(|row| StoredParticipant {
-                email: &row.email,
-                display_name: row.display_name.as_deref(),
-                role: &row.role,
-                status: &row.status,
-            })
-            .collect();
+        let rows = stored_participants(people.get(&existing.id).map_or(&[], Vec::as_slice));
         let people_changed = parse::participants_differ(&rows, parsed.participants.as_deref());
         if changed {
             queries::update_feed_event(db, existing.clone(), parsed).await?;
         }
         if people_changed {
-            participants::sync(db, &existing.id, &participant_inputs(parsed), None).await?;
+            let inputs = participant_inputs(parsed.participants.as_deref());
+            participants::sync(db, &existing.id, &inputs, None).await?;
         }
         if changed || people_changed {
             counts.updated += 1;
@@ -705,7 +708,8 @@ async fn import_legacy(
         let row = parse::to_new_event(event, &user.id, calendar_id, None);
         let imported: Result<calendar_event::Model, AppError> = async {
             let inserted = queries::insert_event(&state.db, row).await?;
-            participants::sync(&state.db, &inserted.id, &participant_inputs(event), None).await?;
+            let inputs = participant_inputs(event.participants.as_deref());
+            participants::sync(&state.db, &inserted.id, &inputs, None).await?;
             Ok(inserted)
         }
         .await;

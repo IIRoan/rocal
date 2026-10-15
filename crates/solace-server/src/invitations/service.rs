@@ -6,8 +6,7 @@ use sea_orm::{ConnectionTrait, Set};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use solace_api_types::events::{
-    ImportInvitationRequest, InvitationDeclined, InvitationEncryptionEntry,
-    InvitationImportSummary, ParticipantInput,
+    ImportInvitationRequest, InvitationDeclined, InvitationEncryptionEntry, InvitationImportSummary,
 };
 
 use super::queries;
@@ -19,10 +18,12 @@ use crate::events::encryption::resolve_persistence_policy;
 use crate::events::{participants, queries as events};
 use crate::http::zod::js_trim;
 use crate::instant;
-use crate::integrations::ics::parse::{self, ParsedEvent, StoredEvent, StoredParticipant};
-use crate::integrations::ics::{Participant, ParticipantRole, RecurrenceRule, resolve_timezone};
+use crate::integrations::ics::parse::{self, ParsedEvent};
+use crate::integrations::ics::{ParticipantRole, RecurrenceRule, resolve_timezone};
 use crate::state::AppState;
-use crate::subscriptions::service::{link_series, rows_by_uid};
+use crate::subscriptions::service::{
+    self as subscriptions, link_series, participant_inputs, rows_by_uid, stored_participants,
+};
 
 const MAX_ICS_CONTENT_BYTES: usize = 1_048_576;
 const MAX_ICS_EVENTS_PER_FILE: usize = 100;
@@ -107,21 +108,6 @@ pub struct BodyPart {
     pub sub_parts: Vec<BodyPart>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AttendeeStatus {
-    Accepted,
-    Tentative,
-}
-
-impl AttendeeStatus {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Accepted => "accepted",
-            Self::Tentative => "tentative",
-        }
-    }
-}
-
 struct Source {
     id: String,
     ics: String,
@@ -129,7 +115,7 @@ struct Source {
 
 #[derive(Default)]
 struct Ingest {
-    status: Option<AttendeeStatus>,
+    status: Option<RsvpStatus>,
     calendar_id: Option<String>,
     encryption: HashMap<String, InvitationEncryptionEntry>,
 }
@@ -152,8 +138,8 @@ pub async fn import_ics(
     request: ImportInvitationRequest,
 ) -> Result<InvitationImportSummary, AppError> {
     let status = match request.status.as_deref() {
-        Some("accepted") => Some(AttendeeStatus::Accepted),
-        Some("tentative") => Some(AttendeeStatus::Tentative),
+        Some("accepted") => Some(RsvpStatus::Accepted),
+        Some("tentative") => Some(RsvpStatus::Tentative),
         _ => None,
     };
     let source = Source {
@@ -190,23 +176,21 @@ pub async fn ingest_from_emails(
 fn index_encryption(
     entries: Vec<InvitationEncryptionEntry>,
 ) -> HashMap<String, InvitationEncryptionEntry> {
-    let mut index = HashMap::new();
-    for entry in entries {
-        let external_id = js_trim(&entry.external_id).to_owned();
-        let content = js_trim(&entry.encrypted_content).to_owned();
-        if external_id.is_empty() || content.is_empty() {
-            continue;
-        }
-        index.insert(
-            external_id.clone(),
-            InvitationEncryptionEntry {
-                external_id,
-                encrypted_content: content,
-                ..entry
-            },
-        );
-    }
-    index
+    entries
+        .into_iter()
+        .filter_map(|entry| {
+            let external_id = js_trim(&entry.external_id).to_owned();
+            let content = js_trim(&entry.encrypted_content).to_owned();
+            (!external_id.is_empty() && !content.is_empty()).then(|| {
+                let entry = InvitationEncryptionEntry {
+                    external_id: external_id.clone(),
+                    encrypted_content: content,
+                    ..entry
+                };
+                (external_id, entry)
+            })
+        })
+        .collect()
 }
 
 fn is_calendar_part(part: &BodyPart) -> bool {
@@ -380,7 +364,7 @@ async fn ingest(
             }
         }
     }
-    if summary.events_created > 0 || summary.events_updated > 0 || summary.events_deleted > 0 {
+    if summary.events_created > 0 || summary.events_updated > 0 {
         tracing::info!(
             calendar_id = %target.id,
             events_created = summary.events_created,
@@ -526,19 +510,6 @@ impl LocalData {
     }
 }
 
-fn participant_inputs(participants: Option<&[Participant]>) -> Vec<ParticipantInput> {
-    participants
-        .unwrap_or_default()
-        .iter()
-        .map(|p| ParticipantInput {
-            email: p.email.clone(),
-            display_name: p.display_name.clone(),
-            role: p.role.map(|role| role.as_str().to_owned()),
-            status: p.status.map(|status| status.as_str().to_owned()),
-        })
-        .collect()
-}
-
 /// `isUserDeclinedOnEvent`: the user's own attendee row says declined.
 fn user_declined(user_id: &str, rows: &[event_participant::Model]) -> bool {
     rows.iter()
@@ -550,7 +521,7 @@ async fn apply_attendee_status(
     state: &AppState,
     user_id: &str,
     event_id: &str,
-    status: AttendeeStatus,
+    status: RsvpStatus,
 ) -> Result<(), AppError> {
     let Some(email) = user_email(state, user_id).await? else {
         return Ok(());
@@ -603,32 +574,12 @@ async fn upsert(
             continue;
         }
         let participants_changed = parse::participants_differ(
-            &stored
-                .iter()
-                .map(|row| StoredParticipant {
-                    email: &row.email,
-                    display_name: row.display_name.as_deref(),
-                    role: &row.role,
-                    status: &row.status,
-                })
-                .collect::<Vec<_>>(),
+            &stored_participants(stored),
             parsed.participants.as_deref(),
         );
         let data = local_data(parsed, encryption, Some(&existing.encryption_state));
         let apply_encryption = encryption.is_some() && existing.encryption_state != "encrypted";
-        let event_changed = parse::is_modified(
-            &StoredEvent {
-                title: &existing.title,
-                description: existing.description.as_deref(),
-                start: existing.start,
-                end: existing.end,
-                all_day: existing.all_day,
-                location: existing.location.as_deref(),
-                recurrence: existing.recurrence.as_deref(),
-                timezone: &existing.timezone,
-            },
-            parsed,
-        );
+        let event_changed = parse::is_modified(&subscriptions::stored(existing), parsed);
         let should_update = event_changed
             || existing.calendar_id != target.calendar.id
             || options.status.is_some()

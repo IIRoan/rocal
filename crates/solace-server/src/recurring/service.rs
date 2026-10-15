@@ -19,12 +19,11 @@ use crate::db::entities::{calendar_event, event_participant, user};
 use crate::error::AppError;
 use crate::events::encryption::resolve_invitation_content;
 use crate::events::recurrence::{generate_instances, validate_rule};
-use crate::events::service::is_writable;
+use crate::events::service::{invitation_event, is_writable};
 use crate::events::view::{Relations, event_dto};
 use crate::events::{participants, queries as events};
 use crate::http::zod::js_trim;
 use crate::instant;
-use crate::integrations::ics::export::{ExportEvent, to_build_event};
 use crate::invitations::request;
 use crate::state::AppState;
 
@@ -458,25 +457,8 @@ async fn respond(
         row.location.as_deref(),
     );
     let invitation = content
-        .map(|content| {
-            to_build_event(&ExportEvent {
-                id: &row.id,
-                external_id: row.external_id.as_deref(),
-                title: &content.title,
-                description: content.description.as_deref(),
-                start: row.start,
-                end: row.end,
-                all_day: row.all_day,
-                timezone: Some(&row.timezone),
-                location: content.location.as_deref(),
-                recurrence: row.recurrence.as_deref(),
-                created_at: row.created_at,
-                updated_at: row.updated_at,
-                participants: &[],
-            })
-        })
-        .transpose()
-        .map_err(AppError::internal)?;
+        .map(|content| invitation_event(&row, &content))
+        .transpose()?;
     let synced = participants::sync(&state.db, &row.id, &inputs, Some(&user.id)).await?;
     if let (Some(_), Some(invitation)) = (&updates.participants, &invitation) {
         let warnings =

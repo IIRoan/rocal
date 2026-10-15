@@ -393,7 +393,7 @@ pub async fn create(
         request.description.as_deref(),
         request.location.as_deref(),
     );
-    let mut warnings = invite(state, &event, &synced, &calendar.name, content, &timezone).await?;
+    let mut warnings = invite(state, &event, &synced, &calendar.name, content).await?;
     if let Some(minutes) = reminder.filter(|m| *m > 0)
         && schedules_reminders(settings.as_ref())
         && let Err(error) = insert_reminder(
@@ -420,28 +420,26 @@ async fn invite(
     synced: &participants::Synced,
     calendar_name: &str,
     content: Option<InvitationContentSource>,
-    timezone: &str,
 ) -> Result<Vec<OperationWarning>, AppError> {
     let Some(content) = content else {
         return Ok(Vec::new());
     };
-    let invitation = export::to_build_event(&export::ExportEvent {
-        id: &event.id,
-        external_id: event.external_id.as_deref(),
+    let invitation = invitation_event(event, &content)?;
+    Ok(request::send_pending(state, &event.id, synced, calendar_name, &invitation).await)
+}
+
+/// The REQUEST a new invitee is mailed: the stored event with the invitation's plaintext.
+pub fn invitation_event(
+    event: &calendar_event::Model,
+    content: &InvitationContentSource,
+) -> Result<build::Event, AppError> {
+    export::to_build_event(&export::ExportEvent {
         title: &content.title,
         description: content.description.as_deref(),
-        start: event.start,
-        end: event.end,
-        all_day: event.all_day,
-        timezone: Some(timezone),
         location: content.location.as_deref(),
-        recurrence: event.recurrence.as_deref(),
-        created_at: event.created_at,
-        updated_at: event.updated_at,
-        participants: &[],
+        ..export_event(event, &[])
     })
-    .map_err(AppError::internal)?;
-    Ok(request::send_pending(state, &event.id, synced, calendar_name, &invitation).await)
+    .map_err(AppError::internal)
 }
 
 pub async fn update(
@@ -647,15 +645,7 @@ pub async fn update(
             next_description.as_deref(),
             next_location.as_deref(),
         );
-        warnings = invite(
-            state,
-            &updated,
-            &synced,
-            &final_calendar.name,
-            content,
-            &timezone,
-        )
-        .await?;
+        warnings = invite(state, &updated, &synced, &final_calendar.name, content).await?;
     }
     if (start.is_some() || end.is_some() || request.reminder.is_some())
         && let Err(error) = reschedule_reminders(

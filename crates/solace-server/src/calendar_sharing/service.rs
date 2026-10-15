@@ -23,13 +23,12 @@ fn not_found() -> AppError {
     AppError::validation("Calendar not found or access denied")
 }
 
-fn base_url(state: &AppState) -> String {
-    state
-        .config
-        .backend_url
-        .trim()
-        .trim_end_matches('/')
-        .to_owned()
+fn share_url(state: &AppState, token: &str) -> String {
+    let base = state.config.backend_url.trim().trim_end_matches('/');
+    format!(
+        "{base}/api/calendars/shared/{}",
+        encode_uri_component(token)
+    )
 }
 
 fn link(state: &AppState, calendar: &calendar::Model) -> CalendarShareLink {
@@ -41,13 +40,7 @@ fn link(state: &AppState, calendar: &calendar::Model) -> CalendarShareLink {
         calendar_id: calendar.id.clone().into(),
         calendar_name: calendar.name.clone(),
         enabled: token.is_some(),
-        share_url: token.map(|token| {
-            format!(
-                "{}/api/calendars/shared/{}",
-                base_url(state),
-                encode_uri_component(token)
-            )
-        }),
+        share_url: token.map(|token| share_url(state, token)),
     }
 }
 
@@ -180,11 +173,7 @@ pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String),
         &build::Calendar {
             name: Some(name.clone()),
             timezone: Some(instant::resolve_timezone(zone)),
-            source_url: Some(format!(
-                "{}/api/calendars/shared/{}",
-                base_url(state),
-                encode_uri_component(raw_token)
-            )),
+            source_url: Some(share_url(state, raw_token)),
             ..Default::default()
         },
         &built,
