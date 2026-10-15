@@ -102,10 +102,6 @@ pub fn resolve_invitation_content(
     })
 }
 
-pub fn is_fully_encrypted(encryption_state: Option<&str>) -> bool {
-    encryption_state == Some("encrypted")
-}
-
 /// The distinct, non-empty calendar ids a backfill covers, in order.
 fn target_calendar_ids(calendar_ids: &[&str]) -> Vec<String> {
     let mut targets: Vec<String> = Vec::new();
@@ -220,14 +216,6 @@ mod tests {
             )
             .is_ok()
         );
-    }
-
-    #[test]
-    fn only_encrypted_state_counts_as_fully_encrypted() {
-        assert!(is_fully_encrypted(Some("encrypted")));
-        for state in [Some("plaintext"), Some("shadow_write"), None] {
-            assert!(!is_fully_encrypted(state), "{state:?}");
-        }
     }
 
     #[tokio::test]
