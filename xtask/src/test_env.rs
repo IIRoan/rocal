@@ -4,12 +4,12 @@ use std::process::Command;
 use std::time::Duration;
 
 use anyhow::{Context, bail};
-use serde_json::{Value, json};
 use solace_api_tests::env::{
     LOCAL_POSTGRES_PASSWORD, LOCAL_POSTGRES_PORT, LOCAL_POSTGRES_USER,
     LOCAL_STALWART_ADMIN_PASSWORD, LOCAL_STALWART_NOREPLY_PASSWORD, LOCAL_STALWART_PORT,
     LOCAL_STALWART_PROVISIONER_PASSWORD, TEMPLATE_DATABASE, TestEnv,
 };
+use solace_api_tests::stalwart::{provision_key, url_host_port};
 use sqlx::{Connection, Executor, PgConnection};
 
 const POSTGRES_CONTAINER: &str = "solace-test-pg";
@@ -186,101 +186,6 @@ pub async fn apply_migrations(db: &mut PgConnection) -> anyhow::Result<usize> {
             .with_context(|| format!("migration {}", path.display()))?;
     }
     Ok(migrations.len())
-}
-
-/// Stalwart reveals a key once and allows five per account, so the key is cached and only re-minted when it stops working.
-pub async fn provision_key(env: &TestEnv) -> anyhow::Result<String> {
-    let host = url_host_port(&env.stalwart_url);
-    // Shared by every checkout and worktree, so one checkout never revokes the key another backend runs with.
-    let home = std::env::var("HOME").context("HOME")?;
-    let cache = std::path::PathBuf::from(home).join(format!(
-        ".local/share/solace-test-tools/provision-keys/{host}"
-    ));
-    if let Ok(key) = std::fs::read_to_string(&cache) {
-        let mut request = reqwest::Client::new()
-            .get(format!("{}/jmap/session", env.stalwart_url))
-            .bearer_auth(key.trim());
-        if let Some(gate) = &env.stalwart_gate_key {
-            request = request.header("X-Solace-Gate", gate);
-        }
-        let session = request.send().await?;
-        if session.status().is_success() {
-            return Ok(key.trim().to_owned());
-        }
-    }
-    let key = mint_provision_key(env).await?;
-    std::fs::create_dir_all(cache.parent().context("cache dir")?)?;
-    std::fs::write(&cache, &key)?;
-    Ok(key)
-}
-
-fn url_host_port(url: &str) -> String {
-    url.split("://")
-        .nth(1)
-        .unwrap_or(url)
-        .split('/')
-        .next()
-        .unwrap_or_default()
-        .replace([':', '.'], "_")
-}
-
-async fn mint_provision_key(env: &TestEnv) -> anyhow::Result<String> {
-    let response = admin_jmap(
-        env,
-        json!([
-            ["x:Account/query", {"filter": {"name": "solace-provisioner"}}, "q"]
-        ]),
-    )
-    .await?;
-    let account_id = response["methodResponses"][0][1]["ids"][0]
-        .as_str()
-        .context("solace-provisioner account missing; is the test plan applied?")?
-        .to_owned();
-    let create = json!(["x:ApiKey/set", {
-        "accountId": account_id,
-        "create": {"k": {"description": "solace-test-provision", "permissions": {"@type": "Inherit"}}}
-    }, "s"]);
-    let response = admin_jmap(env, json!([create.clone()])).await?;
-    if let Some(secret) = response["methodResponses"][0][1]["created"]["k"]["secret"].as_str() {
-        return Ok(secret.to_owned());
-    }
-    // Only at the five-key quota are old keys revoked, since running backends may still hold them.
-    if response["methodResponses"][0][1]["notCreated"]["k"]["type"] != json!("overQuota") {
-        bail!("API key not created: {response}");
-    }
-    let existing = admin_jmap(
-        env,
-        json!([["x:ApiKey/query", {"accountId": account_id}, "q"]]),
-    )
-    .await?;
-    let existing = existing["methodResponses"][0][1]["ids"].clone();
-    let response = admin_jmap(
-        env,
-        json!([["x:ApiKey/set", {"accountId": account_id, "destroy": existing}, "d"], create]),
-    )
-    .await?;
-    response["methodResponses"][1][1]["created"]["k"]["secret"]
-        .as_str()
-        .map(str::to_owned)
-        .with_context(|| format!("API key not created: {response}"))
-}
-
-async fn admin_jmap(env: &TestEnv, method_calls: Value) -> anyhow::Result<Value> {
-    let mut request = reqwest::Client::new()
-        .post(format!("{}/jmap/", env.stalwart_url))
-        .basic_auth("admin", Some(&env.stalwart_admin_password));
-    if let Some(key) = &env.stalwart_gate_key {
-        request = request.header("X-Solace-Gate", key);
-    }
-    let response = request
-        .json(&json!({
-            "using": ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
-            "methodCalls": method_calls,
-        }))
-        .send()
-        .await?
-        .error_for_status()?;
-    Ok(response.json().await?)
 }
 
 async fn wait_for_postgres(env: &TestEnv) -> anyhow::Result<()> {

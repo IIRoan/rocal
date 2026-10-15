@@ -71,6 +71,11 @@ pub struct Config {
     pub mailer: Option<MailerConfig>,
     /// The backend-gate key the Railway Stalwart domain requires (`apps/stalwart/backend-gate.cfg`).
     pub stalwart_gate_key: Option<String>,
+    /// Signs Stalwart's mail-ingest webhook; the webhook is not registered at boot without it.
+    pub stalwart_webhook_secret: String,
+    pub stalwart_webhook_url: String,
+    /// Base64 HMAC key for the per-user Stalwart bridge passwords; mail tokens fail without it.
+    pub mail_bridge_hmac_key: Option<String>,
     pub sentry_dsn: Option<String>,
     /// The private profile-picture bucket; uploads are unavailable without it.
     pub avatar_bucket: Option<AvatarBucketConfig>,
@@ -136,6 +141,16 @@ impl Config {
                 .unwrap_or_default(),
             mailer: mailer(&var),
             stalwart_gate_key: var("STALWART_GATE_KEY")
+                .map(|key| key.trim().to_owned())
+                .filter(|key| !key.is_empty()),
+            stalwart_webhook_secret: var("STALWART_WEBHOOK_SECRET")
+                .map(|secret| secret.trim().to_owned())
+                .unwrap_or_default(),
+            stalwart_webhook_url: var("STALWART_WEBHOOK_URL")
+                .map(|url| url.trim().to_owned())
+                .filter(|url| !url.is_empty())
+                .unwrap_or_else(|| format!("{backend_url}/api/internal/stalwart/webhook")),
+            mail_bridge_hmac_key: var("MAIL_BRIDGE_HMAC_KEY")
                 .map(|key| key.trim().to_owned())
                 .filter(|key| !key.is_empty()),
             sentry_dsn: var("SENTRY_DSN").map(|dsn| dsn.trim().to_owned()),

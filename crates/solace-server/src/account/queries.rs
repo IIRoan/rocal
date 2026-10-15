@@ -21,13 +21,6 @@ pub async fn mailbox<C: ConnectionTrait>(
         .await
 }
 
-pub async fn delete_mailbox<C: ConnectionTrait>(db: &C, id: &str) -> Result<(), sea_orm::DbErr> {
-    mail_directory_entry::Entity::delete_by_id(id)
-        .exec(db)
-        .await
-        .map(|_| ())
-}
-
 /// Shares both ways, reminder logs, invites addressed to or claimed for `emails`, then the user, whose rows cascade.
 pub async fn delete_user<C: ConnectionTrait>(
     db: &C,

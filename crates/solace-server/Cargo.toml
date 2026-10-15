@@ -19,6 +19,7 @@ image.workspace = true
 jiff.workspace = true
 mimalloc = { workspace = true, optional = true }
 percent-encoding.workspace = true
+pgp.workspace = true
 rand.workspace = true
 regex-lite.workspace = true
 reqwest.workspace = true

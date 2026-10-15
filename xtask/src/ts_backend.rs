@@ -34,7 +34,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
 
     let env = TestEnv::from_env()?;
     let database_url = env.database_url_for(&database)?;
-    let provision_token = crate::test_env::provision_key(&env).await?;
+    let provision_token = solace_api_tests::stalwart::provision_key(&env).await?;
     let port_number: u16 = port.parse().context("--port must be a number")?;
     let vars = env.backend_vars(&BackendTarget {
         port: port_number,

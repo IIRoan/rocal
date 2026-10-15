@@ -104,11 +104,16 @@ async fn serve_rust(env: &TestEnv, mode: Mode, database_url: &str) -> String {
         .await
         .expect("bind a port");
     let port = listener.local_addr().expect("local address").port();
+    static PROVISION_KEY: tokio::sync::OnceCell<String> = tokio::sync::OnceCell::const_new();
+    let provision_key = PROVISION_KEY
+        .get_or_try_init(|| solace_api_tests::stalwart::provision_key(env))
+        .await
+        .expect("the test Stalwart's provisioning key");
     let vars = env.backend_vars(&BackendTarget {
         port,
         production: mode == Mode::Production,
         database_url,
-        stalwart_provision_token: "",
+        stalwart_provision_token: provision_key,
     });
     let config = solace_server::config::Config::from_lookup(|wanted| {
         vars.iter()

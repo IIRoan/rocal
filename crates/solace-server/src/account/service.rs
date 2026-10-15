@@ -9,15 +9,15 @@ use solace_api_types::account::{
     AuthStatus, DeleteAccountResponse, EmailAvailability, EmailAvailabilityCode,
 };
 
-use super::{mailbox, queries};
+use super::queries;
 use crate::addresses;
 use crate::auth::guard::{RouteUser, has_passkeys, step_up_verified};
 use crate::auth::session::ActiveSession;
 use crate::error::AppError;
 use crate::invites;
+use crate::mail;
 use crate::profiles::avatars;
 use crate::state::AppState;
-use crate::telemetry;
 
 static LOCAL_PART: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$")
@@ -110,15 +110,7 @@ pub async fn delete(state: &AppState, user: &RouteUser) -> Result<DeleteAccountR
             emails.push(email);
         }
     }
-    if let Some(mailbox) = mailbox {
-        mailbox::purge(state, &mailbox).await?;
-        queries::delete_mailbox(&state.db, &mailbox.id).await?;
-        tracing::info!(
-            recipient_ref = telemetry::log_ref(&mailbox.email),
-            stalwart_account_id = mailbox.stalwart_account_id,
-            "Deleted linked mailbox for Solace account"
-        );
-    }
+    mail::service::delete_mailbox_for_user(state, &user.id).await?;
     let transaction = state.db.begin().await?;
     avatars::delete_current(state, &transaction, &user.id).await?;
     queries::delete_user(&transaction, &user.id, &emails).await?;

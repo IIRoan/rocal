@@ -4,6 +4,7 @@ pub mod client;
 pub mod env;
 pub mod guard;
 pub mod seed;
+pub mod stalwart;
 pub mod webauthn;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
