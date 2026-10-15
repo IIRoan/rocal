@@ -549,6 +549,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mail-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's encrypted mail settings, or `null` before the first upload. */
+        get: operations["getMailSettings"];
+        /** Stores or replaces the caller's blob; an omitted key version keeps the stored one. */
+        put: operations["putMailSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me": {
         parameters: {
             query?: never;
@@ -3288,6 +3306,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessFlag"];
+                };
+            };
+        };
+    };
+    getMailSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailSettings"] | null;
+                };
+            };
+        };
+    };
+    putMailSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutMailSettingsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailSettings"];
                 };
             };
         };

@@ -1299,6 +1299,61 @@
         }
       }
     },
+    "/api/mail-settings": {
+      "get": {
+        "tags": [
+          "Mail settings"
+        ],
+        "summary": "The caller's encrypted mail settings, or `null` before the first upload.",
+        "operationId": "getMailSettings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/MailSettings"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Mail settings"
+        ],
+        "summary": "Stores or replaces the caller's blob; an omitted key version keeps the stored one.",
+        "operationId": "putMailSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutMailSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailSettings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/me": {
       "get": {
         "tags": [

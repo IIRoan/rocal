@@ -18,12 +18,21 @@ use crate::instant;
 use crate::request_schema;
 use crate::state::AppState;
 
-const DEFAULT_ENCRYPTION_KEY_VERSION: i32 = 1;
+pub(crate) const DEFAULT_ENCRYPTION_KEY_VERSION: i32 = 1;
 
-request_schema!(PutRecentContactsRequest => zod::object([
-    ("encryptedContent", zod::string().min(1).max(65_536)),
-    ("encryptionKeyVersion", zod::number().int().min(1).max(1000).optional()),
-]).strict());
+/// The upload `/api/recent-contacts` and `/api/mail-settings` share.
+pub(crate) fn blob_upload_schema() -> zod::Schema {
+    zod::object([
+        ("encryptedContent", zod::string().min(1).max(65_536)),
+        (
+            "encryptionKeyVersion",
+            zod::number().int().min(1).max(1000).optional(),
+        ),
+    ])
+    .strict()
+}
+
+request_schema!(PutRecentContactsRequest => blob_upload_schema());
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new().routes(routes!(get, put))
