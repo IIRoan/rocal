@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 use std::process::Command;
 
-use anyhow::{Context, bail};
+use anyhow::{Context, bail, ensure};
 
 /// Suite tests the Rust server must pass; each sub-step adds its cases until the list is the whole suite.
 const PASSING_LIST: &str = "crates/solace-api-tests/rust-passing.txt";
@@ -39,9 +39,7 @@ fn cargo(args: &[&str]) -> anyhow::Result<()> {
         .current_dir(crate::repo_root())
         .args(args)
         .status()?;
-    if !status.success() {
-        bail!("cargo {} failed", args.join(" "));
-    }
+    ensure!(status.success(), "cargo {} failed", args.join(" "));
     Ok(())
 }
 

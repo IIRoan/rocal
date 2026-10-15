@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-use anyhow::{Context, bail};
+use anyhow::{Context, bail, ensure};
 
 /// The only Railway environment this task deploys to.
 const TEST_ENVIRONMENT: &str = "test";
@@ -11,12 +11,14 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
     let [service, paths @ ..] = args else {
         bail!("usage: cargo xtask deploy-test <service> <path>...");
     };
-    if paths.is_empty() {
-        bail!("usage: cargo xtask deploy-test <service> <path>...");
-    }
-    if !service.starts_with("test-") {
-        bail!("test services are named test-*; refusing {service}");
-    }
+    ensure!(
+        !paths.is_empty(),
+        "usage: cargo xtask deploy-test <service> <path>..."
+    );
+    ensure!(
+        service.starts_with("test-"),
+        "test services are named test-*; refusing {service}"
+    );
     let root = crate::repo_root();
     // Outside the repository, so its .gitignore (which lists target/) cannot hide the upload.
     let stage = std::env::temp_dir()
@@ -33,21 +35,18 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
         .args(["archive", "--format=tar", "HEAD"])
         .args(paths)
         .output()?;
-    if !archive.status.success() {
-        bail!(
-            "git archive failed: {}",
-            String::from_utf8_lossy(&archive.stderr)
-        );
-    }
+    ensure!(
+        archive.status.success(),
+        "git archive failed: {}",
+        String::from_utf8_lossy(&archive.stderr)
+    );
     let mut tar = Command::new("tar")
         .current_dir(&stage)
         .args(["-x", "-f", "-"])
         .stdin(std::process::Stdio::piped())
         .spawn()?;
     std::io::Write::write_all(tar.stdin.as_mut().context("tar stdin")?, &archive.stdout)?;
-    if !tar.wait()?.success() {
-        bail!("tar failed");
-    }
+    ensure!(tar.wait()?.success(), "tar failed");
 
     let upload = match paths {
         [path] => stage.join(path),
@@ -66,8 +65,6 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
             "--ci",
         ])
         .status()?;
-    if !status.success() {
-        bail!("railway up failed");
-    }
+    ensure!(status.success(), "railway up failed");
     Ok(())
 }

@@ -3,14 +3,14 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{Context, bail};
+use anyhow::{Context, bail, ensure};
 use solace_api_tests::env::{BackendTarget, TestEnv};
 use solace_api_tests::guard;
 
 pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let mut checkout = None;
     let mut database = "solace_test_seed".to_owned();
-    let mut port = "4101".to_owned();
+    let mut port: u16 = 4101;
     let mut production = false;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -24,7 +24,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         match *arg {
             "--checkout" => checkout = Some(PathBuf::from(value)),
             "--database" => database = (*value).to_owned(),
-            "--port" => port = (*value).to_owned(),
+            "--port" => port = value.parse().context("--port must be a number")?,
             _ => bail!("unknown option {arg}"),
         }
     }
@@ -35,9 +35,8 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let env = TestEnv::from_env()?;
     let database_url = env.database_url_for(&database)?;
     let provision_token = solace_api_tests::stalwart::provision_key(&env).await?;
-    let port_number: u16 = port.parse().context("--port must be a number")?;
     let vars = env.backend_vars(&BackendTarget {
-        port: port_number,
+        port,
         production,
         database_url: &database_url,
         stalwart_provision_token: &provision_token,
@@ -69,9 +68,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         backend_dir.display()
     );
     let status = command.status()?;
-    if !status.success() {
-        bail!("backend exited with {status}");
-    }
+    ensure!(status.success(), "backend exited with {status}");
     Ok(())
 }
 
