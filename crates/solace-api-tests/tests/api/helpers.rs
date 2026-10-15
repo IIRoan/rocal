@@ -170,7 +170,14 @@ impl TestApp {
         let env = TestEnv::from_env().expect("test environment");
         let mode = mode();
         let database_url = env.database_url.clone();
-        let rust_url = serve_rust(&env, mode, &database_url).await;
+        // Step 5's rollback drill points at the deployed server instead of an in-process one.
+        let rust_url = match std::env::var("INTEROP_RUST_URL") {
+            Ok(url) => {
+                guard::check_service_url("INTEROP_RUST_URL", &url).expect("INTEROP_RUST_URL");
+                url
+            }
+            Err(_) => serve_rust(&env, mode, &database_url).await,
+        };
         let ts = Self::connect(
             env.clone(),
             mode,

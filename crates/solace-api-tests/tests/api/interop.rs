@@ -1,11 +1,12 @@
-//! Step 4b: sessions, passwords, passkeys and step-up made by either backend work on the other; runs when `INTEROP_TS_URL` is set.
+//! Sessions, passwords, passkeys, step-up and data made by either backend work on the other (step 4b, and step 5's rollback drill); runs when `INTEROP_TS_URL` is set.
 
 use serde_json::json;
 use solace_api_tests::client::Agent;
 use solace_api_tests::seed::passkey_sign_in;
 use solace_api_types::auth::SessionWithUser;
 
-use crate::helpers::{TestApp, TestUser, ok};
+use crate::event_fixtures::{FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event};
+use crate::helpers::{TestApp, TestUser, ok, set_cookies_named};
 use crate::passkeys::register;
 
 /// The same browser, now talking to the other backend.
@@ -89,5 +90,58 @@ async fn passkeys_and_step_up_work_on_both_backends() {
             .await
             .expect("passkey");
         assert_eq!(counter, 2, "{label}: the counter");
+    }
+}
+
+#[tokio::test]
+async fn data_and_sessions_renewed_on_rust_keep_working_on_typescript() {
+    let Some((ts, rust)) = TestApp::interop().await else {
+        return;
+    };
+    let mut user = rust.user().await;
+    let calendar = calendar_id(&mut user, "Work").await;
+    let event = create_event(
+        &mut user,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    ok(user
+        .put(
+            "/api/settings",
+            json!({"theme": "dark", "compactView": true}),
+        )
+        .await
+        .expect_status(200));
+    // Thirteen days left means the session was issued a day ago, so Rust renews it on the next request.
+    sqlx::query("UPDATE session SET expires_at = now() + interval '13 days' WHERE user_id = $1")
+        .bind(&user.id)
+        .execute(&rust.db)
+        .await
+        .expect("age the session");
+    let renewal = ok(user.get("/api/settings").await.expect_status(200));
+    assert_eq!(
+        set_cookies_named(&renewal, &rust.session_cookie()).len(),
+        1,
+        "Rust renewed the session"
+    );
+    let mut on_typescript = carry(&user.agent, &ts);
+    for path in [
+        "/api/auth/get-session".to_owned(),
+        "/api/settings".to_owned(),
+        "/api/calendars".to_owned(),
+        format!("/api/events?start={FUTURE_START}&end={FUTURE_END}"),
+        format!("/api/events/{}", event.id.0),
+    ] {
+        let written = ok(user
+            .get(&path)
+            .await
+            .expect_status(200)
+            .and_then(|r| r.value()));
+        let read = ok(on_typescript
+            .get(&path)
+            .await
+            .and_then(|r| r.expect_status(200))
+            .and_then(|r| r.value()));
+        assert_eq!(read, written, "{path} after the switch to TypeScript");
     }
 }
