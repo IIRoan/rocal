@@ -1000,7 +1000,7 @@ pub async fn resolve_ingested_email(
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::sync::{Arc, Mutex as StdMutex};
 
     use sea_orm::ConnectionTrait;
@@ -1011,11 +1011,14 @@ mod tests {
     use crate::integrations::stalwart::fake::{FakeStalwart, Reply};
     use crate::mail::service::tests::{OWNER, cache_token, mail_state, seed_mailbox};
 
-    /// A Stalwart whose JMAP answers each call with `answer(method, arguments)`, as `[name, result]`.
-    async fn stalwart(
+    /// A Stalwart with an idle EventSource whose JMAP answers each call with `answer(method, arguments)`, as `[name, result]`.
+    pub async fn stalwart(
         answer: impl Fn(&str, &Value) -> (String, Value) + Send + Sync + 'static,
     ) -> FakeStalwart {
         FakeStalwart::start(move |request| {
+            if request.path.starts_with("/jmap/eventsource") {
+                return Reply::status(204);
+            }
             let body = request.json();
             let call = &body["methodCalls"][0];
             let (name, result) = answer(call[0].as_str().unwrap_or_default(), &call[1]);
@@ -1024,14 +1027,14 @@ mod tests {
         .await
     }
 
-    fn unchanged(method: &str) -> (String, Value) {
+    pub fn unchanged(method: &str) -> (String, Value) {
         (
             method.to_owned(),
             json!({"oldState": "state-0", "newState": "state-0", "hasMoreChanges": false, "created": [], "updated": [], "destroyed": []}),
         )
     }
 
-    async fn ready(database: &ScratchDatabase, fake: &FakeStalwart, stored: bool) -> AppState {
+    pub async fn ready(database: &ScratchDatabase, fake: &FakeStalwart, stored: bool) -> AppState {
         let state = mail_state(database, fake).await;
         seed_mailbox(&state, "acct-1").await;
         cache_token(&state, "owner-token");

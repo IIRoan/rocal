@@ -554,15 +554,15 @@ mod tests {
     use std::sync::{Mutex as StdMutex, mpsc as std_mpsc};
     use std::time::Duration;
 
-    use sea_orm::ConnectionTrait;
     use serde_json::{Value, json};
     use solace_api_types::mail::{MailCalendarImportSummary, MailSyncCollection};
     use tokio::sync::mpsc::UnboundedReceiver;
 
     use super::*;
     use crate::db::scratch::ScratchDatabase;
-    use crate::integrations::stalwart::fake::{FakeStalwart, Recorded, Reply};
-    use crate::mail::service::tests::{OWNER, cache_token, mail_state, seed_mailbox};
+    use crate::integrations::stalwart::fake::{FakeStalwart, Recorded};
+    use crate::mail::service::tests::OWNER;
+    use crate::mail::sync::tests::{ready, stalwart, unchanged};
 
     fn collection(records: Vec<Value>) -> MailSyncCollection {
         MailSyncCollection {
@@ -649,43 +649,6 @@ mod tests {
         );
     }
 
-    /// Stalwart with an idle EventSource and JMAP answered by `jmap(method, arguments)`, or "unchanged".
-    async fn stalwart(
-        jmap: impl Fn(&str, &Value) -> Option<(String, Value)> + Send + Sync + 'static,
-    ) -> FakeStalwart {
-        FakeStalwart::start(move |request: &Recorded| {
-            if request.path.starts_with("/jmap/eventsource") {
-                return Reply::status(204);
-            }
-            let body = request.json();
-            let call = &body["methodCalls"][0];
-            let method = call[0].as_str().unwrap_or_default();
-            let (name, result) = jmap(method, &call[1]).unwrap_or_else(|| {
-                (
-                    method.to_owned(),
-                    json!({"oldState": "state-0", "newState": "state-0", "hasMoreChanges": false, "created": [], "updated": [], "destroyed": [], "list": []}),
-                )
-            });
-            Reply::json(json!({"methodResponses": [[name, result, "c1"]], "sessionState": "s"}))
-        })
-        .await
-    }
-
-    async fn ready(database: &ScratchDatabase, fake: &FakeStalwart) -> AppState {
-        let state = mail_state(database, fake).await;
-        seed_mailbox(&state, "acct-1").await;
-        cache_token(&state, "owner-token");
-        state
-            .db
-            .execute_unprepared(
-                "INSERT INTO mail_jmap_sync_state (id, directory_entry_id, stalwart_account_id, email_state, mailbox_state, thread_state, created_at, updated_at) \
-                 VALUES ('sync-1', 'entry-1', 'acct-1', 'email-state-1', 'mailbox-state-1', 'thread-state-1', now(), now())",
-            )
-            .await
-            .unwrap();
-        state
-    }
-
     fn owner() -> Owner {
         Owner {
             user_id: OWNER.into(),
@@ -750,8 +713,8 @@ mod tests {
     #[tokio::test]
     async fn coalesces_rapid_changes_into_one_event() {
         let database = ScratchDatabase::create().await;
-        let fake = stalwart(|_, _| None).await;
-        let state = ready(&database, &fake).await;
+        let fake = stalwart(|method, _| unchanged(method)).await;
+        let state = ready(&database, &fake, true).await;
         let (_first, mut first) = listen(&state, "sub-1");
         let (_second, mut second) = listen(&state, "sub-2");
         enqueue(
@@ -785,10 +748,10 @@ mod tests {
             {
                 let _ = held.recv_timeout(Duration::from_secs(30));
             }
-            None
+            unchanged(method)
         })
         .await;
-        let state = ready(&database, &fake).await;
+        let state = ready(&database, &fake, true).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
         enqueue(
             &state,
@@ -818,8 +781,8 @@ mod tests {
     #[tokio::test]
     async fn event_source_first_then_inbound_snapshot() {
         let database = ScratchDatabase::create().await;
-        let fake = stalwart(|_, _| None).await;
-        let state = ready(&database, &fake).await;
+        let fake = stalwart(|method, _| unchanged(method)).await;
+        let state = ready(&database, &fake, true).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
         enqueue(
             &state,
@@ -849,8 +812,8 @@ mod tests {
     #[tokio::test]
     async fn keeps_an_inbound_snapshot_over_a_later_empty_one() {
         let database = ScratchDatabase::create().await;
-        let fake = stalwart(|_, _| None).await;
-        let state = ready(&database, &fake).await;
+        let fake = stalwart(|method, _| unchanged(method)).await;
+        let state = ready(&database, &fake, true).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
         enqueue(
             &state,
@@ -876,8 +839,8 @@ mod tests {
     #[tokio::test]
     async fn merges_inbound_emails_from_overlapping_snapshots() {
         let database = ScratchDatabase::create().await;
-        let fake = stalwart(|_, _| None).await;
-        let state = ready(&database, &fake).await;
+        let fake = stalwart(|method, _| unchanged(method)).await;
+        let state = ready(&database, &fake, true).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
         enqueue(
             &state,
@@ -907,17 +870,17 @@ mod tests {
     }
 
     /// New mail since the stored state: one created email the full fetch returns.
-    fn new_mail(method: &str, _: &Value) -> Option<(String, Value)> {
+    fn new_mail(method: &str, _: &Value) -> (String, Value) {
         match method {
-            "Email/changes" => Some((
+            "Email/changes" => (
                 method.into(),
                 json!({"oldState": "email-state-1", "newState": "email-state-2", "hasMoreChanges": false, "created": ["in-1"], "updated": [], "destroyed": []}),
-            )),
-            "Email/get" => Some((
+            ),
+            "Email/get" => (
                 method.into(),
                 json!({"state": "email-state-2", "list": [{"id": "in-1", "subject": "Lunch tomorrow", "mailboxIds": {"mb-inbox": true}}]}),
-            )),
-            _ => None,
+            ),
+            _ => unchanged(method),
         }
     }
 
@@ -925,7 +888,7 @@ mod tests {
     async fn polls_linked_accounts_and_publishes_sync_payloads() {
         let database = ScratchDatabase::create().await;
         let fake = stalwart(new_mail).await;
-        let state = ready(&database, &fake).await;
+        let state = ready(&database, &fake, true).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
         let polling = start(state.clone());
         let published = collect(&mut events, 1).await;
@@ -947,7 +910,7 @@ mod tests {
     async fn polls_changed_accounts_and_publishes_snapshots() {
         let database = ScratchDatabase::create().await;
         let fake = stalwart(new_mail).await;
-        let state = ready(&database, &fake).await;
+        let state = ready(&database, &fake, true).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
         let polling = start(state.clone());
         let published = collect(&mut events, 1).await;
@@ -964,8 +927,8 @@ mod tests {
     #[tokio::test]
     async fn one_owner_event_source_per_account() {
         let database = ScratchDatabase::create().await;
-        let fake = stalwart(|_, _| None).await;
-        let state = ready(&database, &fake).await;
+        let fake = stalwart(|method, _| unchanged(method)).await;
+        let state = ready(&database, &fake, true).await;
         let (first, _first_events) = listen(&state, "sub-1");
         let (_second, _second_events) = listen(&state, "sub-2");
         wait_for(|| !event_sources(&fake).is_empty()).await;
@@ -988,22 +951,7 @@ mod tests {
 
     #[tokio::test]
     async fn sends_the_gate_key_on_the_event_source() {
-        let config = crate::config::Config::from_lookup(|name| match name {
-            "DATABASE_URL" => Some("postgres://solace_test:x@127.0.0.1:1/solace_test".into()),
-            "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
-            "STALWART_BASE_URL" => Some("https://mail.example.com".into()),
-            "STALWART_GATE_KEY" => Some("g".repeat(64)),
-            _ => None,
-        })
-        .unwrap();
-        let pool = sea_orm::sqlx::postgres::PgPoolOptions::new()
-            .connect_lazy(&config.database_url)
-            .unwrap();
-        let state = AppState::new(
-            config,
-            sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(pool),
-        )
-        .unwrap();
+        let state = crate::mail::proxy::tests::state("https://mail.example.com");
         let request = event_source_request(&state, "owner-token").build().unwrap();
         let header = |name: &str| {
             request
@@ -1029,8 +977,8 @@ mod tests {
     #[tokio::test]
     async fn stop_aborts_event_source_listeners() {
         let database = ScratchDatabase::create().await;
-        let fake = stalwart(|_, _| None).await;
-        let state = ready(&database, &fake).await;
+        let fake = stalwart(|method, _| unchanged(method)).await;
+        let state = ready(&database, &fake, true).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
         wait_for(|| !event_sources(&fake).is_empty()).await;
         assert_eq!(event_sources(&fake).len(), 1);

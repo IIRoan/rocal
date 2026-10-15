@@ -678,7 +678,7 @@ fn millis(duration: Duration) -> f64 {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use axum::http::Request as HttpRequest;
     use tower::ServiceExt;
 
@@ -686,7 +686,8 @@ mod tests {
 
     const BASE: &str = "https://mail.solace.onl";
 
-    fn state(stalwart: &str) -> AppState {
+    /// A server whose Stalwart is `stalwart` behind a gate key, on a database it never reaches.
+    pub fn state(stalwart: &str) -> AppState {
         let config = crate::config::Config::from_lookup(|name| match name {
             "DATABASE_URL" => Some("postgres://solace_test:x@127.0.0.1:1/solace_test".into()),
             "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
