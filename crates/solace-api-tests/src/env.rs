@@ -12,16 +12,9 @@ pub const LOCAL_STALWART_ADMIN_PASSWORD: &str = "solace-test-admin-local";
 pub const LOCAL_STALWART_PROVISIONER_PASSWORD: &str = "solace-test-provisioner-local";
 pub const LOCAL_STALWART_NOREPLY_PASSWORD: &str = "solace-test-noreply-local";
 /// Fixed server secrets for local runs, shared by both backends so sessions and bridge passwords interoperate.
-pub struct LocalSecrets {
-    pub better_auth: &'static str,
-    pub mail_bridge_hmac: &'static str,
-    pub stalwart_webhook: &'static str,
-}
-pub const LOCAL_SECRETS: LocalSecrets = LocalSecrets {
-    better_auth: "solace-test-better-auth-secret-local-0001",
-    mail_bridge_hmac: "solace-test-mail-bridge-hmac-local-0001",
-    stalwart_webhook: "solace-test-stalwart-webhook-local-0001",
-};
+pub const LOCAL_BETTER_AUTH_SECRET: &str = "solace-test-better-auth-secret-local-0001";
+pub const LOCAL_MAIL_BRIDGE_HMAC_KEY: &str = "solace-test-mail-bridge-hmac-local-0001";
+pub const LOCAL_STALWART_WEBHOOK_SECRET: &str = "solace-test-stalwart-webhook-local-0001";
 /// Database every test database is cloned from.
 pub const TEMPLATE_DATABASE: &str = "solace_test_template";
 /// Mail domain of the test Stalwart (RFC 2606 reserved).
@@ -38,7 +31,7 @@ pub struct TestEnv {
     pub mail_domain: String,
     /// Backend-gate key of an https test Stalwart (`TEST_STALWART_GATE_KEY`); unset for local plain HTTP.
     pub stalwart_gate_key: Option<String>,
-    /// Secrets the backend under test runs with (`TEST_BETTER_AUTH_SECRET` etc.), defaulting to [`LOCAL_SECRETS`].
+    /// Secrets the backend under test runs with (`TEST_BETTER_AUTH_SECRET` etc.), defaulting to the `LOCAL_*` ones.
     pub better_auth_secret: String,
     pub mail_bridge_hmac_key: String,
     pub stalwart_webhook_secret: String,
@@ -83,14 +76,14 @@ impl TestEnv {
             ),
             mail_domain: var("TEST_MAIL_DOMAIN", TEST_MAIL_DOMAIN.into()),
             stalwart_gate_key: std::env::var("TEST_STALWART_GATE_KEY").ok(),
-            better_auth_secret: var("TEST_BETTER_AUTH_SECRET", LOCAL_SECRETS.better_auth.into()),
+            better_auth_secret: var("TEST_BETTER_AUTH_SECRET", LOCAL_BETTER_AUTH_SECRET.into()),
             mail_bridge_hmac_key: var(
                 "TEST_MAIL_BRIDGE_HMAC_KEY",
-                LOCAL_SECRETS.mail_bridge_hmac.into(),
+                LOCAL_MAIL_BRIDGE_HMAC_KEY.into(),
             ),
             stalwart_webhook_secret: var(
                 "TEST_STALWART_WEBHOOK_SECRET",
-                LOCAL_SECRETS.stalwart_webhook.into(),
+                LOCAL_STALWART_WEBHOOK_SECRET.into(),
             ),
             avatar_bucket: std::env::var("TEST_AVATAR_BUCKET")
                 .ok()

@@ -440,13 +440,15 @@ pub fn fake_token() -> String {
 }
 
 fn fake_blob(len: usize) -> String {
-    let bytes: Vec<u8> = (0..len).map(|_| rand::random::<u8>()).collect();
-    STANDARD.encode(bytes)
+    STANDARD.encode(random_bytes(len))
 }
 
 fn fake_b64url(len: usize) -> String {
-    let bytes: Vec<u8> = (0..len).map(|_| rand::random::<u8>()).collect();
-    URL_SAFE_NO_PAD.encode(bytes)
+    URL_SAFE_NO_PAD.encode(random_bytes(len))
+}
+
+fn random_bytes(len: usize) -> Vec<u8> {
+    (0..len).map(|_| rand::random()).collect()
 }
 
 /// `len` random bytes as lowercase hex.
