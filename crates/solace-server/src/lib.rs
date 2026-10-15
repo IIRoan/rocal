@@ -117,6 +117,10 @@ pub async fn serve(
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
     let app = MapRequestLayer::new(http::normalize_path).layer(router(state));
+    // Nagle's algorithm would hold a response's last segment back waiting for the client's delayed ACK.
+    let listener = axum::serve::ListenerExt::tap_io(listener, |tcp| {
+        let _ = tcp.set_nodelay(true);
+    });
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
         .with_graceful_shutdown(shutdown)
         .await
