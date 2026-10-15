@@ -60,6 +60,8 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         .env_clear()
         .env("PATH", std::env::var("PATH").unwrap_or_default())
         .env("HOME", std::env::var("HOME").unwrap_or_default())
+        // Vercel runs the backend in UTC, and JavaScript dates parse and format in the process zone.
+        .env("TZ", "UTC")
         .envs(vars)
         .args(["--no-env-file", "serve.ts"]);
     println!(
