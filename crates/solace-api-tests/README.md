@@ -18,6 +18,8 @@ TEST_DATABASE_URL=postgres://solace_test:solace-test-pg@127.0.0.1:55432/solace_t
 
 `TEST_DATABASE_URL` is the backend's own database; tests read it for state checks. The profile and avatar cases need the Railway test bucket `solace-test-avatars`: export `TEST_AVATAR_BUCKET`, `TEST_AVATAR_BUCKET_ENDPOINT`, `TEST_AVATAR_BUCKET_REGION`, `TEST_AVATAR_BUCKET_ACCESS_KEY_ID` and `TEST_AVATAR_BUCKET_SECRET_ACCESS_KEY` before `cargo test` or `cargo xtask check` (the suite hands them to the in-process server as `AVATAR_BUCKET*`). Every URL, database, bucket and secret goes through `src/guard.rs`, which refuses anything that is not a test resource.
 
+On Railway's test environment the suite runs as the `test-suite` service (`Dockerfile` here) against `test-api` over the private network, because Railway's edge sets `X-Real-IP` for every client and the suite's per-client addresses would collapse into one. That service sets `API_BASE_URL=http://test-api.railway.internal:8080`, `TEST_BACKEND=rust` (the Rust-only behaviors the plan mandates), `TEST_BACKEND_MODE=production` and `TEST_LOOPBACK_DNS_NAME=ip6-localhost` (a name the backend's container resolves to loopback). The rollback drill also sets `INTEROP_TS_URL` to `test-api-ts` (`ts-backend.Dockerfile`) and `INTEROP_RUST_URL` to `test-api`, and runs `interop::`. `MEMORY_BURST=1` runs `memory_burst::`, twenty concurrent sign-ins for the memory budget.
+
 ## Writing tests
 
 - One module per domain in `tests/api/`, registered in `tests/api/main.rs`. Shared helpers live in `tests/api/helpers.rs`.

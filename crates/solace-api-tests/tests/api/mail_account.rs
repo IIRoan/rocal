@@ -739,9 +739,15 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
     let again = access_token(&mut user).await;
     assert_eq!(again, token, "a valid token is reused, not reminted");
 
-    let stalwart = reqwest::Client::new();
-    let session: Value = stalwart
-        .get(format!("{}/jmap/session", app.env.stalwart_url))
+    // An https test Stalwart sits behind the backend gate, which these direct reads must pass too.
+    let stalwart_session = || {
+        let request = reqwest::Client::new().get(format!("{}/jmap/session", app.env.stalwart_url));
+        match &app.env.stalwart_gate_key {
+            Some(key) => request.header("X-Solace-Gate", key),
+            None => request,
+        }
+    };
+    let session: Value = stalwart_session()
         .bearer_auth(&token.access_token)
         .send()
         .await
@@ -760,8 +766,7 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
 
     // The bridge password is the HMAC derivation the next backend must reproduce exactly.
     let secret = bridge_secret(&app.env.mail_bridge_hmac_key, &user.id, &user.email);
-    let basic: Value = stalwart
-        .get(format!("{}/jmap/session", app.env.stalwart_url))
+    let basic: Value = stalwart_session()
         .basic_auth(&user.email, Some(&secret))
         .send()
         .await

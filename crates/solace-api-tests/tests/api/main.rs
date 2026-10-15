@@ -26,6 +26,7 @@ mod mail_jmap;
 mod mail_realtime;
 mod mail_support;
 mod mail_sync;
+mod memory_burst;
 mod notifications;
 mod passkeys;
 mod profiles;

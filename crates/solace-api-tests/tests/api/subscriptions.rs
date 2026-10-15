@@ -273,12 +273,18 @@ async fn create_refuses_private_and_loopback_literals_before_connecting() {
     );
 }
 
+/// A plain DNS name the backend's host resolves to loopback, so only the connect-time check catches it; Railway's containers know `ip6-localhost` instead.
+fn loopback_feed() -> String {
+    let host =
+        std::env::var("TEST_LOOPBACK_DNS_NAME").unwrap_or_else(|_| "localhost.localdomain".into());
+    format!("http://{host}/feed.ics")
+}
+
 #[tokio::test]
 async fn create_refuses_hosts_that_resolve_to_loopback_at_connect_time() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    // A plain DNS name that /etc/hosts or nss-myhostname resolves to 127.0.0.1/::1, so only the connect-time check catches it.
-    let response = create(&mut user, "http://localhost.localdomain/feed.ics").await;
+    let response = create(&mut user, &loopback_feed()).await;
     expect_field_error(&response, &create_error(PRIVATE_NETWORK), "url");
     assert_eq!(own_subscription_count(&app, &user).await, 0);
 }
@@ -969,9 +975,9 @@ async fn sync_refuses_a_stored_private_url_and_records_the_failure() {
 async fn sync_revalidates_every_stored_url() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
+    let loopback = loopback_feed();
     let cases = [
-        // Resolves to loopback only at connect time.
-        ("http://localhost.localdomain/feed.ics", PRIVATE_NETWORK),
+        (loopback.as_str(), PRIVATE_NETWORK),
         ("webcal://[::ffff:10.0.0.1]/feed.ics", PRIVATE_NETWORK),
         ("http://0x7f000001/feed.ics", PRIVATE_NETWORK),
         ("ftp://example.com/feed.ics", UNSUPPORTED_SCHEME),
