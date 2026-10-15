@@ -6,7 +6,9 @@ use solace_api_tests::seed::passkey_sign_in;
 use solace_api_tests::webauthn::SoftPasskey;
 use solace_api_types::auth::{AuthError, SessionWithUser, StatusFlag};
 
-use crate::helpers::{TestApp, TestUser, count, ok, set_cookies_named, signed_cookie_token};
+use crate::helpers::{
+    Backend, TestApp, TestUser, count, ok, set_cookies_named, signed_cookie_token,
+};
 
 const STEP_UP_COOKIE: &str = "solace-passkey-step-up";
 
@@ -638,21 +640,104 @@ async fn the_bridge_freshens_a_session_for_native_passkey_setup() {
     }
 }
 
-/// Known gap: complete-step-up trusts any session, so a password-only session can mark itself passkey-verified.
+/// TypeScript lets any session mark itself passkey-verified here; Rust wants a session a passkey sign-in created.
 #[tokio::test]
-async fn complete_step_up_marks_any_session_verified_known_gap() {
+async fn complete_step_up_refuses_a_session_without_a_passkey_sign_in() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     register(&app, &mut user, "Laptop").await;
     let mut password_only = password_agent(&app, &user).await;
     expect_step_up_required(&ok(password_only.get("/api/settings").await));
-    let body = ok(password_only
+    let response = ok(password_only
+        .post("/api/auth/passkey-bridge/complete-step-up", json!({}))
+        .await);
+    match app.backend {
+        Backend::TypeScript => {
+            assert_eq!(
+                ok(response.expect_status(200).and_then(|r| r.value())),
+                json!({"ok": true})
+            );
+            ok(password_only.get("/api/settings").await.expect_status(200));
+        }
+        Backend::Rust => {
+            auth_error(
+                &response,
+                403,
+                "PASSKEY_STEP_UP_REQUIRED",
+                "Passkey verification required.",
+            );
+            assert!(set_cookies_named(&response, STEP_UP_COOKIE).is_empty());
+            expect_step_up_required(&ok(password_only.get("/api/settings").await));
+        }
+    }
+}
+
+/// `signInWithBrowserPasskey`: the app's password session opens the web bridge, a passkey sign-in there makes a new session, and the app takes it and then its step-up.
+#[tokio::test]
+async fn the_native_passkey_sign_in_bridge_hands_its_step_up_to_the_app() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let (mut passkey, _) = register(&app, &mut user, "Laptop").await;
+    let mut native = app.expo("solace");
+    ok(native
+        .post(
+            "/api/auth/sign-in/email",
+            json!({"email": user.email, "password": user.password}),
+        )
+        .await
+        .expect_status(200));
+    expect_step_up_required(&ok(native.get("/api/settings").await));
+
+    let handoff = ok(native
+        .get("/api/auth/one-time-token/generate")
+        .await
+        .value())["token"]
+        .clone();
+    let mut browser = app.anonymous();
+    ok(browser
+        .post("/api/auth/one-time-token/verify", json!({"token": handoff}))
+        .await
+        .expect_status(200));
+    let signed_in = ok(passkey_sign_in(&mut browser, &mut passkey, &app.origin).await);
+    let back = ok(browser
+        .get("/api/auth/one-time-token/generate")
+        .await
+        .value())["token"]
+        .clone();
+    ok(native
+        .post("/api/auth/one-time-token/verify", json!({"token": back}))
+        .await
+        .expect_status(200));
+    assert_eq!(
+        session_id(&mut native).await,
+        signed_in["session"]["id"].as_str().expect("id")
+    );
+    expect_step_up_required(&ok(native.get("/api/settings").await));
+
+    let response = ok(native
         .post("/api/auth/passkey-bridge/complete-step-up", json!({}))
         .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    assert_eq!(body, json!({"ok": true}));
-    ok(password_only.get("/api/settings").await.expect_status(200));
+        .expect_status(200));
+    assert_eq!(ok(response.value()), json!({"ok": true}));
+    let payload = step_up_payload(native.cookie(STEP_UP_COOKIE).expect("step-up cookie"));
+    assert_eq!(
+        (&payload["u"], &payload["s"]),
+        (&json!(user.id), &signed_in["session"]["id"])
+    );
+    ok(native.get("/api/settings").await.expect_status(200));
+
+    let again = ok(native
+        .post("/api/auth/passkey-bridge/complete-step-up", json!({}))
+        .await);
+    match app.backend {
+        Backend::TypeScript => assert_eq!(again.status.as_u16(), 200),
+        Backend::Rust => auth_error(
+            &again,
+            403,
+            "PASSKEY_STEP_UP_REQUIRED",
+            "Passkey verification required.",
+        ),
+    }
 }
 
 /// The plugin's `expiresIn: 3` is in minutes; the token is stored as a SHA-256 hash pointing at the issuing session.

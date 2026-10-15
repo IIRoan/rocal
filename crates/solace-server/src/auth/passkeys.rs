@@ -569,6 +569,13 @@ pub async fn verify_authentication(
         })?;
         let mut set = Vec::new();
         let fresh = new_session(&state, &headers, owner, &mut set).await?;
+        store::create_verification(
+            &state.db,
+            &bridge_step_up(&fresh.session.id),
+            fresh.user.id.clone(),
+            CHALLENGE_SECONDS,
+        )
+        .await?;
         set.push(step_up(&state, &fresh));
         Ok(Reply::new(json(&session::session_dto(&fresh)), set))
     }
@@ -730,11 +737,25 @@ pub async fn freshen_session(State(state): State<AppState>, headers: HeaderMap) 
     hooks::with_cookies(outcome, cookies)
 }
 
-/// Known gap kept for parity: any session can mark itself passkey-verified here.
+/// Marks a session a passkey sign-in created; it outlives the 3-minute one-time token that hands the session to the app.
+fn bridge_step_up(session_id: &str) -> String {
+    format!("passkey-bridge-step-up:{session_id}")
+}
+
+/// The app receives a passkey sign-in's session through a one-time token but not its step-up cookie, so it takes the cookie here, once.
 pub async fn complete_step_up(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let mut cookies = Vec::new();
     let outcome = async {
         let active = require_session(&state, &headers, &mut cookies).await?;
+        store::consume_verification(&state.db, &bridge_step_up(&active.session.id))
+            .await?
+            .ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::FORBIDDEN,
+                    "PASSKEY_STEP_UP_REQUIRED",
+                    "Passkey verification required.",
+                )
+            })?;
         Ok(Reply::new(
             json(&OkFlag { ok: true }),
             vec![step_up(&state, &active)],
