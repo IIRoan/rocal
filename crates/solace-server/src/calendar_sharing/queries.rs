@@ -67,15 +67,15 @@ pub async fn shared<C: ConnectionTrait>(
         .await
 }
 
-/// The calendar's events without detached occurrences, by start.
-pub async fn top_level_events<C: ConnectionTrait>(
+/// The calendar's events, detached occurrences included, by start.
+pub async fn feed_events<C: ConnectionTrait>(
     db: &C,
     calendar_id: &str,
 ) -> Result<Vec<calendar_event::Model>, sea_orm::DbErr> {
     calendar_event::Entity::find()
         .filter(calendar_event::Column::CalendarId.eq(calendar_id))
-        .filter(calendar_event::Column::ParentEventId.is_null())
         .order_by_asc(calendar_event::Column::Start)
+        .order_by_asc(calendar_event::Column::Id)
         .all(db)
         .await
 }

@@ -322,13 +322,15 @@ async fn the_feed_serves_top_level_plaintext_events_as_ics() {
         },
     )
     .await;
-    // Detached instances and other calendars stay out of the feed.
-    insert_event(
+    // Other calendars stay out; a detached row without an exception is its own event on Rust (TypeScript drops it).
+    let moved = insert_event(
         &app.db,
         &user.id,
         id,
         EventRow {
             title: "Moved instance",
+            start: Some("2026-11-03 09:00:00"),
+            end: Some("2026-11-03 10:00:00"),
             parent_event_id: Some(&recurring),
             ..Default::default()
         },
@@ -423,6 +425,16 @@ async fn the_feed_serves_top_level_plaintext_events_as_ics() {
             "LOCATION:Room 4",
         ],
     ));
+    if app.backend == Backend::Rust {
+        expected.extend(stamped(
+            format!("{moved}@solace-calendar.local"),
+            &[
+                "SUMMARY:Moved instance",
+                "DTSTART:20261103T090000Z",
+                "DTEND:20261103T100000Z",
+            ],
+        ));
+    }
     let location_line = format!("LOCATION:{}", long_location.replace(',', "\\,"));
     expected.extend(stamped(
         format!("{offsite}@solace-calendar.local"),
@@ -444,6 +456,104 @@ async fn the_feed_serves_top_level_plaintext_events_as_ics() {
     expected.push("END:VCALENDAR".into());
     assert_eq!(body, ics(&expected));
     assert!(body.contains("\r\n "), "long lines are folded");
+}
+
+#[tokio::test]
+async fn the_feed_carries_each_series_exceptions() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar = create_calendar(&mut user, "Rota", "blue").await;
+    let id = &calendar.id.0;
+    let weekly = insert_event(
+        &app.db,
+        &user.id,
+        id,
+        EventRow {
+            title: "Weekly",
+            start: Some("2026-11-02 09:00:00"),
+            end: Some("2026-11-02 10:00:00"),
+            recurrence: Some(r#"{"frequency":"weekly","interval":1,"count":5}"#),
+            ..Default::default()
+        },
+    )
+    .await;
+    let moved = insert_event(
+        &app.db,
+        &user.id,
+        id,
+        EventRow {
+            title: "Moved occurrence",
+            start: Some("2026-11-16 14:00:00"),
+            end: Some("2026-11-16 15:00:00"),
+            parent_event_id: Some(&weekly),
+            ..Default::default()
+        },
+    )
+    .await;
+    let holiday = insert_event(
+        &app.db,
+        &user.id,
+        id,
+        EventRow {
+            title: "Yearly holiday",
+            start: Some("2026-11-02 23:00:00"),
+            end: Some("2026-11-03 22:59:59"),
+            all_day: true,
+            timezone: Some("Europe/Amsterdam"),
+            recurrence: Some(
+                r#"{"frequency":"weekly","interval":1,"count":3,"timezone":"Europe/Amsterdam"}"#,
+            ),
+            ..Default::default()
+        },
+    )
+    .await;
+    for (parent, date, kind, modified) in [
+        (&weekly, "2026-11-09 09:00:00", "deleted", None),
+        (&weekly, "2026-11-16 09:00:00", "modified", Some(&moved)),
+        // A modified occurrence whose row was deleted stays hidden.
+        (&weekly, "2026-11-23 09:00:00", "modified", None),
+        (&holiday, "2026-11-09 23:00:00", "deleted", None),
+    ] {
+        sqlx::query(
+            "INSERT INTO recurrence_exception (id, parent_event_id, exception_date, modified_event_id, type, created_at, updated_at) \
+             VALUES ($1, $2, $3::timestamp, $4, $5, now(), now())",
+        )
+        .bind(format!("suiteexc{}", hex(8)))
+        .bind(parent)
+        .bind(date)
+        .bind(modified)
+        .bind(kind)
+        .execute(&app.db)
+        .await
+        .expect("insert exception");
+    }
+    let token = token_of(&enable(&mut user, id).await);
+    let body = feed(&app, &token).await.text().replace("\r\n ", "");
+    let series_uid = format!("UID:{weekly}@solace-calendar.local");
+    let markers = [
+        "RRULE:FREQ=WEEKLY;COUNT=5\r\nEXDATE:20261109T090000Z,20261123T090000Z\r\n",
+        "DTSTART:20261116T140000Z\r\nDTEND:20261116T150000Z\r\nRECURRENCE-ID:20261116T090000Z\r\n",
+        "RRULE:FREQ=WEEKLY;COUNT=3\r\nEXDATE;VALUE=DATE:20261110\r\n",
+    ];
+    match app.backend {
+        // TypeScript exports the bare rules: excluded and moved occurrences still show.
+        Backend::TypeScript => {
+            assert_eq!(body.matches(&series_uid).count(), 1, "{body}");
+            assert!(!body.contains("SUMMARY:Moved occurrence"), "{body}");
+            assert!(markers.iter().all(|m| !body.contains(m)), "{body}");
+        }
+        Backend::Rust => {
+            assert_eq!(
+                body.matches(&series_uid).count(),
+                2,
+                "the override shares the series UID: {body}"
+            );
+            assert!(!body.contains(&format!("UID:{moved}@")), "{body}");
+            for marker in markers {
+                assert!(body.contains(marker), "{marker} in {body}");
+            }
+        }
+    }
 }
 
 #[tokio::test]
@@ -518,10 +628,22 @@ async fn encrypted_events_block_sharing_and_the_feed() {
         ..Default::default()
     };
     insert_event(&app.db, &user.id, &shared.id.0, child).await;
-    // The feed ignores detached instances, but enabling again counts them.
     let response = feed(&app, &token).await;
-    assert_eq!(response.status.as_u16(), 200);
-    assert!(response.text().contains("SUMMARY:Visible"));
+    match app.backend {
+        // TypeScript's feed ignores detached instances, so their ciphertext goes unnoticed.
+        Backend::TypeScript => {
+            assert_eq!(response.status.as_u16(), 200);
+            assert!(response.text().contains("SUMMARY:Visible"));
+        }
+        Backend::Rust => {
+            ok(response.expect_error(
+                400,
+                "Validation Error",
+                "This shared calendar contains encrypted event details and cannot be exported.",
+            ));
+        }
+    }
+    // Enabling again counts detached instances on both backends.
     expect_plain_error(
         &user.post(&share_link_path(&shared.id.0), json!({})).await,
         "ICS sharing is unavailable while this calendar contains encrypted events.",

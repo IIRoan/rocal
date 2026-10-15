@@ -49,6 +49,10 @@ pub struct Event {
     pub sequence: Option<i64>,
     pub source_url: Option<String>,
     pub participants: Option<Vec<Participant>>,
+    /// The original start of the occurrence this VEVENT overrides.
+    pub recurrence_id: Option<PrimitiveDateTime>,
+    /// Occurrence starts the series skips (EXDATE).
+    pub excluded_dates: Vec<PrimitiveDateTime>,
 }
 
 /// `buildIcsEventFile`.
@@ -292,9 +296,17 @@ fn event_lines(
             })
         ),
     ]);
+    let zone = normalize_timezone(event.timezone.as_deref().or(calendar_timezone))
+        .unwrap_or_else(|| "UTC".into());
+    let occurrence = |at: PrimitiveDateTime| {
+        if event.all_day {
+            date_stamp_in(ms(at), &zone)
+        } else {
+            date_time_stamp(ms(at))
+        }
+    };
+    let date_value = if event.all_day { ";VALUE=DATE" } else { "" };
     if event.all_day {
-        let zone = event.timezone.as_deref().or(calendar_timezone);
-        let zone = normalize_timezone(zone).unwrap_or_else(|| "UTC".into());
         lines.push(format!(
             "DTSTART;VALUE=DATE:{}",
             date_stamp_in(start, &zone)
@@ -306,6 +318,9 @@ fn event_lines(
     } else {
         lines.push(format!("DTSTART:{}", date_time_stamp(start)));
         lines.push(format!("DTEND:{}", date_time_stamp(end)));
+    }
+    if let Some(at) = event.recurrence_id {
+        lines.push(format!("RECURRENCE-ID{date_value}:{}", occurrence(at)));
     }
     let present = |value: &Option<String>| {
         value
@@ -369,6 +384,14 @@ fn event_lines(
     }
     if let Some(rule) = &event.recurrence {
         lines.push(format!("RRULE:{}", rrule(rule)));
+        if !event.excluded_dates.is_empty() {
+            let dates: Vec<String> = event
+                .excluded_dates
+                .iter()
+                .map(|at| occurrence(*at))
+                .collect();
+            lines.push(format!("EXDATE{date_value}:{}", dates.join(",")));
+        }
     }
     lines.push("END:VEVENT".into());
 }
@@ -398,7 +421,53 @@ pub(super) mod tests {
             sequence: None,
             source_url: None,
             participants: None,
+            recurrence_id: None,
+            excluded_dates: Vec::new(),
         }
+    }
+
+    #[test]
+    fn overrides_and_excluded_dates_follow_the_start_value_type() {
+        let weekly = Some(RecurrenceRule {
+            frequency: Frequency::Weekly,
+            interval: 1,
+            count: None,
+            until: None,
+            by_week_day: None,
+            by_month_day: None,
+            by_month: None,
+            timezone: None,
+        });
+        let timed = Event {
+            recurrence: weekly.clone(),
+            excluded_dates: vec![
+                datetime!(2024-02-08 10:00:00),
+                datetime!(2024-02-15 10:00:00),
+            ],
+            ..event("Weekly")
+        };
+        let moved = Event {
+            recurrence_id: Some(datetime!(2024-02-22 10:00:00)),
+            ..event("Moved")
+        };
+        let all_day = Event {
+            all_day: true,
+            timezone: Some("Europe/Amsterdam".into()),
+            start: datetime!(2024-01-31 23:00:00),
+            end: datetime!(2024-02-01 22:59:59),
+            recurrence: weekly,
+            excluded_dates: vec![datetime!(2024-02-07 23:00:00)],
+            ..event("All day")
+        };
+        let undated = Event {
+            excluded_dates: vec![datetime!(2024-02-08 10:00:00)],
+            ..event("Single")
+        };
+        let ics = build_calendar(&Calendar::default(), &[timed, moved, all_day, undated]);
+        assert!(ics.contains("RRULE:FREQ=WEEKLY\r\nEXDATE:20240208T100000Z,20240215T100000Z\r\n"));
+        assert!(ics.contains("DTEND:20240201T110000Z\r\nRECURRENCE-ID:20240222T100000Z\r\n"));
+        assert!(ics.contains("EXDATE;VALUE=DATE:20240208\r\n"));
+        assert_eq!(ics.matches("EXDATE").count(), 2, "only series carry EXDATE");
     }
 
     #[test]
@@ -506,6 +575,8 @@ pub(super) mod tests {
             sequence: value["sequence"].as_i64(),
             source_url: text(&value["sourceUrl"]),
             participants: participants_from(&value["participants"]),
+            recurrence_id: None,
+            excluded_dates: Vec::new(),
         }
     }
 

@@ -107,6 +107,8 @@ fn reply_ics(reply: &Reply<'_>, organizer: &str, attendee: &str) -> String {
                     status: Some(reply.status.partstat()),
                 },
             ]),
+            recurrence_id: None,
+            excluded_dates: Vec::new(),
         },
     )
 }
