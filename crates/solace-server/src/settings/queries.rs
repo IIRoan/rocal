@@ -3,8 +3,8 @@
 use sea_orm::prelude::TimeDateTime;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QuerySelect, Set, TransactionTrait,
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect, Set,
+    TransactionTrait,
 };
 use solace_api_types::settings::UpdateSettingsRequest;
 
@@ -22,17 +22,29 @@ pub async fn find<C: ConnectionTrait>(
         .await
 }
 
-/// A row of database defaults.
+/// A row of database defaults, or the row a concurrent first read just created.
 pub async fn create<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
 ) -> Result<user_settings::Model, sea_orm::DbErr> {
-    user_settings::ActiveModel {
+    let now = crate::instant::now();
+    user_settings::Entity::insert(user_settings::ActiveModel {
+        id: Set(cuid()),
         user_id: Set(user_id.to_owned()),
+        created_at: Set(now),
+        updated_at: Set(now),
         ..Default::default()
-    }
-    .insert(db)
-    .await
+    })
+    .on_conflict(
+        OnConflict::column(user_settings::Column::UserId)
+            .do_nothing()
+            .to_owned(),
+    )
+    .exec_without_returning(db)
+    .await?;
+    find(db, user_id)
+        .await?
+        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("user_settings".into()))
 }
 
 pub async fn own_calendar<C: ConnectionTrait>(

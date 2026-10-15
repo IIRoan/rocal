@@ -4,7 +4,7 @@ use serde_json::json;
 use solace_api_types::SuccessMessage;
 use solace_api_types::settings::UserSettings;
 
-use crate::helpers::{TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
+use crate::helpers::{Backend, TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
 
 #[tokio::test]
 async fn anonymous_callers_are_refused() {
@@ -80,6 +80,42 @@ async fn first_read_creates_the_defaults() {
         .expect_status(200)
         .and_then(|r| r.dto()));
     assert_eq!(again, settings, "a second read returns the same row");
+}
+
+/// Rust creates the row idempotently; TypeScript's find-then-create can answer the losers of the race 409.
+#[tokio::test]
+async fn concurrent_first_reads_all_get_the_same_defaults() {
+    let app = TestApp::spawn().await;
+    let user = app.user().await;
+    let mut reads = tokio::task::JoinSet::new();
+    for _ in 0..10 {
+        let mut agent = user.agent.clone();
+        reads.spawn(async move { agent.get("/api/settings").await });
+    }
+    let responses: Vec<_> = reads.join_all().await.into_iter().map(ok).collect();
+
+    let mut created = Vec::new();
+    for response in &responses {
+        match (app.backend, response.status.as_u16()) {
+            (_, 200) => created.push(ok(response.dto::<UserSettings>())),
+            (Backend::TypeScript, 409) => {}
+            (_, status) => panic!("{status}: {}", response.text()),
+        }
+    }
+    assert!(!created.is_empty());
+    if app.backend == Backend::Rust {
+        assert_eq!(created.len(), 10);
+    }
+    assert!(created.iter().all(|settings| *settings == created[0]));
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM user_settings WHERE user_id = $1",
+            &user.id
+        )
+        .await,
+        1
+    );
 }
 
 #[tokio::test]
