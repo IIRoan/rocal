@@ -1,4 +1,4 @@
-//! Deploys committed files only (`git archive HEAD`) to a service in the Railway `test` environment.
+//! Deploys committed files only (`git archive HEAD`) to a service in the Railway `test` environment; several paths upload from the repository root.
 
 use std::process::Command;
 
@@ -8,9 +8,12 @@ use anyhow::{Context, bail};
 const TEST_ENVIRONMENT: &str = "test";
 
 pub fn run(args: &[&str]) -> anyhow::Result<()> {
-    let [service, path] = args else {
-        bail!("usage: cargo xtask deploy-test <service> <path>");
+    let [service, paths @ ..] = args else {
+        bail!("usage: cargo xtask deploy-test <service> <path>...");
     };
+    if paths.is_empty() {
+        bail!("usage: cargo xtask deploy-test <service> <path>...");
+    }
     if !service.starts_with("test-") {
         bail!("test services are named test-*; refusing {service}");
     }
@@ -27,7 +30,8 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
     // Untracked and ignored files (.env, local credentials) never leave the machine.
     let archive = Command::new("git")
         .current_dir(&root)
-        .args(["archive", "--format=tar", "HEAD", path])
+        .args(["archive", "--format=tar", "HEAD"])
+        .args(paths)
         .output()?;
     if !archive.status.success() {
         bail!(
@@ -45,7 +49,10 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
         bail!("tar failed");
     }
 
-    let upload = stage.join(path);
+    let upload = match paths {
+        [path] => stage.join(path),
+        _ => stage.clone(),
+    };
     let status = Command::new("railway")
         .current_dir(&root)
         .arg("up")

@@ -24,7 +24,7 @@ tasks:
   test-env seed <api> <database>
                           seed synthetic data through the backend at <api>
   test-env stalwart-key   mint a Stalwart API key for the solace-provisioner test account
-  deploy-test <service> <path>
+  deploy-test <service> <path>...
                           deploy committed files under <path> to a test-* service in Railway's test environment
   entities [--check]      regenerate (or check) the SeaORM entities from the migrations
   mem-budget [--allocator default|system|mimalloc|jemalloc] [--steady-seconds N] [--soak-minutes N]
