@@ -8,7 +8,7 @@ use jiff::civil::DateTime;
 use jiff::tz::{Offset, TimeZone};
 use regex_lite::Regex;
 
-use super::js;
+use super::{js, pattern};
 use crate::http::zod::{is_js_whitespace, js_trim};
 
 /// Bun 1.4's `Intl.supportedValuesOf('timeZone')`, in its order: VTIMEZONE rules resolve to the first zone that fits.
@@ -17,10 +17,6 @@ const BUN_TIME_ZONES: &str = include_str!("bun_time_zones.txt");
 /// Windows zone ids and display labels to IANA, shared with the on-device import: node-ical 0.26.1's table from CLDR windowsZones.xml, plus CLDR's ids up to c4bb2c19 (2026-10-09).
 const WINDOWS_ZONES: &str =
     include_str!("../../../../../packages/calendar-ics/src/windows-zones.json");
-
-fn pattern(source: &str) -> Regex {
-    Regex::new(source).unwrap_or_else(|error| panic!("zone pattern {source}: {error}"))
-}
 
 static OFFSET_LABEL: LazyLock<Regex> =
     LazyLock::new(|| pattern(r"^([+\-])(\d{1,2})(?::?(\d{2}))?$"));

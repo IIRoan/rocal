@@ -6,12 +6,8 @@ use std::sync::LazyLock;
 use regex_lite::Regex;
 
 use super::zones::strip_quotes;
-use super::{js, rrule, vtimezone, zones};
+use super::{js, pattern, rrule, vtimezone, zones};
 use crate::http::zod::{js_number, js_number_string};
-
-fn pattern(source: &str) -> Regex {
-    Regex::new(source).unwrap_or_else(|error| panic!("ics pattern {source}: {error}"))
-}
 
 static LINE: LazyLock<Regex> = LazyLock::new(|| {
     pattern(

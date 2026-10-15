@@ -11,7 +11,8 @@ use time::PrimitiveDateTime;
 
 use super::build;
 use super::{
-    Frequency, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, js, normalize_email,
+    Frequency, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, js,
+    normalize_email, pattern,
 };
 use crate::http::zod::js_trim;
 
@@ -22,11 +23,8 @@ static BASE_COLLATOR: LazyLock<Option<CollatorBorrowed<'static>>> = LazyLock::ne
     Collator::try_new(Default::default(), options).ok()
 });
 
-static UNSAFE_FILENAME: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"[^a-z0-9._-]+").unwrap_or_else(|error| panic!("filename pattern: {error}"))
-});
-static DASH_RUNS: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"-{2,}").unwrap_or_else(|error| panic!("dash pattern: {error}")));
+static UNSAFE_FILENAME: LazyLock<Regex> = LazyLock::new(|| pattern(r"[^a-z0-9._-]+"));
+static DASH_RUNS: LazyLock<Regex> = LazyLock::new(|| pattern(r"-{2,}"));
 
 /// A stored event's columns that go into ICS.
 #[derive(Debug, Clone)]

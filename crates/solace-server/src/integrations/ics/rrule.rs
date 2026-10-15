@@ -6,28 +6,18 @@ use jiff::civil::DateTime;
 use jiff::tz::TimeZone;
 use regex_lite::Regex;
 
-use super::{js, zones};
+use super::{js, pattern, zones};
 use crate::http::zod::{is_js_whitespace, js_trim};
 
-static DTSTART_LINE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)DTSTART(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)")
-        .unwrap_or_else(|error| panic!("dtstart pattern: {error}"))
-});
-static BYDAY_TOKEN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$")
-        .unwrap_or_else(|error| panic!("byday pattern: {error}"))
-});
-static ISO_DATE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
-        .unwrap_or_else(|error| panic!("date pattern: {error}"))
-});
-static LEAP_MONTH: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^\d+L$").unwrap_or_else(|error| panic!("leap month pattern: {error}"))
-});
-static ISO_TIME: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(\d{2})(?:(\d{2})(\d{2})?|:(\d{2})(?::(\d{2}))?)?$")
-        .unwrap_or_else(|error| panic!("time pattern: {error}"))
-});
+static DTSTART_LINE: LazyLock<Regex> =
+    LazyLock::new(|| pattern(r"(?i)DTSTART(?:;VALUE=([^;]+))?(?:;TZID=([^:]+))?:(.+)"));
+static BYDAY_TOKEN: LazyLock<Regex> =
+    LazyLock::new(|| pattern(r"^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$"));
+static ISO_DATE: LazyLock<Regex> =
+    LazyLock::new(|| pattern(r"^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$"));
+static LEAP_MONTH: LazyLock<Regex> = LazyLock::new(|| pattern(r"(?i)^\d+L$"));
+static ISO_TIME: LazyLock<Regex> =
+    LazyLock::new(|| pattern(r"^(\d{2})(?:(\d{2})(\d{2})?|:(\d{2})(?::(\d{2}))?)?$"));
 
 const FREQUENCIES: [&str; 7] = [
     "YEARLY", "MONTHLY", "WEEKLY", "DAILY", "HOURLY", "MINUTELY", "SECONDLY",

@@ -9,9 +9,15 @@ mod rrule;
 mod vtimezone;
 mod zones;
 
+use regex_lite::Regex;
 use serde::Serialize;
 
 use crate::http::zod::js_trim;
+
+/// A compiled built-in pattern; these are fixed, so a failure is a programming error.
+fn pattern(source: &str) -> Regex {
+    Regex::new(source).unwrap_or_else(|error| panic!("ics pattern {source}: {error}"))
+}
 
 const METHODS: [&str; 8] = [
     "PUBLISH",

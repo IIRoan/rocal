@@ -9,7 +9,7 @@ use time::PrimitiveDateTime;
 use super::reader::{self, Obj, Val};
 use super::{
     Frequency, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, external_id, js,
-    normalize_email, normalize_timezone, resolve_timezone, zones,
+    normalize_email, normalize_timezone, pattern, resolve_timezone, zones,
 };
 use crate::http::zod::js_trim;
 use crate::instant;
@@ -25,12 +25,8 @@ const NAME_KEYS: [&str; 5] = [
 const DESCRIPTION_KEYS: [&str; 4] = ["WR-CALDESC", "X-WR-CALDESC", "x-wr-caldesc", "description"];
 const TIMEZONE_KEYS: [&str; 3] = ["WR-TIMEZONE", "X-WR-TIMEZONE", "x-wr-timezone"];
 
-static GOOGLE_SEPARATOR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^-[-:~]{10,}$").unwrap_or_else(|error| panic!("separator pattern: {error}"))
-});
-static BLANK_RUNS: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\n{3,}").unwrap_or_else(|error| panic!("blank pattern: {error}"))
-});
+static GOOGLE_SEPARATOR: LazyLock<Regex> = LazyLock::new(|| pattern(r"^-[-:~]{10,}$"));
+static BLANK_RUNS: LazyLock<Regex> = LazyLock::new(|| pattern(r"\n{3,}"));
 
 /// `IcsParseResult`.
 #[derive(Debug, Clone, PartialEq)]
