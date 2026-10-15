@@ -828,7 +828,7 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
 }
 
 #[tokio::test]
-async fn passkey_step_up_gates_the_mail_token_but_not_the_proxy() {
+async fn passkey_step_up_gates_the_mail_token_and_the_proxy() {
     let app = TestApp::spawn().await;
     let mut owner = mailbox(&app).await;
     let mut passkey = register_passkey(&app, &mut owner.user).await;
@@ -848,13 +848,24 @@ async fn passkey_step_up_gates_the_mail_token_but_not_the_proxy() {
         .await
         .expect_status(403));
 
-    // Pinned gap: the proxy mints from the bare session without the step-up check.
-    let discovery = ok(password_session
+    let discovery = password_session
         .get("/api/mail/jmap/.well-known/jmap")
-        .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    assert_eq!(discovery["username"], json!(owner.user.email));
+        .await;
+    match app.backend {
+        // TypeScript's proxy mints from the bare session without the step-up check (step 3).
+        Backend::TypeScript => {
+            assert_eq!(discovery.status.as_u16(), 200, "{}", discovery.text());
+            assert_eq!(ok(discovery.value())["username"], json!(owner.user.email));
+        }
+        Backend::Rust => {
+            let refused = ok(discovery.value());
+            assert_eq!(discovery.status.as_u16(), 401, "{refused}");
+            assert_eq!(
+                refused["message"],
+                json!("Mailbox authorization is required.")
+            );
+        }
+    }
 
     let mut stepped_up = app.anonymous();
     ok(solace_api_tests::seed::passkey_sign_in(&mut stepped_up, &mut passkey, &app.origin).await);
@@ -864,6 +875,12 @@ async fn passkey_step_up_gates_the_mail_token_but_not_the_proxy() {
         .and_then(|r| r.expect_status(200))
         .and_then(|r| r.dto()));
     assert!(!token.access_token.is_empty());
+    let discovery = ok(stepped_up
+        .get("/api/mail/jmap/.well-known/jmap")
+        .await
+        .and_then(|r| r.expect_status(200))
+        .and_then(|r| r.value()));
+    assert_eq!(discovery["username"], json!(owner.user.email));
 }
 
 #[tokio::test]
