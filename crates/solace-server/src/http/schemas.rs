@@ -1,8 +1,12 @@
 //! Request-schema pieces shared across routes, one per schema in `route-schemas.ts`, `_schemas.ts` and `_zod.ts`.
 
+use std::sync::LazyLock;
+
+use regex_lite::Regex;
 use serde_json::Value;
 
 use super::zod::{self, RefineCtx, Schema};
+use crate::addresses::is_reserved_system_email;
 use crate::entity_metadata::{
     CALENDAR_COLORS, has_encrypted_payload_value, is_valid_calendar_color,
 };
@@ -78,6 +82,130 @@ pub fn timezone_schema() -> Schema {
         "Invalid timezone identifier",
         &[],
     )
+}
+
+/// `recurrenceRuleObjectSchema`.
+pub fn recurrence_rule_object_schema() -> Schema {
+    let int_array = |min: f64, max: f64| zod::array(zod::number().int().gte(min).lte(max));
+    zod::object([
+        (
+            "frequency",
+            zod::enumeration(&["daily", "weekly", "monthly", "yearly"]),
+        ),
+        ("interval", zod::number().int().gte(1.0).lte(999.0)),
+        ("count", zod::number().int().gte(1.0).optional()),
+        ("until", zod::string().optional()),
+        ("timezone", timezone_schema().optional()),
+        ("byWeekDay", int_array(0.0, 6.0).optional()),
+        ("byMonthDay", int_array(1.0, 31.0).optional()),
+        ("byMonth", int_array(1.0, 12.0).optional()),
+    ])
+    .strict()
+}
+
+/// `recurrenceRuleSchema`: a rule object, or the JSON text of one.
+pub fn recurrence_rule_schema() -> Schema {
+    zod::union(vec![zod::string(), recurrence_rule_object_schema()])
+}
+
+/// `recurrenceScopeSchema`.
+pub fn recurrence_scope_schema() -> Schema {
+    zod::enumeration(&["this_only", "this_and_future", "all"])
+}
+
+/// `invitationImportStatusSchema`.
+pub fn invitation_import_status_schema() -> Schema {
+    zod::enumeration(&["accepted", "tentative"])
+}
+
+static PARTICIPANT_EMAIL: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+        .unwrap_or_else(|error| panic!("participant email pattern: {error}"))
+});
+
+/// `eventParticipantInputSchema`.
+pub fn event_participant_input_schema() -> Schema {
+    zod::object([
+        (
+            "email",
+            zod::string()
+                .min(3)
+                .max(320)
+                .regex(&PARTICIPANT_EMAIL)
+                .refine(
+                    |value| {
+                        !value
+                            .as_str()
+                            .is_some_and(|email| is_reserved_system_email(email, None))
+                    },
+                    "Cannot invite system or administrative email addresses",
+                    &[],
+                ),
+        ),
+        ("displayName", zod::string().max(120).optional()),
+        (
+            "role",
+            zod::enumeration(&["organizer", "attendee"]).optional(),
+        ),
+        (
+            "status",
+            zod::enumeration(&["pending", "accepted", "declined", "tentative"]).optional(),
+        ),
+    ])
+    .strict()
+}
+
+/// `eventInvitationContentSchema`.
+pub fn event_invitation_content_schema() -> Schema {
+    zod::object([
+        ("title", zod::string().min(1).max(255)),
+        ("description", zod::string().max(1000).optional()),
+        ("location", zod::string().max(255).optional()),
+    ])
+    .strict()
+}
+
+/// `eventContentEncryptionFieldsSchema.shape`.
+pub fn event_content_encryption_fields() -> [(&'static str, Schema); 3] {
+    [
+        ("encryptedContent", zod::string().optional()),
+        ("blindIndexTokens", zod::array(zod::string()).optional()),
+        (
+            "encryptionKeyVersion",
+            zod::number().int().gte(1.0).optional(),
+        ),
+    ]
+}
+
+pub const PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE: &str =
+    "Plaintext event content must not be sent alongside encrypted content.";
+
+/// `refineEncryptedEventContentBody`: no plaintext content beside ciphertext, and invitation copies only with both.
+pub fn refine_encrypted_event_content_body(
+    require_title: bool,
+) -> impl Fn(&Value, &mut RefineCtx<'_>) + Send + Sync + 'static {
+    move |body, ctx| {
+        let has_ciphertext = has_encrypted_payload_value(body.get("encryptedContent"));
+        if has_ciphertext {
+            for field in ["title", "description", "location"] {
+                if has_encrypted_payload_value(body.get(field)) {
+                    ctx.add_issue(PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE, &[field]);
+                }
+            }
+        } else if require_title && !has_encrypted_payload_value(body.get("title")) {
+            ctx.add_issue("Title is required and cannot be empty", &["title"]);
+        }
+        let has_participants = body
+            .get("participants")
+            .and_then(Value::as_array)
+            .is_some_and(|participants| !participants.is_empty());
+        if body.get("invitationContent").is_some() && (!has_ciphertext || !has_participants) {
+            ctx.add_issue(
+                "Invitation content is only accepted with encrypted content and participants.",
+                &["invitationContent"],
+            );
+        }
+    }
 }
 
 /// `eventEncryptionModeSchema`.
