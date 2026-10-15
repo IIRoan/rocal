@@ -21,16 +21,12 @@ pub async fn error_page(State(state): State<AppState>, RawQuery(query): RawQuery
             .map(|(_, value)| value.clone())
             .filter(|value| !value.is_empty())
     };
-    let raw_code = first("error").unwrap_or_else(|| "UNKNOWN".into());
-    let code = if !raw_code.is_empty()
-        && raw_code
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '\'' | '_' | '-'))
-    {
-        raw_code
-    } else {
-        "UNKNOWN".into()
-    };
+    let code = first("error")
+        .filter(|code| {
+            code.chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '\'' | '_' | '-'))
+        })
+        .unwrap_or_else(|| "UNKNOWN".into());
     let description = first("error_description");
     if state.config.is_production {
         let mut redirect = url::form_urlencoded::Serializer::new(String::new());

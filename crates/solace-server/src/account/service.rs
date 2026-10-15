@@ -99,17 +99,13 @@ pub async fn delete(state: &AppState, user: &RouteUser) -> Result<DeleteAccountR
         .ok_or_else(|| AppError::NotFound("User account not found".into()))?;
     let mailbox = queries::mailbox(&state.db, &user.id).await?;
     // Read before the mailbox and its directory entry are removed.
-    let mut emails: Vec<String> = Vec::new();
-    for email in [Some(&existing.email), mailbox.as_ref().map(|m| &m.email)]
+    let mut emails: Vec<String> = [Some(&existing.email), mailbox.as_ref().map(|m| &m.email)]
         .into_iter()
         .flatten()
         .map(|email| email.trim().to_lowercase())
         .filter(|email| !email.is_empty())
-    {
-        if !emails.contains(&email) {
-            emails.push(email);
-        }
-    }
+        .collect();
+    emails.dedup();
     mail::service::delete_mailbox_for_user(state, &user.id).await?;
     let transaction = state.db.begin().await?;
     avatars::delete_current(state, &transaction, &user.id).await?;
@@ -217,7 +213,6 @@ mod tests {
     fn route_user() -> RouteUser {
         RouteUser {
             id: USER.into(),
-            session_id: "account-test-session".into(),
             email: "account-test@example.com".into(),
             name: "Account Test".into(),
         }

@@ -3,7 +3,7 @@
 mod redaction;
 mod report;
 
-pub use redaction::{log_ref, redact_pii, sanitize_context, sanitize_request_url};
+pub use redaction::{log_ref, redact_pii, sanitize_request_url};
 
 use tracing_subscriber::EnvFilter;
 

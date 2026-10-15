@@ -77,13 +77,9 @@ impl CookieSettings {
         self.name("session_token")
     }
 
-    pub fn secret(&self) -> &str {
-        &self.secret
-    }
-
     /// A signed Better Auth cookie: `name=encodeURIComponent(value.signature)` and the shared attributes.
     pub fn signed(&self, name: &str, value: &str, max_age: Option<i64>) -> String {
-        let signed = format!("{value}.{}", self.signature(value));
+        let signed = format!("{value}.{}", STANDARD.encode(self.hmac(value.as_bytes())));
         self.better_auth_cookie(name, &encode_uri_component(&signed), max_age)
     }
 
@@ -103,10 +99,6 @@ impl CookieSettings {
         }
         cookie.push_str(&format!("; SameSite={}", self.same_site.better_auth()));
         cookie
-    }
-
-    fn signature(&self, value: &str) -> String {
-        STANDARD.encode(self.hmac(value.as_bytes()))
     }
 
     fn hmac(&self, data: &[u8]) -> Vec<u8> {
@@ -188,7 +180,7 @@ impl CookieSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
 pub struct StepUpPayload {
     pub u: String,
     pub s: String,
@@ -196,7 +188,7 @@ pub struct StepUpPayload {
 }
 
 /// The last two labels (`api.solace.onl` → `solace.onl`), or none for `localhost` and bare hosts.
-fn registrable_domain(host: &str) -> Option<String> {
+pub(super) fn registrable_domain(host: &str) -> Option<String> {
     if host == "localhost" {
         return None;
     }

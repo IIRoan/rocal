@@ -391,7 +391,7 @@ pub async fn update_user(
                     })?
             }
             None => {
-                store::update_user(&state.db, active.user.clone(), name, None).await?;
+                store::update_user(&state.db, active.user, name).await?;
             }
         }
         let dont_remember = hooks::dont_remember(&state, &headers);

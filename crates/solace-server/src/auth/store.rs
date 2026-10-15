@@ -20,19 +20,15 @@ pub async fn find_user<C: ConnectionTrait>(
     user::Entity::find_by_id(id).one(db).await
 }
 
-/// `updateUser`: a new name and, when given, a new image (`None` clears it).
+/// `updateUser` without an image, which goes through `profiles::avatars`.
 pub async fn update_user<C: ConnectionTrait>(
     db: &C,
     found: user::Model,
     name: Option<String>,
-    image: Option<Option<String>>,
 ) -> Result<user::Model, sea_orm::DbErr> {
     let mut updated = found.into_active_model();
     if let Some(name) = name {
         updated.name = Set(name);
-    }
-    if let Some(image) = image {
-        updated.image = Set(image);
     }
     updated.update(db).await
 }

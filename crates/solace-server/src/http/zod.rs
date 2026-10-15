@@ -91,23 +91,21 @@ type PreprocessFn = Arc<dyn Fn(Option<&Value>) -> Option<Value> + Send + Sync>;
 
 #[derive(Clone)]
 enum StringCheck {
-    Min(usize, Option<String>),
-    Max(usize, Option<String>),
-    Length(usize, Option<String>),
-    Regex(Regex, Option<String>),
-    Datetime(Option<String>),
-    Url(Option<String>),
-    StartsWith(String, Option<String>),
-    Email(Option<String>),
+    Min(usize),
+    Max(usize),
+    Regex(Regex),
+    Datetime,
+    Url,
+    Email,
     Trim,
-    ToLowerCase,
 }
 
+/// Bounds are inclusive.
 #[derive(Clone)]
 enum NumberCheck {
-    Int(Option<String>),
-    Min(f64, bool, Option<String>),
-    Max(f64, bool, Option<String>),
+    Int,
+    Min(f64),
+    Max(f64),
 }
 
 #[derive(Clone)]
@@ -120,12 +118,11 @@ enum Kind {
     Boolean,
     Null,
     Any,
-    Literal(Value),
     Enum(Vec<String>),
     Array {
         element: Box<Schema>,
-        min: Option<(usize, Option<String>)>,
-        max: Option<(usize, Option<String>)>,
+        min: Option<usize>,
+        max: Option<usize>,
     },
     Object {
         shape: Vec<(String, Schema)>,
@@ -184,12 +181,6 @@ pub fn null() -> Schema {
 
 pub fn any() -> Schema {
     Schema { kind: Kind::Any }
-}
-
-pub fn literal(value: impl Into<Value>) -> Schema {
-    Schema {
-        kind: Kind::Literal(value.into()),
-    }
 }
 
 pub fn enumeration(values: &[&str]) -> Schema {
@@ -259,121 +250,60 @@ impl Schema {
     /// Minimum string length (UTF-16 units), array length or number (inclusive), by schema kind.
     pub fn min(mut self, minimum: usize) -> Self {
         match &mut self.kind {
-            Kind::String(_) => self.with_string_check(StringCheck::Min(minimum, None)),
+            Kind::String(_) => self.with_string_check(StringCheck::Min(minimum)),
             Kind::Array { min, .. } => {
-                *min = Some((minimum, None));
+                *min = Some(minimum);
                 self
             }
-            Kind::Number { .. } => {
-                self.with_number_check(NumberCheck::Min(minimum as f64, true, None))
-            }
+            Kind::Number { .. } => self.with_number_check(NumberCheck::Min(minimum as f64)),
             _ => self,
         }
     }
 
     pub fn max(mut self, maximum: usize) -> Self {
         match &mut self.kind {
-            Kind::String(_) => self.with_string_check(StringCheck::Max(maximum, None)),
+            Kind::String(_) => self.with_string_check(StringCheck::Max(maximum)),
             Kind::Array { max, .. } => {
-                *max = Some((maximum, None));
+                *max = Some(maximum);
                 self
             }
-            Kind::Number { .. } => {
-                self.with_number_check(NumberCheck::Max(maximum as f64, true, None))
-            }
+            Kind::Number { .. } => self.with_number_check(NumberCheck::Max(maximum as f64)),
             _ => self,
         }
     }
 
     /// Number bounds that may be negative or fractional.
     pub fn gte(self, minimum: f64) -> Self {
-        self.with_number_check(NumberCheck::Min(minimum, true, None))
+        self.with_number_check(NumberCheck::Min(minimum))
     }
 
     pub fn lte(self, maximum: f64) -> Self {
-        self.with_number_check(NumberCheck::Max(maximum, true, None))
-    }
-
-    pub fn positive(self) -> Self {
-        self.with_number_check(NumberCheck::Min(0.0, false, None))
-    }
-
-    pub fn nonnegative(self) -> Self {
-        self.with_number_check(NumberCheck::Min(0.0, true, None))
-    }
-
-    pub fn length(self, exact: usize) -> Self {
-        self.with_string_check(StringCheck::Length(exact, None))
+        self.with_number_check(NumberCheck::Max(maximum))
     }
 
     pub fn int(self) -> Self {
-        self.with_number_check(NumberCheck::Int(None))
+        self.with_number_check(NumberCheck::Int)
     }
 
     pub fn trim(self) -> Self {
         self.with_string_check(StringCheck::Trim)
     }
 
-    pub fn to_lowercase(self) -> Self {
-        self.with_string_check(StringCheck::ToLowerCase)
-    }
-
     pub fn regex(self, pattern: &Regex) -> Self {
-        self.with_string_check(StringCheck::Regex(pattern.clone(), None))
+        self.with_string_check(StringCheck::Regex(pattern.clone()))
     }
 
     /// `z.string().datetime()` without options: UTC `Z` only, any fractional precision.
     pub fn datetime(self) -> Self {
-        self.with_string_check(StringCheck::Datetime(None))
+        self.with_string_check(StringCheck::Datetime)
     }
 
     pub fn url(self) -> Self {
-        self.with_string_check(StringCheck::Url(None))
+        self.with_string_check(StringCheck::Url)
     }
 
     pub fn email(self) -> Self {
-        self.with_string_check(StringCheck::Email(None))
-    }
-
-    pub fn starts_with(self, prefix: &str) -> Self {
-        self.with_string_check(StringCheck::StartsWith(prefix.to_owned(), None))
-    }
-
-    /// Replaces the default message of the most recently added check.
-    pub fn msg(mut self, message: &str) -> Self {
-        let message = Some(message.to_owned());
-        match &mut self.kind {
-            Kind::String(checks) => {
-                if let Some(
-                    StringCheck::Min(_, m)
-                    | StringCheck::Max(_, m)
-                    | StringCheck::Length(_, m)
-                    | StringCheck::Regex(_, m)
-                    | StringCheck::Datetime(m)
-                    | StringCheck::Url(m)
-                    | StringCheck::Email(m)
-                    | StringCheck::StartsWith(_, m),
-                ) = checks.last_mut()
-                {
-                    *m = message;
-                }
-            }
-            Kind::Number { checks, .. } => {
-                if let Some(
-                    NumberCheck::Int(m) | NumberCheck::Min(_, _, m) | NumberCheck::Max(_, _, m),
-                ) = checks.last_mut()
-                {
-                    *m = message;
-                }
-            }
-            Kind::Array { min, max, .. } => {
-                if let Some((_, m)) = max.as_mut().or(min.as_mut()) {
-                    *m = message;
-                }
-            }
-            _ => {}
-        }
-        self
+        self.with_string_check(StringCheck::Email)
     }
 
     pub fn strict(mut self) -> Self {
@@ -479,18 +409,6 @@ impl Schema {
                 _ => invalid_type(ctx, path, "null", input),
             },
             Kind::Any => Parsed::ok(input.cloned()),
-            Kind::Literal(expected) => {
-                if input == Some(expected) {
-                    Parsed::ok(input.cloned())
-                } else {
-                    ctx.add(
-                        path,
-                        format!("Invalid literal value, expected {expected}"),
-                        format!("Invalid input: expected {expected}"),
-                    );
-                    Parsed::aborted()
-                }
-            }
             Kind::Enum(options) => parse_enum(input, options, path, ctx),
             Kind::Array { element, min, max } => parse_array(input, element, min, max, path, ctx),
             Kind::Object { shape, strict } => parse_object(input, shape, *strict, path, ctx),
@@ -634,14 +552,6 @@ pub fn is_js_whitespace(c: char) -> bool {
     )
 }
 
-/// A check's custom message replaces both dialects' defaults.
-fn messages(custom: &Option<String>, zod3: String, zod4: String) -> (String, String) {
-    match custom {
-        Some(message) => (message.clone(), message.clone()),
-        None => (zod3, zod4),
-    }
-}
-
 fn datetime_pattern() -> &'static Regex {
     static PATTERN: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
         let date = r"((\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-((0[13578]|1[02])-(0[1-9]|[12]\d|3[01])|(0[469]|11)-(0[1-9]|[12]\d|30)|(02)-(0[1-9]|1\d|2[0-8])))";
@@ -665,74 +575,33 @@ fn parse_string(
     let mut status = Status::Valid;
     for check in checks {
         let failure = match check {
-            StringCheck::Min(min, message) => (js_length(&text) < *min).then(|| {
-                messages(
-                    message,
+            StringCheck::Min(min) => (js_length(&text) < *min).then(|| {
+                (
                     format!("String must contain at least {min} character(s)"),
                     format!("Too small: expected string to have >={min} characters"),
                 )
             }),
-            StringCheck::Max(max, message) => (js_length(&text) > *max).then(|| {
-                messages(
-                    message,
+            StringCheck::Max(max) => (js_length(&text) > *max).then(|| {
+                (
                     format!("String must contain at most {max} character(s)"),
                     format!("Too big: expected string to have <={max} characters"),
                 )
             }),
-            StringCheck::Length(exact, message) => {
-                let length = js_length(&text);
-                (length != *exact).then(|| {
-                    let direction = if length < *exact {
-                        "Too small"
-                    } else {
-                        "Too big"
-                    };
-                    messages(
-                        message,
-                        format!("String must contain exactly {exact} character(s)"),
-                        format!("{direction}: expected string to have exactly {exact} characters"),
-                    )
-                })
-            }
-            StringCheck::Regex(pattern, message) => (!pattern.is_match(&text)).then(|| {
-                messages(
-                    message,
+            StringCheck::Regex(pattern) => (!pattern.is_match(&text)).then(|| {
+                (
                     "Invalid".into(),
                     format!("Invalid string: must match pattern /{}/", pattern.as_str()),
                 )
             }),
-            StringCheck::Datetime(message) => (!datetime_pattern().is_match(&text)).then(|| {
-                messages(
-                    message,
-                    "Invalid datetime".into(),
-                    "Invalid ISO datetime".into(),
-                )
-            }),
-            StringCheck::Url(message) => url::Url::parse(&text)
+            StringCheck::Datetime => (!datetime_pattern().is_match(&text))
+                .then(|| ("Invalid datetime".into(), "Invalid ISO datetime".into())),
+            StringCheck::Url => url::Url::parse(&text)
                 .is_err()
-                .then(|| messages(message, "Invalid url".into(), "Invalid URL".into())),
-            StringCheck::StartsWith(prefix, message) => {
-                (!text.starts_with(prefix.as_str())).then(|| {
-                    messages(
-                        message,
-                        format!("Invalid input: must start with \"{prefix}\""),
-                        format!("Invalid string: must start with \"{prefix}\""),
-                    )
-                })
-            }
-            StringCheck::Email(message) => (!crate::addresses::is_zod_email(&text)).then(|| {
-                messages(
-                    message,
-                    "Invalid email".into(),
-                    "Invalid email address".into(),
-                )
-            }),
+                .then(|| ("Invalid url".into(), "Invalid URL".into())),
+            StringCheck::Email => (!crate::addresses::is_zod_email(&text))
+                .then(|| ("Invalid email".into(), "Invalid email address".into())),
             StringCheck::Trim => {
                 text = js_trim(&text).to_owned();
-                None
-            }
-            StringCheck::ToLowerCase => {
-                text = text.to_lowercase();
                 None
             }
         };
@@ -831,55 +700,26 @@ fn parse_number(
     let mut status = Status::Valid;
     for check in checks {
         let failure = match check {
-            NumberCheck::Int(message) => {
-                (number.fract() != 0.0 || !number.is_finite()).then(|| {
-                    messages(
-                        message,
-                        "Expected integer, received float".into(),
-                        "Invalid input: expected int, received number".into(),
-                    )
-                })
-            }
-            NumberCheck::Min(min, inclusive, message) => {
-                let fails = if *inclusive {
-                    number < *min
-                } else {
-                    number <= *min
-                };
-                fails.then(|| {
-                    let (bound, symbol) = if *inclusive {
-                        ("greater than or equal to", ">=")
-                    } else {
-                        ("greater than", ">")
-                    };
-                    let min = js_number_string(*min);
-                    messages(
-                        message,
-                        format!("Number must be {bound} {min}"),
-                        format!("Too small: expected number to be {symbol}{min}"),
-                    )
-                })
-            }
-            NumberCheck::Max(max, inclusive, message) => {
-                let fails = if *inclusive {
-                    number > *max
-                } else {
-                    number >= *max
-                };
-                fails.then(|| {
-                    let (bound, symbol) = if *inclusive {
-                        ("less than or equal to", "<=")
-                    } else {
-                        ("less than", "<")
-                    };
-                    let max = js_number_string(*max);
-                    messages(
-                        message,
-                        format!("Number must be {bound} {max}"),
-                        format!("Too big: expected number to be {symbol}{max}"),
-                    )
-                })
-            }
+            NumberCheck::Int => (number.fract() != 0.0 || !number.is_finite()).then(|| {
+                (
+                    "Expected integer, received float".into(),
+                    "Invalid input: expected int, received number".into(),
+                )
+            }),
+            NumberCheck::Min(min) => (number < *min).then(|| {
+                let min = js_number_string(*min);
+                (
+                    format!("Number must be greater than or equal to {min}"),
+                    format!("Too small: expected number to be >={min}"),
+                )
+            }),
+            NumberCheck::Max(max) => (number > *max).then(|| {
+                let max = js_number_string(*max);
+                (
+                    format!("Number must be less than or equal to {max}"),
+                    format!("Too big: expected number to be <={max}"),
+                )
+            }),
         };
         if let Some((message, zod4)) = failure {
             ctx.add(path, message, zod4);
@@ -949,8 +789,8 @@ fn child(path: &[String], segment: String) -> Vec<String> {
 fn parse_array(
     input: Option<&Value>,
     element: &Schema,
-    min: &Option<(usize, Option<String>)>,
-    max: &Option<(usize, Option<String>)>,
+    min: &Option<usize>,
+    max: &Option<usize>,
     path: &[String],
     ctx: &mut Ctx,
 ) -> Parsed {
@@ -958,26 +798,24 @@ fn parse_array(
         return invalid_type(ctx, path, "array", input);
     };
     let mut status = Status::Valid;
-    if let Some((min, message)) = min
+    if let Some(min) = min
         && items.len() < *min
     {
-        let (message, zod4) = messages(
-            message,
+        ctx.add(
+            path,
             format!("Array must contain at least {min} element(s)"),
             format!("Too small: expected array to have >={min} items"),
         );
-        ctx.add(path, message, zod4);
         status = Status::Dirty;
     }
-    if let Some((max, message)) = max
+    if let Some(max) = max
         && items.len() > *max
     {
-        let (message, zod4) = messages(
-            message,
+        ctx.add(
+            path,
             format!("Array must contain at most {max} element(s)"),
             format!("Too big: expected array to have <={max} items"),
         );
-        ctx.add(path, message, zod4);
         status = Status::Dirty;
     }
     let mut output = Vec::with_capacity(items.len());
@@ -1183,8 +1021,8 @@ mod tests {
         );
         assert!(issues(&string().min(1).trim(), json!("   ")).is_empty());
         assert_eq!(
-            issues(&string().max(2).msg("Too long"), json!("ab\u{1F600}")),
-            [pair("root", "Too long")],
+            issues(&string().max(2), json!("ab\u{1F600}")),
+            [pair("root", "String must contain at most 2 character(s)")],
             "length counts UTF-16 units"
         );
         assert_eq!(
@@ -1222,10 +1060,6 @@ mod tests {
             object.parse(Some(&json!({"limit": ""}))).ok().flatten(),
             Some(json!({}))
         );
-        assert_eq!(
-            issues(&number().positive(), json!(0)),
-            [pair("root", "Number must be greater than 0")]
-        );
         assert_eq!(js_number("0x10"), 16.0);
         assert!(js_number("1e").is_nan() && js_number("12px").is_nan());
     }
@@ -1247,7 +1081,7 @@ mod tests {
     }
 
     #[test]
-    fn enums_unions_literals_and_arrays() {
+    fn enums_unions_and_arrays() {
         let kind = enumeration(&["email", "push"]);
         assert_eq!(
             issues(&kind, json!("sms")),
@@ -1263,10 +1097,6 @@ mod tests {
         assert_eq!(
             issues(&union(vec![string(), number()]), json!(true)),
             [pair("root", "Invalid input")]
-        );
-        assert_eq!(
-            issues(&literal("v1"), json!("v2")),
-            [pair("root", "Invalid literal value, expected \"v1\"")]
         );
         let list = array(string().min(1)).max(1);
         assert_eq!(

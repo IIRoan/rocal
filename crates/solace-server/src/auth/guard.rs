@@ -16,7 +16,6 @@ use crate::state::AppState;
 #[derive(Debug, Clone)]
 pub struct RouteUser {
     pub id: String,
-    pub session_id: String,
     pub email: String,
     pub name: String,
 }
@@ -35,7 +34,6 @@ impl FromRequestParts<AppState> for RouteUser {
         step_up(state, &parts.headers, &active).await?;
         Ok(Self {
             id: active.user.id,
-            session_id: active.session.id,
             email: active.user.email,
             name: active.user.name,
         })
