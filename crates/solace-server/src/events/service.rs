@@ -160,6 +160,11 @@ fn parse_instant(text: &str, field: &str) -> Result<time::PrimitiveDateTime, App
         })
 }
 
+fn checked_reminder(minutes: Option<i32>) -> Result<Option<i32>, AppError> {
+    constraints::validate_reminder_minutes(minutes.map(f64::from))?;
+    Ok(minutes)
+}
+
 fn tokens_json(tokens: &[String]) -> Result<String, AppError> {
     serde_json::to_string(tokens).map_err(AppError::internal)
 }
@@ -322,12 +327,7 @@ pub async fn create(
         &calendar,
         "Cannot create events in a read-only calendar. This calendar is managed by a subscription or public feed.",
     )?;
-    let reminder = match request.reminder.flatten() {
-        Some(minutes) => {
-            constraints::validate_reminder_minutes(Some(f64::from(minutes)))?.map(|_| minutes)
-        }
-        None => None,
-    };
+    let reminder = checked_reminder(request.reminder.flatten())?;
     let settings = queries::settings(&state.db, &user.id).await?;
     let timezone = instant::resolve_timezone(
         request
@@ -507,12 +507,7 @@ pub async fn update(
     if request.location.is_some() {
         constraints::validate_location_length(request.location.as_deref())?;
     }
-    let reminder_value = match request.reminder.flatten() {
-        Some(minutes) => {
-            constraints::validate_reminder_minutes(Some(f64::from(minutes)))?.map(|_| minutes)
-        }
-        None => None,
-    };
+    let reminder_value = checked_reminder(request.reminder.flatten())?;
     if let Some(color) = request.color.as_deref().filter(|c| !c.is_empty())
         && !is_valid_calendar_color(color)
     {
