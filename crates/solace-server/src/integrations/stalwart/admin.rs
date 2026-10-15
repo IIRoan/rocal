@@ -138,7 +138,8 @@ impl<'a> Admin<'a> {
 
     /// One registry request; the answer is the parsed envelope.
     pub async fn call_jmap(&self, method_calls: Value) -> Result<Value, AdminError> {
-        let (status, body) = super::send(
+        let (status, body) = super::send_in(
+            &super::PROVISIONER_LANE,
             self.post("/jmap/")
                 .bearer_auth(self.token)
                 .json(&json!({"using": USING, "methodCalls": method_calls})),
@@ -152,7 +153,8 @@ impl<'a> Admin<'a> {
 
     pub async fn get_session(&self) -> Result<Value, AdminError> {
         let url = format!("{}/jmap/session", self.base_url);
-        let (status, body) = super::send(
+        let (status, body) = super::send_in(
+            &super::PROVISIONER_LANE,
             self.gate
                 .apply(self.http.get(&url), &url)
                 .bearer_auth(self.token),

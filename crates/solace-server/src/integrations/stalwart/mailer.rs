@@ -148,7 +148,8 @@ impl Jmap<'_> {
             format!("{base}/jmap/session"),
             format!("{base}/.well-known/jmap"),
         ] {
-            let (status, body) = super::send(
+            let (status, body) = super::send_in(
+                &super::NOREPLY_LANE,
                 self.request(reqwest::Method::GET, &url)
                     .header(reqwest::header::ACCEPT, "application/json"),
             )
@@ -184,7 +185,8 @@ impl Jmap<'_> {
     }
 
     async fn call(&self, api_url: &str, method_calls: Value) -> Result<Value, MailerError> {
-        let (status, body) = super::send(
+        let (status, body) = super::send_in(
+            &super::NOREPLY_LANE,
             self.request(reqwest::Method::POST, api_url)
                 .json(&json!({"using": USING, "methodCalls": method_calls})),
         )
@@ -252,7 +254,8 @@ impl Jmap<'_> {
             .filter(|t| !t.is_empty())
             .unwrap_or("application/octet-stream")
             .to_owned();
-        let (status, body) = super::send(
+        let (status, body) = super::send_in(
+            &super::NOREPLY_LANE,
             self.request(
                 reqwest::Method::POST,
                 &resolve_upload_url(&session.upload_url, &session.mail_account),
