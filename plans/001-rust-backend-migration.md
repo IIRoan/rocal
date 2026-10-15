@@ -40,7 +40,7 @@
 - JSON fields are camelCase. Requests reject unknown fields. PATCH fields distinguish omitted, `null`, and a value.
 - Query strings coerce like Zod does. String limits count UTF-16 code units. Errors use the `lib/errors.ts` envelope.
 - Event listing reproduces `EventService.list`: recurring and modified instances, categories, calendars, participant filtering, and sort order.
-- `packages/calendar-ics/src/recurrence.ts` is hand-written and ports directly. Subscription feeds go through `node-ical`, which wraps rrule.js, and its quirks need golden tests built from real feeds.
+- `packages/calendar-ics/src/recurrence.ts` is hand-written and ports directly. Subscription feeds go through `node-ical` 0.26, which wraps rrule-temporal, and its quirks need golden tests built from real feeds.
 - `lib/mail-key-utils.ts` uses openpgp only for `readKey`; replace it with the `pgp` crate.
 
 ## Stack
@@ -296,6 +296,31 @@ Each sub-step is done when its suite cases pass against Rust and the memory budg
   - subscriptions through the `safe_fetch` equivalent (address checked at connect-time DNS, every redirect revalidated, size and time caps);
   - E2EE metadata, push devices, and account deletion.
   - Ciphertext is stored byte for byte, and mixed plaintext-plus-ciphertext requests are rejected.
+
+  **4c result (2026-10-15, done):**
+
+  - `solace-server` serves every calendar and account route:
+    - settings, profiles with uploaded avatars (re-encoded on the server into WebP variants in the private bucket, served only through the authenticated route), calendars, categories, sharing with the share-link feed, recent contacts, push devices and the E2EE metadata routes;
+    - events: the list with recurring and modified instances, search and the search corpus, CRUD with the optimistic `updatedAt` lock, bulk move/delete/duplicate, seal-encryption, the invitation lookup by UID and the ICS export, plus per-event reminders (`/api/notifications/event/{eventId}`);
+    - participants and RSVP, with the iTIP REPLY to the organizer and the hidden tombstone a decline leaves; mailed invitations (`import-ics`, `decline-ics`) and the REQUEST mail to new invitees;
+    - recurring edits (`/api/recurring`: update and delete by scope, preview, validate, patterns);
+    - subscriptions and ICS imports through `safe_fetch` (the address is checked in the connect-time DNS lookup, every redirect is revalidated, bodies are capped after decoding, requests time out), with the 15-minute sync scheduler running in the server;
+    - account deletion. The two Stalwart registry calls it needs (destroy, and look up by mailbox name) live in `account/mailbox.rs` until the admin client lands in 4d.
+  - Mail sync's invitation ingestion (`invitations::service::ingest_from_emails`) is ported and wired to the mailbox routes in 4d.
+  - The ICS reader is hand-written over jiff: the `ical` crate broke 7 of the golden feeds and calcard has no tokenizer to build on. Corrected above: node-ical 0.26 wraps rrule-temporal, not rrule.js.
+  - New dependencies: `image` and `webp` (avatar variants), `rusty-s3` (SigV4 over the existing reqwest client), `jiff` with the bundled tzdb, `icu_collator` (`localeCompare` with base sensitivity), reqwest's gzip/deflate/brotli decoding (as Bun's fetch decodes), and `flate2` and tokio's `test-util` for tests only.
+  - The local TypeScript reference runs with `TZ=UTC`, as on Vercel; its ICS and date results depend on the process zone.
+  - Behavior pinned while porting, beyond step 3's list:
+    - Prisma's `recurrenceExceptions` relation joins on `modified_event_id`, which is why the list never applies a series' own exceptions.
+    - ICS feeds: every `BYMONTHDAY` and `BYMONTH` is dropped (a lowercase key bug); one unreadable `RRULE` or a duplicate `DTSTART`/`DTEND` fails the whole feed; a `RECURRENCE-ID` override with a lower or missing `SEQUENCE` on the same day is dropped; all-day recurring rules get the zone `UTC`; `TZID=+0100` becomes the zone `100`; floating times with any `VTIMEZONE` take the first matching zone.
+    - Bulk event errors name the events by title, which is user content in the message.
+  - Where Rust differs on purpose (no client-visible contract changes):
+    - Unexpected errors no longer copy Prisma's message into `calendar_subscription.last_error_message`, sync logs, import errors or invitation summaries; they use the generic message. Validation messages are unchanged.
+    - The RSVP reply's HTML escapes the attendee name, which can come from a mailed `CN`.
+    - The scheduler syncs one feed at a time instead of five at once, and a tick that comes due during a run is skipped.
+  - **Suite:** `rust-passing.txt` lists 352 cases that pass on Rust in both modes, including the fourteen auth cases moved from 4b. The 48 that still fail are 4d's: mail accounts and keys (16), the JMAP proxy (7), mail sync (6), realtime (3), the Stalwart webhook (8), the mail-settings half of `encrypted_blobs` (5), and the three account-deletion cases that bootstrap a mailbox first.
+  - **Memory** (jemalloc, with the scheduler running): 23.4 MiB idle and 29.0 MiB at steady peak. Twenty concurrent sign-ins peaked at 93.6 MiB, against a budget of 103.4 (idle + 2 × 32 + 16). Sixty seconds later RSS was 29.3 MiB, 2% above the 28.7 before the burst (budget 10%).
+  - **JWT log check, continued:** samples at 20:17 and 22:18 UTC on 2026-10-14 and at 07:04 and 08:24 UTC on 2026-10-15 saw 0 hits on `/api/auth/token` and `/api/auth/jwks` (50 on the `/api/health` control).
 - **4d. Mail:**
   - accounts, bootstrap with `wrappedSecret` required, keys, sync, and settings;
   - the JMAP proxy, which relays Bearer tokens only and streams;
