@@ -328,6 +328,29 @@ Each sub-step is done when its suite cases pass against Rust and the memory budg
   - the backend gate on every Stalwart fetch.
   - No SMTP or IMAP, and the provisioning token never reads mail.
 
+  **4d result (2026-10-15, done; step 4 is done):**
+
+  - `solace-server` serves every mail route:
+    - accounts: status, bootstrap (which requires `wrappedSecret` and `User.mailboxApprovedAt`), repair, vault backups, the public config with Stalwart's limits, and the key directory, where the `pgp` crate replaces openpgp's `readKey` for fingerprints;
+    - the per-user mail token: the OAuth bridge on the HMAC-derived secret, a per-user cache with in-flight dedupe, and the passkey step-up gate on `/api/mail/oauth/access-token`;
+    - the JMAP proxy (`/api/mail/jmap/*`): Bearer-only relay, session-minted tokens, the path allowlist, same-origin redirects followed on the server, 1200 requests a minute per address, and streamed responses. Request bodies up to 1 MiB are kept for the retry after a 401; larger uploads stream once, as the Memory section says;
+    - mail sync (`GET /api/mail/sync`) as the mailbox owner, with invitation auto-filing;
+    - realtime (`GET /api/realtime/mail`): one owner EventSource per subscribed mailbox, coalesced `mail.changed` flushes, and receipt-time polling every 10 s;
+    - the signed Stalwart webhook: HMAC compared in constant time, refused while the secret is unset, a 256 KiB cap, rate limits, dedupe, and opaque `new_mail` jobs with only `emailId`/`accountId`;
+    - `/api/mail-settings`.
+  - Every Stalwart fetch goes through the backend gate: admin, owner JMAP, the proxy, the EventSource, the mailer and the reachability probe. The admin client sends only the registry capabilities (`core`, `urn:stalwart:jmap`), so the provisioning token can't ask for mail. Mailbox JMAP runs as the owner. The boot registers the ingest webhook, best effort.
+  - New dependencies: `pgp` 0.20 (as planned) and `http-body` for the hand-written SSE body (already in the tree through axum and hyper).
+  - Found while porting: `main.ts` starts calendar sync and mail realtime only when `VERCEL` is unset, so production today runs neither the 15-minute subscription sync nor receipt-time mail polling. Rust runs both on its single replica, as step 5 plans.
+  - Ported as is: repairing an entry with an empty `stalwart_account_id` creates an account but never stores its id; push dedupe matches `new_mail` jobs of any status, so a push that failed once is never queued again; the in-memory limiter resets a key only after two windows.
+  - Where Rust differs on purpose (no client-visible contract changes):
+    - Concurrent bootstrap recovery re-reads the entry inside a savepoint. TypeScript re-read inside the transaction Postgres had already aborted, so its recovery always failed.
+    - Stalwart failures while minting a token answer 503 instead of the generic 500. The proxy's 503 message names the transport error without the upstream URL. Bodies over Vercel's 4.5 MB answer 413.
+    - Proxy logs carry the status, operation and JMAP method names, never upstream error bodies.
+    - JSON with lone surrogates is a 400 on every route, where Bun's `JSON.parse` accepted it.
+  - **Suite:** all 402 cases pass on Rust in both modes. `rust-passing.txt` lists 400 of them: everything except the two interop cases, which need `INTEROP_TS_URL`. All 796 Jest cases have their destination in place.
+  - **Memory** (jemalloc, with calendar sync and receipt polling running): 26.5 MiB idle and 31.3 MiB at steady peak. Twenty concurrent sign-ins peaked at 95.8 MiB, against a budget of 106.5 (idle + 2 × 32 + 16). Sixty seconds later RSS was 31.5 MiB, 1.6% above the 31.0 before the burst (budget 10%).
+  - **JWT log check, continued:** samples at 07:44, 09:05, 09:45 and 10:25 UTC on 2026-10-15 saw 0 hits on `/api/auth/token` and `/api/auth/jwks` (50 on the `/api/health` control).
+
 ### 5. Deploy to the Railway test environment and test
 
 - **Build:** `crates/solace-server/Dockerfile` with the build context at the repo root. It's a multi-stage build with a pinned Rust image, `cargo build --release --locked -p solace-server` for `x86-64-v3`, and a slim runtime with CA certificates running as a non-root user.
