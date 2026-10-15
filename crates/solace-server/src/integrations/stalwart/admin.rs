@@ -83,17 +83,8 @@ fn is_method_response(response: &Value) -> bool {
     })
 }
 
-/// The arguments of the first response to `method`.
 pub fn method_result<'a>(envelope: &'a Value, method: &str) -> Result<&'a Value, AdminError> {
-    envelope
-        .get("methodResponses")
-        .and_then(Value::as_array)
-        .and_then(|responses| {
-            responses
-                .iter()
-                .find(|response| response.get(0).and_then(Value::as_str) == Some(method))
-        })
-        .and_then(|response| response.get(1))
+    super::method_response(envelope, method)
         .ok_or_else(|| AdminError::MissingMethod(method.to_owned()))
 }
 

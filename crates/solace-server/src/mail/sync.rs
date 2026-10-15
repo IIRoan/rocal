@@ -16,7 +16,7 @@ use super::queries::{self, States};
 use crate::db::entities::mail_jmap_sync_state;
 use crate::error::AppError;
 use crate::instant;
-use crate::integrations::stalwart::jmap;
+use crate::integrations::stalwart::{jmap, method_response};
 use crate::invitations::service::{MailEmail, ingest_from_emails};
 use crate::state::AppState;
 use crate::telemetry::{log_ref, redact_pii};
@@ -237,18 +237,10 @@ async fn call(state: &AppState, method: &str, arguments: Value) -> Result<Value,
 }
 
 fn method_result(envelope: &Value, method: &str) -> Result<Value, AppError> {
-    let responses = envelope.get("methodResponses").and_then(Value::as_array);
-    let named = |name: &str| {
-        responses
-            .into_iter()
-            .flatten()
-            .find(|entry| entry.get(0).and_then(Value::as_str) == Some(name))
-            .and_then(|entry| entry.get(1))
-    };
-    if let Some(result) = named(method) {
+    if let Some(result) = method_response(envelope, method) {
         return Ok(result.clone());
     }
-    if let Some(error) = named("error") {
+    if let Some(error) = method_response(envelope, "error") {
         let kind = error.get("type").and_then(Value::as_str).unwrap_or("error");
         return Err(AppError::internal(format!(
             "Stalwart JMAP {method} failed ({kind})."

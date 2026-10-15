@@ -384,15 +384,7 @@ fn assert_success(envelope: &Value, context: &str) -> Result<(), MailerError> {
 }
 
 fn method_result<'a>(envelope: &'a Value, method: &str) -> Result<&'a Value, MailerError> {
-    envelope
-        .get("methodResponses")
-        .and_then(Value::as_array)
-        .and_then(|responses| {
-            responses
-                .iter()
-                .find(|r| r.get(0).and_then(Value::as_str) == Some(method))
-        })
-        .and_then(|r| r.get(1))
+    super::method_response(envelope, method)
         .ok_or_else(|| MailerError::Method(format!("Expected {method} in JMAP response")))
 }
 
