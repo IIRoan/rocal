@@ -108,10 +108,11 @@ impl<T: Clone> Ttl<T> {
     }
 }
 
+/// The Solace user a mailbox belongs to, whose mail token every JMAP call for it uses.
 #[derive(Clone)]
-struct Owner {
-    user_id: String,
-    email: String,
+pub struct Owner {
+    pub user_id: String,
+    pub email: String,
 }
 
 #[derive(Clone)]

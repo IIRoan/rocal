@@ -15,10 +15,10 @@ use tokio::sync::mpsc;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use super::{Owner, Subscription, subscribe};
+use super::{Subscription, subscribe};
 use crate::auth::guard::RouteUser;
 use crate::error::AppError;
-use crate::mail::sync;
+use crate::mail::sync::{self, Owner};
 use crate::state::AppState;
 use crate::telemetry::log_ref;
 

@@ -17,7 +17,8 @@ pub use routes::routes;
 
 use crate::instant;
 use crate::mail::push::coalesce_pending_mail_sync;
-use crate::mail::{service, sync};
+use crate::mail::service;
+use crate::mail::sync::{self, Owner};
 use crate::state::AppState;
 use crate::telemetry::redact_pii;
 
@@ -26,18 +27,9 @@ const NOTIFICATION_THROTTLE: Duration = Duration::from_millis(750);
 const RECONNECT_DELAY: Duration = Duration::from_secs(3);
 const RECEIPT_POLL_INTERVAL: Duration = Duration::from_secs(10);
 
-/// What a subscribed SSE stream receives.
-pub type EventSender = mpsc::UnboundedSender<MailChangedEvent>;
-
-#[derive(Clone)]
-pub struct Owner {
-    pub user_id: String,
-    pub email: String,
-}
-
 struct Subscriber {
     account_ids: Vec<String>,
-    events: EventSender,
+    events: mpsc::UnboundedSender<MailChangedEvent>,
 }
 
 #[derive(Default)]
@@ -136,7 +128,7 @@ pub fn subscribe(
     subscriber_id: String,
     account_ids: Vec<String>,
     owner: &Owner,
-    events: EventSender,
+    events: mpsc::UnboundedSender<MailChangedEvent>,
 ) -> Subscription {
     unsubscribe(state, &subscriber_id);
     state.mail_realtime.with(|inner| {
