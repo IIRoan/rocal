@@ -253,8 +253,7 @@ async fn relay(state: &AppState, upstream_path: String, request: Request) -> Res
             "Mailbox authorization must use a Bearer token.",
         );
     }
-    let method = parts.method.clone();
-    let Some(mut outgoing) = outgoing_body(&method, &parts.headers, body).await else {
+    let Some(mut outgoing) = outgoing_body(&parts.method, &parts.headers, body).await else {
         return proxy_error(
             StatusCode::PAYLOAD_TOO_LARGE,
             "Payload Too Large",
@@ -269,7 +268,7 @@ async fn relay(state: &AppState, upstream_path: String, request: Request) -> Res
         client_authorization: client_authorization.as_deref(),
         upstream_path: &upstream_path,
         query: parts.uri.query(),
-        method: &method,
+        method: &parts.method,
         started,
     };
     let first = attempt.send(&mut outgoing, None).await;
