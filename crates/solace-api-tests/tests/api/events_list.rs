@@ -880,6 +880,86 @@ async fn search_matches_plaintext_rows_by_words_and_title_substring() {
     assert_eq!(half.total, 1, "a single bound is ignored");
 }
 
+/// Hits are a subset of the row with trimmed calendar and category labels, exactly the keys `SearchEvent` and `SearchLabel` declare.
+#[tokio::test]
+async fn search_hits_carry_trimmed_calendar_and_category_labels() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar = calendar_id(&mut user, "Work").await;
+    let category = ok(user
+        .post("/api/categories", json!({"name": "Focus", "color": "blue"}))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    let event = insert_plaintext_event(
+        &app,
+        &user.id,
+        &calendar,
+        "Standup",
+        "2099-03-02T09:00:00.000Z",
+        "2099-03-02T09:15:00.000Z",
+    )
+    .await;
+    sqlx::query("UPDATE calendar_event SET category_id = $1 WHERE id = $2")
+        .bind(category["id"].as_str())
+        .bind(&event)
+        .execute(&app.db)
+        .await
+        .expect("category");
+
+    let found = ok(user
+        .get("/api/events/search?q=standup")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    let keys = |value: &Value| {
+        let mut keys: Vec<String> = value.as_object().expect("object").keys().cloned().collect();
+        keys.sort();
+        keys
+    };
+    let hit = &found["events"][0];
+    assert_eq!(
+        keys(hit),
+        [
+            "allDay",
+            "blindIndexTokens",
+            "calendar",
+            "calendarId",
+            "category",
+            "categoryId",
+            "color",
+            "createdAt",
+            "description",
+            "encryptedContent",
+            "encryptionKeyVersion",
+            "encryptionState",
+            "end",
+            "id",
+            "location",
+            "participants",
+            "recurrence",
+            "start",
+            "timezone",
+            "title",
+            "updatedAt",
+            "userId",
+        ]
+    );
+    let label = [
+        "color",
+        "encryptedName",
+        "encryptionKeyVersion",
+        "id",
+        "name",
+    ];
+    assert_eq!(keys(&hit["calendar"]), label);
+    assert_eq!(keys(&hit["category"]), label);
+    assert_eq!(
+        (&hit["calendar"]["id"], &hit["category"]["name"]),
+        (&json!(calendar), &json!("Focus"))
+    );
+}
+
 #[tokio::test]
 async fn search_paging_coerces_query_strings_like_zod() {
     let app = TestApp::spawn().await;

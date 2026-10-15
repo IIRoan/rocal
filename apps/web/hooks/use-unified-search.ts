@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type {
+  EventSearchHit,
   UnifiedSearchResponse,
   UnifiedSearchResult,
 } from "@workspace/calendar-core";
@@ -14,7 +15,6 @@ import {
 import type { CalendarEvent as UiCalendarEvent } from "@workspace/ui/components/calendar";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { webQueryKeys } from "@/lib/query-keys";
-import type { CalendarEvent as ApiCalendarEvent } from "@/lib/types/calendar";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
@@ -45,7 +45,7 @@ type UseUnifiedSearchOptions = {
   includeCalendar?: boolean;
 };
 
-function mapApiEvent(e: ApiCalendarEvent): UiCalendarEvent {
+function mapApiEvent(e: EventSearchHit): UiCalendarEvent {
   return {
     id: e.id,
     title: e.title,
@@ -61,7 +61,6 @@ function mapApiEvent(e: ApiCalendarEvent): UiCalendarEvent {
     createdAt: e.createdAt,
     updatedAt: e.updatedAt,
     recurrence: e.recurrence ?? undefined,
-    parentEventId: e.parentEventId ?? undefined,
     encryptedContent: e.encryptedContent,
     blindIndexTokens: e.blindIndexTokens,
     encryptionState: e.encryptionState,
