@@ -178,7 +178,6 @@ pub async fn participants_with_users<C: ConnectionTrait>(
         .await
 }
 
-/// The events' participant rows, by event id.
 pub async fn participants_by_event<C: ConnectionTrait>(
     db: &C,
     event_ids: Vec<String>,
