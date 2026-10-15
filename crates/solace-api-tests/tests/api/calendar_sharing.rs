@@ -557,6 +557,58 @@ async fn the_feed_carries_each_series_exceptions() {
 }
 
 #[tokio::test]
+async fn zoned_series_keep_wall_clock_time_across_dst() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar = create_calendar(&mut user, "Standup", "blue").await;
+    let id = &calendar.id.0;
+    // 09:00 in Amsterdam every week, across the end of summer time on 25 October.
+    let series = insert_event(
+        &app.db,
+        &user.id,
+        id,
+        EventRow {
+            title: "Standup",
+            start: Some("2026-10-19 07:00:00"),
+            end: Some("2026-10-19 07:15:00"),
+            timezone: Some("Europe/Amsterdam"),
+            recurrence: Some(
+                r#"{"frequency":"weekly","interval":1,"count":6,"timezone":"Europe/Amsterdam"}"#,
+            ),
+            ..Default::default()
+        },
+    )
+    .await;
+    sqlx::query(
+        "INSERT INTO recurrence_exception (id, parent_event_id, exception_date, type, created_at, updated_at) \
+         VALUES ($1, $2, '2026-11-02 08:00:00', 'deleted', now(), now())",
+    )
+    .bind(format!("suiteexc{}", hex(8)))
+    .bind(&series)
+    .execute(&app.db)
+    .await
+    .expect("insert exception");
+    let token = token_of(&enable(&mut user, id).await);
+    let body = feed(&app, &token).await.text().replace("\r\n ", "");
+    match app.backend {
+        // TypeScript anchors the rule in UTC, so subscribers see 10:00 after the change.
+        Backend::TypeScript => {
+            assert!(body.contains("DTSTART:20261019T070000Z\r\n"), "{body}");
+            assert!(!body.contains("VTIMEZONE"), "{body}");
+        }
+        Backend::Rust => {
+            for line in [
+                "BEGIN:VTIMEZONE\r\nTZID:Europe/Amsterdam\r\n",
+                "DTSTART;TZID=Europe/Amsterdam:20261019T090000\r\nDTEND;TZID=Europe/Amsterdam:20261019T091500\r\n",
+                "EXDATE;TZID=Europe/Amsterdam:20261102T090000\r\n",
+            ] {
+                assert!(body.contains(line), "{line} in {body}");
+            }
+        }
+    }
+}
+
+#[tokio::test]
 async fn the_feed_token_may_carry_an_ics_suffix_and_spaces() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;

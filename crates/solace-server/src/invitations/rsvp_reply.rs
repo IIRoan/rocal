@@ -108,6 +108,7 @@ fn reply_ics(reply: &Reply<'_>, organizer: &str, attendee: &str) -> String {
                 },
             ]),
             recurrence_id: None,
+            recurrence_zone: None,
             excluded_dates: Vec::new(),
         },
     )

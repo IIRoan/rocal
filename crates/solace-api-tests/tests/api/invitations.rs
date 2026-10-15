@@ -4,7 +4,7 @@ use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use serde_json::json;
 use solace_api_tests::seed::fake_envelope;
 use solace_api_types::events::{
-    BulkEventResult, Event, EventDeleted, ImportInvitationRequest, InvitationContent,
+    BulkEventResult, Event, EventDeleted, EventList, ImportInvitationRequest, InvitationContent,
     InvitationDeclined, InvitationEncryptionEntry, InvitationImportSummary, InvitationLookup,
     ParticipantInput, RsvpDeleted, UpdateEventRequest,
 };
@@ -75,6 +75,133 @@ fn request_ics(uid: &str, method: &str, organizer: &str, attendee: &str) -> Stri
         "",
     ]
     .join("\r\n")
+}
+
+/// A weekly series' REQUEST for four Mondays from 2 March 2099, the 9th excluded and the 16th moved; or only the move of the 23rd.
+fn series_request(uid: &str, organizer: &str, attendee: &str, master: bool) -> String {
+    let people = [
+        format!("ORGANIZER;CN=Organizer:mailto:{organizer}"),
+        format!("ATTENDEE;CN=Bee;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{attendee}"),
+    ];
+    let event = |lines: &[&str]| {
+        let mut out = vec!["BEGIN:VEVENT".to_owned(), format!("UID:{uid}")];
+        out.extend(lines.iter().map(|line| (*line).to_owned()));
+        out.extend(people.iter().cloned());
+        out.push("END:VEVENT".into());
+        out
+    };
+    let mut lines = vec![
+        "BEGIN:VCALENDAR".to_owned(),
+        "VERSION:2.0".into(),
+        "METHOD:REQUEST".into(),
+    ];
+    if master {
+        lines.extend(event(&[
+            "SUMMARY:Weekly",
+            "DTSTART:20990302T090000Z",
+            "DTEND:20990302T100000Z",
+            "RRULE:FREQ=WEEKLY;COUNT=4",
+            "EXDATE:20990309T090000Z",
+        ]));
+        lines.extend(event(&[
+            "SUMMARY:Moved",
+            "RECURRENCE-ID:20990316T090000Z",
+            "DTSTART:20990316T140000Z",
+            "DTEND:20990316T150000Z",
+        ]));
+    } else {
+        lines.extend(event(&[
+            "SUMMARY:Moved later",
+            "RECURRENCE-ID:20990323T090000Z",
+            "DTSTART:20990323T160000Z",
+            "DTEND:20990323T170000Z",
+        ]));
+    }
+    lines.extend(["END:VCALENDAR".to_owned(), String::new()]);
+    lines.join("\r\n")
+}
+
+#[tokio::test]
+async fn mailed_series_skip_their_excluded_and_overridden_occurrences() {
+    let app = TestApp::spawn().await;
+    let mut attendee = app.user().await;
+    let uid = format!("series-{}@example.com", hex(6));
+    let organizer = "organizer@example.com";
+    let email = attendee.email.clone();
+    let starts = |list: EventList| -> Vec<(String, String)> {
+        list.events
+            .into_iter()
+            .map(|event| (event.start.0, event.end.0))
+            .collect()
+    };
+    let at = |start: &str, end: &str| (start.to_owned(), end.to_owned());
+    import(
+        &mut attendee,
+        &import_request(series_request(&uid, organizer, &email, true), None),
+    )
+    .await;
+    let first = starts(
+        list_events(
+            &mut attendee,
+            "2099-03-01T00:00:00.000Z",
+            "2099-03-31T00:00:00.000Z",
+        )
+        .await,
+    );
+    import(
+        &mut attendee,
+        &import_request(series_request(&uid, organizer, &email, false), None),
+    )
+    .await;
+    let second = starts(
+        list_events(
+            &mut attendee,
+            "2099-03-01T00:00:00.000Z",
+            "2099-03-31T00:00:00.000Z",
+        )
+        .await,
+    );
+    let monday = |day: u8| {
+        at(
+            &format!("2099-03-{day:02}T09:00:00.000Z"),
+            &format!("2099-03-{day:02}T10:00:00.000Z"),
+        )
+    };
+    match app.backend {
+        // TypeScript stores overrides as unrelated events and ignores EXDATE.
+        Backend::TypeScript => {
+            assert_eq!(
+                first,
+                [
+                    monday(2),
+                    monday(9),
+                    monday(16),
+                    at("2099-03-16T14:00:00.000Z", "2099-03-16T15:00:00.000Z"),
+                    monday(23),
+                ]
+            );
+            assert_eq!(second.len(), 6);
+        }
+        Backend::Rust => {
+            assert_eq!(
+                first,
+                [
+                    monday(2),
+                    at("2099-03-16T14:00:00.000Z", "2099-03-16T15:00:00.000Z"),
+                    monday(23),
+                ]
+            );
+            assert_eq!(
+                second,
+                [
+                    monday(2),
+                    at("2099-03-16T14:00:00.000Z", "2099-03-16T15:00:00.000Z"),
+                    at("2099-03-23T16:00:00.000Z", "2099-03-23T17:00:00.000Z"),
+                ],
+                "a later override joins without losing the series' earlier exceptions"
+            );
+        }
+    }
 }
 
 async fn import(user: &mut TestUser, request: &ImportInvitationRequest) -> InvitationImportSummary {

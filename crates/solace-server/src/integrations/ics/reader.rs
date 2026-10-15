@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 use regex_lite::Regex;
 
 use super::zones::strip_quotes;
-use super::{js, rrule, zones};
+use super::{js, rrule, vtimezone, zones};
 use crate::http::zod::{js_number, js_number_string};
 
 fn pattern(source: &str) -> Regex {
@@ -273,23 +273,16 @@ fn number(captures: &regex_lite::Captures<'_>, index: usize) -> i64 {
         .unwrap_or(0)
 }
 
-/// The VTIMEZONE in the parser stack with this (quote-stripped) TZID.
-fn find_vtimezone<'a>(stack: &'a [Obj], tzid: &str) -> Option<&'a Obj> {
-    stack
-        .iter()
-        .flat_map(Obj::values)
-        .filter_map(Val::as_obj)
-        .find(|component| {
-            if component.kind() != Some("VTIMEZONE") {
-                return false;
-            }
-            let ids: Vec<String> = match component.get("tzid") {
-                Some(Val::List(items)) => items.iter().map(Val::js_string).collect(),
-                Some(other) => vec![other.js_string()],
-                None => vec!["undefined".into()],
-            };
-            ids.iter().any(|id| strip_quotes(id) == tzid)
-        })
+/// The file's VTIMEZONE with this (quote-stripped) TZID, wherever in the file it stands.
+fn find_vtimezone<'a>(zones: &'a [FileZone], tzid: &str) -> Option<&'a FileZone> {
+    zones.iter().find(|zone| {
+        let ids: Vec<String> = match zone.component.get("tzid") {
+            Some(Val::List(items)) => items.iter().map(Val::js_string).collect(),
+            Some(other) => vec![other.js_string()],
+            None => vec!["undefined".into()],
+        };
+        ids.iter().any(|id| strip_quotes(id) == tzid)
+    })
 }
 
 /// `resolveVTimezoneToIana`: the zone whose offsets match the STANDARD/DAYLIGHT rules in force in `year`.
@@ -407,15 +400,111 @@ fn utc_add(date: Option<Option<i64>>, amount: i64, unit_ms: i64) -> Option<Optio
     })
 }
 
+/// A VTIMEZONE of the file, with its STANDARD and DAYLIGHT parts read for evaluation.
+struct FileZone {
+    component: Obj,
+    parts: Vec<vtimezone::Observance>,
+}
+
+/// The STANDARD and DAYLIGHT parts of a VTIMEZONE as the evaluator reads them; a part without readable offsets is left out.
+fn observances(component: &Obj) -> Vec<vtimezone::Observance> {
+    let civil = |ms: i64| {
+        jiff::Timestamp::from_millisecond(ms)
+            .ok()
+            .map(|at| jiff::tz::TimeZone::UTC.to_datetime(at))
+    };
+    let texts = |value: Option<&Val>| -> Vec<String> {
+        match value {
+            Some(Val::Str(text) | Val::Param(_, text)) => vec![text.clone()],
+            Some(Val::List(items)) => items
+                .iter()
+                .filter_map(|item| match item {
+                    Val::Str(text) | Val::Param(_, text) => Some(text.clone()),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        }
+    };
+    component
+        .values()
+        .filter_map(Val::as_obj)
+        .filter_map(|block| {
+            let daylight = match block.kind()? {
+                "DAYLIGHT" => true,
+                "STANDARD" => false,
+                _ => return None,
+            };
+            let offset = |key: &str| {
+                let minutes = zones::offset_label_to_minutes(&block.get(key)?.js_string())?;
+                jiff::tz::Offset::from_seconds(i32::try_from(minutes * 60).ok()?).ok()
+            };
+            let rule = texts(block.get("rrule"))
+                .first()
+                .and_then(|line| line.split_once(':'))
+                .map(|(_, rule)| rule.to_owned());
+            let dates = texts(block.get("rdate"))
+                .iter()
+                .flat_map(|text| text.split(','))
+                .filter_map(|date| vtimezone::basic_date_time(date).map(|(at, _)| at))
+                .collect();
+            Some(vtimezone::Observance {
+                daylight,
+                start: block.date("start")?.ms.and_then(civil)?,
+                from: offset("tzoffsetfrom")?,
+                to: offset("tzoffsetto")?,
+                rule,
+                dates,
+            })
+        })
+        .collect()
+}
+
+/// The file's VTIMEZONEs, read ahead so a TZID can name one defined further down.
+fn file_zones(content: &str) -> Vec<FileZone> {
+    let mut captured = String::from("BEGIN:VCALENDAR\n");
+    let mut inside = false;
+    for line in content.split('\n').map(|line| line.trim_end_matches('\r')) {
+        inside |= line == "BEGIN:VTIMEZONE";
+        if inside {
+            captured.push_str(line);
+            captured.push('\n');
+        }
+        inside &= line != "END:VTIMEZONE";
+    }
+    captured.push_str("END:VCALENDAR\n");
+    let Ok(root) = read(&captured, None, Vec::new()) else {
+        return Vec::new();
+    };
+    root.values()
+        .filter_map(Val::as_obj)
+        .filter(|component| component.kind() == Some("VTIMEZONE"))
+        .map(|component| FileZone {
+            parts: observances(component),
+            component: component.clone(),
+        })
+        .collect()
+}
+
 pub struct Reader {
     stack: Vec<Obj>,
     next_id: u64,
+    zones: Vec<FileZone>,
     /// Where floating times are read when the calendar names no zone: the user's.
     floating_zone: Option<String>,
 }
 
 /// node-ical's `parseICS`: the root object, or the message of the error that aborted the whole feed.
 pub fn parse(content: &str, user_timezone: &str) -> Result<Obj, String> {
+    let zones = if content.contains("BEGIN:VTIMEZONE") {
+        file_zones(content)
+    } else {
+        Vec::new()
+    };
+    read(content, Some(user_timezone), zones)
+}
+
+fn read(content: &str, user_timezone: Option<&str>, zones: Vec<FileZone>) -> Result<Obj, String> {
     let mut lines: Vec<&str> = content.split('\n').collect();
     for line in &mut lines {
         *line = line.strip_suffix('\r').unwrap_or(line);
@@ -423,7 +512,8 @@ pub fn parse(content: &str, user_timezone: &str) -> Result<Obj, String> {
     let mut reader = Reader {
         stack: Vec::new(),
         next_id: 0,
-        floating_zone: super::normalize_timezone(Some(user_timezone))
+        zones,
+        floating_zone: super::normalize_timezone(user_timezone)
             .filter(|zone| zones::lookup(zone).is_some()),
     };
     let mut ctx = Obj::default();
@@ -661,14 +751,39 @@ impl Reader {
         parameters: &mut Vec<String>,
         local: impl Fn() -> Option<i64>,
     ) -> Result<JsDate, String> {
+        // A TZID the tz database does not know reads by its own VTIMEZONE's rules, whatever its prefix.
+        if !zones::is_named_zone(&tz)
+            && let Some(zone) = find_vtimezone(&self.zones, &tz)
+            && let Some(at) = local()
+                .and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok())
+                .map(|at| jiff::tz::TimeZone::UTC.to_datetime(at))
+            && let Some(instant) = vtimezone::instant(&zone.parts, at)
+        {
+            // The stored zone: CLDR's for a Windows name, libical's X-LIC-LOCATION, else the first zone with the same offsets.
+            let location = match zone.component.get("LIC-LOCATION") {
+                Some(Val::Str(location)) if zones::is_named_zone(location) => {
+                    Some(location.clone())
+                }
+                _ => None,
+            };
+            let label = zones::windows_zone(&tz).or(location).or_else(|| {
+                let (iana, offset) = resolve_vtimezone(&zone.component, year);
+                iana.or(offset)
+            });
+            return Ok(JsDate {
+                ms: Some(instant.as_millisecond()),
+                tz: label,
+                date_only: false,
+            });
+        }
         if tz == "tzone://Microsoft/Custom"
             || tz == "(no TZ description)"
             || tz.starts_with("Customized Time Zone")
             || tz.starts_with("tzone://Microsoft/")
         {
-            match find_vtimezone(&self.stack, &tz) {
-                Some(vtimezone) => {
-                    let (iana, offset) = resolve_vtimezone(vtimezone, year);
+            match find_vtimezone(&self.zones, &tz) {
+                Some(zone) => {
+                    let (iana, offset) = resolve_vtimezone(&zone.component, year);
                     if let Some(resolved) = iana.or(offset) {
                         tz = resolved;
                     }

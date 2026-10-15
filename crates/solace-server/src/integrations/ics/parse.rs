@@ -1105,6 +1105,57 @@ mod tests {
     }
 
     #[test]
+    fn custom_tzids_read_by_their_own_vtimezone() {
+        // Solace's own feed with the zone renamed: only its VTIMEZONE can say where 09:00 is.
+        let ics = super::super::build::build_calendar(
+            &super::super::build::Calendar::default(),
+            &super::super::build::tests::series_across_dst(),
+        )
+        .replace("Europe/Amsterdam", "Office time");
+        let result = parse(&ics, "America/Los_Angeles");
+        let series = event(&result, "series@example.com");
+        assert_eq!(instant::iso(series.start).0, "2026-10-19T07:00:00.000Z");
+        let moved = event(
+            &result,
+            "series@example.com::RECURRENCE::2026-11-09T08:00:00.000Z",
+        );
+        assert_eq!(
+            moved.occurrence.map(|at| instant::iso(at).0).as_deref(),
+            Some("2026-11-09T08:00:00.000Z"),
+            "the override names the post-change instance"
+        );
+        assert_eq!(
+            series
+                .excluded_dates
+                .iter()
+                .map(|at| instant::iso(*at).0)
+                .collect::<Vec<_>>(),
+            ["2026-11-02T08:00:00.000Z"]
+        );
+        // A VTIMEZONE defined after the event that uses it still counts.
+        let forward = feed(&[
+            "BEGIN:VEVENT",
+            "UID:forward",
+            "DTSTART;TZID=Later:20240715T090000",
+            "SUMMARY:Forward",
+            "END:VEVENT",
+            "BEGIN:VTIMEZONE",
+            "TZID:Later",
+            "BEGIN:STANDARD",
+            "DTSTART:19700101T000000",
+            "TZOFFSETFROM:+0530",
+            "TZOFFSETTO:+0530",
+            "END:STANDARD",
+            "END:VTIMEZONE",
+        ]);
+        let result = parse(&forward, "UTC");
+        assert_eq!(
+            instant::iso(event(&result, "forward").start).0,
+            "2024-07-15T03:30:00.000Z"
+        );
+    }
+
+    #[test]
     fn zones_are_stored_as_iana_names_never_as_labels() {
         let lines = [
             (

@@ -1439,6 +1439,124 @@ async fn imported_zones_are_tz_database_zones_never_labels() {
 }
 
 #[tokio::test]
+async fn custom_tzids_are_read_by_their_vtimezone() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar_id = owned_calendar(&mut user).await;
+    let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:custom@example.com",
+        "DTSTART;TZID=Office time:20261102T090000",
+        "SUMMARY:After the change",
+        "END:VEVENT",
+        "BEGIN:VTIMEZONE",
+        "TZID:Office time",
+        "X-LIC-LOCATION:Europe/Amsterdam",
+        "BEGIN:STANDARD",
+        "DTSTART:19701025T030000",
+        "TZOFFSETFROM:+0200",
+        "TZOFFSETTO:+0100",
+        "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+        "END:STANDARD",
+        "BEGIN:DAYLIGHT",
+        "DTSTART:19700329T020000",
+        "TZOFFSETFROM:+0100",
+        "TZOFFSETTO:+0200",
+        "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+        "END:DAYLIGHT",
+        "END:VTIMEZONE",
+        "END:VCALENDAR",
+        "",
+    ]
+    .join("\r\n");
+    ok(user
+        .post(
+            "/api/subscriptions/import-ics",
+            json!({"calendarId": calendar_id, "icsContent": ics}),
+        )
+        .await
+        .expect_status(200));
+    let stored: (String, String) = sqlx::query_as(&format!(
+        "SELECT timezone, {} FROM calendar_event WHERE calendar_id = $1",
+        iso("start")
+    ))
+    .bind(&calendar_id)
+    .fetch_one(&app.db)
+    .await
+    .expect("imported event");
+    let expected = match app.backend {
+        // node-ical looks a VTIMEZONE up only for Microsoft's custom names, so this reads as UTC under its label.
+        Backend::TypeScript => ("Office time", "2026-11-02T09:00:00.000Z"),
+        Backend::Rust => ("Europe/Amsterdam", "2026-11-02T08:00:00.000Z"),
+    };
+    assert_eq!(stored, (expected.0.to_owned(), expected.1.to_owned()));
+}
+
+#[tokio::test]
+async fn legacy_imports_skip_excluded_and_overridden_occurrences() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar_id = owned_calendar(&mut user).await;
+    let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:weekly@example.com",
+        "DTSTART:20990302T090000Z",
+        "DTEND:20990302T100000Z",
+        "SUMMARY:Weekly",
+        "RRULE:FREQ=WEEKLY;COUNT=4",
+        "EXDATE:20990309T090000Z",
+        "END:VEVENT",
+        "BEGIN:VEVENT",
+        "UID:weekly@example.com",
+        "RECURRENCE-ID:20990316T090000Z",
+        "DTSTART:20990316T140000Z",
+        "DTEND:20990316T150000Z",
+        "SUMMARY:Moved",
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+    ]
+    .join("\r\n");
+    ok(user
+        .post(
+            "/api/subscriptions/import-ics",
+            json!({"calendarId": calendar_id, "icsContent": ics}),
+        )
+        .await
+        .expect_status(200));
+    let listed: Vec<String> = ok(user
+        .get("/api/events?start=2099-03-01T00:00:00.000Z&end=2099-03-31T00:00:00.000Z")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()))["events"]
+        .as_array()
+        .expect("events")
+        .iter()
+        .map(|event| event["start"].as_str().unwrap_or_default().to_owned())
+        .collect();
+    let expected: &[&str] = match app.backend {
+        // TypeScript stores the override as an unrelated event and ignores EXDATE.
+        Backend::TypeScript => &[
+            "2099-03-02T09:00:00.000Z",
+            "2099-03-09T09:00:00.000Z",
+            "2099-03-16T09:00:00.000Z",
+            "2099-03-16T14:00:00.000Z",
+            "2099-03-23T09:00:00.000Z",
+        ],
+        Backend::Rust => &[
+            "2099-03-02T09:00:00.000Z",
+            "2099-03-16T14:00:00.000Z",
+            "2099-03-23T09:00:00.000Z",
+        ],
+    };
+    assert_eq!(listed, expected);
+}
+
+#[tokio::test]
 async fn legacy_ics_import_without_events_is_rejected() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;

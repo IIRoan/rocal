@@ -1,10 +1,12 @@
 //! `buildIcsCalendar` and `buildIcsEventFile`: the ICS Solace writes for exports, public feeds, invitations and RSVP replies.
 
+use jiff::Timestamp;
+use jiff::tz::TimeZone;
 use time::PrimitiveDateTime;
 
 use super::{
     DEFAULT_METHOD, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, js,
-    normalize_timezone, zones,
+    normalize_timezone, vtimezone, zones,
 };
 use crate::http::zod::js_trim;
 use crate::instant;
@@ -51,6 +53,8 @@ pub struct Event {
     pub participants: Option<Vec<Participant>>,
     /// The original start of the occurrence this VEVENT overrides.
     pub recurrence_id: Option<PrimitiveDateTime>,
+    /// The series rule's zone, which a RECURRENCE-ID is written in like the series' DTSTART.
+    pub recurrence_zone: Option<String>,
     /// Occurrence starts the series skips (EXDATE).
     pub excluded_dates: Vec<PrimitiveDateTime>,
 }
@@ -108,6 +112,18 @@ pub fn build_calendar_at(
     }
     if let Some(url) = trimmed(&calendar.source_url) {
         lines.push(format!("URL:{}", sanitize_uri(&url)));
+    }
+    let mut zones: std::collections::BTreeMap<String, (TimeZone, i64)> =
+        std::collections::BTreeMap::new();
+    for event in events {
+        for (name, tz, earliest) in wall_clock_zones(event) {
+            let entry = zones.entry(name).or_insert((tz, earliest));
+            entry.1 = entry.1.min(earliest);
+        }
+    }
+    for (name, (tz, earliest)) in &zones {
+        let earliest = Timestamp::from_millisecond(*earliest).unwrap_or(Timestamp::UNIX_EPOCH);
+        lines.extend(vtimezone::component(name, tz, earliest));
     }
     for event in events {
         event_lines(&mut lines, event, stamp, calendar.timezone.as_deref());
@@ -211,6 +227,42 @@ fn next_day(stamp: &str) -> String {
     }
 }
 
+/// A timed series in its rule's zone, so subscribers expand it on wall-clock time as the owner's calendar does.
+fn series_zone(event: &Event) -> Option<(String, TimeZone)> {
+    let rule = event.recurrence.as_ref().filter(|_| !event.all_day)?;
+    vtimezone::wall_clock_zone(rule.timezone.as_deref())
+}
+
+fn override_zone(event: &Event) -> Option<(String, TimeZone)> {
+    event.recurrence_id.filter(|_| !event.all_day)?;
+    vtimezone::wall_clock_zone(event.recurrence_zone.as_deref())
+}
+
+/// The zones an event writes with `TZID`, and the earliest instant each must cover.
+fn wall_clock_zones(event: &Event) -> Vec<(String, TimeZone, i64)> {
+    let mut used = Vec::new();
+    if let Some((name, tz)) = series_zone(event) {
+        let earliest = event
+            .excluded_dates
+            .iter()
+            .map(|at| ms(*at))
+            .fold(ms(event.start), i64::min);
+        used.push((name, tz, earliest));
+    }
+    if let (Some((name, tz)), Some(at)) = (override_zone(event), event.recurrence_id) {
+        used.push((name, tz, ms(at)));
+    }
+    used
+}
+
+/// A DATE-TIME's parameters and value: `;TZID=<zone>` with the wall time in a wall-clock zone, else UTC.
+fn date_time_parts(zone: Option<&(String, TimeZone)>, at: i64) -> (String, String) {
+    match (zone, Timestamp::from_millisecond(at)) {
+        (Some((name, tz)), Ok(at)) => (format!(";TZID={name}"), vtimezone::local_stamp(tz, at)),
+        _ => (String::new(), date_time_stamp(at)),
+    }
+}
+
 fn rrule(rule: &RecurrenceRule) -> String {
     let mut segments = vec![format!("FREQ={}", rule.frequency.as_str().to_uppercase())];
     if rule.interval > 1 {
@@ -298,14 +350,14 @@ fn event_lines(
     ]);
     let zone = normalize_timezone(event.timezone.as_deref().or(calendar_timezone))
         .unwrap_or_else(|| "UTC".into());
-    let occurrence = |at: PrimitiveDateTime| {
+    let series_zone = series_zone(event);
+    let occurrence = |at: PrimitiveDateTime, wall: Option<&(String, TimeZone)>| {
         if event.all_day {
-            date_stamp_in(ms(at), &zone)
+            (";VALUE=DATE".to_owned(), date_stamp_in(ms(at), &zone))
         } else {
-            date_time_stamp(ms(at))
+            date_time_parts(wall, ms(at))
         }
     };
-    let date_value = if event.all_day { ";VALUE=DATE" } else { "" };
     if event.all_day {
         lines.push(format!(
             "DTSTART;VALUE=DATE:{}",
@@ -316,11 +368,14 @@ fn event_lines(
             next_day(&date_stamp_in(end, &zone))
         ));
     } else {
-        lines.push(format!("DTSTART:{}", date_time_stamp(start)));
-        lines.push(format!("DTEND:{}", date_time_stamp(end)));
+        let (params, value) = date_time_parts(series_zone.as_ref(), start);
+        lines.push(format!("DTSTART{params}:{value}"));
+        let (params, value) = date_time_parts(series_zone.as_ref(), end);
+        lines.push(format!("DTEND{params}:{value}"));
     }
     if let Some(at) = event.recurrence_id {
-        lines.push(format!("RECURRENCE-ID{date_value}:{}", occurrence(at)));
+        let (params, value) = occurrence(at, override_zone(event).as_ref());
+        lines.push(format!("RECURRENCE-ID{params}:{value}"));
     }
     let present = |value: &Option<String>| {
         value
@@ -384,13 +439,14 @@ fn event_lines(
     }
     if let Some(rule) = &event.recurrence {
         lines.push(format!("RRULE:{}", rrule(rule)));
-        if !event.excluded_dates.is_empty() {
+        if let Some(first) = event.excluded_dates.first() {
+            let (params, _) = occurrence(*first, series_zone.as_ref());
             let dates: Vec<String> = event
                 .excluded_dates
                 .iter()
-                .map(|at| occurrence(*at))
+                .map(|at| occurrence(*at, series_zone.as_ref()).1)
                 .collect();
-            lines.push(format!("EXDATE{date_value}:{}", dates.join(",")));
+            lines.push(format!("EXDATE{params}:{}", dates.join(",")));
         }
     }
     lines.push("END:VEVENT".into());
@@ -422,6 +478,7 @@ pub(super) mod tests {
             source_url: None,
             participants: None,
             recurrence_id: None,
+            recurrence_zone: None,
             excluded_dates: Vec::new(),
         }
     }
@@ -468,6 +525,69 @@ pub(super) mod tests {
         assert!(ics.contains("DTEND:20240201T110000Z\r\nRECURRENCE-ID:20240222T100000Z\r\n"));
         assert!(ics.contains("EXDATE;VALUE=DATE:20240208\r\n"));
         assert_eq!(ics.matches("EXDATE").count(), 2, "only series carry EXDATE");
+    }
+
+    /// A weekly Amsterdam series that crosses the end of summer time.
+    pub(crate) fn series_across_dst() -> Vec<Event> {
+        let weekly = RecurrenceRule {
+            frequency: Frequency::Weekly,
+            interval: 1,
+            count: Some(6),
+            until: None,
+            by_week_day: None,
+            by_month_day: None,
+            by_month: None,
+            timezone: Some("Europe/Amsterdam".into()),
+        };
+        vec![
+            Event {
+                uid: Some("series@example.com".into()),
+                start: datetime!(2026-10-19 07:00:00),
+                end: datetime!(2026-10-19 08:00:00),
+                timezone: Some("Europe/Amsterdam".into()),
+                recurrence: Some(weekly),
+                excluded_dates: vec![datetime!(2026-11-02 08:00:00)],
+                ..event("Weekly")
+            },
+            Event {
+                uid: Some("series@example.com".into()),
+                start: datetime!(2026-11-09 13:00:00),
+                end: datetime!(2026-11-09 14:00:00),
+                timezone: Some("Europe/Amsterdam".into()),
+                recurrence_id: Some(datetime!(2026-11-09 08:00:00)),
+                recurrence_zone: Some("Europe/Amsterdam".into()),
+                ..event("Moved")
+            },
+        ]
+    }
+
+    #[test]
+    fn zoned_series_keep_wall_clock_time_across_dst() {
+        let ics = build_calendar(&Calendar::default(), &series_across_dst());
+        for line in [
+            "DTSTART;TZID=Europe/Amsterdam:20261019T090000\r\nDTEND;TZID=Europe/Amsterdam:20261019T100000\r\n",
+            "EXDATE;TZID=Europe/Amsterdam:20261102T090000\r\n",
+            "DTSTART:20261109T130000Z\r\nDTEND:20261109T140000Z\r\nRECURRENCE-ID;TZID=Europe/Amsterdam:20261109T090000\r\n",
+        ] {
+            assert!(ics.contains(line), "{line} in {ics}");
+        }
+        assert_eq!(
+            ics.matches("BEGIN:VTIMEZONE\r\nTZID:Europe/Amsterdam\r\n")
+                .count(),
+            1
+        );
+        assert!(
+            ics.find("END:VTIMEZONE") < ics.find("BEGIN:VEVENT"),
+            "{ics}"
+        );
+        let utc = build_calendar(
+            &Calendar::default(),
+            &[Event {
+                timezone: Some("Europe/Amsterdam".into()),
+                ..event("Rule without a zone")
+            }],
+        );
+        assert!(!utc.contains("VTIMEZONE") && utc.contains("DTSTART:20240201T100000Z"));
     }
 
     #[test]
@@ -576,6 +696,7 @@ pub(super) mod tests {
             source_url: text(&value["sourceUrl"]),
             participants: participants_from(&value["participants"]),
             recurrence_id: None,
+            recurrence_zone: None,
             excluded_dates: Vec::new(),
         }
     }

@@ -99,6 +99,11 @@ fn normalize_windows_label(label: &str) -> String {
     js_trim(&collapsed).to_lowercase()
 }
 
+/// A Windows name or "(UTC±hh:mm) City" label as the tz database zone CLDR maps it to.
+pub fn windows_zone(label: &str) -> Option<String> {
+    map_windows_zone(label).filter(|zone| is_named_zone(zone))
+}
+
 fn map_windows_zone(label: &str) -> Option<String> {
     let zones = &*WINDOWS;
     if let Some(iana) = zones.exact.get(label) {

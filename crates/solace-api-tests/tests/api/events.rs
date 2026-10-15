@@ -1774,6 +1774,109 @@ async fn plaintext_events_export_as_an_ics_attachment() {
 }
 
 #[tokio::test]
+async fn a_series_exports_with_its_exceptions() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let insert = |title: &'static str, start: &'static str, end: &'static str| {
+        insert_plaintext_event(&app, &owner.id, &calendar, title, start, end)
+    };
+    let series = insert(
+        "Weekly",
+        "2099-03-02T09:00:00.000Z",
+        "2099-03-02T10:00:00.000Z",
+    )
+    .await;
+    let moved = insert(
+        "Moved",
+        "2099-03-16T14:00:00.000Z",
+        "2099-03-16T15:00:00.000Z",
+    )
+    .await;
+    let sealed = insert("", "2099-03-23T15:00:00.000Z", "2099-03-23T16:00:00.000Z").await;
+    let sql = |statement: &'static str, id: String| {
+        let db = app.db.clone();
+        let series = series.clone();
+        async move {
+            sqlx::query(statement)
+                .bind(id)
+                .bind(series)
+                .execute(&db)
+                .await
+                .expect(statement);
+        }
+    };
+    sql(
+        "UPDATE calendar_event SET recurrence = '{\"frequency\":\"weekly\",\"interval\":1,\"count\":4}' WHERE id = $1 OR id = $2",
+        series.clone(),
+    )
+    .await;
+    sql(
+        "UPDATE calendar_event SET parent_event_id = $2 WHERE id = $1",
+        moved.clone(),
+    )
+    .await;
+    sql(
+        "UPDATE calendar_event SET parent_event_id = $2, encryption_state = 'encrypted', encrypted_content = 'v1.sealed' WHERE id = $1",
+        sealed.clone(),
+    )
+    .await;
+    for (date, kind, modified) in [
+        ("2099-03-09 09:00:00", "deleted", None),
+        ("2099-03-16 09:00:00", "modified", Some(&moved)),
+        ("2099-03-23 09:00:00", "modified", Some(&sealed)),
+    ] {
+        sqlx::query(
+            "INSERT INTO recurrence_exception (id, parent_event_id, exception_date, modified_event_id, type, created_at, updated_at) \
+             VALUES ($1, $2, $3::timestamp, $4, $5, now(), now())",
+        )
+        .bind(format!("suiteexc{}", hex(8)))
+        .bind(&series)
+        .bind(date)
+        .bind(modified)
+        .bind(kind)
+        .execute(&app.db)
+        .await
+        .expect("insert exception");
+    }
+
+    let ics = unfold(
+        &ok(owner
+            .get(&format!("/api/events/{series}/ics"))
+            .await
+            .expect_status(200))
+        .text(),
+    );
+    let uid = format!("UID:{series}@solace-calendar.local\r\n");
+    let markers = [
+        "RRULE:FREQ=WEEKLY;COUNT=4\r\nEXDATE:20990309T090000Z,20990323T090000Z\r\n",
+        "SUMMARY:Moved\r\nDTSTART:20990316T140000Z\r\nDTEND:20990316T150000Z\r\nRECURRENCE-ID:20990316T090000Z\r\n",
+    ];
+    match app.backend {
+        // TypeScript exports the bare rule.
+        Backend::TypeScript => {
+            assert_eq!(ics.matches(&uid).count(), 1, "{ics}");
+            assert!(markers.iter().all(|m| !ics.contains(m)), "{ics}");
+        }
+        Backend::Rust => {
+            assert_eq!(
+                ics.matches(&uid).count(),
+                2,
+                "the override shares the UID: {ics}"
+            );
+            for marker in markers {
+                assert!(ics.contains(marker), "{marker} in {ics}");
+            }
+            assert_eq!(
+                ics.matches("BEGIN:VEVENT").count(),
+                2,
+                "the sealed row stays out: {ics}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
 async fn all_day_events_export_local_dates_with_an_exclusive_end() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;

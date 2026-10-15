@@ -21,6 +21,7 @@ use crate::instant;
 use crate::integrations::ics::parse::{self, ParsedEvent, StoredEvent, StoredParticipant};
 use crate::integrations::ics::{Participant, ParticipantRole, RecurrenceRule, resolve_timezone};
 use crate::state::AppState;
+use crate::subscriptions::service::{link_series, rows_by_uid};
 
 const MAX_ICS_CONTENT_BYTES: usize = 1_048_576;
 const MAX_ICS_EVENTS_PER_FILE: usize = 100;
@@ -662,6 +663,12 @@ async fn upsert(
             apply_attendee_status(state, user_id, &existing.id, status).await?;
         }
     }
+    let uids = parsed_events
+        .iter()
+        .flat_map(|event| [event.uid.clone(), event.source_uid.clone()])
+        .collect();
+    let copies = queries::copies(&state.db, user_id, uids).await?;
+    link_series(&state.db, &rows_by_uid(copies), parsed_events).await?;
     Ok((created, updated))
 }
 

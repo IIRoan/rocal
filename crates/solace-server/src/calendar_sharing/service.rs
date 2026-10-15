@@ -2,17 +2,16 @@
 
 use solace_api_types::calendars::{CalendarShareLink, DisableShareLinkResponse};
 
-use std::collections::HashMap;
-
 use super::queries;
 use crate::auth::api::{ALPHANUMERIC, random_string};
 use crate::auth::cookies::encode_uri_component;
 use crate::auth::guard::RouteUser;
-use crate::db::entities::{calendar, calendar_event};
+use crate::db::entities::calendar;
 use crate::entity_metadata::external_calendar_name;
 use crate::error::AppError;
 use crate::events::encryption::backfill_ciphertext_only;
 use crate::events::queries as events;
+use crate::events::service::{attach_exceptions, export_event};
 use crate::instant;
 use crate::integrations::ics::{build, export};
 use crate::state::AppState;
@@ -169,63 +168,12 @@ pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String),
     } else {
         events::exceptions(&state.db, series).await?
     };
-    let by_id: HashMap<&str, &calendar_event::Model> = events
+    let mut built = events
         .iter()
-        .map(|event| (event.id.as_str(), event))
-        .collect();
-    // A modified occurrence in this calendar overrides its instance; any other exception excludes it.
-    let mut overrides: HashMap<&str, (String, time::PrimitiveDateTime)> = HashMap::new();
-    let mut excluded: HashMap<&str, Vec<time::PrimitiveDateTime>> = HashMap::new();
-    for exception in &exceptions {
-        let detached = exception
-            .modified_event_id
-            .as_deref()
-            .and_then(|id| by_id.get(id))
-            .filter(|row| row.recurrence.is_none());
-        match (detached, by_id.get(exception.parent_event_id.as_str())) {
-            (Some(row), Some(parent)) => {
-                overrides.insert(
-                    row.id.as_str(),
-                    (
-                        export::uid(&parent.id, parent.external_id.as_deref()),
-                        exception.exception_date,
-                    ),
-                );
-            }
-            (_, Some(parent)) => excluded
-                .entry(parent.id.as_str())
-                .or_default()
-                .push(exception.exception_date),
-            (_, None) => {}
-        }
-    }
-    let built = events
-        .iter()
-        .map(|event| {
-            let mut built = export::to_build_event(&export::ExportEvent {
-                id: &event.id,
-                external_id: event.external_id.as_deref(),
-                title: &event.title,
-                description: event.description.as_deref(),
-                start: event.start,
-                end: event.end,
-                all_day: event.all_day,
-                timezone: Some(&event.timezone),
-                location: event.location.as_deref(),
-                recurrence: event.recurrence.as_deref(),
-                created_at: event.created_at,
-                updated_at: event.updated_at,
-                participants: &[],
-            })?;
-            if let Some((uid, at)) = overrides.get(event.id.as_str()) {
-                built.uid = Some(uid.clone());
-                built.recurrence_id = Some(*at);
-            }
-            built.excluded_dates = excluded.remove(event.id.as_str()).unwrap_or_default();
-            Ok(built)
-        })
+        .map(|event| export::to_build_event(&export_event(event, &[])))
         .collect::<Result<Vec<_>, export::InvalidUntil>>()
         .map_err(|_| AppError::internal("recurrence until is not a valid instant"))?;
+    attach_exceptions(&events.iter().collect::<Vec<_>>(), &mut built, &exceptions);
     let name = external_calendar_name(&calendar.name);
     let ics = build::build_calendar(
         &build::Calendar {
