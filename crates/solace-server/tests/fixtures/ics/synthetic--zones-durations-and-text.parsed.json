@@ -26,10 +26,10 @@
         "uid": "offset-plus",
         "sourceUid": "offset-plus",
         "title": "Offset that parses as a number",
-        "start": "2024-07-15T09:00:00.000Z",
-        "end": "2024-07-15T10:00:00.000Z",
+        "start": "2024-07-15T08:00:00.000Z",
+        "end": "2024-07-15T09:00:00.000Z",
         "allDay": false,
-        "timezone": "100"
+        "timezone": "Etc/GMT-1"
       },
       {
         "uid": "offset-minus",
@@ -38,7 +38,7 @@
         "start": "2024-07-15T14:00:00.000Z",
         "end": "2024-07-16T16:00:00.000Z",
         "allDay": false,
-        "timezone": "-500"
+        "timezone": "Etc/GMT+5"
       },
       {
         "uid": "windows-label",
@@ -102,10 +102,16 @@
         "recurrence": {
           "frequency": "monthly",
           "interval": 2,
+          "byMonthDay": [
+            15
+          ],
+          "byMonth": [
+            7
+          ],
           "timezone": "Europe/Amsterdam"
         },
         "timezone": "europe/amsterdam",
-        "recurrenceJson": "{\"frequency\":\"monthly\",\"interval\":2,\"timezone\":\"Europe/Amsterdam\"}"
+        "recurrenceJson": "{\"frequency\":\"monthly\",\"interval\":2,\"byMonthDay\":[15],\"byMonth\":[7],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "constrained",
@@ -301,10 +307,10 @@
         "uid": "offset-plus",
         "sourceUid": "offset-plus",
         "title": "Offset that parses as a number",
-        "start": "2024-07-15T09:00:00.000Z",
-        "end": "2024-07-15T10:00:00.000Z",
+        "start": "2024-07-15T08:00:00.000Z",
+        "end": "2024-07-15T09:00:00.000Z",
         "allDay": false,
-        "timezone": "100"
+        "timezone": "Etc/GMT-1"
       },
       {
         "uid": "offset-minus",
@@ -313,7 +319,7 @@
         "start": "2024-07-15T14:00:00.000Z",
         "end": "2024-07-16T16:00:00.000Z",
         "allDay": false,
-        "timezone": "-500"
+        "timezone": "Etc/GMT+5"
       },
       {
         "uid": "windows-label",
@@ -377,10 +383,16 @@
         "recurrence": {
           "frequency": "monthly",
           "interval": 2,
+          "byMonthDay": [
+            15
+          ],
+          "byMonth": [
+            7
+          ],
           "timezone": "Europe/Amsterdam"
         },
         "timezone": "europe/amsterdam",
-        "recurrenceJson": "{\"frequency\":\"monthly\",\"interval\":2,\"timezone\":\"Europe/Amsterdam\"}"
+        "recurrenceJson": "{\"frequency\":\"monthly\",\"interval\":2,\"byMonthDay\":[15],\"byMonth\":[7],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "constrained",
@@ -410,11 +422,11 @@
         "recurrence": {
           "frequency": "yearly",
           "interval": 1,
-          "until": "2028-03-01T00:00:00.000Z",
-          "timezone": "UTC"
+          "until": "2028-02-29T23:00:00.000Z",
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"until\":\"2028-03-01T00:00:00.000Z\",\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"until\":\"2028-02-29T23:00:00.000Z\",\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "all-day-no-end",
@@ -539,11 +551,11 @@
         "recurrence": {
           "frequency": "daily",
           "interval": 1,
-          "until": "2024-04-01T00:00:00.000Z",
-          "timezone": "UTC"
+          "until": "2024-03-31T22:00:00.000Z",
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-04-01T00:00:00.000Z\",\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-03-31T22:00:00.000Z\",\"timezone\":\"Europe/Amsterdam\"}"
       }
     ],
     "errors": [],
@@ -576,10 +588,10 @@
         "uid": "offset-plus",
         "sourceUid": "offset-plus",
         "title": "Offset that parses as a number",
-        "start": "2024-07-15T09:00:00.000Z",
-        "end": "2024-07-15T10:00:00.000Z",
+        "start": "2024-07-15T08:00:00.000Z",
+        "end": "2024-07-15T09:00:00.000Z",
         "allDay": false,
-        "timezone": "100"
+        "timezone": "Etc/GMT-1"
       },
       {
         "uid": "offset-minus",
@@ -588,7 +600,7 @@
         "start": "2024-07-15T14:00:00.000Z",
         "end": "2024-07-16T16:00:00.000Z",
         "allDay": false,
-        "timezone": "-500"
+        "timezone": "Etc/GMT+5"
       },
       {
         "uid": "windows-label",
@@ -652,10 +664,16 @@
         "recurrence": {
           "frequency": "monthly",
           "interval": 2,
+          "byMonthDay": [
+            15
+          ],
+          "byMonth": [
+            7
+          ],
           "timezone": "Europe/Amsterdam"
         },
         "timezone": "europe/amsterdam",
-        "recurrenceJson": "{\"frequency\":\"monthly\",\"interval\":2,\"timezone\":\"Europe/Amsterdam\"}"
+        "recurrenceJson": "{\"frequency\":\"monthly\",\"interval\":2,\"byMonthDay\":[15],\"byMonth\":[7],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "constrained",
@@ -685,11 +703,11 @@
         "recurrence": {
           "frequency": "yearly",
           "interval": 1,
-          "until": "2028-03-01T00:00:00.000Z",
-          "timezone": "UTC"
+          "until": "2028-03-01T08:00:00.000Z",
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"until\":\"2028-03-01T00:00:00.000Z\",\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"until\":\"2028-03-01T08:00:00.000Z\",\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "all-day-no-end",
@@ -814,11 +832,11 @@
         "recurrence": {
           "frequency": "daily",
           "interval": 1,
-          "until": "2024-04-01T00:00:00.000Z",
-          "timezone": "UTC"
+          "until": "2024-04-01T07:00:00.000Z",
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-04-01T00:00:00.000Z\",\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-04-01T07:00:00.000Z\",\"timezone\":\"America/Los_Angeles\"}"
       }
     ],
     "errors": [],

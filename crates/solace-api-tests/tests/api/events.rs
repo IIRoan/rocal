@@ -1020,7 +1020,7 @@ async fn a_reminder_on_create_schedules_an_email_notification() {
 }
 
 #[tokio::test]
-async fn an_overdue_reminder_on_an_upcoming_event_is_reported_unscheduled() {
+async fn an_overdue_reminder_on_an_upcoming_event_fires_on_the_next_minute() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let calendar = calendar_id(&mut owner, "Work").await;
@@ -1030,25 +1030,37 @@ async fn an_overdue_reminder_on_an_upcoming_event_is_reported_unscheduled() {
     request.reminder = Some(Some(1440));
     let created = create_event(&mut owner, &request).await;
 
-    // The schedule clamps to the current minute, which chk_notification_time_future (time > created_at) rejects.
     assert_eq!(created.reminder, Some(1440));
-    assert_eq!(
-        created.warnings,
-        Some(vec![OperationWarning {
-            code: "reminder_schedule_failed".into(),
-            message: "Your event was saved, but the email reminder could not be scheduled. Try again from event settings.".into(),
-            target: None,
-        }])
-    );
-    assert_eq!(
+    let schedules = || {
         count(
             &app.db,
             "SELECT count(*) FROM event_notification WHERE event_id = $1",
-            &created.id.0
+            &created.id.0,
         )
-        .await,
-        0
-    );
+    };
+    match app.backend {
+        // TypeScript clamps to the current minute, which chk_notification_time_future (time > created_at) rejects.
+        Backend::TypeScript => {
+            assert_eq!(
+                created.warnings,
+                Some(vec![OperationWarning {
+                    code: "reminder_schedule_failed".into(),
+                    message: "Your event was saved, but the email reminder could not be scheduled. Try again from event settings.".into(),
+                    target: None,
+                }])
+            );
+            assert_eq!(schedules().await, 0);
+        }
+        Backend::Rust => {
+            assert_eq!(created.warnings, None);
+            assert_eq!(schedules().await, 1);
+            assert_eq!(
+                overdue_schedule_shape(&app, &created.id.0).await,
+                (true, true, true, true),
+                "after created_at, on a minute, within a minute, before the start"
+            );
+        }
+    }
     assert_eq!(
         count(
             &app.db,
@@ -1059,6 +1071,21 @@ async fn an_overdue_reminder_on_an_upcoming_event_is_reported_unscheduled() {
         1,
         "the event itself is saved"
     );
+}
+
+/// Whether an event's one schedule is after its row's `created_at`, minute-aligned, at most a minute later, and before the event.
+pub async fn overdue_schedule_shape(app: &TestApp, event_id: &str) -> (bool, bool, bool, bool) {
+    sqlx::query_as(
+        "SELECT en.notification_time > en.created_at, \
+                date_trunc('minute', en.notification_time) = en.notification_time, \
+                en.notification_time <= en.created_at + interval '1 minute', \
+                en.notification_time < ce.start \
+         FROM event_notification en JOIN calendar_event ce ON ce.id = en.event_id WHERE en.event_id = $1",
+    )
+    .bind(event_id)
+    .fetch_one(&app.db)
+    .await
+    .expect("schedule")
 }
 
 #[tokio::test]
@@ -1627,7 +1654,15 @@ async fn synced_events_are_read_only() {
         .expect_error(
             400,
             "Validation Error",
-            "Cannot modify synced events. The following synced events are read-only: Holiday",
+            match app.backend {
+                // TypeScript names the events by title, which is user content in the message.
+                Backend::TypeScript => {
+                    "Cannot modify synced events. The following synced events are read-only: Holiday"
+                }
+                Backend::Rust => {
+                    "Cannot modify synced events. Synced events are read-only (1 selected)."
+                }
+            },
         ));
     assert_eq!(
         row_snapshot(&app.db, "calendar_event", &event).await,

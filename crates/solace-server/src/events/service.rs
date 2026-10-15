@@ -185,11 +185,12 @@ pub async fn insert_reminder<C: sea_orm::ConnectionTrait>(
     encrypted_display_title: Option<String>,
     notification_type: &str,
 ) -> Result<bool, AppError> {
+    let now = instant::now();
     let schedule = calculator::schedule_upcoming_reminder(
         instant::unix_millis(start),
         f64::from(minutes_before),
         Some(timezone),
-        instant::unix_millis(instant::now()),
+        instant::unix_millis(now),
     )
     .map_err(AppError::internal)?;
     let Some(schedule) = schedule else {
@@ -209,6 +210,9 @@ pub async fn insert_reminder<C: sea_orm::ConnectionTrait>(
             is_enabled: Set(true),
             is_sent: Set(false),
             encrypted_display_title: Set(encrypted_display_title),
+            // The schedule is after this instant, which chk_notification_time_future requires of created_at.
+            created_at: Set(now),
+            updated_at: Set(now),
             ..Default::default()
         },
     )
@@ -781,30 +785,24 @@ pub async fn bulk(
             "eventIds",
         ));
     }
-    let synced: Vec<&str> = events
-        .iter()
-        .filter(|e| e.is_synced)
-        .map(|e| e.title.as_str())
-        .collect();
-    if !synced.is_empty() {
+    // Counts, not titles: an error message must not carry user content.
+    let synced = events.iter().filter(|e| e.is_synced).count();
+    if synced > 0 {
         return Err(AppError::validation(format!(
-            "Cannot modify synced events. The following synced events are read-only: {}",
-            synced.join(", ")
+            "Cannot modify synced events. Synced events are read-only ({synced} selected)."
         )));
     }
     let relations = Relations::load(&state.db, &events.iter().collect::<Vec<_>>(), false).await?;
     let attendee = |event: &calendar_event::Model| {
         attendee_copy(&user.id, relations.participants_of(&event.id))
     };
-    let read_only: Vec<&str> = events
+    let read_only = events
         .iter()
         .filter(|e| attendee(e) && !e.is_cancelled)
-        .map(|e| e.title.as_str())
-        .collect();
-    if !read_only.is_empty() && request.action != "delete" {
+        .count();
+    if read_only > 0 && request.action != "delete" {
         return Err(AppError::validation(format!(
-            "Imported invitation events are read-only for attendees: {}",
-            read_only.join(", ")
+            "Imported invitation events are read-only for attendees ({read_only} selected)."
         )));
     }
     match request.action.as_str() {

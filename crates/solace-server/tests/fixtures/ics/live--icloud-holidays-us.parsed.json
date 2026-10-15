@@ -40,10 +40,13 @@
           "byWeekDay": [
             1
           ],
+          "byMonth": [
+            1
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[1],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "19c7528b-a44e-3f70-800f-b22ee6be7bd0",
@@ -100,10 +103,13 @@
           "byWeekDay": [
             1
           ],
+          "byMonth": [
+            2
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[2],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "780abb03-aade-3383-bf48-13aa6ca261a7",
@@ -138,10 +144,13 @@
           "byWeekDay": [
             0
           ],
+          "byMonth": [
+            3
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[3],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "881438c7-7b25-34f7-b1dc-e478381a86d5",
@@ -304,10 +313,13 @@
           "byWeekDay": [
             0
           ],
+          "byMonth": [
+            5
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[5],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "991b560e-7963-314a-8520-e1f256b99ee1",
@@ -323,10 +335,13 @@
           "byWeekDay": [
             1
           ],
+          "byMonth": [
+            5
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[5],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "1831de42-74ac-39bc-83ae-3832144c68c4",
@@ -368,10 +383,13 @@
           "byWeekDay": [
             0
           ],
+          "byMonth": [
+            6
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[6],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "710e8dcf-62d9-39f1-a4ea-570dbb8a60fe",
@@ -429,10 +447,13 @@
           "byWeekDay": [
             1
           ],
+          "byMonth": [
+            9
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[9],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "adc37f3c-38a3-3525-a963-5983b473bf91",
@@ -479,10 +500,13 @@
           "byWeekDay": [
             1
           ],
+          "byMonth": [
+            10
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[10],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "44c8260c-b2e4-30cb-b4f6-5817bea86a30",
@@ -499,10 +523,13 @@
           "byWeekDay": [
             1
           ],
+          "byMonth": [
+            10
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[10],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "a58fb511-6e3b-3d5b-a8ac-a781d31d092e",
@@ -560,10 +587,13 @@
           "byWeekDay": [
             0
           ],
+          "byMonth": [
+            11
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[11],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "325fcebb-1a2b-34f5-b864-41863247debd",
@@ -605,10 +635,13 @@
           "byWeekDay": [
             4
           ],
+          "byMonth": [
+            11
+          ],
           "timezone": "UTC"
         },
         "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[4],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[4],\"byMonth\":[11],\"timezone\":\"UTC\"}"
       },
       {
         "uid": "64945272-f8bf-375c-833f-3030911541c7",
@@ -1394,10 +1427,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "54714bb2-d548-38cd-ae9d-e994ac984460",
@@ -1422,10 +1455,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            1
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[1],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "19c7528b-a44e-3f70-800f-b22ee6be7bd0",
@@ -1447,10 +1483,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "beb94124-1c63-3017-9889-d3f817d62f7f",
@@ -1463,10 +1499,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "a1ae0724-c633-37a0-8269-4a7d4a0a2e7d",
@@ -1482,10 +1518,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            2
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[2],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "780abb03-aade-3383-bf48-13aa6ca261a7",
@@ -1520,10 +1559,13 @@
           "byWeekDay": [
             0
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            3
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[3],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "881438c7-7b25-34f7-b1dc-e478381a86d5",
@@ -1545,10 +1587,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "44da74a5-0985-35bd-91f4-e08c64c5ebe4",
@@ -1581,10 +1623,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "7f9bd4d9-3dbb-356e-93c0-6bf74268b352",
@@ -1651,10 +1693,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "ee515ee6-fd2c-35e5-91cd-e285295ef286",
@@ -1667,10 +1709,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "9ab828d0-5935-3824-b570-b9703ee28e88",
@@ -1686,10 +1728,13 @@
           "byWeekDay": [
             0
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            5
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[5],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "991b560e-7963-314a-8520-e1f256b99ee1",
@@ -1705,10 +1750,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            5
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[5],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "1831de42-74ac-39bc-83ae-3832144c68c4",
@@ -1731,10 +1779,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "714b554b-12a0-3e59-80e9-3a5f9e61f5ef",
@@ -1750,10 +1798,13 @@
           "byWeekDay": [
             0
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            6
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[6],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "710e8dcf-62d9-39f1-a4ea-570dbb8a60fe",
@@ -1766,10 +1817,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "9196d0f5-178c-3979-966c-d9c8f56304da",
@@ -1782,10 +1833,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "a39cf1a4-87e4-3f09-978e-3ce0a82ddbc8",
@@ -1811,10 +1862,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            9
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[9],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "adc37f3c-38a3-3525-a963-5983b473bf91",
@@ -1861,10 +1915,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            10
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[10],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "44c8260c-b2e4-30cb-b4f6-5817bea86a30",
@@ -1881,10 +1938,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            10
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[10],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "a58fb511-6e3b-3d5b-a8ac-a781d31d092e",
@@ -1906,10 +1966,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "5ae40f05-65f9-3f69-beeb-ccb71986276c",
@@ -1923,10 +1983,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "4677270e-7cbc-39ad-a536-fea177cd16b0",
@@ -1942,10 +2002,13 @@
           "byWeekDay": [
             0
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            11
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[11],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "325fcebb-1a2b-34f5-b864-41863247debd",
@@ -1968,10 +2031,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "4d0c1cfb-0de6-3af5-892c-eb1d742a89fe",
@@ -1987,10 +2050,13 @@
           "byWeekDay": [
             4
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            11
+          ],
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[4],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[4],\"byMonth\":[11],\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "64945272-f8bf-375c-833f-3030911541c7",
@@ -2013,10 +2079,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "94d3fbec-3769-3f04-92f3-60840a11da0a",
@@ -2029,10 +2095,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "130416c0-f380-3b6c-b7e0-8fccb35f860f",
@@ -2045,10 +2111,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "cc765417-5752-3a6b-827b-9ee6a0fdde05",
@@ -2061,10 +2127,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "d9b9df4f-bd94-3d1a-b757-0b173a59716d",
@@ -2776,10 +2842,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "54714bb2-d548-38cd-ae9d-e994ac984460",
@@ -2804,10 +2870,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            1
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[1],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "19c7528b-a44e-3f70-800f-b22ee6be7bd0",
@@ -2829,10 +2898,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "beb94124-1c63-3017-9889-d3f817d62f7f",
@@ -2845,10 +2914,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "a1ae0724-c633-37a0-8269-4a7d4a0a2e7d",
@@ -2864,10 +2933,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            2
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[2],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "780abb03-aade-3383-bf48-13aa6ca261a7",
@@ -2902,10 +2974,13 @@
           "byWeekDay": [
             0
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            3
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[3],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "881438c7-7b25-34f7-b1dc-e478381a86d5",
@@ -2927,10 +3002,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "44da74a5-0985-35bd-91f4-e08c64c5ebe4",
@@ -2963,10 +3038,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "7f9bd4d9-3dbb-356e-93c0-6bf74268b352",
@@ -3033,10 +3108,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "ee515ee6-fd2c-35e5-91cd-e285295ef286",
@@ -3049,10 +3124,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "9ab828d0-5935-3824-b570-b9703ee28e88",
@@ -3068,10 +3143,13 @@
           "byWeekDay": [
             0
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            5
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[5],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "991b560e-7963-314a-8520-e1f256b99ee1",
@@ -3087,10 +3165,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            5
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[5],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "1831de42-74ac-39bc-83ae-3832144c68c4",
@@ -3113,10 +3194,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "714b554b-12a0-3e59-80e9-3a5f9e61f5ef",
@@ -3132,10 +3213,13 @@
           "byWeekDay": [
             0
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            6
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[6],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "710e8dcf-62d9-39f1-a4ea-570dbb8a60fe",
@@ -3148,10 +3232,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "9196d0f5-178c-3979-966c-d9c8f56304da",
@@ -3164,10 +3248,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "a39cf1a4-87e4-3f09-978e-3ce0a82ddbc8",
@@ -3193,10 +3277,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            9
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[9],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "adc37f3c-38a3-3525-a963-5983b473bf91",
@@ -3243,10 +3330,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            10
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[10],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "44c8260c-b2e4-30cb-b4f6-5817bea86a30",
@@ -3263,10 +3353,13 @@
           "byWeekDay": [
             1
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            10
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[1],\"byMonth\":[10],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "a58fb511-6e3b-3d5b-a8ac-a781d31d092e",
@@ -3288,10 +3381,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "5ae40f05-65f9-3f69-beeb-ccb71986276c",
@@ -3305,10 +3398,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "4677270e-7cbc-39ad-a536-fea177cd16b0",
@@ -3324,10 +3417,13 @@
           "byWeekDay": [
             0
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            11
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[0],\"byMonth\":[11],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "325fcebb-1a2b-34f5-b864-41863247debd",
@@ -3350,10 +3446,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "4d0c1cfb-0de6-3af5-892c-eb1d742a89fe",
@@ -3369,10 +3465,13 @@
           "byWeekDay": [
             4
           ],
-          "timezone": "UTC"
+          "byMonth": [
+            11
+          ],
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[4],\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"byWeekDay\":[4],\"byMonth\":[11],\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "64945272-f8bf-375c-833f-3030911541c7",
@@ -3395,10 +3494,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "94d3fbec-3769-3f04-92f3-60840a11da0a",
@@ -3411,10 +3510,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "130416c0-f380-3b6c-b7e0-8fccb35f860f",
@@ -3427,10 +3526,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "cc765417-5752-3a6b-827b-9ee6a0fdde05",
@@ -3443,10 +3542,10 @@
           "frequency": "yearly",
           "interval": 1,
           "count": 5,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":5,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "d9b9df4f-bd94-3d1a-b757-0b173a59716d",

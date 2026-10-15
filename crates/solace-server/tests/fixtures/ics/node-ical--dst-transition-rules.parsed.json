@@ -5,10 +5,10 @@
         "uid": "f683404f-aede-43eb-8774-27f62bb27c92",
         "sourceUid": "f683404f-aede-43eb-8774-27f62bb27c92",
         "title": "Morgendienst",
-        "start": "2022-10-09T08:00:00.000Z",
-        "end": "2022-10-09T09:00:00.000Z",
+        "start": "2022-10-09T10:00:00.000Z",
+        "end": "2022-10-09T11:00:00.000Z",
         "allDay": false,
-        "timezone": "Africa/Ceuta"
+        "timezone": "UTC"
       }
     ],
     "errors": [],
@@ -20,10 +20,10 @@
         "uid": "f683404f-aede-43eb-8774-27f62bb27c92",
         "sourceUid": "f683404f-aede-43eb-8774-27f62bb27c92",
         "title": "Morgendienst",
-        "start": "2022-10-09T08:00:00.000Z",
-        "end": "2022-10-09T09:00:00.000Z",
+        "start": "2022-10-09T10:00:00.000Z",
+        "end": "2022-10-09T11:00:00.000Z",
         "allDay": false,
-        "timezone": "Africa/Ceuta"
+        "timezone": "Europe/Amsterdam"
       }
     ],
     "errors": [],
@@ -35,10 +35,10 @@
         "uid": "f683404f-aede-43eb-8774-27f62bb27c92",
         "sourceUid": "f683404f-aede-43eb-8774-27f62bb27c92",
         "title": "Morgendienst",
-        "start": "2022-10-09T08:00:00.000Z",
-        "end": "2022-10-09T09:00:00.000Z",
+        "start": "2022-10-09T10:00:00.000Z",
+        "end": "2022-10-09T11:00:00.000Z",
         "allDay": false,
-        "timezone": "Africa/Ceuta"
+        "timezone": "America/Los_Angeles"
       }
     ],
     "errors": [],

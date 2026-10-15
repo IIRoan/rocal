@@ -920,7 +920,15 @@ async fn attendee_copies_are_read_only_and_deleting_declines() {
             .expect_error(
                 400,
                 "Validation Error",
-                "Imported invitation events are read-only for attendees: Planning",
+                match app.backend {
+                    // TypeScript names the events by title, which is user content in the message.
+                    Backend::TypeScript => {
+                        "Imported invitation events are read-only for attendees: Planning"
+                    }
+                    Backend::Rust => {
+                        "Imported invitation events are read-only for attendees (1 selected)."
+                    }
+                },
             ));
     }
     assert_eq!(

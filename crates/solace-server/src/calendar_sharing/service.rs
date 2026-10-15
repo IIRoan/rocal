@@ -127,7 +127,7 @@ pub async fn disable(
     Ok(DisableShareLinkResponse { success: true })
 }
 
-/// The public feed behind an enabled token (an `.ics` suffix and spaces are ignored): the calendar name and its ICS.
+/// The public feed behind an enabled token (an `.ics` suffix and spaces are ignored): the calendar name and its ICS, which never names the owner.
 pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String), AppError> {
     let token = raw_token.trim();
     let token = match token.len().checked_sub(4) {
@@ -140,7 +140,7 @@ pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String),
     if token.is_empty() {
         return Err(not_found());
     }
-    let (calendar, owner) = queries::shared(&state.db, token)
+    let calendar = queries::shared(&state.db, token)
         .await?
         .ok_or_else(not_found)?;
     let events = queries::top_level_events(&state.db, &calendar.id).await?;
@@ -156,15 +156,6 @@ pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String),
         .iter()
         .find(|event| !event.all_day && !event.timezone.is_empty())
         .map(|event| event.timezone.as_str());
-    let owner_label = owner
-        .map(|owner| {
-            if owner.name.is_empty() {
-                owner.email
-            } else {
-                owner.name
-            }
-        })
-        .unwrap_or_default();
     let built = events
         .iter()
         .map(|event| {
@@ -190,7 +181,6 @@ pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String),
     let ics = build::build_calendar(
         &build::Calendar {
             name: Some(name.clone()),
-            description: Some(format!("Shared calendar from {owner_label}")),
             timezone: Some(instant::resolve_timezone(zone)),
             source_url: Some(format!(
                 "{}/api/calendars/shared/{}",

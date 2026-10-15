@@ -50,12 +50,16 @@ function instant(time: IcsTime, timezone: string): Date {
   );
 }
 
+/** ical.js validates RRULE while parsing the whole file, so rules are renamed and read per event instead. */
+const DEFERRED_RRULE = "x-solace-rrule";
+
 function recurrence(
   component: IcsComponent,
   timezone: string,
 ): string | undefined {
-  const rule = component.getFirstPropertyValue("rrule");
-  if (!(rule instanceof ICAL.Recur)) return undefined;
+  const value = component.getFirstPropertyValue(DEFERRED_RRULE);
+  if (typeof value !== "string") return undefined;
+  const rule = ICAL.Recur.fromString(value);
   if (
     Object.keys(rule.parts).some(
       (key) => !["BYDAY", "BYMONTHDAY", "BYMONTH"].includes(key),
@@ -171,7 +175,9 @@ function parseEvent(
 export function parseIcsImport(content: string, timezone?: string | null) {
   let calendar: IcsComponent;
   try {
-    calendar = ICAL.Component.fromString(content);
+    calendar = ICAL.Component.fromString(
+      content.replace(/^RRULE(?=[;:])/gim, DEFERRED_RRULE.toUpperCase()),
+    );
     if (calendar.name !== "vcalendar") throw new Error("Invalid calendar");
   } catch {
     throw new Error("Invalid calendar file");

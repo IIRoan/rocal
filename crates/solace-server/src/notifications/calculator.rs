@@ -87,7 +87,7 @@ pub fn is_event_in_future(start_ms: i64, now_ms: i64) -> bool {
     valid(start_ms) && valid(now_ms) && start_ms > now_ms
 }
 
-/// `scheduleUpcomingReminder`: none for a past event; a lead time already past fires on the current minute.
+/// `scheduleUpcomingReminder`: none for a past event; a lead time already past fires on the next minute, the first one `chk_notification_time_future` accepts.
 pub fn schedule_upcoming_reminder(
     start_ms: i64,
     minutes_before: f64,
@@ -101,7 +101,7 @@ pub fn schedule_upcoming_reminder(
     if schedule.notification_time_ms > now_ms {
         return Ok(Some(schedule));
     }
-    let notification_time_ms = round_to_minute(now_ms)?;
+    let notification_time_ms = round_to_minute(now_ms)? + 60_000;
     Ok(Some(Schedule {
         notification_date_local: format_local_datetime(
             notification_time_ms,
@@ -217,13 +217,20 @@ mod tests {
     }
 
     #[test]
-    fn an_overdue_lead_time_fires_on_the_current_minute() {
+    fn an_overdue_lead_time_fires_on_the_next_minute() {
+        for now in [ms("2026-01-15T09:30:42Z"), ms("2026-01-15T09:30:00Z")] {
+            let schedule =
+                schedule_upcoming_reminder(ms("2026-01-15T09:40:00Z"), 30.0, Some("UTC"), now)
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(schedule.notification_time_ms, ms("2026-01-15T09:31:00Z"));
+            assert!(
+                schedule.notification_time_ms > now,
+                "after the row's created_at"
+            );
+            assert_eq!(schedule.notification_date_local, "2026-01-15T09:31:00");
+        }
         let now = ms("2026-01-15T09:30:42Z");
-        let schedule =
-            schedule_upcoming_reminder(ms("2026-01-15T09:40:00Z"), 30.0, Some("UTC"), now)
-                .unwrap()
-                .unwrap();
-        assert_eq!(schedule.notification_time_ms, ms("2026-01-15T09:30:00Z"));
         assert_eq!(
             schedule_upcoming_reminder(now - 1, 5.0, None, now),
             Ok(None)

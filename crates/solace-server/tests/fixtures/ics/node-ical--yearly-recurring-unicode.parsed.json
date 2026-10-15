@@ -33,10 +33,10 @@
         "recurrence": {
           "frequency": "yearly",
           "interval": 1,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Europe/Amsterdam\"}"
       }
     ],
     "errors": [],
@@ -55,10 +55,10 @@
         "recurrence": {
           "frequency": "yearly",
           "interval": 1,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"America/Los_Angeles\"}"
       }
     ],
     "errors": [],

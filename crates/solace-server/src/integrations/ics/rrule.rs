@@ -21,6 +21,9 @@ static ISO_DATE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
         .unwrap_or_else(|error| panic!("date pattern: {error}"))
 });
+static LEAP_MONTH: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^\d+L$").unwrap_or_else(|error| panic!("leap month pattern: {error}"))
+});
 static ISO_TIME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(\d{2})(?:(\d{2})(\d{2})?|:(\d{2})(?::(\d{2}))?)?$")
         .unwrap_or_else(|error| panic!("time pattern: {error}"))
@@ -40,6 +43,10 @@ pub struct Options {
     pub count: Option<f64>,
     pub until_ms: Option<i64>,
     pub by_day: Option<Vec<String>>,
+    /// `parseInt` of each value; parse-ics keeps the days 1–31.
+    pub by_month_day: Option<Vec<f64>>,
+    /// `parseInt` of each value but RFC 7529 leap months like `5L`, which stay strings; parse-ics keeps 1–12.
+    pub by_month: Option<Vec<f64>>,
     pub tzid: String,
 }
 
@@ -60,6 +67,8 @@ struct Parsed {
     count: Option<f64>,
     until_ms: Option<i64>,
     by_day: Option<Vec<String>>,
+    by_month_day: Option<Vec<f64>>,
+    by_month: Option<Vec<f64>>,
     by_set_pos: Option<Vec<f64>>,
     wkst: Option<String>,
 }
@@ -147,6 +156,8 @@ fn parse_rule(input: &str, start: Option<(i64, &str)>) -> Result<Parsed, String>
         count: None,
         until_ms: None,
         by_day: None,
+        by_month_day: None,
+        by_month: None,
         by_set_pos: None,
         wkst: None,
     };
@@ -195,9 +206,22 @@ fn parse_rule(input: &str, start: Option<(i64, &str)>) -> Result<Parsed, String>
                     dtstart_has_tzid || dtstart_is_utc,
                 )?);
             }
-            "BYHOUR" | "BYMINUTE" | "BYSECOND" | "BYMONTH" | "BYMONTHDAY" | "BYYEARDAY"
-            | "BYWEEKNO" => {
+            "BYHOUR" | "BYMINUTE" | "BYSECOND" | "BYYEARDAY" | "BYWEEKNO" => {
                 val.ok_or_else(|| undefined_access("split"))?;
+            }
+            "BYMONTHDAY" => {
+                let val = val.ok_or_else(|| undefined_access("split"))?;
+                parsed.by_month_day = Some(val.split(',').map(parse_int).collect());
+            }
+            "BYMONTH" => {
+                let val = val.ok_or_else(|| undefined_access("split"))?;
+                parsed.by_month = Some(
+                    val.split(',')
+                        .map(js_trim)
+                        .filter(|token| !LEAP_MONTH.is_match(token))
+                        .map(parse_int)
+                        .collect(),
+                );
             }
             "BYDAY" => {
                 let val = val.ok_or_else(|| undefined_access("split"))?;
@@ -388,6 +412,8 @@ fn construct(input: &str, start: Option<(i64, &str)>) -> Result<Options, String>
         count: parsed.count,
         until_ms: parsed.until_ms,
         by_day: (!by_day.is_empty()).then_some(by_day),
+        by_month_day: parsed.by_month_day,
+        by_month: parsed.by_month,
         tzid: parsed.tzid,
     })
 }
@@ -411,8 +437,16 @@ mod tests {
                 count: None,
                 until_ms: Some(1_709_251_200_000),
                 by_day: Some(vec!["MO".into(), "1FR".into()]),
+                by_month_day: None,
+                by_month: None,
                 tzid: "Europe/Amsterdam".into(),
             })
+        );
+        let monthly =
+            with_start("FREQ=MONTHLY;BYMONTHDAY=15,-1;BYMONTH= 7,5L,2", 0, "UTC").unwrap();
+        assert_eq!(
+            (monthly.by_month_day, monthly.by_month),
+            (Some(vec![15.0, -1.0]), Some(vec![7.0, 2.0]))
         );
         let yearly = date_only("20240101", "FREQ=YEARLY;COUNT=6;UNTIL=20290101");
         assert_eq!(

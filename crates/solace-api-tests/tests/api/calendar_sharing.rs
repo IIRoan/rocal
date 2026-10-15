@@ -12,9 +12,15 @@ use crate::calendars::{
     event_row, insert_calendar, insert_event,
 };
 use crate::helpers::{
-    TestApp, TestUser, expect_invalid, expect_plain_error, expect_unauthorized,
+    Backend, TestApp, TestUser, expect_invalid, expect_plain_error, expect_unauthorized,
     expect_unknown_field, hex, ok,
 };
+
+/// TypeScript's feed names the owner (falling back to the address); Rust leaves the description out.
+fn owner_description(app: &TestApp, owner: &str) -> Option<String> {
+    (app.backend == Backend::TypeScript)
+        .then(|| format!("X-WR-CALDESC:Shared calendar from {owner}"))
+}
 
 const NOT_FOUND: &str = "Calendar not found or access denied";
 const FEED_NOT_FOUND: &str = "Shared calendar not found";
@@ -162,20 +168,24 @@ async fn enabling_issues_a_public_url_and_keeps_its_token() {
 
     let response = feed(&app, &token).await;
     assert_eq!(response.status.as_u16(), 200);
+    let lines: Vec<String> = [
+        Some("BEGIN:VCALENDAR".into()),
+        Some("VERSION:2.0".into()),
+        Some("PRODID:-//Solace Calendar//Calendar Export//EN".into()),
+        Some("CALSCALE:GREGORIAN".into()),
+        Some("METHOD:PUBLISH".into()),
+        Some("X-WR-CALNAME:Team".into()),
+        owner_description(&app, &user.name),
+        Some("X-WR-TIMEZONE:Europe/Amsterdam".into()),
+        Some(format!("URL:{}", link.share_url.clone().expect("url"))),
+        Some("END:VCALENDAR".into()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
     assert_eq!(
         response.text(),
-        ics(&[
-            "BEGIN:VCALENDAR".into(),
-            "VERSION:2.0".into(),
-            "PRODID:-//Solace Calendar//Calendar Export//EN".into(),
-            "CALSCALE:GREGORIAN".into(),
-            "METHOD:PUBLISH".into(),
-            "X-WR-CALNAME:Team".into(),
-            format!("X-WR-CALDESC:Shared calendar from {}", user.name),
-            "X-WR-TIMEZONE:Europe/Amsterdam".into(),
-            format!("URL:{}", link.share_url.clone().expect("url")),
-            "END:VCALENDAR".into(),
-        ]),
+        ics(&lines),
         "an empty calendar falls back to the default timezone"
     );
 }
@@ -388,10 +398,12 @@ async fn the_feed_serves_top_level_plaintext_events_as_ics() {
         "CALSCALE:GREGORIAN".into(),
         "METHOD:PUBLISH".into(),
         "X-WR-CALNAME:Team\\, Feed\\; Ü".into(),
-        format!("X-WR-CALDESC:Shared calendar from {}", user.name),
+    ];
+    expected.extend(owner_description(&app, &user.name));
+    expected.extend([
         "X-WR-TIMEZONE:America/New_York".into(),
         format!("URL:{}/api/calendars/shared/{token}", app.public_api_url),
-    ];
+    ]);
     expected.extend(stamped(
         "ext-uid-123@example.com".into(),
         &[
@@ -692,7 +704,7 @@ async fn encrypted_calendar_names_leave_as_a_neutral_label() {
         },
     )
     .await;
-    // Without a display name the feed names the owner by mail address.
+    // Without a display name TypeScript's feed names the owner by mail address.
     sqlx::query("UPDATE \"user\" SET name = '' WHERE id = $1")
         .bind(&user.id)
         .execute(&app.db)
@@ -711,11 +723,11 @@ async fn encrypted_calendar_names_leave_as_a_neutral_label() {
         unfolded.contains("\r\nX-WR-CALNAME:Solace calendar\r\n"),
         "{unfolded}"
     );
-    assert!(
-        unfolded.contains(&format!(
-            "\r\nX-WR-CALDESC:Shared calendar from {}\r\n",
-            user.email
-        )),
-        "{unfolded}"
-    );
+    match owner_description(&app, &user.email) {
+        Some(line) => assert!(unfolded.contains(&format!("\r\n{line}\r\n")), "{unfolded}"),
+        None => {
+            assert!(!unfolded.contains("X-WR-CALDESC"), "{unfolded}");
+            assert!(!unfolded.contains(&user.email), "{unfolded}");
+        }
+    }
 }

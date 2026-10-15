@@ -14,8 +14,8 @@
         "uid": "42",
         "sourceUid": "42",
         "title": "Numeric uid floating in the calendar zone",
-        "start": "2024-03-01T10:00:00.000Z",
-        "end": "2024-03-01T11:00:00.000Z",
+        "start": "2024-03-01T09:00:00.000Z",
+        "end": "2024-03-01T10:00:00.000Z",
         "allDay": false,
         "timezone": "Europe/Amsterdam"
       },
@@ -34,6 +34,16 @@
         },
         "timezone": "Europe/Amsterdam",
         "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-01-31T08:00:00.000Z\",\"timezone\":\"Europe/Amsterdam\"}"
+      },
+      {
+        "uid": "series@example.com::RECURRENCE::2024-01-08T08:00:00.000Z",
+        "sourceUid": "series@example.com",
+        "recurrenceId": "2024-01-08T08:00:00.000Z",
+        "title": "Moved morning slot",
+        "start": "2024-01-08T09:00:00.000Z",
+        "end": "2024-01-08T09:30:00.000Z",
+        "allDay": false,
+        "timezone": "Europe/Amsterdam"
       },
       {
         "uid": "series@example.com::RECURRENCE::2024-01-08T14:00:00.000Z",
@@ -94,8 +104,8 @@
         "uid": "42",
         "sourceUid": "42",
         "title": "Numeric uid floating in the calendar zone",
-        "start": "2024-03-01T10:00:00.000Z",
-        "end": "2024-03-01T11:00:00.000Z",
+        "start": "2024-03-01T09:00:00.000Z",
+        "end": "2024-03-01T10:00:00.000Z",
         "allDay": false,
         "timezone": "Europe/Amsterdam"
       },
@@ -114,6 +124,16 @@
         },
         "timezone": "Europe/Amsterdam",
         "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-01-31T08:00:00.000Z\",\"timezone\":\"Europe/Amsterdam\"}"
+      },
+      {
+        "uid": "series@example.com::RECURRENCE::2024-01-08T08:00:00.000Z",
+        "sourceUid": "series@example.com",
+        "recurrenceId": "2024-01-08T08:00:00.000Z",
+        "title": "Moved morning slot",
+        "start": "2024-01-08T09:00:00.000Z",
+        "end": "2024-01-08T09:30:00.000Z",
+        "allDay": false,
+        "timezone": "Europe/Amsterdam"
       },
       {
         "uid": "series@example.com::RECURRENCE::2024-01-08T14:00:00.000Z",
@@ -174,8 +194,8 @@
         "uid": "42",
         "sourceUid": "42",
         "title": "Numeric uid floating in the calendar zone",
-        "start": "2024-03-01T10:00:00.000Z",
-        "end": "2024-03-01T11:00:00.000Z",
+        "start": "2024-03-01T09:00:00.000Z",
+        "end": "2024-03-01T10:00:00.000Z",
         "allDay": false,
         "timezone": "Europe/Amsterdam"
       },
@@ -194,6 +214,16 @@
         },
         "timezone": "Europe/Amsterdam",
         "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-01-31T08:00:00.000Z\",\"timezone\":\"Europe/Amsterdam\"}"
+      },
+      {
+        "uid": "series@example.com::RECURRENCE::2024-01-08T08:00:00.000Z",
+        "sourceUid": "series@example.com",
+        "recurrenceId": "2024-01-08T08:00:00.000Z",
+        "title": "Moved morning slot",
+        "start": "2024-01-08T09:00:00.000Z",
+        "end": "2024-01-08T09:30:00.000Z",
+        "allDay": false,
+        "timezone": "Europe/Amsterdam"
       },
       {
         "uid": "series@example.com::RECURRENCE::2024-01-08T14:00:00.000Z",

@@ -2,21 +2,21 @@
   "UTC": {
     "events": [],
     "errors": [
-      "Failed to parse ICS file: Invalid FREQ value: INVALID_TYPE_CAUSES_ERROR"
+      "Failed to parse event test-123: Invalid FREQ value: INVALID_TYPE_CAUSES_ERROR"
     ],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [],
     "errors": [
-      "Failed to parse ICS file: Invalid FREQ value: INVALID_TYPE_CAUSES_ERROR"
+      "Failed to parse event test-123: Invalid FREQ value: INVALID_TYPE_CAUSES_ERROR"
     ],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [],
     "errors": [
-      "Failed to parse ICS file: Invalid FREQ value: INVALID_TYPE_CAUSES_ERROR"
+      "Failed to parse event test-123: Invalid FREQ value: INVALID_TYPE_CAUSES_ERROR"
     ],
     "method": "PUBLISH"
   }

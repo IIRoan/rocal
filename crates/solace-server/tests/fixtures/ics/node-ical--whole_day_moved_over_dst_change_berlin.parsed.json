@@ -44,10 +44,10 @@
           "frequency": "daily",
           "interval": 1,
           "count": 3,
-          "timezone": "UTC"
+          "timezone": "Europe/Amsterdam"
         },
         "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "14nv8jl8d6dvdbl477lod4fftf@google.com::RECURRENCE::2024-10-28T00:00:00.000Z",
@@ -76,10 +76,10 @@
           "frequency": "daily",
           "interval": 1,
           "count": 3,
-          "timezone": "UTC"
+          "timezone": "America/Los_Angeles"
         },
         "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"UTC\"}"
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "14nv8jl8d6dvdbl477lod4fftf@google.com::RECURRENCE::2024-10-28T00:00:00.000Z",

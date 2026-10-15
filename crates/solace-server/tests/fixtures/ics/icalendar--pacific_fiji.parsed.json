@@ -1,23 +1,47 @@
 {
   "UTC": {
-    "events": [],
-    "errors": [
-      "Failed to parse ICS file: duplicate DTSTART encountered, line=DTSTART;TZID=custom_Pacific/Fiji;VALUE=DATE-TIME:20140829T100000"
+    "events": [
+      {
+        "uid": "noend123",
+        "sourceUid": "noend123",
+        "title": "an event with a custom tz name",
+        "start": "2014-08-29T08:00:00.000Z",
+        "end": "2014-08-29T08:00:00.000Z",
+        "allDay": false,
+        "timezone": "custom_Pacific/Fiji"
+      }
     ],
+    "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
-    "events": [],
-    "errors": [
-      "Failed to parse ICS file: duplicate DTSTART encountered, line=DTSTART;TZID=custom_Pacific/Fiji;VALUE=DATE-TIME:20140829T100000"
+    "events": [
+      {
+        "uid": "noend123",
+        "sourceUid": "noend123",
+        "title": "an event with a custom tz name",
+        "start": "2014-08-29T08:00:00.000Z",
+        "end": "2014-08-29T08:00:00.000Z",
+        "allDay": false,
+        "timezone": "custom_Pacific/Fiji"
+      }
     ],
+    "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
-    "events": [],
-    "errors": [
-      "Failed to parse ICS file: duplicate DTSTART encountered, line=DTSTART;TZID=custom_Pacific/Fiji;VALUE=DATE-TIME:20140829T100000"
+    "events": [
+      {
+        "uid": "noend123",
+        "sourceUid": "noend123",
+        "title": "an event with a custom tz name",
+        "start": "2014-08-29T08:00:00.000Z",
+        "end": "2014-08-29T08:00:00.000Z",
+        "allDay": false,
+        "timezone": "custom_Pacific/Fiji"
+      }
     ],
+    "errors": [],
     "method": "PUBLISH"
   }
 }

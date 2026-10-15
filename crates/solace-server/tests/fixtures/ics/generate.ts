@@ -1,4 +1,4 @@
-// Regenerates the ICS goldens from the TypeScript backend: bun --no-env-file generate.ts <checkout with node_modules>.
+// Regenerates the ICS goldens from the TypeScript backend: bun --no-env-file generate.ts <checkout with node_modules>. Events touched by the node-ical quirks Rust fixes (plan 001, 4c) differ on purpose; keep their Rust expectations.
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
