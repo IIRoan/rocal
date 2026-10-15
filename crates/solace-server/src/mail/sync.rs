@@ -262,7 +262,7 @@ fn strings(value: Option<&Value>) -> Vec<String> {
 }
 
 /// `uniqueIds`: first occurrence order, without blanks.
-fn unique(values: impl IntoIterator<Item = String>) -> Vec<String> {
+pub(super) fn unique(values: impl IntoIterator<Item = String>) -> Vec<String> {
     let mut seen = HashSet::new();
     values
         .into_iter()
