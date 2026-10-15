@@ -312,8 +312,7 @@ impl<'a> Admin<'a> {
             .await?
             .into_iter()
             .find(|account| {
-                str_field(account, "emailAddress").map(|a| a.trim().to_lowercase())
-                    == Some(email.clone())
+                str_field(account, "emailAddress").is_some_and(|a| a.trim().to_lowercase() == email)
             }))
     }
 
@@ -510,21 +509,20 @@ impl<'a> Admin<'a> {
                 if redirect_uris.contains(&uri) && *stored_description == json!(description) {
                     return Ok(());
                 }
-                let mut next: Vec<Value> = Vec::with_capacity(redirect_uris.len() + 1);
                 redirect_uris.push(uri);
+                let mut next: Vec<Value> = Vec::new();
                 for value in redirect_uris {
                     if !next.contains(&value) {
                         next.push(value);
                     }
                 }
-                let id = existing.get("id").cloned().unwrap_or(Value::Null);
-                let mut update = Map::new();
-                update.insert(
-                    id.as_str().unwrap_or_default().to_owned(),
-                    json!({"redirectUris": next, "description": description}),
-                );
-                self.call("x:OAuthClient/set", json!({"update": update}), "c1")
-                    .await?;
+                let id = str_field(existing, "id").unwrap_or_default();
+                self.call(
+                    "x:OAuthClient/set",
+                    json!({"update": {id: {"redirectUris": next, "description": description}}}),
+                    "c1",
+                )
+                .await?;
                 return Ok(());
             }
         }
@@ -805,18 +803,14 @@ impl<'a> Admin<'a> {
             "httpAuth": {"@type": "Unauthenticated"},
             "signatureKey": {"@type": "Value", "secret": secret},
         });
-        let mut entry = Map::new();
-        entry.insert(
-            existing.clone().unwrap_or_else(|| WEBHOOK_ID.to_owned()),
-            payload,
-        );
+        let id = existing.as_deref().unwrap_or(WEBHOOK_ID);
         let operation = if existing.is_some() {
             "update"
         } else {
             "create"
         };
         let result = self
-            .call("x:WebHook/set", json!({operation: entry}), "s1")
+            .call("x:WebHook/set", json!({operation: {id: payload}}), "s1")
             .await?;
         let create_error = result.pointer(&format!("/notCreated/{WEBHOOK_ID}"));
         let update_error = existing
@@ -856,7 +850,7 @@ impl<'a> Admin<'a> {
         )
         .await?;
         tracing::info!(
-            webhook_ref = telemetry::log_ref(existing.as_deref().unwrap_or(WEBHOOK_ID)),
+            webhook_ref = telemetry::log_ref(id),
             "Ensured Stalwart mail ingest webhook"
         );
         Ok(())

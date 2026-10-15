@@ -243,17 +243,13 @@ impl Jmap<'_> {
             .as_deref()
             .map(str::trim)
             .filter(|t| !t.is_empty())
-            .unwrap_or("application/octet-stream; charset=utf-8")
-            .to_owned();
-        let bytes = attachment.content.as_bytes().to_vec();
-        let size = bytes.len();
+            .unwrap_or("application/octet-stream; charset=utf-8");
         let media = kind
             .split(';')
             .next()
             .map(str::trim)
             .filter(|t| !t.is_empty())
-            .unwrap_or("application/octet-stream")
-            .to_owned();
+            .unwrap_or("application/octet-stream");
         let (status, body) = super::send_in(
             &super::NOREPLY_LANE,
             self.request(
@@ -261,7 +257,7 @@ impl Jmap<'_> {
                 &resolve_upload_url(&session.upload_url, &session.mail_account),
             )
             .header(reqwest::header::CONTENT_TYPE, media)
-            .body(bytes),
+            .body(attachment.content.clone()),
         )
         .await?;
         if !status.is_success() {
@@ -278,7 +274,7 @@ impl Jmap<'_> {
             "blobId": blob_id,
             "type": kind,
             "name": attachment.filename,
-            "size": parsed.get("size").and_then(Value::as_u64).unwrap_or(size as u64),
+            "size": parsed.get("size").and_then(Value::as_u64).unwrap_or(attachment.content.len() as u64),
             "disposition": "attachment",
         }))
     }
@@ -346,16 +342,16 @@ fn assert_success(envelope: &Value, context: &str) -> Result<(), MailerError> {
     let responses = envelope
         .get("methodResponses")
         .and_then(Value::as_array)
-        .cloned()
+        .map(Vec::as_slice)
         .unwrap_or_default();
     if responses.is_empty() {
         return Err(MailerError::Method(format!(
             "{context}: empty JMAP response"
         )));
     }
-    for response in &responses {
+    for response in responses {
         let name = response.get(0).and_then(Value::as_str).unwrap_or_default();
-        let result = response.get(1).cloned().unwrap_or(Value::Null);
+        let result = response.get(1).unwrap_or(&Value::Null);
         let describe = |method: &str, error: &Value| {
             let hint = error
                 .get("type")
@@ -367,7 +363,7 @@ fn assert_success(envelope: &Value, context: &str) -> Result<(), MailerError> {
         if name == "error" || name.ends_with("/error") {
             return Err(describe(
                 if name == "error" { context } else { name },
-                &result,
+                result,
             ));
         }
         for key in ["notCreated", "notUpdated", "notDestroyed"] {
@@ -416,8 +412,7 @@ fn pick_identity(identities: &[Value], from: &str) -> Option<String> {
             identity
                 .get("email")
                 .and_then(Value::as_str)
-                .map(|e| e.trim().to_lowercase())
-                == Some(needle.clone())
+                .is_some_and(|e| e.trim().to_lowercase() == needle)
         })
         .and_then(|identity| identity.get("id").and_then(Value::as_str))
         .map(str::to_owned)

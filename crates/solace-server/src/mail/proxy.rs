@@ -262,7 +262,7 @@ async fn relay(state: &AppState, upstream_path: String, request: Request) -> Res
         );
     };
     let cookies = parts.extensions.get::<ResponseCookies>();
-    let mut attempt = Attempt {
+    let attempt = Attempt {
         state,
         headers: &parts.headers,
         cookies,
@@ -345,7 +345,7 @@ enum Sent {
 
 impl Attempt<'_> {
     /// One upstream try; `retry_after` is the auth source whose token Stalwart just refused.
-    async fn send(&mut self, outgoing: &mut Outgoing, retry_after: Option<AuthSource>) -> Sent {
+    async fn send(&self, outgoing: &mut Outgoing, retry_after: Option<AuthSource>) -> Sent {
         let mut timings = Timings::default();
         let mut authorization = self.client_authorization.map(str::to_owned);
         let mut auth_source = if authorization.is_some() {
@@ -373,8 +373,8 @@ impl Attempt<'_> {
                 "Mailbox authorization is required.",
             ));
         };
-        let base = self.state.config.stalwart_base_url.clone();
-        let url = match upstream_url(&base, self.upstream_path, self.query) {
+        let base = &self.state.config.stalwart_base_url;
+        let url = match upstream_url(base, self.upstream_path, self.query) {
             Ok(url) => url,
             Err(error) => {
                 return Sent::Early(proxy_error(
@@ -387,13 +387,13 @@ impl Attempt<'_> {
         let upstream_started = Instant::now();
         // A streamed body goes out once, so a token Stalwart refuses takes the 401 retry before the upload starts.
         let refused = if retry_after.is_none() && matches!(outgoing, Outgoing::Streamed(Some(_))) {
-            self.refused(&base, &authorization).await
+            self.refused(base, &authorization).await
         } else {
             None
         };
         let fetched = match refused {
             Some(refusal) => Ok(refusal),
-            None => self.fetch(&base, url, &authorization, outgoing).await,
+            None => self.fetch(base, url, &authorization, outgoing).await,
         };
         let response = match fetched {
             Ok(response) => response,
@@ -603,12 +603,7 @@ impl Sent {
         let op_desc = if method_calls.is_empty() {
             op.to_owned()
         } else {
-            method_calls
-                .iter()
-                .take(4)
-                .cloned()
-                .collect::<Vec<_>>()
-                .join("+")
+            method_calls[..method_calls.len().min(4)].join("+")
         };
         let op_desc: String = op_desc.chars().take(80).collect();
         if upstream >= SLOW_UPSTREAM {
