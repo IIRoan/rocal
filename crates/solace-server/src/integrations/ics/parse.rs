@@ -458,7 +458,6 @@ fn parse_event(
     let occurrence = event
         .get("recurrenceid")
         .and_then(|date| occurrence_start(date, &all_day_timezone));
-    // ponytail: instants beyond year 9999 (only reachable through field rollover) are skipped; widen if a feed ever needs them.
     let (Some(start), Some(end)) = (
         instant::from_unix_millis(start),
         instant::from_unix_millis(end),
