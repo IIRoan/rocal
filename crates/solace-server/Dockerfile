@@ -20,5 +20,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --system --uid 10001 --no-create-home solace
 COPY --from=build /solace-server /usr/local/bin/solace-server
+# jemalloc purges freed pages only on allocation unless a background thread does it, so an idle server would keep its last peak.
+ENV _RJEM_MALLOC_CONF=background_thread:true
 USER solace
 CMD ["solace-server"]
