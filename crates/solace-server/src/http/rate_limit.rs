@@ -30,7 +30,10 @@ static STORES: LazyLock<Mutex<HashMap<&'static str, Store>>> = LazyLock::new(Def
 
 /// Counts one request; over the limit it is `RateLimitError` with the seconds until the window resets.
 pub fn enforce(store: &'static str, key: &str, limit: Limit) -> Result<(), AppError> {
-    let now = Instant::now();
+    enforce_at(store, key, limit, Instant::now())
+}
+
+fn enforce_at(store: &'static str, key: &str, limit: Limit, now: Instant) -> Result<(), AppError> {
     let mut stores = STORES
         .lock()
         .map_err(|_| AppError::internal("rate limit store poisoned"))?;
@@ -39,12 +42,11 @@ pub fn enforce(store: &'static str, key: &str, limit: Limit) -> Result<(), AppEr
         .last_cleanup
         .is_none_or(|last| now.duration_since(last) > limit.window)
     {
-        store.entries.retain(|_, entry| entry.reset >= now);
+        store.entries.retain(|_, entry| entry.reset > now);
         store.last_cleanup = Some(now);
     }
-    let window_start = now.checked_sub(limit.window);
     match store.entries.get_mut(key) {
-        Some(entry) if window_start.is_none_or(|start| entry.reset >= start) => {
+        Some(entry) if entry.reset > now => {
             if entry.count >= limit.requests {
                 let retry_after = entry
                     .reset
@@ -61,7 +63,7 @@ pub fn enforce(store: &'static str, key: &str, limit: Limit) -> Result<(), AppEr
         }
         _ => {
             if store.entries.len() >= MAX_KEYS_PER_STORE {
-                store.entries.retain(|_, entry| entry.reset >= now);
+                store.entries.retain(|_, entry| entry.reset > now);
             }
             if store.entries.len() < MAX_KEYS_PER_STORE {
                 store.entries.insert(
@@ -103,5 +105,20 @@ mod tests {
             enforce("test-store", "b", limit).is_ok(),
             "keys are separate"
         );
+    }
+
+    #[test]
+    fn a_key_resets_once_its_window_has_passed() {
+        let limit = Limit {
+            requests: 1,
+            window: Duration::from_secs(60),
+        };
+        let start = Instant::now();
+        let at = |offset: Duration| enforce_at("window-store", "a", limit, start + offset);
+        assert!(at(Duration::ZERO).is_ok());
+        assert!(at(Duration::from_millis(59_999)).is_err());
+        assert!(at(limit.window).is_ok(), "a new window starts");
+        assert!(at(limit.window + Duration::from_secs(1)).is_err());
+        assert!(at(limit.window * 2).is_ok());
     }
 }
