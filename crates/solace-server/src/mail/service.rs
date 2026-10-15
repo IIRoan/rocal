@@ -496,7 +496,7 @@ impl Stalwart {
         address: &Address,
         provisioning: &Provisioning,
     ) -> Result<(), AdminError> {
-        self.domain_id = admin.resolve_domain_by_name(&address.domain).await?.id;
+        self.domain_id = admin.resolve_domain_by_name(&address.domain).await?;
         if self.account_id.is_empty() {
             let account = admin
                 .create_account(

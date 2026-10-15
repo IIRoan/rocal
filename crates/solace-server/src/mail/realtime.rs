@@ -490,10 +490,9 @@ fn handle_frame(state: &AppState, frame: Frame) -> Result<(), String> {
     Ok(())
 }
 
-#[derive(Default, Debug, PartialEq, Eq)]
+#[derive(Default)]
 struct Frame {
     event: Option<String>,
-    id: Option<String>,
     data: Option<String>,
 }
 
@@ -519,24 +518,17 @@ impl SseParser {
         frames
     }
 
+    /// The unterminated last line, then the frame it ends.
     fn finish(mut self) -> Vec<Frame> {
         let rest = String::from_utf8_lossy(&std::mem::take(&mut self.buffer)).into_owned();
-        let mut frames: Vec<Frame> = self.line(&rest).into_iter().collect();
-        if !rest.is_empty() {
-            frames.extend(self.line(""));
-        }
-        let frame = std::mem::take(&mut self.frame);
-        if frame.event.is_some() || frame.data.is_some() || frame.id.is_some() {
-            frames.push(frame);
-        }
-        frames
+        let last = self.line(&rest);
+        last.into_iter().chain(self.line("")).collect()
     }
 
     fn line(&mut self, line: &str) -> Option<Frame> {
         if line.is_empty() {
             let frame = std::mem::take(&mut self.frame);
-            return (frame.event.is_some() || frame.data.is_some() || frame.id.is_some())
-                .then_some(frame);
+            return (frame.event.is_some() || frame.data.is_some()).then_some(frame);
         }
         if line.starts_with(':') {
             return None;
@@ -551,7 +543,6 @@ impl SseParser {
                     None => value,
                 })
             }
-            "id" => self.frame.id = Some(value),
             _ => {}
         }
         None

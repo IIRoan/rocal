@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use axum::body::Bytes;
 use axum::extract::State;
-use axum::http::{HeaderMap, Method, StatusCode, Uri};
+use axum::http::{HeaderMap, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use serde_json::Value;
 
@@ -13,7 +13,6 @@ use super::gate::{GATE_HEADER, StalwartGate};
 
 #[derive(Debug, Clone)]
 pub struct Recorded {
-    pub method: Method,
     pub path: String,
     pub authorization: Option<String>,
     pub gate: Option<String>,
@@ -123,7 +122,6 @@ impl FakeStalwart {
 
 async fn answer(
     State(shared): State<Shared>,
-    method: Method,
     uri: Uri,
     headers: HeaderMap,
     body: Bytes,
@@ -135,7 +133,6 @@ async fn answer(
             .map(str::to_owned)
     };
     let recorded = Recorded {
-        method,
         path: uri.path().to_owned(),
         authorization: header("authorization"),
         gate: header(GATE_HEADER),

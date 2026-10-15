@@ -20,17 +20,10 @@ pub enum AdminError {
     NotJson,
     #[error("Stalwart admin JMAP request failed with status {0}.")]
     Status(u16),
-    #[error("Stalwart admin session request failed with status {0}.")]
-    SessionStatus(u16),
     #[error("Stalwart JMAP response did not include {0}.")]
     MissingMethod(String),
     #[error("{0}")]
     Failed(String),
-}
-
-pub struct Domain {
-    pub id: String,
-    pub name: String,
 }
 
 pub struct CreatedAccount {
@@ -151,21 +144,6 @@ impl<'a> Admin<'a> {
         Ok(parse_envelope(read_json(&body)?))
     }
 
-    pub async fn get_session(&self) -> Result<Value, AdminError> {
-        let url = format!("{}/jmap/session", self.base_url);
-        let (status, body) = super::send_in(
-            &super::PROVISIONER_LANE,
-            self.gate
-                .apply(self.http.get(&url), &url)
-                .bearer_auth(self.token),
-        )
-        .await?;
-        if !status.is_success() {
-            return Err(AdminError::SessionStatus(status.as_u16()));
-        }
-        Ok(parse_envelope(read_json(&body)?))
-    }
-
     /// One method call and its result's arguments.
     async fn call(
         &self,
@@ -195,21 +173,18 @@ impl<'a> Admin<'a> {
         ))
     }
 
-    pub async fn resolve_domain_by_name(&self, name: &str) -> Result<Domain, AdminError> {
+    /// The id of the domain with this name.
+    pub async fn resolve_domain_by_name(&self, name: &str) -> Result<String, AdminError> {
         let wanted = name.trim().to_lowercase();
         let ids = self.ids("x:Domain/query", json!({})).await?;
         self.list("x:Domain/get", ids)
             .await?
             .iter()
             .find(|domain| {
-                str_field(domain, "name").map(|n| n.trim().to_lowercase()) == Some(wanted.clone())
+                str_field(domain, "name").is_some_and(|n| n.trim().to_lowercase() == wanted)
             })
-            .and_then(|domain| {
-                Some(Domain {
-                    id: str_field(domain, "id")?.to_owned(),
-                    name: str_field(domain, "name")?.to_owned(),
-                })
-            })
+            .and_then(|domain| str_field(domain, "id"))
+            .map(str::to_owned)
             .ok_or_else(|| AdminError::Failed(format!("Stalwart domain '{name}' was not found.")))
     }
 
@@ -400,13 +375,13 @@ impl<'a> Admin<'a> {
         else {
             return Ok(None);
         };
-        let Ok(domain) = self.resolve_domain_by_name(domain_name).await else {
+        let Ok(domain_id) = self.resolve_domain_by_name(domain_name).await else {
             return Ok(None);
         };
-        let account = match self.find_account_by_mailbox(local_part, &domain.id).await? {
+        let account = match self.find_account_by_mailbox(local_part, &domain_id).await? {
             Some(account) => Some(account),
             None => {
-                self.find_account_by_email_address(&email, &domain.id)
+                self.find_account_by_email_address(&email, &domain_id)
                     .await?
             }
         };
@@ -1036,14 +1011,11 @@ mod tests {
             ),
         ])
         .await;
-        let domain = admin(&fake)
+        let domain_id = admin(&fake)
             .resolve_domain_by_name("solace.onl")
             .await
             .unwrap();
-        assert_eq!(
-            (domain.id.as_str(), domain.name.as_str()),
-            ("domain-1", "solace.onl")
-        );
+        assert_eq!(domain_id, "domain-1");
         let requests = fake.requests();
         assert_eq!(requests.len(), 2);
         assert_eq!(requests[0].path, "/jmap/");
@@ -1072,12 +1044,9 @@ mod tests {
             Reply::concurrency_limit(),
             Reply::concurrency_limit(),
             envelope("x:Domain/query", json!({"ids": ["domain-1"]}), "c1"),
-            Reply::concurrency_limit(),
-            Reply::json(json!({"primaryAccounts": {"urn:stalwart:jmap": "a"}})),
         ])
         .await;
-        let admin = admin(&fake);
-        let envelope = admin
+        let envelope = admin(&fake)
             .call_jmap(json!([["x:Domain/query", {}, "c1"]]))
             .await
             .unwrap();
@@ -1085,11 +1054,7 @@ mod tests {
             envelope,
             json!({"methodResponses": [["x:Domain/query", {"ids": ["domain-1"]}, "c1"]]})
         );
-        assert_eq!(
-            admin.get_session().await.unwrap(),
-            json!({"primaryAccounts": {"urn:stalwart:jmap": "a"}})
-        );
-        assert_eq!(fake.requests().len(), 5);
+        assert_eq!(fake.requests().len(), 3);
     }
 
     #[tokio::test]
