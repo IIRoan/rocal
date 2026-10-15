@@ -20,8 +20,8 @@
         "uid": "floating-with-custom-vtimezone@test",
         "sourceUid": "floating-with-custom-vtimezone@test",
         "title": "Floating DTSTART with custom VTIMEZONE",
-        "start": "2025-06-10T14:00:00.000Z",
-        "end": "2025-06-10T15:00:00.000Z",
+        "start": "2025-06-10T12:00:00.000Z",
+        "end": "2025-06-10T13:00:00.000Z",
         "allDay": false,
         "timezone": "Europe/Amsterdam"
       }
@@ -35,8 +35,8 @@
         "uid": "floating-with-custom-vtimezone@test",
         "sourceUid": "floating-with-custom-vtimezone@test",
         "title": "Floating DTSTART with custom VTIMEZONE",
-        "start": "2025-06-10T14:00:00.000Z",
-        "end": "2025-06-10T15:00:00.000Z",
+        "start": "2025-06-10T21:00:00.000Z",
+        "end": "2025-06-10T22:00:00.000Z",
         "allDay": false,
         "timezone": "America/Los_Angeles"
       }

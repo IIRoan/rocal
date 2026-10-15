@@ -75,7 +75,7 @@ pub fn parse(content: &str, user_timezone: &str) -> ParseResult {
         calendar_description: None,
         calendar_timezone: None,
     };
-    let root = match reader::parse(content) {
+    let root = match reader::parse(content, user_timezone) {
         Ok(root) => root,
         Err(message) => {
             result
@@ -1096,7 +1096,7 @@ mod tests {
     }
 
     #[test]
-    fn floating_times_use_the_calendar_zone_or_stay_floating() {
+    fn floating_times_use_the_calendar_zone_or_the_users() {
         let vtimezone = [
             "BEGIN:VTIMEZONE",
             "TZID:Asia/Tokyo",
@@ -1135,10 +1135,10 @@ mod tests {
         assert_eq!(
             start(&[]),
             (
-                "2024-07-15T09:00:00.000Z".into(),
+                "2024-07-15T07:00:00.000Z".into(),
                 Some("Europe/Amsterdam".into())
             ),
-            "a VTIMEZONE alone does not claim floating times"
+            "a VTIMEZONE alone does not claim floating times: the user's zone does"
         );
     }
 

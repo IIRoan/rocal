@@ -410,10 +410,12 @@ fn utc_add(date: Option<Option<i64>>, amount: i64, unit_ms: i64) -> Option<Optio
 pub struct Reader {
     stack: Vec<Obj>,
     next_id: u64,
+    /// Where floating times are read when the calendar names no zone: the user's.
+    floating_zone: Option<String>,
 }
 
 /// node-ical's `parseICS`: the root object, or the message of the error that aborted the whole feed.
-pub fn parse(content: &str) -> Result<Obj, String> {
+pub fn parse(content: &str, user_timezone: &str) -> Result<Obj, String> {
     let mut lines: Vec<&str> = content.split('\n').collect();
     for line in &mut lines {
         *line = line.strip_suffix('\r').unwrap_or(line);
@@ -421,6 +423,8 @@ pub fn parse(content: &str) -> Result<Obj, String> {
     let mut reader = Reader {
         stack: Vec::new(),
         next_id: 0,
+        floating_zone: super::normalize_timezone(Some(user_timezone))
+            .filter(|zone| zones::lookup(zone).is_some()),
     };
     let mut ctx = Obj::default();
     let mut index = 0;
@@ -700,9 +704,9 @@ impl Reader {
         })
     }
 
-    /// A DATE-TIME without a TZID: in the calendar's X-WR-TIMEZONE when it names a zone, else floating (host-local, UTC).
+    /// A DATE-TIME without a TZID: in the calendar's X-WR-TIMEZONE when it names a zone, else in the user's, as the on-device import reads it.
     fn floating_date(&self, value: &str, local: impl Fn() -> Option<i64>) -> JsDate {
-        match self.calendar_zone() {
+        match self.calendar_zone().or_else(|| self.floating_zone.clone()) {
             Some(zone) => JsDate {
                 ms: zones::parse_date_time_in_zone(value, &zone),
                 tz: Some(zone),

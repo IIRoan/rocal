@@ -89,6 +89,35 @@ END:VEVENT`),
     });
   });
 
+  it("reads floating times in the calendar's zone, else the user's, never a VTIMEZONE's", () => {
+    const vtimezone = `BEGIN:VTIMEZONE
+TZID:Asia/Tokyo
+BEGIN:STANDARD
+DTSTART:19700101T000000
+TZOFFSETFROM:+0900
+TZOFFSETTO:+0900
+END:STANDARD
+END:VTIMEZONE`;
+    const floating = `BEGIN:VEVENT
+UID:floating
+DTSTART:20260715T090000
+SUMMARY:Floating
+END:VEVENT`;
+    const read = (header: string) =>
+      parseIcsImport(
+        `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${header}${vtimezone}\r\n${floating}\r\nEND:VCALENDAR`,
+        "Europe/Amsterdam",
+      ).events[0];
+    expect(read("X-WR-TIMEZONE:America/New_York\r\n")).toMatchObject({
+      start: "2026-07-15T13:00:00.000Z",
+      timezone: "America/New_York",
+    });
+    expect(read("")).toMatchObject({
+      start: "2026-07-15T07:00:00.000Z",
+      timezone: "Europe/Amsterdam",
+    });
+  });
+
   it("rejects malformed input without echoing its contents", () => {
     expect(() => parseIcsImport("private garbage", "UTC")).toThrow(
       "Invalid calendar file",

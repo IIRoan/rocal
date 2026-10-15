@@ -528,8 +528,8 @@
         "sourceUid": "item-ee275ccffa83f492d9eb63b01953b39f18d4f944@tripit.com",
         "title": "Directions from SFO to Embassy Suites San Francisco Airport - South San Francisco",
         "description": "View and/or edit details in TripIt : http://www.tripit.com/trip/show/id/1234\n \n[Directions] 10/11/2011 10:05am - Directions from SFO to Embassy Suites San Francisco Airport - South San Francisco \nfrom: SFO \nto: 250 GATEWAY BLVD, South San Francisco, CA, 94080 \nView directions here: http://maps.google.com/maps?output=mobile&saddr=SFO&daddr=250+GATEWAY+BLVD%2C+South+San+Francisco%2C+CA%2C+94080 \n \n \n\nTripIt - organize your travel at http://www.tripit.com",
-        "start": "2011-10-11T10:05:00.000Z",
-        "end": "2011-10-11T11:05:00.000Z",
+        "start": "2011-10-11T08:05:00.000Z",
+        "end": "2011-10-11T09:05:00.000Z",
         "allDay": false,
         "location": "250 GATEWAY BLVD, South San Francisco, CA, 94080",
         "timezone": "Europe/Amsterdam"
@@ -625,8 +625,8 @@
         "sourceUid": "item-962e4f045d12149319d1837ec096bf43770abd6e@tripit.com",
         "title": "Directions from Hertz to Sofitel San Francisco Bay",
         "description": "View and/or edit details in TripIt : http://www.tripit.com/trip/show/id/24259445\n \n[Directions] 10/25/2011 9:40am - Directions from Hertz to Sofitel San Francisco Bay \nfrom: 780 McDonnell Road, San Francisco, CA, 94128 \nto: 223 Twin Dolphin Drive, Redwood City, CA, 94065 \nView directions here: http://maps.google.com/maps?output=mobile&saddr=780+McDonnell+Road%2C+San+Francisco%2C+CA%2C+94128&daddr=223+Twin+Dolphin+Drive%2C+Redwood+City%2C+CA%2C+94065 \n \n \n\nTripIt - organize your travel at http://www.tripit.com",
-        "start": "2011-10-25T09:40:00.000Z",
-        "end": "2011-10-25T10:40:00.000Z",
+        "start": "2011-10-25T07:40:00.000Z",
+        "end": "2011-10-25T08:40:00.000Z",
         "allDay": false,
         "location": "223 Twin Dolphin Drive, Redwood City, CA, 94065",
         "timezone": "Europe/Amsterdam"
@@ -1039,8 +1039,8 @@
         "sourceUid": "item-ee275ccffa83f492d9eb63b01953b39f18d4f944@tripit.com",
         "title": "Directions from SFO to Embassy Suites San Francisco Airport - South San Francisco",
         "description": "View and/or edit details in TripIt : http://www.tripit.com/trip/show/id/1234\n \n[Directions] 10/11/2011 10:05am - Directions from SFO to Embassy Suites San Francisco Airport - South San Francisco \nfrom: SFO \nto: 250 GATEWAY BLVD, South San Francisco, CA, 94080 \nView directions here: http://maps.google.com/maps?output=mobile&saddr=SFO&daddr=250+GATEWAY+BLVD%2C+South+San+Francisco%2C+CA%2C+94080 \n \n \n\nTripIt - organize your travel at http://www.tripit.com",
-        "start": "2011-10-11T10:05:00.000Z",
-        "end": "2011-10-11T11:05:00.000Z",
+        "start": "2011-10-11T17:05:00.000Z",
+        "end": "2011-10-11T18:05:00.000Z",
         "allDay": false,
         "location": "250 GATEWAY BLVD, South San Francisco, CA, 94080",
         "timezone": "America/Los_Angeles"
@@ -1136,8 +1136,8 @@
         "sourceUid": "item-962e4f045d12149319d1837ec096bf43770abd6e@tripit.com",
         "title": "Directions from Hertz to Sofitel San Francisco Bay",
         "description": "View and/or edit details in TripIt : http://www.tripit.com/trip/show/id/24259445\n \n[Directions] 10/25/2011 9:40am - Directions from Hertz to Sofitel San Francisco Bay \nfrom: 780 McDonnell Road, San Francisco, CA, 94128 \nto: 223 Twin Dolphin Drive, Redwood City, CA, 94065 \nView directions here: http://maps.google.com/maps?output=mobile&saddr=780+McDonnell+Road%2C+San+Francisco%2C+CA%2C+94128&daddr=223+Twin+Dolphin+Drive%2C+Redwood+City%2C+CA%2C+94065 \n \n \n\nTripIt - organize your travel at http://www.tripit.com",
-        "start": "2011-10-25T09:40:00.000Z",
-        "end": "2011-10-25T10:40:00.000Z",
+        "start": "2011-10-25T16:40:00.000Z",
+        "end": "2011-10-25T17:40:00.000Z",
         "allDay": false,
         "location": "223 Twin Dolphin Drive, Redwood City, CA, 94065",
         "timezone": "America/Los_Angeles"

@@ -1338,6 +1338,52 @@ async fn an_unreadable_rule_fails_only_its_event() {
 }
 
 #[tokio::test]
+async fn floating_times_are_read_in_the_users_zone() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    ok(user
+        .put("/api/settings", json!({"timezone": "Europe/Amsterdam"}))
+        .await
+        .expect_status(200));
+    let calendar_id = owned_calendar(&mut user).await;
+    let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:floating@example.com",
+        "DTSTART:20260715T090000",
+        "DTEND:20260715T100000",
+        "SUMMARY:Floating",
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+    ]
+    .join("\r\n");
+    ok(user
+        .post(
+            "/api/subscriptions/import-ics",
+            json!({"calendarId": calendar_id, "icsContent": ics}),
+        )
+        .await
+        .expect_status(200));
+    let stored: (String, String) = sqlx::query_as(&format!(
+        "SELECT {}, timezone FROM calendar_event WHERE calendar_id = $1",
+        iso("start")
+    ))
+    .bind(&calendar_id)
+    .fetch_one(&app.db)
+    .await
+    .expect("imported event");
+    let start = match app.backend {
+        // node-ical reads a floating time as host-local, which is UTC on Vercel.
+        Backend::TypeScript => "2026-07-15T09:00:00.000Z",
+        // 09:00 in Amsterdam, as the on-device import reads it.
+        Backend::Rust => "2026-07-15T07:00:00.000Z",
+    };
+    assert_eq!(stored, (start.to_owned(), "Europe/Amsterdam".to_owned()));
+}
+
+#[tokio::test]
 async fn legacy_ics_import_without_events_is_rejected() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
