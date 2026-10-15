@@ -729,7 +729,7 @@ async fn one_time_tokens_hand_over_the_issuing_session_once_within_three_minutes
     assert_eq!(response.status.as_u16(), 401, "{}", response.text());
 }
 
-fn sha256_base64url(value: &str) -> String {
+pub fn sha256_base64url(value: &str) -> String {
     use base64::Engine;
     use sha2::Digest;
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(value.as_bytes()))

@@ -19,9 +19,10 @@ use solace_api_types::subscriptions::{
 use sqlx::PgPool;
 
 use crate::helpers::{
-    TestApp, TestUser, expect_invalid, expect_unauthorized, expect_unknown_field, fixture, hex,
-    json_body, ok,
+    Backend, TestApp, TestUser, expect_invalid, expect_unauthorized, expect_unknown_field, fixture,
+    hex, json_body, ok,
 };
+use crate::passkeys::sha256_base64url;
 use crate::profiles::{stored_objects_exist, upload_fixture};
 
 /// `(table, id)` of a database row.
@@ -423,6 +424,33 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
     directory_entry_stalwart
 }
 
+/// A participant row as `(user_id, email, display_name, status)`.
+type Participation = (Option<String>, String, Option<String>, String);
+
+fn unlinked(email: &str, name: Option<&str>, status: &str) -> Participation {
+    (
+        None,
+        email.to_owned(),
+        name.map(str::to_owned),
+        status.to_owned(),
+    )
+}
+
+/// The kinds of the user's verification rows: reset tokens and challenges hold the user id, `one_time` names the token row.
+async fn verifications(db: &PgPool, user_id: &str, one_time: &str) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT CASE WHEN identifier = $2 THEN 'one-time-token' \
+                     WHEN identifier LIKE 'reset-password:%' THEN 'reset-password' \
+                     ELSE 'passkey-challenge' END AS kind \
+         FROM verification WHERE identifier = $2 OR strpos(value, $1) > 0 ORDER BY kind",
+    )
+    .bind(user_id)
+    .bind(one_time)
+    .fetch_all(db)
+    .await
+    .expect("verifications")
+}
+
 #[tokio::test]
 async fn anonymous_callers_cannot_delete_an_account() {
     let app = TestApp::spawn().await;
@@ -445,14 +473,28 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
     import(
         &mut bystander,
         &bystander_calendar,
-        vec![encrypted_event(
-            "meeting",
-            "2026-11-05T09:00:00.000Z",
-            "2026-11-05T10:00:00.000Z",
-        )],
+        vec![
+            encrypted_event(
+                "meeting",
+                "2026-11-05T09:00:00.000Z",
+                "2026-11-05T10:00:00.000Z",
+            ),
+            encrypted_event(
+                "copy",
+                "2026-11-06T09:00:00.000Z",
+                "2026-11-06T10:00:00.000Z",
+            ),
+            encrypted_event(
+                "typed",
+                "2026-11-07T09:00:00.000Z",
+                "2026-11-07T10:00:00.000Z",
+            ),
+        ],
     )
     .await;
     let bystander_event = event_id(&app.db, &bystander_calendar, "meeting").await;
+    let bystander_copy = event_id(&app.db, &bystander_calendar, "copy").await;
+    let bystander_typed = event_id(&app.db, &bystander_calendar, "typed").await;
     ok(bystander
         .put(
             "/api/push/devices",
@@ -476,6 +518,25 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         &[&participant, &bystander_event, &victim.id, &victim.email],
     )
     .await;
+    // The victim organizes the bystander's invitation copy, and is typed by address alone on another event.
+    let organizer = format!("suitepart{}", hex(8));
+    exec(
+        &app.db,
+        "INSERT INTO event_participant (id, event_id, user_id, email, display_name, status, role, created_at, updated_at) \
+         VALUES ($1, $2, $3, $4, 'Victim', 'accepted', 'organizer', now(), now())",
+        &[&organizer, &bystander_copy, &victim.id, &victim.email],
+    )
+    .await;
+    let typed = format!("suitepart{}", hex(8));
+    let upper = victim.email.to_uppercase();
+    exec(
+        &app.db,
+        "INSERT INTO event_participant (id, event_id, user_id, email, display_name, status, role, created_at, updated_at) \
+         VALUES ($1, $2, NULL, $3, 'Typed name', 'tentative', 'attendee', now(), now())",
+        &[&typed, &bystander_typed, &upper],
+    )
+    .await;
+    let participants = [participant.clone(), organizer.clone(), typed.clone()];
     exec(
         &app.db,
         "INSERT INTO calendar_sharing (id, calendar_id, shared_with, shared_by, created_at, updated_at) VALUES ($1, $2, $3, $4, now(), now())",
@@ -488,6 +549,28 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         &[&shared_in, &bystander_calendar, &victim.id, &bystander.id],
     )
     .await;
+
+    ok(app
+        .anonymous()
+        .post(
+            "/api/auth/request-password-reset",
+            json!({"email": victim.email, "redirectTo": format!("{}/reset-password", app.origin)}),
+        )
+        .await
+        .and_then(|r| r.expect_status(200)));
+    let one_time_token = ok(victim
+        .get("/api/auth/one-time-token/generate")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()))["token"]
+        .as_str()
+        .expect("one-time token")
+        .to_owned();
+    let one_time = format!("one-time-token:{}", sha256_base64url(&one_time_token));
+    assert_eq!(
+        verifications(&app.db, &victim.id, &one_time).await,
+        ["one-time-token", "passkey-challenge", "reset-password"]
+    );
 
     let (needles, owned) = owned_rows(&app.db, &victim).await;
     let owned_tables: BTreeSet<&str> = owned.keys().map(|(table, _)| table.as_str()).collect();
@@ -553,13 +636,14 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         }
     );
 
-    // Pinned as is: the participant email stays by design; the passkey challenge and FK-less recurrence exceptions outlive the user.
+    let typescript = app.backend == Backend::TypeScript;
     let expected_leftovers: BTreeSet<RowKey> = owned
         .keys()
         .filter(|(table, id)| {
-            table == "verification"
-                || table == "recurrence_exception"
-                || (table == "event_participant" && id.as_deref() == Some(participant.as_str()))
+            // TypeScript leaves the passkey challenge, the reset token and the FK-less recurrence exceptions behind.
+            (typescript && (table == "verification" || table == "recurrence_exception"))
+                || (table == "event_participant"
+                    && id.as_ref().is_some_and(|id| participants.contains(id)))
         })
         .cloned()
         .collect();
@@ -568,20 +652,42 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
             .iter()
             .filter(|(t, _)| t == "recurrence_exception")
             .count(),
-        2
+        if typescript { 2 } else { 0 }
     );
     assert_eq!(remaining(&app.db, &needles).await, expected_leftovers);
-    let kept: (Option<String>, String) =
-        sqlx::query_as("SELECT user_id, email FROM event_participant WHERE id = $1")
-            .bind(&participant)
-            .fetch_one(&app.db)
-            .await
-            .expect("bystander's participant row");
-    assert_eq!(
-        kept,
-        (None, victim.email.clone()),
-        "the link is cut, the invite email stays"
-    );
+    let left: &[&str] = if typescript {
+        &["one-time-token", "passkey-challenge", "reset-password"]
+    } else {
+        &[]
+    };
+    assert_eq!(verifications(&app.db, &victim.id, &one_time).await, left);
+    let mut kept = Vec::new();
+    for id in &participants {
+        let row: Participation = sqlx::query_as(
+            "SELECT user_id, email, display_name, status FROM event_participant WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_one(&app.db)
+        .await
+        .expect("bystander's participant row");
+        kept.push(row);
+    }
+    let expected = if typescript {
+        // TypeScript only cuts the link (ON DELETE SET NULL).
+        [
+            unlinked(&victim.email, Some("Victim"), "accepted"),
+            unlinked(&victim.email, Some("Victim"), "accepted"),
+            unlinked(&upper, Some("Typed name"), "tentative"),
+        ]
+    } else {
+        // The typed address stays; the account's RSVP and a name that may come from its profile go.
+        [
+            unlinked(&victim.email, None, "pending"),
+            unlinked(&victim.email, None, "accepted"),
+            unlinked(&upper, None, "pending"),
+        ]
+    };
+    assert_eq!(kept, expected);
 
     let mut bystander_after = rows_mentioning(&app.db, &bystander_needles).await;
     let mut expected_bystander = bystander_before.clone();
@@ -592,9 +698,11 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
                 .is_some()
         );
     }
-    let participant_key = ("event_participant".to_owned(), Some(participant.clone()));
-    assert!(bystander_after.remove(&participant_key).is_some());
-    expected_bystander.remove(&participant_key);
+    for id in &participants {
+        let key = ("event_participant".to_owned(), Some(id.clone()));
+        assert!(bystander_after.remove(&key).is_some());
+        expected_bystander.remove(&key);
+    }
     assert_eq!(
         bystander_after, expected_bystander,
         "the other account's rows are untouched"
