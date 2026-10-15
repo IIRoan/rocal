@@ -363,6 +363,31 @@ Each sub-step is done when its suite cases pass against Rust and the memory budg
   - a one-hour soak;
   - a rollback drill: Rust writes data and renews sessions, then the test environment switches to the TypeScript backend, and data and sessions must still work.
 
+**Result (2026-10-15; done except the app and device checks, which need a person):**
+
+- **Build:** `crates/solace-server/Dockerfile` (pinned `rust:1.98.1-slim-bookworm` and `debian:bookworm-slim` by digest; OpenSSL for webauthn-rs-core and `make` for jemalloc in the builder; a 133 MB runtime image with CA certificates and `libssl3`, running as uid 10001). `cargo xtask deploy-test test-api crates xtask Cargo.toml Cargo.lock packages/calendar-core/src/redaction-policy.js` uploads only those committed paths.
+- **Run:** Railway service `test-api` in `test` (`https://solace-rust-api-test.up.railway.app`, `test-api.railway.internal:8080`), one replica, `/api/health` as the health check, 30 s draining, the test Postgres over the private network, production mode with the suite's `.test` origins. SIGTERM drains: the shutdown ends the SSE streams so in-flight requests finish.
+- **Background work:** calendar sync runs every 15 minutes, and realtime keeps one owner EventSource per subscribed mailbox. Receipt-time mail polling stays off unless `MAIL_RECEIPT_POLLING=true`: `main.ts` started it only outside Vercel, so production has never polled, and polling every mailbox's new mail on the server widens the known invite-ingestion gap. On Railway it also retried every orphaned mailbox's login every 10 s.
+- **Railway's edge sets `X-Real-IP`:** 31 requests to the invite validation, each with a different spoofed `X-Real-IP` and `X-Forwarded-For`, still hit the 30-a-minute limit on the 31st. The client address the server reads can't be chosen by the client, which closes 4a's open question. Because every client shares one address through the edge, the suite runs inside Railway as the `test-suite` service (`crates/solace-api-tests/Dockerfile`) against `test-api` over the private network.
+- **Suite:** all 404 cases pass against the deployed Rust server in production mode, interop included. Getting there found:
+  - the Railway test Stalwart still ran its first deploy, without `maxConcurrentRequests: 32`, so bursts of invitation mail failed with JMAP's limit error until it was redeployed from `apps/stalwart/test-env`;
+  - one suite case read the gated test Stalwart without the gate key, and the loopback-DNS cases assumed the host's `/etc/hosts` (now `TEST_LOOPBACK_DNS_NAME`).
+- **Rollback drill:** the TypeScript backend runs as `test-api-ts` (`crates/solace-api-tests/ts-backend.Dockerfile`, Bun from source, never `build:vercel`) on the same database and secrets. `interop::` with `INTEROP_RUST_URL` and `INTEROP_TS_URL` passes on Railway: an event, a calendar and settings written on Rust, and a session Rust renewed, read identically on TypeScript; password sessions, passkeys with their counters, and the step-up cookie made by either backend work on the other.
+- **Memory on Railway** (`cargo xtask mem-budget --remote`, which reads `/proc/1` through `railway ssh`; VmHWM is the exact peak; the container sees 48 CPUs; each run starts a fresh process on a clean template database):
+  - idle 28.0 MiB untouched, 29.5 after the first requests (budget 30; about 20 MiB of it is the binary and libraries, file-backed);
+  - steady peak 29.9 MiB (budget 80);
+  - twenty concurrent sign-ins (`memory_burst::`, run inside Railway, after twenty sign-ups): peak 97.2 MiB against a budget of 110.6 (30.6 + 2 × 32 + 16); 60 s later 29.2 MiB, below the 30.6 before;
+  - soak: 42 minutes of the soak load (4 clients) instead of the full hour, cut short on request: RSS ended at 26.2 MiB and never exceeded 28.4, so no growth. The one-hour run is still open.
+  - On a database full of suite data, idle and the burst ran 15–45 MiB higher: the 15-minute calendar sync fetching hundreds of suite feeds, and, before the gate, receipt polling. Under the whole suite at 8-way concurrency the peak was 169 MiB, with 79 MiB still resident afterwards.
+- **Short benchmarks** (k6 from one machine through Railway's edge, Rust `test-api` and TypeScript `test-api-ts` on the same database, a signed-in user; 20 s per route at 20 virtual users, then 15 s at 8):
+  - at 20 users, requests a second (p50): health 1829 (9.5 ms) against TypeScript's 2386 (7.7 ms); get-session 1219 (16 ms) against 1137 (16 ms); settings 534 (36 ms) against 813 (23 ms); the event list 188 (100 ms) against 366 (53 ms);
+  - at 8 users, settings is at parity (323 against 361), so its gap at 20 is the pool: Rust keeps 10 connections (`db::connect`, sized for memory) where Prisma opened 33;
+  - the event list stays about 1.5× slower per request (139 against 222 at 8 users), which points at its database round trips. Worth tuning before cutover; the plan has no latency budget;
+  - memory after the run: Rust 67.5 MiB (peak 71), TypeScript 210 MiB (peak 269);
+  - concurrent first requests for a new account race on the settings row (find, then create) and answer 409 on either backend, as TypeScript's `SettingsService.get` does.
+- **Not done:** the web app and both native apps through sign-in, calendar and mail, with a passkey on a real device. That needs a person and devices.
+- **Test resources:** `test-api`, `test-api-ts` and `test-suite` services, and the `solace_test_api` and `solace_test_mem` databases, all in `test`. Production is unchanged.
+
 ### 6. Cutover
 
 This happens only with explicit go-ahead.
