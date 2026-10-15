@@ -23,6 +23,7 @@ pub mod notifications;
 pub mod profiles;
 pub mod push_devices;
 pub mod recent_contacts;
+pub mod recurring;
 pub mod settings;
 pub mod state;
 pub mod telemetry;
@@ -67,6 +68,7 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(profiles::routes())
         .merge(e2ee::routes())
         .merge(invitations::routes())
+        .merge(recurring::routes())
 }
 
 /// Every route's OpenAPI entry, without a database.
