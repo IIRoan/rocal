@@ -19,9 +19,10 @@ use solace_api_types::subscriptions::{
 use sqlx::PgPool;
 
 use crate::helpers::{
-    Backend, TestApp, TestUser, expect_invalid, expect_unauthorized, expect_unknown_field, fixture,
-    hex, json_body, ok,
+    Backend, TestApp, TestUser, expect_invalid, expect_unauthorized, expect_unknown_field, hex,
+    json_body, ok,
 };
+use crate::mail_support::bootstrap_request;
 use crate::passkeys::sha256_base64url;
 use crate::profiles::{stored_objects_exist, upload_fixture};
 
@@ -113,29 +114,9 @@ async fn stalwart_account_exists(app: &TestApp, account_id: &str) -> bool {
 
 /// Provisions the user's Stalwart mailbox the way the apps do; the PGP fixtures may be shared between users.
 async fn bootstrap_mailbox(app: &TestApp, user: &mut TestUser) -> String {
-    let keys: Value = serde_json::from_slice(&fixture("pgp/keys.json")).expect("pgp fixture index");
-    let entry = &keys[rand::random_range(0..4usize)];
-    let armored = String::from_utf8(fixture(&format!(
-        "pgp/{}",
-        entry["file"].as_str().expect("key file")
-    )))
-    .expect("armored key");
+    let request = json_body(&bootstrap_request(rand::random_range(0..4)));
     ok(user
-        .post(
-            "/api/mail/account/bootstrap",
-            json!({
-                "publicKeyArmored": armored,
-                "fingerprint": entry["fingerprint"],
-                "algorithm": entry["algorithm"],
-                "createdAt": entry["createdAt"],
-                "vaultVersion": 1,
-                "encryptedVaultB64": fake_envelope(),
-                "kdf": "argon2id",
-                "kdfParams": {"saltB64": "c2FsdHNhbHRzYWx0c2FsdA==", "memoryKiB": 65536, "iterations": 3, "parallelism": 1},
-                "wrappedSecret": fake_envelope(),
-                "wrapAlgorithm": "AES-GCM-256",
-            }),
-        )
+        .post("/api/mail/account/bootstrap", request)
         .await
         .expect_status(200));
     sqlx::query_scalar("SELECT stalwart_account_id FROM mail_directory_entry WHERE user_id = $1")

@@ -13,11 +13,12 @@ use serde_json::{Value, json};
 use sha2::Sha256;
 use solace_api_tests::client::ApiResponse;
 use solace_api_tests::seed::fake_envelope;
+use solace_api_tests::stalwart::REGISTRY;
 use solace_api_types::mail::{
     MailAccessToken, MailBootstrapRequest, MailSignup, MailSyncResult, MailVaultKdfParams,
 };
 
-use crate::helpers::{Backend, TestApp, TestUser, hex, ok};
+use crate::helpers::{Backend, TestApp, TestUser, hex, json_body, ok};
 
 pub const JMAP_MAIL: [&str; 3] = [
     "urn:ietf:params:jmap:core",
@@ -72,10 +73,6 @@ pub fn bootstrap_request(index: usize) -> MailBootstrapRequest {
     }
 }
 
-pub fn to_json<T: serde::Serialize>(value: &T) -> Value {
-    serde_json::to_value(value).expect("serializable")
-}
-
 /// Stalwart limits concurrent JMAP requests per account, every backend provisions through one shared account, and only Rust resends what the limit refuses.
 static PROVISIONING: AtomicBool = AtomicBool::new(false);
 const STALWART_BUSY: &str = "Stalwart admin JMAP request failed with status 400.";
@@ -111,23 +108,30 @@ fn stalwart_busy(app: &TestApp, response: &ApiResponse) -> bool {
             .is_ok_and(|body| body["message"] == json!(STALWART_BUSY))
 }
 
-/// `POST /api/mail/account/bootstrap`, retried on TypeScript while Stalwart is busy; call it holding a [`ProvisioningTurn`].
-pub async fn bootstrap(
-    app: &TestApp,
-    user: &mut TestUser,
-    request: &MailBootstrapRequest,
-) -> ApiResponse {
+/// Sends until TypeScript stops answering that Stalwart is busy, at most eight times.
+async fn while_busy(app: &TestApp, mut send: impl AsyncFnMut() -> ApiResponse) -> ApiResponse {
     let mut attempt = 0;
     loop {
-        let response = user
-            .post("/api/mail/account/bootstrap", to_json(request))
-            .await;
+        let response = send().await;
         attempt += 1;
         if !stalwart_busy(app, &response) || attempt == 8 {
             return response;
         }
         tokio::time::sleep(Duration::from_millis(250 * attempt)).await;
     }
+}
+
+/// `POST /api/mail/account/bootstrap`, retried while Stalwart is busy; call it holding a [`ProvisioningTurn`].
+pub async fn bootstrap(
+    app: &TestApp,
+    user: &mut TestUser,
+    request: &MailBootstrapRequest,
+) -> ApiResponse {
+    while_busy(app, async || {
+        user.post("/api/mail/account/bootstrap", json_body(request))
+            .await
+    })
+    .await
 }
 
 /// Bootstraps the user's mailbox, sets its bridge password so the backend's first login is not a failed one, and warms the mail token.
@@ -158,14 +162,12 @@ pub async fn mailbox(app: &TestApp) -> Mailbox {
     Mailbox { user, signup }
 }
 
-const STALWART_ADMIN: [&str; 2] = ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"];
-
 /// Stalwart's failed-login ban counts every rejected bridge login against the backend's address, so tests avoid them.
 pub async fn set_bridge_password(app: &TestApp, account_id: &str, user_id: &str, email: &str) {
     let secret = bridge_secret(&app.env.mail_bridge_hmac_key, user_id, email);
     let reply = app
         .stalwart_admin(
-            &STALWART_ADMIN,
+            &REGISTRY,
             json!([["x:Account/set", {"update": {account_id: {"credentials/0": {
                 "@type": "Password", "secret": secret, "expiresAt": null, "allowedIps": {}
             }}}}, "p"]]),
@@ -220,24 +222,17 @@ pub fn hmac_sha256(key: &[u8], message: &[u8]) -> Vec<u8> {
 pub async fn stalwart_account(app: &TestApp, account_id: &str) -> Option<Value> {
     let reply = app
         .stalwart_admin(
-            &STALWART_ADMIN,
+            &REGISTRY,
             json!([["x:Account/get", {"ids": [account_id], "properties": ["id", "name", "emailAddress", "encryptionAtRest"]}, "a"]]),
         )
         .await;
     reply["methodResponses"][0][1]["list"].get(0).cloned()
 }
 
-/// `GET /api/mail/oauth/access-token`, retried on TypeScript while Stalwart is busy: a first mint makes admin calls.
+/// `GET /api/mail/oauth/access-token`, retried while Stalwart is busy: a first mint makes admin calls.
 pub async fn access_token(app: &TestApp, user: &mut TestUser) -> MailAccessToken {
-    let mut attempt = 0;
-    loop {
-        let response = user.get("/api/mail/oauth/access-token").await;
-        attempt += 1;
-        if !stalwart_busy(app, &response) || attempt == 8 {
-            return ok(response.expect_status(200).and_then(|r| r.dto()));
-        }
-        tokio::time::sleep(Duration::from_millis(250 * attempt)).await;
-    }
+    let response = while_busy(app, async || user.get("/api/mail/oauth/access-token").await).await;
+    ok(response.expect_status(200).and_then(|r| r.dto()))
 }
 
 /// The arguments of the method response with this call id.

@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-use anyhow::{Context, bail};
+use anyhow::{Context, bail, ensure};
 
 pub fn run(args: &[&str]) -> anyhow::Result<()> {
     let check = match args {
@@ -44,9 +44,7 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
         .arg("generate")
         .status()
         .context("bun")?;
-    if !status.success() {
-        bail!("openapi-typescript failed");
-    }
+    ensure!(status.success(), "openapi-typescript failed");
     if check {
         let diff = Command::new("git")
             .current_dir(&root)
@@ -58,11 +56,10 @@ pub fn run(args: &[&str]) -> anyhow::Result<()> {
                 "packages/api-contracts",
             ])
             .status()?;
-        if !diff.success() {
-            bail!(
-                "packages/api-contracts is stale; run `cargo xtask openapi` and commit the result"
-            );
-        }
+        ensure!(
+            diff.success(),
+            "packages/api-contracts is stale; run `cargo xtask openapi` and commit the result"
+        );
         println!("packages/api-contracts matches the server's routes");
     }
     Ok(())

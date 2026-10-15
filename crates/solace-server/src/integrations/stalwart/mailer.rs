@@ -243,17 +243,13 @@ impl Jmap<'_> {
             .as_deref()
             .map(str::trim)
             .filter(|t| !t.is_empty())
-            .unwrap_or("application/octet-stream; charset=utf-8")
-            .to_owned();
-        let bytes = attachment.content.as_bytes().to_vec();
-        let size = bytes.len();
+            .unwrap_or("application/octet-stream; charset=utf-8");
         let media = kind
             .split(';')
             .next()
             .map(str::trim)
             .filter(|t| !t.is_empty())
-            .unwrap_or("application/octet-stream")
-            .to_owned();
+            .unwrap_or("application/octet-stream");
         let (status, body) = super::send_in(
             &super::NOREPLY_LANE,
             self.request(
@@ -261,7 +257,7 @@ impl Jmap<'_> {
                 &resolve_upload_url(&session.upload_url, &session.mail_account),
             )
             .header(reqwest::header::CONTENT_TYPE, media)
-            .body(bytes),
+            .body(attachment.content.clone()),
         )
         .await?;
         if !status.is_success() {
@@ -278,7 +274,7 @@ impl Jmap<'_> {
             "blobId": blob_id,
             "type": kind,
             "name": attachment.filename,
-            "size": parsed.get("size").and_then(Value::as_u64).unwrap_or(size as u64),
+            "size": parsed.get("size").and_then(Value::as_u64).unwrap_or(attachment.content.len() as u64),
             "disposition": "attachment",
         }))
     }
@@ -346,16 +342,16 @@ fn assert_success(envelope: &Value, context: &str) -> Result<(), MailerError> {
     let responses = envelope
         .get("methodResponses")
         .and_then(Value::as_array)
-        .cloned()
+        .map(Vec::as_slice)
         .unwrap_or_default();
     if responses.is_empty() {
         return Err(MailerError::Method(format!(
             "{context}: empty JMAP response"
         )));
     }
-    for response in &responses {
+    for response in responses {
         let name = response.get(0).and_then(Value::as_str).unwrap_or_default();
-        let result = response.get(1).cloned().unwrap_or(Value::Null);
+        let result = response.get(1).unwrap_or(&Value::Null);
         let describe = |method: &str, error: &Value| {
             let hint = error
                 .get("type")
@@ -367,7 +363,7 @@ fn assert_success(envelope: &Value, context: &str) -> Result<(), MailerError> {
         if name == "error" || name.ends_with("/error") {
             return Err(describe(
                 if name == "error" { context } else { name },
-                &result,
+                result,
             ));
         }
         for key in ["notCreated", "notUpdated", "notDestroyed"] {
@@ -384,15 +380,7 @@ fn assert_success(envelope: &Value, context: &str) -> Result<(), MailerError> {
 }
 
 fn method_result<'a>(envelope: &'a Value, method: &str) -> Result<&'a Value, MailerError> {
-    envelope
-        .get("methodResponses")
-        .and_then(Value::as_array)
-        .and_then(|responses| {
-            responses
-                .iter()
-                .find(|r| r.get(0).and_then(Value::as_str) == Some(method))
-        })
-        .and_then(|r| r.get(1))
+    super::method_response(envelope, method)
         .ok_or_else(|| MailerError::Method(format!("Expected {method} in JMAP response")))
 }
 
@@ -424,8 +412,7 @@ fn pick_identity(identities: &[Value], from: &str) -> Option<String> {
             identity
                 .get("email")
                 .and_then(Value::as_str)
-                .map(|e| e.trim().to_lowercase())
-                == Some(needle.clone())
+                .is_some_and(|e| e.trim().to_lowercase() == needle)
         })
         .and_then(|identity| identity.get("id").and_then(Value::as_str))
         .map(str::to_owned)
@@ -458,11 +445,12 @@ pub fn resolve_upload_url(template: &str, account_id: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use axum::Json;
-    use axum::extract::State;
-    use axum::http::{HeaderMap, StatusCode};
+    use std::collections::VecDeque;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
+
+    use super::super::fake::{FakeStalwart, Recorded, Reply};
+    use super::*;
 
     #[test]
     fn rewrites_internal_hosts_onto_the_public_origin() {
@@ -519,73 +507,52 @@ mod tests {
         assert_eq!(pick_identity(&identities, "other@solace.test"), None);
     }
 
-    /// A local JMAP server: records each request's gate header and answers like Stalwart, first refusing calls listed in `refusals`.
-    #[derive(Clone, Default)]
-    struct Fake {
-        identities: Arc<Vec<Value>>,
-        gate_headers: Arc<Mutex<Vec<Option<String>>>>,
-        calls: Arc<Mutex<Vec<Value>>>,
-        refusals: Arc<Mutex<Vec<(&'static str, Value)>>>,
-        submitted: Arc<Mutex<usize>>,
+    /// The noreply account's Stalwart, counting submissions; each `(method, reply)` in `refusals` answers the next call to that method, in order.
+    async fn stalwart(
+        identities: Value,
+        refusals: Vec<(&'static str, Reply)>,
+    ) -> (FakeStalwart, Arc<AtomicUsize>) {
+        let submitted = Arc::new(AtomicUsize::new(0));
+        let counted = submitted.clone();
+        let refusals = Mutex::new(VecDeque::from(refusals));
+        let fake = FakeStalwart::start(move |request| {
+            if request.path == "/jmap/session" {
+                return Reply::json(
+                    json!({"apiUrl": "http://stalwart.internal:8080/jmap/", "uploadUrl": "", "primaryAccounts": {"urn:ietf:params:jmap:mail": "acc"}}),
+                );
+            }
+            let first = request.first_method();
+            let mut refusals = refusals.lock().unwrap();
+            if refusals.front().is_some_and(|(method, _)| *method == first) {
+                return refusals.pop_front().unwrap().1;
+            }
+            if first == "Mailbox/get" {
+                return Reply::json(json!({"methodResponses": [
+                    ["Mailbox/get", {"list": [{"id": "d", "role": "drafts"}, {"id": "s", "role": "sent"}]}, "m"],
+                    ["Identity/get", {"list": identities}, "i"],
+                ]}));
+            }
+            counted.fetch_add(1, Ordering::SeqCst);
+            Reply::json(json!({"methodResponses": [
+                ["Email/set", {"created": {"draft1": {"id": "e1"}}}, "c1"],
+                ["EmailSubmission/set", {"created": {"s1": {"id": "sub1"}}}, "c2"],
+            ]}))
+        })
+        .await;
+        (fake, submitted)
     }
 
-    /// Stalwart's answer past its per-account `maxConcurrentRequests`.
-    fn concurrency_limit() -> Value {
-        json!({"type": "urn:ietf:params:jmap:error:limit", "status": 400, "detail": "The request exceeds the maximum number of concurrent requests.", "limit": "maxConcurrentRequests"})
+    fn noreply() -> Value {
+        json!([{"id": "id1", "email": "noreply@solace.test"}])
     }
 
-    async fn fake_server(fake: Fake) -> String {
-        async fn record(fake: &Fake, headers: &HeaderMap) {
-            let gate = headers
-                .get(super::super::gate::GATE_HEADER)
-                .and_then(|v| v.to_str().ok())
-                .map(str::to_owned);
-            fake.gate_headers.lock().unwrap().push(gate);
-        }
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let base = format!("http://{}", listener.local_addr().unwrap());
-        let api = format!("{base}/jmap/");
-        let app = axum::Router::new()
-            .route(
-                "/jmap/session",
-                axum::routing::get(move |State(fake): State<Fake>, headers: HeaderMap| {
-                    let api = api.clone();
-                    async move {
-                        record(&fake, &headers).await;
-                        Json(json!({"apiUrl": api, "uploadUrl": "", "primaryAccounts": {"urn:ietf:params:jmap:mail": "acc"}}))
-                    }
-                }),
-            )
-            .route(
-                "/jmap/",
-                axum::routing::post(|State(fake): State<Fake>, headers: HeaderMap, Json(body): Json<Value>| async move {
-                    record(&fake, &headers).await;
-                    fake.calls.lock().unwrap().push(body.clone());
-                    let first = body["methodCalls"][0][0].as_str().unwrap_or_default().to_owned();
-                    let refusal = {
-                        let mut refusals = fake.refusals.lock().unwrap();
-                        let next = refusals.first().is_some_and(|(method, _)| *method == first);
-                        next.then(|| refusals.remove(0).1)
-                    };
-                    if let Some(problem) = refusal {
-                        (StatusCode::BAD_REQUEST, Json(problem))
-                    } else if first == "Mailbox/get" {
-                        (StatusCode::OK, Json(json!({"methodResponses": [
-                            ["Mailbox/get", {"list": [{"id": "d", "role": "drafts"}, {"id": "s", "role": "sent"}]}, "m"],
-                            ["Identity/get", {"list": fake.identities.as_ref()}, "i"],
-                        ]})))
-                    } else {
-                        *fake.submitted.lock().unwrap() += 1;
-                        (StatusCode::OK, Json(json!({"methodResponses": [
-                            ["Email/set", {"created": {"draft1": {"id": "e1"}}}, "c1"],
-                            ["EmailSubmission/set", {"created": {"s1": {"id": "sub1"}}}, "c2"],
-                        ]})))
-                    }
-                }),
-            )
-            .with_state(fake);
-        tokio::spawn(async move { axum::serve(listener, app).await });
-        base
+    /// The JMAP API calls the fake received.
+    fn calls(fake: &FakeStalwart) -> Vec<Value> {
+        fake.requests()
+            .iter()
+            .filter(|r| r.path == "/jmap/")
+            .map(Recorded::json)
+            .collect()
     }
 
     fn config(base: &str) -> MailerConfig {
@@ -607,25 +574,23 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn sends_through_session_identity_and_submission() {
-        let fake = Fake {
-            identities: Arc::new(vec![json!({"id": "id1", "email": "noreply@solace.test"})]),
-            ..Default::default()
-        };
-        let base = fake_server(fake.clone()).await;
-        let gate = StalwartGate::new(&base, None);
-        let id = send(
-            &Client::new(),
-            &gate,
-            &config(&base),
+    async fn send_with(fake: &FakeStalwart, gate: &StalwartGate) -> Result<String, MailerError> {
+        send(
+            &fake.http,
+            gate,
+            &config(&fake.base_url),
             "friend@example.com",
             &message(),
         )
         .await
-        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn sends_through_session_identity_and_submission() {
+        let (fake, _) = stalwart(noreply(), Vec::new()).await;
+        let id = send_with(&fake, &fake.gate).await.unwrap();
         assert_eq!(id, "sub1");
-        let calls = fake.calls.lock().unwrap().clone();
+        let calls = calls(&fake);
         let submit = &calls[1]["methodCalls"];
         assert_eq!(submit[0][0], json!("Email/set"));
         assert_eq!(
@@ -639,111 +604,70 @@ mod tests {
         );
     }
 
-    fn noreply() -> Fake {
-        Fake {
-            identities: Arc::new(vec![json!({"id": "id1", "email": "noreply@solace.test"})]),
-            ..Default::default()
-        }
-    }
-
-    async fn send_with(fake: &Fake) -> Result<String, MailerError> {
-        let base = fake_server(fake.clone()).await;
-        send(
-            &Client::new(),
-            &StalwartGate::new(&base, None),
-            &config(&base),
-            "friend@example.com",
-            &message(),
-        )
-        .await
-    }
-
     #[tokio::test]
     async fn resends_calls_refused_at_the_concurrency_limit_and_submits_once() {
-        let fake = noreply();
-        *fake.refusals.lock().unwrap() = vec![
-            ("Mailbox/get", concurrency_limit()),
-            ("Email/set", concurrency_limit()),
-            ("Email/set", concurrency_limit()),
-        ];
-        assert_eq!(send_with(&fake).await.unwrap(), "sub1");
-        assert_eq!(fake.calls.lock().unwrap().len(), 5);
-        assert_eq!(*fake.submitted.lock().unwrap(), 1);
+        let (fake, submitted) = stalwart(
+            noreply(),
+            vec![
+                ("Mailbox/get", Reply::concurrency_limit()),
+                ("Email/set", Reply::concurrency_limit()),
+                ("Email/set", Reply::concurrency_limit()),
+            ],
+        )
+        .await;
+        assert_eq!(send_with(&fake, &fake.gate).await.unwrap(), "sub1");
+        assert_eq!(calls(&fake).len(), 5);
+        assert_eq!(submitted.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
     async fn gives_up_after_bounded_retries_at_the_concurrency_limit() {
-        let fake = noreply();
         let attempts = usize::try_from(super::super::LIMIT_RETRIES).unwrap() + 1;
-        *fake.refusals.lock().unwrap() = vec![("Mailbox/get", concurrency_limit()); attempts + 1];
+        let refusals = std::iter::repeat_with(|| ("Mailbox/get", Reply::concurrency_limit()))
+            .take(attempts + 1)
+            .collect();
+        let (fake, submitted) = stalwart(noreply(), refusals).await;
         let started = std::time::Instant::now();
-        let error = send_with(&fake).await;
+        let error = send_with(&fake, &fake.gate).await;
         assert!(matches!(error, Err(MailerError::Request(400))), "{error:?}");
         assert!(
             started.elapsed() < Duration::from_secs(4),
             "{:?}",
             started.elapsed()
         );
-        assert_eq!(fake.calls.lock().unwrap().len(), attempts);
-        assert_eq!(*fake.submitted.lock().unwrap(), 0);
+        assert_eq!(calls(&fake).len(), attempts);
+        assert_eq!(submitted.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
     async fn other_request_errors_are_not_resent() {
-        let fake = noreply();
         let too_big = json!({"type": "urn:ietf:params:jmap:error:limit", "status": 400, "limit": "maxSizeRequest"});
         let not_request = json!({"type": "urn:ietf:params:jmap:error:notRequest", "status": 400});
         for problem in [too_big, not_request] {
-            fake.calls.lock().unwrap().clear();
-            *fake.refusals.lock().unwrap() = vec![("Email/set", problem)];
-            let error = send_with(&fake).await;
+            let (fake, submitted) =
+                stalwart(noreply(), vec![("Email/set", Reply::problem(problem))]).await;
+            let error = send_with(&fake, &fake.gate).await;
             assert!(matches!(error, Err(MailerError::Request(400))), "{error:?}");
-            assert_eq!(fake.calls.lock().unwrap().len(), 2, "sent once");
+            assert_eq!(calls(&fake).len(), 2, "sent once");
+            assert_eq!(submitted.load(Ordering::SeqCst), 0);
         }
-        assert_eq!(*fake.submitted.lock().unwrap(), 0);
     }
 
     #[tokio::test]
     async fn fails_closed_without_an_identity() {
-        let fake = Fake::default();
-        let base = fake_server(fake.clone()).await;
-        let error = send(
-            &Client::new(),
-            &StalwartGate::new(&base, None),
-            &config(&base),
-            "friend@example.com",
-            &message(),
-        )
-        .await;
+        let (fake, _) = stalwart(json!([]), Vec::new()).await;
+        let error = send_with(&fake, &fake.gate).await;
         assert!(matches!(error, Err(MailerError::NoIdentity)), "{error:?}");
-        assert_eq!(fake.calls.lock().unwrap().len(), 1, "nothing was submitted");
+        assert_eq!(calls(&fake).len(), 1, "nothing was submitted");
     }
 
     #[tokio::test]
     async fn sends_the_gate_key_when_configured() {
-        let fake = Fake {
-            identities: Arc::new(vec![json!({"id": "id1", "email": "noreply@solace.test"})]),
-            ..Default::default()
-        };
-        let base = fake_server(fake.clone()).await;
+        let (fake, _) = stalwart(noreply(), Vec::new()).await;
         // The gate only applies to https; over http the key must never be sent.
-        let gate = StalwartGate::new(&base, Some("solace-test-gate"));
-        send(
-            &Client::new(),
-            &gate,
-            &config(&base),
-            "friend@example.com",
-            &message(),
-        )
-        .await
-        .unwrap();
-        assert!(
-            fake.gate_headers
-                .lock()
-                .unwrap()
-                .iter()
-                .all(Option::is_none)
-        );
+        let gate = StalwartGate::new(&fake.base_url, Some("solace-test-gate"));
+        send_with(&fake, &gate).await.unwrap();
+        assert!(fake.requests().iter().all(|r| r.gate.is_none()));
         let https_gate = StalwartGate::new("https://mail.solace.test", Some("solace-test-gate"));
         assert_eq!(
             https_gate.key_for("https://mail.solace.test/jmap/"),

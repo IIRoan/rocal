@@ -12,6 +12,14 @@ use crate::config::Config;
 
 pub const CLIENT_ID: &str = "solace-mail-bridge";
 
+/// Node's `Buffer.from(…, "base64")` decoding: padding optional and stray trailing bits ignored.
+pub const LENIENT_BASE64: GeneralPurpose = GeneralPurpose::new(
+    &alphabet::STANDARD,
+    GeneralPurposeConfig::new()
+        .with_decode_padding_mode(DecodePaddingMode::Indifferent)
+        .with_decode_allow_trailing_bits(true),
+);
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum BridgeError {
     #[error(
@@ -69,13 +77,7 @@ fn lenient_base64(input: &str) -> Vec<u8> {
     if normalized.len() % 4 == 1 {
         normalized.pop();
     }
-    let lenient = GeneralPurpose::new(
-        &alphabet::STANDARD,
-        GeneralPurposeConfig::new()
-            .with_decode_allow_trailing_bits(true)
-            .with_decode_padding_mode(DecodePaddingMode::RequireNone),
-    );
-    lenient.decode(normalized).unwrap_or_default()
+    LENIENT_BASE64.decode(normalized).unwrap_or_default()
 }
 
 #[cfg(test)]

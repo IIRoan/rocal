@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{Context, bail};
+use anyhow::{Context, bail, ensure};
 use solace_api_tests::env::TestEnv;
 use sqlx::{Connection, Executor, PgConnection};
 
@@ -18,12 +18,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let env = TestEnv::from_env()?;
     let url = env.database_url_for(DATABASE)?;
     let mut admin = PgConnection::connect(&env.database_url).await?;
-    admin
-        .execute(format!("DROP DATABASE IF EXISTS {DATABASE} WITH (FORCE)").as_str())
-        .await?;
-    admin
-        .execute(format!("CREATE DATABASE {DATABASE}").as_str())
-        .await?;
+    crate::test_env::recreate_database(&mut admin, DATABASE, None).await?;
     let mut db = PgConnection::connect(&url).await?;
     crate::test_env::apply_migrations(&mut db).await?;
     db.close().await?;
@@ -49,9 +44,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
             "_prisma_migrations",
         ])
         .status()?;
-    if !status.success() {
-        bail!("sea-orm-cli failed");
-    }
+    ensure!(status.success(), "sea-orm-cli failed");
     admin
         .execute(format!("DROP DATABASE IF EXISTS {DATABASE} WITH (FORCE)").as_str())
         .await?;
@@ -63,9 +56,10 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     if check {
         let differences = diff(&out.join("entities.rs"), &committed.join("entities.rs"))?
             + diff_dir(&generated, &committed.join("entities"))?;
-        if differences > 0 {
-            bail!("db/entities differs from the migrations; run `cargo xtask entities`");
-        }
+        ensure!(
+            differences == 0,
+            "db/entities differs from the migrations; run `cargo xtask entities`"
+        );
         println!("db/entities matches the migrations");
         return Ok(());
     }
@@ -101,9 +95,7 @@ fn format(dir: &Path) -> anyhow::Result<()> {
         .args(["--edition", "2024"])
         .args(&files)
         .status()?;
-    if !status.success() {
-        bail!("rustfmt failed on the generated entities");
-    }
+    ensure!(status.success(), "rustfmt failed on the generated entities");
     Ok(())
 }
 

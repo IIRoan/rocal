@@ -1,12 +1,13 @@
 //! `lib/mail-push-enqueue.ts` and `lib/inbound-mail-push.ts`: one `new_mail` outbox job per inbound email, holding only `emailId`/`accountId`.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use sea_orm::{ConnectionTrait, DbErr, SqlErr};
 use serde_json::Value;
 use solace_api_types::mail::{MailCalendarImportSummary, MailSyncCollection, MailSyncResult};
 
 use super::queries;
+use super::sync::unique;
 use crate::http::zod::js_trim;
 use crate::notifications::job_payload::new_mail_payload;
 use crate::telemetry::{log_ref, redact_pii};
@@ -84,15 +85,7 @@ async fn insert_job<C: ConnectionTrait>(
 
 /// `mergeInboundMailPushItems`: trimmed, non-blank and first occurrence kept.
 fn unique_ids(email_ids: &[String]) -> Vec<String> {
-    unique_strings(email_ids.iter().map(|id| js_trim(id).to_owned()))
-}
-
-fn unique_strings(values: impl IntoIterator<Item = String>) -> Vec<String> {
-    let mut seen = HashSet::new();
-    values
-        .into_iter()
-        .filter(|value| !value.is_empty() && seen.insert(value.clone()))
-        .collect()
+    unique(email_ids.iter().map(|id| js_trim(id).to_owned()))
 }
 
 /// A later record replaces an earlier one with the same `id` in its place, as a JavaScript `Map` does.
@@ -114,9 +107,9 @@ fn unique_records(records: impl IntoIterator<Item = Value>) -> Vec<Value> {
 
 fn merge_collection(pending: MailSyncCollection, next: MailSyncCollection) -> MailSyncCollection {
     MailSyncCollection {
-        created: unique_strings(pending.created.into_iter().chain(next.created)),
-        updated: unique_strings(pending.updated.into_iter().chain(next.updated)),
-        destroyed: unique_strings(pending.destroyed.into_iter().chain(next.destroyed)),
+        created: unique(pending.created.into_iter().chain(next.created)),
+        updated: unique(pending.updated.into_iter().chain(next.updated)),
+        destroyed: unique(pending.destroyed.into_iter().chain(next.destroyed)),
         records: unique_records(pending.records.into_iter().chain(next.records)),
         ..next
     }
@@ -135,7 +128,7 @@ pub fn coalesce_pending_mail_sync(
     };
     let (earlier, later) = (pending.calendar_import, next.calendar_import);
     Some(MailSyncResult {
-        changed_types: unique_strings(pending.changed_types.into_iter().chain(next.changed_types)),
+        changed_types: unique(pending.changed_types.into_iter().chain(next.changed_types)),
         email: merge_collection(pending.email, next.email),
         mailbox: merge_collection(pending.mailbox, next.mailbox),
         thread: merge_collection(pending.thread, next.thread),
@@ -145,7 +138,7 @@ pub fn coalesce_pending_mail_sync(
             events_created: earlier.events_created + later.events_created,
             events_updated: earlier.events_updated + later.events_updated,
             events_deleted: earlier.events_deleted + later.events_deleted,
-            errors: unique_strings(earlier.errors.into_iter().chain(later.errors)),
+            errors: unique(earlier.errors.into_iter().chain(later.errors)),
         },
         ..next
     })

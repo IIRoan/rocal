@@ -175,19 +175,38 @@ async fn insert_root_and_invites(db: &mut PgConnection) -> Result<Vec<String>> {
     let mut tokens = Vec::new();
     for (handle, _) in SEED_USERS {
         let token = URL_SAFE_NO_PAD.encode(rand::random::<[u8; 32]>());
-        sqlx::query(
-            "INSERT INTO invite (id, token, invited_by_id, email, status, expires_at, created_at, updated_at) \
-             VALUES ($1, $2, $3, $4, 'pending', now() + interval '7 days', now(), now())",
+        insert_invite(
+            &mut *db,
+            &format!("seedinvite{handle}{}", hex(8)),
+            &token,
+            ROOT_USER_ID,
+            &format!("{handle}@example.com"),
         )
-        .bind(format!("seedinvite{handle}{}", hex_id(8)))
-        .bind(&token)
-        .bind(ROOT_USER_ID)
-        .bind(format!("{handle}@example.com"))
-        .execute(&mut *db)
         .await?;
         tokens.push(token);
     }
     Ok(tokens)
+}
+
+/// A pending invite with this token from `inviter`, written straight to the database.
+pub async fn insert_invite<'e>(
+    db: impl sqlx::PgExecutor<'e>,
+    id: &str,
+    token: &str,
+    inviter: &str,
+    email: &str,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO invite (id, token, invited_by_id, email, status, expires_at, created_at, updated_at) \
+         VALUES ($1, $2, $3, $4, 'pending', now() + interval '7 days', now(), now())",
+    )
+    .bind(id)
+    .bind(token)
+    .bind(inviter)
+    .bind(email)
+    .execute(db)
+    .await?;
+    Ok(())
 }
 
 /// Alice's passkey is a single-device key with a counter; Bob's is a synced one like iCloud Keychain's.
@@ -243,7 +262,7 @@ async fn seed_e2ee(agent: &mut Agent) -> Result<()> {
         .put(
             "/api/e2ee/device",
             json!({
-                "deviceId": format!("seed-device-{}", hex_id(6)),
+                "deviceId": format!("seed-device-{}", hex(6)),
                 "deviceLabel": "Seed device",
                 "publicKey": fake_blob(550),
                 "publicKeyAlgorithm": "RSA-OAEP-256",
@@ -354,7 +373,7 @@ async fn seed_settings_and_push(agent: &mut Agent, index: usize) -> Result<()> {
     agent
         .put(
             "/api/push/devices",
-            json!({"token": hex_id(32), "platform": "ios", "bundleId": bundle, "environment": "sandbox"}),
+            json!({"token": hex(32), "platform": "ios", "bundleId": bundle, "environment": "sandbox"}),
         )
         .await?
         .expect_status(200)?;
@@ -421,16 +440,19 @@ pub fn fake_token() -> String {
 }
 
 fn fake_blob(len: usize) -> String {
-    let bytes: Vec<u8> = (0..len).map(|_| rand::random::<u8>()).collect();
-    STANDARD.encode(bytes)
+    STANDARD.encode(random_bytes(len))
 }
 
 fn fake_b64url(len: usize) -> String {
-    let bytes: Vec<u8> = (0..len).map(|_| rand::random::<u8>()).collect();
-    URL_SAFE_NO_PAD.encode(bytes)
+    URL_SAFE_NO_PAD.encode(random_bytes(len))
 }
 
-fn hex_id(len: usize) -> String {
+fn random_bytes(len: usize) -> Vec<u8> {
+    (0..len).map(|_| rand::random()).collect()
+}
+
+/// `len` random bytes as lowercase hex.
+pub fn hex(len: usize) -> String {
     (0..len)
         .map(|_| format!("{:02x}", rand::random::<u8>()))
         .collect()

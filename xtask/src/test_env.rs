@@ -3,7 +3,7 @@
 use std::process::Command;
 use std::time::Duration;
 
-use anyhow::{Context, bail};
+use anyhow::{Context, bail, ensure};
 use solace_api_tests::env::{
     LOCAL_POSTGRES_PASSWORD, LOCAL_POSTGRES_PORT, LOCAL_POSTGRES_USER,
     LOCAL_STALWART_ADMIN_PASSWORD, LOCAL_STALWART_NOREPLY_PASSWORD, LOCAL_STALWART_PORT,
@@ -100,12 +100,7 @@ fn down() -> anyhow::Result<()> {
 /// Applies every Prisma migration in order to a fresh template database.
 async fn template(env: &TestEnv) -> anyhow::Result<()> {
     let mut admin = PgConnection::connect(&env.database_url).await?;
-    admin
-        .execute(format!("DROP DATABASE IF EXISTS {TEMPLATE_DATABASE} WITH (FORCE)").as_str())
-        .await?;
-    admin
-        .execute(format!("CREATE DATABASE {TEMPLATE_DATABASE}").as_str())
-        .await?;
+    recreate_database(&mut admin, TEMPLATE_DATABASE, None).await?;
     let mut db = PgConnection::connect(&env.database_url_for(TEMPLATE_DATABASE)?).await?;
     let applied = apply_migrations(&mut db).await?;
     println!("{TEMPLATE_DATABASE}: {applied} migrations applied");
@@ -115,24 +110,34 @@ async fn template(env: &TestEnv) -> anyhow::Result<()> {
 /// A fresh database copied from the template; replaces any database of that name.
 async fn clone_template(env: &TestEnv, name: &str) -> anyhow::Result<()> {
     env.database_url_for(name)?;
-    if !name
-        .chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-    {
-        bail!("database names are lowercase letters, digits and underscores");
-    }
+    ensure!(
+        name.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+        "database names are lowercase letters, digits and underscores"
+    );
     let mut admin = PgConnection::connect(&env.database_url).await?;
-    admin
-        .execute(format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)").as_str())
-        .await?;
-    admin
-        .execute(format!("CREATE DATABASE {name} TEMPLATE {TEMPLATE_DATABASE}").as_str())
-        .await?;
+    recreate_database(&mut admin, name, Some(TEMPLATE_DATABASE)).await?;
     println!("{name}: cloned from {TEMPLATE_DATABASE}");
     Ok(())
 }
 
-/// Seeds `database` through the backend at `api`, then writes the manifest the auth checks and suite read.
+/// Drops `name` and creates it again, empty or as a copy of `template`.
+pub async fn recreate_database(
+    admin: &mut PgConnection,
+    name: &str,
+    template: Option<&str>,
+) -> anyhow::Result<()> {
+    admin
+        .execute(format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)").as_str())
+        .await?;
+    let from = template.map_or(String::new(), |template| format!(" TEMPLATE {template}"));
+    admin
+        .execute(format!("CREATE DATABASE {name}{from}").as_str())
+        .await?;
+    Ok(())
+}
+
+/// Seeds `database` through the backend at `api`, then writes a manifest of the seeded users.
 async fn seed(env: &TestEnv, api: &str, database: &str) -> anyhow::Result<()> {
     solace_api_tests::guard::check_service_url("api", api)?;
     let database_url = env.database_url_for(database)?;
@@ -226,11 +231,10 @@ fn container_running(name: &str) -> anyhow::Result<bool> {
 
 fn podman(args: &[&str]) -> anyhow::Result<()> {
     let status = Command::new("podman").args(args).status()?;
-    if !status.success() {
-        bail!(
-            "podman {} failed",
-            args.first().copied().unwrap_or_default()
-        );
-    }
+    ensure!(
+        status.success(),
+        "podman {} failed",
+        args.first().copied().unwrap_or_default()
+    );
     Ok(())
 }

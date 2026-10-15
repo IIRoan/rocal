@@ -16,7 +16,7 @@ use super::queries::{self, States};
 use crate::db::entities::mail_jmap_sync_state;
 use crate::error::AppError;
 use crate::instant;
-use crate::integrations::stalwart::jmap;
+use crate::integrations::stalwart::{jmap, method_response};
 use crate::invitations::service::{MailEmail, ingest_from_emails};
 use crate::state::AppState;
 use crate::telemetry::{log_ref, redact_pii};
@@ -66,6 +66,7 @@ const FULL_PROPERTIES: [&str; 15] = [
     "attachments",
 ];
 const MAILBOX_PROPERTIES: [&str; 5] = ["id", "name", "role", "parentId", "sortOrder"];
+const THREAD_PROPERTIES: [&str; 2] = ["id", "emailIds"];
 
 /// A 60 s cache, like the TypeScript `Map`s.
 struct Ttl<T>(Mutex<HashMap<String, (Instant, T)>>);
@@ -107,10 +108,11 @@ impl<T: Clone> Ttl<T> {
     }
 }
 
+/// The Solace user a mailbox belongs to, whose mail token every JMAP call for it uses.
 #[derive(Clone)]
-struct Owner {
-    user_id: String,
-    email: String,
+pub struct Owner {
+    pub user_id: String,
+    pub email: String,
 }
 
 #[derive(Clone)]
@@ -237,18 +239,10 @@ async fn call(state: &AppState, method: &str, arguments: Value) -> Result<Value,
 }
 
 fn method_result(envelope: &Value, method: &str) -> Result<Value, AppError> {
-    let responses = envelope.get("methodResponses").and_then(Value::as_array);
-    let named = |name: &str| {
-        responses
-            .into_iter()
-            .flatten()
-            .find(|entry| entry.get(0).and_then(Value::as_str) == Some(name))
-            .and_then(|entry| entry.get(1))
-    };
-    if let Some(result) = named(method) {
+    if let Some(result) = method_response(envelope, method) {
         return Ok(result.clone());
     }
-    if let Some(error) = named("error") {
+    if let Some(error) = method_response(envelope, "error") {
         let kind = error.get("type").and_then(Value::as_str).unwrap_or("error");
         return Err(AppError::internal(format!(
             "Stalwart JMAP {method} failed ({kind})."
@@ -270,7 +264,7 @@ fn strings(value: Option<&Value>) -> Vec<String> {
 }
 
 /// `uniqueIds`: first occurrence order, without blanks.
-fn unique(values: impl IntoIterator<Item = String>) -> Vec<String> {
+pub(super) fn unique(values: impl IntoIterator<Item = String>) -> Vec<String> {
     let mut seen = HashSet::new();
     values
         .into_iter()
@@ -278,19 +272,17 @@ fn unique(values: impl IntoIterator<Item = String>) -> Vec<String> {
         .collect()
 }
 
-fn list(response: Value) -> Vec<Value> {
-    match response {
-        Value::Object(mut object) => match object.remove("list") {
-            Some(Value::Array(list)) => list,
-            _ => Vec::new(),
-        },
+fn list(mut response: Value) -> Vec<Value> {
+    match response.get_mut("list").map(Value::take) {
+        Some(Value::Array(list)) => list,
         _ => Vec::new(),
     }
 }
 
-fn state_of(response: &Value) -> String {
+/// A string field of a JMAP result, empty when absent.
+fn text(response: &Value, key: &str) -> String {
     response
-        .get("state")
+        .get(key)
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_owned()
@@ -340,6 +332,13 @@ struct Changes {
     destroyed: Vec<String>,
 }
 
+impl Changes {
+    /// The created and updated ids, once each.
+    fn touched(&self) -> Vec<String> {
+        unique(self.created.iter().chain(&self.updated).cloned())
+    }
+}
+
 /// `collectChanges`: every page of `{type}/changes`, at most 25.
 async fn collect_changes(
     state: &AppState,
@@ -357,29 +356,16 @@ async fn collect_changes(
             json!({"accountId": account_id, "sinceState": request_state, "maxChanges": 200}),
         )
         .await?;
-        let old_state = response
-            .get("oldState")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned();
+        let old_state = text(&response, "oldState");
         changes.created.extend(strings(response.get("created")));
         changes.updated.extend(strings(response.get("updated")));
         changes.destroyed.extend(strings(response.get("destroyed")));
-        let new_state = response
-            .get("newState")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned();
+        let new_state = text(&response, "newState");
         if !response
             .get("hasMoreChanges")
             .and_then(Value::as_bool)
             .unwrap_or(false)
         {
-            let changes = Changes {
-                created: unique(changes.created),
-                updated: unique(changes.updated),
-                destroyed: unique(changes.destroyed),
-            };
             return Ok((old_state, new_state, changes));
         }
         request_state = new_state;
@@ -437,16 +423,19 @@ async fn recent_ids(
     Ok(strings(response.get("ids")))
 }
 
-async fn mailboxes_by_ids(
+/// `{kind}/get` of these ids.
+async fn objects(
     state: &AppState,
+    kind: &str,
     account_id: &str,
     ids: &[String],
+    properties: &[&str],
 ) -> Result<Vec<Value>, AppError> {
     Ok(list(
         call(
             state,
-            "Mailbox/get",
-            json!({"accountId": account_id, "ids": ids, "properties": MAILBOX_PROPERTIES}),
+            &format!("{kind}/get"),
+            json!({"accountId": account_id, "ids": ids, "properties": properties}),
         )
         .await?,
     ))
@@ -459,8 +448,7 @@ async fn email_changes(
 ) -> Result<MailSyncCollection, AppError> {
     let (old_state, new_state, changes) =
         collect_changes(state, "Email", account_id, since).await?;
-    let ids = unique(changes.created.iter().chain(&changes.updated).cloned());
-    let mut records = emails(state, account_id, &ids).await?;
+    let mut records = emails(state, account_id, &changes.touched()).await?;
     let found: HashSet<String> = records
         .iter()
         .filter_map(|r| r.get("id").and_then(Value::as_str))
@@ -485,41 +473,20 @@ async fn email_changes(
     Ok(collection(Some(old_state), new_state, changes, records))
 }
 
-async fn mailbox_changes(
+/// Mailbox or Thread changes, with the records of those created or updated.
+async fn object_changes(
     state: &AppState,
+    kind: &str,
+    properties: &[&str],
     account_id: &str,
     since: &str,
 ) -> Result<MailSyncCollection, AppError> {
-    let (old_state, new_state, changes) =
-        collect_changes(state, "Mailbox", account_id, since).await?;
-    let ids = unique(changes.created.iter().chain(&changes.updated).cloned());
+    let (old_state, new_state, changes) = collect_changes(state, kind, account_id, since).await?;
+    let ids = changes.touched();
     let records = if ids.is_empty() {
         Vec::new()
     } else {
-        mailboxes_by_ids(state, account_id, &ids).await?
-    };
-    Ok(collection(Some(old_state), new_state, changes, records))
-}
-
-async fn thread_changes(
-    state: &AppState,
-    account_id: &str,
-    since: &str,
-) -> Result<MailSyncCollection, AppError> {
-    let (old_state, new_state, changes) =
-        collect_changes(state, "Thread", account_id, since).await?;
-    let ids = unique(changes.created.iter().chain(&changes.updated).cloned());
-    let records = if ids.is_empty() {
-        Vec::new()
-    } else {
-        list(
-            call(
-                state,
-                "Thread/get",
-                json!({"accountId": account_id, "ids": ids, "properties": ["id", "emailIds"]}),
-            )
-            .await?,
-        )
+        objects(state, kind, account_id, &ids, properties).await?
     };
     Ok(collection(Some(old_state), new_state, changes, records))
 }
@@ -579,13 +546,13 @@ async fn initialize(
         call(
             state,
             "Thread/get",
-            json!({"accountId": account_id, "ids": [], "properties": ["id", "emailIds"]})
+            json!({"accountId": account_id, "ids": [], "properties": THREAD_PROPERTIES})
         ),
     )?;
     let (mailbox_state, email_state, thread_state) = (
-        state_of(&mailboxes),
-        state_of(&email_state),
-        state_of(&thread_state),
+        text(&mailboxes, "state"),
+        text(&email_state, "state"),
+        text(&thread_state, "state"),
     );
     let stored = queries::store_initial(
         &state.db,
@@ -662,8 +629,20 @@ pub async fn sync_for_user(
         .unwrap_or_else(|| existing.email_state.clone());
     let fetched = tokio::try_join!(
         email_changes(state, account_id, &existing.email_state),
-        mailbox_changes(state, account_id, &existing.mailbox_state),
-        thread_changes(state, account_id, &thread_since),
+        object_changes(
+            state,
+            "Mailbox",
+            &MAILBOX_PROPERTIES,
+            account_id,
+            &existing.mailbox_state
+        ),
+        object_changes(
+            state,
+            "Thread",
+            &THREAD_PROPERTIES,
+            account_id,
+            &thread_since
+        ),
     );
     let (email, mut mailbox, thread) = match fetched {
         Ok(fetched) => fetched,
@@ -702,7 +681,7 @@ pub async fn sync_for_user(
             .filter(|id| !known.contains(id.as_str())),
     );
     if !missing.is_empty() {
-        match mailboxes_by_ids(state, account_id, &missing).await {
+        match objects(state, "Mailbox", account_id, &missing, &MAILBOX_PROPERTIES).await {
             Ok(extra) => mailbox.records.extend(extra),
             Err(error) => {
                 tracing::warn!(account_id, missing = missing.len(), error = %redact_pii(&error.to_string()), "Failed to hydrate mailboxes for inbound detection")
@@ -1012,7 +991,7 @@ pub async fn resolve_ingested_email(
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::sync::{Arc, Mutex as StdMutex};
 
     use sea_orm::ConnectionTrait;
@@ -1023,11 +1002,14 @@ mod tests {
     use crate::integrations::stalwart::fake::{FakeStalwart, Reply};
     use crate::mail::service::tests::{OWNER, cache_token, mail_state, seed_mailbox};
 
-    /// A Stalwart whose JMAP answers each call with `answer(method, arguments)`, as `[name, result]`.
-    async fn stalwart(
+    /// A Stalwart with an idle EventSource whose JMAP answers each call with `answer(method, arguments)`, as `[name, result]`.
+    pub async fn stalwart(
         answer: impl Fn(&str, &Value) -> (String, Value) + Send + Sync + 'static,
     ) -> FakeStalwart {
         FakeStalwart::start(move |request| {
+            if request.path.starts_with("/jmap/eventsource") {
+                return Reply::status(204);
+            }
             let body = request.json();
             let call = &body["methodCalls"][0];
             let (name, result) = answer(call[0].as_str().unwrap_or_default(), &call[1]);
@@ -1036,14 +1018,14 @@ mod tests {
         .await
     }
 
-    fn unchanged(method: &str) -> (String, Value) {
+    pub fn unchanged(method: &str) -> (String, Value) {
         (
             method.to_owned(),
             json!({"oldState": "state-0", "newState": "state-0", "hasMoreChanges": false, "created": [], "updated": [], "destroyed": []}),
         )
     }
 
-    async fn ready(database: &ScratchDatabase, fake: &FakeStalwart, stored: bool) -> AppState {
+    pub async fn ready(database: &ScratchDatabase, fake: &FakeStalwart, stored: bool) -> AppState {
         let state = mail_state(database, fake).await;
         seed_mailbox(&state, "acct-1").await;
         cache_token(&state, "owner-token");

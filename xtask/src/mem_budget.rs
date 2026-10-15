@@ -6,9 +6,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, bail};
+use anyhow::{Context, bail, ensure};
 use serde_json::json;
 use solace_api_tests::env::{BackendTarget, TEMPLATE_DATABASE, TestEnv};
+use solace_api_tests::seed::insert_invite;
 use sqlx::{Connection, Executor, PgConnection};
 
 const IDLE_BUDGET_MIB: f64 = 30.0;
@@ -29,8 +30,15 @@ struct Memory {
 /// `/proc/<pid>/status` VmRSS and VmHWM, and `smaps_rollup` Pss, like `benchmark.py`'s `metrics`.
 fn sample(pid: u32) -> anyhow::Result<Memory> {
     let directory = Path::new("/proc").join(pid.to_string());
+    let status = std::fs::read_to_string(directory.join("status"))?;
+    let rollup = std::fs::read_to_string(directory.join("smaps_rollup"))?;
+    Ok(parse_memory(&format!("{status}\n{rollup}")))
+}
+
+/// The `VmRSS:`, `VmHWM:` and `Pss:` lines (in kB) of procfs text, in MiB.
+fn parse_memory(text: &str) -> Memory {
     let mut memory = Memory::default();
-    for line in std::fs::read_to_string(directory.join("status"))?.lines() {
+    for line in text.lines() {
         let mut parts = line.split_whitespace();
         let (Some(key), Some(value)) = (parts.next(), parts.next()) else {
             continue;
@@ -39,21 +47,11 @@ fn sample(pid: u32) -> anyhow::Result<Memory> {
         match key {
             "VmRSS:" => memory.rss_mib = mib,
             "VmHWM:" => memory.hwm_mib = mib,
+            "Pss:" => memory.pss_mib = mib,
             _ => {}
         }
     }
-    for line in std::fs::read_to_string(directory.join("smaps_rollup"))?.lines() {
-        if let Some(value) = line.strip_prefix("Pss:") {
-            memory.pss_mib = value
-                .trim()
-                .trim_end_matches("kB")
-                .trim()
-                .parse::<f64>()
-                .unwrap_or_default()
-                / 1024.0;
-        }
-    }
-    Ok(memory)
+    memory
 }
 
 /// Samples `pid` until `running` turns false, returning the peak of each figure.
@@ -116,9 +114,10 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         (None, None, None) => {}
         (Some(base), Some(service), Some(database)) => {
             solace_api_tests::guard::check_service_url("--remote", &base)?;
-            if !service.starts_with("test-") {
-                bail!("test services are named test-*; refusing {service}");
-            }
+            ensure!(
+                service.starts_with("test-"),
+                "test services are named test-*; refusing {service}"
+            );
             options.remote = Some(Remote {
                 base,
                 service,
@@ -132,12 +131,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let database = format!("solace_test_mem_{}", std::process::id());
     let database_url = env.database_url_for(&database)?;
     let mut admin = PgConnection::connect(&env.database_url).await?;
-    admin
-        .execute(format!("DROP DATABASE IF EXISTS {database} WITH (FORCE)").as_str())
-        .await?;
-    admin
-        .execute(format!("CREATE DATABASE {database} TEMPLATE {TEMPLATE_DATABASE}").as_str())
-        .await?;
+    crate::test_env::recreate_database(&mut admin, &database, Some(TEMPLATE_DATABASE)).await?;
     let result = measure(&binary, &env, &database_url, &options).await;
     admin
         .execute(format!("DROP DATABASE IF EXISTS {database} WITH (FORCE)").as_str())
@@ -163,9 +157,7 @@ fn build(allocator: &str) -> anyhow::Result<std::path::PathBuf> {
         }
         other => bail!("unknown allocator {other}"),
     }
-    if !command.status()?.success() {
-        bail!("release build failed");
-    }
+    ensure!(command.status()?.success(), "release build failed");
     Ok(root.join("target/release/solace-server"))
 }
 
@@ -196,9 +188,10 @@ async fn measure(
     let _ = server.wait();
     let report = outcome?;
     println!("{}", serde_json::to_string_pretty(&report)?);
-    if report["failures"].as_array().is_some_and(|f| !f.is_empty()) {
-        bail!("memory budgets exceeded");
-    }
+    ensure!(
+        report["failures"].as_array().is_none_or(Vec::is_empty),
+        "memory budgets exceeded"
+    );
     Ok(())
 }
 
@@ -444,9 +437,10 @@ async fn sign_in_burst(
     let peak = sampler
         .join()
         .map_err(|_| anyhow::anyhow!("sampler panicked"))?;
-    if statuses.iter().any(|status| *status != 200) {
-        bail!("sign-ins failed: {statuses:?}");
-    }
+    ensure!(
+        statuses.iter().all(|status| *status == 200),
+        "sign-ins failed: {statuses:?}"
+    );
     Ok(Some(peak))
 }
 
@@ -470,15 +464,13 @@ async fn sign_up_users(
     let mut users = Vec::with_capacity(count);
     for index in 0..count {
         let token = format!("memtoken{}x{index}", std::process::id());
-        sqlx::query(
-            "INSERT INTO invite (id, token, invited_by_id, email, status, expires_at, created_at, updated_at) \
-             VALUES ($1, $2, $3, $4, 'pending', now() + interval '7 days', now(), now())",
+        insert_invite(
+            &mut db,
+            &format!("meminvite{}x{index}", std::process::id()),
+            &token,
+            &root,
+            &format!("invitee{index}@example.com"),
         )
-        .bind(format!("meminvite{}x{index}", std::process::id()))
-        .bind(&token)
-        .bind(&root)
-        .bind(format!("invitee{index}@example.com"))
-        .execute(&mut db)
         .await?;
         let email = format!("mem{}x{index}@{}", std::process::id(), env.mail_domain);
         let password = format!("solace-test-mem-{index:04}");
@@ -497,13 +489,12 @@ async fn sign_up_users(
             .json(&json!({"email": email, "password": password, "name": "Mem"}))
             .send()
             .await?;
-        if !claim.status().is_success() || !sign_up.status().is_success() {
-            bail!(
-                "could not create burst account {index}: {} / {}",
-                claim.status(),
-                sign_up.status()
-            );
-        }
+        ensure!(
+            claim.status().is_success() && sign_up.status().is_success(),
+            "could not create burst account {index}: {} / {}",
+            claim.status(),
+            sign_up.status()
+        );
         users.push((email, password));
     }
     Ok(users)
@@ -520,27 +511,12 @@ fn remote_sample(service: &str) -> anyhow::Result<Memory> {
         ])
         .output()
         .context("railway ssh")?;
-    if !output.status.success() {
-        bail!(
-            "railway ssh failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    let mut memory = Memory::default();
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let mut parts = line.split_whitespace();
-        let (Some(key), Some(value)) = (parts.next(), parts.next()) else {
-            continue;
-        };
-        let mib = value.parse::<f64>().unwrap_or_default() / 1024.0;
-        match key {
-            "VmRSS:" => memory.rss_mib = mib,
-            "VmHWM:" => memory.hwm_mib = mib,
-            "Pss:" => memory.pss_mib = mib,
-            _ => {}
-        }
-    }
-    Ok(memory)
+    ensure!(
+        output.status.success(),
+        "railway ssh failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(parse_memory(&String::from_utf8_lossy(&output.stdout)))
 }
 
 /// Idle, the steady load and the soak against a freshly started deployed server; the sign-in burst runs inside Railway (`memory_burst`), because its edge gives every client one address.
@@ -588,8 +564,6 @@ async fn measure_remote(env: &TestEnv, options: &Options) -> anyhow::Result<()> 
         "failures": failures,
     });
     println!("{}", serde_json::to_string_pretty(&report)?);
-    if !failures.is_empty() {
-        bail!("memory budgets exceeded");
-    }
+    ensure!(failures.is_empty(), "memory budgets exceeded");
     Ok(())
 }

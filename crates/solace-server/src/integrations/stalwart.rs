@@ -14,6 +14,7 @@ use std::time::Duration;
 use axum::body::Bytes;
 use reqwest::{RequestBuilder, StatusCode};
 use serde::Deserialize;
+use serde_json::Value;
 use tokio::sync::Semaphore;
 
 /// Resends after a concurrency-limit refusal, with full-jitter backoff that sums to at most 2.35 s.
@@ -53,6 +54,16 @@ pub async fn send(mut request: RequestBuilder) -> Result<(StatusCode, Bytes), re
             _ => return Ok((status, body)),
         }
     }
+}
+
+/// The arguments of the first response to `method` in a JMAP envelope.
+pub fn method_response<'a>(envelope: &'a Value, method: &str) -> Option<&'a Value> {
+    envelope
+        .get("methodResponses")?
+        .as_array()?
+        .iter()
+        .find(|response| response.get(0).and_then(Value::as_str) == Some(method))?
+        .get(1)
 }
 
 /// RFC 8620's `limit` request error for the per-account concurrency limits; Stalwart processed nothing, so resending can't apply a call twice.

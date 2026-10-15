@@ -20,17 +20,10 @@ pub enum AdminError {
     NotJson,
     #[error("Stalwart admin JMAP request failed with status {0}.")]
     Status(u16),
-    #[error("Stalwart admin session request failed with status {0}.")]
-    SessionStatus(u16),
     #[error("Stalwart JMAP response did not include {0}.")]
     MissingMethod(String),
     #[error("{0}")]
     Failed(String),
-}
-
-pub struct Domain {
-    pub id: String,
-    pub name: String,
 }
 
 pub struct CreatedAccount {
@@ -90,17 +83,8 @@ fn is_method_response(response: &Value) -> bool {
     })
 }
 
-/// The arguments of the first response to `method`.
 pub fn method_result<'a>(envelope: &'a Value, method: &str) -> Result<&'a Value, AdminError> {
-    envelope
-        .get("methodResponses")
-        .and_then(Value::as_array)
-        .and_then(|responses| {
-            responses
-                .iter()
-                .find(|response| response.get(0).and_then(Value::as_str) == Some(method))
-        })
-        .and_then(|response| response.get(1))
+    super::method_response(envelope, method)
         .ok_or_else(|| AdminError::MissingMethod(method.to_owned()))
 }
 
@@ -151,21 +135,6 @@ impl<'a> Admin<'a> {
         Ok(parse_envelope(read_json(&body)?))
     }
 
-    pub async fn get_session(&self) -> Result<Value, AdminError> {
-        let url = format!("{}/jmap/session", self.base_url);
-        let (status, body) = super::send_in(
-            &super::PROVISIONER_LANE,
-            self.gate
-                .apply(self.http.get(&url), &url)
-                .bearer_auth(self.token),
-        )
-        .await?;
-        if !status.is_success() {
-            return Err(AdminError::SessionStatus(status.as_u16()));
-        }
-        Ok(parse_envelope(read_json(&body)?))
-    }
-
     /// One method call and its result's arguments.
     async fn call(
         &self,
@@ -195,21 +164,18 @@ impl<'a> Admin<'a> {
         ))
     }
 
-    pub async fn resolve_domain_by_name(&self, name: &str) -> Result<Domain, AdminError> {
+    /// The id of the domain with this name.
+    pub async fn resolve_domain_by_name(&self, name: &str) -> Result<String, AdminError> {
         let wanted = name.trim().to_lowercase();
         let ids = self.ids("x:Domain/query", json!({})).await?;
         self.list("x:Domain/get", ids)
             .await?
             .iter()
             .find(|domain| {
-                str_field(domain, "name").map(|n| n.trim().to_lowercase()) == Some(wanted.clone())
+                str_field(domain, "name").is_some_and(|n| n.trim().to_lowercase() == wanted)
             })
-            .and_then(|domain| {
-                Some(Domain {
-                    id: str_field(domain, "id")?.to_owned(),
-                    name: str_field(domain, "name")?.to_owned(),
-                })
-            })
+            .and_then(|domain| str_field(domain, "id"))
+            .map(str::to_owned)
             .ok_or_else(|| AdminError::Failed(format!("Stalwart domain '{name}' was not found.")))
     }
 
@@ -260,17 +226,16 @@ impl<'a> Admin<'a> {
             error_type = refused.and_then(|e| str_field(e, "type")),
             "Stalwart createAccount response"
         );
-        let account_id = match created_id {
-            Some(id) => Some(id.to_owned()),
-            None => recovered_account_id(refused),
-        }
-        .filter(|id| !id.is_empty())
-        .ok_or_else(|| {
-            AdminError::Failed(format!(
-                "Stalwart account creation failed: {}",
-                description_of(refused).unwrap_or("Unknown error")
-            ))
-        })?;
+        let account_id = created_id
+            .map(str::to_owned)
+            .or_else(|| recovered_account_id(refused))
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| {
+                AdminError::Failed(format!(
+                    "Stalwart account creation failed: {}",
+                    description_of(refused).unwrap_or("Unknown error")
+                ))
+            })?;
         let verified = self.account(&account_id).await?;
         let verified_name = str_field(&verified, "name").unwrap_or_default();
         let verified_domain = str_field(&verified, "domainId").unwrap_or_default();
@@ -346,8 +311,7 @@ impl<'a> Admin<'a> {
             .await?
             .into_iter()
             .find(|account| {
-                str_field(account, "emailAddress").map(|a| a.trim().to_lowercase())
-                    == Some(email.clone())
+                str_field(account, "emailAddress").is_some_and(|a| a.trim().to_lowercase() == email)
             }))
     }
 
@@ -400,13 +364,13 @@ impl<'a> Admin<'a> {
         else {
             return Ok(None);
         };
-        let Ok(domain) = self.resolve_domain_by_name(domain_name).await else {
+        let Ok(domain_id) = self.resolve_domain_by_name(domain_name).await else {
             return Ok(None);
         };
-        let account = match self.find_account_by_mailbox(local_part, &domain.id).await? {
+        let account = match self.find_account_by_mailbox(local_part, &domain_id).await? {
             Some(account) => Some(account),
             None => {
-                self.find_account_by_email_address(&email, &domain.id)
+                self.find_account_by_email_address(&email, &domain_id)
                     .await?
             }
         };
@@ -544,21 +508,20 @@ impl<'a> Admin<'a> {
                 if redirect_uris.contains(&uri) && *stored_description == json!(description) {
                     return Ok(());
                 }
-                let mut next: Vec<Value> = Vec::with_capacity(redirect_uris.len() + 1);
                 redirect_uris.push(uri);
+                let mut next: Vec<Value> = Vec::new();
                 for value in redirect_uris {
                     if !next.contains(&value) {
                         next.push(value);
                     }
                 }
-                let id = existing.get("id").cloned().unwrap_or(Value::Null);
-                let mut update = Map::new();
-                update.insert(
-                    id.as_str().unwrap_or_default().to_owned(),
-                    json!({"redirectUris": next, "description": description}),
-                );
-                self.call("x:OAuthClient/set", json!({"update": update}), "c1")
-                    .await?;
+                let id = str_field(existing, "id").unwrap_or_default();
+                self.call(
+                    "x:OAuthClient/set",
+                    json!({"update": {id: {"redirectUris": next, "description": description}}}),
+                    "c1",
+                )
+                .await?;
                 return Ok(());
             }
         }
@@ -699,21 +662,21 @@ impl<'a> Admin<'a> {
         refused: Option<&Value>,
     ) -> Result<Option<String>, AdminError> {
         let keys = self.public_keys(account_id).await?;
-        let matching = keys.iter().find(|key| key_matches_email(key, email));
-        let key = match matching {
-            Some(key) => Some(key),
-            None => keys
-                .first()
-                .filter(|key| str_field(key, "id").is_some())
-                .inspect(|key| {
-                    tracing::warn!(
-                        account_id,
-                        recipient_ref = telemetry::log_ref(email),
-                        existing_public_key_id = str_field(key, "id"),
-                        "Adopting the first Stalwart public key for mailbox recovery"
-                    );
-                }),
-        };
+        let key = keys
+            .iter()
+            .find(|key| key_matches_email(key, email))
+            .or_else(|| {
+                keys.first()
+                    .filter(|key| str_field(key, "id").is_some())
+                    .inspect(|key| {
+                        tracing::warn!(
+                            account_id,
+                            recipient_ref = telemetry::log_ref(email),
+                            existing_public_key_id = str_field(key, "id"),
+                            "Adopting the first Stalwart public key for mailbox recovery"
+                        );
+                    })
+            });
         let Some(key_id) = key
             .and_then(|key| str_field(key, "id"))
             .filter(|id| !id.is_empty())
@@ -839,18 +802,14 @@ impl<'a> Admin<'a> {
             "httpAuth": {"@type": "Unauthenticated"},
             "signatureKey": {"@type": "Value", "secret": secret},
         });
-        let mut entry = Map::new();
-        entry.insert(
-            existing.clone().unwrap_or_else(|| WEBHOOK_ID.to_owned()),
-            payload,
-        );
+        let id = existing.as_deref().unwrap_or(WEBHOOK_ID);
         let operation = if existing.is_some() {
             "update"
         } else {
             "create"
         };
         let result = self
-            .call("x:WebHook/set", json!({operation: entry}), "s1")
+            .call("x:WebHook/set", json!({operation: {id: payload}}), "s1")
             .await?;
         let create_error = result.pointer(&format!("/notCreated/{WEBHOOK_ID}"));
         let update_error = existing
@@ -890,7 +849,7 @@ impl<'a> Admin<'a> {
         )
         .await?;
         tracing::info!(
-            webhook_ref = telemetry::log_ref(existing.as_deref().unwrap_or(WEBHOOK_ID)),
+            webhook_ref = telemetry::log_ref(id),
             "Ensured Stalwart mail ingest webhook"
         );
         Ok(())
@@ -1036,14 +995,11 @@ mod tests {
             ),
         ])
         .await;
-        let domain = admin(&fake)
+        let domain_id = admin(&fake)
             .resolve_domain_by_name("solace.onl")
             .await
             .unwrap();
-        assert_eq!(
-            (domain.id.as_str(), domain.name.as_str()),
-            ("domain-1", "solace.onl")
-        );
+        assert_eq!(domain_id, "domain-1");
         let requests = fake.requests();
         assert_eq!(requests.len(), 2);
         assert_eq!(requests[0].path, "/jmap/");
@@ -1072,12 +1028,9 @@ mod tests {
             Reply::concurrency_limit(),
             Reply::concurrency_limit(),
             envelope("x:Domain/query", json!({"ids": ["domain-1"]}), "c1"),
-            Reply::concurrency_limit(),
-            Reply::json(json!({"primaryAccounts": {"urn:stalwart:jmap": "a"}})),
         ])
         .await;
-        let admin = admin(&fake);
-        let envelope = admin
+        let envelope = admin(&fake)
             .call_jmap(json!([["x:Domain/query", {}, "c1"]]))
             .await
             .unwrap();
@@ -1085,11 +1038,7 @@ mod tests {
             envelope,
             json!({"methodResponses": [["x:Domain/query", {"ids": ["domain-1"]}, "c1"]]})
         );
-        assert_eq!(
-            admin.get_session().await.unwrap(),
-            json!({"primaryAccounts": {"urn:stalwart:jmap": "a"}})
-        );
-        assert_eq!(fake.requests().len(), 5);
+        assert_eq!(fake.requests().len(), 3);
     }
 
     #[tokio::test]

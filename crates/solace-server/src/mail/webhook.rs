@@ -12,14 +12,13 @@ use axum::body::Body;
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use base64::Engine;
-use base64::alphabet;
-use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
 use hmac::{KeyInit, Mac};
 use regex_lite::Regex;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use solace_api_types::mail::{StalwartWebhookError, StalwartWebhookResult};
 
+use super::bridge::LENIENT_BASE64;
 use super::sync::{self, IngestLookup, IngestedEmailRef};
 use super::{push, queries};
 use crate::db::entities::mail_directory_entry;
@@ -45,14 +44,6 @@ const UNSIGNED_LIMIT: Limit = Limit {
 const MAIL_INGEST_EVENT: &str = "message-ingest.ham";
 /// Must match `reminderMessageIDPrefix` in `apps/notifications/main.go`.
 const REMINDER_MESSAGE_ID_PREFIX: &str = "solace-reminder.";
-
-/// Node's `Buffer.from(…, "base64")`: padding optional and stray trailing bits ignored.
-const LENIENT_BASE64: GeneralPurpose = GeneralPurpose::new(
-    &alphabet::STANDARD,
-    GeneralPurposeConfig::new()
-        .with_decode_padding_mode(DecodePaddingMode::Indifferent)
-        .with_decode_allow_trailing_bits(true),
-);
 
 /// Why a post was refused.
 #[derive(Debug, PartialEq, Eq)]
