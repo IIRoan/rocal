@@ -2,33 +2,19 @@
 
 use serde_json::json;
 use solace_api_types::auth::{
-    AuthError, AuthSession, MeResponse, SessionWithUser, SignInResponse, SignUpResponse,
-    StatusFlag, SuccessFlag,
+    AuthSession, MeResponse, SessionWithUser, SignInResponse, SignUpResponse, StatusFlag,
+    SuccessFlag,
 };
 
 use solace_api_tests::client::ResponseResult;
 
 use crate::helpers::{
-    Backend, Mode, TestApp, TestUser, count, expect_unauthorized, hex, ok, set_cookies_named,
-    signed_cookie_token,
+    Backend, Mode, TestApp, TestUser, auth_error, count, expect_unauthorized, hex, ok,
+    set_cookies_named, signed_cookie_token,
 };
 
 const INVITE_REQUIRED: &str =
     "An invite is required to create an account. Please use your invite token before signing up.";
-
-fn auth_error(
-    response: &solace_api_tests::client::ApiResponse,
-    status: u16,
-    code: &str,
-    message: &str,
-) {
-    assert_eq!(response.status.as_u16(), status, "{}", response.text());
-    let error: AuthError = ok(response.dto());
-    assert_eq!(
-        (error.code.as_str(), error.message.as_str()),
-        (code, message)
-    );
-}
 
 #[tokio::test]
 async fn sign_up_needs_a_claimed_invite() {

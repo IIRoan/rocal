@@ -193,11 +193,10 @@ pub fn generate_id() -> String {
     random_string(32, ALPHANUMERIC)
 }
 
-pub use crate::addresses::is_zod_email as is_email;
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::addresses::is_zod_email;
     use crate::http::zod;
     use serde_json::json;
 
@@ -221,11 +220,11 @@ mod tests {
     fn ids_and_emails_match_better_auth() {
         let id = generate_id();
         assert!(id.len() == 32 && id.chars().all(|c| c.is_ascii_alphanumeric()));
-        assert!(is_email("a.b+c@solace.test"));
+        assert!(is_zod_email("a.b+c@solace.test"));
         assert!(
-            !is_email("not-an-email")
-                && !is_email(".a@solace.test")
-                && !is_email("a..b@solace.test")
+            !is_zod_email("not-an-email")
+                && !is_zod_email(".a@solace.test")
+                && !is_zod_email("a..b@solace.test")
         );
     }
 }

@@ -9,10 +9,12 @@ use super::queries::{self, AvatarOwner};
 use crate::addresses;
 use crate::auth::cookies::encode_uri_component;
 use crate::error::AppError;
-use crate::http::zod::js_length;
+use crate::events::participants::normalize_email;
+use crate::http::zod::{js_length, js_trim};
 use crate::state::AppState;
 
-const LOOKUP_MAX_EMAILS: usize = 50;
+/// `SOLACE_PROFILE_LOOKUP_MAX_EMAILS`.
+pub const LOOKUP_MAX_EMAILS: usize = 50;
 const MAX_PUBLIC_IMAGE_URL_LENGTH: usize = 2048;
 const UPLOADED_AVATAR_PATH_PREFIX: &str = "/api/profiles/avatars/";
 
@@ -40,23 +42,10 @@ static BLOCKED_IMAGE_HOSTS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     .collect()
 });
 
-/// `normalizeParticipantEmail`.
-pub fn normalize_participant_email(email: &str) -> String {
-    let trimmed = email.trim();
-    let unprefixed = match trimmed.get(..7) {
-        Some(prefix) if prefix.eq_ignore_ascii_case("mailto:") => &trimmed[7..],
-        _ => trimmed,
-    };
-    unprefixed.to_lowercase()
-}
-
 /// `normalizeSolaceProfileLookupEmails`: normalized, deduplicated addresses, at most 50.
 fn lookup_emails(emails: &[String]) -> Vec<String> {
     let mut result: Vec<String> = Vec::new();
-    for email in emails
-        .iter()
-        .map(|email| normalize_participant_email(email))
-    {
+    for email in emails.iter().map(|email| normalize_email(Some(email))) {
         if email.is_empty() || !email.contains('@') || result.contains(&email) {
             continue;
         }
@@ -70,7 +59,7 @@ fn lookup_emails(emails: &[String]) -> Vec<String> {
 
 /// `sanitizePublicImageUrl`: public HTTPS without credentials, so pictures cannot beacon internal hosts.
 pub fn public_image_url(value: Option<&str>) -> Option<String> {
-    let trimmed = value?.trim();
+    let trimmed = js_trim(value?);
     if trimmed.is_empty() || js_length(trimmed) > MAX_PUBLIC_IMAGE_URL_LENGTH {
         return None;
     }
@@ -106,7 +95,7 @@ pub fn uploaded_avatar_path(avatar_id: &str) -> String {
 
 /// `buildSolaceProfileAvatarPath`; carries the email (a known privacy gap, ported as is).
 fn email_avatar_path(email: &str) -> Option<String> {
-    let normalized = normalize_participant_email(email);
+    let normalized = normalize_email(Some(email));
     (!normalized.is_empty()).then(|| {
         format!(
             "/api/profiles/avatar?email={}",
@@ -126,7 +115,7 @@ pub fn participant_image(image: Option<&str>, email: &str) -> Option<String> {
 
 /// `findAvatarOwner`: the account or mailbox alias with this address that has a picture.
 pub async fn avatar_owner(state: &AppState, email: &str) -> Result<Option<AvatarOwner>, AppError> {
-    let normalized = normalize_participant_email(email);
+    let normalized = normalize_email(Some(email));
     if normalized.is_empty() || addresses::is_reserved_system_email(&normalized, None) {
         return Ok(None);
     }

@@ -1,12 +1,11 @@
 //! Better Auth's `getSession` over the session table, without the `session_data` cookie cache.
 
 use axum::http::HeaderMap;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, Set,
-};
+use sea_orm::{ActiveModelTrait, IntoActiveModel, ModelTrait, Set};
 use solace_api_types::auth::{AuthSession, AuthUser, SessionWithUser};
 
 use super::cookies::{self, SESSION_LIFETIME_SECONDS, SESSION_UPDATE_AGE_SECONDS};
+use super::store;
 use crate::db::entities::{session, user};
 use crate::instant;
 use crate::state::AppState;
@@ -59,11 +58,7 @@ async fn resolve(
             cookies: set,
         });
     };
-    let found = session::Entity::find()
-        .filter(session::Column::Token.eq(token.as_str()))
-        .find_also_related(user::Entity)
-        .one(&state.db)
-        .await?;
+    let found = store::find_session_with_user(&state.db, &token).await?;
     let now = instant::now();
     let (session, user) = match found {
         Some((session, Some(user))) if session.expires_at >= now => (session, user),
@@ -127,19 +122,22 @@ pub fn user_dto(user: &user::Model) -> AuthUser {
     }
 }
 
+pub fn auth_session(session: &session::Model) -> AuthSession {
+    AuthSession {
+        id: session.id.clone().into(),
+        token: session.token.clone(),
+        user_id: session.user_id.clone().into(),
+        expires_at: instant::iso(session.expires_at),
+        created_at: instant::iso(session.created_at),
+        updated_at: instant::iso(session.updated_at),
+        ip_address: None,
+        user_agent: None,
+    }
+}
+
 pub fn session_dto(active: &ActiveSession) -> SessionWithUser {
-    let session = &active.session;
     SessionWithUser {
-        session: AuthSession {
-            id: session.id.clone().into(),
-            token: session.token.clone(),
-            user_id: session.user_id.clone().into(),
-            expires_at: instant::iso(session.expires_at),
-            created_at: instant::iso(session.created_at),
-            updated_at: instant::iso(session.updated_at),
-            ip_address: None,
-            user_agent: None,
-        },
+        session: auth_session(&active.session),
         user: user_dto(&active.user),
     }
 }

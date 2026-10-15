@@ -152,30 +152,20 @@ impl Config {
                 .unwrap_or_else(|| DEFAULT_STALWART_BASE_URL.into()),
             stalwart_default_domain: var("STALWART_DEFAULT_DOMAIN")
                 .unwrap_or_else(|| "solace.onl".into()),
-            stalwart_provision_token: var("STALWART_PROVISION_TOKEN")
-                .map(|token| token.trim().to_owned())
-                .filter(|token| !token.is_empty())
+            stalwart_provision_token: trimmed(&var, "STALWART_PROVISION_TOKEN")
                 .or_else(|| var("STALWART_ADMIN_TOKEN"))
                 .unwrap_or_default(),
             mailer: mailer(&var, &noreply_email),
             noreply_email,
-            stalwart_webhook_secret: var("STALWART_WEBHOOK_SECRET")
-                .map(|secret| secret.trim().to_owned())
-                .filter(|secret| !secret.is_empty()),
-            stalwart_gate_key: var("STALWART_GATE_KEY")
-                .map(|key| key.trim().to_owned())
-                .filter(|key| !key.is_empty()),
+            stalwart_webhook_secret: trimmed(&var, "STALWART_WEBHOOK_SECRET"),
+            stalwart_gate_key: trimmed(&var, "STALWART_GATE_KEY"),
             mail_receipt_polling: matches!(
                 var("MAIL_RECEIPT_POLLING").as_deref(),
                 Some("1" | "true")
             ),
-            stalwart_webhook_url: var("STALWART_WEBHOOK_URL")
-                .map(|url| url.trim().to_owned())
-                .filter(|url| !url.is_empty())
+            stalwart_webhook_url: trimmed(&var, "STALWART_WEBHOOK_URL")
                 .unwrap_or_else(|| format!("{backend_url}/api/internal/stalwart/webhook")),
-            mail_bridge_hmac_key: var("MAIL_BRIDGE_HMAC_KEY")
-                .map(|key| key.trim().to_owned())
-                .filter(|key| !key.is_empty()),
+            mail_bridge_hmac_key: trimmed(&var, "MAIL_BRIDGE_HMAC_KEY"),
             sentry_dsn: var("SENTRY_DSN").map(|dsn| dsn.trim().to_owned()),
             avatar_bucket: avatar_bucket(&var),
             backend_url,
@@ -183,10 +173,15 @@ impl Config {
     }
 }
 
+/// The variable without surrounding whitespace, `None` when that leaves nothing.
+fn trimmed(var: &impl Fn(&str) -> Option<String>, name: &str) -> Option<String> {
+    var(name)
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
 fn noreply_email(var: &impl Fn(&str) -> Option<String>) -> String {
-    var("EMAIL_FROM")
-        .map(|from| from.trim().to_owned())
-        .filter(|from| !from.is_empty())
+    trimmed(var, "EMAIL_FROM")
         .or_else(|| {
             var("AUTH_EMAIL_FROM")
                 .or_else(|| var("AUTH_RESET_EMAIL_FROM"))
@@ -198,9 +193,7 @@ fn noreply_email(var: &impl Fn(&str) -> Option<String>) -> String {
 
 /// `email-client.ts`: Stalwart JMAP credentials and the noreply address and name.
 fn mailer(var: &impl Fn(&str) -> Option<String>, from: &str) -> Option<MailerConfig> {
-    let username = var("STALWART_JMAP_USERNAME")
-        .map(|u| u.trim().to_owned())
-        .filter(|u| !u.is_empty())?;
+    let username = trimmed(var, "STALWART_JMAP_USERNAME")?;
     let password = var("STALWART_JMAP_PASSWORD")?;
     let base_url = var("STALWART_JMAP_URL")
         .or_else(|| var("STALWART_BASE_URL"))
@@ -212,25 +205,17 @@ fn mailer(var: &impl Fn(&str) -> Option<String>, from: &str) -> Option<MailerCon
         username,
         password,
         from: from.to_owned(),
-        from_name: var("EMAIL_FROM_NAME")
-            .map(|n| n.trim().to_owned())
-            .filter(|n| !n.is_empty())
-            .unwrap_or_else(|| "Solace".into()),
+        from_name: trimmed(var, "EMAIL_FROM_NAME").unwrap_or_else(|| "Solace".into()),
     })
 }
 
 fn avatar_bucket(var: &impl Fn(&str) -> Option<String>) -> Option<AvatarBucketConfig> {
-    let trimmed = |name: &str| {
-        var(name)
-            .map(|value| value.trim().to_owned())
-            .filter(|value| !value.is_empty())
-    };
     Some(AvatarBucketConfig {
-        name: trimmed("AVATAR_BUCKET")?,
-        endpoint: trimmed("AVATAR_BUCKET_ENDPOINT")?,
-        region: trimmed("AVATAR_BUCKET_REGION").unwrap_or_else(|| "auto".into()),
-        access_key_id: trimmed("AVATAR_BUCKET_ACCESS_KEY_ID")?,
-        secret_access_key: trimmed("AVATAR_BUCKET_SECRET_ACCESS_KEY")?,
+        name: trimmed(var, "AVATAR_BUCKET")?,
+        endpoint: trimmed(var, "AVATAR_BUCKET_ENDPOINT")?,
+        region: trimmed(var, "AVATAR_BUCKET_REGION").unwrap_or_else(|| "auto".into()),
+        access_key_id: trimmed(var, "AVATAR_BUCKET_ACCESS_KEY_ID")?,
+        secret_access_key: trimmed(var, "AVATAR_BUCKET_SECRET_ACCESS_KEY")?,
     })
 }
 

@@ -1,7 +1,5 @@
 //! `/api/notifications/event/{eventId}`: an event's reminder settings, rate-limited per user and URL.
 
-use std::time::Duration;
-
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::Uri;
@@ -22,14 +20,8 @@ use crate::http::zod;
 use crate::request_schema;
 use crate::state::AppState;
 
-const READ_LIMIT: Limit = Limit {
-    requests: 100,
-    window: Duration::from_secs(60),
-};
-const WRITE_LIMIT: Limit = Limit {
-    requests: 20,
-    window: Duration::from_secs(60),
-};
+const READ_LIMIT: Limit = Limit::per_minute(100);
+const WRITE_LIMIT: Limit = Limit::per_minute(20);
 
 request_schema!(UpdateEventNotificationsRequest => {
     let title = regex_lite::Regex::new(r"^v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{23,}$")

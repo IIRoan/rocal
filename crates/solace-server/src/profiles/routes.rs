@@ -1,7 +1,6 @@
 //! `/api/profiles`: lookup, the email-keyed proxy (a known privacy gap), opaque uploaded avatars, and the caller's own picture.
 
 use std::sync::LazyLock;
-use std::time::Duration;
 
 use axum::Json;
 use axum::extract::State;
@@ -16,7 +15,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::avatars::{self, Picture};
-use super::service;
+use super::service::{self, LOOKUP_MAX_EMAILS};
 use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidPath, ValidQuery};
@@ -25,12 +24,7 @@ use crate::http::zod;
 use crate::request_schema;
 use crate::state::AppState;
 
-const AVATAR_WRITE_LIMIT: Limit = Limit {
-    requests: 10,
-    window: Duration::from_secs(60),
-};
-/// `SOLACE_PROFILE_LOOKUP_MAX_EMAILS`.
-const LOOKUP_MAX_EMAILS: usize = 50;
+const AVATAR_WRITE_LIMIT: Limit = Limit::per_minute(10);
 /// Base64 of `SOLACE_AVATAR_UPLOAD_MAX_BYTES` (512 KiB).
 const MAX_AVATAR_BASE64_LENGTH: usize = (512 * 1024usize).div_ceil(3) * 4;
 const PROXY_CACHE: &str = "private, max-age=300";

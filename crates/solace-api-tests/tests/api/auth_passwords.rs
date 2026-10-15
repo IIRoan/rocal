@@ -1,22 +1,15 @@
 //! Password change, reset by email, verification and profile updates through Better Auth.
 
 use serde_json::{Value, json};
-use solace_api_tests::client::{ApiResponse, ResponseResult};
-use solace_api_types::auth::{AuthError, SessionWithUser, StatusFlag};
+use solace_api_tests::client::ResponseResult;
+use solace_api_types::auth::{SessionWithUser, StatusFlag};
 
-use crate::helpers::{TestApp, TestUser, count, ok, set_cookies_named, signed_cookie_token};
+use crate::helpers::{
+    TestApp, TestUser, auth_error, count, ok, set_cookies_named, signed_cookie_token,
+};
 
 const RESET_SUBJECT: &str = "Reset your Solace password";
 const UPDATED_SUBJECT: &str = "Your Solace password was updated";
-
-fn auth_error(response: &ApiResponse, status: u16, code: &str, message: &str) {
-    assert_eq!(response.status.as_u16(), status, "{}", response.text());
-    let error: AuthError = ok(response.dto());
-    assert_eq!(
-        (error.code.as_str(), error.message.as_str()),
-        (code, message)
-    );
-}
 
 async fn password_hash(app: &TestApp, user: &TestUser) -> String {
     sqlx::query_scalar(

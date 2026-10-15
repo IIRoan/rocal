@@ -1,7 +1,5 @@
 //! `/api/push`: APNs device registration and removal, token-free listing, and the test push outbox row.
 
-use std::time::Duration;
-
 use axum::Json;
 use axum::extract::State;
 use axum::http::Uri;
@@ -29,17 +27,10 @@ use crate::notifications::job_payload::event_reminder_payload;
 use crate::request_schema;
 use crate::state::AppState;
 
-const fn per_minute(requests: u32) -> Limit {
-    Limit {
-        requests,
-        window: Duration::from_secs(60),
-    }
-}
-
-const LIST_LIMIT: Limit = per_minute(60);
-const REGISTER_LIMIT: Limit = per_minute(30);
-const UNREGISTER_LIMIT: Limit = per_minute(30);
-const TEST_LIMIT: Limit = per_minute(5);
+const LIST_LIMIT: Limit = Limit::per_minute(60);
+const REGISTER_LIMIT: Limit = Limit::per_minute(30);
+const UNREGISTER_LIMIT: Limit = Limit::per_minute(30);
+const TEST_LIMIT: Limit = Limit::per_minute(5);
 const TEST_NOTIFICATION_EVENT_ID: &str = "test-notification";
 const TEST_NOTIFICATION_MINUTES_BEFORE: u32 = 15;
 

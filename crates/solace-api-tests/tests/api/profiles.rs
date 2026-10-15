@@ -10,7 +10,7 @@ use solace_api_types::profiles::{
 
 use crate::helpers::{
     TestApp, TestUser, expect_field_error, expect_invalid, expect_unauthorized,
-    expect_unknown_field, fixture, hex, json_body, ok,
+    expect_unknown_field, fixture, header, hex, json_body, ok,
 };
 
 const UPLOAD_PREFIX: &str = "/api/profiles/avatars/";
@@ -104,13 +104,6 @@ fn webp_size(bytes: &[u8]) -> (u32, u32) {
         b"VP8X" => (le(24..27) + 1, le(27..30) + 1),
         other => panic!("unknown WebP chunk {other:?}"),
     }
-}
-
-fn header<'a>(response: &'a ApiResponse, name: &str) -> Option<&'a str> {
-    response
-        .headers
-        .get(name)
-        .and_then(|value| value.to_str().ok())
 }
 
 /// A served variant: WebP bytes with the given cache policy; returns its edge length.

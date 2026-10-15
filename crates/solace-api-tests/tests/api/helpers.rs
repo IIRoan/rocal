@@ -10,6 +10,7 @@ use solace_api_tests::env::{
     TEMPLATE_DATABASE, TestEnv,
 };
 use solace_api_tests::guard;
+use solace_api_types::auth::AuthError;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, Executor, PgPool};
 
@@ -574,4 +575,18 @@ pub fn fixture(name: &str) -> Vec<u8> {
 pub fn expect_plain_error(response: &ApiResponse, message: &str) {
     let body = ok(response.expect_error(400, "Validation Error", message));
     assert!(body.get("details").is_none(), "{body}");
+}
+
+/// A Better Auth error: the status and its `{ code, message }` body.
+pub fn auth_error(response: &ApiResponse, status: u16, code: &str, message: &str) {
+    assert_eq!(response.status.as_u16(), status, "{}", response.text());
+    let error: AuthError = ok(response.dto());
+    assert_eq!(
+        (error.code.as_str(), error.message.as_str()),
+        (code, message)
+    );
+}
+
+pub fn header<'a>(response: &'a ApiResponse, name: &str) -> Option<&'a str> {
+    response.headers.get(name).and_then(|v| v.to_str().ok())
 }

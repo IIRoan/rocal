@@ -76,6 +76,28 @@ fn required(value: &str, message: &str, field: &str) -> Result<String, AppError>
     Ok(value.to_owned())
 }
 
+/// The account and search keys wrapped for a device or a password, and their key version.
+fn wrapped_keys(
+    account: &str,
+    search: &str,
+    key_version: Option<i32>,
+) -> Result<(String, String, i32), AppError> {
+    let account = required(
+        account,
+        "Wrapped account key is required",
+        "wrappedAccountKey",
+    )?;
+    let search = required(search, "Wrapped search key is required", "wrappedSearchKey")?;
+    let key_version = key_version.unwrap_or(1);
+    if key_version < 1 {
+        return Err(AppError::field(
+            "Key version must be at least 1",
+            "keyVersion",
+        ));
+    }
+    Ok((account, search, key_version))
+}
+
 pub async fn register_device(
     state: &AppState,
     user: &RouteUser,
@@ -83,23 +105,11 @@ pub async fn register_device(
 ) -> Result<EncryptionDevice, AppError> {
     let device_id = required(&request.device_id, "Device ID is required", "deviceId")?;
     let public_key = required(&request.public_key, "Public key is required", "publicKey")?;
-    let wrapped_account_key = required(
+    let (wrapped_account_key, wrapped_search_key, key_version) = wrapped_keys(
         &request.wrapped_account_key,
-        "Wrapped account key is required",
-        "wrappedAccountKey",
-    )?;
-    let wrapped_search_key = required(
         &request.wrapped_search_key,
-        "Wrapped search key is required",
-        "wrappedSearchKey",
+        request.key_version,
     )?;
-    let key_version = request.key_version.unwrap_or(1);
-    if key_version < 1 {
-        return Err(AppError::field(
-            "Key version must be at least 1",
-            "keyVersion",
-        ));
-    }
     let keys = DeviceKeys {
         device_label: request
             .device_label
@@ -141,23 +151,11 @@ pub async fn store_password_envelope(
             "kdfIterations",
         ));
     }
-    let wrapped_account_key = required(
+    let (wrapped_account_key, wrapped_search_key, key_version) = wrapped_keys(
         &request.wrapped_account_key,
-        "Wrapped account key is required",
-        "wrappedAccountKey",
-    )?;
-    let wrapped_search_key = required(
         &request.wrapped_search_key,
-        "Wrapped search key is required",
-        "wrappedSearchKey",
+        request.key_version,
     )?;
-    let key_version = request.key_version.unwrap_or(1);
-    if key_version < 1 {
-        return Err(AppError::field(
-            "Key version must be at least 1",
-            "keyVersion",
-        ));
-    }
     let keys = PasswordKeys {
         kdf_algorithm,
         kdf_salt,
