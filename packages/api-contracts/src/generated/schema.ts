@@ -514,6 +514,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/internal/stalwart/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accepts signed Stalwart `message-ingest.ham` events and queues native pushes for linked Solace mailboxes. */
+        post: operations["receiveStalwartWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/invites": {
         parameters: {
             query?: never;
@@ -2173,6 +2190,11 @@ export interface components {
             email: string;
             image: string;
         };
+        /** @description The webhook's refusals, which are not the API envelope. */
+        StalwartWebhookError: {
+            error: string;
+            message: string;
+        };
         /** @description `POST /api/internal/stalwart/webhook`; `enqueuedCount` counts events handed to the push outbox, duplicates included. */
         StalwartWebhookResult: {
             /** Format: int32 */
@@ -3243,6 +3265,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MailHealthFailure"];
+                };
+            };
+        };
+    };
+    receiveStalwartWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StalwartWebhookError"];
                 };
             };
         };

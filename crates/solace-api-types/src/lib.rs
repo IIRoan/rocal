@@ -135,6 +135,7 @@ pub use common::{ErrorResponse, SuccessMessage, Timestamp};
     mail::MailCalendarImportSummary,
     mail::MailChangedEvent,
     mail::StalwartWebhookResult,
+    mail::StalwartWebhookError,
     mail_settings::MailSettings,
     mail_settings::PutMailSettingsRequest,
     notifications::UpdateEventNotificationsRequest,

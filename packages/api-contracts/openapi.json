@@ -1221,6 +1221,71 @@
         }
       }
     },
+    "/api/internal/stalwart/webhook": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "summary": "Accepts signed Stalwart `message-ingest.ham` events and queues native pushes for linked Solace mailboxes.",
+        "operationId": "receiveStalwartWebhook",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StalwartWebhookError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/invites": {
       "get": {
         "tags": [
@@ -7290,6 +7355,22 @@
             "type": "string"
           },
           "image": {
+            "type": "string"
+          }
+        }
+      },
+      "StalwartWebhookError": {
+        "type": "object",
+        "description": "The webhook's refusals, which are not the API envelope.",
+        "required": [
+          "error",
+          "message"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
             "type": "string"
           }
         }
