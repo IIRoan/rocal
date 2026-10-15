@@ -47,17 +47,22 @@ impl Reply {
         }
     }
 
-    /// Stalwart's answer past its per-account `maxConcurrentRequests`.
-    pub fn concurrency_limit() -> Self {
+    /// A 400 with this JMAP request-level problem.
+    pub fn problem(body: Value) -> Self {
         Self {
             status: StatusCode::BAD_REQUEST,
-            body: Some(serde_json::json!({
-                "type": "urn:ietf:params:jmap:error:limit",
-                "status": 400,
-                "detail": "The request exceeds the maximum number of concurrent requests.",
-                "limit": "maxConcurrentRequests",
-            })),
+            body: Some(body),
         }
+    }
+
+    /// Stalwart's answer past its per-account `maxConcurrentRequests`.
+    pub fn concurrency_limit() -> Self {
+        Self::problem(serde_json::json!({
+            "type": "urn:ietf:params:jmap:error:limit",
+            "status": 400,
+            "detail": "The request exceeds the maximum number of concurrent requests.",
+            "limit": "maxConcurrentRequests",
+        }))
     }
 
     pub fn status(status: u16) -> Self {
