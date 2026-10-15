@@ -1,6 +1,6 @@
-//! VTIMEZONE components from jiff's tz database, so a series written with `TZID` keeps its wall-clock time wherever it is read.
+//! VTIMEZONE components: written from jiff's tz database so a series keeps its wall-clock time, and read by their own rules.
 
-use jiff::civil::{DateTime, Weekday};
+use jiff::civil::{Date, DateTime, Weekday};
 use jiff::tz::{Offset, TimeZone};
 use jiff::{SignedDuration, Timestamp};
 
@@ -192,6 +192,214 @@ pub fn component(name: &str, tz: &TimeZone, earliest: Timestamp) -> Vec<String> 
     lines
 }
 
+/// A STANDARD or DAYLIGHT part as a file defines it: its first onset (wall time before the change), offsets, RRULE and RDATEs.
+#[derive(Debug, Clone)]
+pub struct Observance {
+    pub daylight: bool,
+    pub start: DateTime,
+    pub from: Offset,
+    pub to: Offset,
+    /// The RRULE value, without `RRULE:`.
+    pub rule: Option<String>,
+    pub dates: Vec<DateTime>,
+}
+
+struct YearlyRule {
+    interval: i16,
+    count: Option<i16>,
+    /// `(wall time, written in UTC)`.
+    until: Option<(DateTime, bool)>,
+    month: Option<i8>,
+    /// `(ordinal, weekday)`; 0 for any.
+    weekday: Option<(i8, Weekday)>,
+    month_days: Vec<i8>,
+}
+
+fn weekday_of(code: &str) -> Option<Weekday> {
+    Some(match code {
+        "MO" => Weekday::Monday,
+        "TU" => Weekday::Tuesday,
+        "WE" => Weekday::Wednesday,
+        "TH" => Weekday::Thursday,
+        "FR" => Weekday::Friday,
+        "SA" => Weekday::Saturday,
+        "SU" => Weekday::Sunday,
+        _ => return None,
+    })
+}
+
+/// `YYYYMMDDTHHMMSS`, a trailing `Z` reported.
+pub fn basic_date_time(value: &str) -> Option<(DateTime, bool)> {
+    let value = value.trim();
+    let (value, utc) = match value.strip_suffix('Z') {
+        Some(rest) => (rest, true),
+        None => (value, false),
+    };
+    let number = |range: std::ops::Range<usize>| value.get(range)?.parse::<i16>().ok();
+    let civil = if value.len() == 8 {
+        DateTime::new(
+            number(0..4)?,
+            number(4..6)? as i8,
+            number(6..8)? as i8,
+            0,
+            0,
+            0,
+            0,
+        )
+    } else {
+        if value.len() != 15 || value.as_bytes()[8] != b'T' {
+            return None;
+        }
+        DateTime::new(
+            number(0..4)?,
+            number(4..6)? as i8,
+            number(6..8)? as i8,
+            number(9..11)? as i8,
+            number(11..13)? as i8,
+            number(13..15)? as i8,
+            0,
+        )
+    };
+    Some((civil.ok()?, utc))
+}
+
+/// The yearly rules VTIMEZONEs use; anything else reads as no rule.
+fn yearly_rule(text: &str) -> Option<YearlyRule> {
+    let mut rule = YearlyRule {
+        interval: 1,
+        count: None,
+        until: None,
+        month: None,
+        weekday: None,
+        month_days: Vec::new(),
+    };
+    let mut yearly = false;
+    for part in text.split(';') {
+        let (key, value) = part.split_once('=')?;
+        match key.to_uppercase().as_str() {
+            "FREQ" => yearly = value.eq_ignore_ascii_case("YEARLY"),
+            "INTERVAL" => rule.interval = value.parse().ok().filter(|n| *n > 0)?,
+            "COUNT" => rule.count = value.parse().ok(),
+            "UNTIL" => rule.until = basic_date_time(value),
+            "BYMONTH" => rule.month = value.split(',').next()?.parse().ok(),
+            "BYMONTHDAY" => {
+                rule.month_days = value
+                    .split(',')
+                    .filter_map(|day| day.parse().ok())
+                    .collect();
+            }
+            "BYDAY" => {
+                let token = value.split(',').next()?.to_uppercase();
+                let (ordinal, code) = token.split_at(token.len().checked_sub(2)?);
+                let ordinal = if ordinal.is_empty() {
+                    0
+                } else {
+                    ordinal.parse().ok()?
+                };
+                rule.weekday = Some((ordinal, weekday_of(code)?));
+            }
+            _ => {}
+        }
+    }
+    yearly.then_some(rule)
+}
+
+/// The day a yearly rule falls on in `year` and `month`.
+fn rule_day(rule: &YearlyRule, year: i16, month: i8, fallback: i8) -> Option<Date> {
+    let first = Date::new(year, month, 1).ok()?;
+    let last = first.days_in_month();
+    let on = |day: i8| Date::new(year, month, day).ok();
+    match (rule.weekday, rule.month_days.as_slice()) {
+        (Some((ordinal, weekday)), _) if ordinal != 0 => {
+            if ordinal > 0 {
+                let mut day = 1;
+                while on(day)?.weekday() != weekday {
+                    day += 1;
+                }
+                on(day + 7 * (ordinal - 1)).filter(|date| date.month() == month)
+            } else {
+                let mut day = last;
+                while on(day)?.weekday() != weekday {
+                    day -= 1;
+                }
+                on(day - 7 * (-ordinal - 1))
+            }
+        }
+        (Some((_, weekday)), days) if !days.is_empty() => days
+            .iter()
+            .filter_map(|day| on(*day))
+            .find(|date| date.weekday() == weekday),
+        (Some((_, weekday)), _) => (1..=last)
+            .filter_map(on)
+            .find(|date| date.weekday() == weekday),
+        (None, [day, ..]) => on(*day),
+        (None, []) => on(fallback),
+    }
+}
+
+/// An observance's RRULE onset in `year`; a later observance of the same kind with its own rule ends an earlier rule (Exchange writes eras that way).
+fn rule_onset(part: &Observance, year: i16, ends: Option<DateTime>) -> Option<DateTime> {
+    let rule = yearly_rule(part.rule.as_deref()?)?;
+    let since = year - part.start.year();
+    if since < 0
+        || since % rule.interval != 0
+        || rule
+            .count
+            .is_some_and(|count| since / rule.interval >= count)
+    {
+        return None;
+    }
+    let month = rule.month.unwrap_or(part.start.month());
+    let onset = rule_day(&rule, year, month, part.start.day())?.to_datetime(part.start.time());
+    let within_until = match rule.until {
+        None => true,
+        Some((until, false)) => onset <= until,
+        Some((until, true)) => part
+            .from
+            .to_timestamp(onset)
+            .ok()
+            .zip(TimeZone::UTC.to_timestamp(until).ok())
+            .is_some_and(|(onset, until)| onset <= until),
+    };
+    (onset >= part.start && within_until && ends.is_none_or(|end| onset < end)).then_some(onset)
+}
+
+/// The UTC instant of a wall time under a file's observances; `None` when they only sketch a pattern (differing offsets, onsets in one year, no RRULE or RDATE), which node-ical matches to a zone instead.
+pub fn instant(parts: &[Observance], local: DateTime) -> Option<Timestamp> {
+    let first = parts.iter().min_by_key(|part| part.start)?;
+    let recurring = parts
+        .iter()
+        .any(|part| part.rule.is_some() || !part.dates.is_empty());
+    let single_offset = parts.iter().all(|part| part.to == first.to);
+    let one_year = parts
+        .iter()
+        .all(|part| part.start.year() == first.start.year());
+    if !recurring && !single_offset && one_year {
+        return None;
+    }
+    let mut best: Option<(DateTime, Offset)> = None;
+    for part in parts {
+        let ends = parts
+            .iter()
+            .filter(|other| {
+                other.daylight == part.daylight && other.rule.is_some() && other.start > part.start
+            })
+            .map(|other| other.start)
+            .min();
+        let fixed = std::iter::once(part.start).chain(part.dates.iter().copied());
+        let ruled = [local.year() - 1, local.year()]
+            .into_iter()
+            .filter_map(|year| rule_onset(part, year, ends));
+        for onset in fixed.chain(ruled) {
+            if onset <= local && best.is_none_or(|(at, _)| onset > at) {
+                best = Some((onset, part.to));
+            }
+        }
+    }
+    let offset = best.map_or(first.from, |(_, offset)| offset);
+    offset.to_timestamp(local).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,6 +441,150 @@ mod tests {
                 "END:VTIMEZONE",
             ]
         );
+    }
+
+    /// Reads `component`'s own output back, as a file's VTIMEZONE.
+    fn read_back(lines: &[String]) -> Vec<Observance> {
+        let mut parts = Vec::new();
+        let mut current: Option<Observance> = None;
+        for line in lines {
+            let (key, value) = line.split_once(':').unwrap();
+            match key {
+                "BEGIN" if value != "VTIMEZONE" => {
+                    current = Some(Observance {
+                        daylight: value == "DAYLIGHT",
+                        start: DateTime::default(),
+                        from: Offset::UTC,
+                        to: Offset::UTC,
+                        rule: None,
+                        dates: Vec::new(),
+                    })
+                }
+                "END" if value != "VTIMEZONE" => parts.push(current.take().unwrap()),
+                "DTSTART" => current.as_mut().unwrap().start = basic_date_time(value).unwrap().0,
+                "TZOFFSETFROM" | "TZOFFSETTO" => {
+                    let minutes =
+                        crate::integrations::ics::zones::offset_label_to_minutes(value).unwrap();
+                    let offset = Offset::from_seconds(minutes as i32 * 60).unwrap();
+                    let part = current.as_mut().unwrap();
+                    if key == "TZOFFSETFROM" {
+                        part.from = offset;
+                    } else {
+                        part.to = offset;
+                    }
+                }
+                "RRULE" => current.as_mut().unwrap().rule = Some(value.to_owned()),
+                _ => {}
+            }
+        }
+        parts
+    }
+
+    #[test]
+    fn generated_components_read_back_to_the_tz_database() {
+        for zone in [
+            "Europe/Amsterdam",
+            "America/New_York",
+            "Australia/Sydney",
+            "Europe/Moscow",
+        ] {
+            let (name, tz) = wall_clock_zone(Some(zone)).unwrap();
+            let parts = read_back(&component(&name, &tz, at("2011-01-15T12:00:00Z")));
+            let mut probe = at("2011-01-01T00:00:00Z");
+            while probe < at("2040-01-01T00:00:00Z") {
+                let local = tz.to_datetime(probe);
+                assert_eq!(instant(&parts, local), Some(probe), "{zone} {local}");
+                probe = probe
+                    .checked_add(SignedDuration::from_hours(24 * 17 + 5))
+                    .unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn rules_bymonthday_rdates_and_eras_resolve() {
+        let offset = |hours: i8| Offset::constant(hours);
+        let wall = |text: &str| basic_date_time(text).unwrap().0;
+        // Fiji's tzurl.org rules: the Sunday among given month days, and RDATEs before them.
+        let fiji = [
+            Observance {
+                daylight: true,
+                start: wall("20101024T020000"),
+                from: offset(12),
+                to: offset(13),
+                rule: Some(
+                    "FREQ=YEARLY;BYMONTH=10;BYMONTHDAY=21,22,23,24,25,26,27;BYDAY=SU".into(),
+                ),
+                dates: Vec::new(),
+            },
+            Observance {
+                daylight: false,
+                start: wall("20140119T020000"),
+                from: offset(13),
+                to: offset(12),
+                rule: Some("FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=18,19,20,21,22,23,24;BYDAY=SU".into()),
+                dates: Vec::new(),
+            },
+            Observance {
+                daylight: false,
+                start: wall("19990228T030000"),
+                from: offset(13),
+                to: offset(12),
+                rule: None,
+                dates: vec![wall("20130120T030000")],
+            },
+        ];
+        assert_eq!(
+            instant(&fiji, wall("20140829T100000")),
+            Some(at("2014-08-28T22:00:00Z"))
+        );
+        assert_eq!(
+            instant(&fiji, wall("20131201T100000")),
+            Some(at("2013-11-30T21:00:00Z"))
+        );
+        assert_eq!(
+            instant(&fiji, wall("20130301T100000")),
+            Some(at("2013-02-28T22:00:00Z"))
+        );
+        // Exchange's multi-era custom zones: the 2007 rules end the 1671 ones.
+        let era = |daylight: bool, start: &str, rule: &str| Observance {
+            daylight,
+            start: wall(start),
+            from: offset(if daylight { -5 } else { -4 }),
+            to: offset(if daylight { -4 } else { -5 }),
+            rule: Some(rule.into()),
+            dates: Vec::new(),
+        };
+        let eras = [
+            era(
+                false,
+                "16711029T020000",
+                "FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10",
+            ),
+            era(true, "16710404T020000", "FREQ=YEARLY;BYDAY=1SU;BYMONTH=4"),
+            era(false, "20071104T020000", "FREQ=YEARLY;BYDAY=1SU;BYMONTH=11"),
+            era(true, "20070311T020000", "FREQ=YEARLY;BYDAY=2SU;BYMONTH=3"),
+        ];
+        assert_eq!(
+            instant(&eras, wall("20241101T090000")),
+            Some(at("2024-11-01T13:00:00Z"))
+        );
+        assert_eq!(
+            instant(&eras, wall("20060415T090000")),
+            Some(at("2006-04-15T13:00:00Z"))
+        );
+        // Two offsets in one year without any rule only sketch a pattern.
+        let bare = [
+            Observance {
+                rule: None,
+                ..eras[0].clone()
+            },
+            Observance {
+                rule: None,
+                ..eras[1].clone()
+            },
+        ];
+        assert_eq!(instant(&bare, wall("20240715T090000")), None);
     }
 
     #[test]
