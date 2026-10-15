@@ -40,14 +40,14 @@ impl FromRequestParts<AppState> for Auth {
         let Some(active) = resolve(parts, state).await else {
             return Ok(Self(Err(AppError::Unauthenticated)));
         };
-        Ok(Self(step_up(parts, state, &active).await.map(|()| {
-            RouteUser {
+        Ok(Self(step_up(state, &parts.headers, &active).await.map(
+            |()| RouteUser {
                 id: active.user.id.clone(),
                 session_id: active.session.id.clone(),
                 email: active.user.email.clone(),
                 name: active.user.name.clone(),
-            }
-        })))
+            },
+        )))
     }
 }
 
@@ -96,10 +96,13 @@ async fn resolve(parts: &mut Parts, state: &AppState) -> Option<ActiveSession> {
     })
 }
 
-async fn step_up(parts: &Parts, state: &AppState, active: &ActiveSession) -> Result<(), AppError> {
-    if step_up_verified(state, &parts.headers, active)
-        || !has_passkeys(state, &active.user.id).await?
-    {
+/// The guard's 403 for a session of an account with a passkey that has not used one.
+pub async fn step_up(
+    state: &AppState,
+    headers: &axum::http::HeaderMap,
+    active: &ActiveSession,
+) -> Result<(), AppError> {
+    if step_up_verified(state, headers, active) || !has_passkeys(state, &active.user.id).await? {
         Ok(())
     } else {
         Err(AppError::StepUpRequired)

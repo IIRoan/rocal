@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use utoipa_axum::router::OpenApiRouter;
 
-use crate::auth::guard::optional_session;
+use crate::auth::guard::{optional_session, step_up};
 use crate::error::AppError;
 use crate::http::BODY_LIMIT_BYTES;
 use crate::http::client_ip::client_ip;
@@ -356,9 +356,13 @@ impl Attempt<'_> {
         // A client bearer skips the session lookup and token cache; the session mints only without one or after a 401.
         if retry_after.is_some() || authorization.is_none() {
             let auth_started = Instant::now();
-            if let Some(token) = self.session_token(retry_after, &mut timings).await {
-                authorization = Some(format!("Bearer {token}"));
-                auth_source = AuthSource::Session;
+            match self.session_token(retry_after, &mut timings).await {
+                Ok(Some(token)) => {
+                    authorization = Some(format!("Bearer {token}"));
+                    auth_source = AuthSource::Session;
+                }
+                Ok(None) => {}
+                Err(refused) => return Sent::Early(refused.into_response()),
             }
             timings.auth = auth_started.elapsed();
         }
@@ -414,11 +418,12 @@ impl Attempt<'_> {
         }
     }
 
+    /// A token minted from the session; a session that still needs passkey step-up is refused as `/api/mail/oauth/access-token` refuses it.
     async fn session_token(
         &self,
         retry_after: Option<AuthSource>,
         timings: &mut Timings,
-    ) -> Option<String> {
+    ) -> Result<Option<String>, AppError> {
         let session_started = Instant::now();
         let active = optional_session(self.state, self.headers, self.cookies)
             .await
@@ -427,10 +432,14 @@ impl Attempt<'_> {
                 None
             });
         timings.session = session_started.elapsed();
-        let user = active.map(|active| active.user)?;
+        let Some(active) = active else {
+            return Ok(None);
+        };
+        step_up(self.state, self.headers, &active).await?;
+        let user = active.user;
         let email = user.email.trim();
         if email.is_empty() {
-            return None;
+            return Ok(None);
         }
         // Only a session-minted token that itself drew the 401 is dropped; a client bearer's 401 keeps the warm cache.
         if retry_after == Some(AuthSource::Session) {
@@ -440,10 +449,10 @@ impl Attempt<'_> {
         let token = service::access_token_for_user(self.state, &user.id, email).await;
         timings.token = token_started.elapsed();
         match token {
-            Ok(token) => Some(token.access_token),
+            Ok(token) => Ok(Some(token.access_token)),
             Err(error) => {
                 tracing::debug!(error = %redact_pii(&error.to_string()), "JMAP proxy could not mint a mail token from the session");
-                None
+                Ok(None)
             }
         }
     }

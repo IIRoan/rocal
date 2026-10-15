@@ -8,7 +8,9 @@ use solace_api_types::mail::{
     MailSignup, MailVaultBackup, MailVaultBackupRequest, MailVaultKdfParams,
 };
 
-use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok};
+use crate::helpers::{
+    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok,
+};
 use crate::mail_support::{
     access_token, bootstrap, bootstrap_request, bridge_secret, kdf_params, mailbox, pgp_key,
     provision, provisioning_turn, row_json, stalwart_account, to_json,
@@ -777,34 +779,53 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
     assert_eq!(basic["username"], json!(user.email), "{basic}");
 }
 
-#[tokio::test]
-async fn passkey_step_up_gates_the_mail_token_but_not_the_proxy() {
-    let app = TestApp::spawn().await;
-    let mut owner = mailbox(&app).await;
-    let mut passkey = register_passkey(&app, &mut owner.user).await;
-
-    let mut password_session = signed_in(&app, &owner.user).await;
-    let error = ok(password_session
-        .get("/api/mail/oauth/access-token")
-        .await
-        .expect_error(403, "Forbidden", "Passkey verification required."));
+/// The guard's step-up 403, which the access-token route answers.
+fn expect_step_up_required(response: &solace_api_tests::client::ApiResponse) {
+    let error = ok(response.expect_error(403, "Forbidden", "Passkey verification required."));
     assert_eq!(
         error["details"],
         json!({"code": "PASSKEY_STEP_UP_REQUIRED"})
     );
     assert!(error.get("requestId").is_none(), "{error}");
+}
+
+/// TypeScript's proxy mints from a session that still needs step-up; Rust refuses it like the access-token route, and relays bearers as before.
+#[tokio::test]
+async fn passkey_step_up_gates_the_mail_token_and_the_proxy_session() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    let mut passkey = register_passkey(&app, &mut owner.user).await;
+
+    let mut password_session = signed_in(&app, &owner.user).await;
+    expect_step_up_required(&password_session.get("/api/mail/oauth/access-token").await);
     ok(password_session
         .get("/api/mail/account")
         .await
         .expect_status(403));
 
-    // Pinned gap: the proxy mints from the bare session without the step-up check.
-    let discovery = ok(password_session
+    let discovery = password_session
         .get("/api/mail/jmap/.well-known/jmap")
-        .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    assert_eq!(discovery["username"], json!(owner.user.email));
+        .await;
+    let stale = ok(password_session
+        .agent
+        .send(
+            reqwest::Method::GET,
+            "/api/mail/jmap/jmap/session",
+            None,
+            &[("authorization", "Bearer stale-token")],
+        )
+        .await);
+    match app.backend {
+        Backend::TypeScript => {
+            let discovery = ok(discovery.expect_status(200).and_then(|r| r.value()));
+            assert_eq!(discovery["username"], json!(owner.user.email));
+            assert_eq!(stale.status.as_u16(), 200, "{}", stale.text());
+        }
+        Backend::Rust => {
+            expect_step_up_required(&discovery);
+            expect_step_up_required(&stale);
+        }
+    }
 
     let mut stepped_up = app.anonymous();
     ok(solace_api_tests::seed::passkey_sign_in(&mut stepped_up, &mut passkey, &app.origin).await);
@@ -814,6 +835,23 @@ async fn passkey_step_up_gates_the_mail_token_but_not_the_proxy() {
         .and_then(|r| r.expect_status(200))
         .and_then(|r| r.dto()));
     assert!(!token.access_token.is_empty());
+    ok(stepped_up
+        .get("/api/mail/jmap/.well-known/jmap")
+        .await
+        .and_then(|r| r.expect_status(200)));
+
+    let relayed = ok(password_session
+        .agent
+        .send(
+            reqwest::Method::GET,
+            "/api/mail/jmap/jmap/session",
+            None,
+            &[("authorization", &format!("Bearer {}", token.access_token))],
+        )
+        .await
+        .and_then(|r| r.expect_status(200))
+        .and_then(|r| r.value()));
+    assert_eq!(relayed["username"], json!(owner.user.email));
 }
 
 #[tokio::test]
