@@ -441,6 +441,7 @@ async fn verifications(db: &PgPool, user_id: &str, one_time: &str) -> Vec<String
     sqlx::query_scalar(
         "SELECT CASE WHEN identifier = $2 THEN 'one-time-token' \
                      WHEN identifier LIKE 'reset-password:%' THEN 'reset-password' \
+                     WHEN identifier LIKE 'passkey-bridge-step-up:%' THEN 'step-up-marker' \
                      ELSE 'passkey-challenge' END AS kind \
          FROM verification WHERE identifier = $2 OR strpos(value, $1) > 0 ORDER BY kind",
     )
@@ -567,9 +568,14 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         .expect("one-time token")
         .to_owned();
     let one_time = format!("one-time-token:{}", sha256_base64url(&one_time_token));
+    let mut expected = vec!["one-time-token", "passkey-challenge", "reset-password"];
+    // Rust marks each passkey sign-in for the native bridge's complete-step-up.
+    if app.backend == Backend::Rust {
+        expected.push("step-up-marker");
+    }
     assert_eq!(
         verifications(&app.db, &victim.id, &one_time).await,
-        ["one-time-token", "passkey-challenge", "reset-password"]
+        expected
     );
 
     let (needles, owned) = owned_rows(&app.db, &victim).await;
