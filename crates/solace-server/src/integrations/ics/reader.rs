@@ -1122,7 +1122,7 @@ fn convert_rrule(curr: &mut Obj) -> Result<(), String> {
         let Some(date) = start_date else {
             return Err("curr.start.getTime is not a function. (In 'curr.start.getTime()', 'curr.start.getTime' is undefined)".into());
         };
-        let ms = date.ms.ok_or("Invalid epoch milliseconds")?;
+        date.ms.ok_or("Invalid epoch milliseconds")?;
         let zone = date
             .tz
             .as_deref()
@@ -1131,7 +1131,7 @@ fn convert_rrule(curr: &mut Obj) -> Result<(), String> {
             .and_then(|info| info.iana.or(info.offset))
             .and_then(|zone| zones::temporal_id(&zone))
             .unwrap_or_else(|| "UTC".into());
-        rrule::with_start(&rule_only, ms, &zone)?
+        rrule::with_start(&rule_only, &zone)?
     };
     curr.set("rrule", Val::Rrule(Box::new(options)));
     Ok(())

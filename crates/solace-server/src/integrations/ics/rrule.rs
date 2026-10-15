@@ -56,8 +56,8 @@ pub fn date_only(ymd: &str, rule: &str) -> Result<Options, String> {
 }
 
 /// `new RRuleTemporal({ rruleString: rule, dtstart })` with the start's Temporal zone id.
-pub fn with_start(rule: &str, start_ms: i64, tzid: &str) -> Result<Options, String> {
-    construct(rule, Some((start_ms, tzid)))
+pub fn with_start(rule: &str, tzid: &str) -> Result<Options, String> {
+    construct(rule, Some(tzid))
 }
 
 struct Parsed {
@@ -94,7 +94,7 @@ fn parse_int(text: &str) -> f64 {
     sign * digits[..end].parse::<f64>().unwrap_or(f64::NAN)
 }
 
-fn parse_rule(input: &str, start: Option<(i64, &str)>) -> Result<Parsed, String> {
+fn parse_rule(input: &str, start: Option<&str>) -> Result<Parsed, String> {
     let input = js_trim(input);
     let mut tzid = String::from("UTC");
     let mut dtstart_is_date = false;
@@ -143,7 +143,7 @@ fn parse_rule(input: &str, start: Option<(i64, &str)>) -> Result<Parsed, String>
             .copied();
     } else {
         rule_line = Some(input);
-        if let Some((_, zone)) = start {
+        if let Some(zone) = start {
             tzid = zone.to_owned();
             dtstart_has_tzid = true;
             dtstart_is_utc = zone == "UTC";
@@ -364,7 +364,7 @@ fn ics_date_time(value: &str, tzid: &str, date_only: bool) -> Result<(i64, Strin
 }
 
 /// The constructor: parsing, then `sanitizeOpts`' checks in their order.
-fn construct(input: &str, start: Option<(i64, &str)>) -> Result<Options, String> {
+fn construct(input: &str, start: Option<&str>) -> Result<Options, String> {
     let parsed = parse_rule(input, start)?;
     let freq = parsed
         .freq
@@ -426,7 +426,6 @@ mod tests {
     fn rules_parse_and_fail_like_rrule_temporal() {
         let weekly = with_start(
             "FREQ=WEEKLY;BYDAY=mo,1FR;UNTIL=20240301T000000Z",
-            0,
             "Europe/Amsterdam",
         );
         assert_eq!(
@@ -442,8 +441,7 @@ mod tests {
                 tzid: "Europe/Amsterdam".into(),
             })
         );
-        let monthly =
-            with_start("FREQ=MONTHLY;BYMONTHDAY=15,-1;BYMONTH= 7,5L,2", 0, "UTC").unwrap();
+        let monthly = with_start("FREQ=MONTHLY;BYMONTHDAY=15,-1;BYMONTH= 7,5L,2", "UTC").unwrap();
         assert_eq!(
             (monthly.by_month_day, monthly.by_month),
             (Some(vec![15.0, -1.0]), Some(vec![7.0, 2.0]))
@@ -456,27 +454,27 @@ mod tests {
             Ok(("UTC", Some(6.0), Some(1_861_920_000_000)))
         );
         assert_eq!(
-            with_start("FREQ=FOO", 0, "UTC"),
+            with_start("FREQ=FOO", "UTC"),
             Err("Invalid FREQ value: FOO".into())
         );
         assert_eq!(
-            with_start("COUNT=2", 0, "UTC"),
+            with_start("COUNT=2", "UTC"),
             Err("RRULE must include FREQ".into())
         );
         assert_eq!(
-            with_start("FREQ=DAILY;INTERVAL=0", 0, "UTC"),
+            with_start("FREQ=DAILY;INTERVAL=0", "UTC"),
             Err("Cannot create RRule: interval must be greater than 0".into())
         );
         assert_eq!(
-            with_start("FREQ=DAILY;BYDAY=XX", 0, "UTC"),
+            with_start("FREQ=DAILY;BYDAY=XX", "UTC"),
             Err("Invalid BYDAY value: XX".into())
         );
         assert_eq!(
-            with_start("FREQ", 0, "UTC"),
+            with_start("FREQ", "UTC"),
             Err("undefined is not an object (evaluating 'val.toUpperCase')".into())
         );
         assert_eq!(
-            with_start("FREQ=DAILY;UNTIL=20240101T100000", 0, "UTC"),
+            with_start("FREQ=DAILY;UNTIL=20240101T100000", "UTC"),
             Err("UNTIL rule part MUST always be specified as a date with UTC time".into())
         );
         assert_eq!(
@@ -484,7 +482,7 @@ mod tests {
             Err("invalid RFC 9557 string: 2024-13-01".into())
         );
         assert_eq!(
-            with_start("FREQ=DAILY;INTERVAL=x", 0, "UTC").map(|o| o.interval.is_nan()),
+            with_start("FREQ=DAILY;INTERVAL=x", "UTC").map(|o| o.interval.is_nan()),
             Ok(true)
         );
     }
