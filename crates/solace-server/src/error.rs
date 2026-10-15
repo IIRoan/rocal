@@ -109,7 +109,8 @@ impl AppError {
         }
     }
 
-    fn client_message(&self) -> String {
+    /// The message the envelope shows, which hides internal errors.
+    pub fn client_message(&self) -> String {
         match self {
             Self::Internal(_) => GENERIC_SERVER_ERROR.into(),
             other => other.to_string(),
