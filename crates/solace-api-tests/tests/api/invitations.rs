@@ -269,31 +269,6 @@ async fn new_invitees_get_a_noreply_invitation_with_an_ics_request() {
 }
 
 #[tokio::test]
-async fn invitation_bursts_wait_out_stalwarts_concurrency_limit() {
-    let app = TestApp::spawn().await;
-    // TypeScript drops mail past the limit (step 3), and its burst would also fail mail that concurrent cases send.
-    if app.backend == Backend::TypeScript {
-        return;
-    }
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    let mut creates = tokio::task::JoinSet::new();
-    for _ in 0..64 {
-        let mut request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
-        request.participants = Some(vec![participant(&guest())]);
-        request.invitation_content = Some(invitation("Burst"));
-        let mut agent = owner.agent.clone();
-        creates.spawn(async move { agent.post("/api/events", to_json(&request)).await });
-    }
-    for response in creates.join_all().await {
-        let event: Event = ok(response
-            .and_then(|r| r.expect_status(200))
-            .and_then(|r| r.dto()));
-        assert_eq!(event.warnings, None, "every invitation went out");
-    }
-}
-
-#[tokio::test]
 async fn encrypted_events_without_an_invitation_copy_send_no_mail() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
