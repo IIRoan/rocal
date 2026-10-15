@@ -15,10 +15,10 @@
           "byWeekDay": [
             2
           ],
-          "timezone": "+01:00"
+          "timezone": "Etc/GMT-1"
         },
-        "timezone": "(GMT +01:00)",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"+01:00\"}"
+        "timezone": "Etc/GMT-1",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"Etc/GMT-1\"}"
       }
     ],
     "errors": [],
@@ -40,10 +40,10 @@
           "byWeekDay": [
             2
           ],
-          "timezone": "+01:00"
+          "timezone": "Etc/GMT-1"
         },
-        "timezone": "(GMT +01:00)",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"+01:00\"}"
+        "timezone": "Etc/GMT-1",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"Etc/GMT-1\"}"
       }
     ],
     "errors": [],
@@ -65,10 +65,10 @@
           "byWeekDay": [
             2
           ],
-          "timezone": "+01:00"
+          "timezone": "Etc/GMT-1"
         },
-        "timezone": "(GMT +01:00)",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"+01:00\"}"
+        "timezone": "Etc/GMT-1",
+        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"Etc/GMT-1\"}"
       }
     ],
     "errors": [],

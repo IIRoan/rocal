@@ -8,6 +8,7 @@ use sea_orm::{
 
 use crate::db::entities::{calendar, calendar_event};
 use crate::entity_metadata::MAIL_INVITATION_STAGING_CALENDAR_NAME;
+use crate::events::queries as events;
 use crate::instant;
 
 /// `excludeInvitationStagingCalendarWhere`: not the hidden `Invitations` calendar.
@@ -181,10 +182,16 @@ pub async fn move_events<C: ConnectionTrait>(
         .map(|_| ())
 }
 
+/// The calendar's events with their recurrence exceptions.
 pub async fn delete_events<C: ConnectionTrait>(
     db: &C,
     calendar_id: &str,
 ) -> Result<(), sea_orm::DbErr> {
+    events::delete_exceptions_of(
+        db,
+        events::ids_where(Condition::all().add(calendar_event::Column::CalendarId.eq(calendar_id))),
+    )
+    .await?;
     calendar_event::Entity::delete_many()
         .filter(calendar_event::Column::CalendarId.eq(calendar_id))
         .exec(db)

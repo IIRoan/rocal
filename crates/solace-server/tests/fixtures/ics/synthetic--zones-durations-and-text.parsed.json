@@ -60,10 +60,10 @@
           "frequency": "daily",
           "interval": 1,
           "until": "2024-07-20T03:15:00.000Z",
-          "timezone": "+05:45"
+          "timezone": "UTC"
         },
-        "timezone": "(UTC+05:45) Somewhere new",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-07-20T03:15:00.000Z\",\"timezone\":\"+05:45\"}"
+        "timezone": "UTC",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-07-20T03:15:00.000Z\",\"timezone\":\"UTC\"}"
       },
       {
         "uid": "microsoft-custom",
@@ -341,10 +341,10 @@
           "frequency": "daily",
           "interval": 1,
           "until": "2024-07-20T03:15:00.000Z",
-          "timezone": "+05:45"
+          "timezone": "Europe/Amsterdam"
         },
-        "timezone": "(UTC+05:45) Somewhere new",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-07-20T03:15:00.000Z\",\"timezone\":\"+05:45\"}"
+        "timezone": "Europe/Amsterdam",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-07-20T03:15:00.000Z\",\"timezone\":\"Europe/Amsterdam\"}"
       },
       {
         "uid": "microsoft-custom",
@@ -622,10 +622,10 @@
           "frequency": "daily",
           "interval": 1,
           "until": "2024-07-20T03:15:00.000Z",
-          "timezone": "+05:45"
+          "timezone": "America/Los_Angeles"
         },
-        "timezone": "(UTC+05:45) Somewhere new",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-07-20T03:15:00.000Z\",\"timezone\":\"+05:45\"}"
+        "timezone": "America/Los_Angeles",
+        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-07-20T03:15:00.000Z\",\"timezone\":\"America/Los_Angeles\"}"
       },
       {
         "uid": "microsoft-custom",

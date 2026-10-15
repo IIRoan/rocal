@@ -59,6 +59,10 @@ pub struct ParsedEvent {
     pub recurrence: Option<RecurrenceRule>,
     pub timezone: Option<String>,
     pub participants: Option<Vec<Participant>>,
+    /// The start of the occurrence an override replaces, as the series' instances start.
+    pub occurrence: Option<PrimitiveDateTime>,
+    /// EXDATE occurrences, as the series' instances start.
+    pub excluded_dates: Vec<PrimitiveDateTime>,
 }
 
 /// `parseICSFile` in `lib/ics-parser.ts`: the package parser, with Google's invite boilerplate removed from descriptions.
@@ -71,7 +75,7 @@ pub fn parse(content: &str, user_timezone: &str) -> ParseResult {
         calendar_description: None,
         calendar_timezone: None,
     };
-    let root = match reader::parse(content) {
+    let root = match reader::parse(content, user_timezone) {
         Ok(root) => root,
         Err(message) => {
             result
@@ -175,6 +179,25 @@ fn event_timezone(event: &Obj) -> Option<String> {
     zone("start")
         .or_else(|| zone("end"))
         .and_then(|tz| normalize_timezone(Some(tz)))
+}
+
+/// The zone an event or rule is stored in, never a label: `zones::iana_zone`, else `fallback` (the user's zone).
+fn storable_zone(zone: Option<&str>, fallback: &str) -> String {
+    zone.and_then(zones::iana_zone)
+        .unwrap_or_else(|| fallback.to_owned())
+}
+
+/// An EXDATE or RECURRENCE-ID as the instance it names starts: a DATE at midnight in the all-day zone, a DATE-TIME as is.
+fn occurrence_start(value: &Val, all_day_zone: &str) -> Option<PrimitiveDateTime> {
+    let Val::Date(date) = value else {
+        return None;
+    };
+    let ms = date.ms?;
+    if !date.date_only {
+        return utc(ms);
+    }
+    let day = js::fields(ms);
+    utc(day_boundary(day.year, day.month, day.day, all_day_zone, false).ok()?)
 }
 
 /// `buildUtcDateFromTimeZoneDateParts`: the first (or last) millisecond of a calendar day in `zone`.
@@ -418,7 +441,7 @@ fn parse_event(
         (start, end) = all_day_range(start, end, &all_day_timezone)?;
     }
     let recurrence_id = date_value(event.get("recurrenceid")).map(js::iso_string);
-    let timezone = event_timezone(event).or_else(|| {
+    let written = event_timezone(event).or_else(|| {
         if all_day {
             Some(all_day_timezone.clone())
         } else if let Some(calendar) = calendar_timezone {
@@ -427,14 +450,26 @@ fn parse_event(
             Some(user_timezone.to_owned())
         }
     });
+    let timezone = Some(storable_zone(written.as_deref(), &all_day_timezone));
     let mut recurrence = recurrence_rule(event.get("rrule"));
     if let Some(rule) = recurrence.as_mut() {
         if all_day {
             floating_dates(rule, &all_day_timezone)?;
-        } else if rule.timezone.is_none() {
-            rule.timezone = timezone.clone().filter(|tz| !tz.is_empty());
+        } else {
+            let zone = rule.timezone.take().or_else(|| timezone.clone());
+            rule.timezone = Some(storable_zone(zone.as_deref(), &all_day_timezone));
         }
     }
+    let excluded_dates = match event.get("exdate") {
+        Some(Val::List(dates)) => dates
+            .iter()
+            .filter_map(|date| occurrence_start(date, &all_day_timezone))
+            .collect(),
+        _ => Vec::new(),
+    };
+    let occurrence = event
+        .get("recurrenceid")
+        .and_then(|date| occurrence_start(date, &all_day_timezone));
     // ponytail: instants beyond year 9999 (only reachable through field rollover) are skipped; widen if a feed ever needs them.
     let (Some(start), Some(end)) = (utc(start), utc(end)) else {
         return Ok(None);
@@ -452,6 +487,8 @@ fn parse_event(
         recurrence,
         timezone,
         participants: participants(event),
+        occurrence,
+        excluded_dates,
     }))
 }
 
@@ -620,6 +657,8 @@ mod tests {
             recurrence: None,
             timezone: None,
             participants: None,
+            occurrence: None,
+            excluded_dates: Vec::new(),
         }
     }
 
@@ -895,6 +934,53 @@ mod tests {
     }
 
     #[test]
+    fn excluded_dates_and_overrides_name_their_instances() {
+        let result = parse(
+            &feed(&[
+                "BEGIN:VEVENT",
+                "UID:weekly",
+                "DTSTART:20240101T090000Z",
+                "SUMMARY:Weekly",
+                "RRULE:FREQ=WEEKLY;COUNT=4",
+                "EXDATE:20240108T090000Z,nonsense",
+                "EXDATE;TZID=Europe/Amsterdam:20240115T100000",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:weekly",
+                "RECURRENCE-ID:20240122T090000Z",
+                "DTSTART:20240122T140000Z",
+                "SUMMARY:Moved",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:daily",
+                "DTSTART;VALUE=DATE:20240101",
+                "SUMMARY:Daily",
+                "RRULE:FREQ=DAILY;COUNT=3",
+                "EXDATE;VALUE=DATE:20240102",
+                "END:VEVENT",
+            ]),
+            "Europe/Amsterdam",
+        );
+        let iso = |dates: &[PrimitiveDateTime]| -> Vec<String> {
+            dates.iter().map(|at| instant::iso(*at).0).collect()
+        };
+        assert_eq!(
+            iso(&event(&result, "weekly").excluded_dates),
+            ["2024-01-08T09:00:00.000Z", "2024-01-15T09:00:00.000Z"]
+        );
+        let moved = event(&result, "weekly::RECURRENCE::2024-01-22T09:00:00.000Z");
+        assert_eq!(
+            moved.occurrence.map(|at| instant::iso(at).0).as_deref(),
+            Some("2024-01-22T09:00:00.000Z")
+        );
+        assert_eq!(
+            iso(&event(&result, "daily").excluded_dates),
+            ["2024-01-01T23:00:00.000Z"],
+            "a DATE names midnight in the user's zone"
+        );
+    }
+
+    #[test]
     fn a_repeated_dtstart_or_dtend_keeps_the_first() {
         let result = parse(
             &feed(&[
@@ -1013,12 +1099,76 @@ mod tests {
         );
         assert_eq!(
             at("half"),
-            ("2024-07-15T03:30:00.000Z".into(), Some("+05:30".into()))
+            ("2024-07-15T03:30:00.000Z".into(), Some("UTC".into())),
+            "no IANA zone keeps +05:30, so the event is filed in the user's"
         );
     }
 
     #[test]
-    fn floating_times_use_the_calendar_zone_or_stay_floating() {
+    fn zones_are_stored_as_iana_names_never_as_labels() {
+        let lines = [
+            (
+                "windows",
+                "DTSTART;TZID=Romance Standard Time:20240715T090000",
+            ),
+            (
+                "label",
+                "DTSTART;TZID=\"(UTC+01:00) Brussels, Copenhagen, Madrid, Paris\":20240715T090000",
+            ),
+            ("lowercase", "DTSTART;TZID=europe/amsterdam:20240715T090000"),
+            (
+                "hour",
+                "DTSTART;TZID=\"(UTC+03:00) Nowhere\":20240715T090000",
+            ),
+            ("unknown", "DTSTART;TZID=Mars/Olympus_Mons:20240715T090000"),
+        ];
+        let mut feed_lines = Vec::new();
+        for (uid, start) in lines {
+            feed_lines.extend([
+                "BEGIN:VEVENT",
+                start,
+                "SUMMARY:Zone",
+                "RRULE:FREQ=DAILY;COUNT=2",
+            ]);
+            feed_lines.push(Box::leak(format!("UID:{uid}").into_boxed_str()));
+            feed_lines.push("END:VEVENT");
+        }
+        let result = parse(&feed(&feed_lines), "America/Los_Angeles");
+        let zones = |uid: &str| {
+            let found = event(&result, uid);
+            (
+                found.timezone.clone().unwrap_or_default(),
+                found
+                    .recurrence
+                    .as_ref()
+                    .and_then(|rule| rule.timezone.clone())
+                    .unwrap_or_default(),
+                instant::iso(found.start).0,
+            )
+        };
+        let expect = |zone: &str, start: &str| (zone.to_owned(), zone.to_owned(), start.to_owned());
+        assert_eq!(
+            zones("windows"),
+            expect("Europe/Paris", "2024-07-15T07:00:00.000Z")
+        );
+        assert_eq!(
+            zones("label"),
+            expect("Europe/Paris", "2024-07-15T07:00:00.000Z")
+        );
+        assert_eq!(zones("lowercase").0, "europe/amsterdam");
+        assert_eq!(
+            zones("hour"),
+            expect("Etc/GMT-3", "2024-07-15T06:00:00.000Z")
+        );
+        assert_eq!(
+            zones("unknown"),
+            expect("America/Los_Angeles", "2024-07-15T16:00:00.000Z"),
+            "an unknown name falls back to the user's zone, which also reads the time"
+        );
+    }
+
+    #[test]
+    fn floating_times_use_the_calendar_zone_or_the_users() {
         let vtimezone = [
             "BEGIN:VTIMEZONE",
             "TZID:Asia/Tokyo",
@@ -1057,10 +1207,10 @@ mod tests {
         assert_eq!(
             start(&[]),
             (
-                "2024-07-15T09:00:00.000Z".into(),
+                "2024-07-15T07:00:00.000Z".into(),
                 Some("Europe/Amsterdam".into())
             ),
-            "a VTIMEZONE alone does not claim floating times"
+            "a VTIMEZONE alone does not claim floating times: the user's zone does"
         );
     }
 

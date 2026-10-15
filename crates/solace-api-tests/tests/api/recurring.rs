@@ -14,7 +14,7 @@ use crate::event_fixtures::{
     row_snapshot, sent_mail, stored_content, to_json, unfold,
 };
 use crate::helpers::{
-    TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
 };
 
 const WEEKLY_FIVE: &str = r#"{"frequency":"weekly","interval":1,"count":5}"#;
@@ -1529,6 +1529,59 @@ async fn deleting_this_and_future_ends_the_series() {
     )
     .await;
     assert_eq!(list.events.len(), 3);
+}
+
+#[tokio::test]
+async fn single_bulk_and_calendar_deletes_take_the_series_exceptions() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let doomed = insert_calendar(&app, &owner.id, "owned", false).await;
+    let mut excepted = Vec::new();
+    for calendar in [&calendar, &calendar, &doomed] {
+        let series = weekly_series(&mut owner, calendar).await;
+        ok(owner
+            .delete(&format!(
+                "/api/recurring/event/{}?deleteScope=this_only&occurrenceDate=2099-03-09T09:00:00.000Z",
+                series.id
+            ))
+            .await
+            .expect_status(200));
+        assert_eq!(exceptions(&app, &series.id.0).await.len(), 1);
+        excepted.push(series.id.0);
+    }
+    ok(owner
+        .delete(&format!("/api/events/{}", excepted[0]))
+        .await
+        .expect_status(200));
+    ok(owner
+        .post(
+            "/api/events/bulk",
+            json!({"action": "delete", "eventIds": [excepted[1]]}),
+        )
+        .await
+        .expect_status(200));
+    ok(owner
+        .delete(&format!("/api/calendars/{doomed}"))
+        .await
+        .expect_status(200));
+    for series in &excepted {
+        assert_eq!(
+            count(
+                &app.db,
+                "SELECT count(*) FROM calendar_event WHERE id = $1",
+                series
+            )
+            .await,
+            0
+        );
+        let left = exceptions(&app, series).await.len();
+        match app.backend {
+            // recurrence_exception has no foreign key, and TypeScript leaves it behind.
+            Backend::TypeScript => assert_eq!(left, 1, "{series}"),
+            Backend::Rust => assert_eq!(left, 0, "{series}"),
+        }
+    }
 }
 
 #[tokio::test]

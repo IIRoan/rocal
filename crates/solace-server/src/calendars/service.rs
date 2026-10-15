@@ -301,7 +301,9 @@ pub async fn delete(
             }
             queries::move_events(&state.db, id, &target).await?;
         } else {
-            queries::delete_events(&state.db, id).await?;
+            let transaction = state.db.begin().await?;
+            queries::delete_events(&transaction, id).await?;
+            transaction.commit().await?;
         }
     }
     if existing.is_default

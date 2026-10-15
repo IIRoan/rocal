@@ -410,10 +410,12 @@ fn utc_add(date: Option<Option<i64>>, amount: i64, unit_ms: i64) -> Option<Optio
 pub struct Reader {
     stack: Vec<Obj>,
     next_id: u64,
+    /// Where floating times are read when the calendar names no zone: the user's.
+    floating_zone: Option<String>,
 }
 
 /// node-ical's `parseICS`: the root object, or the message of the error that aborted the whole feed.
-pub fn parse(content: &str) -> Result<Obj, String> {
+pub fn parse(content: &str, user_timezone: &str) -> Result<Obj, String> {
     let mut lines: Vec<&str> = content.split('\n').collect();
     for line in &mut lines {
         *line = line.strip_suffix('\r').unwrap_or(line);
@@ -421,6 +423,8 @@ pub fn parse(content: &str) -> Result<Obj, String> {
     let mut reader = Reader {
         stack: Vec::new(),
         next_id: 0,
+        floating_zone: super::normalize_timezone(Some(user_timezone))
+            .filter(|zone| zones::lookup(zone).is_some()),
     };
     let mut ctx = Obj::default();
     let mut index = 0;
@@ -512,7 +516,11 @@ impl Reader {
                 return Ok(curr);
             }
             // Stored by node-ical but never read by parse-ics, and they cannot fail.
-            "EXDATE" | "GEO" | "CATEGORIES" | "FREEBUSY" => return Ok(curr),
+            "GEO" | "CATEGORIES" | "FREEBUSY" => return Ok(curr),
+            "EXDATE" => {
+                self.excluded_dates(&mut curr, value, &parameters);
+                return Ok(curr);
+            }
             "SEQUENCE" => {
                 curr.set("sequence", parse_value(value));
                 return Ok(curr);
@@ -620,6 +628,30 @@ impl Reader {
         Ok(())
     }
 
+    /// Each date of an EXDATE line, read like DTSTART, onto the `exdate` list; an unreadable one is skipped.
+    fn excluded_dates(&self, curr: &mut Obj, value: &str, parameters: &[String]) {
+        for part in value.split(',') {
+            let mut read = Obj::default();
+            let mut parameters = parameters.to_vec();
+            if self
+                .date_parameter(&mut read, "exdate", part, &mut parameters)
+                .is_err()
+            {
+                continue;
+            }
+            let Some(date) = read
+                .remove("exdate")
+                .filter(|date| matches!(date, Val::Date(_)))
+            else {
+                continue;
+            };
+            match curr.get_mut("exdate") {
+                Some(Val::List(dates)) => dates.push(date),
+                _ => curr.set("exdate", Val::List(vec![date])),
+            }
+        }
+    }
+
     /// A DATE-TIME with a TZID parameter.
     fn zoned_date(
         &self,
@@ -659,7 +691,8 @@ impl Reader {
         } else if let Some(iana) = &info.iana {
             zones::parse_date_time_in_zone(value, iana)
         } else {
-            local()
+            // A TZID no table knows reads like a floating time, in the zone the event will be filed under.
+            return Ok(self.floating_date(value, local));
         };
         let tz = parse_parameters(parameters)
             .get("TZID")
@@ -672,9 +705,9 @@ impl Reader {
         })
     }
 
-    /// A DATE-TIME without a TZID: in the calendar's X-WR-TIMEZONE when it names a zone, else floating (host-local, UTC).
+    /// A DATE-TIME without a TZID: in the calendar's X-WR-TIMEZONE when it names a zone, else in the user's, as the on-device import reads it.
     fn floating_date(&self, value: &str, local: impl Fn() -> Option<i64>) -> JsDate {
-        match self.calendar_zone() {
+        match self.calendar_zone().or_else(|| self.floating_zone.clone()) {
             Some(zone) => JsDate {
                 ms: zones::parse_date_time_in_zone(value, &zone),
                 tz: Some(zone),
@@ -697,7 +730,7 @@ impl Reader {
         let Some(Val::Str(zone)) = calendar.get("WR-TIMEZONE") else {
             return None;
         };
-        super::normalize_timezone(Some(zone)).filter(|zone| zones::lookup(zone).is_some())
+        super::normalize_timezone(Some(zone)).and_then(|zone| zones::iana_zone(&zone))
     }
 
     fn next_id(&mut self) -> String {

@@ -8,6 +8,8 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 COPY xtask xtask
 COPY packages/calendar-core/src/redaction-policy.js packages/calendar-core/src/redaction-policy.js
+# The ICS reader compiles in the Windows zone table shared with the on-device import.
+COPY packages/calendar-ics/src/windows-zones.json packages/calendar-ics/src/windows-zones.json
 # Fixtures are read from the source tree at run time, so the suite runs where it was built.
 RUN cargo test --locked -p solace-api-tests --test api --no-run
 CMD ["cargo", "test", "--locked", "-p", "solace-api-tests", "--test", "api", "--", "--test-threads", "8"]

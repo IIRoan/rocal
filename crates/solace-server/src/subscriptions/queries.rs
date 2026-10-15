@@ -14,6 +14,7 @@ use crate::db::entities::{
     calendar, calendar_event, calendar_subscription, calendar_sync_log, event_participant,
     recurrence_exception, user_settings,
 };
+use crate::events::queries as events;
 use crate::instant;
 use crate::integrations::ics::parse::{NewEvent, ParsedEvent};
 use crate::integrations::ics::{RecurrenceRule, resolve_timezone};
@@ -176,6 +177,13 @@ pub async fn delete_feed_events<C: ConnectionTrait>(
     db: &C,
     subscription_id: &str,
 ) -> Result<(), sea_orm::DbErr> {
+    events::delete_exceptions_of(
+        db,
+        events::ids_where(
+            Condition::all().add(calendar_event::Column::SubscriptionId.eq(subscription_id)),
+        ),
+    )
+    .await?;
     calendar_event::Entity::delete_many()
         .filter(calendar_event::Column::SubscriptionId.eq(subscription_id))
         .exec(db)
@@ -439,10 +447,53 @@ pub async fn update_feed_event<C: ConnectionTrait>(
 }
 
 pub async fn delete_event<C: ConnectionTrait>(db: &C, id: &str) -> Result<(), sea_orm::DbErr> {
+    events::delete_exceptions_of(
+        db,
+        events::ids_where(Condition::all().add(calendar_event::Column::Id.eq(id))),
+    )
+    .await?;
     calendar_event::Entity::delete_by_id(id)
         .exec(db)
         .await
         .map(|_| ())
+}
+
+/// Hangs a feed override under its series, or frees it when the series is gone.
+pub async fn set_parent<C: ConnectionTrait>(
+    db: &C,
+    event: calendar_event::Model,
+    parent_event_id: Option<String>,
+) -> Result<(), sea_orm::DbErr> {
+    let mut row: calendar_event::ActiveModel = event.into();
+    row.parent_event_id = Set(parent_event_id);
+    row.update(db).await.map(|_| ())
+}
+
+/// A feed series' exceptions as `(date, type, modified event)`, oldest first.
+pub type ExceptionSet = Vec<(TimeDateTime, String, Option<String>)>;
+
+/// Replaces a feed series' exceptions with `wanted`.
+pub async fn replace_exceptions<C: ConnectionTrait>(
+    db: &C,
+    series_id: &str,
+    wanted: ExceptionSet,
+) -> Result<(), sea_orm::DbErr> {
+    recurrence_exception::Entity::delete_many()
+        .filter(recurrence_exception::Column::ParentEventId.eq(series_id))
+        .exec(db)
+        .await?;
+    for (date, kind, modified_event_id) in wanted {
+        recurrence_exception::ActiveModel {
+            parent_event_id: Set(series_id.to_owned()),
+            exception_date: Set(date),
+            modified_event_id: Set(modified_event_id),
+            r#type: Set(kind),
+            ..Default::default()
+        }
+        .insert(db)
+        .await?;
+    }
+    Ok(())
 }
 
 pub async fn owned_calendar<C: ConnectionTrait>(

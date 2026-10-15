@@ -491,7 +491,14 @@ async fn legacy_plaintext_imports_still_work() {
             file_name: Some("unknown.ics".into()),
             calendar_name: Some("Legacy".into()),
             errors: Some(vec![
-                "Event \"Legacy meeting\" with UID legacy-uid-1 already exists in calendar".into()
+                match app.backend {
+                    // TypeScript names the event by title, which is the file's content.
+                    Backend::TypeScript => {
+                        "Event \"Legacy meeting\" with UID legacy-uid-1 already exists in calendar"
+                    }
+                    Backend::Rust => "An event already exists in this calendar.",
+                }
+                .into()
             ]),
         }
     );

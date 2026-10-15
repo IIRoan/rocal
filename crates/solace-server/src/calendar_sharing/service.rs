@@ -2,14 +2,17 @@
 
 use solace_api_types::calendars::{CalendarShareLink, DisableShareLinkResponse};
 
+use std::collections::HashMap;
+
 use super::queries;
 use crate::auth::api::{ALPHANUMERIC, random_string};
 use crate::auth::cookies::encode_uri_component;
 use crate::auth::guard::RouteUser;
-use crate::db::entities::calendar;
+use crate::db::entities::{calendar, calendar_event};
 use crate::entity_metadata::external_calendar_name;
 use crate::error::AppError;
 use crate::events::encryption::backfill_ciphertext_only;
+use crate::events::queries as events;
 use crate::instant;
 use crate::integrations::ics::{build, export};
 use crate::state::AppState;
@@ -143,7 +146,7 @@ pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String),
     let calendar = queries::shared(&state.db, token)
         .await?
         .ok_or_else(not_found)?;
-    let events = queries::top_level_events(&state.db, &calendar.id).await?;
+    let events = queries::feed_events(&state.db, &calendar.id).await?;
     if events
         .iter()
         .any(|event| event.encryption_state == "encrypted")
@@ -156,10 +159,50 @@ pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String),
         .iter()
         .find(|event| !event.all_day && !event.timezone.is_empty())
         .map(|event| event.timezone.as_str());
+    let series: Vec<String> = events
+        .iter()
+        .filter(|event| event.recurrence.is_some())
+        .map(|event| event.id.clone())
+        .collect();
+    let exceptions = if series.is_empty() {
+        Vec::new()
+    } else {
+        events::exceptions(&state.db, series).await?
+    };
+    let by_id: HashMap<&str, &calendar_event::Model> = events
+        .iter()
+        .map(|event| (event.id.as_str(), event))
+        .collect();
+    // A modified occurrence in this calendar overrides its instance; any other exception excludes it.
+    let mut overrides: HashMap<&str, (String, time::PrimitiveDateTime)> = HashMap::new();
+    let mut excluded: HashMap<&str, Vec<time::PrimitiveDateTime>> = HashMap::new();
+    for exception in &exceptions {
+        let detached = exception
+            .modified_event_id
+            .as_deref()
+            .and_then(|id| by_id.get(id))
+            .filter(|row| row.recurrence.is_none());
+        match (detached, by_id.get(exception.parent_event_id.as_str())) {
+            (Some(row), Some(parent)) => {
+                overrides.insert(
+                    row.id.as_str(),
+                    (
+                        export::uid(&parent.id, parent.external_id.as_deref()),
+                        exception.exception_date,
+                    ),
+                );
+            }
+            (_, Some(parent)) => excluded
+                .entry(parent.id.as_str())
+                .or_default()
+                .push(exception.exception_date),
+            (_, None) => {}
+        }
+    }
     let built = events
         .iter()
         .map(|event| {
-            export::to_build_event(&export::ExportEvent {
+            let mut built = export::to_build_event(&export::ExportEvent {
                 id: &event.id,
                 external_id: event.external_id.as_deref(),
                 title: &event.title,
@@ -173,9 +216,15 @@ pub async fn feed(state: &AppState, raw_token: &str) -> Result<(String, String),
                 created_at: event.created_at,
                 updated_at: event.updated_at,
                 participants: &[],
-            })
+            })?;
+            if let Some((uid, at)) = overrides.get(event.id.as_str()) {
+                built.uid = Some(uid.clone());
+                built.recurrence_id = Some(*at);
+            }
+            built.excluded_dates = excluded.remove(event.id.as_str()).unwrap_or_default();
+            Ok(built)
         })
-        .collect::<Result<Vec<_>, _>>()
+        .collect::<Result<Vec<_>, export::InvalidUntil>>()
         .map_err(|_| AppError::internal("recurrence until is not a valid instant"))?;
     let name = external_calendar_name(&calendar.name);
     let ics = build::build_calendar(

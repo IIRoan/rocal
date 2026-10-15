@@ -837,7 +837,7 @@ pub async fn bulk(
                     .await?;
             Ok(BulkEventResult {
                 success: true,
-                message: format!("Successfully moved {moved} events to {}", target.name),
+                message: format!("Successfully moved {moved} events"),
                 events_processed: i64::try_from(moved).unwrap_or(i64::MAX),
                 action: "move".into(),
                 created_events: None,
@@ -858,9 +858,11 @@ pub async fn bulk(
                 .collect();
             let mut deleted = declined;
             if !local.is_empty() {
-                queries::delete_reminders(&state.db, local.clone()).await?;
-                queries::delete_notification_logs(&state.db, None, local.clone()).await?;
-                deleted += queries::delete(&state.db, &user.id, local).await?;
+                let transaction = state.db.begin().await?;
+                queries::delete_reminders(&transaction, local.clone()).await?;
+                queries::delete_notification_logs(&transaction, None, local.clone()).await?;
+                deleted += queries::delete(&transaction, &user.id, local).await?;
+                transaction.commit().await?;
             }
             Ok(BulkEventResult {
                 success: true,

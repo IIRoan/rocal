@@ -191,16 +191,20 @@ fn sort_participants(participants: &mut [(Participant, &str)]) {
     });
 }
 
+/// The UID an event exports under: its imported UID, else its id at the Solace domain.
+pub fn uid(id: &str, external_id: Option<&str>) -> String {
+    external_id
+        .filter(|id| !id.is_empty())
+        .map_or_else(|| format!("{id}@solace-calendar.local"), str::to_owned)
+}
+
 /// `toIcsBuildEvent`.
 pub fn to_build_event(event: &ExportEvent<'_>) -> Result<build::Event, InvalidUntil> {
     let mut participants: Vec<(Participant, &str)> =
         event.participants.iter().map(mapped).collect();
     sort_participants(&mut participants);
     Ok(build::Event {
-        uid: Some(event.external_id.filter(|id| !id.is_empty()).map_or_else(
-            || format!("{}@solace-calendar.local", event.id),
-            str::to_owned,
-        )),
+        uid: Some(uid(event.id, event.external_id)),
         title: event.title.to_owned(),
         description: event.description.map(str::to_owned),
         start: event.start,
@@ -220,6 +224,8 @@ pub fn to_build_event(event: &ExportEvent<'_>) -> Result<build::Event, InvalidUn
                 .map(|(participant, _)| participant)
                 .collect()
         }),
+        recurrence_id: None,
+        excluded_dates: Vec::new(),
     })
 }
 

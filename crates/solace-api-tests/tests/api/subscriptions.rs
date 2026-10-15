@@ -1220,10 +1220,16 @@ async fn legacy_ics_import_reports_events_already_in_the_calendar() {
             events_total: 2,
             file_name: Some("unknown.ics".into()),
             calendar_name: Some("Team Cal".into()),
-            errors: Some(vec![
-                "Event \"Planning\" with UID evt-1@example.com already exists in calendar".into(),
-                "Event \"Offsite\" with UID evt-2@example.com already exists in calendar".into(),
-            ]),
+            errors: Some(match app.backend {
+                // TypeScript names each event by title, which is the file's content.
+                Backend::TypeScript => vec![
+                    "Event \"Planning\" with UID evt-1@example.com already exists in calendar"
+                        .into(),
+                    "Event \"Offsite\" with UID evt-2@example.com already exists in calendar"
+                        .into(),
+                ],
+                Backend::Rust => vec!["An event already exists in this calendar.".into(); 2],
+            }),
         }
     );
     assert_eq!(
@@ -1332,6 +1338,107 @@ async fn an_unreadable_rule_fails_only_its_event() {
 }
 
 #[tokio::test]
+async fn floating_times_are_read_in_the_users_zone() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    ok(user
+        .put("/api/settings", json!({"timezone": "Europe/Amsterdam"}))
+        .await
+        .expect_status(200));
+    let calendar_id = owned_calendar(&mut user).await;
+    let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:floating@example.com",
+        "DTSTART:20260715T090000",
+        "DTEND:20260715T100000",
+        "SUMMARY:Floating",
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+    ]
+    .join("\r\n");
+    ok(user
+        .post(
+            "/api/subscriptions/import-ics",
+            json!({"calendarId": calendar_id, "icsContent": ics}),
+        )
+        .await
+        .expect_status(200));
+    let stored: (String, String) = sqlx::query_as(&format!(
+        "SELECT {}, timezone FROM calendar_event WHERE calendar_id = $1",
+        iso("start")
+    ))
+    .bind(&calendar_id)
+    .fetch_one(&app.db)
+    .await
+    .expect("imported event");
+    let start = match app.backend {
+        // node-ical reads a floating time as host-local, which is UTC on Vercel.
+        Backend::TypeScript => "2026-07-15T09:00:00.000Z",
+        // 09:00 in Amsterdam, as the on-device import reads it.
+        Backend::Rust => "2026-07-15T07:00:00.000Z",
+    };
+    assert_eq!(stored, (start.to_owned(), "Europe/Amsterdam".to_owned()));
+}
+
+#[tokio::test]
+async fn imported_zones_are_tz_database_zones_never_labels() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    ok(user
+        .put("/api/settings", json!({"timezone": "Europe/Amsterdam"}))
+        .await
+        .expect_status(200));
+    let calendar_id = owned_calendar(&mut user).await;
+    let event = |uid: &str, tzid: &str| {
+        format!(
+            "BEGIN:VEVENT\r\nUID:{uid}\r\nDTSTART;TZID={tzid}:20260715T090000\r\nSUMMARY:Zone\r\nEND:VEVENT"
+        )
+    };
+    let ics = [
+        "BEGIN:VCALENDAR\r\nVERSION:2.0".to_owned(),
+        event("a-windows", "Romance Standard Time"),
+        event("b-label", "\"(UTC+05:45) Somewhere new\""),
+        event("c-unknown", "Mars/Olympus_Mons"),
+        "END:VCALENDAR\r\n".to_owned(),
+    ]
+    .join("\r\n");
+    ok(user
+        .post(
+            "/api/subscriptions/import-ics",
+            json!({"calendarId": calendar_id, "icsContent": ics}),
+        )
+        .await
+        .expect_status(200));
+    let stored: Vec<(String, String)> = sqlx::query_as(&format!(
+        "SELECT timezone, {} FROM calendar_event WHERE calendar_id = $1 ORDER BY external_id",
+        iso("start")
+    ))
+    .bind(&calendar_id)
+    .fetch_all(&app.db)
+    .await
+    .expect("imported events");
+    let expected = match app.backend {
+        // node-ical keeps labels it cannot map, and reads an unknown zone as UTC.
+        Backend::TypeScript => [
+            ("Europe/Paris", "2026-07-15T07:00:00.000Z"),
+            ("(UTC+05:45) Somewhere new", "2026-07-15T03:15:00.000Z"),
+            ("Mars/Olympus_Mons", "2026-07-15T09:00:00.000Z"),
+        ],
+        // A label CLDR cannot map files under the user's zone, which also reads an unknown zone's times.
+        Backend::Rust => [
+            ("Europe/Paris", "2026-07-15T07:00:00.000Z"),
+            ("Europe/Amsterdam", "2026-07-15T03:15:00.000Z"),
+            ("Europe/Amsterdam", "2026-07-15T07:00:00.000Z"),
+        ],
+    }
+    .map(|(zone, start)| (zone.to_owned(), start.to_owned()));
+    assert_eq!(stored, expected);
+}
+
+#[tokio::test]
 async fn legacy_ics_import_without_events_is_rejected() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
@@ -1350,20 +1457,37 @@ async fn legacy_ics_import_without_events_is_rejected() {
 }
 
 #[tokio::test]
-async fn legacy_ics_import_ignores_the_read_only_flag() {
+async fn legacy_ics_import_refuses_a_read_only_calendar() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let feed = insert_feed(&app, &user, "https://example.com/feed.ics", 0).await;
-    // Pinned as is: unlike the encrypted import, the legacy path writes into a sync-only calendar.
-    let imported: ImportIcsResponse = ok(user
+    let response = user
         .post(
             "/api/subscriptions/import-ics",
             legacy_import(&feed.calendar_id, None),
         )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.dto()));
-    assert_eq!(imported.events_created, 2);
+        .await;
+    let stored = count(
+        &app.db,
+        "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
+        &feed.calendar_id,
+    )
+    .await;
+    match app.backend {
+        // Unlike its encrypted import, TypeScript's legacy path writes into a sync-only calendar.
+        Backend::TypeScript => {
+            let imported: ImportIcsResponse = ok(response.expect_status(200).and_then(|r| r.dto()));
+            assert_eq!((imported.events_created, stored), (2, 2));
+        }
+        Backend::Rust => {
+            expect_field_error(
+                &response,
+                "Cannot import events into a read-only calendar.",
+                "calendarId",
+            );
+            assert_eq!(stored, 0);
+        }
+    }
 }
 
 fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEvent {

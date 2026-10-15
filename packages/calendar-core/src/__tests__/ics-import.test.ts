@@ -89,6 +89,61 @@ END:VEVENT`),
     });
   });
 
+  it("reads floating times in the calendar's zone, else the user's, never a VTIMEZONE's", () => {
+    const vtimezone = `BEGIN:VTIMEZONE
+TZID:Asia/Tokyo
+BEGIN:STANDARD
+DTSTART:19700101T000000
+TZOFFSETFROM:+0900
+TZOFFSETTO:+0900
+END:STANDARD
+END:VTIMEZONE`;
+    const floating = `BEGIN:VEVENT
+UID:floating
+DTSTART:20260715T090000
+SUMMARY:Floating
+END:VEVENT`;
+    const read = (header: string) =>
+      parseIcsImport(
+        `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${header}${vtimezone}\r\n${floating}\r\nEND:VCALENDAR`,
+        "Europe/Amsterdam",
+      ).events[0];
+    expect(read("X-WR-TIMEZONE:America/New_York\r\n")).toMatchObject({
+      start: "2026-07-15T13:00:00.000Z",
+      timezone: "America/New_York",
+    });
+    expect(read("")).toMatchObject({
+      start: "2026-07-15T07:00:00.000Z",
+      timezone: "Europe/Amsterdam",
+    });
+  });
+
+  it("files Windows names and labels under IANA zones and unknown ones under the user's", () => {
+    const at = (tzid: string) =>
+      `BEGIN:VEVENT\r\nUID:${tzid}\r\nDTSTART;TZID=${tzid}:20260715T090000\r\nSUMMARY:Zone\r\nEND:VEVENT`;
+    const tzids = [
+      "Romance Standard Time",
+      '"(UTC+01:00) Brussels, Copenhagen, Madrid, Paris"',
+      '"(UTC+03:00) Nowhere"',
+      '"(UTC+05:45) Somewhere new"',
+      "Mars/Olympus_Mons",
+    ];
+    const result = parseIcsImport(
+      wrap(tzids.map(at).join("\r\n")),
+      "America/Los_Angeles",
+    );
+    expect(result.errors).toEqual([]);
+    expect(
+      result.events.map((event) => [event.timezone, event.start]),
+    ).toEqual([
+      ["Europe/Paris", "2026-07-15T07:00:00.000Z"],
+      ["Europe/Paris", "2026-07-15T07:00:00.000Z"],
+      ["Etc/GMT-3", "2026-07-15T06:00:00.000Z"],
+      ["America/Los_Angeles", "2026-07-15T03:15:00.000Z"],
+      ["America/Los_Angeles", "2026-07-15T16:00:00.000Z"],
+    ]);
+  });
+
   it("rejects malformed input without echoing its contents", () => {
     expect(() => parseIcsImport("private garbage", "UTC")).toThrow(
       "Invalid calendar file",
