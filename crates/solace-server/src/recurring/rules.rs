@@ -3,9 +3,10 @@
 use serde_json::Value;
 use solace_api_types::recurring::RecurrenceRuleInput;
 
-use crate::events::recurrence::{Frequency, Rule, parse_rule};
+use crate::events::recurrence::{Rule, parse_rule};
 use crate::http::zod::js_number_string;
 use crate::instant;
+use crate::integrations::ics::Frequency;
 
 const MS_PER_DAY: f64 = 86_400_000.0;
 const WEEKDAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

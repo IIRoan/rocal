@@ -178,6 +178,14 @@ pub fn normalize_email(email: &str) -> String {
     without_scheme.to_lowercase()
 }
 
+/// The trimmed text, or `None` when it is blank.
+pub fn trimmed_text(value: Option<&str>) -> Option<String> {
+    value
+        .map(js_trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_owned)
+}
+
 /// `normalizeIcsTimezone`: Windows and Exchange names of a few common zones mapped to IANA.
 pub fn normalize_timezone(timezone: Option<&str>) -> Option<String> {
     let trimmed = zones::strip_quotes(js_trim(timezone?));

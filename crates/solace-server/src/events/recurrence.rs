@@ -2,27 +2,10 @@
 
 use serde_json::Value;
 
+use crate::integrations::ics::Frequency;
+
 const MS_PER_DAY: f64 = 86_400_000.0;
 const MAX_ITERATIONS: usize = 1000;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Frequency {
-    Daily,
-    Weekly,
-    Monthly,
-    Yearly,
-}
-
-impl Frequency {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Daily => "daily",
-            Self::Weekly => "weekly",
-            Self::Monthly => "monthly",
-            Self::Yearly => "yearly",
-        }
-    }
-}
 
 /// A parsed rule; numbers stay `f64` because the stored JSON is read the way JavaScript reads it.
 #[derive(Debug, Clone, PartialEq)]
@@ -118,13 +101,7 @@ pub fn parse_rule(json: &str) -> Option<Rule> {
     if !truthy(frequency) || !truthy(interval) {
         return None;
     }
-    let frequency = match frequency.as_str()? {
-        "daily" => Frequency::Daily,
-        "weekly" => Frequency::Weekly,
-        "monthly" => Frequency::Monthly,
-        "yearly" => Frequency::Yearly,
-        _ => return None,
-    };
+    let frequency = Frequency::parse(frequency.as_str()?)?;
     let interval = interval.as_f64().filter(|interval| *interval >= 1.0)?;
     let timezone = match field("timezone") {
         Some(value) if truthy(value) => Some(value.as_str()?.to_owned()),

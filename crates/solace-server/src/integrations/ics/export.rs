@@ -250,7 +250,7 @@ pub fn safe_filename(base: &str) -> String {
 }
 
 /// Orders two labels the way `localeCompare` with base sensitivity does.
-fn compare_base(left: &str, right: &str) -> Ordering {
+pub fn compare_base(left: &str, right: &str) -> Ordering {
     BASE_COLLATOR
         .as_ref()
         .map_or_else(|| left.cmp(right), |collator| collator.compare(left, right))

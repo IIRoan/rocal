@@ -3,8 +3,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
-use icu_collator::options::{CollatorOptions, Strength};
-use icu_collator::{Collator, CollatorBorrowed};
 use regex_lite::Regex;
 use solace_api_types::events::{EventParticipant, ParticipantInput};
 
@@ -14,16 +12,11 @@ use crate::auth::cookies::encode_uri_component;
 use crate::db::entities::{event_participant, user};
 use crate::http::zod::js_trim;
 use crate::instant;
+use crate::integrations::ics::export::compare_base;
+use crate::integrations::ics::{normalize_email, trimmed_text};
 
 const UPLOADED_AVATAR_PATH_PREFIX: &str = "/api/profiles/avatars/";
 const MAX_PUBLIC_IMAGE_URL_LENGTH: usize = 2048;
-
-/// `localeCompare(…, { sensitivity: "base" })`: ICU root collation, ignoring case and accents.
-static COLLATOR: LazyLock<Option<CollatorBorrowed<'static>>> = LazyLock::new(|| {
-    let mut options = CollatorOptions::default();
-    options.strength = Some(Strength::Primary);
-    Collator::try_new(Default::default(), options).ok()
-});
 
 static BLOCKED_IMAGE_HOSTS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     [
@@ -70,17 +63,6 @@ pub struct Owner {
     pub name: String,
 }
 
-/// `normalizeParticipantEmail`: trimmed, without `mailto:`, lowercase.
-pub fn normalize_email(email: Option<&str>) -> String {
-    let trimmed = js_trim(email.unwrap_or_default());
-    let without_scheme = if trimmed.len() >= 7 && trimmed[..7].eq_ignore_ascii_case("mailto:") {
-        &trimmed[7..]
-    } else {
-        trimmed
-    };
-    without_scheme.to_lowercase()
-}
-
 pub fn normalize_role(role: Option<&str>) -> &'static str {
     if role == Some("organizer") {
         "organizer"
@@ -95,13 +77,6 @@ pub fn normalize_status(status: Option<&str>, role: &str) -> String {
         _ if role == "organizer" => "accepted".into(),
         _ => "pending".into(),
     }
-}
-
-fn trimmed_non_empty(value: Option<&str>) -> Option<String> {
-    value
-        .map(js_trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_owned)
 }
 
 /// `mergeParticipantInput`: a repeated address keeps the strongest role and the latest status.
@@ -120,8 +95,8 @@ fn merge(existing: Option<Input>, next: Input) -> Input {
         next.status.clone()
     };
     Input {
-        display_name: trimmed_non_empty(next.display_name.as_deref())
-            .or_else(|| trimmed_non_empty(existing.display_name.as_deref())),
+        display_name: trimmed_text(next.display_name.as_deref())
+            .or_else(|| trimmed_text(existing.display_name.as_deref())),
         email: next.email,
         role,
         status,
@@ -130,7 +105,7 @@ fn merge(existing: Option<Input>, next: Input) -> Input {
 
 /// `resolveParticipantInputs`: the owner first as accepted organizer, then each address once.
 pub fn resolve_inputs(owner: Option<&Owner>, participants: &[ParticipantInput]) -> Vec<Input> {
-    let owner_email = owner.map(|owner| normalize_email(Some(&owner.email)));
+    let owner_email = owner.map(|owner| normalize_email(&owner.email));
     let mut order: Vec<String> = Vec::new();
     let mut deduped: HashMap<String, Input> = HashMap::new();
     if let (Some(owner), Some(email)) = (owner, owner_email.as_ref().filter(|e| !e.is_empty())) {
@@ -140,7 +115,7 @@ pub fn resolve_inputs(owner: Option<&Owner>, participants: &[ParticipantInput]) 
             Input {
                 email: email.clone(),
                 display_name: Some(
-                    trimmed_non_empty(Some(&owner.name)).unwrap_or_else(|| email.clone()),
+                    trimmed_text(Some(&owner.name)).unwrap_or_else(|| email.clone()),
                 ),
                 role: "organizer",
                 status: "accepted".into(),
@@ -148,7 +123,7 @@ pub fn resolve_inputs(owner: Option<&Owner>, participants: &[ParticipantInput]) 
         );
     }
     for participant in participants {
-        let email = normalize_email(Some(&participant.email));
+        let email = normalize_email(&participant.email);
         if email.is_empty() || is_reserved_system_email(&email, None) {
             continue;
         }
@@ -162,7 +137,7 @@ pub fn resolve_inputs(owner: Option<&Owner>, participants: &[ParticipantInput]) 
         };
         let next = Input {
             email: email.clone(),
-            display_name: trimmed_non_empty(participant.display_name.as_deref()),
+            display_name: trimmed_text(participant.display_name.as_deref()),
             role,
             status: normalize_status(participant.status.as_deref(), role),
         };
@@ -217,7 +192,7 @@ fn participant_image(image: Option<&str>, email: &str) -> Option<String> {
     if image.is_some_and(|image| image.starts_with(UPLOADED_AVATAR_PATH_PREFIX)) {
         return image.map(str::to_owned);
     }
-    let email = normalize_email(Some(email));
+    let email = normalize_email(email);
     (is_public_image_url(image) && !email.is_empty()).then(|| {
         format!(
             "/api/profiles/avatar?email={}",
@@ -228,9 +203,12 @@ fn participant_image(image: Option<&str>, email: &str) -> Option<String> {
 
 /// `mapEventParticipant`.
 pub fn dto(row: &event_participant::Model, user: Option<&user::Model>) -> EventParticipant {
-    let email = Some(normalize_email(Some(&row.email)))
+    let email = Some(normalize_email(&row.email))
         .filter(|email| !email.is_empty())
-        .unwrap_or_else(|| normalize_email(user.map(|user| user.email.as_str())));
+        .unwrap_or_else(|| {
+            user.map(|user| normalize_email(&user.email))
+                .unwrap_or_default()
+        });
     let role = normalize_role(Some(&row.role));
     let display_name = row
         .display_name
@@ -269,10 +247,7 @@ pub fn sort(mut participants: Vec<EventParticipant>) -> Vec<EventParticipant> {
     participants.sort_by(|left, right| {
         rank(left)
             .cmp(&rank(right))
-            .then_with(|| match COLLATOR.as_ref() {
-                Some(collator) => collator.compare(label(left), label(right)),
-                None => label(left).to_lowercase().cmp(&label(right).to_lowercase()),
-            })
+            .then_with(|| compare_base(label(left), label(right)))
     });
     participants
 }
@@ -309,9 +284,9 @@ pub async fn sync<C: sea_orm::ConnectionTrait>(
         None => None,
     };
     let owner = owner.and_then(|owner| {
-        let email = normalize_email(Some(&owner.email));
+        let email = normalize_email(&owner.email);
         (!js_trim(&owner.email).is_empty()).then(|| Owner {
-            name: trimmed_non_empty(Some(&owner.name))
+            name: trimmed_text(Some(&owner.name))
                 .unwrap_or_else(|| js_trim(&owner.email).to_owned()),
             email,
         })
@@ -323,9 +298,13 @@ pub async fn sync<C: sea_orm::ConnectionTrait>(
     let resolved = resolve(db, inputs).await?;
     let existing = queries::participants_with_users(db, &[event_id.to_owned()]).await?;
     let key = |(row, user): &(event_participant::Model, Option<user::Model>)| {
-        Some(normalize_email(Some(&row.email)))
+        Some(normalize_email(&row.email))
             .filter(|email| !email.is_empty())
-            .unwrap_or_else(|| normalize_email(user.as_ref().map(|u| u.email.as_str())))
+            .unwrap_or_else(|| {
+                user.as_ref()
+                    .map(|u| normalize_email(&u.email))
+                    .unwrap_or_default()
+            })
     };
     let reserved: Vec<String> = existing
         .iter()
@@ -401,12 +380,12 @@ async fn resolve<C: sea_orm::ConnectionTrait>(
     let users: HashMap<String, user::Model> = queries::users_with_emails(db, emails.clone())
         .await?
         .into_iter()
-        .map(|user| (normalize_email(Some(&user.email)), user))
+        .map(|user| (normalize_email(&user.email), user))
         .collect();
     let directory: HashMap<String, Option<String>> = queries::directory_entries(db, emails)
         .await?
         .into_iter()
-        .map(|entry| (normalize_email(Some(&entry.email)), entry.user_id))
+        .map(|entry| (normalize_email(&entry.email), entry.user_id))
         .collect();
     Ok(inputs
         .into_iter()
@@ -418,8 +397,8 @@ async fn resolve<C: sea_orm::ConnectionTrait>(
                 "attendee"
             };
             Resolved {
-                display_name: trimmed_non_empty(input.display_name.as_deref())
-                    .or_else(|| user.and_then(|user| trimmed_non_empty(Some(&user.name))))
+                display_name: trimmed_text(input.display_name.as_deref())
+                    .or_else(|| user.and_then(|user| trimmed_text(Some(&user.name))))
                     .unwrap_or_else(|| input.email.clone()),
                 user_id: user
                     .map(|user| user.id.clone())
@@ -452,10 +431,10 @@ mod tests {
     #[test]
     fn emails_lose_mailto_case_and_spaces() {
         assert_eq!(
-            normalize_email(Some("  MAILTO:Ann@Example.COM ")),
+            normalize_email("  MAILTO:Ann@Example.COM "),
             "ann@example.com"
         );
-        assert_eq!(normalize_email(None), "");
+        assert_eq!(normalize_email(""), "");
     }
 
     #[test]

@@ -5,6 +5,7 @@ use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 
 use crate::db::entities::calendar_event;
 use crate::http::zod::js_trim;
+use crate::integrations::ics::trimmed_text;
 
 /// The content columns an event write stores.
 #[derive(Debug, PartialEq, Eq)]
@@ -13,13 +14,6 @@ pub struct PersistencePolicy {
     pub title: String,
     pub description: Option<String>,
     pub location: Option<String>,
-}
-
-fn normalize_optional_text(value: Option<&str>) -> Option<String> {
-    value
-        .map(js_trim)
-        .filter(|text| !text.is_empty())
-        .map(str::to_owned)
 }
 
 /// `resolveEventPersistencePolicy`: encrypted events keep no plaintext; plaintext is trimmed and blanks become null.
@@ -40,8 +34,8 @@ pub fn resolve_persistence_policy(
     PersistencePolicy {
         encryption_state: "plaintext",
         title: js_trim(title).to_owned(),
-        description: normalize_optional_text(description),
-        location: normalize_optional_text(location),
+        description: trimmed_text(description),
+        location: trimmed_text(location),
     }
 }
 
@@ -87,8 +81,8 @@ pub fn resolve_invitation_content(
     if let Some(invitation) = invitation {
         return Some(InvitationContentSource {
             title: js_trim(&invitation.title).to_owned(),
-            description: normalize_optional_text(invitation.description.as_deref()),
-            location: normalize_optional_text(invitation.location.as_deref()),
+            description: trimmed_text(invitation.description.as_deref()),
+            location: trimmed_text(invitation.location.as_deref()),
         });
     }
     let title = title.map(js_trim).filter(|title| !title.is_empty())?;
@@ -97,8 +91,8 @@ pub fn resolve_invitation_content(
     }
     Some(InvitationContentSource {
         title: title.to_owned(),
-        description: normalize_optional_text(description),
-        location: normalize_optional_text(location),
+        description: trimmed_text(description),
+        location: trimmed_text(location),
     })
 }
 
