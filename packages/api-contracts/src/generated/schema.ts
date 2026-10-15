@@ -259,6 +259,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/invitations/decline-ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Declines a mailed invitation without importing it: replies to the organizer and keeps a hidden declined copy. */
+        post: operations["declineInvitationIcs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/invitations/import-ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Imports a decrypted mailed invitation: staged in the hidden Invitations calendar, or accepted onto a writable one. */
+        post: operations["importInvitationIcs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -462,6 +496,75 @@ export interface paths {
         /** Stores or replaces the caller's blob; an omitted key version keeps the stored one. */
         put: operations["putRecentContacts"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/recurring/event/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edits one occurrence (detached), this and future occurrences (a split), or the whole series. */
+        put: operations["editRecurringEvent"];
+        post?: never;
+        /** Deletes one occurrence (an exception), this and future occurrences (ends the rule), or the series with its children. */
+        delete: operations["deleteRecurringEvent"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/recurring/patterns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The six fixed patterns the editors offer. */
+        get: operations["listRecurrencePatterns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/recurring/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The occurrences of a rule from the start through `previewDays` (90 by default) later. */
+        post: operations["previewRecurrence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/recurring/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validates a rule object or rule text and describes it; the parsed rule echoes whatever rule text held, so it is JSON. */
+        post: operations["validateRecurrenceRule"];
         delete?: never;
         options?: never;
         head?: never;
@@ -755,6 +858,13 @@ export interface components {
         DeleteCalendarQuery: {
             action?: string | null;
             targetCalendarId?: components["schemas"]["CalendarId"] | null;
+        };
+        /** @description Query of `DELETE /api/recurring/event/:id`. */
+        DeleteRecurringQuery: {
+            /** @description `this_only`, `this_and_future` or `all`. */
+            deleteScope: string;
+            /** @description The occurrence instant; required for `this_only` and `this_and_future`. */
+            occurrenceDate?: string | null;
         };
         /** @description Query of `DELETE /api/subscriptions/:id`; `true` also deletes the synced events and calendar. */
         DeleteSubscriptionQuery: {
@@ -2407,6 +2517,52 @@ export interface operations {
             };
         };
     };
+    declineInvitationIcs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclineInvitationRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationDeclined"];
+                };
+            };
+        };
+    };
+    importInvitationIcs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportInvitationRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationImportSummary"];
+                };
+            };
+        };
+    };
     getHealth: {
         parameters: {
             query?: never;
@@ -2783,6 +2939,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecentContacts"];
+                };
+            };
+        };
+    };
+    editRecurringEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditRecurringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+        };
+    };
+    deleteRecurringEvent: {
+        parameters: {
+            query: {
+                deleteScope: string;
+                occurrenceDate?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringDeleted"];
+                };
+            };
+        };
+    };
+    listRecurrencePatterns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurrencePatterns"];
+                };
+            };
+        };
+    };
+    previewRecurrence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewRecurrenceRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurrencePreview"];
+                };
+            };
+        };
+    };
+    validateRecurrenceRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidateRecurrenceRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurrenceValidation"];
                 };
             };
         };
