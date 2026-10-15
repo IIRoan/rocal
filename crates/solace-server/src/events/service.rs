@@ -19,7 +19,9 @@ use super::{constraints, queries, recurrence};
 use super::{participants, rsvp};
 use crate::addresses::is_reserved_system_email;
 use crate::auth::guard::RouteUser;
-use crate::db::entities::{calendar, calendar_event, event_notification, user_settings};
+use crate::db::entities::{
+    calendar, calendar_event, event_notification, recurrence_exception, user_settings,
+};
 use crate::email;
 use crate::entity_metadata::{CALENDAR_COLORS, external_calendar_name, is_valid_calendar_color};
 use crate::error::AppError;
@@ -1018,6 +1020,58 @@ pub async fn seal(
     view::one(&state.db, &updated).await
 }
 
+/// A stored row as the ICS export reads it.
+pub fn export_event<'a>(
+    event: &'a calendar_event::Model,
+    participants: &'a [export::ExportParticipant<'a>],
+) -> export::ExportEvent<'a> {
+    export::ExportEvent {
+        id: &event.id,
+        external_id: event.external_id.as_deref(),
+        title: &event.title,
+        description: event.description.as_deref(),
+        start: event.start,
+        end: event.end,
+        all_day: event.all_day,
+        timezone: Some(&event.timezone),
+        location: event.location.as_deref(),
+        recurrence: event.recurrence.as_deref(),
+        created_at: event.created_at,
+        updated_at: event.updated_at,
+        participants,
+    }
+}
+
+/// Carries series' exceptions onto exported rows (`built[i]` is `rows[i]`): a detached row among them overrides its instance under the series UID, and any other exception of a series among them becomes EXDATE.
+pub fn attach_exceptions(
+    rows: &[&calendar_event::Model],
+    built: &mut [build::Event],
+    exceptions: &[recurrence_exception::Model],
+) {
+    let index: std::collections::HashMap<&str, usize> = rows
+        .iter()
+        .enumerate()
+        .map(|(at, row)| (row.id.as_str(), at))
+        .collect();
+    for exception in exceptions {
+        let Some(&series) = index.get(exception.parent_event_id.as_str()) else {
+            continue;
+        };
+        let detached = exception
+            .modified_event_id
+            .as_deref()
+            .and_then(|id| index.get(id).copied())
+            .filter(|&at| rows[at].recurrence.is_none());
+        match detached {
+            Some(at) => {
+                built[at].uid = built[series].uid.clone();
+                built[at].recurrence_id = Some(exception.exception_date);
+            }
+            None => built[series].excluded_dates.push(exception.exception_date),
+        }
+    }
+}
+
 /// `exportIcs`: a plaintext event (or one occurrence of a series) as an `.ics` file.
 pub async fn export_ics(
     state: &AppState,
@@ -1058,22 +1112,9 @@ pub async fn export_ics(
             user_name: owner.as_ref().map(|u| u.name.as_str()),
         })
         .collect();
-    let mut built = export::to_build_event(&export::ExportEvent {
-        id: &event.id,
-        external_id: event.external_id.as_deref(),
-        title: &event.title,
-        description: event.description.as_deref(),
-        start: event.start,
-        end: event.end,
-        all_day: event.all_day,
-        timezone: Some(&event.timezone),
-        location: event.location.as_deref(),
-        recurrence: event.recurrence.as_deref(),
-        created_at: event.created_at,
-        updated_at: event.updated_at,
-        participants: &export_participants,
-    })
-    .map_err(|_| AppError::internal("recurrence until is not a valid instant"))?;
+    let invalid_until = |_| AppError::internal("recurrence until is not a valid instant");
+    let mut built = export::to_build_event(&export_event(&event, &export_participants))
+        .map_err(invalid_until)?;
     if let Some(at) = occurrence {
         let duration = (instant::unix_millis(event.end) - instant::unix_millis(event.start)).max(
             if event.all_day {
@@ -1097,13 +1138,36 @@ pub async fn export_ics(
         built.end = end;
         built.recurrence = None;
     }
-    let ics = build::event_file(
+    let mut events = vec![built];
+    if occurrence.is_none() && event.recurrence.is_some() {
+        // The series' exceptions travel along; a detached row the server cannot export is skipped like a deleted one.
+        let exceptions = queries::exceptions(&state.db, vec![event.id.clone()]).await?;
+        let detached_ids: Vec<String> = exceptions
+            .iter()
+            .filter_map(|exception| exception.modified_event_id.clone())
+            .collect();
+        let detached: Vec<calendar_event::Model> = if detached_ids.is_empty() {
+            Vec::new()
+        } else {
+            queries::find_many(&state.db, &user.id, detached_ids)
+                .await?
+                .into_iter()
+                .filter(|row| row.encryption_state != "encrypted")
+                .collect()
+        };
+        let rows: Vec<&calendar_event::Model> = std::iter::once(&event).chain(&detached).collect();
+        for row in &detached {
+            events.push(export::to_build_event(&export_event(row, &[])).map_err(invalid_until)?);
+        }
+        attach_exceptions(&rows, &mut events, &exceptions);
+    }
+    let ics = build::build_calendar(
         &build::Calendar {
             name: Some(external_calendar_name(&calendar.name)),
             timezone: Some(instant::resolve_timezone(Some(&event.timezone))),
             ..Default::default()
         },
-        built,
+        &events,
     );
     let base = match occurrence {
         Some(at) => format!("{}-{}", event.title, &instant::iso(at).0[..10]),
