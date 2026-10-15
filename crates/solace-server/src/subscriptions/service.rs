@@ -549,35 +549,37 @@ async fn reconcile<C: ConnectionTrait>(
             counts.deleted += 1;
         }
     }
-    link_series(db, feed, events).await?;
+    link_series(
+        db,
+        &rows_by_uid(queries::feed_events(db, &feed.id).await?),
+        events,
+    )
+    .await?;
     Ok(counts)
 }
 
-/// Overrides hang under their series, and a series' EXDATEs and overrides become its exceptions, so the list shows each occurrence once.
-async fn link_series<C: ConnectionTrait>(
+/// Rows of `events` (and their series) by UID, as `link_series` takes them.
+pub(crate) fn rows_by_uid(
+    rows: Vec<calendar_event::Model>,
+) -> HashMap<String, calendar_event::Model> {
+    rows.into_iter()
+        .map(|row| (row.external_id.clone().unwrap_or_default(), row))
+        .collect()
+}
+
+/// Overrides among `rows` hang under their series, and a series' EXDATEs and overrides become its exceptions, so the list shows each occurrence once. A file without the series' master only adds its overrides.
+pub(crate) async fn link_series<C: ConnectionTrait>(
     db: &C,
-    feed: &calendar_subscription::Model,
+    rows: &HashMap<String, calendar_event::Model>,
     events: &[ParsedEvent],
 ) -> Result<(), AppError> {
-    let rows: HashMap<String, calendar_event::Model> = queries::feed_events(db, &feed.id)
-        .await?
-        .into_iter()
-        .map(|row| (row.external_id.clone().unwrap_or_default(), row))
-        .collect();
     let series_of = |uid: &str| rows.get(uid).filter(|row| row.recurrence.is_some());
-    // By date: an override of an excluded occurrence still shows, once.
-    let mut wanted: HashMap<
-        &str,
-        std::collections::BTreeMap<time::PrimitiveDateTime, (String, Option<String>)>,
-    > = HashMap::new();
-    for parsed in events.iter().filter(|parsed| parsed.recurrence.is_some()) {
-        if let Some(series) = series_of(&parsed.uid) {
-            let dates = wanted.entry(series.id.as_str()).or_default();
-            for at in &parsed.excluded_dates {
-                dates.insert(*at, ("deleted".into(), None));
-            }
-        }
-    }
+    let masters: HashMap<&str, &ParsedEvent> = events
+        .iter()
+        .filter(|parsed| parsed.recurrence.is_some())
+        .filter_map(|parsed| series_of(&parsed.uid).map(|row| (row.id.as_str(), parsed)))
+        .collect();
+    let mut overrides: HashMap<&str, Vec<(time::PrimitiveDateTime, String)>> = HashMap::new();
     for parsed in events {
         let (Some(at), Some(row)) = (parsed.occurrence, rows.get(&parsed.uid)) else {
             continue;
@@ -588,16 +590,19 @@ async fn link_series<C: ConnectionTrait>(
             queries::set_parent(db, row.clone(), parent).await?;
         }
         if let Some(series) = series {
-            wanted
+            overrides
                 .entry(series.id.as_str())
                 .or_default()
-                .insert(at, ("modified".into(), Some(row.id.clone())));
+                .push((at, row.id.clone()));
         }
     }
     let series: Vec<&calendar_event::Model> = rows
         .values()
         .filter(|row| row.recurrence.is_some())
         .collect();
+    if series.is_empty() {
+        return Ok(());
+    }
     let mut stored: HashMap<String, queries::ExceptionSet> = HashMap::new();
     for exception in
         events_queries::exceptions(db, series.iter().map(|row| row.id.clone()).collect()).await?
@@ -609,13 +614,32 @@ async fn link_series<C: ConnectionTrait>(
         ));
     }
     for row in series {
-        let wanted: queries::ExceptionSet = wanted
-            .remove(row.id.as_str())
-            .unwrap_or_default()
+        let have = stored.remove(&row.id).unwrap_or_default();
+        // By date: an override of an excluded occurrence still shows, once.
+        let mut dates: std::collections::BTreeMap<
+            time::PrimitiveDateTime,
+            (String, Option<String>),
+        > = std::collections::BTreeMap::new();
+        let master = masters.get(row.id.as_str());
+        if let Some(master) = master {
+            for at in &master.excluded_dates {
+                dates.insert(*at, ("deleted".into(), None));
+            }
+        }
+        // A master is authoritative for EXDATEs; overrides from earlier files stay while their rows do.
+        for (at, kind, modified) in &have {
+            if master.is_none() || modified.is_some() {
+                dates.insert(*at, (kind.clone(), modified.clone()));
+            }
+        }
+        for (at, id) in overrides.remove(row.id.as_str()).unwrap_or_default() {
+            dates.insert(at, ("modified".into(), Some(id)));
+        }
+        let wanted: queries::ExceptionSet = dates
             .into_iter()
             .map(|(at, (kind, modified))| (at, kind, modified))
             .collect();
-        if stored.remove(&row.id).unwrap_or_default() != wanted {
+        if have != wanted {
             queries::replace_exceptions(db, &row.id, wanted).await?;
         }
     }
@@ -675,6 +699,7 @@ async fn import_legacy(
         .collect();
     let mut errors = parsed.errors.clone();
     let mut created = 0;
+    let mut rows = Vec::new();
     for event in &parsed.events {
         // Messages never carry titles or UIDs: those are the file's content.
         if taken.contains(&event.uid) {
@@ -682,20 +707,25 @@ async fn import_legacy(
             continue;
         }
         let row = parse::to_new_event(event, &user.id, calendar_id, None);
-        let imported: Result<(), AppError> = async {
+        let imported: Result<calendar_event::Model, AppError> = async {
             let inserted = queries::insert_event(&state.db, row).await?;
             participants::sync(&state.db, &inserted.id, &participant_inputs(event), None).await?;
-            Ok(())
+            Ok(inserted)
         }
         .await;
         match imported {
-            Ok(()) => created += 1,
+            Ok(inserted) => {
+                created += 1;
+                rows.push(inserted);
+            }
             Err(error) => errors.push(format!(
                 "An event could not be created: {}",
                 error.client_message()
             )),
         }
     }
+    // Only rows this file created are linked, so a calendar's own exceptions are never rewritten.
+    link_series(&state.db, &rows_by_uid(rows), &parsed.events).await?;
     Ok(ImportIcsResponse {
         success: true,
         events_created: created,

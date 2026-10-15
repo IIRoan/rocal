@@ -1495,6 +1495,68 @@ async fn custom_tzids_are_read_by_their_vtimezone() {
 }
 
 #[tokio::test]
+async fn legacy_imports_skip_excluded_and_overridden_occurrences() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar_id = owned_calendar(&mut user).await;
+    let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:weekly@example.com",
+        "DTSTART:20990302T090000Z",
+        "DTEND:20990302T100000Z",
+        "SUMMARY:Weekly",
+        "RRULE:FREQ=WEEKLY;COUNT=4",
+        "EXDATE:20990309T090000Z",
+        "END:VEVENT",
+        "BEGIN:VEVENT",
+        "UID:weekly@example.com",
+        "RECURRENCE-ID:20990316T090000Z",
+        "DTSTART:20990316T140000Z",
+        "DTEND:20990316T150000Z",
+        "SUMMARY:Moved",
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+    ]
+    .join("\r\n");
+    ok(user
+        .post(
+            "/api/subscriptions/import-ics",
+            json!({"calendarId": calendar_id, "icsContent": ics}),
+        )
+        .await
+        .expect_status(200));
+    let listed: Vec<String> = ok(user
+        .get("/api/events?start=2099-03-01T00:00:00.000Z&end=2099-03-31T00:00:00.000Z")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()))["events"]
+        .as_array()
+        .expect("events")
+        .iter()
+        .map(|event| event["start"].as_str().unwrap_or_default().to_owned())
+        .collect();
+    let expected: &[&str] = match app.backend {
+        // TypeScript stores the override as an unrelated event and ignores EXDATE.
+        Backend::TypeScript => &[
+            "2099-03-02T09:00:00.000Z",
+            "2099-03-09T09:00:00.000Z",
+            "2099-03-16T09:00:00.000Z",
+            "2099-03-16T14:00:00.000Z",
+            "2099-03-23T09:00:00.000Z",
+        ],
+        Backend::Rust => &[
+            "2099-03-02T09:00:00.000Z",
+            "2099-03-16T14:00:00.000Z",
+            "2099-03-23T09:00:00.000Z",
+        ],
+    };
+    assert_eq!(listed, expected);
+}
+
+#[tokio::test]
 async fn legacy_ics_import_without_events_is_rejected() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
