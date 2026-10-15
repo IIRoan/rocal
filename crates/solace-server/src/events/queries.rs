@@ -177,13 +177,14 @@ pub async fn participants_with_users<C: ConnectionTrait>(
         .await
 }
 
-/// Prisma's `recurrenceExceptions` relation joins on `modified_event_id`, so a series never loads its own exceptions.
+/// The series' own exceptions (Prisma's relation joined on `modified_event_id`, so TypeScript never applied them).
 pub async fn exceptions<C: ConnectionTrait>(
     db: &C,
-    event_ids: Vec<String>,
+    series_ids: Vec<String>,
 ) -> Result<Vec<recurrence_exception::Model>, sea_orm::DbErr> {
     recurrence_exception::Entity::find()
-        .filter(recurrence_exception::Column::ModifiedEventId.is_in(event_ids))
+        .filter(recurrence_exception::Column::ParentEventId.is_in(series_ids))
+        .order_by_asc(recurrence_exception::Column::ExceptionDate)
         .all(db)
         .await
 }

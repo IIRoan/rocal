@@ -8,7 +8,7 @@ use crate::event_fixtures::{
     FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event, insert_plaintext_event,
     list_events,
 };
-use crate::helpers::{TestApp, TestUser, count, hex, ok};
+use crate::helpers::{Backend, TestApp, TestUser, count, hex, ok};
 
 const MARCH_START: &str = "2099-03-01T00:00:00.000Z";
 const MARCH_END: &str = "2099-03-31T23:59:59.000Z";
@@ -440,7 +440,7 @@ async fn timezone_rules_keep_the_wall_clock_across_dst() {
 }
 
 #[tokio::test]
-async fn listed_series_ignore_their_occurrence_exceptions() {
+async fn listed_series_apply_their_occurrence_exceptions() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let calendar = calendar_id(&mut user, "Work").await;
@@ -474,21 +474,66 @@ async fn listed_series_ignore_their_occurrence_exceptions() {
         .expect_status(200)
         .and_then(|r| r.dto()));
 
-    // The list loads `recurrenceExceptions` through the modified-event relation, so a series never sees its own exceptions.
     let list = list_events(&mut user, MARCH_START, MARCH_END).await;
-    assert_eq!(
-        ids(&list.events),
-        [
-            weekly.id.0.clone(),
-            format!("{}_2099-03-09T09:00:00.000Z", weekly.id),
-            format!("{}_2099-03-16T09:00:00.000Z", weekly.id),
-            modified.id.0.clone(),
-            format!("{}_2099-03-23T09:00:00.000Z", weekly.id),
-        ]
-    );
-    assert_eq!(list.events[0].recurrence_exceptions, Some(vec![]));
-    assert_eq!(list.events[2].recurrence_exceptions, Some(vec![]));
-    let detached = &list.events[3];
+    let detached_at = match app.backend {
+        // Prisma's relation joins on the modified event, so TypeScript never sees a series' own exceptions.
+        Backend::TypeScript => {
+            assert_eq!(
+                ids(&list.events),
+                [
+                    weekly.id.0.clone(),
+                    format!("{}_2099-03-09T09:00:00.000Z", weekly.id),
+                    format!("{}_2099-03-16T09:00:00.000Z", weekly.id),
+                    modified.id.0.clone(),
+                    format!("{}_2099-03-23T09:00:00.000Z", weekly.id),
+                ]
+            );
+            assert_eq!(list.events[0].recurrence_exceptions, Some(vec![]));
+            assert_eq!(list.events[2].recurrence_exceptions, Some(vec![]));
+            3
+        }
+        Backend::Rust => {
+            assert_eq!(
+                ids(&list.events),
+                [
+                    weekly.id.0.clone(),
+                    modified.id.0.clone(),
+                    format!("{}_2099-03-23T09:00:00.000Z", weekly.id),
+                ],
+                "the deleted occurrence is gone and the modified one lists once, as its own row"
+            );
+            let kinds = |event: &Event| -> Vec<(String, String, Option<String>)> {
+                event
+                    .recurrence_exceptions
+                    .iter()
+                    .flatten()
+                    .map(|e| {
+                        (
+                            e.exception_date.0.clone(),
+                            e.kind.clone(),
+                            e.modified_event_id.as_ref().map(|id| id.0.clone()),
+                        )
+                    })
+                    .collect()
+            };
+            let expected = vec![
+                (
+                    "2099-03-09T09:00:00.000Z".to_owned(),
+                    "deleted".to_owned(),
+                    None,
+                ),
+                (
+                    "2099-03-16T09:00:00.000Z".to_owned(),
+                    "modified".to_owned(),
+                    Some(modified.id.0.clone()),
+                ),
+            ];
+            assert_eq!(kinds(&list.events[0]), expected);
+            assert_eq!(kinds(&list.events[2]), expected, "instances carry them too");
+            1
+        }
+    };
+    let detached = &list.events[detached_at];
     assert_eq!(detached.parent_event_id.as_ref(), Some(&weekly.id));
     assert_eq!(
         (
@@ -573,21 +618,31 @@ async fn a_split_series_lists_both_halves_and_the_detached_row_once() {
         .and_then(|r| r.dto()));
 
     let list = list_events(&mut user, MARCH_START, MARCH_END).await;
+    let mut expected = vec![
+        weekly.id.0.clone(),
+        format!("{}_2099-03-09T09:00:00.000Z", weekly.id),
+        future.id.0.clone(),
+        format!("{}_2099-03-23T11:00:00.000Z", future.id),
+        detached.id.0.clone(),
+        format!("{}_2099-03-30T11:00:00.000Z", future.id),
+    ];
+    if app.backend == Backend::Rust {
+        // The moved occurrence's generated slot is excepted; TypeScript still lists it.
+        expected.remove(3);
+    }
     assert_eq!(
         ids(&list.events),
-        [
-            weekly.id.0.clone(),
-            format!("{}_2099-03-09T09:00:00.000Z", weekly.id),
-            future.id.0.clone(),
-            format!("{}_2099-03-23T11:00:00.000Z", future.id),
-            detached.id.0.clone(),
-            format!("{}_2099-03-30T11:00:00.000Z", future.id),
-        ],
-        "the old half stops before the split; the moved occurrence still lists its generated slot"
+        expected,
+        "the old half stops before the split"
     );
     assert_eq!(list.events[2].parent_event_id.as_ref(), Some(&weekly.id));
     assert_eq!(list.events[2].is_recurring_instance, Some(false));
-    assert_eq!(list.events[4].parent_event_id.as_ref(), Some(&future.id));
+    let detached_row = list
+        .events
+        .iter()
+        .find(|e| e.id == detached.id)
+        .expect("detached row");
+    assert_eq!(detached_row.parent_event_id.as_ref(), Some(&future.id));
 }
 
 #[tokio::test]
