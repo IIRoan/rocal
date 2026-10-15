@@ -10,6 +10,9 @@ use solace_api_tests::env::{
     TEMPLATE_DATABASE, TestEnv,
 };
 use solace_api_tests::guard;
+pub use solace_api_tests::seed::hex;
+use solace_api_tests::seed::insert_invite;
+use solace_api_tests::stalwart::{REGISTRY, admin_jmap};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, Executor, PgPool};
 
@@ -253,30 +256,15 @@ impl TestApp {
         self.auth_cookie("session_token")
     }
 
-    /// Admin JMAP on the test Stalwart, for setup and inspection only.
     pub async fn stalwart_admin(&self, using: &[&str], method_calls: Value) -> Value {
-        let mut request = reqwest::Client::new()
-            .post(format!("{}/jmap/", self.env.stalwart_url))
-            .basic_auth("admin", Some(&self.env.stalwart_admin_password))
-            .json(&json!({"using": using, "methodCalls": method_calls}));
-        if let Some(key) = &self.env.stalwart_gate_key {
-            request = request.header("X-Solace-Gate", key);
-        }
-        request
-            .send()
-            .await
-            .and_then(|r| r.error_for_status())
-            .expect("stalwart admin request")
-            .json()
-            .await
-            .expect("stalwart admin json")
+        ok(admin_jmap(&self.env, using, method_calls).await)
     }
 
     /// The Stalwart account id of a mailbox local part, if it exists.
     pub async fn stalwart_account_id(&self, local_part: &str) -> Option<String> {
         let response = self
             .stalwart_admin(
-                &["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+                &REGISTRY,
                 json!([["x:Account/query", {"filter": {"name": local_part}}, "q"]]),
             )
             .await;
@@ -291,7 +279,7 @@ impl TestApp {
     pub async fn plain_mailbox(&self, local_part: &str) {
         let domain = self
             .stalwart_admin(
-                &["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+                &REGISTRY,
                 json!([
                     ["x:Domain/query", {"filter": {"name": self.env.mail_domain}}, "q"]
                 ]),
@@ -300,7 +288,7 @@ impl TestApp {
         let domain_id = domain["methodResponses"][0][1]["ids"][0].clone();
         let created = self
             .stalwart_admin(
-                &["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+                &REGISTRY,
                 json!([["x:Account/set", {"create": {"a": {
                     "@type": "User",
                     "name": local_part,
@@ -367,17 +355,14 @@ impl TestApp {
     /// An invite from the root user for someone outside Solace, straight in the database.
     pub async fn invite_token(&self) -> String {
         let token = URL_SAFE_NO_PAD.encode(rand::random::<[u8; 32]>());
-        sqlx::query(
-            "INSERT INTO invite (id, token, invited_by_id, email, status, expires_at, created_at, updated_at) \
-             VALUES ($1, $2, $3, $4, 'pending', now() + interval '7 days', now(), now())",
+        ok(insert_invite(
+            &self.db,
+            &format!("suiteinvite{}", hex(8)),
+            &token,
+            &self.root_user_id,
+            &format!("invitee-{}@example.com", hex(6)),
         )
-        .bind(format!("suiteinvite{}", hex(8)))
-        .bind(&token)
-        .bind(&self.root_user_id)
-        .bind(format!("invitee-{}@example.com", hex(6)))
-        .execute(&self.db)
-        .await
-        .expect("insert invite");
+        .await);
         token
     }
 
@@ -423,36 +408,6 @@ impl TestApp {
 impl TestUser {
     pub fn local_part(&self) -> &str {
         self.email.split('@').next().unwrap_or_default()
-    }
-
-    /// Provisions this user's mailbox with one of the four fixture OpenPGP keys.
-    pub async fn bootstrap_mailbox(&mut self, key: usize) {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/pgp");
-        let keys: Value = serde_json::from_str(
-            &std::fs::read_to_string(dir.join("keys.json")).expect("keys.json"),
-        )
-        .expect("keys.json");
-        let entry = &keys[key % 4];
-        let armored = std::fs::read_to_string(dir.join(entry["file"].as_str().unwrap_or_default()))
-            .expect("fixture key");
-        let response = self
-            .post(
-                "/api/mail/account/bootstrap",
-                json!({
-                    "publicKeyArmored": armored,
-                    "fingerprint": entry["fingerprint"],
-                    "algorithm": entry["algorithm"],
-                    "createdAt": entry["createdAt"],
-                    "vaultVersion": 1,
-                    "encryptedVaultB64": "c29sYWNlLXRlc3QtdmF1bHQ=",
-                    "kdf": "argon2id",
-                    "kdfParams": {"saltB64": "c29sYWNlLXRlc3Q=", "memoryKiB": 65536, "iterations": 3, "parallelism": 1},
-                    "wrappedSecret": "{\"version\":1,\"algorithm\":\"AES-GCM\",\"iv\":\"AAAAAAAAAAAAAAAA\",\"ciphertext\":\"c29sYWNl\"}",
-                    "wrapAlgorithm": "AES-GCM-256",
-                }),
-            )
-            .await;
-        ok(response.expect_status(200));
     }
 
     pub async fn get(&mut self, path: &str) -> ApiResponse {
@@ -532,12 +487,6 @@ pub async fn count(db: &PgPool, sql: &str, bind: &str) -> i64 {
         .fetch_one(db)
         .await
         .expect("count query")
-}
-
-pub fn hex(bytes: usize) -> String {
-    (0..bytes)
-        .map(|_| format!("{:02x}", rand::random::<u8>()))
-        .collect()
 }
 
 /// Turns a request failure into a test failure with the server's answer.

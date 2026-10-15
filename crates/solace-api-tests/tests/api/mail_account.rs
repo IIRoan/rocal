@@ -9,11 +9,12 @@ use solace_api_types::mail::{
 };
 
 use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, json_body,
+    ok,
 };
 use crate::mail_support::{
     access_token, bootstrap, bootstrap_request, bridge_secret, kdf_params, mailbox, pgp_key,
-    provision, provisioning_turn, row_json, set_bridge_password, stalwart_account, to_json,
+    provision, provisioning_turn, row_json, set_bridge_password, stalwart_account,
 };
 
 const ENTRY_COUNT: &str = "SELECT count(*) FROM mail_directory_entry WHERE user_id = $1";
@@ -26,7 +27,7 @@ async fn anonymous_callers_are_refused() {
     expect_unauthorized(&ok(anon
         .post(
             "/api/mail/account/bootstrap",
-            to_json(&bootstrap_request(0)),
+            json_body(&bootstrap_request(0)),
         )
         .await));
     expect_unauthorized(&ok(anon.get("/api/mail/account/vault-backup").await));
@@ -39,7 +40,7 @@ async fn anonymous_callers_are_refused() {
         wrap_algorithm: None,
     };
     expect_unauthorized(&ok(anon
-        .put("/api/mail/account/vault-backup", to_json(&update))
+        .put("/api/mail/account/vault-backup", json_body(&update))
         .await));
     expect_unauthorized(&ok(anon.get("/api/mail/oauth/access-token").await));
 
@@ -91,7 +92,7 @@ async fn an_invited_account_is_approved_but_not_provisioned() {
         wrap_algorithm: None,
     };
     ok(user
-        .put("/api/mail/account/vault-backup", to_json(&update))
+        .put("/api/mail/account/vault-backup", json_body(&update))
         .await
         .expect_error(
             404,
@@ -216,7 +217,7 @@ async fn bootstrap_provisions_an_encrypted_mailbox_linked_to_the_user() {
     let again = ok(user
         .post(
             "/api/mail/account/bootstrap",
-            to_json(&bootstrap_request(1)),
+            json_body(&bootstrap_request(1)),
         )
         .await
         .expect_error(
@@ -236,7 +237,7 @@ async fn bootstrap_requires_a_vault_secret_sealed_to_the_account_key() {
         let mut request = bootstrap_request(0);
         request.wrapped_secret = wrapped_secret.clone();
         let error = ok(user
-            .post("/api/mail/account/bootstrap", to_json(&request))
+            .post("/api/mail/account/bootstrap", json_body(&request))
             .await
             .expect_error(
                 400,
@@ -268,7 +269,7 @@ async fn unapproved_accounts_cannot_bootstrap() {
     let mut request = bootstrap_request(0);
     request.wrapped_secret = None;
     let error = ok(user
-        .post("/api/mail/account/bootstrap", to_json(&request))
+        .post("/api/mail/account/bootstrap", json_body(&request))
         .await
         .expect_error(
             403,
@@ -283,7 +284,7 @@ async fn unapproved_accounts_cannot_bootstrap() {
 async fn bootstrap_rejects_invalid_bodies_with_the_zod_message() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let base = to_json(&bootstrap_request(0));
+    let base = json_body(&bootstrap_request(0));
     let with = |patch: Value| {
         let mut body = base.clone();
         for (key, value) in patch.as_object().expect("patch").clone() {
@@ -436,7 +437,7 @@ async fn bootstrap_service_rules_reject_unusable_keys_and_vaults() {
         let mut request = bootstrap_request(0);
         change(&mut request, &other_key);
         let error = user
-            .post("/api/mail/account/bootstrap", to_json(&request))
+            .post("/api/mail/account/bootstrap", json_body(&request))
             .await
             .expect_error(400, "Validation Error", message)
             .unwrap_or_else(|e| panic!("{field}: {e}"));
@@ -576,7 +577,7 @@ async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
     update.kdf_params.salt_b64 = format!(" {} ", update.kdf_params.salt_b64);
     let updated: MailVaultBackup = ok(owner
         .user
-        .put("/api/mail/account/vault-backup", to_json(&update))
+        .put("/api/mail/account/vault-backup", json_body(&update))
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
@@ -601,7 +602,7 @@ async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
     update.wrap_algorithm = Some(None);
     let nulled: MailVaultBackup = ok(owner
         .user
-        .put("/api/mail/account/vault-backup", to_json(&update))
+        .put("/api/mail/account/vault-backup", json_body(&update))
         .await
         .dto());
     assert_eq!(
@@ -618,7 +619,7 @@ async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
     update.wrap_algorithm = Some(Some("AES-GCM-256".into()));
     let resealed: MailVaultBackup = ok(owner
         .user
-        .put("/api/mail/account/vault-backup", to_json(&update))
+        .put("/api/mail/account/vault-backup", json_body(&update))
         .await
         .dto());
     assert_eq!(resealed.wrapped_secret, Some(new_seal.clone()));
@@ -640,7 +641,7 @@ async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
         )
     );
 
-    let mut bad = to_json(&update);
+    let mut bad = json_body(&update);
     bad["kdf"] = json!("pbkdf2");
     let error = ok(owner
         .user
@@ -652,7 +653,7 @@ async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
             "Mail vault backups must use Argon2id.",
         ));
     assert_eq!(error["details"], json!({"field": "kdf"}));
-    let mut forged = to_json(&update);
+    let mut forged = json_body(&update);
     forged["userId"] = json!("someone-else");
     expect_unknown_field(
         &owner
@@ -661,7 +662,7 @@ async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
             .await,
         "userId",
     );
-    let mut forged = to_json(&update);
+    let mut forged = json_body(&update);
     forged["email"] = json!("someone-else@solace.test");
     expect_unknown_field(
         &owner
@@ -723,7 +724,7 @@ async fn mailboxes_resolve_by_owner_and_never_attach_to_another_account() {
         other
             .post(
                 "/api/mail/account/bootstrap",
-                to_json(&bootstrap_request(3)),
+                json_body(&bootstrap_request(3)),
             )
             .await,
     ] {
@@ -778,7 +779,7 @@ async fn provisioning_and_first_mint_bursts_wait_out_stalwarts_concurrency_limit
             let response = user
                 .post(
                     "/api/mail/account/bootstrap",
-                    to_json(&bootstrap_request(index)),
+                    json_body(&bootstrap_request(index)),
                 )
                 .await;
             (user, response)

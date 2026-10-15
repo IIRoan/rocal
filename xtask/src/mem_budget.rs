@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, bail};
 use serde_json::json;
 use solace_api_tests::env::{BackendTarget, TEMPLATE_DATABASE, TestEnv};
+use solace_api_tests::seed::insert_invite;
 use sqlx::{Connection, Executor, PgConnection};
 
 const IDLE_BUDGET_MIB: f64 = 30.0;
@@ -470,15 +471,13 @@ async fn sign_up_users(
     let mut users = Vec::with_capacity(count);
     for index in 0..count {
         let token = format!("memtoken{}x{index}", std::process::id());
-        sqlx::query(
-            "INSERT INTO invite (id, token, invited_by_id, email, status, expires_at, created_at, updated_at) \
-             VALUES ($1, $2, $3, $4, 'pending', now() + interval '7 days', now(), now())",
+        insert_invite(
+            &mut db,
+            &format!("meminvite{}x{index}", std::process::id()),
+            &token,
+            &root,
+            &format!("invitee{index}@example.com"),
         )
-        .bind(format!("meminvite{}x{index}", std::process::id()))
-        .bind(&token)
-        .bind(&root)
-        .bind(format!("invitee{index}@example.com"))
-        .execute(&mut db)
         .await?;
         let email = format!("mem{}x{index}@{}", std::process::id(), env.mail_domain);
         let password = format!("solace-test-mem-{index:04}");

@@ -5,6 +5,9 @@ use serde_json::{Value, json};
 use crate::env::TestEnv;
 use crate::{Error, Result};
 
+/// The capabilities of Stalwart's registry methods (`x:`).
+pub const REGISTRY: [&str; 2] = ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"];
+
 /// Stalwart reveals a key once and allows five per account, so the key is cached and only re-minted when it stops working.
 pub async fn provision_key(env: &TestEnv) -> Result<String> {
     let host = url_host_port(&env.stalwart_url);
@@ -45,6 +48,7 @@ pub fn url_host_port(url: &str) -> String {
 async fn mint_provision_key(env: &TestEnv) -> Result<String> {
     let response = admin_jmap(
         env,
+        &REGISTRY,
         json!([
             ["x:Account/query", {"filter": {"name": "solace-provisioner"}}, "q"]
         ]),
@@ -62,7 +66,7 @@ async fn mint_provision_key(env: &TestEnv) -> Result<String> {
         "accountId": account_id,
         "create": {"k": {"description": "solace-test-provision", "permissions": {"@type": "Inherit"}}}
     }, "s"]);
-    let response = admin_jmap(env, json!([create.clone()])).await?;
+    let response = admin_jmap(env, &REGISTRY, json!([create.clone()])).await?;
     if let Some(secret) = response["methodResponses"][0][1]["created"]["k"]["secret"].as_str() {
         return Ok(secret.to_owned());
     }
@@ -74,12 +78,14 @@ async fn mint_provision_key(env: &TestEnv) -> Result<String> {
     }
     let existing = admin_jmap(
         env,
+        &REGISTRY,
         json!([["x:ApiKey/query", {"accountId": account_id}, "q"]]),
     )
     .await?;
     let existing = existing["methodResponses"][0][1]["ids"].clone();
     let response = admin_jmap(
         env,
+        &REGISTRY,
         json!([["x:ApiKey/set", {"accountId": account_id, "destroy": existing}, "d"], create]),
     )
     .await?;
@@ -89,7 +95,8 @@ async fn mint_provision_key(env: &TestEnv) -> Result<String> {
         .ok_or_else(|| Error::Unexpected(format!("API key not created: {response}")))
 }
 
-async fn admin_jmap(env: &TestEnv, method_calls: Value) -> Result<Value> {
+/// Admin JMAP on the test Stalwart, for setup and inspection only.
+pub async fn admin_jmap(env: &TestEnv, using: &[&str], method_calls: Value) -> Result<Value> {
     let mut request = reqwest::Client::new()
         .post(format!("{}/jmap/", env.stalwart_url))
         .basic_auth("admin", Some(&env.stalwart_admin_password));
@@ -97,10 +104,7 @@ async fn admin_jmap(env: &TestEnv, method_calls: Value) -> Result<Value> {
         request = request.header("X-Solace-Gate", key);
     }
     let response = request
-        .json(&json!({
-            "using": ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
-            "methodCalls": method_calls,
-        }))
+        .json(&json!({"using": using, "methodCalls": method_calls}))
         .send()
         .await?
         .error_for_status()?;
