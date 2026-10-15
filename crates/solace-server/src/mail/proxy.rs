@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use utoipa_axum::router::OpenApiRouter;
 
-use crate::auth::guard::{has_passkeys, optional_session, step_up_verified};
+use crate::auth::guard::optional_session;
 use crate::error::AppError;
 use crate::http::BODY_LIMIT_BYTES;
 use crate::http::client_ip::client_ip;
@@ -437,16 +437,7 @@ impl Attempt<'_> {
                 None
             });
         timings.session = session_started.elapsed();
-        let active = active?;
-        // Like `/api/mail/oauth/access-token`, a session that still owes its passkey step-up gets no mail token.
-        if !step_up_verified(self.state, self.headers, &active)
-            && has_passkeys(self.state, &active.user.id)
-                .await
-                .unwrap_or(true)
-        {
-            return None;
-        }
-        let user = active.user;
+        let user = active.map(|active| active.user)?;
         let email = user.email.trim();
         if email.is_empty() {
             return None;
