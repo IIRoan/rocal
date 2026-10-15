@@ -249,12 +249,7 @@ mod tests {
     use super::*;
 
     fn settings(production: bool) -> CookieSettings {
-        let mut config = Config::from_lookup(|name| match name {
-            "DATABASE_URL" => Some("postgres://localhost/solace_test".into()),
-            "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
-            _ => None,
-        })
-        .unwrap();
+        let mut config = Config::for_tests(&[]);
         config.is_production = production;
         config.backend_url = if production {
             "https://api.solace.test".into()
@@ -277,13 +272,7 @@ mod tests {
                 .starts_with("solace-passkey-step-up=;")
         );
 
-        let mut config = Config::from_lookup(|name| match name {
-            "DATABASE_URL" => Some("postgres://localhost/solace_test".into()),
-            "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
-            "AUTH_COOKIE_PREFIX" => Some("solace-test".into()),
-            _ => None,
-        })
-        .unwrap();
+        let mut config = Config::for_tests(&[("AUTH_COOKIE_PREFIX", "solace-test")]);
         config.is_production = true;
         config.backend_url = "https://api.solace.test".into();
         let renamed = CookieSettings::new(&config);

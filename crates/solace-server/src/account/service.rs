@@ -204,9 +204,9 @@ mod tests {
     use sea_orm::{ConnectionTrait, Statement};
 
     use super::*;
-    use crate::config::Config;
     use crate::db::scratch::ScratchDatabase;
-    use crate::integrations::storage::tests::{LocalBucket, config as bucket_config};
+    use crate::integrations::storage::tests::LocalBucket;
+    use crate::profiles::avatars::tests::state_with_bucket;
 
     const USER: &str = "account-test-user";
 
@@ -216,22 +216,6 @@ mod tests {
             email: "account-test@example.com".into(),
             name: "Account Test".into(),
         }
-    }
-
-    async fn state(database: &ScratchDatabase, bucket: &LocalBucket) -> AppState {
-        let endpoint = bucket.start().await;
-        let bucket_settings = bucket_config(&endpoint);
-        let config = Config::from_lookup(|name| match name {
-            "DATABASE_URL" => Some(database.url.clone()),
-            "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
-            "AVATAR_BUCKET" => Some(bucket_settings.name.clone()),
-            "AVATAR_BUCKET_ENDPOINT" => Some(bucket_settings.endpoint.clone()),
-            "AVATAR_BUCKET_ACCESS_KEY_ID" => Some(bucket_settings.access_key_id.clone()),
-            "AVATAR_BUCKET_SECRET_ACCESS_KEY" => Some(bucket_settings.secret_access_key.clone()),
-            _ => None,
-        })
-        .unwrap();
-        AppState::new(config, database.db.clone()).unwrap()
     }
 
     async fn users(state: &AppState) -> i64 {
@@ -251,7 +235,7 @@ mod tests {
     #[tokio::test]
     async fn deleting_a_vanished_account_is_not_found() {
         let database = ScratchDatabase::create().await;
-        let state = state(&database, &LocalBucket::default()).await;
+        let state = state_with_bucket(&database, &LocalBucket::default()).await;
         let error = delete(&state, &route_user()).await.unwrap_err();
         assert!(
             matches!(&error, AppError::NotFound(message) if message == "User account not found"),
@@ -263,7 +247,7 @@ mod tests {
     async fn a_failed_avatar_deletion_keeps_the_account() {
         let database = ScratchDatabase::create().await;
         let bucket = LocalBucket::default();
-        let state = state(&database, &bucket).await;
+        let state = state_with_bucket(&database, &bucket).await;
         state
             .db
             .execute_unprepared(&format!(

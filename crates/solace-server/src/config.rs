@@ -255,6 +255,24 @@ fn csv(value: Option<&str>) -> Vec<String> {
 }
 
 #[cfg(test)]
+impl Config {
+    /// A development config for unit tests: a test auth secret and database URL unless `vars` sets its own.
+    pub fn for_tests(vars: &[(&str, &str)]) -> Self {
+        Self::from_lookup(|name| {
+            vars.iter()
+                .find(|(key, _)| *key == name)
+                .map(|(_, value)| (*value).to_owned())
+                .or_else(|| match name {
+                    "DATABASE_URL" => Some("postgres://localhost/solace_test".into()),
+                    "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
+                    _ => None,
+                })
+        })
+        .unwrap()
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

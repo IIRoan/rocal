@@ -150,12 +150,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_failed_session_lookup_is_an_error_without_cookie_clears() {
-        let config = Config::from_lookup(|name| match name {
-            "DATABASE_URL" => Some("postgres://solace_test:x@127.0.0.1:1/solace_test".into()),
-            "BETTER_AUTH_SECRET" => Some("solace-test-auth-secret-0123456789abcdef".into()),
-            _ => None,
-        })
-        .unwrap();
+        let config = Config::for_tests(&[(
+            "DATABASE_URL",
+            "postgres://solace_test:x@127.0.0.1:1/solace_test",
+        )]);
         let pool = sea_orm::sqlx::postgres::PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_millis(200))
             .connect_lazy(&config.database_url)
