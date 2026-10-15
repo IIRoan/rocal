@@ -563,18 +563,31 @@ pub async fn import_ics(
     }
 }
 
+/// The caller's calendar an import writes into: it must be their own and not managed by a feed.
+async fn import_target(
+    state: &AppState,
+    user: &RouteUser,
+    calendar_id: &str,
+) -> Result<calendar::Model, AppError> {
+    let Some(calendar) = queries::owned_calendar(&state.db, calendar_id, &user.id).await? else {
+        return Err(AppError::NotFound(CALENDAR_NOT_FOUND.into()));
+    };
+    if calendar.kind != "owned" || calendar.is_sync_only {
+        return Err(AppError::field(
+            "Cannot import events into a read-only calendar.",
+            "calendarId",
+        ));
+    }
+    Ok(calendar)
+}
+
 async fn import_legacy(
     state: &AppState,
     user: &RouteUser,
     request: LegacyIcsImportRequest,
 ) -> Result<ImportIcsResponse, AppError> {
     let calendar_id = request.calendar_id.0.as_str();
-    if queries::owned_calendar(&state.db, calendar_id, &user.id)
-        .await?
-        .is_none()
-    {
-        return Err(AppError::NotFound(CALENDAR_NOT_FOUND.into()));
-    }
+    import_target(state, user, calendar_id).await?;
     let timezone = queries::user_timezone(&state.db, &user.id).await?;
     let parsed = parse::parse(&request.ics_content, &timezone);
     if parsed.events.is_empty() {
@@ -641,15 +654,7 @@ async fn import_encrypted(
     request: EncryptedIcsImportRequest,
 ) -> Result<ImportIcsResponse, AppError> {
     let calendar_id = request.calendar_id.0.as_str();
-    let Some(calendar) = queries::owned_calendar(&state.db, calendar_id, &user.id).await? else {
-        return Err(AppError::NotFound(CALENDAR_NOT_FOUND.into()));
-    };
-    if calendar.kind != "owned" || calendar.is_sync_only {
-        return Err(AppError::field(
-            "Cannot import events into a read-only calendar.",
-            "calendarId",
-        ));
-    }
+    import_target(state, user, calendar_id).await?;
     let mut entries: Vec<_> = request.encrypted_events.iter().collect();
     entries.sort_by_key(|entry| entry.series_external_id.is_some());
     let transaction = state.db.begin().await?;

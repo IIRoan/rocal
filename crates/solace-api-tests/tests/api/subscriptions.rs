@@ -1356,20 +1356,37 @@ async fn legacy_ics_import_without_events_is_rejected() {
 }
 
 #[tokio::test]
-async fn legacy_ics_import_ignores_the_read_only_flag() {
+async fn legacy_ics_import_refuses_a_read_only_calendar() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let feed = insert_feed(&app, &user, "https://example.com/feed.ics", 0).await;
-    // Pinned as is: unlike the encrypted import, the legacy path writes into a sync-only calendar.
-    let imported: ImportIcsResponse = ok(user
+    let response = user
         .post(
             "/api/subscriptions/import-ics",
             legacy_import(&feed.calendar_id, None),
         )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.dto()));
-    assert_eq!(imported.events_created, 2);
+        .await;
+    let stored = count(
+        &app.db,
+        "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
+        &feed.calendar_id,
+    )
+    .await;
+    match app.backend {
+        // Unlike its encrypted import, TypeScript's legacy path writes into a sync-only calendar.
+        Backend::TypeScript => {
+            let imported: ImportIcsResponse = ok(response.expect_status(200).and_then(|r| r.dto()));
+            assert_eq!((imported.events_created, stored), (2, 2));
+        }
+        Backend::Rust => {
+            expect_field_error(
+                &response,
+                "Cannot import events into a read-only calendar.",
+                "calendarId",
+            );
+            assert_eq!(stored, 0);
+        }
+    }
 }
 
 fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEvent {
