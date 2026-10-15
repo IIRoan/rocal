@@ -1299,6 +1299,174 @@
         }
       }
     },
+    "/api/mail/account": {
+      "get": {
+        "tags": [
+          "Mail"
+        ],
+        "summary": "Whether the caller's Solace account has a linked mailbox, and its address.",
+        "operationId": "getMailAccount",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailAccountStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mail/account/bootstrap": {
+      "post": {
+        "tags": [
+          "Mail"
+        ],
+        "summary": "Provisions the caller's mailbox with the client-made OpenPGP key, encryption at rest and the sealed vault backup.",
+        "operationId": "bootstrapMailAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailBootstrapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailSignup"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mail/account/vault-backup": {
+      "get": {
+        "tags": [
+          "Mail"
+        ],
+        "summary": "The caller's encrypted private-key vault backup.",
+        "operationId": "getMailVaultBackup",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailVaultBackup"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Mail"
+        ],
+        "summary": "Replaces the caller's ciphertext-only vault backup.",
+        "operationId": "putMailVaultBackup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailVaultBackupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailVaultBackup"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mail/config": {
+      "get": {
+        "tags": [
+          "Mail"
+        ],
+        "summary": "The public mail configuration: domain, JMAP discovery base, token endpoint and Stalwart's limits.",
+        "operationId": "getMailConfig",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mail/keys/{email}": {
+      "get": {
+        "tags": [
+          "Mail"
+        ],
+        "summary": "A mailbox's OpenPGP public key; signed-in callers also get keys only Stalwart still holds. 60 a minute per user or client.",
+        "operationId": "getMailDirectoryKey",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailDirectoryKey"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mail/oauth/access-token": {
+      "get": {
+        "tags": [
+          "Mail"
+        ],
+        "summary": "A Stalwart bearer for the caller's own mailbox, minted server-side; refused while the session still needs passkey step-up.",
+        "operationId": "getMailAccessToken",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailAccessToken"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/me": {
       "get": {
         "tags": [
