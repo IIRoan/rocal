@@ -74,6 +74,14 @@ struct Options {
     allocator: String,
     soak: Option<Duration>,
     steady: Duration,
+    remote: Option<Remote>,
+}
+
+/// A deployed server in Railway's test environment, read through `railway ssh`; it runs in production mode.
+struct Remote {
+    base: String,
+    service: String,
+    database: String,
 }
 
 pub async fn run(args: &[&str]) -> anyhow::Result<()> {
@@ -81,7 +89,9 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         allocator: "default".into(),
         soak: None,
         steady: Duration::from_secs(30),
+        remote: None,
     };
+    let mut remote = (None, None, None);
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         let value = iter
@@ -93,13 +103,32 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
                 options.soak = Some(Duration::from_secs(value.parse::<u64>()? * 60))
             }
             "--steady-seconds" => options.steady = Duration::from_secs(value.parse()?),
+            "--remote" => remote.0 = Some((*value).to_owned()),
+            "--railway-service" => remote.1 = Some((*value).to_owned()),
+            "--database" => remote.2 = Some((*value).to_owned()),
             _ => bail!(
-                "usage: cargo xtask mem-budget [--allocator default|system|mimalloc|jemalloc] [--steady-seconds N] [--soak-minutes N]"
+                "usage: cargo xtask mem-budget [--allocator default|system|mimalloc|jemalloc] [--steady-seconds N] [--soak-minutes N] [--remote <url> --railway-service <test-*> --database <name>]"
             ),
         }
     }
-    let binary = build(&options.allocator)?;
     let env = TestEnv::from_env()?;
+    match remote {
+        (None, None, None) => {}
+        (Some(base), Some(service), Some(database)) => {
+            solace_api_tests::guard::check_service_url("--remote", &base)?;
+            if !service.starts_with("test-") {
+                bail!("test services are named test-*; refusing {service}");
+            }
+            options.remote = Some(Remote {
+                base,
+                service,
+                database,
+            });
+            return measure_remote(&env, &options).await;
+        }
+        _ => bail!("--remote needs --railway-service and --database"),
+    }
+    let binary = build(&options.allocator)?;
     let database = format!("solace_test_mem_{}", std::process::id());
     let database_url = env.database_url_for(&database)?;
     let mut admin = PgConnection::connect(&env.database_url).await?;
@@ -184,11 +213,11 @@ async fn phases(
     let base = format!("http://127.0.0.1:{port}");
     let client = reqwest::Client::new();
     wait_until_up(&client, &base).await?;
-    let cookie = session_cookie(env, database_url, port).await?;
+    let cookie = session_cookie(env, database_url, port, false).await?;
     tokio::time::sleep(Duration::from_secs(2)).await;
     let idle = sample(pid)?;
 
-    let steady = load(pid, &client, &base, &cookie, options.steady, 8).await?;
+    let steady = load(Some(pid), &client, &base, &cookie, options.steady, 8).await?;
     tokio::time::sleep(Duration::from_secs(2)).await;
     let before_burst = sample(pid)?;
     let burst = sign_in_burst(pid, &client, &base, env, database_url).await?;
@@ -202,7 +231,7 @@ async fn phases(
     let soak = match options.soak {
         Some(duration) => {
             let start = sample(pid)?;
-            load(pid, &client, &base, &cookie, duration, 4).await?;
+            load(Some(pid), &client, &base, &cookie, duration, 4).await?;
             tokio::time::sleep(Duration::from_secs(5)).await;
             Some((start, sample(pid)?))
         }
@@ -280,7 +309,12 @@ async fn wait_until_up(client: &reqwest::Client, base: &str) -> anyhow::Result<(
 }
 
 /// A user and session written the way the TypeScript backend writes them, and its signed cookie.
-async fn session_cookie(env: &TestEnv, database_url: &str, port: u16) -> anyhow::Result<String> {
+async fn session_cookie(
+    env: &TestEnv,
+    database_url: &str,
+    port: u16,
+    production: bool,
+) -> anyhow::Result<String> {
     let mut db = PgConnection::connect(database_url).await?;
     let suffix = std::process::id();
     let token = format!("memsession{suffix:022}");
@@ -301,7 +335,7 @@ async fn session_cookie(env: &TestEnv, database_url: &str, port: u16) -> anyhow:
     .await?;
     let vars = env.backend_vars(&BackendTarget {
         port,
-        production: false,
+        production,
         database_url,
         stalwart_provision_token: "",
     });
@@ -317,7 +351,7 @@ async fn session_cookie(env: &TestEnv, database_url: &str, port: u16) -> anyhow:
 
 /// The routes the server has, at `concurrency` requests in flight, for `duration`.
 async fn load(
-    pid: u32,
+    pid: Option<u32>,
     client: &reqwest::Client,
     base: &str,
     cookie: &str,
@@ -325,10 +359,10 @@ async fn load(
     concurrency: usize,
 ) -> anyhow::Result<Memory> {
     let running = Arc::new(AtomicBool::new(true));
-    let sampler = {
+    let sampler = pid.map(|pid| {
         let running = running.clone();
         std::thread::spawn(move || sample_until(pid, &running))
-    };
+    });
     let deadline = Instant::now() + duration;
     let mut workers = tokio::task::JoinSet::new();
     for worker in 0..concurrency {
@@ -357,9 +391,12 @@ async fn load(
     }
     while workers.join_next().await.is_some() {}
     running.store(false, Ordering::Relaxed);
-    sampler
-        .join()
-        .map_err(|_| anyhow::anyhow!("sampler panicked"))
+    match sampler {
+        Some(sampler) => sampler
+            .join()
+            .map_err(|_| anyhow::anyhow!("sampler panicked")),
+        None => Ok(Memory::default()),
+    }
 }
 
 /// Twenty concurrent password sign-ins, once the server has the sign-in route.
@@ -470,4 +507,89 @@ async fn sign_up_users(
         users.push((email, password));
     }
     Ok(users)
+}
+
+/// The server's `/proc/1` figures inside its Railway container (PSS when readable); VmHWM is the exact peak since it started.
+fn remote_sample(service: &str) -> anyhow::Result<Memory> {
+    let output = Command::new("railway")
+        .args(["ssh", "--service", service, "--environment", "test", "--"])
+        .args([
+            "sh",
+            "-c",
+            "cat /proc/1/status; grep '^Pss:' /proc/1/smaps_rollup 2>/dev/null; true",
+        ])
+        .output()
+        .context("railway ssh")?;
+    if !output.status.success() {
+        bail!(
+            "railway ssh failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let mut memory = Memory::default();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let mut parts = line.split_whitespace();
+        let (Some(key), Some(value)) = (parts.next(), parts.next()) else {
+            continue;
+        };
+        let mib = value.parse::<f64>().unwrap_or_default() / 1024.0;
+        match key {
+            "VmRSS:" => memory.rss_mib = mib,
+            "VmHWM:" => memory.hwm_mib = mib,
+            "Pss:" => memory.pss_mib = mib,
+            _ => {}
+        }
+    }
+    Ok(memory)
+}
+
+/// Idle, the steady load and the soak against a freshly started deployed server; the sign-in burst runs inside Railway (`memory_burst`), because its edge gives every client one address.
+async fn measure_remote(env: &TestEnv, options: &Options) -> anyhow::Result<()> {
+    let Some(remote) = &options.remote else {
+        bail!("no remote server");
+    };
+    let database_url = env.database_url_for(&remote.database)?;
+    let client = reqwest::Client::new();
+    let base = remote.base.trim_end_matches('/').to_owned();
+    wait_until_up(&client, &base).await?;
+    let cookie = session_cookie(env, &database_url, 0, true).await?;
+    let idle = remote_sample(&remote.service)?;
+    load(None, &client, &base, &cookie, options.steady, 8).await?;
+    let steady = remote_sample(&remote.service)?;
+    let soak = match options.soak {
+        Some(duration) => {
+            let start = remote_sample(&remote.service)?;
+            load(None, &client, &base, &cookie, duration, 4).await?;
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            Some((start, remote_sample(&remote.service)?))
+        }
+        None => None,
+    };
+    let mut failures = Vec::new();
+    let mut check = |name: &str, value: f64, budget: f64| {
+        if value > budget {
+            failures.push(format!("{name}: {value:.1} MiB > {budget:.1} MiB"));
+        }
+    };
+    check("idle RSS", idle.rss_mib, IDLE_BUDGET_MIB);
+    check("steady peak RSS", steady.hwm_mib, STEADY_BUDGET_MIB);
+    if let Some((start, end)) = soak {
+        check(
+            "soak growth",
+            end.rss_mib,
+            start.rss_mib * (1.0 + SOAK_GROWTH_TOLERANCE),
+        );
+    }
+    let report = json!({
+        "server": remote.base,
+        "idle": memory_json(idle),
+        "steady": memory_json(steady),
+        "soak": soak.map(|(start, end)| json!({"start": memory_json(start), "end": memory_json(end)})),
+        "failures": failures,
+    });
+    println!("{}", serde_json::to_string_pretty(&report)?);
+    if !failures.is_empty() {
+        bail!("memory budgets exceeded");
+    }
+    Ok(())
 }

@@ -77,6 +77,8 @@ pub struct Config {
     pub stalwart_gate_key: Option<String>,
     /// Where Stalwart posts its signed mail-ingest webhook; registered at boot when the secret is set.
     pub stalwart_webhook_url: String,
+    /// `main.ts` polled every linked mailbox only outside Vercel, so production never did; it stays off unless set, since it widens server-side invite ingestion.
+    pub mail_receipt_polling: bool,
     /// Base64 HMAC key for the per-user Stalwart bridge passwords; mail tokens fail without it.
     pub mail_bridge_hmac_key: Option<String>,
     pub sentry_dsn: Option<String>,
@@ -151,6 +153,10 @@ impl Config {
             stalwart_gate_key: var("STALWART_GATE_KEY")
                 .map(|key| key.trim().to_owned())
                 .filter(|key| !key.is_empty()),
+            mail_receipt_polling: matches!(
+                var("MAIL_RECEIPT_POLLING").as_deref(),
+                Some("1" | "true")
+            ),
             stalwart_webhook_url: var("STALWART_WEBHOOK_URL")
                 .map(|url| url.trim().to_owned())
                 .filter(|url| !url.is_empty())

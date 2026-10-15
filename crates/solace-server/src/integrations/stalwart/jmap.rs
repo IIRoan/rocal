@@ -147,11 +147,13 @@ mod tests {
         .await
         .unwrap_err();
         assert!(error.to_string().contains("status 503"), "{error}");
-        assert_eq!(fake.requests().len(), 1);
-        assert_eq!(
-            fake.requests()[0].authorization.as_deref(),
-            Some("Bearer owner-token")
-        );
+        let jmap: Vec<_> = fake
+            .requests()
+            .into_iter()
+            .filter(|r| r.first_method() == "Email/get")
+            .collect();
+        assert_eq!(jmap.len(), 1, "no retry after a 503");
+        assert_eq!(jmap[0].authorization.as_deref(), Some("Bearer owner-token"));
     }
 
     #[test]

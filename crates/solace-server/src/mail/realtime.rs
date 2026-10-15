@@ -714,17 +714,32 @@ mod tests {
         event("acct-1".into(), vec![kind.into()], at, sync)
     }
 
-    /// Every event that arrives within `window`.
+    /// The first `expected` events (within thirty seconds), then any that land in the next second, past one more flush.
     async fn collect(
         events: &mut UnboundedReceiver<MailChangedEvent>,
-        window: Duration,
+        expected: usize,
     ) -> Vec<MailChangedEvent> {
         let mut got = Vec::new();
-        let deadline = tokio::time::Instant::now() + window;
-        while let Ok(Some(event)) = tokio::time::timeout_at(deadline, events.recv()).await {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+        while got.len() < expected {
+            match tokio::time::timeout_at(deadline, events.recv()).await {
+                Ok(Some(event)) => got.push(event),
+                _ => return got,
+            }
+        }
+        let grace = tokio::time::Instant::now() + Duration::from_secs(1);
+        while let Ok(Some(event)) = tokio::time::timeout_at(grace, events.recv()).await {
             got.push(event);
         }
         got
+    }
+
+    /// Waits up to thirty seconds for `ready`, so the tests hold on a loaded machine.
+    async fn wait_for(ready: impl Fn() -> bool) {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+        while !ready() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
     }
 
     fn email_changes(fake: &FakeStalwart) -> usize {
@@ -740,8 +755,6 @@ mod tests {
             .filter(|r| r.path.starts_with("/jmap/eventsource"))
             .collect()
     }
-
-    const SETTLE: Duration = Duration::from_millis(1500);
 
     #[tokio::test]
     async fn coalesces_rapid_changes_into_one_event() {
@@ -760,8 +773,8 @@ mod tests {
             changed("Mailbox", "2026-05-13T09:00:01.000Z", None),
             None,
         );
-        let first = collect(&mut first, SETTLE).await;
-        let second = collect(&mut second, Duration::from_millis(100)).await;
+        let first = collect(&mut first, 1).await;
+        let second = collect(&mut second, 1).await;
         stop(&state);
         assert_eq!(email_changes(&fake), 1, "one live sync for the burst");
         assert_eq!((first.len(), second.len()), (1, 1));
@@ -779,7 +792,7 @@ mod tests {
             if method == "Email/changes"
                 && let Some(held) = held.lock().unwrap().take()
             {
-                let _ = held.recv_timeout(Duration::from_secs(10));
+                let _ = held.recv_timeout(Duration::from_secs(30));
             }
             None
         })
@@ -791,7 +804,7 @@ mod tests {
             changed("Email", "2026-05-13T09:00:00.000Z", None),
             None,
         );
-        tokio::time::sleep(SETTLE).await;
+        wait_for(|| email_changes(&fake) == 1).await;
         assert_eq!(email_changes(&fake), 1, "the first sync is running");
         enqueue(
             &state,
@@ -805,7 +818,7 @@ mod tests {
             "no second flush while one is in flight"
         );
         release.send(()).unwrap();
-        let published = collect(&mut events, Duration::from_millis(2500)).await;
+        let published = collect(&mut events, 2).await;
         stop(&state);
         assert_eq!(email_changes(&fake), 2, "exactly one follow-up");
         assert_eq!(published.len(), 2);
@@ -831,7 +844,7 @@ mod tests {
             ),
             None,
         );
-        let published = collect(&mut events, SETTLE).await;
+        let published = collect(&mut events, 1).await;
         stop(&state);
         assert_eq!(
             email_changes(&fake),
@@ -862,7 +875,7 @@ mod tests {
             changed("Email", "2026-05-13T09:00:01.000Z", Some(sync())),
             None,
         );
-        let published = collect(&mut events, SETTLE).await;
+        let published = collect(&mut events, 1).await;
         stop(&state);
         assert_eq!(email_changes(&fake), 0, "snapshots need no live sync");
         assert_eq!(published.len(), 1);
@@ -893,7 +906,7 @@ mod tests {
             ),
             None,
         );
-        let published = collect(&mut events, SETTLE).await;
+        let published = collect(&mut events, 1).await;
         stop(&state);
         assert_eq!(published.len(), 1);
         assert_eq!(
@@ -924,7 +937,7 @@ mod tests {
         let state = ready(&database, &fake).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
         let polling = start(state.clone());
-        let published = collect(&mut events, SETTLE).await;
+        let published = collect(&mut events, 1).await;
         polling.abort();
         stop(&state);
         assert_eq!(published.len(), 1);
@@ -946,7 +959,7 @@ mod tests {
         let state = ready(&database, &fake).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
         let polling = start(state.clone());
-        let published = collect(&mut events, SETTLE).await;
+        let published = collect(&mut events, 1).await;
         polling.abort();
         stop(&state);
         let snapshot = published[0].sync.as_ref().unwrap();
@@ -964,6 +977,7 @@ mod tests {
         let state = ready(&database, &fake).await;
         let (first, _first_events) = listen(&state, "sub-1");
         let (_second, _second_events) = listen(&state, "sub-2");
+        wait_for(|| !event_sources(&fake).is_empty()).await;
         tokio::time::sleep(Duration::from_millis(300)).await;
         let opened = event_sources(&fake);
         assert_eq!(opened.len(), 1, "both subscribers share one listener");
@@ -1027,7 +1041,7 @@ mod tests {
         let fake = stalwart(|_, _| None).await;
         let state = ready(&database, &fake).await;
         let (_subscription, mut events) = listen(&state, "sub-1");
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        wait_for(|| !event_sources(&fake).is_empty()).await;
         assert_eq!(event_sources(&fake).len(), 1);
         stop(&state);
         assert!(

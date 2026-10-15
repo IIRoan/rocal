@@ -37,12 +37,17 @@ async fn run(config: Config) -> anyhow::Result<()> {
     tracing::info!(port, "Server is running");
     tokio::spawn(ensure_stalwart_webhook(state.clone()));
     let calendar_sync = scheduler::start(state.clone());
-    let receipt_poll = realtime::start(state.clone());
+    let receipt_poll = state
+        .config
+        .mail_receipt_polling
+        .then(|| realtime::start(state.clone()));
     let stopping = state.clone();
     let shutdown = async move {
         shutdown_signal().await;
         calendar_sync.abort();
-        receipt_poll.abort();
+        if let Some(receipt_poll) = receipt_poll {
+            receipt_poll.abort();
+        }
         realtime::stop(&stopping);
     };
     solace_server::serve(listener, state, shutdown).await?;
