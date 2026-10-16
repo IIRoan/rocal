@@ -1,17 +1,7 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "20055546456446",
-        "sourceUid": "20055546456446",
-        "title": "Termin 4353 und\"so\"",
-        "description": "Toller Termin fürmal zu\\\"gucken\\\"und so",
-        "start": "2022-02-22T18:30:00.000Z",
-        "end": "2022-02-22T19:30:00.000Z",
-        "allDay": false,
-        "location": "online",
-        "timezone": "Etc/UTC"
-      }
+      {"uid":"20055546456446","sourceUid":"20055546456446","title":"Termin 4353 und\"so\"","description":"Toller Termin fürmal zu\\\"gucken\\\"und so","start":"2022-02-22T18:30:00.000Z","end":"2022-02-22T19:30:00.000Z","allDay":false,"location":"online","timezone":"Etc/UTC"}
     ],
     "errors": [],
     "method": "REQUEST",
@@ -20,17 +10,7 @@
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "20055546456446",
-        "sourceUid": "20055546456446",
-        "title": "Termin 4353 und\"so\"",
-        "description": "Toller Termin fürmal zu\\\"gucken\\\"und so",
-        "start": "2022-02-22T18:30:00.000Z",
-        "end": "2022-02-22T19:30:00.000Z",
-        "allDay": false,
-        "location": "online",
-        "timezone": "Etc/UTC"
-      }
+      {"uid":"20055546456446","sourceUid":"20055546456446","title":"Termin 4353 und\"so\"","description":"Toller Termin fürmal zu\\\"gucken\\\"und so","start":"2022-02-22T18:30:00.000Z","end":"2022-02-22T19:30:00.000Z","allDay":false,"location":"online","timezone":"Etc/UTC"}
     ],
     "errors": [],
     "method": "REQUEST",
@@ -39,17 +19,7 @@
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "20055546456446",
-        "sourceUid": "20055546456446",
-        "title": "Termin 4353 und\"so\"",
-        "description": "Toller Termin fürmal zu\\\"gucken\\\"und so",
-        "start": "2022-02-22T18:30:00.000Z",
-        "end": "2022-02-22T19:30:00.000Z",
-        "allDay": false,
-        "location": "online",
-        "timezone": "Etc/UTC"
-      }
+      {"uid":"20055546456446","sourceUid":"20055546456446","title":"Termin 4353 und\"so\"","description":"Toller Termin fürmal zu\\\"gucken\\\"und so","start":"2022-02-22T18:30:00.000Z","end":"2022-02-22T19:30:00.000Z","allDay":false,"location":"online","timezone":"Etc/UTC"}
     ],
     "errors": [],
     "method": "REQUEST",

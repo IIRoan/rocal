@@ -1,28 +1,7 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "1173422081SZR322",
-        "sourceUid": "1173422081SZR322",
-        "title": "[private]",
-        "description": "[private]",
-        "start": "2020-08-25T14:35:00.000Z",
-        "end": "2020-08-25T15:50:00.000Z",
-        "allDay": false,
-        "location": "[private]",
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2020-12-17T15:35:00.000Z",
-          "byWeekDay": [
-            2,
-            4
-          ],
-          "timezone": "America/Detroit"
-        },
-        "timezone": "America/Detroit",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2020-12-17T15:35:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"America/Detroit\"}"
-      }
+      {"uid":"1173422081SZR322","sourceUid":"1173422081SZR322","title":"[private]","description":"[private]","start":"2020-08-25T14:35:00.000Z","end":"2020-08-25T15:50:00.000Z","allDay":false,"location":"[private]","recurrence":{"frequency":"weekly","interval":1,"until":"2020-12-17T15:35:00.000Z","byWeekDay":[2,4],"timezone":"America/Detroit"},"timezone":"America/Detroit","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2020-12-17T15:35:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"America/Detroit\"}"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -30,28 +9,7 @@
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "1173422081SZR322",
-        "sourceUid": "1173422081SZR322",
-        "title": "[private]",
-        "description": "[private]",
-        "start": "2020-08-25T14:35:00.000Z",
-        "end": "2020-08-25T15:50:00.000Z",
-        "allDay": false,
-        "location": "[private]",
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2020-12-17T15:35:00.000Z",
-          "byWeekDay": [
-            2,
-            4
-          ],
-          "timezone": "America/Detroit"
-        },
-        "timezone": "America/Detroit",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2020-12-17T15:35:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"America/Detroit\"}"
-      }
+      {"uid":"1173422081SZR322","sourceUid":"1173422081SZR322","title":"[private]","description":"[private]","start":"2020-08-25T14:35:00.000Z","end":"2020-08-25T15:50:00.000Z","allDay":false,"location":"[private]","recurrence":{"frequency":"weekly","interval":1,"until":"2020-12-17T15:35:00.000Z","byWeekDay":[2,4],"timezone":"America/Detroit"},"timezone":"America/Detroit","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2020-12-17T15:35:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"America/Detroit\"}"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -59,28 +17,7 @@
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "1173422081SZR322",
-        "sourceUid": "1173422081SZR322",
-        "title": "[private]",
-        "description": "[private]",
-        "start": "2020-08-25T14:35:00.000Z",
-        "end": "2020-08-25T15:50:00.000Z",
-        "allDay": false,
-        "location": "[private]",
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2020-12-17T15:35:00.000Z",
-          "byWeekDay": [
-            2,
-            4
-          ],
-          "timezone": "America/Detroit"
-        },
-        "timezone": "America/Detroit",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2020-12-17T15:35:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"America/Detroit\"}"
-      }
+      {"uid":"1173422081SZR322","sourceUid":"1173422081SZR322","title":"[private]","description":"[private]","start":"2020-08-25T14:35:00.000Z","end":"2020-08-25T15:50:00.000Z","allDay":false,"location":"[private]","recurrence":{"frequency":"weekly","interval":1,"until":"2020-12-17T15:35:00.000Z","byWeekDay":[2,4],"timezone":"America/Detroit"},"timezone":"America/Detroit","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2020-12-17T15:35:00.000Z\",\"byWeekDay\":[2,4],\"timezone\":\"America/Detroit\"}"}
     ],
     "errors": [],
     "method": "PUBLISH",

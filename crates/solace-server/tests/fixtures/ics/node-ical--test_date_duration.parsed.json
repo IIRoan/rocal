@@ -1,48 +1,21 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "20240215T101655-b6e4bbe9@192.168.178.100",
-        "sourceUid": "20240215T101655-b6e4bbe9@192.168.178.100",
-        "title": "period test2",
-        "start": "2024-02-15T00:00:00.000Z",
-        "end": "2024-02-21T23:59:59.999Z",
-        "allDay": true,
-        "location": "Kriftel",
-        "timezone": "UTC"
-      }
+      {"uid":"20240215T101655-b6e4bbe9@192.168.178.100","sourceUid":"20240215T101655-b6e4bbe9@192.168.178.100","title":"period test2","start":"2024-02-15T00:00:00.000Z","end":"2024-02-21T23:59:59.999Z","allDay":true,"location":"Kriftel","timezone":"UTC"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "20240215T101655-b6e4bbe9@192.168.178.100",
-        "sourceUid": "20240215T101655-b6e4bbe9@192.168.178.100",
-        "title": "period test2",
-        "start": "2024-02-14T23:00:00.000Z",
-        "end": "2024-02-21T22:59:59.999Z",
-        "allDay": true,
-        "location": "Kriftel",
-        "timezone": "Europe/Amsterdam"
-      }
+      {"uid":"20240215T101655-b6e4bbe9@192.168.178.100","sourceUid":"20240215T101655-b6e4bbe9@192.168.178.100","title":"period test2","start":"2024-02-14T23:00:00.000Z","end":"2024-02-21T22:59:59.999Z","allDay":true,"location":"Kriftel","timezone":"Europe/Amsterdam"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "20240215T101655-b6e4bbe9@192.168.178.100",
-        "sourceUid": "20240215T101655-b6e4bbe9@192.168.178.100",
-        "title": "period test2",
-        "start": "2024-02-15T08:00:00.000Z",
-        "end": "2024-02-22T07:59:59.999Z",
-        "allDay": true,
-        "location": "Kriftel",
-        "timezone": "America/Los_Angeles"
-      }
+      {"uid":"20240215T101655-b6e4bbe9@192.168.178.100","sourceUid":"20240215T101655-b6e4bbe9@192.168.178.100","title":"period test2","start":"2024-02-15T08:00:00.000Z","end":"2024-02-22T07:59:59.999Z","allDay":true,"location":"Kriftel","timezone":"America/Los_Angeles"}
     ],
     "errors": [],
     "method": "PUBLISH"

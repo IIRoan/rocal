@@ -1,33 +1,9 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "EC9439B1-FF65-11D6-9973-003065F99D04",
-        "sourceUid": "EC9439B1-FF65-11D6-9973-003065F99D04",
-        "title": "Coffee with Jason",
-        "start": "2002-10-28T22:00:00.000Z",
-        "end": "2002-10-28T23:00:00.000Z",
-        "allDay": false,
-        "timezone": "US/Pacific"
-      },
-      {
-        "uid": "EC944331-FF65-11D6-9973-003065F99D04",
-        "sourceUid": "EC944331-FF65-11D6-9973-003065F99D04",
-        "title": "Code Review",
-        "start": "2002-11-27T20:00:00.000Z",
-        "end": "2002-11-27T21:00:00.000Z",
-        "allDay": false,
-        "timezone": "US/Pacific"
-      },
-      {
-        "uid": "EC944CFA-FF65-11D6-9973-003065F99D04",
-        "sourceUid": "EC944CFA-FF65-11D6-9973-003065F99D04",
-        "title": "Dinner with T",
-        "start": "2002-12-17T04:00:00.000Z",
-        "end": "2002-12-17T05:00:00.000Z",
-        "allDay": false,
-        "timezone": "US/Pacific"
-      }
+      {"uid":"EC9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"EC9439B1-FF65-11D6-9973-003065F99D04","title":"Coffee with Jason","start":"2002-10-28T22:00:00.000Z","end":"2002-10-28T23:00:00.000Z","allDay":false,"timezone":"US/Pacific"},
+      {"uid":"EC944331-FF65-11D6-9973-003065F99D04","sourceUid":"EC944331-FF65-11D6-9973-003065F99D04","title":"Code Review","start":"2002-11-27T20:00:00.000Z","end":"2002-11-27T21:00:00.000Z","allDay":false,"timezone":"US/Pacific"},
+      {"uid":"EC944CFA-FF65-11D6-9973-003065F99D04","sourceUid":"EC944CFA-FF65-11D6-9973-003065F99D04","title":"Dinner with T","start":"2002-12-17T04:00:00.000Z","end":"2002-12-17T05:00:00.000Z","allDay":false,"timezone":"US/Pacific"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -36,33 +12,9 @@
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "EC9439B1-FF65-11D6-9973-003065F99D04",
-        "sourceUid": "EC9439B1-FF65-11D6-9973-003065F99D04",
-        "title": "Coffee with Jason",
-        "start": "2002-10-28T22:00:00.000Z",
-        "end": "2002-10-28T23:00:00.000Z",
-        "allDay": false,
-        "timezone": "US/Pacific"
-      },
-      {
-        "uid": "EC944331-FF65-11D6-9973-003065F99D04",
-        "sourceUid": "EC944331-FF65-11D6-9973-003065F99D04",
-        "title": "Code Review",
-        "start": "2002-11-27T20:00:00.000Z",
-        "end": "2002-11-27T21:00:00.000Z",
-        "allDay": false,
-        "timezone": "US/Pacific"
-      },
-      {
-        "uid": "EC944CFA-FF65-11D6-9973-003065F99D04",
-        "sourceUid": "EC944CFA-FF65-11D6-9973-003065F99D04",
-        "title": "Dinner with T",
-        "start": "2002-12-17T04:00:00.000Z",
-        "end": "2002-12-17T05:00:00.000Z",
-        "allDay": false,
-        "timezone": "US/Pacific"
-      }
+      {"uid":"EC9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"EC9439B1-FF65-11D6-9973-003065F99D04","title":"Coffee with Jason","start":"2002-10-28T22:00:00.000Z","end":"2002-10-28T23:00:00.000Z","allDay":false,"timezone":"US/Pacific"},
+      {"uid":"EC944331-FF65-11D6-9973-003065F99D04","sourceUid":"EC944331-FF65-11D6-9973-003065F99D04","title":"Code Review","start":"2002-11-27T20:00:00.000Z","end":"2002-11-27T21:00:00.000Z","allDay":false,"timezone":"US/Pacific"},
+      {"uid":"EC944CFA-FF65-11D6-9973-003065F99D04","sourceUid":"EC944CFA-FF65-11D6-9973-003065F99D04","title":"Dinner with T","start":"2002-12-17T04:00:00.000Z","end":"2002-12-17T05:00:00.000Z","allDay":false,"timezone":"US/Pacific"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -71,33 +23,9 @@
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "EC9439B1-FF65-11D6-9973-003065F99D04",
-        "sourceUid": "EC9439B1-FF65-11D6-9973-003065F99D04",
-        "title": "Coffee with Jason",
-        "start": "2002-10-28T22:00:00.000Z",
-        "end": "2002-10-28T23:00:00.000Z",
-        "allDay": false,
-        "timezone": "US/Pacific"
-      },
-      {
-        "uid": "EC944331-FF65-11D6-9973-003065F99D04",
-        "sourceUid": "EC944331-FF65-11D6-9973-003065F99D04",
-        "title": "Code Review",
-        "start": "2002-11-27T20:00:00.000Z",
-        "end": "2002-11-27T21:00:00.000Z",
-        "allDay": false,
-        "timezone": "US/Pacific"
-      },
-      {
-        "uid": "EC944CFA-FF65-11D6-9973-003065F99D04",
-        "sourceUid": "EC944CFA-FF65-11D6-9973-003065F99D04",
-        "title": "Dinner with T",
-        "start": "2002-12-17T04:00:00.000Z",
-        "end": "2002-12-17T05:00:00.000Z",
-        "allDay": false,
-        "timezone": "US/Pacific"
-      }
+      {"uid":"EC9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"EC9439B1-FF65-11D6-9973-003065F99D04","title":"Coffee with Jason","start":"2002-10-28T22:00:00.000Z","end":"2002-10-28T23:00:00.000Z","allDay":false,"timezone":"US/Pacific"},
+      {"uid":"EC944331-FF65-11D6-9973-003065F99D04","sourceUid":"EC944331-FF65-11D6-9973-003065F99D04","title":"Code Review","start":"2002-11-27T20:00:00.000Z","end":"2002-11-27T21:00:00.000Z","allDay":false,"timezone":"US/Pacific"},
+      {"uid":"EC944CFA-FF65-11D6-9973-003065F99D04","sourceUid":"EC944CFA-FF65-11D6-9973-003065F99D04","title":"Dinner with T","start":"2002-12-17T04:00:00.000Z","end":"2002-12-17T05:00:00.000Z","allDay":false,"timezone":"US/Pacific"}
     ],
     "errors": [],
     "method": "PUBLISH",

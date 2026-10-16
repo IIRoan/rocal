@@ -1,75 +1,21 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "0000021",
-        "sourceUid": "0000021",
-        "title": "Music School",
-        "start": "2022-10-04T13:00:00.000Z",
-        "end": "2022-10-04T14:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2022-12-01T01:00:00.000Z",
-          "byWeekDay": [
-            2
-          ],
-          "timezone": "Etc/GMT-1"
-        },
-        "timezone": "Etc/GMT-1",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"Etc/GMT-1\"}"
-      }
+      {"uid":"0000021","sourceUid":"0000021","title":"Music School","start":"2022-10-04T13:00:00.000Z","end":"2022-10-04T14:00:00.000Z","allDay":false,"recurrence":{"frequency":"weekly","interval":1,"until":"2022-12-01T01:00:00.000Z","byWeekDay":[2],"timezone":"Etc/GMT-1"},"timezone":"Etc/GMT-1","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"Etc/GMT-1\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "0000021",
-        "sourceUid": "0000021",
-        "title": "Music School",
-        "start": "2022-10-04T13:00:00.000Z",
-        "end": "2022-10-04T14:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2022-12-01T01:00:00.000Z",
-          "byWeekDay": [
-            2
-          ],
-          "timezone": "Etc/GMT-1"
-        },
-        "timezone": "Etc/GMT-1",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"Etc/GMT-1\"}"
-      }
+      {"uid":"0000021","sourceUid":"0000021","title":"Music School","start":"2022-10-04T13:00:00.000Z","end":"2022-10-04T14:00:00.000Z","allDay":false,"recurrence":{"frequency":"weekly","interval":1,"until":"2022-12-01T01:00:00.000Z","byWeekDay":[2],"timezone":"Etc/GMT-1"},"timezone":"Etc/GMT-1","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"Etc/GMT-1\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "0000021",
-        "sourceUid": "0000021",
-        "title": "Music School",
-        "start": "2022-10-04T13:00:00.000Z",
-        "end": "2022-10-04T14:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2022-12-01T01:00:00.000Z",
-          "byWeekDay": [
-            2
-          ],
-          "timezone": "Etc/GMT-1"
-        },
-        "timezone": "Etc/GMT-1",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"Etc/GMT-1\"}"
-      }
+      {"uid":"0000021","sourceUid":"0000021","title":"Music School","start":"2022-10-04T13:00:00.000Z","end":"2022-10-04T14:00:00.000Z","allDay":false,"recurrence":{"frequency":"weekly","interval":1,"until":"2022-12-01T01:00:00.000Z","byWeekDay":[2],"timezone":"Etc/GMT-1"},"timezone":"Etc/GMT-1","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2022-12-01T01:00:00.000Z\",\"byWeekDay\":[2],\"timezone\":\"Etc/GMT-1\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"

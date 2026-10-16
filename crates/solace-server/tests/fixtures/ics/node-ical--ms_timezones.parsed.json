@@ -1,73 +1,10 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F",
-        "sourceUid": "040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F",
-        "title": "test",
-        "description": "test new event 1",
-        "start": "2020-09-10T07:00:00.000Z",
-        "end": "2020-09-10T07:30:00.000Z",
-        "allDay": false,
-        "timezone": "Europe/Berlin"
-      },
-      {
-        "uid": "040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560",
-        "sourceUid": "040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560",
-        "title": "Log Yesterday's Jira time",
-        "description": "text new evert 2",
-        "start": "2020-06-09T07:00:00.000Z",
-        "end": "2020-06-09T07:30:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2021-03-09T08:00:00.000Z",
-          "byWeekDay": [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6
-          ],
-          "timezone": "Europe/Berlin"
-        },
-        "timezone": "Europe/Berlin",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T08:00:00.000Z\",\"byWeekDay\":[1,2,3,4,5,6],\"timezone\":\"Europe/Berlin\"}"
-      },
-      {
-        "uid": "040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E",
-        "sourceUid": "040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E",
-        "title": "Not the actual summary 1",
-        "start": "2020-09-15T15:30:00.000Z",
-        "end": "2020-09-15T16:30:00.000Z",
-        "allDay": false,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F",
-        "sourceUid": "040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F",
-        "title": "Not the actual summary either",
-        "start": "2020-07-07T19:00:00.000Z",
-        "end": "2020-07-07T19:30:00.000Z",
-        "allDay": false,
-        "location": "https://bluejeans.com/7999979999",
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2021-03-09T20:00:00.000Z",
-          "byWeekDay": [
-            2,
-            4,
-            5,
-            0
-          ],
-          "timezone": "America/Los_Angeles"
-        },
-        "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T20:00:00.000Z\",\"byWeekDay\":[2,4,5,0],\"timezone\":\"America/Los_Angeles\"}"
-      }
+      {"uid":"040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F","sourceUid":"040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F","title":"test","description":"test new event 1","start":"2020-09-10T07:00:00.000Z","end":"2020-09-10T07:30:00.000Z","allDay":false,"timezone":"Europe/Berlin"},
+      {"uid":"040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560","sourceUid":"040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560","title":"Log Yesterday's Jira time","description":"text new evert 2","start":"2020-06-09T07:00:00.000Z","end":"2020-06-09T07:30:00.000Z","allDay":false,"recurrence":{"frequency":"weekly","interval":1,"until":"2021-03-09T08:00:00.000Z","byWeekDay":[1,2,3,4,5,6],"timezone":"Europe/Berlin"},"timezone":"Europe/Berlin","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T08:00:00.000Z\",\"byWeekDay\":[1,2,3,4,5,6],\"timezone\":\"Europe/Berlin\"}"},
+      {"uid":"040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E","sourceUid":"040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E","title":"Not the actual summary 1","start":"2020-09-15T15:30:00.000Z","end":"2020-09-15T16:30:00.000Z","allDay":false,"timezone":"America/Los_Angeles"},
+      {"uid":"040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F","sourceUid":"040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F","title":"Not the actual summary either","start":"2020-07-07T19:00:00.000Z","end":"2020-07-07T19:30:00.000Z","allDay":false,"location":"https://bluejeans.com/7999979999","recurrence":{"frequency":"weekly","interval":1,"until":"2021-03-09T20:00:00.000Z","byWeekDay":[2,4,5,0],"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T20:00:00.000Z\",\"byWeekDay\":[2,4,5,0],\"timezone\":\"America/Los_Angeles\"}"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -75,73 +12,10 @@
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F",
-        "sourceUid": "040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F",
-        "title": "test",
-        "description": "test new event 1",
-        "start": "2020-09-10T07:00:00.000Z",
-        "end": "2020-09-10T07:30:00.000Z",
-        "allDay": false,
-        "timezone": "Europe/Berlin"
-      },
-      {
-        "uid": "040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560",
-        "sourceUid": "040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560",
-        "title": "Log Yesterday's Jira time",
-        "description": "text new evert 2",
-        "start": "2020-06-09T07:00:00.000Z",
-        "end": "2020-06-09T07:30:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2021-03-09T08:00:00.000Z",
-          "byWeekDay": [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6
-          ],
-          "timezone": "Europe/Berlin"
-        },
-        "timezone": "Europe/Berlin",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T08:00:00.000Z\",\"byWeekDay\":[1,2,3,4,5,6],\"timezone\":\"Europe/Berlin\"}"
-      },
-      {
-        "uid": "040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E",
-        "sourceUid": "040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E",
-        "title": "Not the actual summary 1",
-        "start": "2020-09-15T15:30:00.000Z",
-        "end": "2020-09-15T16:30:00.000Z",
-        "allDay": false,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F",
-        "sourceUid": "040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F",
-        "title": "Not the actual summary either",
-        "start": "2020-07-07T19:00:00.000Z",
-        "end": "2020-07-07T19:30:00.000Z",
-        "allDay": false,
-        "location": "https://bluejeans.com/7999979999",
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2021-03-09T20:00:00.000Z",
-          "byWeekDay": [
-            2,
-            4,
-            5,
-            0
-          ],
-          "timezone": "America/Los_Angeles"
-        },
-        "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T20:00:00.000Z\",\"byWeekDay\":[2,4,5,0],\"timezone\":\"America/Los_Angeles\"}"
-      }
+      {"uid":"040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F","sourceUid":"040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F","title":"test","description":"test new event 1","start":"2020-09-10T07:00:00.000Z","end":"2020-09-10T07:30:00.000Z","allDay":false,"timezone":"Europe/Berlin"},
+      {"uid":"040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560","sourceUid":"040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560","title":"Log Yesterday's Jira time","description":"text new evert 2","start":"2020-06-09T07:00:00.000Z","end":"2020-06-09T07:30:00.000Z","allDay":false,"recurrence":{"frequency":"weekly","interval":1,"until":"2021-03-09T08:00:00.000Z","byWeekDay":[1,2,3,4,5,6],"timezone":"Europe/Berlin"},"timezone":"Europe/Berlin","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T08:00:00.000Z\",\"byWeekDay\":[1,2,3,4,5,6],\"timezone\":\"Europe/Berlin\"}"},
+      {"uid":"040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E","sourceUid":"040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E","title":"Not the actual summary 1","start":"2020-09-15T15:30:00.000Z","end":"2020-09-15T16:30:00.000Z","allDay":false,"timezone":"America/Los_Angeles"},
+      {"uid":"040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F","sourceUid":"040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F","title":"Not the actual summary either","start":"2020-07-07T19:00:00.000Z","end":"2020-07-07T19:30:00.000Z","allDay":false,"location":"https://bluejeans.com/7999979999","recurrence":{"frequency":"weekly","interval":1,"until":"2021-03-09T20:00:00.000Z","byWeekDay":[2,4,5,0],"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T20:00:00.000Z\",\"byWeekDay\":[2,4,5,0],\"timezone\":\"America/Los_Angeles\"}"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -149,73 +23,10 @@
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F",
-        "sourceUid": "040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F",
-        "title": "test",
-        "description": "test new event 1",
-        "start": "2020-09-10T07:00:00.000Z",
-        "end": "2020-09-10T07:30:00.000Z",
-        "allDay": false,
-        "timezone": "Europe/Berlin"
-      },
-      {
-        "uid": "040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560",
-        "sourceUid": "040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560",
-        "title": "Log Yesterday's Jira time",
-        "description": "text new evert 2",
-        "start": "2020-06-09T07:00:00.000Z",
-        "end": "2020-06-09T07:30:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2021-03-09T08:00:00.000Z",
-          "byWeekDay": [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6
-          ],
-          "timezone": "Europe/Berlin"
-        },
-        "timezone": "Europe/Berlin",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T08:00:00.000Z\",\"byWeekDay\":[1,2,3,4,5,6],\"timezone\":\"Europe/Berlin\"}"
-      },
-      {
-        "uid": "040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E",
-        "sourceUid": "040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E",
-        "title": "Not the actual summary 1",
-        "start": "2020-09-15T15:30:00.000Z",
-        "end": "2020-09-15T16:30:00.000Z",
-        "allDay": false,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F",
-        "sourceUid": "040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F",
-        "title": "Not the actual summary either",
-        "start": "2020-07-07T19:00:00.000Z",
-        "end": "2020-07-07T19:30:00.000Z",
-        "allDay": false,
-        "location": "https://bluejeans.com/7999979999",
-        "recurrence": {
-          "frequency": "weekly",
-          "interval": 1,
-          "until": "2021-03-09T20:00:00.000Z",
-          "byWeekDay": [
-            2,
-            4,
-            5,
-            0
-          ],
-          "timezone": "America/Los_Angeles"
-        },
-        "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T20:00:00.000Z\",\"byWeekDay\":[2,4,5,0],\"timezone\":\"America/Los_Angeles\"}"
-      }
+      {"uid":"040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F","sourceUid":"040000008200E00074C5B7101A82E0080000000070DE40F38786D601000000000000000010000000D2A9BA8A3668CA4ABB2CC6838268179F","title":"test","description":"test new event 1","start":"2020-09-10T07:00:00.000Z","end":"2020-09-10T07:30:00.000Z","allDay":false,"timezone":"Europe/Berlin"},
+      {"uid":"040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560","sourceUid":"040000008200E00074C5B7101A82E008000000008001F1896B63D3010000000000000000100000005D0552D848712746896D6C8E2E066560","title":"Log Yesterday's Jira time","description":"text new evert 2","start":"2020-06-09T07:00:00.000Z","end":"2020-06-09T07:30:00.000Z","allDay":false,"recurrence":{"frequency":"weekly","interval":1,"until":"2021-03-09T08:00:00.000Z","byWeekDay":[1,2,3,4,5,6],"timezone":"Europe/Berlin"},"timezone":"Europe/Berlin","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T08:00:00.000Z\",\"byWeekDay\":[1,2,3,4,5,6],\"timezone\":\"Europe/Berlin\"}"},
+      {"uid":"040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E","sourceUid":"040000008200E00074C5B7101A82E008000000007070639B9D82D601000000000000000010000000690B7C3173632247A60664DDD8E0160E","title":"Not the actual summary 1","start":"2020-09-15T15:30:00.000Z","end":"2020-09-15T16:30:00.000Z","allDay":false,"timezone":"America/Los_Angeles"},
+      {"uid":"040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F","sourceUid":"040000008200E00074C5B7101A82E00800000000C8CF296B9654D60100000000000000001000000031C6A267A9E4A2489CEB57D709E7A37F","title":"Not the actual summary either","start":"2020-07-07T19:00:00.000Z","end":"2020-07-07T19:30:00.000Z","allDay":false,"location":"https://bluejeans.com/7999979999","recurrence":{"frequency":"weekly","interval":1,"until":"2021-03-09T20:00:00.000Z","byWeekDay":[2,4,5,0],"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"until\":\"2021-03-09T20:00:00.000Z\",\"byWeekDay\":[2,4,5,0],\"timezone\":\"America/Los_Angeles\"}"}
     ],
     "errors": [],
     "method": "PUBLISH",

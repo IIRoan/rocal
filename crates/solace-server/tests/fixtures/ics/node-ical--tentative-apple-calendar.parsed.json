@@ -1,66 +1,10 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "31a1ffc9-9b76-465b-ae4a-cadb694c9d37",
-        "sourceUid": "31a1ffc9-9b76-465b-ae4a-cadb694c9d37",
-        "title": "Tentative",
-        "start": "2022-07-04T23:00:00.000Z",
-        "end": "2022-07-04T23:50:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC",
-        "participants": [
-          {
-            "email": "tentative@example.com",
-            "role": "organizer",
-            "status": "accepted",
-            "displayName": "tentative@example.com"
-          }
-        ]
-      },
-      {
-        "uid": "F00F3710-BF4D-46D3-9A2C-1037AB24C6AC",
-        "sourceUid": "F00F3710-BF4D-46D3-9A2C-1037AB24C6AC",
-        "title": "Confirmed",
-        "start": "2022-07-05T16:00:00.000Z",
-        "end": "2022-07-05T17:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Vancouver",
-        "participants": [
-          {
-            "email": "confirmed@example.com",
-            "role": "organizer",
-            "status": "accepted",
-            "displayName": "confirmed@example.com"
-          }
-        ]
-      },
-      {
-        "uid": "8CAB46C5-669F-4249-B1AD-52BFA72F4E0A",
-        "sourceUid": "8CAB46C5-669F-4249-B1AD-52BFA72F4E0A",
-        "title": "Cancelled",
-        "start": "2022-07-06T20:00:00.000Z",
-        "end": "2022-07-06T21:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Vancouver",
-        "participants": [
-          {
-            "email": "cancelled@example.com",
-            "role": "organizer",
-            "status": "accepted",
-            "displayName": "cancelled@example.com"
-          }
-        ]
-      },
-      {
-        "uid": "99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3",
-        "sourceUid": "99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3",
-        "title": "No Status",
-        "start": "2022-07-07T16:00:00.000Z",
-        "end": "2022-07-07T17:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Vancouver"
-      }
+      {"uid":"31a1ffc9-9b76-465b-ae4a-cadb694c9d37","sourceUid":"31a1ffc9-9b76-465b-ae4a-cadb694c9d37","title":"Tentative","start":"2022-07-04T23:00:00.000Z","end":"2022-07-04T23:50:00.000Z","allDay":false,"timezone":"Etc/UTC","participants":[{"email":"tentative@example.com","role":"organizer","status":"accepted","displayName":"tentative@example.com"}]},
+      {"uid":"F00F3710-BF4D-46D3-9A2C-1037AB24C6AC","sourceUid":"F00F3710-BF4D-46D3-9A2C-1037AB24C6AC","title":"Confirmed","start":"2022-07-05T16:00:00.000Z","end":"2022-07-05T17:00:00.000Z","allDay":false,"timezone":"America/Vancouver","participants":[{"email":"confirmed@example.com","role":"organizer","status":"accepted","displayName":"confirmed@example.com"}]},
+      {"uid":"8CAB46C5-669F-4249-B1AD-52BFA72F4E0A","sourceUid":"8CAB46C5-669F-4249-B1AD-52BFA72F4E0A","title":"Cancelled","start":"2022-07-06T20:00:00.000Z","end":"2022-07-06T21:00:00.000Z","allDay":false,"timezone":"America/Vancouver","participants":[{"email":"cancelled@example.com","role":"organizer","status":"accepted","displayName":"cancelled@example.com"}]},
+      {"uid":"99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3","sourceUid":"99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3","title":"No Status","start":"2022-07-07T16:00:00.000Z","end":"2022-07-07T17:00:00.000Z","allDay":false,"timezone":"America/Vancouver"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -69,66 +13,10 @@
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "31a1ffc9-9b76-465b-ae4a-cadb694c9d37",
-        "sourceUid": "31a1ffc9-9b76-465b-ae4a-cadb694c9d37",
-        "title": "Tentative",
-        "start": "2022-07-04T23:00:00.000Z",
-        "end": "2022-07-04T23:50:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC",
-        "participants": [
-          {
-            "email": "tentative@example.com",
-            "role": "organizer",
-            "status": "accepted",
-            "displayName": "tentative@example.com"
-          }
-        ]
-      },
-      {
-        "uid": "F00F3710-BF4D-46D3-9A2C-1037AB24C6AC",
-        "sourceUid": "F00F3710-BF4D-46D3-9A2C-1037AB24C6AC",
-        "title": "Confirmed",
-        "start": "2022-07-05T16:00:00.000Z",
-        "end": "2022-07-05T17:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Vancouver",
-        "participants": [
-          {
-            "email": "confirmed@example.com",
-            "role": "organizer",
-            "status": "accepted",
-            "displayName": "confirmed@example.com"
-          }
-        ]
-      },
-      {
-        "uid": "8CAB46C5-669F-4249-B1AD-52BFA72F4E0A",
-        "sourceUid": "8CAB46C5-669F-4249-B1AD-52BFA72F4E0A",
-        "title": "Cancelled",
-        "start": "2022-07-06T20:00:00.000Z",
-        "end": "2022-07-06T21:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Vancouver",
-        "participants": [
-          {
-            "email": "cancelled@example.com",
-            "role": "organizer",
-            "status": "accepted",
-            "displayName": "cancelled@example.com"
-          }
-        ]
-      },
-      {
-        "uid": "99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3",
-        "sourceUid": "99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3",
-        "title": "No Status",
-        "start": "2022-07-07T16:00:00.000Z",
-        "end": "2022-07-07T17:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Vancouver"
-      }
+      {"uid":"31a1ffc9-9b76-465b-ae4a-cadb694c9d37","sourceUid":"31a1ffc9-9b76-465b-ae4a-cadb694c9d37","title":"Tentative","start":"2022-07-04T23:00:00.000Z","end":"2022-07-04T23:50:00.000Z","allDay":false,"timezone":"Etc/UTC","participants":[{"email":"tentative@example.com","role":"organizer","status":"accepted","displayName":"tentative@example.com"}]},
+      {"uid":"F00F3710-BF4D-46D3-9A2C-1037AB24C6AC","sourceUid":"F00F3710-BF4D-46D3-9A2C-1037AB24C6AC","title":"Confirmed","start":"2022-07-05T16:00:00.000Z","end":"2022-07-05T17:00:00.000Z","allDay":false,"timezone":"America/Vancouver","participants":[{"email":"confirmed@example.com","role":"organizer","status":"accepted","displayName":"confirmed@example.com"}]},
+      {"uid":"8CAB46C5-669F-4249-B1AD-52BFA72F4E0A","sourceUid":"8CAB46C5-669F-4249-B1AD-52BFA72F4E0A","title":"Cancelled","start":"2022-07-06T20:00:00.000Z","end":"2022-07-06T21:00:00.000Z","allDay":false,"timezone":"America/Vancouver","participants":[{"email":"cancelled@example.com","role":"organizer","status":"accepted","displayName":"cancelled@example.com"}]},
+      {"uid":"99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3","sourceUid":"99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3","title":"No Status","start":"2022-07-07T16:00:00.000Z","end":"2022-07-07T17:00:00.000Z","allDay":false,"timezone":"America/Vancouver"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -137,66 +25,10 @@
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "31a1ffc9-9b76-465b-ae4a-cadb694c9d37",
-        "sourceUid": "31a1ffc9-9b76-465b-ae4a-cadb694c9d37",
-        "title": "Tentative",
-        "start": "2022-07-04T23:00:00.000Z",
-        "end": "2022-07-04T23:50:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC",
-        "participants": [
-          {
-            "email": "tentative@example.com",
-            "role": "organizer",
-            "status": "accepted",
-            "displayName": "tentative@example.com"
-          }
-        ]
-      },
-      {
-        "uid": "F00F3710-BF4D-46D3-9A2C-1037AB24C6AC",
-        "sourceUid": "F00F3710-BF4D-46D3-9A2C-1037AB24C6AC",
-        "title": "Confirmed",
-        "start": "2022-07-05T16:00:00.000Z",
-        "end": "2022-07-05T17:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Vancouver",
-        "participants": [
-          {
-            "email": "confirmed@example.com",
-            "role": "organizer",
-            "status": "accepted",
-            "displayName": "confirmed@example.com"
-          }
-        ]
-      },
-      {
-        "uid": "8CAB46C5-669F-4249-B1AD-52BFA72F4E0A",
-        "sourceUid": "8CAB46C5-669F-4249-B1AD-52BFA72F4E0A",
-        "title": "Cancelled",
-        "start": "2022-07-06T20:00:00.000Z",
-        "end": "2022-07-06T21:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Vancouver",
-        "participants": [
-          {
-            "email": "cancelled@example.com",
-            "role": "organizer",
-            "status": "accepted",
-            "displayName": "cancelled@example.com"
-          }
-        ]
-      },
-      {
-        "uid": "99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3",
-        "sourceUid": "99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3",
-        "title": "No Status",
-        "start": "2022-07-07T16:00:00.000Z",
-        "end": "2022-07-07T17:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Vancouver"
-      }
+      {"uid":"31a1ffc9-9b76-465b-ae4a-cadb694c9d37","sourceUid":"31a1ffc9-9b76-465b-ae4a-cadb694c9d37","title":"Tentative","start":"2022-07-04T23:00:00.000Z","end":"2022-07-04T23:50:00.000Z","allDay":false,"timezone":"Etc/UTC","participants":[{"email":"tentative@example.com","role":"organizer","status":"accepted","displayName":"tentative@example.com"}]},
+      {"uid":"F00F3710-BF4D-46D3-9A2C-1037AB24C6AC","sourceUid":"F00F3710-BF4D-46D3-9A2C-1037AB24C6AC","title":"Confirmed","start":"2022-07-05T16:00:00.000Z","end":"2022-07-05T17:00:00.000Z","allDay":false,"timezone":"America/Vancouver","participants":[{"email":"confirmed@example.com","role":"organizer","status":"accepted","displayName":"confirmed@example.com"}]},
+      {"uid":"8CAB46C5-669F-4249-B1AD-52BFA72F4E0A","sourceUid":"8CAB46C5-669F-4249-B1AD-52BFA72F4E0A","title":"Cancelled","start":"2022-07-06T20:00:00.000Z","end":"2022-07-06T21:00:00.000Z","allDay":false,"timezone":"America/Vancouver","participants":[{"email":"cancelled@example.com","role":"organizer","status":"accepted","displayName":"cancelled@example.com"}]},
+      {"uid":"99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3","sourceUid":"99F615DE-82C6-4CEF-97B8-CD0D3E1EE0D3","title":"No Status","start":"2022-07-07T16:00:00.000Z","end":"2022-07-07T17:00:00.000Z","allDay":false,"timezone":"America/Vancouver"}
     ],
     "errors": [],
     "method": "PUBLISH",

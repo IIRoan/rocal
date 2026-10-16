@@ -69,65 +69,30 @@ fn sample_until(pid: u32, running: &AtomicBool) -> Memory {
 }
 
 struct Options {
-    allocator: String,
     soak: Option<Duration>,
     steady: Duration,
-    remote: Option<Remote>,
-}
-
-/// A deployed server in Railway's test environment, read through `railway ssh`; it runs in production mode.
-struct Remote {
-    base: String,
-    service: String,
-    database: String,
 }
 
 pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let mut options = Options {
-        allocator: "default".into(),
         soak: None,
         steady: Duration::from_secs(30),
-        remote: None,
     };
-    let mut remote = (None, None, None);
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         let value = iter
             .next()
             .with_context(|| format!("{arg} needs a value"))?;
         match *arg {
-            "--allocator" => options.allocator = (*value).to_owned(),
             "--soak-minutes" => {
                 options.soak = Some(Duration::from_secs(value.parse::<u64>()? * 60))
             }
             "--steady-seconds" => options.steady = Duration::from_secs(value.parse()?),
-            "--remote" => remote.0 = Some((*value).to_owned()),
-            "--railway-service" => remote.1 = Some((*value).to_owned()),
-            "--database" => remote.2 = Some((*value).to_owned()),
-            _ => bail!(
-                "usage: cargo xtask mem-budget [--allocator default|system|mimalloc|jemalloc] [--steady-seconds N] [--soak-minutes N] [--remote <url> --railway-service <test-*> --database <name>]"
-            ),
+            _ => bail!("usage: cargo xtask mem-budget [--steady-seconds N] [--soak-minutes N]"),
         }
     }
     let env = TestEnv::from_env()?;
-    match remote {
-        (None, None, None) => {}
-        (Some(base), Some(service), Some(database)) => {
-            solace_api_tests::guard::check_service_url("--remote", &base)?;
-            ensure!(
-                service.starts_with("test-"),
-                "test services are named test-*; refusing {service}"
-            );
-            options.remote = Some(Remote {
-                base,
-                service,
-                database,
-            });
-            return measure_remote(&env, &options).await;
-        }
-        _ => bail!("--remote needs --railway-service and --database"),
-    }
-    let binary = build(&options.allocator)?;
+    let binary = build()?;
     let database = format!("solace_test_mem_{}", std::process::id());
     let database_url = env.database_url_for(&database)?;
     let mut admin = PgConnection::connect(&env.database_url).await?;
@@ -139,25 +104,15 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     result
 }
 
-/// A release build for x86-64-v3 with the chosen allocator feature.
-fn build(allocator: &str) -> anyhow::Result<std::path::PathBuf> {
+/// A release build for x86-64-v3, as the Dockerfile builds it.
+fn build() -> anyhow::Result<std::path::PathBuf> {
     let root = crate::repo_root();
-    let mut command = Command::new("cargo");
-    command
+    let status = Command::new("cargo")
         .current_dir(&root)
         .args(["build", "--release", "--locked", "-p", "solace-server"])
-        .env("RUSTFLAGS", "-C target-cpu=x86-64-v3");
-    match allocator {
-        "default" => {}
-        "system" => {
-            command.arg("--no-default-features");
-        }
-        "mimalloc" | "jemalloc" => {
-            command.args(["--no-default-features", "--features", allocator]);
-        }
-        other => bail!("unknown allocator {other}"),
-    }
-    ensure!(command.status()?.success(), "release build failed");
+        .env("RUSTFLAGS", "-C target-cpu=x86-64-v3")
+        .status()?;
+    ensure!(status.success(), "release build failed");
     Ok(root.join("target/release/solace-server"))
 }
 
@@ -206,11 +161,11 @@ async fn phases(
     let base = format!("http://127.0.0.1:{port}");
     let client = reqwest::Client::new();
     wait_until_up(&client, &base).await?;
-    let cookie = session_cookie(env, database_url, port, false).await?;
+    let cookie = session_cookie(env, database_url, port).await?;
     tokio::time::sleep(Duration::from_secs(2)).await;
     let idle = sample(pid)?;
 
-    let steady = load(Some(pid), &client, &base, &cookie, options.steady, 8).await?;
+    let steady = load(pid, &client, &base, &cookie, options.steady, 8).await?;
     tokio::time::sleep(Duration::from_secs(2)).await;
     let before_burst = sample(pid)?;
     let burst = sign_in_burst(pid, &client, &base, env, database_url).await?;
@@ -224,7 +179,7 @@ async fn phases(
     let soak = match options.soak {
         Some(duration) => {
             let start = sample(pid)?;
-            load(Some(pid), &client, &base, &cookie, duration, 4).await?;
+            load(pid, &client, &base, &cookie, duration, 4).await?;
             tokio::time::sleep(Duration::from_secs(5)).await;
             Some((start, sample(pid)?))
         }
@@ -261,7 +216,6 @@ async fn phases(
         );
     }
     Ok(json!({
-        "allocator": options.allocator,
         "idle": memory_json(idle),
         "steady_peak": memory_json(steady),
         "before_burst": memory_json(before_burst),
@@ -302,12 +256,7 @@ async fn wait_until_up(client: &reqwest::Client, base: &str) -> anyhow::Result<(
 }
 
 /// A user and session written the way the TypeScript backend writes them, and its signed cookie.
-async fn session_cookie(
-    env: &TestEnv,
-    database_url: &str,
-    port: u16,
-    production: bool,
-) -> anyhow::Result<String> {
+async fn session_cookie(env: &TestEnv, database_url: &str, port: u16) -> anyhow::Result<String> {
     let mut db = PgConnection::connect(database_url).await?;
     let suffix = std::process::id();
     let token = format!("memsession{suffix:022}");
@@ -328,7 +277,7 @@ async fn session_cookie(
     .await?;
     let vars = env.backend_vars(&BackendTarget {
         port,
-        production,
+        production: false,
         database_url,
         stalwart_provision_token: "",
     });
@@ -344,7 +293,7 @@ async fn session_cookie(
 
 /// The routes the server has, at `concurrency` requests in flight, for `duration`.
 async fn load(
-    pid: Option<u32>,
+    pid: u32,
     client: &reqwest::Client,
     base: &str,
     cookie: &str,
@@ -352,10 +301,10 @@ async fn load(
     concurrency: usize,
 ) -> anyhow::Result<Memory> {
     let running = Arc::new(AtomicBool::new(true));
-    let sampler = pid.map(|pid| {
+    let sampler = {
         let running = running.clone();
         std::thread::spawn(move || sample_until(pid, &running))
-    });
+    };
     let deadline = Instant::now() + duration;
     let mut workers = tokio::task::JoinSet::new();
     for worker in 0..concurrency {
@@ -384,12 +333,9 @@ async fn load(
     }
     while workers.join_next().await.is_some() {}
     running.store(false, Ordering::Relaxed);
-    match sampler {
-        Some(sampler) => sampler
-            .join()
-            .map_err(|_| anyhow::anyhow!("sampler panicked")),
-        None => Ok(Memory::default()),
-    }
+    sampler
+        .join()
+        .map_err(|_| anyhow::anyhow!("sampler panicked"))
 }
 
 /// Twenty concurrent password sign-ins, once the server has the sign-in route.
@@ -498,72 +444,4 @@ async fn sign_up_users(
         users.push((email, password));
     }
     Ok(users)
-}
-
-/// The server's `/proc/1` figures inside its Railway container (PSS when readable); VmHWM is the exact peak since it started.
-fn remote_sample(service: &str) -> anyhow::Result<Memory> {
-    let output = Command::new("railway")
-        .args(["ssh", "--service", service, "--environment", "test", "--"])
-        .args([
-            "sh",
-            "-c",
-            "cat /proc/1/status; grep '^Pss:' /proc/1/smaps_rollup 2>/dev/null; true",
-        ])
-        .output()
-        .context("railway ssh")?;
-    ensure!(
-        output.status.success(),
-        "railway ssh failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    Ok(parse_memory(&String::from_utf8_lossy(&output.stdout)))
-}
-
-/// Idle, the steady load and the soak against a freshly started deployed server; the sign-in burst runs inside Railway (`memory_burst`), because its edge gives every client one address.
-async fn measure_remote(env: &TestEnv, options: &Options) -> anyhow::Result<()> {
-    let Some(remote) = &options.remote else {
-        bail!("no remote server");
-    };
-    let database_url = env.database_url_for(&remote.database)?;
-    let client = reqwest::Client::new();
-    let base = remote.base.trim_end_matches('/').to_owned();
-    wait_until_up(&client, &base).await?;
-    let cookie = session_cookie(env, &database_url, 0, true).await?;
-    let idle = remote_sample(&remote.service)?;
-    load(None, &client, &base, &cookie, options.steady, 8).await?;
-    let steady = remote_sample(&remote.service)?;
-    let soak = match options.soak {
-        Some(duration) => {
-            let start = remote_sample(&remote.service)?;
-            load(None, &client, &base, &cookie, duration, 4).await?;
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            Some((start, remote_sample(&remote.service)?))
-        }
-        None => None,
-    };
-    let mut failures = Vec::new();
-    let mut check = |name: &str, value: f64, budget: f64| {
-        if value > budget {
-            failures.push(format!("{name}: {value:.1} MiB > {budget:.1} MiB"));
-        }
-    };
-    check("idle RSS", idle.rss_mib, IDLE_BUDGET_MIB);
-    check("steady peak RSS", steady.hwm_mib, STEADY_BUDGET_MIB);
-    if let Some((start, end)) = soak {
-        check(
-            "soak growth",
-            end.rss_mib,
-            start.rss_mib * (1.0 + SOAK_GROWTH_TOLERANCE),
-        );
-    }
-    let report = json!({
-        "server": remote.base,
-        "idle": memory_json(idle),
-        "steady": memory_json(steady),
-        "soak": soak.map(|(start, end)| json!({"start": memory_json(start), "end": memory_json(end)})),
-        "failures": failures,
-    });
-    println!("{}", serde_json::to_string_pretty(&report)?);
-    ensure!(failures.is_empty(), "memory budgets exceeded");
-    Ok(())
 }

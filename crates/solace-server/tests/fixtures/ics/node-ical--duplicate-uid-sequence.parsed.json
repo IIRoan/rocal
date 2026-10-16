@@ -1,72 +1,24 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "duplicate-sequence-test@node-ical.test",
-        "sourceUid": "duplicate-sequence-test@node-ical.test",
-        "title": "Team Meeting (SEQUENCE 2)",
-        "start": "2024-01-15T10:00:00.000Z",
-        "end": "2024-01-15T11:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      },
-      {
-        "uid": "newer-wins-test@node-ical.test",
-        "sourceUid": "newer-wins-test@node-ical.test",
-        "title": "Updated version (SEQUENCE 3) - should win",
-        "start": "2024-01-20T14:00:00.000Z",
-        "end": "2024-01-20T15:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      }
+      {"uid":"duplicate-sequence-test@node-ical.test","sourceUid":"duplicate-sequence-test@node-ical.test","title":"Team Meeting (SEQUENCE 2)","start":"2024-01-15T10:00:00.000Z","end":"2024-01-15T11:00:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"newer-wins-test@node-ical.test","sourceUid":"newer-wins-test@node-ical.test","title":"Updated version (SEQUENCE 3) - should win","start":"2024-01-20T14:00:00.000Z","end":"2024-01-20T15:00:00.000Z","allDay":false,"timezone":"Etc/UTC"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "duplicate-sequence-test@node-ical.test",
-        "sourceUid": "duplicate-sequence-test@node-ical.test",
-        "title": "Team Meeting (SEQUENCE 2)",
-        "start": "2024-01-15T10:00:00.000Z",
-        "end": "2024-01-15T11:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      },
-      {
-        "uid": "newer-wins-test@node-ical.test",
-        "sourceUid": "newer-wins-test@node-ical.test",
-        "title": "Updated version (SEQUENCE 3) - should win",
-        "start": "2024-01-20T14:00:00.000Z",
-        "end": "2024-01-20T15:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      }
+      {"uid":"duplicate-sequence-test@node-ical.test","sourceUid":"duplicate-sequence-test@node-ical.test","title":"Team Meeting (SEQUENCE 2)","start":"2024-01-15T10:00:00.000Z","end":"2024-01-15T11:00:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"newer-wins-test@node-ical.test","sourceUid":"newer-wins-test@node-ical.test","title":"Updated version (SEQUENCE 3) - should win","start":"2024-01-20T14:00:00.000Z","end":"2024-01-20T15:00:00.000Z","allDay":false,"timezone":"Etc/UTC"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "duplicate-sequence-test@node-ical.test",
-        "sourceUid": "duplicate-sequence-test@node-ical.test",
-        "title": "Team Meeting (SEQUENCE 2)",
-        "start": "2024-01-15T10:00:00.000Z",
-        "end": "2024-01-15T11:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      },
-      {
-        "uid": "newer-wins-test@node-ical.test",
-        "sourceUid": "newer-wins-test@node-ical.test",
-        "title": "Updated version (SEQUENCE 3) - should win",
-        "start": "2024-01-20T14:00:00.000Z",
-        "end": "2024-01-20T15:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      }
+      {"uid":"duplicate-sequence-test@node-ical.test","sourceUid":"duplicate-sequence-test@node-ical.test","title":"Team Meeting (SEQUENCE 2)","start":"2024-01-15T10:00:00.000Z","end":"2024-01-15T11:00:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"newer-wins-test@node-ical.test","sourceUid":"newer-wins-test@node-ical.test","title":"Updated version (SEQUENCE 3) - should win","start":"2024-01-20T14:00:00.000Z","end":"2024-01-20T15:00:00.000Z","allDay":false,"timezone":"Etc/UTC"}
     ],
     "errors": [],
     "method": "PUBLISH"

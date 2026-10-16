@@ -38,8 +38,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["f
 sentry = { version = "0.49", default-features = false, features = ["backtrace", "panic", "reqwest", "rustls"] }
 uuid = { version = "1", features = ["v4"] }
 hex = "0.4"
-# Allocators, picked by `cargo xtask mem-budget`.
-mimalloc = { version = "0.1", default-features = false }
+# Picked over mimalloc and glibc by `cargo xtask mem-budget` (plan 001, step 4a).
 tikv-jemallocator = "0.7"
 # Better Auth passwords: scrypt over the NFKC-normalized password.
 scrypt = { version = "0.12", default-features = false }

@@ -1,108 +1,24 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "000021a",
-        "sourceUid": "000021a",
-        "title": "Party",
-        "start": "2022-07-14T12:00:00.000Z",
-        "end": "2022-07-14T19:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "timezone": "Europe/Berlin"
-        },
-        "timezone": "Europe/Berlin",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Europe/Berlin\"}"
-      },
-      {
-        "uid": "000021b",
-        "sourceUid": "000021b",
-        "title": "Party next day",
-        "start": "2022-07-15T12:00:00.000Z",
-        "end": "2022-07-15T19:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "timezone": "Etc/GMT-2"
-        },
-        "timezone": "Etc/GMT-2",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Etc/GMT-2\"}"
-      }
+      {"uid":"000021a","sourceUid":"000021a","title":"Party","start":"2022-07-14T12:00:00.000Z","end":"2022-07-14T19:00:00.000Z","allDay":false,"recurrence":{"frequency":"yearly","interval":1,"timezone":"Europe/Berlin"},"timezone":"Europe/Berlin","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Europe/Berlin\"}"},
+      {"uid":"000021b","sourceUid":"000021b","title":"Party next day","start":"2022-07-15T12:00:00.000Z","end":"2022-07-15T19:00:00.000Z","allDay":false,"recurrence":{"frequency":"yearly","interval":1,"timezone":"Etc/GMT-2"},"timezone":"Etc/GMT-2","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Etc/GMT-2\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "000021a",
-        "sourceUid": "000021a",
-        "title": "Party",
-        "start": "2022-07-14T12:00:00.000Z",
-        "end": "2022-07-14T19:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "timezone": "Europe/Berlin"
-        },
-        "timezone": "Europe/Berlin",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Europe/Berlin\"}"
-      },
-      {
-        "uid": "000021b",
-        "sourceUid": "000021b",
-        "title": "Party next day",
-        "start": "2022-07-15T12:00:00.000Z",
-        "end": "2022-07-15T19:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "timezone": "Etc/GMT-2"
-        },
-        "timezone": "Etc/GMT-2",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Etc/GMT-2\"}"
-      }
+      {"uid":"000021a","sourceUid":"000021a","title":"Party","start":"2022-07-14T12:00:00.000Z","end":"2022-07-14T19:00:00.000Z","allDay":false,"recurrence":{"frequency":"yearly","interval":1,"timezone":"Europe/Berlin"},"timezone":"Europe/Berlin","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Europe/Berlin\"}"},
+      {"uid":"000021b","sourceUid":"000021b","title":"Party next day","start":"2022-07-15T12:00:00.000Z","end":"2022-07-15T19:00:00.000Z","allDay":false,"recurrence":{"frequency":"yearly","interval":1,"timezone":"Etc/GMT-2"},"timezone":"Etc/GMT-2","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Etc/GMT-2\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "000021a",
-        "sourceUid": "000021a",
-        "title": "Party",
-        "start": "2022-07-14T12:00:00.000Z",
-        "end": "2022-07-14T19:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "timezone": "Europe/Berlin"
-        },
-        "timezone": "Europe/Berlin",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Europe/Berlin\"}"
-      },
-      {
-        "uid": "000021b",
-        "sourceUid": "000021b",
-        "title": "Party next day",
-        "start": "2022-07-15T12:00:00.000Z",
-        "end": "2022-07-15T19:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "timezone": "Etc/GMT-2"
-        },
-        "timezone": "Etc/GMT-2",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Etc/GMT-2\"}"
-      }
+      {"uid":"000021a","sourceUid":"000021a","title":"Party","start":"2022-07-14T12:00:00.000Z","end":"2022-07-14T19:00:00.000Z","allDay":false,"recurrence":{"frequency":"yearly","interval":1,"timezone":"Europe/Berlin"},"timezone":"Europe/Berlin","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Europe/Berlin\"}"},
+      {"uid":"000021b","sourceUid":"000021b","title":"Party next day","start":"2022-07-15T12:00:00.000Z","end":"2022-07-15T19:00:00.000Z","allDay":false,"recurrence":{"frequency":"yearly","interval":1,"timezone":"Etc/GMT-2"},"timezone":"Etc/GMT-2","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Etc/GMT-2\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"

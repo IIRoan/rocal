@@ -1,419 +1,48 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "e4928aff-334b-3d33-9ff8-cbe74b0ea009",
-        "sourceUid": "e4928aff-334b-3d33-9ff8-cbe74b0ea009",
-        "title": "Nieuwjaarsdag",
-        "start": "2024-01-01T00:00:00.000Z",
-        "end": "2024-01-01T23:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "UTC"
-        },
-        "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"
-      },
-      {
-        "uid": "ddc371b4-cb91-345a-95db-5e6260f4c172",
-        "sourceUid": "ddc371b4-cb91-345a-95db-5e6260f4c172",
-        "title": "Goede Vrijdag",
-        "start": "2024-03-29T00:00:00.000Z",
-        "end": "2024-03-29T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "326f001c-6275-3f84-944f-b84439e1fc5d",
-        "sourceUid": "326f001c-6275-3f84-944f-b84439e1fc5d",
-        "title": "Eerste paasdag",
-        "start": "2024-03-31T00:00:00.000Z",
-        "end": "2024-03-31T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "0afbaf91-0dec-3c1c-9b39-8587bd01ca37",
-        "sourceUid": "0afbaf91-0dec-3c1c-9b39-8587bd01ca37",
-        "title": "Tweede paasdag",
-        "start": "2024-04-01T00:00:00.000Z",
-        "end": "2024-04-01T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "e12e71ac-a942-30f7-a677-f6d31f6a93a7",
-        "sourceUid": "e12e71ac-a942-30f7-a677-f6d31f6a93a7",
-        "title": "Koningsdag",
-        "start": "2024-04-27T00:00:00.000Z",
-        "end": "2024-04-27T23:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "UTC"
-        },
-        "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"
-      },
-      {
-        "uid": "e9bdd973-8118-347f-b83e-5bbb29434afa",
-        "sourceUid": "e9bdd973-8118-347f-b83e-5bbb29434afa",
-        "title": "Bevrijdingsdag",
-        "start": "2024-05-05T00:00:00.000Z",
-        "end": "2024-05-05T23:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "UTC"
-        },
-        "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"
-      },
-      {
-        "uid": "ef5fd63f-b76c-323b-8c80-432a9915635b",
-        "sourceUid": "ef5fd63f-b76c-323b-8c80-432a9915635b",
-        "title": "Hemelvaartsdag",
-        "start": "2024-05-09T00:00:00.000Z",
-        "end": "2024-05-09T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "4f365693-6139-3461-88f6-5c31b2bdb406",
-        "sourceUid": "4f365693-6139-3461-88f6-5c31b2bdb406",
-        "title": "Eerste pinksterdag",
-        "start": "2024-05-19T00:00:00.000Z",
-        "end": "2024-05-19T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "6ff2ff06-c023-3a96-bbaa-c956f5fda459",
-        "sourceUid": "6ff2ff06-c023-3a96-bbaa-c956f5fda459",
-        "title": "Tweede pinksterdag",
-        "start": "2024-05-20T00:00:00.000Z",
-        "end": "2024-05-20T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "e7ce2830-cde8-35e6-9ac7-fc967f1f9a09",
-        "sourceUid": "e7ce2830-cde8-35e6-9ac7-fc967f1f9a09",
-        "title": "Eerste kerstdag",
-        "start": "2024-12-25T00:00:00.000Z",
-        "end": "2024-12-25T23:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "UTC"
-        },
-        "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"
-      },
-      {
-        "uid": "5aceff0d-a20a-3721-bc27-6a1b9d785033",
-        "sourceUid": "5aceff0d-a20a-3721-bc27-6a1b9d785033",
-        "title": "Tweede kerstdag",
-        "start": "2024-12-26T00:00:00.000Z",
-        "end": "2024-12-26T23:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "UTC"
-        },
-        "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"
-      },
-      {
-        "uid": "86f99fb5-d9be-3050-a892-29f632906a0f",
-        "sourceUid": "86f99fb5-d9be-3050-a892-29f632906a0f",
-        "title": "Goede Vrijdag",
-        "start": "2025-04-18T00:00:00.000Z",
-        "end": "2025-04-18T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
-        "sourceUid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
-        "title": "Eerste paasdag",
-        "start": "2025-04-20T00:00:00.000Z",
-        "end": "2025-04-20T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "4cca7402-8848-3ba1-bff0-5326cbad6bb3",
-        "sourceUid": "4cca7402-8848-3ba1-bff0-5326cbad6bb3",
-        "title": "Tweede paasdag",
-        "start": "2025-04-21T00:00:00.000Z",
-        "end": "2025-04-21T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "e9436fec-d224-3ea6-be7a-d5be315c4511",
-        "sourceUid": "e9436fec-d224-3ea6-be7a-d5be315c4511",
-        "title": "Koningsdag",
-        "start": "2025-04-26T00:00:00.000Z",
-        "end": "2025-04-26T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb",
-        "sourceUid": "2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb",
-        "title": "Hemelvaartsdag",
-        "start": "2025-05-29T00:00:00.000Z",
-        "end": "2025-05-29T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "2497f734-dad7-370f-8899-4a1fc0eb49ee",
-        "sourceUid": "2497f734-dad7-370f-8899-4a1fc0eb49ee",
-        "title": "Eerste pinksterdag",
-        "start": "2025-06-08T00:00:00.000Z",
-        "end": "2025-06-08T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "19c7351b-034f-38ef-a3b3-394e88d082cd",
-        "sourceUid": "19c7351b-034f-38ef-a3b3-394e88d082cd",
-        "title": "Tweede pinksterdag",
-        "start": "2025-06-09T00:00:00.000Z",
-        "end": "2025-06-09T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "57378f6f-0614-3e7d-a908-0f05201a396c",
-        "sourceUid": "57378f6f-0614-3e7d-a908-0f05201a396c",
-        "title": "Goede Vrijdag",
-        "start": "2026-04-03T00:00:00.000Z",
-        "end": "2026-04-03T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
-        "sourceUid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
-        "title": "Eerste paasdag",
-        "start": "2026-04-05T00:00:00.000Z",
-        "end": "2026-04-05T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "400e13b0-5728-35e5-981b-7ee37fe30ec2",
-        "sourceUid": "400e13b0-5728-35e5-981b-7ee37fe30ec2",
-        "title": "Tweede paasdag",
-        "start": "2026-04-06T00:00:00.000Z",
-        "end": "2026-04-06T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "30a2fb2b-4a99-3f51-9911-b23d81ee2a92",
-        "sourceUid": "30a2fb2b-4a99-3f51-9911-b23d81ee2a92",
-        "title": "Hemelvaartsdag",
-        "start": "2026-05-14T00:00:00.000Z",
-        "end": "2026-05-14T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "946c672c-d83f-38dc-b0a4-465fa95b3cee",
-        "sourceUid": "946c672c-d83f-38dc-b0a4-465fa95b3cee",
-        "title": "Eerste pinksterdag",
-        "start": "2026-05-24T00:00:00.000Z",
-        "end": "2026-05-24T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "63fa6175-5d78-38c6-a6d0-a44ce632b8bb",
-        "sourceUid": "63fa6175-5d78-38c6-a6d0-a44ce632b8bb",
-        "title": "Tweede pinksterdag",
-        "start": "2026-05-25T00:00:00.000Z",
-        "end": "2026-05-25T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "c765379d-3c9d-38dc-8d34-083d59841260",
-        "sourceUid": "c765379d-3c9d-38dc-8d34-083d59841260",
-        "title": "Goede Vrijdag",
-        "start": "2027-03-26T00:00:00.000Z",
-        "end": "2027-03-26T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
-        "sourceUid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
-        "title": "Eerste paasdag",
-        "start": "2027-03-28T00:00:00.000Z",
-        "end": "2027-03-28T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "b1493465-2f10-3985-977b-5b2bdafe507b",
-        "sourceUid": "b1493465-2f10-3985-977b-5b2bdafe507b",
-        "title": "Tweede paasdag",
-        "start": "2027-03-29T00:00:00.000Z",
-        "end": "2027-03-29T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "7d3b16b1-ad43-33ce-aebe-4921176e4351",
-        "sourceUid": "7d3b16b1-ad43-33ce-aebe-4921176e4351",
-        "title": "Hemelvaartsdag",
-        "start": "2027-05-06T00:00:00.000Z",
-        "end": "2027-05-06T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "ba9573f5-f176-3751-837a-1dd4946d02bd",
-        "sourceUid": "ba9573f5-f176-3751-837a-1dd4946d02bd",
-        "title": "Eerste pinksterdag",
-        "start": "2027-05-16T00:00:00.000Z",
-        "end": "2027-05-16T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "a2182aa7-3419-3be7-b880-b969741dc84c",
-        "sourceUid": "a2182aa7-3419-3be7-b880-b969741dc84c",
-        "title": "Tweede pinksterdag",
-        "start": "2027-05-17T00:00:00.000Z",
-        "end": "2027-05-17T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "af26ac65-4781-3115-8b6f-4ca703471382",
-        "sourceUid": "af26ac65-4781-3115-8b6f-4ca703471382",
-        "title": "Goede Vrijdag",
-        "start": "2028-04-14T00:00:00.000Z",
-        "end": "2028-04-14T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
-        "sourceUid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
-        "title": "Eerste paasdag",
-        "start": "2028-04-16T00:00:00.000Z",
-        "end": "2028-04-16T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "13b91c0e-14ac-3778-9c10-c354adb32609",
-        "sourceUid": "13b91c0e-14ac-3778-9c10-c354adb32609",
-        "title": "Tweede paasdag",
-        "start": "2028-04-17T00:00:00.000Z",
-        "end": "2028-04-17T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "9058a29c-db67-3553-a8a9-bd6e7cf2aef7",
-        "sourceUid": "9058a29c-db67-3553-a8a9-bd6e7cf2aef7",
-        "title": "Hemelvaartsdag",
-        "start": "2028-05-25T00:00:00.000Z",
-        "end": "2028-05-25T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "38c751ac-fab4-3567-9f7c-e5d098e8676c",
-        "sourceUid": "38c751ac-fab4-3567-9f7c-e5d098e8676c",
-        "title": "Eerste pinksterdag",
-        "start": "2028-06-04T00:00:00.000Z",
-        "end": "2028-06-04T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "876ee675-cc88-3c3f-837d-df9ab57c1af9",
-        "sourceUid": "876ee675-cc88-3c3f-837d-df9ab57c1af9",
-        "title": "Tweede pinksterdag",
-        "start": "2028-06-05T00:00:00.000Z",
-        "end": "2028-06-05T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
-        "sourceUid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
-        "title": "Goede Vrijdag",
-        "start": "2029-03-30T00:00:00.000Z",
-        "end": "2029-03-30T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
-        "sourceUid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
-        "title": "Eerste paasdag",
-        "start": "2029-04-01T00:00:00.000Z",
-        "end": "2029-04-01T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "75aeff38-f2e9-3dde-9bdd-bdc0d18cf907",
-        "sourceUid": "75aeff38-f2e9-3dde-9bdd-bdc0d18cf907",
-        "title": "Tweede paasdag",
-        "start": "2029-04-02T00:00:00.000Z",
-        "end": "2029-04-02T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "743cd2ec-8278-342f-8b22-ba8d3201226b",
-        "sourceUid": "743cd2ec-8278-342f-8b22-ba8d3201226b",
-        "title": "Hemelvaartsdag",
-        "start": "2029-05-10T00:00:00.000Z",
-        "end": "2029-05-10T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "42133187-6214-3ab8-8c86-1b86f0be2b1e",
-        "sourceUid": "42133187-6214-3ab8-8c86-1b86f0be2b1e",
-        "title": "Eerste pinksterdag",
-        "start": "2029-05-20T00:00:00.000Z",
-        "end": "2029-05-20T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      },
-      {
-        "uid": "6decfb15-dbcf-378e-a3fc-a16213fe22a7",
-        "sourceUid": "6decfb15-dbcf-378e-a3fc-a16213fe22a7",
-        "title": "Tweede pinksterdag",
-        "start": "2029-05-21T00:00:00.000Z",
-        "end": "2029-05-21T23:59:59.999Z",
-        "allDay": true,
-        "timezone": "UTC"
-      }
+      {"uid":"e4928aff-334b-3d33-9ff8-cbe74b0ea009","sourceUid":"e4928aff-334b-3d33-9ff8-cbe74b0ea009","title":"Nieuwjaarsdag","start":"2024-01-01T00:00:00.000Z","end":"2024-01-01T23:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"UTC"},"timezone":"UTC","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"},
+      {"uid":"ddc371b4-cb91-345a-95db-5e6260f4c172","sourceUid":"ddc371b4-cb91-345a-95db-5e6260f4c172","title":"Goede Vrijdag","start":"2024-03-29T00:00:00.000Z","end":"2024-03-29T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"326f001c-6275-3f84-944f-b84439e1fc5d","sourceUid":"326f001c-6275-3f84-944f-b84439e1fc5d","title":"Eerste paasdag","start":"2024-03-31T00:00:00.000Z","end":"2024-03-31T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"0afbaf91-0dec-3c1c-9b39-8587bd01ca37","sourceUid":"0afbaf91-0dec-3c1c-9b39-8587bd01ca37","title":"Tweede paasdag","start":"2024-04-01T00:00:00.000Z","end":"2024-04-01T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"e12e71ac-a942-30f7-a677-f6d31f6a93a7","sourceUid":"e12e71ac-a942-30f7-a677-f6d31f6a93a7","title":"Koningsdag","start":"2024-04-27T00:00:00.000Z","end":"2024-04-27T23:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"UTC"},"timezone":"UTC","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"},
+      {"uid":"e9bdd973-8118-347f-b83e-5bbb29434afa","sourceUid":"e9bdd973-8118-347f-b83e-5bbb29434afa","title":"Bevrijdingsdag","start":"2024-05-05T00:00:00.000Z","end":"2024-05-05T23:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"UTC"},"timezone":"UTC","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"},
+      {"uid":"ef5fd63f-b76c-323b-8c80-432a9915635b","sourceUid":"ef5fd63f-b76c-323b-8c80-432a9915635b","title":"Hemelvaartsdag","start":"2024-05-09T00:00:00.000Z","end":"2024-05-09T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"4f365693-6139-3461-88f6-5c31b2bdb406","sourceUid":"4f365693-6139-3461-88f6-5c31b2bdb406","title":"Eerste pinksterdag","start":"2024-05-19T00:00:00.000Z","end":"2024-05-19T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"6ff2ff06-c023-3a96-bbaa-c956f5fda459","sourceUid":"6ff2ff06-c023-3a96-bbaa-c956f5fda459","title":"Tweede pinksterdag","start":"2024-05-20T00:00:00.000Z","end":"2024-05-20T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"e7ce2830-cde8-35e6-9ac7-fc967f1f9a09","sourceUid":"e7ce2830-cde8-35e6-9ac7-fc967f1f9a09","title":"Eerste kerstdag","start":"2024-12-25T00:00:00.000Z","end":"2024-12-25T23:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"UTC"},"timezone":"UTC","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"},
+      {"uid":"5aceff0d-a20a-3721-bc27-6a1b9d785033","sourceUid":"5aceff0d-a20a-3721-bc27-6a1b9d785033","title":"Tweede kerstdag","start":"2024-12-26T00:00:00.000Z","end":"2024-12-26T23:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"UTC"},"timezone":"UTC","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"UTC\"}"},
+      {"uid":"86f99fb5-d9be-3050-a892-29f632906a0f","sourceUid":"86f99fb5-d9be-3050-a892-29f632906a0f","title":"Goede Vrijdag","start":"2025-04-18T00:00:00.000Z","end":"2025-04-18T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"9ec35bb3-ffb7-3fec-b6a1-69f19818adbc","sourceUid":"9ec35bb3-ffb7-3fec-b6a1-69f19818adbc","title":"Eerste paasdag","start":"2025-04-20T00:00:00.000Z","end":"2025-04-20T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"4cca7402-8848-3ba1-bff0-5326cbad6bb3","sourceUid":"4cca7402-8848-3ba1-bff0-5326cbad6bb3","title":"Tweede paasdag","start":"2025-04-21T00:00:00.000Z","end":"2025-04-21T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"e9436fec-d224-3ea6-be7a-d5be315c4511","sourceUid":"e9436fec-d224-3ea6-be7a-d5be315c4511","title":"Koningsdag","start":"2025-04-26T00:00:00.000Z","end":"2025-04-26T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb","sourceUid":"2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb","title":"Hemelvaartsdag","start":"2025-05-29T00:00:00.000Z","end":"2025-05-29T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"2497f734-dad7-370f-8899-4a1fc0eb49ee","sourceUid":"2497f734-dad7-370f-8899-4a1fc0eb49ee","title":"Eerste pinksterdag","start":"2025-06-08T00:00:00.000Z","end":"2025-06-08T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"19c7351b-034f-38ef-a3b3-394e88d082cd","sourceUid":"19c7351b-034f-38ef-a3b3-394e88d082cd","title":"Tweede pinksterdag","start":"2025-06-09T00:00:00.000Z","end":"2025-06-09T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"57378f6f-0614-3e7d-a908-0f05201a396c","sourceUid":"57378f6f-0614-3e7d-a908-0f05201a396c","title":"Goede Vrijdag","start":"2026-04-03T00:00:00.000Z","end":"2026-04-03T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"13ae86ea-3db6-3ecf-8cb0-da6fe8251b93","sourceUid":"13ae86ea-3db6-3ecf-8cb0-da6fe8251b93","title":"Eerste paasdag","start":"2026-04-05T00:00:00.000Z","end":"2026-04-05T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"400e13b0-5728-35e5-981b-7ee37fe30ec2","sourceUid":"400e13b0-5728-35e5-981b-7ee37fe30ec2","title":"Tweede paasdag","start":"2026-04-06T00:00:00.000Z","end":"2026-04-06T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"30a2fb2b-4a99-3f51-9911-b23d81ee2a92","sourceUid":"30a2fb2b-4a99-3f51-9911-b23d81ee2a92","title":"Hemelvaartsdag","start":"2026-05-14T00:00:00.000Z","end":"2026-05-14T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"946c672c-d83f-38dc-b0a4-465fa95b3cee","sourceUid":"946c672c-d83f-38dc-b0a4-465fa95b3cee","title":"Eerste pinksterdag","start":"2026-05-24T00:00:00.000Z","end":"2026-05-24T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"63fa6175-5d78-38c6-a6d0-a44ce632b8bb","sourceUid":"63fa6175-5d78-38c6-a6d0-a44ce632b8bb","title":"Tweede pinksterdag","start":"2026-05-25T00:00:00.000Z","end":"2026-05-25T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"c765379d-3c9d-38dc-8d34-083d59841260","sourceUid":"c765379d-3c9d-38dc-8d34-083d59841260","title":"Goede Vrijdag","start":"2027-03-26T00:00:00.000Z","end":"2027-03-26T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"579305d3-9bf2-3598-8cee-7fc99fe2afaa","sourceUid":"579305d3-9bf2-3598-8cee-7fc99fe2afaa","title":"Eerste paasdag","start":"2027-03-28T00:00:00.000Z","end":"2027-03-28T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"b1493465-2f10-3985-977b-5b2bdafe507b","sourceUid":"b1493465-2f10-3985-977b-5b2bdafe507b","title":"Tweede paasdag","start":"2027-03-29T00:00:00.000Z","end":"2027-03-29T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"7d3b16b1-ad43-33ce-aebe-4921176e4351","sourceUid":"7d3b16b1-ad43-33ce-aebe-4921176e4351","title":"Hemelvaartsdag","start":"2027-05-06T00:00:00.000Z","end":"2027-05-06T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"ba9573f5-f176-3751-837a-1dd4946d02bd","sourceUid":"ba9573f5-f176-3751-837a-1dd4946d02bd","title":"Eerste pinksterdag","start":"2027-05-16T00:00:00.000Z","end":"2027-05-16T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"a2182aa7-3419-3be7-b880-b969741dc84c","sourceUid":"a2182aa7-3419-3be7-b880-b969741dc84c","title":"Tweede pinksterdag","start":"2027-05-17T00:00:00.000Z","end":"2027-05-17T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"af26ac65-4781-3115-8b6f-4ca703471382","sourceUid":"af26ac65-4781-3115-8b6f-4ca703471382","title":"Goede Vrijdag","start":"2028-04-14T00:00:00.000Z","end":"2028-04-14T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"2d5058ab-4748-3d9f-b1cf-65d3666a327a","sourceUid":"2d5058ab-4748-3d9f-b1cf-65d3666a327a","title":"Eerste paasdag","start":"2028-04-16T00:00:00.000Z","end":"2028-04-16T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"13b91c0e-14ac-3778-9c10-c354adb32609","sourceUid":"13b91c0e-14ac-3778-9c10-c354adb32609","title":"Tweede paasdag","start":"2028-04-17T00:00:00.000Z","end":"2028-04-17T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"9058a29c-db67-3553-a8a9-bd6e7cf2aef7","sourceUid":"9058a29c-db67-3553-a8a9-bd6e7cf2aef7","title":"Hemelvaartsdag","start":"2028-05-25T00:00:00.000Z","end":"2028-05-25T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"38c751ac-fab4-3567-9f7c-e5d098e8676c","sourceUid":"38c751ac-fab4-3567-9f7c-e5d098e8676c","title":"Eerste pinksterdag","start":"2028-06-04T00:00:00.000Z","end":"2028-06-04T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"876ee675-cc88-3c3f-837d-df9ab57c1af9","sourceUid":"876ee675-cc88-3c3f-837d-df9ab57c1af9","title":"Tweede pinksterdag","start":"2028-06-05T00:00:00.000Z","end":"2028-06-05T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"311f5b1d-f0ec-3dca-ab6c-9df66296e9c2","sourceUid":"311f5b1d-f0ec-3dca-ab6c-9df66296e9c2","title":"Goede Vrijdag","start":"2029-03-30T00:00:00.000Z","end":"2029-03-30T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"cb7c2666-b5a3-30a5-b6ff-4fd15def14b5","sourceUid":"cb7c2666-b5a3-30a5-b6ff-4fd15def14b5","title":"Eerste paasdag","start":"2029-04-01T00:00:00.000Z","end":"2029-04-01T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"75aeff38-f2e9-3dde-9bdd-bdc0d18cf907","sourceUid":"75aeff38-f2e9-3dde-9bdd-bdc0d18cf907","title":"Tweede paasdag","start":"2029-04-02T00:00:00.000Z","end":"2029-04-02T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"743cd2ec-8278-342f-8b22-ba8d3201226b","sourceUid":"743cd2ec-8278-342f-8b22-ba8d3201226b","title":"Hemelvaartsdag","start":"2029-05-10T00:00:00.000Z","end":"2029-05-10T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"42133187-6214-3ab8-8c86-1b86f0be2b1e","sourceUid":"42133187-6214-3ab8-8c86-1b86f0be2b1e","title":"Eerste pinksterdag","start":"2029-05-20T00:00:00.000Z","end":"2029-05-20T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"6decfb15-dbcf-378e-a3fc-a16213fe22a7","sourceUid":"6decfb15-dbcf-378e-a3fc-a16213fe22a7","title":"Tweede pinksterdag","start":"2029-05-21T00:00:00.000Z","end":"2029-05-21T23:59:59.999Z","allDay":true,"timezone":"UTC"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -421,419 +50,48 @@
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "e4928aff-334b-3d33-9ff8-cbe74b0ea009",
-        "sourceUid": "e4928aff-334b-3d33-9ff8-cbe74b0ea009",
-        "title": "Nieuwjaarsdag",
-        "start": "2023-12-31T23:00:00.000Z",
-        "end": "2024-01-01T22:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "Europe/Amsterdam"
-        },
-        "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"
-      },
-      {
-        "uid": "ddc371b4-cb91-345a-95db-5e6260f4c172",
-        "sourceUid": "ddc371b4-cb91-345a-95db-5e6260f4c172",
-        "title": "Goede Vrijdag",
-        "start": "2024-03-28T23:00:00.000Z",
-        "end": "2024-03-29T22:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "326f001c-6275-3f84-944f-b84439e1fc5d",
-        "sourceUid": "326f001c-6275-3f84-944f-b84439e1fc5d",
-        "title": "Eerste paasdag",
-        "start": "2024-03-30T23:00:00.000Z",
-        "end": "2024-03-31T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "0afbaf91-0dec-3c1c-9b39-8587bd01ca37",
-        "sourceUid": "0afbaf91-0dec-3c1c-9b39-8587bd01ca37",
-        "title": "Tweede paasdag",
-        "start": "2024-03-31T22:00:00.000Z",
-        "end": "2024-04-01T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "e12e71ac-a942-30f7-a677-f6d31f6a93a7",
-        "sourceUid": "e12e71ac-a942-30f7-a677-f6d31f6a93a7",
-        "title": "Koningsdag",
-        "start": "2024-04-26T22:00:00.000Z",
-        "end": "2024-04-27T21:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "Europe/Amsterdam"
-        },
-        "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"
-      },
-      {
-        "uid": "e9bdd973-8118-347f-b83e-5bbb29434afa",
-        "sourceUid": "e9bdd973-8118-347f-b83e-5bbb29434afa",
-        "title": "Bevrijdingsdag",
-        "start": "2024-05-04T22:00:00.000Z",
-        "end": "2024-05-05T21:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "Europe/Amsterdam"
-        },
-        "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"
-      },
-      {
-        "uid": "ef5fd63f-b76c-323b-8c80-432a9915635b",
-        "sourceUid": "ef5fd63f-b76c-323b-8c80-432a9915635b",
-        "title": "Hemelvaartsdag",
-        "start": "2024-05-08T22:00:00.000Z",
-        "end": "2024-05-09T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "4f365693-6139-3461-88f6-5c31b2bdb406",
-        "sourceUid": "4f365693-6139-3461-88f6-5c31b2bdb406",
-        "title": "Eerste pinksterdag",
-        "start": "2024-05-18T22:00:00.000Z",
-        "end": "2024-05-19T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "6ff2ff06-c023-3a96-bbaa-c956f5fda459",
-        "sourceUid": "6ff2ff06-c023-3a96-bbaa-c956f5fda459",
-        "title": "Tweede pinksterdag",
-        "start": "2024-05-19T22:00:00.000Z",
-        "end": "2024-05-20T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "e7ce2830-cde8-35e6-9ac7-fc967f1f9a09",
-        "sourceUid": "e7ce2830-cde8-35e6-9ac7-fc967f1f9a09",
-        "title": "Eerste kerstdag",
-        "start": "2024-12-24T23:00:00.000Z",
-        "end": "2024-12-25T22:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "Europe/Amsterdam"
-        },
-        "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"
-      },
-      {
-        "uid": "5aceff0d-a20a-3721-bc27-6a1b9d785033",
-        "sourceUid": "5aceff0d-a20a-3721-bc27-6a1b9d785033",
-        "title": "Tweede kerstdag",
-        "start": "2024-12-25T23:00:00.000Z",
-        "end": "2024-12-26T22:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "Europe/Amsterdam"
-        },
-        "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"
-      },
-      {
-        "uid": "86f99fb5-d9be-3050-a892-29f632906a0f",
-        "sourceUid": "86f99fb5-d9be-3050-a892-29f632906a0f",
-        "title": "Goede Vrijdag",
-        "start": "2025-04-17T22:00:00.000Z",
-        "end": "2025-04-18T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
-        "sourceUid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
-        "title": "Eerste paasdag",
-        "start": "2025-04-19T22:00:00.000Z",
-        "end": "2025-04-20T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "4cca7402-8848-3ba1-bff0-5326cbad6bb3",
-        "sourceUid": "4cca7402-8848-3ba1-bff0-5326cbad6bb3",
-        "title": "Tweede paasdag",
-        "start": "2025-04-20T22:00:00.000Z",
-        "end": "2025-04-21T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "e9436fec-d224-3ea6-be7a-d5be315c4511",
-        "sourceUid": "e9436fec-d224-3ea6-be7a-d5be315c4511",
-        "title": "Koningsdag",
-        "start": "2025-04-25T22:00:00.000Z",
-        "end": "2025-04-26T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb",
-        "sourceUid": "2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb",
-        "title": "Hemelvaartsdag",
-        "start": "2025-05-28T22:00:00.000Z",
-        "end": "2025-05-29T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "2497f734-dad7-370f-8899-4a1fc0eb49ee",
-        "sourceUid": "2497f734-dad7-370f-8899-4a1fc0eb49ee",
-        "title": "Eerste pinksterdag",
-        "start": "2025-06-07T22:00:00.000Z",
-        "end": "2025-06-08T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "19c7351b-034f-38ef-a3b3-394e88d082cd",
-        "sourceUid": "19c7351b-034f-38ef-a3b3-394e88d082cd",
-        "title": "Tweede pinksterdag",
-        "start": "2025-06-08T22:00:00.000Z",
-        "end": "2025-06-09T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "57378f6f-0614-3e7d-a908-0f05201a396c",
-        "sourceUid": "57378f6f-0614-3e7d-a908-0f05201a396c",
-        "title": "Goede Vrijdag",
-        "start": "2026-04-02T22:00:00.000Z",
-        "end": "2026-04-03T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
-        "sourceUid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
-        "title": "Eerste paasdag",
-        "start": "2026-04-04T22:00:00.000Z",
-        "end": "2026-04-05T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "400e13b0-5728-35e5-981b-7ee37fe30ec2",
-        "sourceUid": "400e13b0-5728-35e5-981b-7ee37fe30ec2",
-        "title": "Tweede paasdag",
-        "start": "2026-04-05T22:00:00.000Z",
-        "end": "2026-04-06T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "30a2fb2b-4a99-3f51-9911-b23d81ee2a92",
-        "sourceUid": "30a2fb2b-4a99-3f51-9911-b23d81ee2a92",
-        "title": "Hemelvaartsdag",
-        "start": "2026-05-13T22:00:00.000Z",
-        "end": "2026-05-14T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "946c672c-d83f-38dc-b0a4-465fa95b3cee",
-        "sourceUid": "946c672c-d83f-38dc-b0a4-465fa95b3cee",
-        "title": "Eerste pinksterdag",
-        "start": "2026-05-23T22:00:00.000Z",
-        "end": "2026-05-24T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "63fa6175-5d78-38c6-a6d0-a44ce632b8bb",
-        "sourceUid": "63fa6175-5d78-38c6-a6d0-a44ce632b8bb",
-        "title": "Tweede pinksterdag",
-        "start": "2026-05-24T22:00:00.000Z",
-        "end": "2026-05-25T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "c765379d-3c9d-38dc-8d34-083d59841260",
-        "sourceUid": "c765379d-3c9d-38dc-8d34-083d59841260",
-        "title": "Goede Vrijdag",
-        "start": "2027-03-25T23:00:00.000Z",
-        "end": "2027-03-26T22:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
-        "sourceUid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
-        "title": "Eerste paasdag",
-        "start": "2027-03-27T23:00:00.000Z",
-        "end": "2027-03-28T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "b1493465-2f10-3985-977b-5b2bdafe507b",
-        "sourceUid": "b1493465-2f10-3985-977b-5b2bdafe507b",
-        "title": "Tweede paasdag",
-        "start": "2027-03-28T22:00:00.000Z",
-        "end": "2027-03-29T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "7d3b16b1-ad43-33ce-aebe-4921176e4351",
-        "sourceUid": "7d3b16b1-ad43-33ce-aebe-4921176e4351",
-        "title": "Hemelvaartsdag",
-        "start": "2027-05-05T22:00:00.000Z",
-        "end": "2027-05-06T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "ba9573f5-f176-3751-837a-1dd4946d02bd",
-        "sourceUid": "ba9573f5-f176-3751-837a-1dd4946d02bd",
-        "title": "Eerste pinksterdag",
-        "start": "2027-05-15T22:00:00.000Z",
-        "end": "2027-05-16T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "a2182aa7-3419-3be7-b880-b969741dc84c",
-        "sourceUid": "a2182aa7-3419-3be7-b880-b969741dc84c",
-        "title": "Tweede pinksterdag",
-        "start": "2027-05-16T22:00:00.000Z",
-        "end": "2027-05-17T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "af26ac65-4781-3115-8b6f-4ca703471382",
-        "sourceUid": "af26ac65-4781-3115-8b6f-4ca703471382",
-        "title": "Goede Vrijdag",
-        "start": "2028-04-13T22:00:00.000Z",
-        "end": "2028-04-14T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
-        "sourceUid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
-        "title": "Eerste paasdag",
-        "start": "2028-04-15T22:00:00.000Z",
-        "end": "2028-04-16T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "13b91c0e-14ac-3778-9c10-c354adb32609",
-        "sourceUid": "13b91c0e-14ac-3778-9c10-c354adb32609",
-        "title": "Tweede paasdag",
-        "start": "2028-04-16T22:00:00.000Z",
-        "end": "2028-04-17T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "9058a29c-db67-3553-a8a9-bd6e7cf2aef7",
-        "sourceUid": "9058a29c-db67-3553-a8a9-bd6e7cf2aef7",
-        "title": "Hemelvaartsdag",
-        "start": "2028-05-24T22:00:00.000Z",
-        "end": "2028-05-25T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "38c751ac-fab4-3567-9f7c-e5d098e8676c",
-        "sourceUid": "38c751ac-fab4-3567-9f7c-e5d098e8676c",
-        "title": "Eerste pinksterdag",
-        "start": "2028-06-03T22:00:00.000Z",
-        "end": "2028-06-04T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "876ee675-cc88-3c3f-837d-df9ab57c1af9",
-        "sourceUid": "876ee675-cc88-3c3f-837d-df9ab57c1af9",
-        "title": "Tweede pinksterdag",
-        "start": "2028-06-04T22:00:00.000Z",
-        "end": "2028-06-05T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
-        "sourceUid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
-        "title": "Goede Vrijdag",
-        "start": "2029-03-29T22:00:00.000Z",
-        "end": "2029-03-30T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
-        "sourceUid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
-        "title": "Eerste paasdag",
-        "start": "2029-03-31T22:00:00.000Z",
-        "end": "2029-04-01T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "75aeff38-f2e9-3dde-9bdd-bdc0d18cf907",
-        "sourceUid": "75aeff38-f2e9-3dde-9bdd-bdc0d18cf907",
-        "title": "Tweede paasdag",
-        "start": "2029-04-01T22:00:00.000Z",
-        "end": "2029-04-02T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "743cd2ec-8278-342f-8b22-ba8d3201226b",
-        "sourceUid": "743cd2ec-8278-342f-8b22-ba8d3201226b",
-        "title": "Hemelvaartsdag",
-        "start": "2029-05-09T22:00:00.000Z",
-        "end": "2029-05-10T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "42133187-6214-3ab8-8c86-1b86f0be2b1e",
-        "sourceUid": "42133187-6214-3ab8-8c86-1b86f0be2b1e",
-        "title": "Eerste pinksterdag",
-        "start": "2029-05-19T22:00:00.000Z",
-        "end": "2029-05-20T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      },
-      {
-        "uid": "6decfb15-dbcf-378e-a3fc-a16213fe22a7",
-        "sourceUid": "6decfb15-dbcf-378e-a3fc-a16213fe22a7",
-        "title": "Tweede pinksterdag",
-        "start": "2029-05-20T22:00:00.000Z",
-        "end": "2029-05-21T21:59:59.999Z",
-        "allDay": true,
-        "timezone": "Europe/Amsterdam"
-      }
+      {"uid":"e4928aff-334b-3d33-9ff8-cbe74b0ea009","sourceUid":"e4928aff-334b-3d33-9ff8-cbe74b0ea009","title":"Nieuwjaarsdag","start":"2023-12-31T23:00:00.000Z","end":"2024-01-01T22:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"},
+      {"uid":"ddc371b4-cb91-345a-95db-5e6260f4c172","sourceUid":"ddc371b4-cb91-345a-95db-5e6260f4c172","title":"Goede Vrijdag","start":"2024-03-28T23:00:00.000Z","end":"2024-03-29T22:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"326f001c-6275-3f84-944f-b84439e1fc5d","sourceUid":"326f001c-6275-3f84-944f-b84439e1fc5d","title":"Eerste paasdag","start":"2024-03-30T23:00:00.000Z","end":"2024-03-31T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"0afbaf91-0dec-3c1c-9b39-8587bd01ca37","sourceUid":"0afbaf91-0dec-3c1c-9b39-8587bd01ca37","title":"Tweede paasdag","start":"2024-03-31T22:00:00.000Z","end":"2024-04-01T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"e12e71ac-a942-30f7-a677-f6d31f6a93a7","sourceUid":"e12e71ac-a942-30f7-a677-f6d31f6a93a7","title":"Koningsdag","start":"2024-04-26T22:00:00.000Z","end":"2024-04-27T21:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"},
+      {"uid":"e9bdd973-8118-347f-b83e-5bbb29434afa","sourceUid":"e9bdd973-8118-347f-b83e-5bbb29434afa","title":"Bevrijdingsdag","start":"2024-05-04T22:00:00.000Z","end":"2024-05-05T21:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"},
+      {"uid":"ef5fd63f-b76c-323b-8c80-432a9915635b","sourceUid":"ef5fd63f-b76c-323b-8c80-432a9915635b","title":"Hemelvaartsdag","start":"2024-05-08T22:00:00.000Z","end":"2024-05-09T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"4f365693-6139-3461-88f6-5c31b2bdb406","sourceUid":"4f365693-6139-3461-88f6-5c31b2bdb406","title":"Eerste pinksterdag","start":"2024-05-18T22:00:00.000Z","end":"2024-05-19T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"6ff2ff06-c023-3a96-bbaa-c956f5fda459","sourceUid":"6ff2ff06-c023-3a96-bbaa-c956f5fda459","title":"Tweede pinksterdag","start":"2024-05-19T22:00:00.000Z","end":"2024-05-20T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"e7ce2830-cde8-35e6-9ac7-fc967f1f9a09","sourceUid":"e7ce2830-cde8-35e6-9ac7-fc967f1f9a09","title":"Eerste kerstdag","start":"2024-12-24T23:00:00.000Z","end":"2024-12-25T22:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"},
+      {"uid":"5aceff0d-a20a-3721-bc27-6a1b9d785033","sourceUid":"5aceff0d-a20a-3721-bc27-6a1b9d785033","title":"Tweede kerstdag","start":"2024-12-25T23:00:00.000Z","end":"2024-12-26T22:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"Europe/Amsterdam\"}"},
+      {"uid":"86f99fb5-d9be-3050-a892-29f632906a0f","sourceUid":"86f99fb5-d9be-3050-a892-29f632906a0f","title":"Goede Vrijdag","start":"2025-04-17T22:00:00.000Z","end":"2025-04-18T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"9ec35bb3-ffb7-3fec-b6a1-69f19818adbc","sourceUid":"9ec35bb3-ffb7-3fec-b6a1-69f19818adbc","title":"Eerste paasdag","start":"2025-04-19T22:00:00.000Z","end":"2025-04-20T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"4cca7402-8848-3ba1-bff0-5326cbad6bb3","sourceUid":"4cca7402-8848-3ba1-bff0-5326cbad6bb3","title":"Tweede paasdag","start":"2025-04-20T22:00:00.000Z","end":"2025-04-21T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"e9436fec-d224-3ea6-be7a-d5be315c4511","sourceUid":"e9436fec-d224-3ea6-be7a-d5be315c4511","title":"Koningsdag","start":"2025-04-25T22:00:00.000Z","end":"2025-04-26T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb","sourceUid":"2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb","title":"Hemelvaartsdag","start":"2025-05-28T22:00:00.000Z","end":"2025-05-29T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"2497f734-dad7-370f-8899-4a1fc0eb49ee","sourceUid":"2497f734-dad7-370f-8899-4a1fc0eb49ee","title":"Eerste pinksterdag","start":"2025-06-07T22:00:00.000Z","end":"2025-06-08T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"19c7351b-034f-38ef-a3b3-394e88d082cd","sourceUid":"19c7351b-034f-38ef-a3b3-394e88d082cd","title":"Tweede pinksterdag","start":"2025-06-08T22:00:00.000Z","end":"2025-06-09T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"57378f6f-0614-3e7d-a908-0f05201a396c","sourceUid":"57378f6f-0614-3e7d-a908-0f05201a396c","title":"Goede Vrijdag","start":"2026-04-02T22:00:00.000Z","end":"2026-04-03T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"13ae86ea-3db6-3ecf-8cb0-da6fe8251b93","sourceUid":"13ae86ea-3db6-3ecf-8cb0-da6fe8251b93","title":"Eerste paasdag","start":"2026-04-04T22:00:00.000Z","end":"2026-04-05T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"400e13b0-5728-35e5-981b-7ee37fe30ec2","sourceUid":"400e13b0-5728-35e5-981b-7ee37fe30ec2","title":"Tweede paasdag","start":"2026-04-05T22:00:00.000Z","end":"2026-04-06T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"30a2fb2b-4a99-3f51-9911-b23d81ee2a92","sourceUid":"30a2fb2b-4a99-3f51-9911-b23d81ee2a92","title":"Hemelvaartsdag","start":"2026-05-13T22:00:00.000Z","end":"2026-05-14T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"946c672c-d83f-38dc-b0a4-465fa95b3cee","sourceUid":"946c672c-d83f-38dc-b0a4-465fa95b3cee","title":"Eerste pinksterdag","start":"2026-05-23T22:00:00.000Z","end":"2026-05-24T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"63fa6175-5d78-38c6-a6d0-a44ce632b8bb","sourceUid":"63fa6175-5d78-38c6-a6d0-a44ce632b8bb","title":"Tweede pinksterdag","start":"2026-05-24T22:00:00.000Z","end":"2026-05-25T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"c765379d-3c9d-38dc-8d34-083d59841260","sourceUid":"c765379d-3c9d-38dc-8d34-083d59841260","title":"Goede Vrijdag","start":"2027-03-25T23:00:00.000Z","end":"2027-03-26T22:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"579305d3-9bf2-3598-8cee-7fc99fe2afaa","sourceUid":"579305d3-9bf2-3598-8cee-7fc99fe2afaa","title":"Eerste paasdag","start":"2027-03-27T23:00:00.000Z","end":"2027-03-28T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"b1493465-2f10-3985-977b-5b2bdafe507b","sourceUid":"b1493465-2f10-3985-977b-5b2bdafe507b","title":"Tweede paasdag","start":"2027-03-28T22:00:00.000Z","end":"2027-03-29T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"7d3b16b1-ad43-33ce-aebe-4921176e4351","sourceUid":"7d3b16b1-ad43-33ce-aebe-4921176e4351","title":"Hemelvaartsdag","start":"2027-05-05T22:00:00.000Z","end":"2027-05-06T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"ba9573f5-f176-3751-837a-1dd4946d02bd","sourceUid":"ba9573f5-f176-3751-837a-1dd4946d02bd","title":"Eerste pinksterdag","start":"2027-05-15T22:00:00.000Z","end":"2027-05-16T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"a2182aa7-3419-3be7-b880-b969741dc84c","sourceUid":"a2182aa7-3419-3be7-b880-b969741dc84c","title":"Tweede pinksterdag","start":"2027-05-16T22:00:00.000Z","end":"2027-05-17T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"af26ac65-4781-3115-8b6f-4ca703471382","sourceUid":"af26ac65-4781-3115-8b6f-4ca703471382","title":"Goede Vrijdag","start":"2028-04-13T22:00:00.000Z","end":"2028-04-14T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"2d5058ab-4748-3d9f-b1cf-65d3666a327a","sourceUid":"2d5058ab-4748-3d9f-b1cf-65d3666a327a","title":"Eerste paasdag","start":"2028-04-15T22:00:00.000Z","end":"2028-04-16T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"13b91c0e-14ac-3778-9c10-c354adb32609","sourceUid":"13b91c0e-14ac-3778-9c10-c354adb32609","title":"Tweede paasdag","start":"2028-04-16T22:00:00.000Z","end":"2028-04-17T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"9058a29c-db67-3553-a8a9-bd6e7cf2aef7","sourceUid":"9058a29c-db67-3553-a8a9-bd6e7cf2aef7","title":"Hemelvaartsdag","start":"2028-05-24T22:00:00.000Z","end":"2028-05-25T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"38c751ac-fab4-3567-9f7c-e5d098e8676c","sourceUid":"38c751ac-fab4-3567-9f7c-e5d098e8676c","title":"Eerste pinksterdag","start":"2028-06-03T22:00:00.000Z","end":"2028-06-04T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"876ee675-cc88-3c3f-837d-df9ab57c1af9","sourceUid":"876ee675-cc88-3c3f-837d-df9ab57c1af9","title":"Tweede pinksterdag","start":"2028-06-04T22:00:00.000Z","end":"2028-06-05T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"311f5b1d-f0ec-3dca-ab6c-9df66296e9c2","sourceUid":"311f5b1d-f0ec-3dca-ab6c-9df66296e9c2","title":"Goede Vrijdag","start":"2029-03-29T22:00:00.000Z","end":"2029-03-30T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"cb7c2666-b5a3-30a5-b6ff-4fd15def14b5","sourceUid":"cb7c2666-b5a3-30a5-b6ff-4fd15def14b5","title":"Eerste paasdag","start":"2029-03-31T22:00:00.000Z","end":"2029-04-01T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"75aeff38-f2e9-3dde-9bdd-bdc0d18cf907","sourceUid":"75aeff38-f2e9-3dde-9bdd-bdc0d18cf907","title":"Tweede paasdag","start":"2029-04-01T22:00:00.000Z","end":"2029-04-02T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"743cd2ec-8278-342f-8b22-ba8d3201226b","sourceUid":"743cd2ec-8278-342f-8b22-ba8d3201226b","title":"Hemelvaartsdag","start":"2029-05-09T22:00:00.000Z","end":"2029-05-10T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"42133187-6214-3ab8-8c86-1b86f0be2b1e","sourceUid":"42133187-6214-3ab8-8c86-1b86f0be2b1e","title":"Eerste pinksterdag","start":"2029-05-19T22:00:00.000Z","end":"2029-05-20T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"6decfb15-dbcf-378e-a3fc-a16213fe22a7","sourceUid":"6decfb15-dbcf-378e-a3fc-a16213fe22a7","title":"Tweede pinksterdag","start":"2029-05-20T22:00:00.000Z","end":"2029-05-21T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -841,419 +99,48 @@
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "e4928aff-334b-3d33-9ff8-cbe74b0ea009",
-        "sourceUid": "e4928aff-334b-3d33-9ff8-cbe74b0ea009",
-        "title": "Nieuwjaarsdag",
-        "start": "2024-01-01T08:00:00.000Z",
-        "end": "2024-01-02T07:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "America/Los_Angeles"
-        },
-        "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"
-      },
-      {
-        "uid": "ddc371b4-cb91-345a-95db-5e6260f4c172",
-        "sourceUid": "ddc371b4-cb91-345a-95db-5e6260f4c172",
-        "title": "Goede Vrijdag",
-        "start": "2024-03-29T07:00:00.000Z",
-        "end": "2024-03-30T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "326f001c-6275-3f84-944f-b84439e1fc5d",
-        "sourceUid": "326f001c-6275-3f84-944f-b84439e1fc5d",
-        "title": "Eerste paasdag",
-        "start": "2024-03-31T07:00:00.000Z",
-        "end": "2024-04-01T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "0afbaf91-0dec-3c1c-9b39-8587bd01ca37",
-        "sourceUid": "0afbaf91-0dec-3c1c-9b39-8587bd01ca37",
-        "title": "Tweede paasdag",
-        "start": "2024-04-01T07:00:00.000Z",
-        "end": "2024-04-02T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "e12e71ac-a942-30f7-a677-f6d31f6a93a7",
-        "sourceUid": "e12e71ac-a942-30f7-a677-f6d31f6a93a7",
-        "title": "Koningsdag",
-        "start": "2024-04-27T07:00:00.000Z",
-        "end": "2024-04-28T06:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "America/Los_Angeles"
-        },
-        "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"
-      },
-      {
-        "uid": "e9bdd973-8118-347f-b83e-5bbb29434afa",
-        "sourceUid": "e9bdd973-8118-347f-b83e-5bbb29434afa",
-        "title": "Bevrijdingsdag",
-        "start": "2024-05-05T07:00:00.000Z",
-        "end": "2024-05-06T06:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "America/Los_Angeles"
-        },
-        "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"
-      },
-      {
-        "uid": "ef5fd63f-b76c-323b-8c80-432a9915635b",
-        "sourceUid": "ef5fd63f-b76c-323b-8c80-432a9915635b",
-        "title": "Hemelvaartsdag",
-        "start": "2024-05-09T07:00:00.000Z",
-        "end": "2024-05-10T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "4f365693-6139-3461-88f6-5c31b2bdb406",
-        "sourceUid": "4f365693-6139-3461-88f6-5c31b2bdb406",
-        "title": "Eerste pinksterdag",
-        "start": "2024-05-19T07:00:00.000Z",
-        "end": "2024-05-20T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "6ff2ff06-c023-3a96-bbaa-c956f5fda459",
-        "sourceUid": "6ff2ff06-c023-3a96-bbaa-c956f5fda459",
-        "title": "Tweede pinksterdag",
-        "start": "2024-05-20T07:00:00.000Z",
-        "end": "2024-05-21T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "e7ce2830-cde8-35e6-9ac7-fc967f1f9a09",
-        "sourceUid": "e7ce2830-cde8-35e6-9ac7-fc967f1f9a09",
-        "title": "Eerste kerstdag",
-        "start": "2024-12-25T08:00:00.000Z",
-        "end": "2024-12-26T07:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "America/Los_Angeles"
-        },
-        "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"
-      },
-      {
-        "uid": "5aceff0d-a20a-3721-bc27-6a1b9d785033",
-        "sourceUid": "5aceff0d-a20a-3721-bc27-6a1b9d785033",
-        "title": "Tweede kerstdag",
-        "start": "2024-12-26T08:00:00.000Z",
-        "end": "2024-12-27T07:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "yearly",
-          "interval": 1,
-          "count": 6,
-          "timezone": "America/Los_Angeles"
-        },
-        "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"
-      },
-      {
-        "uid": "86f99fb5-d9be-3050-a892-29f632906a0f",
-        "sourceUid": "86f99fb5-d9be-3050-a892-29f632906a0f",
-        "title": "Goede Vrijdag",
-        "start": "2025-04-18T07:00:00.000Z",
-        "end": "2025-04-19T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
-        "sourceUid": "9ec35bb3-ffb7-3fec-b6a1-69f19818adbc",
-        "title": "Eerste paasdag",
-        "start": "2025-04-20T07:00:00.000Z",
-        "end": "2025-04-21T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "4cca7402-8848-3ba1-bff0-5326cbad6bb3",
-        "sourceUid": "4cca7402-8848-3ba1-bff0-5326cbad6bb3",
-        "title": "Tweede paasdag",
-        "start": "2025-04-21T07:00:00.000Z",
-        "end": "2025-04-22T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "e9436fec-d224-3ea6-be7a-d5be315c4511",
-        "sourceUid": "e9436fec-d224-3ea6-be7a-d5be315c4511",
-        "title": "Koningsdag",
-        "start": "2025-04-26T07:00:00.000Z",
-        "end": "2025-04-27T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb",
-        "sourceUid": "2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb",
-        "title": "Hemelvaartsdag",
-        "start": "2025-05-29T07:00:00.000Z",
-        "end": "2025-05-30T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "2497f734-dad7-370f-8899-4a1fc0eb49ee",
-        "sourceUid": "2497f734-dad7-370f-8899-4a1fc0eb49ee",
-        "title": "Eerste pinksterdag",
-        "start": "2025-06-08T07:00:00.000Z",
-        "end": "2025-06-09T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "19c7351b-034f-38ef-a3b3-394e88d082cd",
-        "sourceUid": "19c7351b-034f-38ef-a3b3-394e88d082cd",
-        "title": "Tweede pinksterdag",
-        "start": "2025-06-09T07:00:00.000Z",
-        "end": "2025-06-10T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "57378f6f-0614-3e7d-a908-0f05201a396c",
-        "sourceUid": "57378f6f-0614-3e7d-a908-0f05201a396c",
-        "title": "Goede Vrijdag",
-        "start": "2026-04-03T07:00:00.000Z",
-        "end": "2026-04-04T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
-        "sourceUid": "13ae86ea-3db6-3ecf-8cb0-da6fe8251b93",
-        "title": "Eerste paasdag",
-        "start": "2026-04-05T07:00:00.000Z",
-        "end": "2026-04-06T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "400e13b0-5728-35e5-981b-7ee37fe30ec2",
-        "sourceUid": "400e13b0-5728-35e5-981b-7ee37fe30ec2",
-        "title": "Tweede paasdag",
-        "start": "2026-04-06T07:00:00.000Z",
-        "end": "2026-04-07T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "30a2fb2b-4a99-3f51-9911-b23d81ee2a92",
-        "sourceUid": "30a2fb2b-4a99-3f51-9911-b23d81ee2a92",
-        "title": "Hemelvaartsdag",
-        "start": "2026-05-14T07:00:00.000Z",
-        "end": "2026-05-15T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "946c672c-d83f-38dc-b0a4-465fa95b3cee",
-        "sourceUid": "946c672c-d83f-38dc-b0a4-465fa95b3cee",
-        "title": "Eerste pinksterdag",
-        "start": "2026-05-24T07:00:00.000Z",
-        "end": "2026-05-25T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "63fa6175-5d78-38c6-a6d0-a44ce632b8bb",
-        "sourceUid": "63fa6175-5d78-38c6-a6d0-a44ce632b8bb",
-        "title": "Tweede pinksterdag",
-        "start": "2026-05-25T07:00:00.000Z",
-        "end": "2026-05-26T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "c765379d-3c9d-38dc-8d34-083d59841260",
-        "sourceUid": "c765379d-3c9d-38dc-8d34-083d59841260",
-        "title": "Goede Vrijdag",
-        "start": "2027-03-26T07:00:00.000Z",
-        "end": "2027-03-27T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
-        "sourceUid": "579305d3-9bf2-3598-8cee-7fc99fe2afaa",
-        "title": "Eerste paasdag",
-        "start": "2027-03-28T07:00:00.000Z",
-        "end": "2027-03-29T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "b1493465-2f10-3985-977b-5b2bdafe507b",
-        "sourceUid": "b1493465-2f10-3985-977b-5b2bdafe507b",
-        "title": "Tweede paasdag",
-        "start": "2027-03-29T07:00:00.000Z",
-        "end": "2027-03-30T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "7d3b16b1-ad43-33ce-aebe-4921176e4351",
-        "sourceUid": "7d3b16b1-ad43-33ce-aebe-4921176e4351",
-        "title": "Hemelvaartsdag",
-        "start": "2027-05-06T07:00:00.000Z",
-        "end": "2027-05-07T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "ba9573f5-f176-3751-837a-1dd4946d02bd",
-        "sourceUid": "ba9573f5-f176-3751-837a-1dd4946d02bd",
-        "title": "Eerste pinksterdag",
-        "start": "2027-05-16T07:00:00.000Z",
-        "end": "2027-05-17T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "a2182aa7-3419-3be7-b880-b969741dc84c",
-        "sourceUid": "a2182aa7-3419-3be7-b880-b969741dc84c",
-        "title": "Tweede pinksterdag",
-        "start": "2027-05-17T07:00:00.000Z",
-        "end": "2027-05-18T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "af26ac65-4781-3115-8b6f-4ca703471382",
-        "sourceUid": "af26ac65-4781-3115-8b6f-4ca703471382",
-        "title": "Goede Vrijdag",
-        "start": "2028-04-14T07:00:00.000Z",
-        "end": "2028-04-15T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
-        "sourceUid": "2d5058ab-4748-3d9f-b1cf-65d3666a327a",
-        "title": "Eerste paasdag",
-        "start": "2028-04-16T07:00:00.000Z",
-        "end": "2028-04-17T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "13b91c0e-14ac-3778-9c10-c354adb32609",
-        "sourceUid": "13b91c0e-14ac-3778-9c10-c354adb32609",
-        "title": "Tweede paasdag",
-        "start": "2028-04-17T07:00:00.000Z",
-        "end": "2028-04-18T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "9058a29c-db67-3553-a8a9-bd6e7cf2aef7",
-        "sourceUid": "9058a29c-db67-3553-a8a9-bd6e7cf2aef7",
-        "title": "Hemelvaartsdag",
-        "start": "2028-05-25T07:00:00.000Z",
-        "end": "2028-05-26T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "38c751ac-fab4-3567-9f7c-e5d098e8676c",
-        "sourceUid": "38c751ac-fab4-3567-9f7c-e5d098e8676c",
-        "title": "Eerste pinksterdag",
-        "start": "2028-06-04T07:00:00.000Z",
-        "end": "2028-06-05T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "876ee675-cc88-3c3f-837d-df9ab57c1af9",
-        "sourceUid": "876ee675-cc88-3c3f-837d-df9ab57c1af9",
-        "title": "Tweede pinksterdag",
-        "start": "2028-06-05T07:00:00.000Z",
-        "end": "2028-06-06T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
-        "sourceUid": "311f5b1d-f0ec-3dca-ab6c-9df66296e9c2",
-        "title": "Goede Vrijdag",
-        "start": "2029-03-30T07:00:00.000Z",
-        "end": "2029-03-31T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
-        "sourceUid": "cb7c2666-b5a3-30a5-b6ff-4fd15def14b5",
-        "title": "Eerste paasdag",
-        "start": "2029-04-01T07:00:00.000Z",
-        "end": "2029-04-02T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "75aeff38-f2e9-3dde-9bdd-bdc0d18cf907",
-        "sourceUid": "75aeff38-f2e9-3dde-9bdd-bdc0d18cf907",
-        "title": "Tweede paasdag",
-        "start": "2029-04-02T07:00:00.000Z",
-        "end": "2029-04-03T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "743cd2ec-8278-342f-8b22-ba8d3201226b",
-        "sourceUid": "743cd2ec-8278-342f-8b22-ba8d3201226b",
-        "title": "Hemelvaartsdag",
-        "start": "2029-05-10T07:00:00.000Z",
-        "end": "2029-05-11T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "42133187-6214-3ab8-8c86-1b86f0be2b1e",
-        "sourceUid": "42133187-6214-3ab8-8c86-1b86f0be2b1e",
-        "title": "Eerste pinksterdag",
-        "start": "2029-05-20T07:00:00.000Z",
-        "end": "2029-05-21T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      },
-      {
-        "uid": "6decfb15-dbcf-378e-a3fc-a16213fe22a7",
-        "sourceUid": "6decfb15-dbcf-378e-a3fc-a16213fe22a7",
-        "title": "Tweede pinksterdag",
-        "start": "2029-05-21T07:00:00.000Z",
-        "end": "2029-05-22T06:59:59.999Z",
-        "allDay": true,
-        "timezone": "America/Los_Angeles"
-      }
+      {"uid":"e4928aff-334b-3d33-9ff8-cbe74b0ea009","sourceUid":"e4928aff-334b-3d33-9ff8-cbe74b0ea009","title":"Nieuwjaarsdag","start":"2024-01-01T08:00:00.000Z","end":"2024-01-02T07:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"},
+      {"uid":"ddc371b4-cb91-345a-95db-5e6260f4c172","sourceUid":"ddc371b4-cb91-345a-95db-5e6260f4c172","title":"Goede Vrijdag","start":"2024-03-29T07:00:00.000Z","end":"2024-03-30T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"326f001c-6275-3f84-944f-b84439e1fc5d","sourceUid":"326f001c-6275-3f84-944f-b84439e1fc5d","title":"Eerste paasdag","start":"2024-03-31T07:00:00.000Z","end":"2024-04-01T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"0afbaf91-0dec-3c1c-9b39-8587bd01ca37","sourceUid":"0afbaf91-0dec-3c1c-9b39-8587bd01ca37","title":"Tweede paasdag","start":"2024-04-01T07:00:00.000Z","end":"2024-04-02T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"e12e71ac-a942-30f7-a677-f6d31f6a93a7","sourceUid":"e12e71ac-a942-30f7-a677-f6d31f6a93a7","title":"Koningsdag","start":"2024-04-27T07:00:00.000Z","end":"2024-04-28T06:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"},
+      {"uid":"e9bdd973-8118-347f-b83e-5bbb29434afa","sourceUid":"e9bdd973-8118-347f-b83e-5bbb29434afa","title":"Bevrijdingsdag","start":"2024-05-05T07:00:00.000Z","end":"2024-05-06T06:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"},
+      {"uid":"ef5fd63f-b76c-323b-8c80-432a9915635b","sourceUid":"ef5fd63f-b76c-323b-8c80-432a9915635b","title":"Hemelvaartsdag","start":"2024-05-09T07:00:00.000Z","end":"2024-05-10T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"4f365693-6139-3461-88f6-5c31b2bdb406","sourceUid":"4f365693-6139-3461-88f6-5c31b2bdb406","title":"Eerste pinksterdag","start":"2024-05-19T07:00:00.000Z","end":"2024-05-20T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"6ff2ff06-c023-3a96-bbaa-c956f5fda459","sourceUid":"6ff2ff06-c023-3a96-bbaa-c956f5fda459","title":"Tweede pinksterdag","start":"2024-05-20T07:00:00.000Z","end":"2024-05-21T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"e7ce2830-cde8-35e6-9ac7-fc967f1f9a09","sourceUid":"e7ce2830-cde8-35e6-9ac7-fc967f1f9a09","title":"Eerste kerstdag","start":"2024-12-25T08:00:00.000Z","end":"2024-12-26T07:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"},
+      {"uid":"5aceff0d-a20a-3721-bc27-6a1b9d785033","sourceUid":"5aceff0d-a20a-3721-bc27-6a1b9d785033","title":"Tweede kerstdag","start":"2024-12-26T08:00:00.000Z","end":"2024-12-27T07:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"count":6,"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"count\":6,\"timezone\":\"America/Los_Angeles\"}"},
+      {"uid":"86f99fb5-d9be-3050-a892-29f632906a0f","sourceUid":"86f99fb5-d9be-3050-a892-29f632906a0f","title":"Goede Vrijdag","start":"2025-04-18T07:00:00.000Z","end":"2025-04-19T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"9ec35bb3-ffb7-3fec-b6a1-69f19818adbc","sourceUid":"9ec35bb3-ffb7-3fec-b6a1-69f19818adbc","title":"Eerste paasdag","start":"2025-04-20T07:00:00.000Z","end":"2025-04-21T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"4cca7402-8848-3ba1-bff0-5326cbad6bb3","sourceUid":"4cca7402-8848-3ba1-bff0-5326cbad6bb3","title":"Tweede paasdag","start":"2025-04-21T07:00:00.000Z","end":"2025-04-22T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"e9436fec-d224-3ea6-be7a-d5be315c4511","sourceUid":"e9436fec-d224-3ea6-be7a-d5be315c4511","title":"Koningsdag","start":"2025-04-26T07:00:00.000Z","end":"2025-04-27T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb","sourceUid":"2ce9a4a0-3fd3-3a93-8466-1e60cd0ecedb","title":"Hemelvaartsdag","start":"2025-05-29T07:00:00.000Z","end":"2025-05-30T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"2497f734-dad7-370f-8899-4a1fc0eb49ee","sourceUid":"2497f734-dad7-370f-8899-4a1fc0eb49ee","title":"Eerste pinksterdag","start":"2025-06-08T07:00:00.000Z","end":"2025-06-09T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"19c7351b-034f-38ef-a3b3-394e88d082cd","sourceUid":"19c7351b-034f-38ef-a3b3-394e88d082cd","title":"Tweede pinksterdag","start":"2025-06-09T07:00:00.000Z","end":"2025-06-10T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"57378f6f-0614-3e7d-a908-0f05201a396c","sourceUid":"57378f6f-0614-3e7d-a908-0f05201a396c","title":"Goede Vrijdag","start":"2026-04-03T07:00:00.000Z","end":"2026-04-04T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"13ae86ea-3db6-3ecf-8cb0-da6fe8251b93","sourceUid":"13ae86ea-3db6-3ecf-8cb0-da6fe8251b93","title":"Eerste paasdag","start":"2026-04-05T07:00:00.000Z","end":"2026-04-06T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"400e13b0-5728-35e5-981b-7ee37fe30ec2","sourceUid":"400e13b0-5728-35e5-981b-7ee37fe30ec2","title":"Tweede paasdag","start":"2026-04-06T07:00:00.000Z","end":"2026-04-07T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"30a2fb2b-4a99-3f51-9911-b23d81ee2a92","sourceUid":"30a2fb2b-4a99-3f51-9911-b23d81ee2a92","title":"Hemelvaartsdag","start":"2026-05-14T07:00:00.000Z","end":"2026-05-15T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"946c672c-d83f-38dc-b0a4-465fa95b3cee","sourceUid":"946c672c-d83f-38dc-b0a4-465fa95b3cee","title":"Eerste pinksterdag","start":"2026-05-24T07:00:00.000Z","end":"2026-05-25T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"63fa6175-5d78-38c6-a6d0-a44ce632b8bb","sourceUid":"63fa6175-5d78-38c6-a6d0-a44ce632b8bb","title":"Tweede pinksterdag","start":"2026-05-25T07:00:00.000Z","end":"2026-05-26T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"c765379d-3c9d-38dc-8d34-083d59841260","sourceUid":"c765379d-3c9d-38dc-8d34-083d59841260","title":"Goede Vrijdag","start":"2027-03-26T07:00:00.000Z","end":"2027-03-27T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"579305d3-9bf2-3598-8cee-7fc99fe2afaa","sourceUid":"579305d3-9bf2-3598-8cee-7fc99fe2afaa","title":"Eerste paasdag","start":"2027-03-28T07:00:00.000Z","end":"2027-03-29T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"b1493465-2f10-3985-977b-5b2bdafe507b","sourceUid":"b1493465-2f10-3985-977b-5b2bdafe507b","title":"Tweede paasdag","start":"2027-03-29T07:00:00.000Z","end":"2027-03-30T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"7d3b16b1-ad43-33ce-aebe-4921176e4351","sourceUid":"7d3b16b1-ad43-33ce-aebe-4921176e4351","title":"Hemelvaartsdag","start":"2027-05-06T07:00:00.000Z","end":"2027-05-07T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"ba9573f5-f176-3751-837a-1dd4946d02bd","sourceUid":"ba9573f5-f176-3751-837a-1dd4946d02bd","title":"Eerste pinksterdag","start":"2027-05-16T07:00:00.000Z","end":"2027-05-17T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"a2182aa7-3419-3be7-b880-b969741dc84c","sourceUid":"a2182aa7-3419-3be7-b880-b969741dc84c","title":"Tweede pinksterdag","start":"2027-05-17T07:00:00.000Z","end":"2027-05-18T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"af26ac65-4781-3115-8b6f-4ca703471382","sourceUid":"af26ac65-4781-3115-8b6f-4ca703471382","title":"Goede Vrijdag","start":"2028-04-14T07:00:00.000Z","end":"2028-04-15T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"2d5058ab-4748-3d9f-b1cf-65d3666a327a","sourceUid":"2d5058ab-4748-3d9f-b1cf-65d3666a327a","title":"Eerste paasdag","start":"2028-04-16T07:00:00.000Z","end":"2028-04-17T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"13b91c0e-14ac-3778-9c10-c354adb32609","sourceUid":"13b91c0e-14ac-3778-9c10-c354adb32609","title":"Tweede paasdag","start":"2028-04-17T07:00:00.000Z","end":"2028-04-18T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"9058a29c-db67-3553-a8a9-bd6e7cf2aef7","sourceUid":"9058a29c-db67-3553-a8a9-bd6e7cf2aef7","title":"Hemelvaartsdag","start":"2028-05-25T07:00:00.000Z","end":"2028-05-26T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"38c751ac-fab4-3567-9f7c-e5d098e8676c","sourceUid":"38c751ac-fab4-3567-9f7c-e5d098e8676c","title":"Eerste pinksterdag","start":"2028-06-04T07:00:00.000Z","end":"2028-06-05T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"876ee675-cc88-3c3f-837d-df9ab57c1af9","sourceUid":"876ee675-cc88-3c3f-837d-df9ab57c1af9","title":"Tweede pinksterdag","start":"2028-06-05T07:00:00.000Z","end":"2028-06-06T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"311f5b1d-f0ec-3dca-ab6c-9df66296e9c2","sourceUid":"311f5b1d-f0ec-3dca-ab6c-9df66296e9c2","title":"Goede Vrijdag","start":"2029-03-30T07:00:00.000Z","end":"2029-03-31T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"cb7c2666-b5a3-30a5-b6ff-4fd15def14b5","sourceUid":"cb7c2666-b5a3-30a5-b6ff-4fd15def14b5","title":"Eerste paasdag","start":"2029-04-01T07:00:00.000Z","end":"2029-04-02T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"75aeff38-f2e9-3dde-9bdd-bdc0d18cf907","sourceUid":"75aeff38-f2e9-3dde-9bdd-bdc0d18cf907","title":"Tweede paasdag","start":"2029-04-02T07:00:00.000Z","end":"2029-04-03T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"743cd2ec-8278-342f-8b22-ba8d3201226b","sourceUid":"743cd2ec-8278-342f-8b22-ba8d3201226b","title":"Hemelvaartsdag","start":"2029-05-10T07:00:00.000Z","end":"2029-05-11T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"42133187-6214-3ab8-8c86-1b86f0be2b1e","sourceUid":"42133187-6214-3ab8-8c86-1b86f0be2b1e","title":"Eerste pinksterdag","start":"2029-05-20T07:00:00.000Z","end":"2029-05-21T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"6decfb15-dbcf-378e-a3fc-a16213fe22a7","sourceUid":"6decfb15-dbcf-378e-a3fc-a16213fe22a7","title":"Tweede pinksterdag","start":"2029-05-21T07:00:00.000Z","end":"2029-05-22T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"}
     ],
     "errors": [],
     "method": "PUBLISH",

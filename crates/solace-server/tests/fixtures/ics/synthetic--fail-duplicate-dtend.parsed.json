@@ -1,72 +1,24 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "fine@example.com",
-        "sourceUid": "fine@example.com",
-        "title": "Fine",
-        "start": "2024-01-01T08:00:00.000Z",
-        "end": "2024-01-01T08:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      },
-      {
-        "uid": "fail@example.com",
-        "sourceUid": "fail@example.com",
-        "title": "Failing feed",
-        "start": "2024-01-01T10:00:00.000Z",
-        "end": "2024-01-01T11:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      }
+      {"uid":"fine@example.com","sourceUid":"fine@example.com","title":"Fine","start":"2024-01-01T08:00:00.000Z","end":"2024-01-01T08:00:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"fail@example.com","sourceUid":"fail@example.com","title":"Failing feed","start":"2024-01-01T10:00:00.000Z","end":"2024-01-01T11:00:00.000Z","allDay":false,"timezone":"Etc/UTC"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "fine@example.com",
-        "sourceUid": "fine@example.com",
-        "title": "Fine",
-        "start": "2024-01-01T08:00:00.000Z",
-        "end": "2024-01-01T08:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      },
-      {
-        "uid": "fail@example.com",
-        "sourceUid": "fail@example.com",
-        "title": "Failing feed",
-        "start": "2024-01-01T10:00:00.000Z",
-        "end": "2024-01-01T11:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      }
+      {"uid":"fine@example.com","sourceUid":"fine@example.com","title":"Fine","start":"2024-01-01T08:00:00.000Z","end":"2024-01-01T08:00:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"fail@example.com","sourceUid":"fail@example.com","title":"Failing feed","start":"2024-01-01T10:00:00.000Z","end":"2024-01-01T11:00:00.000Z","allDay":false,"timezone":"Etc/UTC"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "fine@example.com",
-        "sourceUid": "fine@example.com",
-        "title": "Fine",
-        "start": "2024-01-01T08:00:00.000Z",
-        "end": "2024-01-01T08:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      },
-      {
-        "uid": "fail@example.com",
-        "sourceUid": "fail@example.com",
-        "title": "Failing feed",
-        "start": "2024-01-01T10:00:00.000Z",
-        "end": "2024-01-01T11:00:00.000Z",
-        "allDay": false,
-        "timezone": "Etc/UTC"
-      }
+      {"uid":"fine@example.com","sourceUid":"fine@example.com","title":"Fine","start":"2024-01-01T08:00:00.000Z","end":"2024-01-01T08:00:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"fail@example.com","sourceUid":"fail@example.com","title":"Failing feed","start":"2024-01-01T10:00:00.000Z","end":"2024-01-01T11:00:00.000Z","allDay":false,"timezone":"Etc/UTC"}
     ],
     "errors": [],
     "method": "PUBLISH"

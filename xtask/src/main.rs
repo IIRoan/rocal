@@ -27,7 +27,7 @@ tasks:
   deploy-test <service> <path>...
                           deploy committed files under <path> to a test-* service in Railway's test environment
   entities [--check]      regenerate (or check) the SeaORM entities from the migrations
-  mem-budget [--allocator default|system|mimalloc|jemalloc] [--steady-seconds N] [--soak-minutes N] [--remote <url> --railway-service <test-*> --database <name>]
+  mem-budget [--steady-seconds N] [--soak-minutes N]
                           measure a release build against the plan's memory budgets
   openapi [--check]       write packages/api-contracts/openapi.json and regenerate its TypeScript types
   jest-destinations [--complete] [--units]

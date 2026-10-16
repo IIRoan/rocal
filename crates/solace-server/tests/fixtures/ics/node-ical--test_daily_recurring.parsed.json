@@ -1,66 +1,21 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "daily-test@example.com",
-        "sourceUid": "daily-test@example.com",
-        "title": "Daily Standup",
-        "start": "2025-01-01T00:00:00.000Z",
-        "end": "2025-01-01T23:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "daily",
-          "interval": 1,
-          "count": 30,
-          "timezone": "UTC"
-        },
-        "timezone": "UTC",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"UTC\"}"
-      }
+      {"uid":"daily-test@example.com","sourceUid":"daily-test@example.com","title":"Daily Standup","start":"2025-01-01T00:00:00.000Z","end":"2025-01-01T23:59:59.999Z","allDay":true,"recurrence":{"frequency":"daily","interval":1,"count":30,"timezone":"UTC"},"timezone":"UTC","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"UTC\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "daily-test@example.com",
-        "sourceUid": "daily-test@example.com",
-        "title": "Daily Standup",
-        "start": "2024-12-31T23:00:00.000Z",
-        "end": "2025-01-01T22:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "daily",
-          "interval": 1,
-          "count": 30,
-          "timezone": "Europe/Amsterdam"
-        },
-        "timezone": "Europe/Amsterdam",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"Europe/Amsterdam\"}"
-      }
+      {"uid":"daily-test@example.com","sourceUid":"daily-test@example.com","title":"Daily Standup","start":"2024-12-31T23:00:00.000Z","end":"2025-01-01T22:59:59.999Z","allDay":true,"recurrence":{"frequency":"daily","interval":1,"count":30,"timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"Europe/Amsterdam\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "daily-test@example.com",
-        "sourceUid": "daily-test@example.com",
-        "title": "Daily Standup",
-        "start": "2025-01-01T08:00:00.000Z",
-        "end": "2025-01-02T07:59:59.999Z",
-        "allDay": true,
-        "recurrence": {
-          "frequency": "daily",
-          "interval": 1,
-          "count": 30,
-          "timezone": "America/Los_Angeles"
-        },
-        "timezone": "America/Los_Angeles",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"America/Los_Angeles\"}"
-      }
+      {"uid":"daily-test@example.com","sourceUid":"daily-test@example.com","title":"Daily Standup","start":"2025-01-01T08:00:00.000Z","end":"2025-01-02T07:59:59.999Z","allDay":true,"recurrence":{"frequency":"daily","interval":1,"count":30,"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":30,\"timezone\":\"America/Los_Angeles\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"

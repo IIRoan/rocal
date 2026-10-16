@@ -79,7 +79,7 @@ Default stance: **the server should not be able to read user content, and we sho
 - Errors are `thiserror` enums converted into `AppError` (the `lib/errors.ts` envelope); no `unwrap`/`expect` outside tests; `anyhow` only in `main.rs` and `xtask`.
 - Entities in `db/entities/` are generated (`cargo xtask entities`) and never edited; ids, `created_at` and `updated_at` defaults live in `db/behavior.rs`.
 - Logging: `tracing` with opaque ids only; messages through `telemetry::redact_pii`; Errex reports pass `telemetry::report` scrubbing.
-- Before every commit: `cargo xtask check` (fmt, clippy, tests, the suite on Rust in both modes against `crates/solace-api-tests/rust-passing.txt`, codegen diffs, Jest destinations, memory budgets).
+- Before every commit: `cargo xtask check` (fmt, clippy, tests, the whole suite on Rust in both modes, codegen diffs, Jest destinations, memory budgets).
 
 ## 4. Data layer: TanStack Query (MUST)
 

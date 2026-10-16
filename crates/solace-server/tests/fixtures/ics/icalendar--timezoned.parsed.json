@@ -1,17 +1,7 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "123456",
-        "sourceUid": "123456",
-        "title": "artsprint 2012",
-        "description": "sprinting at the artsprint",
-        "start": "2012-02-13T09:00:00.000Z",
-        "end": "2012-02-17T17:00:00.000Z",
-        "allDay": false,
-        "location": "aka bild, wien",
-        "timezone": "Europe/Vienna"
-      }
+      {"uid":"123456","sourceUid":"123456","title":"artsprint 2012","description":"sprinting at the artsprint","start":"2012-02-13T09:00:00.000Z","end":"2012-02-17T17:00:00.000Z","allDay":false,"location":"aka bild, wien","timezone":"Europe/Vienna"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -21,17 +11,7 @@
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "123456",
-        "sourceUid": "123456",
-        "title": "artsprint 2012",
-        "description": "sprinting at the artsprint",
-        "start": "2012-02-13T09:00:00.000Z",
-        "end": "2012-02-17T17:00:00.000Z",
-        "allDay": false,
-        "location": "aka bild, wien",
-        "timezone": "Europe/Vienna"
-      }
+      {"uid":"123456","sourceUid":"123456","title":"artsprint 2012","description":"sprinting at the artsprint","start":"2012-02-13T09:00:00.000Z","end":"2012-02-17T17:00:00.000Z","allDay":false,"location":"aka bild, wien","timezone":"Europe/Vienna"}
     ],
     "errors": [],
     "method": "PUBLISH",
@@ -41,17 +21,7 @@
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "123456",
-        "sourceUid": "123456",
-        "title": "artsprint 2012",
-        "description": "sprinting at the artsprint",
-        "start": "2012-02-13T09:00:00.000Z",
-        "end": "2012-02-17T17:00:00.000Z",
-        "allDay": false,
-        "location": "aka bild, wien",
-        "timezone": "Europe/Vienna"
-      }
+      {"uid":"123456","sourceUid":"123456","title":"artsprint 2012","description":"sprinting at the artsprint","start":"2012-02-13T09:00:00.000Z","end":"2012-02-17T17:00:00.000Z","allDay":false,"location":"aka bild, wien","timezone":"Europe/Vienna"}
     ],
     "errors": [],
     "method": "PUBLISH",

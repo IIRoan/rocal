@@ -1,45 +1,21 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "noend123",
-        "sourceUid": "noend123",
-        "title": "an event with a custom tz name",
-        "start": "2014-08-29T12:00:00.000Z",
-        "end": "2014-08-29T12:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Detroit"
-      }
+      {"uid":"noend123","sourceUid":"noend123","title":"an event with a custom tz name","start":"2014-08-29T12:00:00.000Z","end":"2014-08-29T12:00:00.000Z","allDay":false,"timezone":"America/Detroit"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "noend123",
-        "sourceUid": "noend123",
-        "title": "an event with a custom tz name",
-        "start": "2014-08-29T12:00:00.000Z",
-        "end": "2014-08-29T12:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Detroit"
-      }
+      {"uid":"noend123","sourceUid":"noend123","title":"an event with a custom tz name","start":"2014-08-29T12:00:00.000Z","end":"2014-08-29T12:00:00.000Z","allDay":false,"timezone":"America/Detroit"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "noend123",
-        "sourceUid": "noend123",
-        "title": "an event with a custom tz name",
-        "start": "2014-08-29T12:00:00.000Z",
-        "end": "2014-08-29T12:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Detroit"
-      }
+      {"uid":"noend123","sourceUid":"noend123","title":"an event with a custom tz name","start":"2014-08-29T12:00:00.000Z","end":"2014-08-29T12:00:00.000Z","allDay":false,"timezone":"America/Detroit"}
     ],
     "errors": [],
     "method": "PUBLISH"

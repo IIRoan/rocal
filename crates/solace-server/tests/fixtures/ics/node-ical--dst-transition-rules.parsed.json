@@ -1,45 +1,21 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "f683404f-aede-43eb-8774-27f62bb27c92",
-        "sourceUid": "f683404f-aede-43eb-8774-27f62bb27c92",
-        "title": "Morgendienst",
-        "start": "2022-10-09T10:00:00.000Z",
-        "end": "2022-10-09T11:00:00.000Z",
-        "allDay": false,
-        "timezone": "UTC"
-      }
+      {"uid":"f683404f-aede-43eb-8774-27f62bb27c92","sourceUid":"f683404f-aede-43eb-8774-27f62bb27c92","title":"Morgendienst","start":"2022-10-09T10:00:00.000Z","end":"2022-10-09T11:00:00.000Z","allDay":false,"timezone":"UTC"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "f683404f-aede-43eb-8774-27f62bb27c92",
-        "sourceUid": "f683404f-aede-43eb-8774-27f62bb27c92",
-        "title": "Morgendienst",
-        "start": "2022-10-09T08:00:00.000Z",
-        "end": "2022-10-09T09:00:00.000Z",
-        "allDay": false,
-        "timezone": "Europe/Amsterdam"
-      }
+      {"uid":"f683404f-aede-43eb-8774-27f62bb27c92","sourceUid":"f683404f-aede-43eb-8774-27f62bb27c92","title":"Morgendienst","start":"2022-10-09T08:00:00.000Z","end":"2022-10-09T09:00:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "f683404f-aede-43eb-8774-27f62bb27c92",
-        "sourceUid": "f683404f-aede-43eb-8774-27f62bb27c92",
-        "title": "Morgendienst",
-        "start": "2022-10-09T17:00:00.000Z",
-        "end": "2022-10-09T18:00:00.000Z",
-        "allDay": false,
-        "timezone": "America/Los_Angeles"
-      }
+      {"uid":"f683404f-aede-43eb-8774-27f62bb27c92","sourceUid":"f683404f-aede-43eb-8774-27f62bb27c92","title":"Morgendienst","start":"2022-10-09T17:00:00.000Z","end":"2022-10-09T18:00:00.000Z","allDay":false,"timezone":"America/Los_Angeles"}
     ],
     "errors": [],
     "method": "PUBLISH"

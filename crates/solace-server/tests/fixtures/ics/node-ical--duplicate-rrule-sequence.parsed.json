@@ -1,66 +1,21 @@
 {
   "UTC": {
     "events": [
-      {
-        "uid": "rrule-sequence-test@node-ical.test",
-        "sourceUid": "rrule-sequence-test@node-ical.test",
-        "title": "Daily Meeting (SEQUENCE 2)",
-        "start": "2024-01-01T10:00:00.000Z",
-        "end": "2024-01-01T11:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "daily",
-          "interval": 1,
-          "count": 5,
-          "timezone": "Etc/UTC"
-        },
-        "timezone": "Etc/UTC",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":5,\"timezone\":\"Etc/UTC\"}"
-      }
+      {"uid":"rrule-sequence-test@node-ical.test","sourceUid":"rrule-sequence-test@node-ical.test","title":"Daily Meeting (SEQUENCE 2)","start":"2024-01-01T10:00:00.000Z","end":"2024-01-01T11:00:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"count":5,"timezone":"Etc/UTC"},"timezone":"Etc/UTC","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":5,\"timezone\":\"Etc/UTC\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "Europe/Amsterdam": {
     "events": [
-      {
-        "uid": "rrule-sequence-test@node-ical.test",
-        "sourceUid": "rrule-sequence-test@node-ical.test",
-        "title": "Daily Meeting (SEQUENCE 2)",
-        "start": "2024-01-01T10:00:00.000Z",
-        "end": "2024-01-01T11:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "daily",
-          "interval": 1,
-          "count": 5,
-          "timezone": "Etc/UTC"
-        },
-        "timezone": "Etc/UTC",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":5,\"timezone\":\"Etc/UTC\"}"
-      }
+      {"uid":"rrule-sequence-test@node-ical.test","sourceUid":"rrule-sequence-test@node-ical.test","title":"Daily Meeting (SEQUENCE 2)","start":"2024-01-01T10:00:00.000Z","end":"2024-01-01T11:00:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"count":5,"timezone":"Etc/UTC"},"timezone":"Etc/UTC","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":5,\"timezone\":\"Etc/UTC\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"
   },
   "America/Los_Angeles": {
     "events": [
-      {
-        "uid": "rrule-sequence-test@node-ical.test",
-        "sourceUid": "rrule-sequence-test@node-ical.test",
-        "title": "Daily Meeting (SEQUENCE 2)",
-        "start": "2024-01-01T10:00:00.000Z",
-        "end": "2024-01-01T11:00:00.000Z",
-        "allDay": false,
-        "recurrence": {
-          "frequency": "daily",
-          "interval": 1,
-          "count": 5,
-          "timezone": "Etc/UTC"
-        },
-        "timezone": "Etc/UTC",
-        "recurrenceJson": "{\"frequency\":\"daily\",\"interval\":1,\"count\":5,\"timezone\":\"Etc/UTC\"}"
-      }
+      {"uid":"rrule-sequence-test@node-ical.test","sourceUid":"rrule-sequence-test@node-ical.test","title":"Daily Meeting (SEQUENCE 2)","start":"2024-01-01T10:00:00.000Z","end":"2024-01-01T11:00:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"count":5,"timezone":"Etc/UTC"},"timezone":"Etc/UTC","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":5,\"timezone\":\"Etc/UTC\"}"}
     ],
     "errors": [],
     "method": "PUBLISH"

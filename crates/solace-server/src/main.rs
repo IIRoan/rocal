@@ -1,10 +1,5 @@
 //! Boots the API: typed config, telemetry, a small Tokio runtime, the pool, and graceful shutdown on SIGTERM.
 
-#[cfg(feature = "mimalloc")]
-#[global_allocator]
-static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
-#[cfg(feature = "jemalloc")]
 #[global_allocator]
 static ALLOCATOR: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
