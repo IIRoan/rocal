@@ -18,6 +18,11 @@ export default defineRailway(() => {
     branch: "master",
     checkSuites: false,
   });
+  // The Rust API builds from its PR branch until plan 001 merges; then it uses solaceRepo.
+  const rustApiRepo = github("IIRoan/rocal", {
+    branch: "rust-rewrite",
+    checkSuites: false,
+  });
   const stalwartRepo = github("IIRoan/rocal", {
     branch: "master",
     checkSuites: false,
@@ -133,7 +138,7 @@ export default defineRailway(() => {
   });
 
   const api = service("Solace API", {
-    source: solaceRepo,
+    source: rustApiRepo,
     build: {
       builder: "DOCKERFILE",
       dockerfilePath: "crates/solace-server/Dockerfile",
@@ -154,7 +159,6 @@ export default defineRailway(() => {
     deploy: {
       ipv6EgressEnabled: true,
       drainingSeconds: 30,
-      restartPolicyType: "ON_FAILURE",
       restartPolicyMaxRetries: 5,
     },
     // The same variables as the Vercel API; STALWART_WEBHOOK_SECRET waits for cutover, since boot re-registers the webhook with it.

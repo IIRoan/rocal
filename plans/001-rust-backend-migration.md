@@ -453,7 +453,7 @@ Each sub-step is done when its suite cases pass against Rust and the memory budg
 This happens only with explicit go-ahead.
 
 1. Take a backup and test restoring it.
-2. Move `api.solace.onl` from Vercel to the Railway Rust service ("Solace API" in `.railway/railway.ts`, deployed without a domain): add the domain and drop its `CALENDAR_SYNC=false`. The hostname stays the same, so cookies, passkeys, and native apps need no release.
+2. Move `api.solace.onl` from Vercel to the Railway Rust service ("Solace API" in `.railway/railway.ts`, deployed without a domain): add the domain, drop its `CALENDAR_SYNC=false`, set a fresh `STALWART_WEBHOOK_SECRET` (boot re-registers the webhook with it), and once the PR is merged build it from `master` again (`solaceRepo`). The hostname stays the same, so cookies, passkeys, and native apps need no release.
 3. Keep the Vercel API deployment untouched. Rolling back means moving the domain back.
 4. Freeze schema changes and watch auth, errors, outbox, mail, and memory for 14 days, one full session lifetime.
 5. Roll back on any security problem, session failure, wrong data, duplicate side effect, or exceeded threshold.
