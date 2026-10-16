@@ -8,6 +8,7 @@ import {
   postgres,
   preserve,
   project,
+  ref,
   service,
   volume,
 } from "railway/iac";
@@ -15,6 +16,7 @@ import {
 export default defineRailway(() => {
   // Web (Next.js) and API (Elysia) run on Vercel — see apps/web + apps/backend vercel.json.
   // Postgres stays here so Vercel API can reach it via DATABASE_PUBLIC_URL.
+  // The Rust API (plan 001) runs here without a domain until api.solace.onl moves to it.
   const stalwartRepo = github("IIRoan/rocal", {
     branch: "master",
     rootDirectory: "apps/stalwart",
@@ -214,13 +216,76 @@ export default defineRailway(() => {
     },
   });
 
+  const api = service("Solace API", {
+    source: solaceRepo,
+    build: {
+      builder: "DOCKERFILE",
+      dockerfilePath: "crates/solace-server/Dockerfile",
+      buildEnvironment: "V3",
+      watchPatterns: [
+        "crates/**",
+        "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml",
+        "packages/calendar-core/src/redaction-policy.js",
+        "packages/calendar-ics/src/windows-zones.json",
+      ],
+    },
+    healthcheck: "/api/health",
+    healthcheckTimeout: 120,
+    replicas: { "europe-west4-drams3a": 1 },
+    networking: { privateNetworkEndpoint: "solace-api" },
+    deploy: {
+      ipv6EgressEnabled: true,
+      drainingSeconds: 30,
+      restartPolicyType: "ON_FAILURE",
+      restartPolicyMaxRetries: 5,
+    },
+    env: {
+      NODE_ENV: "production",
+      // Cookies, passkeys and the Stalwart webhook it re-registers at boot all use the public API URL.
+      BACKEND_URL: "https://api.solace.onl",
+      // Off until api.solace.onl points here: Vercel still serves manual syncs, and synced events have no unique key.
+      CALENDAR_SYNC: "false",
+      DATABASE_URL: ref(postgresApp, "DATABASE_URL"),
+      AUTH_COOKIE_SAME_SITE: preserve(),
+      AVATAR_BUCKET: preserve(),
+      AVATAR_BUCKET_ACCESS_KEY_ID: preserve(),
+      AVATAR_BUCKET_ENDPOINT: preserve(),
+      AVATAR_BUCKET_REGION: preserve(),
+      AVATAR_BUCKET_SECRET_ACCESS_KEY: preserve(),
+      BETTER_AUTH_SECRET: preserve(),
+      EMAIL_FROM: preserve(),
+      EMAIL_FROM_NAME: preserve(),
+      FRONTEND_URL: preserve(),
+      MAIL_BRIDGE_HMAC_KEY: preserve(),
+      MOBILE_AUTH_CALLBACK_URL: preserve(),
+      NEXT_PUBLIC_APP_URL: preserve(),
+      PASSKEY_ORIGIN: preserve(),
+      SENTRY_DSN: preserve(),
+      STALWART_ADMIN_TOKEN: preserve(),
+      STALWART_BASE_URL: preserve(),
+      STALWART_DEFAULT_DOMAIN: preserve(),
+      STALWART_GATE_KEY: preserve(),
+      STALWART_JMAP_PASSWORD: preserve(),
+      STALWART_JMAP_URL: preserve(),
+      STALWART_JMAP_USERNAME: preserve(),
+      STALWART_PROVISION_TOKEN: preserve(),
+      STALWART_WEBHOOK_SECRET: preserve(),
+      STALWART_WEBHOOK_URL: preserve(),
+      TRUSTED_ORIGINS: preserve(),
+    },
+  });
+
   const mailServer = group("Mail server", [stalwartMail, postgresStalwart]);
+  const apiGroup = group("API", [api]);
   const notificationGroup = group("Notifications", [notifications]);
   const monitoringGroup = group("Monitoring", [monitoring]);
   const errorTrackingGroup = group("Error tracking", [errex]);
 
   return project("Solace", {
     resources: [
+      apiGroup,
       mailServer,
       notificationGroup,
       monitoringGroup,

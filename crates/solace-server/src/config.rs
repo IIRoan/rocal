@@ -82,6 +82,8 @@ pub struct Config {
     pub stalwart_webhook_url: String,
     /// `main.ts` polled every linked mailbox only outside Vercel, so production never did; it stays off unless set, since it widens server-side invite ingestion.
     pub mail_receipt_polling: bool,
+    /// `CALENDAR_SYNC=false` keeps a deployment that doesn't serve the API yet from syncing feeds beside the one that does.
+    pub calendar_sync: bool,
     /// Base64 HMAC key for the per-user Stalwart bridge passwords; mail tokens fail without it.
     pub mail_bridge_hmac_key: Option<String>,
     pub sentry_dsn: Option<String>,
@@ -163,6 +165,7 @@ impl Config {
                 var("MAIL_RECEIPT_POLLING").as_deref(),
                 Some("1" | "true")
             ),
+            calendar_sync: !matches!(var("CALENDAR_SYNC").as_deref(), Some("0" | "false")),
             stalwart_webhook_url: trimmed(&var, "STALWART_WEBHOOK_URL")
                 .unwrap_or_else(|| format!("{backend_url}/api/internal/stalwart/webhook")),
             mail_bridge_hmac_key: trimmed(&var, "MAIL_BRIDGE_HMAC_KEY"),
@@ -334,5 +337,21 @@ mod tests {
         assert_eq!(config.passkey_origin, "https://app.example");
         assert!(!config.is_production);
         assert_eq!(config.cookie_same_site, SameSite::Lax);
+    }
+
+    #[test]
+    fn calendar_sync_runs_unless_switched_off() {
+        assert!(config(&[DB]).unwrap().calendar_sync);
+        assert!(
+            config(&[DB, ("CALENDAR_SYNC", "true")])
+                .unwrap()
+                .calendar_sync
+        );
+        assert!(
+            !config(&[DB, ("CALENDAR_SYNC", "false")])
+                .unwrap()
+                .calendar_sync
+        );
+        assert!(!config(&[DB, ("CALENDAR_SYNC", "0")]).unwrap().calendar_sync);
     }
 }

@@ -71,3 +71,42 @@ jobs:
             packages/native-core/coverage
             apps/native-calendar/coverage
             apps/native-mail/coverage
+
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+      # The avatar cases use Railway's test bucket (solace-test-*); the suite's guard refuses anything else.
+      TEST_AVATAR_BUCKET: ${{ secrets.TEST_AVATAR_BUCKET }}
+      TEST_AVATAR_BUCKET_ENDPOINT: ${{ secrets.TEST_AVATAR_BUCKET_ENDPOINT }}
+      TEST_AVATAR_BUCKET_REGION: ${{ secrets.TEST_AVATAR_BUCKET_REGION }}
+      TEST_AVATAR_BUCKET_ACCESS_KEY_ID: ${{ secrets.TEST_AVATAR_BUCKET_ACCESS_KEY_ID }}
+      TEST_AVATAR_BUCKET_SECRET_ACCESS_KEY: ${{ secrets.TEST_AVATAR_BUCKET_SECRET_ACCESS_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install sea-orm-cli
+        run: cargo install sea-orm-cli@2.0.4 --locked
+
+      - name: Start the test environment
+        run: cargo xtask test-env up && cargo xtask test-env template
+
+      # Memory budgets stay local: shared runners' RSS is too noisy for fixed MiB limits.
+      - name: Run cargo xtask check
+        run: cargo xtask check --skip-mem

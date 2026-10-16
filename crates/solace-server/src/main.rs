@@ -31,7 +31,10 @@ async fn run(config: Config) -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", port)).await?;
     tracing::info!(port, "Server is running");
     tokio::spawn(ensure_stalwart_webhook(state.clone()));
-    let calendar_sync = scheduler::start(state.clone());
+    let calendar_sync = state
+        .config
+        .calendar_sync
+        .then(|| scheduler::start(state.clone()));
     let receipt_poll = state
         .config
         .mail_receipt_polling
@@ -39,9 +42,8 @@ async fn run(config: Config) -> anyhow::Result<()> {
     let stopping = state.clone();
     let shutdown = async move {
         shutdown_signal().await;
-        calendar_sync.abort();
-        if let Some(receipt_poll) = receipt_poll {
-            receipt_poll.abort();
+        for task in [calendar_sync, receipt_poll].into_iter().flatten() {
+            task.abort();
         }
         realtime::stop(&stopping);
     };
