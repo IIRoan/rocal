@@ -472,6 +472,7 @@ This happens only with explicit go-ahead.
 - Remove `apps/backend`, Prisma, the Better Auth server packages, and, after confirming, the Vercel API project. Keep the frontend, shared-package, and Go tests.
 - Move migrations to `sea-orm-migration`, baselined at migration 53, keeping the `_prisma_migrations` history.
 - Fix the known privacy gaps, delete them from AGENTS §2, and remove the exception.
+- Reach Stalwart over Railway's private network (`stalwart.railway.internal`) with a scoped provisioner key instead of `STALWART_ADMIN_TOKEN` over `https://mail.solace.onl` (what the Vercel API used too; the provisioner role needs the User role and `impersonate`, see step 1), then correct AGENTS §8's gate sentence.
 - Optional: rehash passwords to argon2id on sign-in.
 - Update CI (Rust jobs replace backend Jest), root scripts, repo rules, the README, and both AGENTS files.
 
