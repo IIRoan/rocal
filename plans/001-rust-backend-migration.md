@@ -458,6 +458,14 @@ This happens only with explicit go-ahead.
 4. Freeze schema changes and watch auth, errors, outbox, mail, and memory for 14 days, one full session lifetime.
 5. Roll back on any security problem, session failure, wrong data, duplicate side effect, or exceeded threshold.
 
+**Result (2026-10-17, at the user's request):**
+
+- Backup `~/Documents/rocal-db-backups/solace-prod-20261017-1647-before-rust-cutover.dump` (390 KB) restored without errors into a scratch Postgres 18: 31 users, 180 events, 70 calendars, 53 migrations.
+- Before the switch, read-only requests to the production Rust service with a real Vercel-issued session matched the Vercel API byte for byte on 10 of 11 routes (the event list differs only in JSON key order), and a mail token minted.
+- 14:51 UTC: `api.solace.onl`'s CNAME moved from `8d335a303195b28e.vercel-dns-017.com` to Railway's `obq4rs6q.up.railway.app`, DNS-only so Railway's `X-Real-IP` is the client. Railway issues the certificate only after it sees the CNAME, so clients already on the new record had no valid TLS until 14:54:46 (about 3.5 minutes).
+- The redeploy at 14:55 brought a fresh `STALWART_WEBHOOK_SECRET` (the boot re-registered the webhook with it) and calendar sync, whose first run synced every due feed. No warnings or errors afterwards; 47 MiB resident.
+- Rollback: point the CNAME back at Vercel and set Vercel's `STALWART_WEBHOOK_SECRET` to Railway's value, because only `serve.ts`, never the Vercel function, registers the webhook.
+
 ### 7. Delete TypeScript and clean up
 
 - Remove `apps/backend`, Prisma, the Better Auth server packages, and, after confirming, the Vercel API project. Keep the frontend, shared-package, and Go tests.

@@ -13,7 +13,7 @@ import {
 
 export default defineRailway(() => {
   // Web (Next.js) and the TypeScript API (Elysia) run on Vercel; see apps/web + apps/backend vercel.json.
-  // The Rust API (plan 001) runs here without a domain until api.solace.onl moves to it.
+  // The Rust API (plan 001) serves api.solace.onl (a custom domain, set outside this file); the Vercel API stays deployed for rollback.
   const solaceRepo = github("IIRoan/rocal", {
     branch: "master",
     checkSuites: false,
@@ -161,11 +161,9 @@ export default defineRailway(() => {
       drainingSeconds: 30,
       restartPolicyMaxRetries: 5,
     },
-    // The same variables as the Vercel API; STALWART_WEBHOOK_SECRET waits for cutover, since boot re-registers the webhook with it.
+    // The same variables as the Vercel API; boot re-registers Stalwart's webhook with STALWART_WEBHOOK_SECRET.
     env: {
       NODE_ENV: "production",
-      // Off until api.solace.onl points here: Vercel still serves manual syncs, and synced events have no unique key.
-      CALENDAR_SYNC: "false",
       DATABASE_URL: ref(postgresApp, "DATABASE_URL"),
       // Read from the Vercel API's responses: its cookies are SameSite=None and it trusts the Vercel web URL.
       AUTH_COOKIE_SAME_SITE: "none",
