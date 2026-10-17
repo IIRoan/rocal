@@ -61,6 +61,13 @@ fn not_found() -> AppError {
     AppError::validation("Event not found or access denied")
 }
 
+fn target_not_found() -> AppError {
+    AppError::field(
+        "Target calendar not found or access denied",
+        "targetCalendarId",
+    )
+}
+
 fn has_text(value: Option<&str>) -> bool {
     value.is_some_and(|value| !js_trim(value).is_empty())
 }
@@ -808,12 +815,7 @@ pub async fn bulk(
             };
             let target = calendars::find(&state.db, &user.id, &target_id.0)
                 .await?
-                .ok_or_else(|| {
-                    AppError::field(
-                        "Target calendar not found or access denied",
-                        "targetCalendarId",
-                    )
-                })?;
+                .ok_or_else(target_not_found)?;
             if target.ics_share_enabled && events.iter().any(|e| e.encryption_state == "encrypted")
             {
                 return Err(AppError::field(
@@ -862,14 +864,18 @@ pub async fn bulk(
             })
         }
         "duplicate" => {
-            duplicate(
-                state,
-                user,
-                &events,
-                &relations,
-                request.target_calendar_id.as_ref().map(|id| id.0.as_str()),
-            )
-            .await
+            let target = request
+                .target_calendar_id
+                .as_ref()
+                .map(|id| id.0.as_str())
+                .filter(|id| !id.is_empty());
+            // Copies land only in the caller's own calendars; TypeScript wrote into any id and returned its share token.
+            if let Some(id) = target
+                && calendars::find(&state.db, &user.id, id).await?.is_none()
+            {
+                return Err(target_not_found());
+            }
+            duplicate(state, user, &events, &relations, target).await
         }
         _ => Err(AppError::field(
             "Invalid action. Use 'move', 'delete', or 'duplicate'",
@@ -910,9 +916,9 @@ async fn duplicate(
                 is_private: Set(event.is_private),
                 reminder: Set(event.reminder),
                 recurrence: Set(None),
-                calendar_id: Set(target_calendar_id
-                    .filter(|id| !id.is_empty())
-                    .map_or_else(|| event.calendar_id.clone(), str::to_owned)),
+                calendar_id: Set(
+                    target_calendar_id.map_or_else(|| event.calendar_id.clone(), str::to_owned)
+                ),
                 category_id: Set(event.category_id.clone()),
                 user_id: Set(user.id.clone()),
                 ..Default::default()

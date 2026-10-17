@@ -2068,6 +2068,49 @@ async fn bulk_validation_uses_the_zod_messages() {
 }
 
 #[tokio::test]
+async fn bulk_duplicate_refuses_another_users_calendar() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let mut other = app.user().await;
+    let work = calendar_id(&mut owner, "Work").await;
+    let foreign = calendar_id(&mut other, "Work").await;
+    let event = create_event(
+        &mut owner,
+        &encrypted_event(&work, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    let response = owner
+        .post(
+            "/api/events/bulk",
+            json!({"action": "duplicate", "eventIds": [event.id], "targetCalendarId": foreign}),
+        )
+        .await;
+    let copies = match app.backend {
+        // TypeScript copies into any calendar id and returns that calendar, share token included.
+        Backend::TypeScript => {
+            ok(response.expect_status(200));
+            1
+        }
+        Backend::Rust => {
+            let error = ok(response.expect_error(
+                400,
+                "Validation Error",
+                "Target calendar not found or access denied",
+            ));
+            assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
+            0
+        }
+    };
+    let stored = count(
+        &app.db,
+        "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
+        &foreign,
+    )
+    .await;
+    assert_eq!(stored, copies);
+}
+
+#[tokio::test]
 async fn bulk_duplicate_copies_ciphertext_attendees_and_reminders() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
