@@ -20,6 +20,7 @@ use crate::http::zod::js_trim;
 use crate::instant;
 use crate::integrations::ics::trimmed_text;
 use crate::state::AppState;
+use crate::telemetry::redact_pii;
 
 /// The rule an empty recurrence gets when the title says it repeats on weekdays.
 const WEEKDAY_FALLBACK_RULE: &str = r#"{"frequency":"daily","interval":1,"byWeekDay":[1,2,3,4,5]}"#;
@@ -150,7 +151,7 @@ fn expand(
     let instances = match instances {
         Ok(instances) => instances,
         Err(error) => {
-            tracing::error!(event_id = %series.id, error = %error, "Error generating instances for a recurring event");
+            tracing::error!(event_id = %series.id, error = %redact_pii(&error.to_string()), "Error generating instances for a recurring event");
             let in_range = series.start >= range_start && series.start <= range_end;
             return Ok(if in_range {
                 vec![original(&base)]

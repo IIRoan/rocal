@@ -34,6 +34,7 @@ use crate::invitations::rsvp_reply::RsvpStatus;
 use crate::notifications::calculator;
 use crate::notifications::job_payload::should_schedule_event_reminder;
 use crate::state::AppState;
+use crate::telemetry::redact_pii;
 
 const MS_PER_DAY: i64 = 86_400_000;
 const MS_PER_MINUTE: i64 = 60_000;
@@ -401,7 +402,7 @@ pub async fn create(
         )
         .await
     {
-        tracing::error!(error = %error, "Failed to create notifications");
+        tracing::error!(error = %redact_pii(&error.to_string()), "Failed to create notifications");
         warnings.push(email::reminder_schedule_warning(
             email::ReminderContext::Create,
         ));
@@ -654,7 +655,7 @@ pub async fn update(
         )
         .await
     {
-        tracing::error!(error = %error, "Failed to update notifications");
+        tracing::error!(error = %redact_pii(&error.to_string()), "Failed to update notifications");
         warnings.push(email::reminder_schedule_warning(
             email::ReminderContext::Update,
         ));
@@ -946,7 +947,7 @@ async fn duplicate(
             )
             .await
         {
-            tracing::error!(error = %error, "Failed to create notifications for a duplicated event");
+            tracing::error!(error = %redact_pii(&error.to_string()), "Failed to create notifications for a duplicated event");
         }
         let copy_relations = Relations::load(&state.db, &[&copy], false).await?;
         let mut dto = view::event_dto(&copy, &copy_relations)?;

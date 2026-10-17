@@ -151,6 +151,11 @@ UID:custom
 DTSTART;TZID=Office time:20261102T090000
 SUMMARY:After the change
 END:VEVENT
+BEGIN:VEVENT
+UID:summer
+DTSTART;TZID=Office time:20260715T090000
+SUMMARY:Daylight saving time
+END:VEVENT
 BEGIN:VTIMEZONE
 TZID:Office time
 BEGIN:STANDARD
@@ -170,6 +175,9 @@ END:VTIMEZONE`),
     );
     expect(result.events[0]).toMatchObject({
       start: "2026-11-02T08:00:00.000Z",
+    });
+    expect(result.events[1]).toMatchObject({
+      start: "2026-07-15T07:00:00.000Z",
     });
   });
 

@@ -171,7 +171,8 @@ pub fn validate<T: DeserializeOwned>(
         ApiError::new(StatusCode::BAD_REQUEST, "VALIDATION_ERROR", message)
     })?;
     serde_json::from_value(output.unwrap_or(Value::Null)).map_err(|error| {
-        tracing::error!(error = %error, "Better Auth body did not match its schema");
+        // serde's message quotes the offending value, which can be a password.
+        tracing::error!(category = ?error.classify(), "Better Auth body did not match its schema");
         ApiError::internal()
     })
 }

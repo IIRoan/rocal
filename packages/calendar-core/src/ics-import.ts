@@ -178,13 +178,25 @@ function parseEvent(
   };
 }
 
+/** Defers only event RRULEs; VTIMEZONE STANDARD/DAYLIGHT rules must stay readable for offsets. */
+function deferEventRules(content: string): string {
+  let inEvent = false;
+  return content.replace(
+    /^(?:BEGIN|END):VEVENT\b|^RRULE(?=[;:])/gim,
+    (match) => {
+      if (match.toUpperCase().startsWith("BEGIN")) inEvent = true;
+      else if (match.toUpperCase().startsWith("END")) inEvent = false;
+      else if (inEvent) return DEFERRED_RRULE.toUpperCase();
+      return match;
+    },
+  );
+}
+
 /** Parses untrusted ICS only on-device; errors never echo file contents. */
 export function parseIcsImport(content: string, timezone?: string | null) {
   let calendar: IcsComponent;
   try {
-    calendar = ICAL.Component.fromString(
-      content.replace(/^RRULE(?=[;:])/gim, DEFERRED_RRULE.toUpperCase()),
-    );
+    calendar = ICAL.Component.fromString(deferEventRules(content));
     if (calendar.name !== "vcalendar") throw new Error("Invalid calendar");
   } catch {
     throw new Error("Invalid calendar file");

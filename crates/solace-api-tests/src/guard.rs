@@ -55,7 +55,7 @@ pub fn check_database_url(name: &'static str, value: &str) -> Result<(), GuardEr
         return Err(GuardError::InvalidUrl(name));
     }
     let host = url.host_str().unwrap_or_default();
-    if !is_test_host(host) && !host.ends_with(".proxy.rlwy.net") {
+    if !is_test_host(host) {
         return Err(GuardError::NotTestHost(name));
     }
     if !url
@@ -144,19 +144,19 @@ mod tests {
                 "DB",
                 "postgresql://postgres:solace-test-x@ab.proxy.rlwy.net:123/solace_test_template"
             ),
-            Ok(())
+            Err(GuardError::NotTestHost("DB"))
         );
         assert_eq!(
             check_database_url(
                 "DB",
-                "postgresql://postgres:random@ab.proxy.rlwy.net:123/railway"
+                "postgresql://solace_test:solace-test-pg@127.0.0.1:55432/railway"
             ),
             Err(GuardError::NotTestDatabase("DB"))
         );
         assert_eq!(
             check_database_url(
                 "DB",
-                "postgresql://postgres:random@ab.proxy.rlwy.net:123/solace_test"
+                "postgresql://postgres:random@127.0.0.1:55432/solace_test"
             ),
             Err(GuardError::NotTestPassword("DB"))
         );

@@ -94,17 +94,18 @@ pub async fn access_token_for_user(
     user_id: &str,
     email: &str,
 ) -> Result<MailAccessToken, AppError> {
-    let slot = state
-        .mail_cache
-        .tokens
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .entry(user_id.to_owned())
-        .or_default()
-        .clone();
+    let now = instant::unix_millis(instant::now());
+    let slot = {
+        let mut tokens = state
+            .mail_cache
+            .tokens
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        tokens.retain(|_, slot| keep_token_slot(slot, now));
+        tokens.entry(user_id.to_owned()).or_default().clone()
+    };
     // Callers queued behind a failed mint try their own rather than sharing its error.
     let mut cached = slot.lock().await;
-    let now = instant::unix_millis(instant::now());
     if let Some(entry) = cached
         .as_ref()
         .filter(|entry| now + MAIL_TOKEN_EXPIRY_SKEW_MS < entry.expires_at_ms)
@@ -124,6 +125,16 @@ pub async fn access_token_for_user(
         "Cached mail access token for user"
     );
     Ok(token)
+}
+
+/// Keeps a token slot while a caller holds it or its bearer is unexpired, so the map only holds live users.
+fn keep_token_slot(slot: &Arc<tokio::sync::Mutex<Option<CachedToken>>>, now_ms: i64) -> bool {
+    Arc::strong_count(slot) > 1
+        || slot.try_lock().map_or(true, |cached| {
+            cached
+                .as_ref()
+                .is_some_and(|entry| now_ms < entry.expires_at_ms)
+        })
 }
 
 /// Drops the cached bearer, so the next caller mints a new one.
@@ -1107,6 +1118,30 @@ pub mod tests {
     use crate::config::Config;
     use crate::db::scratch::ScratchDatabase;
     use crate::integrations::stalwart::fake::{FakeStalwart, Recorded, Reply};
+
+    fn token_slot(expires_at_ms: i64) -> Arc<tokio::sync::Mutex<Option<CachedToken>>> {
+        Arc::new(tokio::sync::Mutex::new(Some(CachedToken {
+            token: MailAccessToken {
+                access_token: "bearer".into(),
+                expires_in: 0,
+                expires_at: 0,
+            },
+            expires_at_ms,
+        })))
+    }
+
+    #[tokio::test]
+    async fn token_slots_are_pruned_once_idle_and_expired() {
+        assert!(keep_token_slot(&token_slot(2_000), 1_000));
+        assert!(!keep_token_slot(&token_slot(1_000), 1_000));
+        assert!(!keep_token_slot(&Arc::default(), 1_000));
+        let held = token_slot(1_000);
+        let _caller = held.clone();
+        assert!(keep_token_slot(&held, 5_000));
+        let minting = token_slot(1_000);
+        let _guard = minting.lock().await;
+        assert!(keep_token_slot(&minting, 5_000));
+    }
 
     pub const OWNER: &str = "mail-test-owner";
     const KEY: &str = include_str!("../../../solace-api-tests/fixtures/pgp/test1.asc");
