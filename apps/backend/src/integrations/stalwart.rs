@@ -1,7 +1,7 @@
 //! Stalwart: the backend gate, the registry admin client and its limits, owner-authenticated JMAP, the reachability probe and the noreply mailer.
 
 pub mod admin;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub mod fake;
 pub mod gate;
 pub mod jmap;

@@ -23,12 +23,6 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: apps/notifications/go.mod
-          cache-dependency-path: apps/notifications/go.sum
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -54,13 +48,6 @@ jobs:
         with:
           name: ui-coverage
           path: packages/ui/coverage
-
-      - name: Upload notifications coverage
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: notifications-coverage
-          path: apps/notifications/coverage.out
 
       - name: Upload native coverage
         if: always()

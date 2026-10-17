@@ -9,7 +9,7 @@ A calendar and mail monorepo: web frontend, native Calendar and Mail apps, API b
 - **retired/backend** - The previous Elysia.js API, kept deployed on Vercel for rollback until plan 001 step 7 deletes it; the Prisma migrations still live here
 - **apps/native-calendar** - Expo app "Solace Calendar". See [apps/native-calendar/README.md](apps/native-calendar/README.md).
 - **apps/native-mail** - Expo app "Solace Mail". See [apps/native-mail/README.md](apps/native-mail/README.md).
-- **apps/notifications** - Go service for scheduled email and APNs notifications
+- **apps/notifications** - Rust worker for scheduled reminder email and APNs notifications
 - **apps/stalwart** - Stalwart mail server image, JMAP config plan, VPS HAProxy/frp. See [apps/stalwart/README.md](apps/stalwart/README.md).
 - **apps/gatus** - Status page (`status.solace.onl`). See [apps/gatus/README.md](apps/gatus/README.md).
 - **packages/ui** - Shared UI component library
@@ -21,11 +21,11 @@ A calendar and mail monorepo: web frontend, native Calendar and Mail apps, API b
 ## Technology Stack
 
 - Frontend: Next.js, React, Tailwind CSS, shadcn/ui
-- Backend: Elysia.js, Bun, Prisma, PostgreSQL
-- Notifications: Go, Stalwart JMAP (noreply identity), APNs
+- Backend: Rust (axum, SeaORM), PostgreSQL; the retired Elysia.js/Bun/Prisma API stays deployed for rollback
+- Notifications: Rust, Stalwart JMAP (noreply identity), APNs
 - Mail server: Stalwart (JMAP) on Railway, inbound/outbound via VPS tunnels
-- Authentication: Better Auth with passkey support
-- Database: PostgreSQL with Prisma ORM
+- Authentication: Better Auth's protocol and tables, served by the Rust API, with passkey support
+- Database: PostgreSQL; Prisma migrations until plan 001 step 7
 
 ## Development
 

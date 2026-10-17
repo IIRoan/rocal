@@ -53,5 +53,9 @@ flate2.workspace = true
 # Paused time for the subscription scheduler's timer tests.
 tokio = { workspace = true, features = ["test-util"] }
 
+[features]
+# The scratch test databases and the fake HTTP server, for other workspace crates' tests.
+test-support = []
+
 [lints]
 workspace = true

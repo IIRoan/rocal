@@ -2,7 +2,7 @@
 
 mod behavior;
 pub mod entities;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub mod scratch;
 
 pub use behavior::cuid;

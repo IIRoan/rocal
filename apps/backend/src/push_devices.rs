@@ -34,13 +34,24 @@ const TEST_LIMIT: Limit = Limit::per_minute(5);
 const TEST_NOTIFICATION_EVENT_ID: &str = "test-notification";
 const TEST_NOTIFICATION_MINUTES_BEFORE: u32 = 15;
 
-/// `SOLACE_IOS_BUNDLE_IDS`, kept in sync with `apps/notifications/internal/push/bundles.go`.
+/// `SOLACE_IOS_BUNDLE_IDS` in `packages/calendar-core/src/push-device.ts`; the notifications worker routes pushes by them too.
 const BUNDLE_IDS: [&str; 4] = [
-    "onl.solace.calendar",
-    "onl.solace.calendar.dev",
-    "onl.solace.mail",
-    "onl.solace.mail.dev",
+    CALENDAR_BUNDLE_IDS[0],
+    CALENDAR_BUNDLE_IDS[1],
+    MAIL_BUNDLE_IDS[0],
+    MAIL_BUNDLE_IDS[1],
 ];
+pub const CALENDAR_BUNDLE_IDS: [&str; 2] = ["onl.solace.calendar", "onl.solace.calendar.dev"];
+pub const MAIL_BUNDLE_IDS: [&str; 2] = ["onl.solace.mail", "onl.solace.mail.dev"];
+
+/// Calendar and Mail ship as separate apps: reminders go to Calendar, new-mail pushes to Mail.
+pub fn bundle_receives_kind(bundle_id: &str, kind: &str) -> bool {
+    match kind {
+        "event_reminder" => CALENDAR_BUNDLE_IDS.contains(&bundle_id),
+        "new_mail" => MAIL_BUNDLE_IDS.contains(&bundle_id),
+        _ => false,
+    }
+}
 
 fn push_token() -> zod::Schema {
     zod::string().trim().min(16).max(4096)
@@ -329,5 +340,24 @@ mod queries {
         }
         .insert(&state.db)
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_app_receives_only_its_own_pushes() {
+        for bundle in CALENDAR_BUNDLE_IDS {
+            assert!(bundle_receives_kind(bundle, "event_reminder"));
+            assert!(!bundle_receives_kind(bundle, "new_mail"));
+        }
+        for bundle in MAIL_BUNDLE_IDS {
+            assert!(bundle_receives_kind(bundle, "new_mail"));
+            assert!(!bundle_receives_kind(bundle, "event_reminder"));
+        }
+        assert!(!bundle_receives_kind("com.example.app", "new_mail"));
+        assert!(!bundle_receives_kind("onl.solace.mail", "unknown"));
     }
 }

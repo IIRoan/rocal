@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MailViewer, type EmailPreview } from "./mail-viewer";
 
@@ -11,7 +12,7 @@ const LOGO_URL = "https://solace.onl/favicon-192x192.png";
 const APP_URL = "https://solace.example.com";
 
 // ─── Email template helpers ───────────────────────────────────────────────────
-// Mirrors retired/backend/lib/auth-email.ts — keep in sync when updating designs.
+// Mirrors the Rust API templates in apps/backend/src/email/ — keep in sync when updating designs.
 
 function escapeHtml(value: string): string {
   return value
@@ -151,7 +152,7 @@ function buildPasswordUpdatedHtml(action: "changed" | "reset"): string {
   });
 }
 
-/** Event reminder with fake data — mirrors apps/notifications/emails/event-reminder.html */
+/** Event reminder with fake data — mirrors apps/notifications/src/event_reminder.html */
 function buildEventReminderHtml(): string {
   const logoUrl = escapeHtml(LOGO_URL);
   const appUrl = escapeHtml(APP_URL);
@@ -233,6 +234,10 @@ function buildEventReminderHtml(): string {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+export const metadata: Metadata = {
+  title: "Mail previews – Solace",
+};
+
 export default function DebugMailsPage() {
   if (process.env.NODE_ENV === "production") {
     notFound();
@@ -271,7 +276,7 @@ export default function DebugMailsPage() {
       category: "Notifications",
       label: "Event Reminder",
       description:
-        "Sent by the notifications service before an event starts. Mirrors apps/notifications/emails/event-reminder.html.",
+        "Sent by the notifications service before an event starts. Mirrors apps/notifications/src/event_reminder.html.",
       subject: "Team Standup - in 15 minutes",
       html: buildEventReminderHtml(),
     },
@@ -295,7 +300,7 @@ export default function DebugMailsPage() {
             <span className="text-foreground font-medium">{FAKE_NAME}</span>
             {" · "}
             <code className="rounded bg-muted px-1 py-0.5 text-[11px] font-mono">
-              retired/backend/lib/auth-email.ts
+              apps/backend/src/email/
             </code>
           </p>
         </div>

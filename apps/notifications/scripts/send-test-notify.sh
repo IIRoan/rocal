@@ -4,4 +4,4 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 recipient="${1:-testingproduction15@solace.onl}"
-exec go run ./ --test --test-push --test-to "$recipient"
+exec cargo run -q -p solace-notifications -- --test --test-push --test-to "$recipient"

@@ -331,6 +331,9 @@ fn send_calls(
     if !attachments.is_empty() {
         draft["attachments"] = Value::Array(attachments.to_vec());
     }
+    if let Some(message_id) = &message.message_id {
+        draft["messageId"] = json!([message_id]);
+    }
     json!([
         ["Email/set", {"accountId": session.mail_account, "create": {"draft1": draft}}, "c1"],
         ["EmailSubmission/set", submission, "c2"],
@@ -571,6 +574,7 @@ mod tests {
             text: "Text".into(),
             html: "<p>HTML</p>".into(),
             attachments: Vec::new(),
+            message_id: None,
         }
     }
 
@@ -601,6 +605,35 @@ mod tests {
         assert_eq!(
             submit[1][1]["onSuccessUpdateEmail"]["#s1"]["mailboxIds/s"],
             json!(true)
+        );
+    }
+
+    #[tokio::test]
+    async fn sets_the_message_id_only_when_given() {
+        let (fake, _) = stalwart(noreply(), Vec::new()).await;
+        send_with(&fake, &fake.gate).await.unwrap();
+        let tagged = Message {
+            message_id: Some("solace-reminder.abc@solace.test".into()),
+            ..message()
+        };
+        send(
+            &fake.http,
+            &fake.gate,
+            &config(&fake.base_url),
+            "friend@example.com",
+            &tagged,
+        )
+        .await
+        .unwrap();
+        let drafts: Vec<Value> = calls(&fake)
+            .iter()
+            .filter(|call| call["methodCalls"][0][0] == json!("Email/set"))
+            .map(|call| call["methodCalls"][0][1]["create"]["draft1"].clone())
+            .collect();
+        assert_eq!(drafts[0].get("messageId"), None);
+        assert_eq!(
+            drafts[1]["messageId"],
+            json!(["solace-reminder.abc@solace.test"])
         );
     }
 

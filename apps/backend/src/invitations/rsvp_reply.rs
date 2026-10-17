@@ -137,6 +137,7 @@ fn message(reply: &Reply<'_>) -> Option<(String, Message)> {
             content: reply_ics(reply, &organizer, &attendee),
             content_type: Some("text/calendar; method=REPLY; charset=utf-8".into()),
         }],
+        message_id: None,
     };
     Some((organizer, message))
 }

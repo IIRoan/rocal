@@ -1,4 +1,6 @@
 //! A local HTTP server that answers like Stalwart and records every request, for the Stalwart clients' tests.
+// Test support: a setup failure aborts the test, which is what a panic is for here.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -63,6 +65,14 @@ impl Reply {
             "detail": "The request exceeds the maximum number of concurrent requests.",
             "limit": "maxConcurrentRequests",
         }))
+    }
+
+    /// `body` with any status, for HTTP APIs other than JMAP.
+    pub fn status_json(status: u16, body: Value) -> Self {
+        Self {
+            status: StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            body: Some(body),
+        }
     }
 
     pub fn status(status: u16) -> Self {
@@ -131,6 +141,10 @@ async fn answer(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
+    // Dev tools that probe newly opened local ports ask for `/`, which no Stalwart or APNs call uses.
+    if uri.path() == "/" {
+        return StatusCode::NOT_FOUND.into_response();
+    }
     let header = |name: &str| {
         headers
             .get(name)

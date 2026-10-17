@@ -4744,6 +4744,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "solace-notifications"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64 0.22.1",
+ "dotenvy",
+ "hex",
+ "jiff",
+ "p256 0.14.0",
+ "rand 0.10.3",
+ "reqwest",
+ "sea-orm",
+ "serde_json",
+ "solace-server",
+ "thiserror 2.0.21",
+ "time",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "solace-server"
 version = "0.1.0"
 dependencies = [

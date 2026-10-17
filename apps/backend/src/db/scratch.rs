@@ -1,4 +1,6 @@
 //! Unit-test databases cloned from the suite's template on the local test Postgres, dropped afterwards.
+// Test support: a setup failure aborts the test, which is what a panic is for here.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use sea_orm::{ConnectionTrait, Database, DatabaseConnection, SqlxPostgresConnector};
 

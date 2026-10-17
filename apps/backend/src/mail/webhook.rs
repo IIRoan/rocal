@@ -42,8 +42,8 @@ const UNSIGNED_LIMIT: Limit = Limit {
     window: Duration::from_secs(60),
 };
 const MAIL_INGEST_EVENT: &str = "message-ingest.ham";
-/// Must match `reminderMessageIDPrefix` in `apps/notifications/main.go`.
-const REMINDER_MESSAGE_ID_PREFIX: &str = "solace-reminder.";
+/// The notifications worker tags reminder mail with it, so this webhook skips its new-mail push.
+pub const REMINDER_MESSAGE_ID_PREFIX: &str = "solace-reminder.";
 
 /// Why a post was refused.
 #[derive(Debug, PartialEq, Eq)]

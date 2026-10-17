@@ -25,5 +25,3 @@ apps/gatus/**
 apps/stalwart/**
 !apps/stalwart/package.json
 apps/notifications/**
-!apps/notifications/package.json
-!apps/notifications/go.mod

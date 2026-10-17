@@ -23,6 +23,8 @@ pub struct Message {
     pub text: String,
     pub html: String,
     pub attachments: Vec<Attachment>,
+    /// The Message-ID header (without angle brackets); Stalwart assigns one when unset.
+    pub message_id: Option<String>,
 }
 
 pub fn escape_html(value: &str) -> String {
@@ -85,6 +87,7 @@ pub fn password_reset(name: &str, reset_url: &str) -> Message {
         text,
         html,
         attachments: Vec::new(),
+        message_id: None,
     }
 }
 
@@ -124,6 +127,7 @@ pub fn password_updated(name: &str, action: PasswordAction, sign_in_url: &str) -
         text,
         html,
         attachments: Vec::new(),
+        message_id: None,
     }
 }
 
@@ -158,6 +162,7 @@ pub fn invite(inviter: &str, signup_url: &str, token: &str) -> Message {
         text,
         html,
         attachments: Vec::new(),
+        message_id: None,
     }
 }
 
@@ -258,6 +263,7 @@ pub fn event_invitation(
         text: text.join("\n"),
         html,
         attachments: Vec::new(),
+        message_id: None,
     }
 }
 

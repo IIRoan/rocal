@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/backend", "crates/*", "xtask"]
+members = ["apps/backend", "apps/notifications", "crates/*", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -51,6 +51,8 @@ webauthn-rs-core = "=0.5.5"
 # The CBOR crate webauthn-rs-core reads COSE keys with.
 serde_cbor_2 = "0.13"
 anyhow = "1"
+# Local runs of the notifications worker read the shared dev `.env` files.
+dotenvy = "0.15"
 base64 = "0.22"
 ciborium = "0.2"
 cookie = "0.18"

@@ -467,6 +467,7 @@ This happens only with explicit go-ahead.
 - Rollback: point the CNAME back at Vercel and set Vercel's `STALWART_WEBHOOK_SECRET` to Railway's value, because only `serve.ts`, never the Vercel function, registers the webhook.
 - The Railway `test` environment (the replica, its Stalwart, Postgres and bucket) was deleted after the cutover. The suite's avatar bucket is now a local S3 mock (`adobe/s3mock`) that `cargo xtask test-env up` starts, so CI needs no bucket secrets; `deploy-test`, the test-service Dockerfiles and the guard's Railway host allowances went with it.
 - Layout after the cutover: the Rust server moved from `crates/solace-server` to `apps/backend` (crate name unchanged), and the TypeScript backend to `retired/backend`, still a Bun workspace so it can be rebuilt for a rollback (its Vercel project's root directory must follow).
+- The Go notifications worker became the Rust crate `solace-notifications` in `apps/notifications`, with the same SQL, payload rules, APNs payloads, reminder mail, retention rules, `/health` and `/status` and test CLI. It reuses the API crate's JMAP mailer (which gained an optional Message-ID), webhook prefix, bundle routing, scratch databases and fake HTTP server, and builds from `apps/notifications/Dockerfile`; the reminder HTML is the React Email render, committed.
 
 ### 7. Delete TypeScript and clean up
 

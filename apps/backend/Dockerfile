@@ -7,6 +7,8 @@ RUN apt-get update \
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY apps/backend apps/backend
+# Every workspace member must be present for cargo to load the workspace.
+COPY apps/notifications apps/notifications
 COPY crates crates
 COPY xtask xtask
 # Telemetry compiles in the redaction keys shared with the TypeScript apps.
