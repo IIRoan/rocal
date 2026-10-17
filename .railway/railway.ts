@@ -18,11 +18,6 @@ export default defineRailway(() => {
     branch: "master",
     checkSuites: false,
   });
-  // The Rust API builds from its PR branch until plan 001 merges; then it uses solaceRepo.
-  const rustApiRepo = github("IIRoan/rocal", {
-    branch: "rust-rewrite",
-    checkSuites: false,
-  });
   const stalwartRepo = github("IIRoan/rocal", {
     branch: "master",
     checkSuites: false,
@@ -138,7 +133,7 @@ export default defineRailway(() => {
   });
 
   const api = service("Solace API", {
-    source: rustApiRepo,
+    source: solaceRepo,
     build: {
       builder: "DOCKERFILE",
       dockerfilePath: "crates/solace-server/Dockerfile",
