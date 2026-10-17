@@ -95,7 +95,8 @@ export default defineRailway(() => {
     },
   });
 
-  const notifications = service("Solace Fiber Notification service", {
+  // The Rust worker; it replaced the Go "Solace Fiber Notification service" on 2026-10-17.
+  const notifications = service("notifications-rust", {
     source: solaceRepo,
     build: {
       builder: "DOCKERFILE",
@@ -116,7 +117,7 @@ export default defineRailway(() => {
     healthcheck: "/health",
     healthcheckTimeout: 300,
     replicas: { "europe-west4-drams3a": 1 },
-    networking: { privateNetworkEndpoint: "notification-service" },
+    networking: { privateNetworkEndpoint: "notifications-rust" },
     deploy: {
       ipv6EgressEnabled: true,
       restartPolicyMaxRetries: 5,
@@ -125,16 +126,11 @@ export default defineRailway(() => {
       APNS_AUTH_KEY: preserve(),
       APNS_KEY_ID: preserve(),
       APNS_TEAM_ID: preserve(),
-      BETTER_AUTH_SECRET: preserve(),
-      DATABASE_URL: preserve(),
+      DATABASE_URL: ref(postgresApp, "DATABASE_URL"),
       EMAIL_FROM: preserve(),
       EMAIL_FROM_NAME: preserve(),
-      // Reminder links; NEXT_PUBLIC_APP_URL here was only "https://".
       FRONTEND_URL: "https://solace.onl",
-      GITHUB_CLIENT_ID: preserve(),
-      GITHUB_CLIENT_SECRET: preserve(),
-      NEXT_PUBLIC_APP_URL: preserve(),
-      NODE_ENV: preserve(),
+      NODE_ENV: "production",
       STALWART_JMAP_PASSWORD: preserve(),
       STALWART_JMAP_URL: preserve(),
       STALWART_JMAP_USERNAME: preserve(),
