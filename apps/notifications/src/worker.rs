@@ -486,37 +486,30 @@ impl Worker {
         tracing::info!(sent, "Test push delivered");
         Ok(())
     }
+}
 
-    /// `--test`: a sample reminder email (an event 90 minutes out, 30 minutes' notice) to `recipient`.
-    pub async fn send_test_email(&self, recipient: &str) -> Result<(), String> {
-        let Some(mailer) = &self.mailer else {
-            return Err("email service not configured".into());
-        };
-        let start = Timestamp::now() + jiff::SignedDuration::from_mins(90);
-        let sample = jobs::Reminder {
-            encrypted_title: String::new(),
-            start,
-            end: start + jiff::SignedDuration::from_mins(45),
-            all_day: false,
-            user_email: recipient.into(),
-            timezone: "Europe/Amsterdam".into(),
-            time_format: "24h".into(),
-        };
-        let content = reminder::content(&sample, 30, "manual-test-event", &self.settings);
-        let mut message = reminder::message(&content, 30, &mailer.config.from);
-        message.message_id = None;
-        let id = mailer::send(
-            &self.http,
-            &mailer.gate,
-            &mailer.config,
-            recipient,
-            &message,
-        )
+/// `--test`: a sample reminder email (an event 90 minutes out, 30 minutes' notice) to `recipient`; it needs no database.
+pub async fn send_test_email(settings: &Settings, recipient: &str) -> Result<(), String> {
+    let config = settings.mailer().ok_or("email service not configured")?;
+    let gate = StalwartGate::new(&config.base_url, None);
+    let start = Timestamp::now() + jiff::SignedDuration::from_mins(90);
+    let sample = jobs::Reminder {
+        encrypted_title: String::new(),
+        start,
+        end: start + jiff::SignedDuration::from_mins(45),
+        all_day: false,
+        user_email: recipient.into(),
+        timezone: "Europe/Amsterdam".into(),
+        time_format: "24h".into(),
+    };
+    let content = reminder::content(&sample, 30, "manual-test-event", settings);
+    let mut message = reminder::message(&content, 30, &config.from);
+    message.message_id = None;
+    let id = mailer::send(&reqwest::Client::new(), &gate, &config, recipient, &message)
         .await
         .map_err(|error| format!("failed to send test email with Stalwart: {error}"))?;
-        tracing::info!(submission = %id, "Test email queued");
-        Ok(())
-    }
+    tracing::info!(submission = %id, "Test email queued");
+    Ok(())
 }
 
 #[cfg(test)]

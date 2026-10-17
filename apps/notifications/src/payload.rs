@@ -29,8 +29,11 @@ pub struct Payload {
 
 /// The payload, or `None` when it is malformed or carries anything but opaque references.
 pub fn parse(raw: &str) -> Option<Payload> {
-    let Ok(Value::Object(map)) = serde_json::from_str::<Value>(raw) else {
-        return None;
+    // A JSON `null` payload reads as empty, as Go's decoder read it.
+    let map = match serde_json::from_str::<Value>(raw) {
+        Ok(Value::Object(map)) => map,
+        Ok(Value::Null) => Map::new(),
+        _ => return None,
     };
     if map
         .keys()
@@ -95,9 +98,15 @@ mod tests {
             r#"{"kind":"event_reminder","minutesBefore":"5"}"#,
             "not json",
             "[]",
+            "5",
         ] {
             assert_eq!(parse(raw), None, "{raw}");
         }
+    }
+
+    #[test]
+    fn a_null_payload_reads_as_empty() {
+        assert_eq!(parse("null"), Some(Payload::default()));
     }
 
     #[test]

@@ -129,6 +129,8 @@ export default defineRailway(() => {
       DATABASE_URL: preserve(),
       EMAIL_FROM: preserve(),
       EMAIL_FROM_NAME: preserve(),
+      // Reminder links; NEXT_PUBLIC_APP_URL here was only "https://".
+      FRONTEND_URL: "https://solace.onl",
       GITHUB_CLIENT_ID: preserve(),
       GITHUB_CLIENT_SECRET: preserve(),
       NEXT_PUBLIC_APP_URL: preserve(),

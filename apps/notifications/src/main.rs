@@ -9,14 +9,17 @@ mod schedule;
 mod settings;
 mod worker;
 
-use std::net::Ipv6Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, bail};
 use axum::Router;
 use axum::routing::any;
-use sea_orm::sqlx::postgres::PgPoolOptions;
+use sea_orm::sqlx::PgPool;
+use sea_orm::sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
+use tokio::sync::watch;
+use tokio::task::{JoinError, JoinSet};
 
 use crate::settings::Settings;
 use crate::worker::Worker;
@@ -24,6 +27,9 @@ use crate::worker::Worker;
 const TICK: Duration = Duration::from_secs(5);
 /// Cleanup runs at this minute of every hour, never at startup.
 const CLEANUP_MINUTE: i8 = 17;
+/// How long shutdown waits for running ticks, so a sent job is never left leased to go out again.
+const DRAIN: Duration = Duration::from_secs(50);
+const TEST_PUSH_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// `--test` (reminder email) and `--test-push` (lock-screen push) send once to a recipient and exit.
 struct Cli {
@@ -69,72 +75,18 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!(file = %file.display(), "Loaded environment file");
     }
     let cli = parse_cli(std::env::args().skip(1))?;
-    let testing = cli.test_email || cli.test_push;
-    if !testing && !cli.extra.is_empty() {
+    if cli.test_email || cli.test_push {
+        return run_tests(cli, settings).await;
+    }
+    if !cli.extra.is_empty() {
         bail!("unexpected arguments: {}", cli.extra.join(" "));
     }
-    let database_url = settings
-        .get("DATABASE_URL")
-        .context("DATABASE_URL not found")?;
-    let db = PgPoolOptions::new()
-        .max_connections(10)
-        .acquire_timeout(Duration::from_secs(5))
-        .max_lifetime(Duration::from_secs(30 * 60))
-        .connect(&database_url)
-        .await
-        .context("failed to connect to the database")?;
-    tracing::info!("Database connection initialized");
-    let recipient = cli
-        .recipient
-        .or_else(|| cli.extra.first().cloned())
-        .or_else(|| settings.get("TEST_EMAIL"))
-        .map(|value| value.trim().to_owned());
-    let port = settings.port();
+    let port = settings.port().map_err(anyhow::Error::msg)?;
+    let db = connect(&settings).await?;
     let worker = Arc::new(Worker::new(db.clone(), settings));
-
-    if testing {
-        let recipient = recipient.filter(|value| !value.is_empty()).context(
-            "test recipient is required; use --test-to, pass an address after the flag, or set TEST_EMAIL",
-        )?;
-        let mut failed = false;
-        if cli.test_push
-            && let Err(error) = worker.send_test_push(&recipient).await
-        {
-            tracing::error!(%error, "Failed to send test push");
-            failed = true;
-        }
-        if cli.test_email
-            && let Err(error) = worker.send_test_email(&recipient).await
-        {
-            tracing::error!(%error, "Failed to send test email");
-            failed = true;
-        }
-        if failed {
-            std::process::exit(1);
-        }
-        return Ok(());
-    }
-
-    let ticker = tokio::spawn({
-        let worker = worker.clone();
-        async move {
-            let mut every = tokio::time::interval(TICK);
-            every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            loop {
-                every.tick().await;
-                worker.tick().await;
-            }
-        }
-    });
-    let cleaner = tokio::spawn({
-        let worker = worker.clone();
-        async move {
-            loop {
-                tokio::time::sleep(until_minute(CLEANUP_MINUTE)).await;
-                worker.cleanup().await;
-            }
-        }
-    });
+    let (stop, stopped) = watch::channel(false);
+    let ticker = tokio::spawn(run_ticks(worker.clone(), stopped.clone()));
+    let cleaner = tokio::spawn(run_cleanups(worker.clone(), stopped));
     tracing::info!("Notification worker started");
 
     let app = Router::new()
@@ -152,8 +104,11 @@ async fn main() -> anyhow::Result<()> {
                 move || async move { worker.status_report().await }
             }),
         );
-    // `::` also accepts IPv4 here, so both Railway's private network and its health check reach it.
-    let listener = tokio::net::TcpListener::bind((Ipv6Addr::UNSPECIFIED, port)).await?;
+    // `::` also takes IPv4 where the host has IPv6, so Railway's private network and health check both reach it.
+    let listener = match tokio::net::TcpListener::bind((Ipv6Addr::UNSPECIFIED, port)).await {
+        Ok(listener) => listener,
+        Err(_) => tokio::net::TcpListener::bind((Ipv4Addr::UNSPECIFIED, port)).await?,
+    };
     tracing::info!(port, "HTTP server listening");
     axum::serve(listener, app)
         .with_graceful_shutdown({
@@ -162,13 +117,120 @@ async fn main() -> anyhow::Result<()> {
                 shutdown_signal().await;
                 tracing::info!("Shutting down notification worker");
                 worker.stop();
-                ticker.abort();
-                cleaner.abort();
+                let _ = stop.send(true);
             }
         })
         .await?;
+    if tokio::time::timeout(DRAIN, ticker).await.is_err() {
+        tracing::warn!("Running ticks did not finish before shutdown");
+    }
+    // Retention deletes run in bounded statements, so cutting a cleanup short loses nothing.
+    cleaner.abort();
     db.close().await;
     tracing::info!("Notification worker stopped");
+    Ok(())
+}
+
+/// A tick every 5 s; ticks overlap as the Go cron's did, which claims stay safe for (`SKIP LOCKED`).
+async fn run_ticks(worker: Arc<Worker>, mut stopped: watch::Receiver<bool>) {
+    let mut every = tokio::time::interval(TICK);
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut running = JoinSet::new();
+    loop {
+        tokio::select! {
+            _ = every.tick() => {
+                let worker = worker.clone();
+                running.spawn(async move { worker.tick().await });
+            }
+            Some(done) = running.join_next() => exit_on_panic(done, "tick"),
+            _ = stopped.changed() => break,
+        }
+    }
+    while let Some(done) = running.join_next().await {
+        exit_on_panic(done, "tick");
+    }
+}
+
+async fn run_cleanups(worker: Arc<Worker>, mut stopped: watch::Receiver<bool>) {
+    loop {
+        tokio::select! {
+            () = tokio::time::sleep(until_minute(CLEANUP_MINUTE)) => {
+                let worker = worker.clone();
+                exit_on_panic(tokio::spawn(async move { worker.cleanup().await }).await, "cleanup");
+            }
+            _ = stopped.changed() => break,
+        }
+    }
+}
+
+/// A panic ends the process so Railway restarts it, as a panic did in the Go worker, instead of a silent stall.
+fn exit_on_panic(done: Result<(), JoinError>, what: &str) {
+    if let Err(error) = done
+        && error.is_panic()
+    {
+        tracing::error!(task = what, "Worker task panicked; exiting for a restart");
+        std::process::exit(1);
+    }
+}
+
+/// The pool; without an explicit `sslmode` the connection requires TLS, as lib/pq did for the Go worker.
+async fn connect(settings: &Settings) -> anyhow::Result<PgPool> {
+    let url = settings
+        .get("DATABASE_URL")
+        .context("DATABASE_URL not found")?;
+    let mut options: PgConnectOptions =
+        url.parse().context("DATABASE_URL is not a Postgres URL")?;
+    if !url.contains("sslmode=") {
+        options = options.ssl_mode(PgSslMode::Require);
+    }
+    let db = PgPoolOptions::new()
+        .max_connections(10)
+        .acquire_timeout(Duration::from_secs(5))
+        .max_lifetime(Duration::from_secs(30 * 60))
+        .connect_with(options)
+        .await
+        .context("failed to connect to the database")?;
+    tracing::info!("Database connection initialized");
+    Ok(db)
+}
+
+/// `--test` needs only the mailer; `--test-push` also needs the database to find the account's devices.
+async fn run_tests(cli: Cli, settings: Settings) -> anyhow::Result<()> {
+    let recipient = cli
+        .recipient
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| cli.extra.first().cloned())
+        .or_else(|| settings.get("TEST_EMAIL"))
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .context("test recipient is required; use --test-to, pass an address after the flag, or set TEST_EMAIL")?;
+    let mut failed = false;
+    if cli.test_push {
+        let push = async {
+            let db = connect(&settings)
+                .await
+                .map_err(|error| error.to_string())?;
+            Worker::new(db, settings.clone())
+                .send_test_push(&recipient)
+                .await
+        };
+        let outcome = tokio::time::timeout(TEST_PUSH_TIMEOUT, push)
+            .await
+            .unwrap_or_else(|_| Err("the test push timed out".into()));
+        if let Err(error) = outcome {
+            tracing::error!(%error, "Failed to send test push");
+            failed = true;
+        }
+    }
+    if cli.test_email
+        && let Err(error) = worker::send_test_email(&settings, &recipient).await
+    {
+        tracing::error!(%error, "Failed to send test email");
+        failed = true;
+    }
+    if failed {
+        std::process::exit(1);
+    }
     Ok(())
 }
 
@@ -210,6 +272,8 @@ async fn shutdown_signal() {
 
 #[cfg(test)]
 mod tests {
+    use axum::Json;
+
     use super::*;
 
     fn cli(args: &[&str]) -> anyhow::Result<Cli> {
@@ -234,5 +298,25 @@ mod tests {
     fn cleanup_waits_at_most_an_hour() {
         let wait = until_minute(CLEANUP_MINUTE);
         assert!(wait > Duration::ZERO && wait <= Duration::from_secs(3600));
+    }
+
+    #[tokio::test]
+    async fn stopping_drains_the_tick_loop() {
+        let scratch = solace_server::db::scratch::ScratchDatabase::create().await;
+        let db = PgPool::connect(&scratch.url).await.unwrap();
+        let worker = Arc::new(Worker::new(db, Settings::from_pairs(&[])));
+        let (stop, stopped) = watch::channel(false);
+        let ticks = tokio::spawn(run_ticks(worker.clone(), stopped));
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        stop.send(true).unwrap();
+        tokio::time::timeout(Duration::from_secs(10), ticks)
+            .await
+            .unwrap()
+            .unwrap();
+        let Json(status) = worker.status_report().await;
+        assert!(
+            status.get("lastProcessedAt").is_some(),
+            "the first tick ran"
+        );
     }
 }

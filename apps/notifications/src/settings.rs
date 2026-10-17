@@ -8,6 +8,7 @@ use solace_server::integrations::stalwart::mailer::MailerConfig;
 const DEFAULT_PORT: u16 = 4002;
 const DEFAULT_STALWART_URL: &str = "https://mail.solace.onl";
 
+#[derive(Clone)]
 pub struct Settings {
     values: HashMap<String, String>,
     /// The `.env` files merged in, for the startup log.
@@ -17,22 +18,8 @@ pub struct Settings {
 impl Settings {
     /// The process environment, plus values the discovered `.env` files add without overriding it.
     pub fn load() -> Self {
-        let mut values: HashMap<String, String> = HashMap::new();
-        let mut loaded_files = Vec::new();
-        let start = std::env::current_dir().unwrap_or_default();
-        for file in discover_env_files(&start) {
-            let Ok(entries) = dotenvy::from_path_iter(&file) else {
-                continue;
-            };
-            // The backend's PORT is its own; the worker keeps its default.
-            let skip_port = is_shared_backend_env(&file);
-            for (key, value) in entries.flatten() {
-                if !(skip_port && key == "PORT") {
-                    values.entry(key).or_insert(value);
-                }
-            }
-            loaded_files.push(file);
-        }
+        let loaded_files = discover_env_files(&std::env::current_dir().unwrap_or_default());
+        let mut values = read_env_files(&loaded_files);
         values.extend(std::env::vars().filter(|(_, value)| !value.is_empty()));
         Self {
             values,
@@ -63,10 +50,14 @@ impl Settings {
         self.get("NODE_ENV").as_deref() == Some("production")
     }
 
-    pub fn port(&self) -> u16 {
-        self.get("PORT")
-            .and_then(|port| port.parse().ok())
-            .unwrap_or(DEFAULT_PORT)
+    /// `PORT`, 4002 when unset; an unusable value is an error, as it was when the Go worker failed to listen.
+    pub fn port(&self) -> Result<u16, String> {
+        match self.get("PORT") {
+            None => Ok(DEFAULT_PORT),
+            Some(port) => port
+                .parse()
+                .map_err(|_| format!("PORT {port:?} is not a port")),
+        }
     }
 
     /// `EMAIL_FROM` (or its older names) as a bare address; a "Name <address>" form keeps the address.
@@ -75,9 +66,13 @@ impl Settings {
             .get("EMAIL_FROM")
             .or_else(|| self.get("EMAIL_FROM_ADDRESS"))
             .or_else(|| self.get("FROM_EMAIL"))?;
+        // RFC 5322 forms: "Name <address>", or an address with a trailing "(comment)".
         let address = match (raw.rfind('<'), raw.rfind('>')) {
             (Some(open), Some(close)) if open < close => raw[open + 1..close].trim().to_owned(),
-            _ => raw,
+            _ => raw
+                .split_whitespace()
+                .find(|part| part.contains('@'))?
+                .to_owned(),
         };
         address.contains('@').then_some(address)
     }
@@ -164,6 +159,25 @@ fn normalize_pem(raw: &str) -> Option<String> {
     }
 }
 
+/// The files' values in order; a later file only fills keys an earlier one left blank.
+fn read_env_files(files: &[PathBuf]) -> HashMap<String, String> {
+    let mut values: HashMap<String, String> = HashMap::new();
+    for file in files {
+        let Ok(entries) = dotenvy::from_path_iter(file) else {
+            continue;
+        };
+        // The backend's PORT is its own; the worker keeps its default.
+        let skip_port = is_shared_backend_env(file);
+        for (key, value) in entries.flatten() {
+            let blank = values.get(&key).is_none_or(|known| known.trim().is_empty());
+            if blank && !(skip_port && key == "PORT") {
+                values.insert(key, value);
+            }
+        }
+    }
+    values
+}
+
 fn is_shared_backend_env(path: &Path) -> bool {
     path.file_name().is_some_and(|name| name == ".env")
         && path
@@ -202,11 +216,22 @@ mod tests {
         std::fs::create_dir_all(&backend).unwrap();
         std::fs::write(backend.join(".env"), "DATABASE_URL=backend\nPORT=4001\n").unwrap();
         assert_eq!(discover_env_files(&worker), vec![backend.join(".env")]);
-        std::fs::write(worker.join(".env"), "DATABASE_URL=local\n").unwrap();
-        assert_eq!(
-            discover_env_files(&worker),
-            vec![worker.join(".env"), backend.join(".env")]
-        );
+        std::fs::write(
+            worker.join(".env"),
+            "DATABASE_URL=local\nSTALWART_JMAP_PASSWORD=\"\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            backend.join(".env"),
+            "DATABASE_URL=backend\nPORT=4001\nSTALWART_JMAP_PASSWORD=secret\n",
+        )
+        .unwrap();
+        let files = discover_env_files(&worker);
+        assert_eq!(files, vec![worker.join(".env"), backend.join(".env")]);
+        let values = read_env_files(&files);
+        assert_eq!(values["DATABASE_URL"], "local");
+        assert_eq!(values["STALWART_JMAP_PASSWORD"], "secret");
+        assert!(!values.contains_key("PORT"));
         assert!(is_shared_backend_env(&backend.join(".env")));
         assert!(!is_shared_backend_env(&worker.join(".env")));
         std::fs::remove_dir_all(root).unwrap();
@@ -226,6 +251,12 @@ mod tests {
             Some("noreply@solace.onl")
         );
         assert_eq!(settings("not an address").sender_address(), None);
+        assert_eq!(
+            settings("noreply@solace.onl (Solace)")
+                .sender_address()
+                .as_deref(),
+            Some("noreply@solace.onl")
+        );
         assert_eq!(
             Settings::from_pairs(&[("FROM_EMAIL", "a@b.test")])
                 .sender_address()
@@ -293,7 +324,8 @@ mod tests {
 
     #[test]
     fn port_defaults_to_4002() {
-        assert_eq!(Settings::from_pairs(&[]).port(), 4002);
-        assert_eq!(Settings::from_pairs(&[("PORT", "8080")]).port(), 8080);
+        assert_eq!(Settings::from_pairs(&[]).port(), Ok(4002));
+        assert_eq!(Settings::from_pairs(&[("PORT", "8080")]).port(), Ok(8080));
+        assert!(Settings::from_pairs(&[("PORT", "eighty")]).port().is_err());
     }
 }

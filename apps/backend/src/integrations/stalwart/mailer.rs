@@ -109,7 +109,7 @@ pub async fn send(
         &attachments,
     );
     let envelope = client.call(&session.api_url, calls).await?;
-    assert_success(&envelope, "Stalwart email send")?;
+    assert_success(&without_sent_move(&envelope), "Stalwart email send")?;
     method_result(&envelope, "EmailSubmission/set")?
         .pointer("/created/s1/id")
         .and_then(Value::as_str)
@@ -338,6 +338,20 @@ fn send_calls(
         ["Email/set", {"accountId": session.mail_account, "create": {"draft1": draft}}, "c1"],
         ["EmailSubmission/set", submission, "c2"],
     ])
+}
+
+/// The envelope without the implicit `Email/set` that answers `onSuccessUpdateEmail` (call id `c2`): once the submission is queued, a failed move to Sent must not fail, and so resend, the mail.
+fn without_sent_move(envelope: &Value) -> Value {
+    let mut queued = envelope.clone();
+    if let Some(responses) = queued
+        .get_mut("methodResponses")
+        .and_then(Value::as_array_mut)
+    {
+        responses.retain(|response| {
+            !(response.get(0) == Some(&json!("Email/set")) && response.get(2) == Some(&json!("c2")))
+        });
+    }
+    queued
 }
 
 /// Method errors and the first `notCreated`/`notUpdated`/`notDestroyed` entry fail the send, naming only the method and error type.
@@ -606,6 +620,35 @@ mod tests {
             submit[1][1]["onSuccessUpdateEmail"]["#s1"]["mailboxIds/s"],
             json!(true)
         );
+    }
+
+    #[tokio::test]
+    async fn a_failed_move_to_sent_does_not_fail_queued_mail() {
+        let (fake, _) = stalwart(
+            noreply(),
+            vec![(
+                "Email/set",
+                Reply::json(json!({"methodResponses": [
+                    ["Email/set", {"created": {"draft1": {"id": "e1"}}}, "c1"],
+                    ["EmailSubmission/set", {"created": {"s1": {"id": "sub1"}}}, "c2"],
+                    ["Email/set", {"notUpdated": {"e1": {"type": "notFound"}}}, "c2"],
+                ]})),
+            )],
+        )
+        .await;
+        assert_eq!(send_with(&fake, &fake.gate).await.unwrap(), "sub1");
+        let (fake, _) = stalwart(
+            noreply(),
+            vec![(
+                "Email/set",
+                Reply::json(json!({"methodResponses": [
+                    ["Email/set", {"notCreated": {"draft1": {"type": "invalidProperties"}}}, "c1"],
+                    ["EmailSubmission/set", {"notCreated": {"s1": {"type": "invalidProperties"}}}, "c2"],
+                ]})),
+            )],
+        )
+        .await;
+        assert!(send_with(&fake, &fake.gate).await.is_err());
     }
 
     #[tokio::test]
