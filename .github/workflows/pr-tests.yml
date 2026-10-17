@@ -78,12 +78,6 @@ jobs:
     timeout-minutes: 60
     env:
       CARGO_TERM_COLOR: always
-      # The avatar cases use Railway's test bucket (solace-test-*); the suite's guard refuses anything else.
-      TEST_AVATAR_BUCKET: ${{ secrets.TEST_AVATAR_BUCKET }}
-      TEST_AVATAR_BUCKET_ENDPOINT: ${{ secrets.TEST_AVATAR_BUCKET_ENDPOINT }}
-      TEST_AVATAR_BUCKET_REGION: ${{ secrets.TEST_AVATAR_BUCKET_REGION }}
-      TEST_AVATAR_BUCKET_ACCESS_KEY_ID: ${{ secrets.TEST_AVATAR_BUCKET_ACCESS_KEY_ID }}
-      TEST_AVATAR_BUCKET_SECRET_ACCESS_KEY: ${{ secrets.TEST_AVATAR_BUCKET_SECRET_ACCESS_KEY }}
 
     steps:
       - name: Checkout

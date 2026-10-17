@@ -465,6 +465,7 @@ This happens only with explicit go-ahead.
 - 14:51 UTC: `api.solace.onl`'s CNAME moved from `8d335a303195b28e.vercel-dns-017.com` to Railway's `obq4rs6q.up.railway.app`, DNS-only so Railway's `X-Real-IP` is the client. Railway issues the certificate only after it sees the CNAME, so clients already on the new record had no valid TLS until 14:54:46 (about 3.5 minutes).
 - The redeploy at 14:55 brought a fresh `STALWART_WEBHOOK_SECRET` (the boot re-registered the webhook with it) and calendar sync, whose first run synced every due feed. No warnings or errors afterwards; 47 MiB resident.
 - Rollback: point the CNAME back at Vercel and set Vercel's `STALWART_WEBHOOK_SECRET` to Railway's value, because only `serve.ts`, never the Vercel function, registers the webhook.
+- The Railway `test` environment (the replica, its Stalwart, Postgres and bucket) was deleted after the cutover. The suite's avatar bucket is now a local S3 mock (`adobe/s3mock`) that `cargo xtask test-env up` starts, so CI needs no bucket secrets; `deploy-test`, the test-service Dockerfiles and the guard's Railway host allowances went with it.
 
 ### 7. Delete TypeScript and clean up
 

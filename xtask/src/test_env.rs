@@ -5,9 +5,9 @@ use std::time::Duration;
 
 use anyhow::{Context, bail, ensure};
 use solace_api_tests::env::{
-    LOCAL_POSTGRES_PASSWORD, LOCAL_POSTGRES_PORT, LOCAL_POSTGRES_USER,
-    LOCAL_STALWART_ADMIN_PASSWORD, LOCAL_STALWART_NOREPLY_PASSWORD, LOCAL_STALWART_PORT,
-    LOCAL_STALWART_PROVISIONER_PASSWORD, TEMPLATE_DATABASE, TestEnv,
+    LOCAL_AVATAR_BUCKET, LOCAL_POSTGRES_PASSWORD, LOCAL_POSTGRES_PORT, LOCAL_POSTGRES_USER,
+    LOCAL_S3_PORT, LOCAL_STALWART_ADMIN_PASSWORD, LOCAL_STALWART_NOREPLY_PASSWORD,
+    LOCAL_STALWART_PORT, LOCAL_STALWART_PROVISIONER_PASSWORD, TEMPLATE_DATABASE, TestEnv,
 };
 use solace_api_tests::stalwart::{provision_key, url_host_port};
 use sqlx::{Connection, Executor, PgConnection};
@@ -16,6 +16,8 @@ const POSTGRES_CONTAINER: &str = "solace-test-pg";
 const POSTGRES_IMAGE: &str = "docker.io/library/postgres:18";
 const STALWART_CONTAINER: &str = "solace-test-stalwart";
 const STALWART_IMAGE: &str = "localhost/solace-test-stalwart";
+const S3_CONTAINER: &str = "solace-test-s3";
+const S3_IMAGE: &str = "docker.io/adobe/s3mock:4.10.0";
 
 pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     match args {
@@ -83,9 +85,24 @@ async fn up() -> anyhow::Result<()> {
             STALWART_IMAGE,
         ])?;
     }
+    if !container_running(S3_CONTAINER)? {
+        podman(&[
+            "run",
+            "-d",
+            "--replace",
+            "--name",
+            S3_CONTAINER,
+            "-p",
+            &format!("127.0.0.1:{LOCAL_S3_PORT}:9090"),
+            "-e",
+            &format!("COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS={LOCAL_AVATAR_BUCKET}"),
+            S3_IMAGE,
+        ])?;
+    }
     let env = TestEnv::from_env()?;
     wait_for_postgres(&env).await?;
     wait_for_stalwart(&env).await?;
+    wait_for_s3(&env).await?;
     println!(
         "test env up: postgres {}, stalwart {}",
         env.database_url, env.stalwart_url
@@ -94,7 +111,13 @@ async fn up() -> anyhow::Result<()> {
 }
 
 fn down() -> anyhow::Result<()> {
-    podman(&["rm", "-f", POSTGRES_CONTAINER, STALWART_CONTAINER])
+    podman(&[
+        "rm",
+        "-f",
+        POSTGRES_CONTAINER,
+        STALWART_CONTAINER,
+        S3_CONTAINER,
+    ])
 }
 
 /// Applies every Prisma migration in order to a fresh template database.
@@ -220,6 +243,22 @@ async fn wait_for_stalwart(env: &TestEnv) -> anyhow::Result<()> {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
     bail!("test stalwart did not come up (plan applied?)")
+}
+
+async fn wait_for_s3(env: &TestEnv) -> anyhow::Result<()> {
+    let bucket = &env.avatar_bucket;
+    let client = reqwest::Client::new();
+    for _ in 0..60 {
+        let listing = client
+            .get(format!("{}/{}", bucket.endpoint, bucket.name))
+            .send()
+            .await;
+        if listing.is_ok_and(|response| response.status().is_success()) {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    bail!("the test S3 mock did not come up")
 }
 
 fn container_running(name: &str) -> anyhow::Result<bool> {

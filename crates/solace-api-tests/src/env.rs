@@ -11,6 +11,9 @@ pub const LOCAL_STALWART_PORT: u16 = 58080;
 pub const LOCAL_STALWART_ADMIN_PASSWORD: &str = "solace-test-admin-local";
 pub const LOCAL_STALWART_PROVISIONER_PASSWORD: &str = "solace-test-provisioner-local";
 pub const LOCAL_STALWART_NOREPLY_PASSWORD: &str = "solace-test-noreply-local";
+/// Local S3 mock (adobe/s3mock) holding the avatar bucket, started by `cargo xtask test-env up`; it ignores credentials.
+pub const LOCAL_S3_PORT: u16 = 59000;
+pub const LOCAL_AVATAR_BUCKET: &str = "solace-test-avatars";
 /// Fixed server secrets for local runs, shared by both backends so sessions and bridge passwords interoperate.
 pub const LOCAL_BETTER_AUTH_SECRET: &str = "solace-test-better-auth-secret-local-0001";
 pub const LOCAL_MAIL_BRIDGE_HMAC_KEY: &str = "solace-test-mail-bridge-hmac-local-0001";
@@ -35,8 +38,8 @@ pub struct TestEnv {
     pub better_auth_secret: String,
     pub mail_bridge_hmac_key: String,
     pub stalwart_webhook_secret: String,
-    /// The test avatar bucket (`TEST_AVATAR_BUCKET*`); uploads are disabled when unset, as in the backends.
-    pub avatar_bucket: Option<AvatarBucket>,
+    /// The avatar bucket (`TEST_AVATAR_BUCKET*`), the local S3 mock unless set.
+    pub avatar_bucket: AvatarBucket,
 }
 
 #[derive(Debug, Clone)]
@@ -85,19 +88,21 @@ impl TestEnv {
                 "TEST_STALWART_WEBHOOK_SECRET",
                 LOCAL_STALWART_WEBHOOK_SECRET.into(),
             ),
-            avatar_bucket: std::env::var("TEST_AVATAR_BUCKET")
-                .ok()
-                .map(|name| AvatarBucket {
-                    name,
-                    endpoint: var("TEST_AVATAR_BUCKET_ENDPOINT", String::new()),
-                    region: var("TEST_AVATAR_BUCKET_REGION", "auto".into()),
-                    access_key_id: var("TEST_AVATAR_BUCKET_ACCESS_KEY_ID", String::new()),
-                    secret_access_key: var("TEST_AVATAR_BUCKET_SECRET_ACCESS_KEY", String::new()),
-                }),
+            avatar_bucket: AvatarBucket {
+                name: var("TEST_AVATAR_BUCKET", LOCAL_AVATAR_BUCKET.into()),
+                endpoint: var(
+                    "TEST_AVATAR_BUCKET_ENDPOINT",
+                    format!("http://127.0.0.1:{LOCAL_S3_PORT}"),
+                ),
+                region: var("TEST_AVATAR_BUCKET_REGION", "us-east-1".into()),
+                access_key_id: var("TEST_AVATAR_BUCKET_ACCESS_KEY_ID", "solace-test-s3".into()),
+                secret_access_key: var(
+                    "TEST_AVATAR_BUCKET_SECRET_ACCESS_KEY",
+                    "solace-test-s3-secret".into(),
+                ),
+            },
         };
-        if let Some(bucket) = &env.avatar_bucket {
-            guard::check_bucket("TEST_AVATAR_BUCKET", &bucket.name)?;
-        }
+        guard::check_bucket("TEST_AVATAR_BUCKET", &env.avatar_bucket.name)?;
         guard::check_secret("TEST_BETTER_AUTH_SECRET", &env.better_auth_secret)?;
         guard::check_secret("TEST_MAIL_BRIDGE_HMAC_KEY", &env.mail_bridge_hmac_key)?;
         guard::check_secret("TEST_STALWART_WEBHOOK_SECRET", &env.stalwart_webhook_secret)?;
@@ -204,25 +209,15 @@ impl TestEnv {
             ("EMAIL_FROM", format!("noreply@{}", self.mail_domain)),
             ("EMAIL_FROM_NAME", "Solace Test".to_owned()),
         ];
-        let bucket = self.avatar_bucket.as_ref();
-        let bucket_var = |value: Option<&String>| value.cloned().unwrap_or_default();
+        let bucket = &self.avatar_bucket;
         vars.extend([
-            ("AVATAR_BUCKET", bucket_var(bucket.map(|b| &b.name))),
-            (
-                "AVATAR_BUCKET_ENDPOINT",
-                bucket_var(bucket.map(|b| &b.endpoint)),
-            ),
-            (
-                "AVATAR_BUCKET_REGION",
-                bucket_var(bucket.map(|b| &b.region)),
-            ),
-            (
-                "AVATAR_BUCKET_ACCESS_KEY_ID",
-                bucket_var(bucket.map(|b| &b.access_key_id)),
-            ),
+            ("AVATAR_BUCKET", bucket.name.clone()),
+            ("AVATAR_BUCKET_ENDPOINT", bucket.endpoint.clone()),
+            ("AVATAR_BUCKET_REGION", bucket.region.clone()),
+            ("AVATAR_BUCKET_ACCESS_KEY_ID", bucket.access_key_id.clone()),
             (
                 "AVATAR_BUCKET_SECRET_ACCESS_KEY",
-                bucket_var(bucket.map(|b| &b.secret_access_key)),
+                bucket.secret_access_key.clone(),
             ),
         ]);
         vars

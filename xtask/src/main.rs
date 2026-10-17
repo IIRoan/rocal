@@ -3,7 +3,6 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 mod check;
-mod deploy_test;
 mod entities;
 mod jest_destinations;
 mod mem_budget;
@@ -24,8 +23,6 @@ tasks:
   test-env seed <api> <database>
                           seed synthetic data through the backend at <api>
   test-env stalwart-key   mint a Stalwart API key for the solace-provisioner test account
-  deploy-test <service> <path>...
-                          deploy committed files under <path> to a test-* service in Railway's test environment
   entities [--check]      regenerate (or check) the SeaORM entities from the migrations
   mem-budget [--steady-seconds N] [--soak-minutes N]
                           measure a release build against the plan's memory budgets
@@ -42,7 +39,6 @@ async fn main() -> anyhow::Result<()> {
     match args.as_slice() {
         ["test-env", rest @ ..] => test_env::run(rest).await,
         ["ts-backend", rest @ ..] => ts_backend::run(rest).await,
-        ["deploy-test", rest @ ..] => deploy_test::run(rest),
         ["jest-destinations", rest @ ..] => jest_destinations::run(rest),
         ["entities", rest @ ..] => entities::run(rest).await,
         ["openapi", rest @ ..] => openapi::run(rest),
