@@ -72,68 +72,27 @@ export default defineRailway(() => {
       overlapSeconds: 90,
     },
     env: {
-      BUCKET: preserve(),
-      BUCKET_ACCESS_KEY_ID: preserve(),
+      BUCKET: ref(stalwartBlobs, "BUCKET"),
+      BUCKET_ACCESS_KEY_ID: ref(stalwartBlobs, "ACCESS_KEY_ID"),
+      // Stalwart's store uses the path-style endpoint, not the bucket's virtual-host one.
       BUCKET_ENDPOINT: preserve(),
-      BUCKET_REGION: preserve(),
-      BUCKET_SECRET_ACCESS_KEY: preserve(),
+      BUCKET_REGION: ref(stalwartBlobs, "REGION"),
+      BUCKET_SECRET_ACCESS_KEY: ref(stalwartBlobs, "SECRET_ACCESS_KEY"),
       FRPC_RELAY_STCP_KEY: preserve(),
       FRPC_SLOT: preserve(),
       FRPC_TOKEN: preserve(),
       FRPS_ADDR: preserve(),
-      PGDATABASE: preserve(),
-      PGHOST: preserve(),
-      PGPASSWORD: preserve(),
-      PGPORT: preserve(),
-      PGUSER: preserve(),
+      PGDATABASE: ref(postgresStalwart, "PGDATABASE"),
+      PGHOST: ref(postgresStalwart, "PGHOST"),
+      PGPASSWORD: ref(postgresStalwart, "PGPASSWORD"),
+      PGPORT: ref(postgresStalwart, "PGPORT"),
+      PGUSER: ref(postgresStalwart, "PGUSER"),
       PORT: preserve(),
       SLOT_MANAGER_TOKEN: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
       STALWART_GATE_KEY: preserve(),
       STALWART_RECOVERY_MODE: preserve(),
       STALWART_TOKEN: preserve(),
-    },
-  });
-
-  // The Rust worker; it replaced the Go "Solace Fiber Notification service" on 2026-10-17.
-  const notifications = service("notifications-rust", {
-    source: solaceRepo,
-    build: {
-      builder: "DOCKERFILE",
-      dockerfilePath: "apps/notifications/Dockerfile",
-      buildEnvironment: "V3",
-      // The worker compiles against the API crate, so its sources count too.
-      watchPatterns: [
-        "apps/notifications/**",
-        "apps/backend/**",
-        "crates/**",
-        "Cargo.toml",
-        "Cargo.lock",
-        "rust-toolchain.toml",
-        "packages/calendar-core/src/redaction-policy.js",
-        "packages/calendar-ics/src/windows-zones.json",
-      ],
-    },
-    healthcheck: "/health",
-    healthcheckTimeout: 300,
-    replicas: { "europe-west4-drams3a": 1 },
-    networking: { privateNetworkEndpoint: "notifications-rust" },
-    deploy: {
-      ipv6EgressEnabled: true,
-      restartPolicyMaxRetries: 5,
-    },
-    env: {
-      APNS_AUTH_KEY: preserve(),
-      APNS_KEY_ID: preserve(),
-      APNS_TEAM_ID: preserve(),
-      DATABASE_URL: ref(postgresApp, "DATABASE_URL"),
-      EMAIL_FROM: preserve(),
-      EMAIL_FROM_NAME: preserve(),
-      FRONTEND_URL: "https://solace.onl",
-      NODE_ENV: "production",
-      STALWART_JMAP_PASSWORD: preserve(),
-      STALWART_JMAP_URL: preserve(),
-      STALWART_JMAP_USERNAME: preserve(),
     },
   });
 
@@ -180,18 +139,59 @@ export default defineRailway(() => {
       FRONTEND_URL: "https://solace.onl",
       MAIL_BRIDGE_HMAC_KEY: preserve(),
       MOBILE_AUTH_CALLBACK_URL: preserve(),
-      NEXT_PUBLIC_APP_URL: "https://solace.onl",
       SENTRY_DSN: "https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace",
       // The same Stalwart admin token the server itself is configured with.
       STALWART_ADMIN_TOKEN: ref(stalwartMail, "STALWART_ADMIN_TOKEN"),
       STALWART_BASE_URL: "https://mail.solace.onl",
       STALWART_DEFAULT_DOMAIN: "solace.onl",
       STALWART_JMAP_PASSWORD: preserve(),
-      STALWART_JMAP_URL: preserve(),
       STALWART_JMAP_USERNAME: preserve(),
       STALWART_WEBHOOK_SECRET: preserve(),
       STALWART_WEBHOOK_URL: preserve(),
       TRUSTED_ORIGINS: "https://solace-web.vercel.app",
+    },
+  });
+
+  // The Rust worker; it replaced the Go "Solace Fiber Notification service" on 2026-10-17.
+  const notifications = service("notifications-rust", {
+    source: solaceRepo,
+    build: {
+      builder: "DOCKERFILE",
+      dockerfilePath: "apps/notifications/Dockerfile",
+      buildEnvironment: "V3",
+      // The worker compiles against the API crate, so its sources count too.
+      watchPatterns: [
+        "apps/notifications/**",
+        "apps/backend/**",
+        "crates/**",
+        "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml",
+        "packages/calendar-core/src/redaction-policy.js",
+        "packages/calendar-ics/src/windows-zones.json",
+      ],
+    },
+    healthcheck: "/health",
+    healthcheckTimeout: 300,
+    replicas: { "europe-west4-drams3a": 1 },
+    networking: { privateNetworkEndpoint: "notifications-rust" },
+    deploy: {
+      ipv6EgressEnabled: true,
+      restartPolicyMaxRetries: 5,
+    },
+    // The noreply identity, URLs and mode are the API's; only APNs is the worker's own.
+    env: {
+      APNS_AUTH_KEY: preserve(),
+      APNS_KEY_ID: preserve(),
+      APNS_TEAM_ID: preserve(),
+      DATABASE_URL: ref(postgresApp, "DATABASE_URL"),
+      EMAIL_FROM: ref(api, "EMAIL_FROM"),
+      EMAIL_FROM_NAME: ref(api, "EMAIL_FROM_NAME"),
+      FRONTEND_URL: ref(api, "FRONTEND_URL"),
+      NODE_ENV: ref(api, "NODE_ENV"),
+      STALWART_BASE_URL: ref(api, "STALWART_BASE_URL"),
+      STALWART_JMAP_PASSWORD: ref(api, "STALWART_JMAP_PASSWORD"),
+      STALWART_JMAP_USERNAME: ref(api, "STALWART_JMAP_USERNAME"),
     },
   });
 
