@@ -1,4 +1,5 @@
-import { HttpClient } from "./http-client";
+import type { Schema } from "@workspace/api-contracts";
+import { HttpClient, type ApiResponse, type StrictBody } from "./http-client";
 import {
   NoopE2eeProvider,
   hydrateEncryptedNameWithoutSession,
@@ -22,8 +23,6 @@ import type {
   Calendar,
   EventCategory,
   EventsResponse,
-  CalendarsResponse,
-  CategoriesResponse,
   CreateEventRequest,
   UpdateEventRequest,
   WithOperationWarnings,
@@ -35,25 +34,19 @@ import type {
   ApiError,
   UserSettings,
   UpdateSettingsRequest,
-  RecentContactsRecord,
   PutRecentContactsRequest,
-  MailSettingsRecord,
   PutMailSettingsRequest,
-  RecurrenceValidation,
   RecurrencePreview,
-  RecurrencePatterns,
+  RecurrenceRule,
   EditRecurringEventRequest,
   CalendarDeleteResponse,
   BulkEventRequest,
   BulkEventResponse,
-  NotificationStatus,
-  EventNotification,
   CreateNotificationRequest,
   CalendarSubscription,
   RegisterPushDeviceRequest,
   PushDeviceRegistrationResult,
   PushDeviceUnregisterResult,
-  ListPushDevicesResult,
   PushTestNotificationResult,
   CreateSubscriptionRequest,
   UpdateSubscriptionRequest,
@@ -76,21 +69,7 @@ import type {
 
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
 
-export type DeleteAccountResponse = {
-  success: boolean;
-  message: string;
-  deletedUserId: string;
-};
-
-export type InvitationImportSummary = {
-  messagesScanned: number;
-  icsPartsFound: number;
-  eventsCreated: number;
-  eventsUpdated: number;
-  eventsDeleted: number;
-  errors: string[];
-};
-
+// `as` casts from API types only narrow free-text fields (kind, encryptionState, role, status) to calendar-core's literal unions.
 export class CalendarApiService {
   private client: HttpClient;
   private e2ee: E2eeProvider;
@@ -256,10 +235,10 @@ export class CalendarApiService {
       const startISO = start.toISOString();
       const endISO = end.toISOString();
 
-      const response = await this.client.get<EventsResponse>(
+      const response = (await this.client.get<Schema<"EventList">>(
         `/api/events?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`,
         { signal },
-      );
+      )) as EventsResponse;
 
       if (!response || !Array.isArray(response.events)) {
         throw {
@@ -328,10 +307,10 @@ export class CalendarApiService {
 
   async getEvent(id: string): Promise<CalendarEvent> {
     try {
-      const response = await this.client.get<CalendarEvent>(
+      const response = await this.client.get<Schema<"Event">>(
         `/api/events/${id}`,
       );
-      return await this.hydrateEncryptedEvent(response);
+      return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
       throw this.transformError(error, "Failed to fetch event");
     }
@@ -348,11 +327,11 @@ export class CalendarApiService {
       if (options.syncRemote === false) {
         searchParams.set("syncRemote", "false");
       }
-      const response = await this.client.get<{ event: CalendarEvent | null }>(
+      const response = await this.client.get<Schema<"InvitationLookup">>(
         `/api/events/invitations/by-external-id?${searchParams.toString()}`,
       );
       return response.event
-        ? await this.hydrateEncryptedEvent(response.event)
+        ? await this.hydrateEncryptedEvent(response.event as CalendarEvent)
         : null;
     } catch (error) {
       throw this.transformError(error, "Failed to fetch calendar invitation");
@@ -365,18 +344,18 @@ export class CalendarApiService {
       status?: "accepted" | "tentative";
       calendarId?: string;
     } = {},
-  ): Promise<InvitationImportSummary> {
+  ): Promise<Schema<"InvitationImportSummary">> {
     try {
       const encryption = await this.buildInvitationImportEncryption(icsContent);
 
-      return await this.client.post<InvitationImportSummary>(
+      return await this.client.post<Schema<"InvitationImportSummary">>(
         "/api/events/invitations/import-ics",
         {
           icsContent,
           ...(options.status ? { status: options.status } : {}),
           ...(options.calendarId ? { calendarId: options.calendarId } : {}),
           ...(encryption ? { encryption } : {}),
-        },
+        } satisfies Schema<"ImportInvitationRequest">,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to import calendar invitation");
@@ -417,11 +396,11 @@ export class CalendarApiService {
 
   async declineInvitationIcs(
     icsContent: string,
-  ): Promise<{ declined: true }> {
+  ): Promise<Schema<"InvitationDeclined">> {
     try {
-      return await this.client.post<{ declined: true }>(
+      return await this.client.post<Schema<"InvitationDeclined">>(
         "/api/events/invitations/decline-ics",
-        { icsContent },
+        { icsContent } satisfies Schema<"DeclineInvitationRequest">,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to decline calendar invitation");
@@ -457,7 +436,7 @@ export class CalendarApiService {
     }
 
     try {
-      const response = await this.client.post<CalendarEvent>(
+      const response = await this.client.post<Schema<"Event">>(
         `/api/events/${event.id}/seal-encryption`,
         {
           encryptedContent: shadow.encryptedContent,
@@ -467,9 +446,9 @@ export class CalendarApiService {
           ...(shadow.encryptionKeyVersion
             ? { encryptionKeyVersion: shadow.encryptionKeyVersion }
             : {}),
-        },
+        } satisfies Schema<"SealEncryptionRequest">,
       );
-      return await this.hydrateEncryptedEvent(response);
+      return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
       throw this.transformError(error, "Failed to seal event encryption");
     }
@@ -491,11 +470,12 @@ export class CalendarApiService {
     status: "accepted" | "declined" | "tentative",
   ): Promise<CalendarEvent | { deleted: true }> {
     try {
-      const response = await this.client.post<
-        CalendarEvent | { deleted: true }
-      >(`/api/events/${id}/rsvp`, { status });
-      if ("deleted" in response && response.deleted) {
-        return { deleted: true };
+      const response = await this.client.post<Schema<"RsvpResult">>(
+        `/api/events/${id}/rsvp`,
+        { status } satisfies Schema<"RsvpRequest">,
+      );
+      if ("deleted" in response) {
+        return response;
       }
       return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
@@ -520,13 +500,16 @@ export class CalendarApiService {
       if (params.startDate) searchParams.set("startDate", params.startDate);
       if (params.endDate) searchParams.set("endDate", params.endDate);
 
-      const response = await this.client.get<EventSearchResult>(
+      const response = await this.client.get<Schema<"EventSearchResults">>(
         `/api/events/search?${searchParams.toString()}`,
         { signal },
       );
       return {
         ...response,
-        events: await this.hydrateEncryptedEvents(response.events),
+        // Hydration rewrites only content and label-name fields, so the trimmed `SearchLabel`s pass through it as `EventSearchHit` labels.
+        events: await this.hydrateEncryptedEvents(
+          response.events as CalendarEvent[],
+        ),
       };
     } catch (error) {
       throw this.transformError(error, "Failed to search events");
@@ -546,14 +529,16 @@ export class CalendarApiService {
       }
 
       const query = searchParams.toString();
-      const response = await this.client.get<EventSearchCorpusResult>(
+      const response = await this.client.get<Schema<"EventSearchCorpus">>(
         `/api/events/search-corpus${query ? `?${query}` : ""}`,
         { signal },
       );
 
       return {
         ...response,
-        events: await this.hydrateEncryptedEvents(response.events),
+        events: await this.hydrateEncryptedEvents(
+          response.events as CalendarEvent[],
+        ),
       };
     } catch (error) {
       throw this.transformError(
@@ -568,11 +553,11 @@ export class CalendarApiService {
   ): Promise<WithOperationWarnings<CalendarEvent>> {
     try {
       const payload = await this.e2ee.attachEventEncryptionShadow(event);
-      const response = await this.client.post<WithOperationWarnings<CalendarEvent>>(
+      const response = await this.client.post<Schema<"Event">>(
         "/api/events",
-        payload,
+        payload satisfies StrictBody<Schema<"CreateEventRequest">>,
       );
-      return await this.hydrateEncryptedEvent(response);
+      return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
       throw this.transformError(error, "Failed to create event");
     }
@@ -584,11 +569,11 @@ export class CalendarApiService {
   ): Promise<WithOperationWarnings<CalendarEvent>> {
     try {
       const payload = await this.e2ee.attachEventEncryptionShadow(event);
-      const response = await this.client.put<WithOperationWarnings<CalendarEvent>>(
+      const response = await this.client.put<Schema<"Event">>(
         `/api/events/${id}`,
-        payload,
+        payload satisfies StrictBody<Schema<"UpdateEventRequest">>,
       );
-      return await this.hydrateEncryptedEvent(response);
+      return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
       throw this.transformError(error, "Failed to update event");
     }
@@ -596,7 +581,9 @@ export class CalendarApiService {
 
   async deleteEvent(id: string): Promise<DeleteResponse> {
     try {
-      return await this.client.delete<DeleteResponse>(`/api/events/${id}`);
+      return await this.client.delete<Schema<"EventDeleted">>(
+        `/api/events/${id}`,
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to delete event");
     }
@@ -607,8 +594,8 @@ export class CalendarApiService {
   async getCalendars(): Promise<Calendar[]> {
     try {
       const response =
-        await this.client.get<CalendarsResponse>("/api/calendars");
-      return await this.hydrateCalendars(response.calendars);
+        await this.client.get<Schema<"CalendarList">>("/api/calendars");
+      return await this.hydrateCalendars(response.calendars as Calendar[]);
     } catch (error) {
       throw this.transformError(error, "Failed to fetch calendars");
     }
@@ -617,11 +604,11 @@ export class CalendarApiService {
   async createCalendar(calendar: CreateCalendarRequest): Promise<Calendar> {
     try {
       const payload = await this.e2ee.attachCalendarEncryptionShadow(calendar);
-      const response = await this.client.post<Calendar>(
+      const response = await this.client.post<Schema<"Calendar">>(
         "/api/calendars",
-        payload,
+        payload satisfies Schema<"CreateCalendarRequest">,
       );
-      return await this.hydrateCalendar(response);
+      return await this.hydrateCalendar(response as Calendar);
     } catch (error) {
       throw this.transformError(error, "Failed to create calendar");
     }
@@ -633,11 +620,11 @@ export class CalendarApiService {
   ): Promise<Calendar> {
     try {
       const payload = await this.e2ee.attachCalendarEncryptionShadow(calendar);
-      const response = await this.client.put<Calendar>(
+      const response = await this.client.put<Schema<"Calendar">>(
         `/api/calendars/${id}`,
-        payload,
+        payload satisfies Schema<"UpdateCalendarRequest">,
       );
-      return await this.hydrateCalendar(response);
+      return await this.hydrateCalendar(response as Calendar);
     } catch (error) {
       throw this.transformError(error, "Failed to update calendar");
     }
@@ -645,7 +632,9 @@ export class CalendarApiService {
 
   async deleteCalendar(id: string): Promise<DeleteResponse> {
     try {
-      return await this.client.delete<DeleteResponse>(`/api/calendars/${id}`);
+      return await this.client.delete<Schema<"CalendarDeleteResult">>(
+        `/api/calendars/${id}`,
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to delete calendar");
     }
@@ -661,7 +650,7 @@ export class CalendarApiService {
       if (action) params.append("action", action);
       if (targetCalendarId) params.append("targetCalendarId", targetCalendarId);
 
-      return await this.client.delete<CalendarDeleteResponse>(
+      return await this.client.delete<Schema<"CalendarDeleteResult">>(
         `/api/calendars/${id}?${params}`,
       );
     } catch (error) {
@@ -674,8 +663,10 @@ export class CalendarApiService {
   async getCategories(): Promise<EventCategory[]> {
     try {
       const response =
-        await this.client.get<CategoriesResponse>("/api/categories");
-      return await this.hydrateCategories(response.categories);
+        await this.client.get<Schema<"CategoryList">>("/api/categories");
+      return await this.hydrateCategories(
+        response.categories as EventCategory[],
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to fetch categories");
     }
@@ -686,11 +677,11 @@ export class CalendarApiService {
   ): Promise<EventCategory> {
     try {
       const payload = await this.e2ee.attachCategoryEncryptionShadow(category);
-      const response = await this.client.post<EventCategory>(
+      const response = await this.client.post<Schema<"Category">>(
         "/api/categories",
-        payload,
+        payload satisfies Schema<"CreateCategoryRequest">,
       );
-      return await this.hydrateCategory(response);
+      return await this.hydrateCategory(response as EventCategory);
     } catch (error) {
       throw this.transformError(error, "Failed to create category");
     }
@@ -702,11 +693,11 @@ export class CalendarApiService {
   ): Promise<EventCategory> {
     try {
       const payload = await this.e2ee.attachCategoryEncryptionShadow(category);
-      const response = await this.client.put<EventCategory>(
+      const response = await this.client.put<Schema<"Category">>(
         `/api/categories/${id}`,
-        payload,
+        payload satisfies Schema<"UpdateCategoryRequest">,
       );
-      return await this.hydrateCategory(response);
+      return await this.hydrateCategory(response as EventCategory);
     } catch (error) {
       throw this.transformError(error, "Failed to update category");
     }
@@ -714,7 +705,9 @@ export class CalendarApiService {
 
   async deleteCategory(id: string): Promise<DeleteResponse> {
     try {
-      return await this.client.delete<DeleteResponse>(`/api/categories/${id}`);
+      return await this.client.delete<Schema<"SuccessMessage">>(
+        `/api/categories/${id}`,
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to delete category");
     }
@@ -724,7 +717,9 @@ export class CalendarApiService {
 
   async getUserSettings(): Promise<UserSettings> {
     try {
-      return await this.client.get<UserSettings>("/api/settings");
+      return (await this.client.get<Schema<"UserSettings">>(
+        "/api/settings",
+      )) as UserSettings;
     } catch (error) {
       throw this.transformError(error, "Failed to fetch user settings");
     }
@@ -734,18 +729,18 @@ export class CalendarApiService {
     settings: UpdateSettingsRequest,
   ): Promise<UserSettings> {
     try {
-      return await this.client.put<UserSettings>("/api/settings", settings);
+      return (await this.client.put<Schema<"UserSettings">>(
+        "/api/settings",
+        settings satisfies Schema<"UpdateSettingsRequest">,
+      )) as UserSettings;
     } catch (error) {
       throw this.transformError(error, "Failed to update user settings");
     }
   }
 
-  async resetUserSettings(): Promise<{ success: boolean; message: string }> {
+  async resetUserSettings(): Promise<Schema<"SuccessMessage">> {
     try {
-      return await this.client.delete<{
-        success: boolean;
-        message: string;
-      }>("/api/settings");
+      return await this.client.delete<Schema<"SuccessMessage">>("/api/settings");
     } catch (error) {
       throw this.transformError(error, "Failed to reset user settings");
     }
@@ -753,9 +748,9 @@ export class CalendarApiService {
 
   // ─── Recent contacts ─────────────────────────────────────────────────────────
 
-  async getRecentContacts(): Promise<RecentContactsRecord | null> {
+  async getRecentContacts(): Promise<ApiResponse<"RecentContacts"> | null> {
     try {
-      return await this.client.get<RecentContactsRecord | null>(
+      return await this.client.get<Schema<"RecentContacts"> | null>(
         "/api/recent-contacts",
       );
     } catch (error) {
@@ -765,20 +760,20 @@ export class CalendarApiService {
 
   async putRecentContacts(
     request: PutRecentContactsRequest,
-  ): Promise<RecentContactsRecord> {
+  ): Promise<ApiResponse<"RecentContacts">> {
     try {
-      return await this.client.put<RecentContactsRecord>(
+      return await this.client.put<Schema<"RecentContacts">>(
         "/api/recent-contacts",
-        request,
+        request satisfies StrictBody<Schema<"PutRecentContactsRequest">>,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to save recent contacts");
     }
   }
 
-  async getMailSettings(): Promise<MailSettingsRecord | null> {
+  async getMailSettings(): Promise<ApiResponse<"MailSettings"> | null> {
     try {
-      return await this.client.get<MailSettingsRecord | null>(
+      return await this.client.get<Schema<"MailSettings"> | null>(
         "/api/mail-settings",
       );
     } catch (error) {
@@ -788,11 +783,11 @@ export class CalendarApiService {
 
   async putMailSettings(
     request: PutMailSettingsRequest,
-  ): Promise<MailSettingsRecord> {
+  ): Promise<ApiResponse<"MailSettings">> {
     try {
-      return await this.client.put<MailSettingsRecord>(
+      return await this.client.put<Schema<"MailSettings">>(
         "/api/mail-settings",
-        request,
+        request satisfies StrictBody<Schema<"PutMailSettingsRequest">>,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to save mail settings");
@@ -803,9 +798,9 @@ export class CalendarApiService {
     request: SolaceProfileLookupRequest,
   ): Promise<SolaceProfileLookupResponse> {
     try {
-      return await this.client.post<SolaceProfileLookupResponse>(
+      return await this.client.post<Schema<"ProfileLookupResponse">>(
         "/api/profiles/lookup",
-        request,
+        request satisfies Schema<"ProfileLookupRequest">,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to look up profile pictures");
@@ -816,9 +811,9 @@ export class CalendarApiService {
     request: UploadProfileAvatarRequest,
   ): Promise<ProfileAvatarResponse> {
     try {
-      return await this.client.put<ProfileAvatarResponse>(
+      return await this.client.put<Schema<"AvatarResponse">>(
         "/api/profiles/me/avatar",
-        request,
+        request satisfies Schema<"UploadAvatarRequest">,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to upload profile picture");
@@ -827,7 +822,7 @@ export class CalendarApiService {
 
   async removeProfileAvatar(): Promise<ProfileAvatarResponse> {
     try {
-      return await this.client.delete<ProfileAvatarResponse>(
+      return await this.client.delete<Schema<"AvatarResponse">>(
         "/api/profiles/me/avatar",
       );
     } catch (error) {
@@ -835,9 +830,11 @@ export class CalendarApiService {
     }
   }
 
-  async deleteAccount(): Promise<DeleteAccountResponse> {
+  async deleteAccount(): Promise<Schema<"DeleteAccountResponse">> {
     try {
-      return await this.client.delete<DeleteAccountResponse>("/api/account");
+      return await this.client.delete<Schema<"DeleteAccountResponse">>(
+        "/api/account",
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to delete account");
     }
@@ -846,10 +843,10 @@ export class CalendarApiService {
   // ─── Recurring Events ────────────────────────────────────────────────────────
 
   async validateRecurrence(
-    rule: string | object,
-  ): Promise<RecurrenceValidation> {
+    rule: string | RecurrenceRule,
+  ): Promise<Schema<"RecurrenceValidation">> {
     try {
-      return await this.client.post<RecurrenceValidation>(
+      return await this.client.post<Schema<"RecurrenceValidation">>(
         "/api/recurring/validate",
         { rule },
       );
@@ -861,11 +858,11 @@ export class CalendarApiService {
   async previewRecurrence(
     eventStart: string,
     eventEnd: string,
-    recurrenceRule: string | object,
+    recurrenceRule: string | RecurrenceRule,
     previewDays?: number,
   ): Promise<RecurrencePreview> {
     try {
-      return await this.client.post<RecurrencePreview>(
+      return await this.client.post<Schema<"RecurrencePreview">>(
         "/api/recurring/preview",
         { eventStart, eventEnd, recurrenceRule, previewDays },
       );
@@ -874,9 +871,11 @@ export class CalendarApiService {
     }
   }
 
-  async getRecurrencePatterns(): Promise<RecurrencePatterns> {
+  async getRecurrencePatterns(): Promise<
+    Schema<"RecurrencePatterns">["patterns"]
+  > {
     try {
-      const response = await this.client.get<{ patterns: RecurrencePatterns }>(
+      const response = await this.client.get<Schema<"RecurrencePatterns">>(
         "/api/recurring/patterns",
       );
       return response.patterns;
@@ -893,11 +892,14 @@ export class CalendarApiService {
       const updates = await this.e2ee.attachEventEncryptionShadow(
         request.updates,
       );
-      const response = await this.client.put<CalendarEvent>(
+      const response = await this.client.put<Schema<"Event">>(
         `/api/recurring/event/${id}`,
-        { ...request, updates },
+        {
+          ...request,
+          updates,
+        } satisfies StrictBody<Schema<"EditRecurringRequest">>,
       );
-      return await this.hydrateEncryptedEvent(response);
+      return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
       throw this.transformError(error, "Failed to edit recurring event");
     }
@@ -907,15 +909,14 @@ export class CalendarApiService {
     id: string,
     deleteScope: string,
     occurrenceDate?: string,
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<Schema<"RecurringDeleted">> {
     try {
       const params = new URLSearchParams({ deleteScope });
       if (occurrenceDate) params.append("occurrenceDate", occurrenceDate);
 
-      return await this.client.delete<{
-        success: boolean;
-        message: string;
-      }>(`/api/recurring/event/${id}?${params}`);
+      return await this.client.delete<Schema<"RecurringDeleted">>(
+        `/api/recurring/event/${id}?${params}`,
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to delete recurring event");
     }
@@ -950,9 +951,9 @@ export class CalendarApiService {
       let eventsCreated = 0;
       const errors = [...parsed.errors];
       for (let offset = 0; offset < encryptedEvents.length; offset += 100) {
-        const result = await this.client.post<ImportICSResponse>("/api/subscriptions/import-ics", {
+        const result = await this.client.post<Schema<"ImportIcsResponse">>("/api/subscriptions/import-ics", {
           calendarId: request.calendarId, encryptedEvents: encryptedEvents.slice(offset, offset + 100),
-        });
+        } satisfies StrictBody<Schema<"EncryptedIcsImportRequest">>);
         eventsCreated += result.eventsCreated;
         errors.push(...(result.errors ?? []));
       }
@@ -977,9 +978,9 @@ export class CalendarApiService {
 
   async getSubscriptions(): Promise<CalendarSubscription[]> {
     try {
-      return await this.client.get<CalendarSubscription[]>(
+      return (await this.client.get<Schema<"CalendarSubscription">[]>(
         "/api/subscriptions",
-      );
+      )) as CalendarSubscription[];
     } catch (error) {
       throw this.transformError(error, "Failed to load subscriptions");
     }
@@ -987,12 +988,12 @@ export class CalendarApiService {
 
   async createSubscription(
     request: CreateSubscriptionRequest,
-  ): Promise<CalendarSubscription> {
+  ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
-      return await this.client.post<CalendarSubscription>(
+      return (await this.client.post<Schema<"CalendarSubscription">>(
         "/api/subscriptions",
-        request,
-      );
+        request satisfies Schema<"CreateSubscriptionRequest">,
+      )) as Omit<CalendarSubscription, "_count">;
     } catch (error) {
       throw this.transformError(error, "Failed to create subscription");
     }
@@ -1001,12 +1002,12 @@ export class CalendarApiService {
   async updateSubscription(
     id: string,
     request: UpdateSubscriptionRequest,
-  ): Promise<CalendarSubscription> {
+  ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
-      return await this.client.put<CalendarSubscription>(
+      return (await this.client.put<Schema<"CalendarSubscription">>(
         `/api/subscriptions/${id}`,
-        request,
-      );
+        request satisfies Schema<"UpdateSubscriptionRequest">,
+      )) as Omit<CalendarSubscription, "_count">;
     } catch (error) {
       throw this.transformError(error, "Failed to update subscription");
     }
@@ -1020,7 +1021,7 @@ export class CalendarApiService {
       const params = new URLSearchParams();
       if (deleteEvents) params.append("deleteEvents", "true");
 
-      return await this.client.delete<DeleteSubscriptionResponse>(
+      return await this.client.delete<Schema<"DeleteSubscriptionResponse">>(
         `/api/subscriptions/${id}?${params}`,
       );
     } catch (error) {
@@ -1030,10 +1031,10 @@ export class CalendarApiService {
 
   async syncSubscription(id: string): Promise<SyncSubscriptionResponse> {
     try {
-      return await this.client.post<SyncSubscriptionResponse>(
+      return (await this.client.post<Schema<"SubscriptionSyncResult">>(
         `/api/subscriptions/${id}/sync`,
         {},
-      );
+      )) as SyncSubscriptionResponse;
     } catch (error) {
       throw this.transformError(error, "Failed to sync subscription");
     }
@@ -1043,7 +1044,7 @@ export class CalendarApiService {
 
   async getCalendarShareLink(calendarId: string): Promise<CalendarShareLink> {
     try {
-      return await this.client.get<CalendarShareLink>(
+      return await this.client.get<Schema<"CalendarShareLink">>(
         `/api/calendars/${calendarId}/share-link`,
       );
     } catch (error) {
@@ -1056,9 +1057,9 @@ export class CalendarApiService {
     request?: CreateCalendarShareLinkRequestPayload,
   ): Promise<CalendarShareLink> {
     try {
-      return await this.client.post<CalendarShareLink>(
+      return await this.client.post<Schema<"CalendarShareLink">>(
         `/api/calendars/${calendarId}/share-link`,
-        request || {},
+        (request || {}) satisfies Schema<"CreateShareLinkRequest">,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to enable calendar share link");
@@ -1069,7 +1070,7 @@ export class CalendarApiService {
     calendarId: string,
   ): Promise<DisableCalendarShareLinkResponsePayload> {
     try {
-      return await this.client.delete<DisableCalendarShareLinkResponsePayload>(
+      return await this.client.delete<Schema<"DisableShareLinkResponse">>(
         `/api/calendars/${calendarId}/share-link`,
       );
     } catch (error) {
@@ -1083,10 +1084,10 @@ export class CalendarApiService {
     request: BulkEventRequest,
   ): Promise<BulkEventResponse> {
     try {
-      return await this.client.post<BulkEventResponse>(
+      return (await this.client.post<Schema<"BulkEventResult">>(
         "/api/events/bulk",
-        request,
-      );
+        request satisfies StrictBody<Schema<"BulkEventRequest">>,
+      )) as BulkEventResponse;
     } catch (error) {
       throw this.transformError(
         error,
@@ -1097,44 +1098,13 @@ export class CalendarApiService {
 
   // ─── Notifications ───────────────────────────────────────────────────────────
 
-  async triggerReminderCheck(): Promise<{ success: boolean; message: string }> {
+  async getEventNotifications(
+    eventId: string,
+  ): Promise<ApiResponse<"EventNotifications">> {
     try {
-      return await this.client.post<{
-        success: boolean;
-        message: string;
-      }>("/api/notifications/trigger-check", {});
-    } catch (error) {
-      throw this.transformError(error, "Failed to trigger reminder check");
-    }
-  }
-
-  async getNotificationStatus(): Promise<NotificationStatus> {
-    try {
-      return await this.client.get<NotificationStatus>(
-        "/api/notifications/status",
+      return await this.client.get<Schema<"EventNotifications">>(
+        `/api/notifications/event/${eventId}`,
       );
-    } catch (error) {
-      throw this.transformError(error, "Failed to get notification status");
-    }
-  }
-
-  async getEventNotifications(eventId: string): Promise<{
-    success: boolean;
-    data: {
-      eventId: string;
-      notifications: EventNotification[];
-      count: number;
-    };
-  }> {
-    try {
-      return await this.client.get<{
-        success: boolean;
-        data: {
-          eventId: string;
-          notifications: EventNotification[];
-          count: number;
-        };
-      }>(`/api/notifications/event/${eventId}`);
     } catch (error) {
       throw this.transformError(error, "Failed to get event notifications");
     }
@@ -1144,41 +1114,19 @@ export class CalendarApiService {
     eventId: string,
     notifications: CreateNotificationRequest["notifications"],
     options?: Pick<CreateNotificationRequest, "encryptedDisplayTitle">,
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<Schema<"NotificationUpdateResult">> {
     try {
-      return await this.client.put<{
-        success: boolean;
-        message: string;
-      }>(`/api/notifications/event/${eventId}`, {
-        notifications,
-        ...(options?.encryptedDisplayTitle !== undefined
-          ? { encryptedDisplayTitle: options.encryptedDisplayTitle }
-          : {}),
-      });
+      return await this.client.put<Schema<"NotificationUpdateResult">>(
+        `/api/notifications/event/${eventId}`,
+        {
+          notifications,
+          ...(options?.encryptedDisplayTitle !== undefined
+            ? { encryptedDisplayTitle: options.encryptedDisplayTitle }
+            : {}),
+        } satisfies Schema<"UpdateEventNotificationsRequest">,
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to update event notifications");
-    }
-  }
-
-  async createMultipleNotifications(
-    eventId: string,
-    notificationTimes: number[],
-  ): Promise<{
-    success: boolean;
-    message: string;
-    notificationTimes: number[];
-  }> {
-    try {
-      return await this.client.post<{
-        success: boolean;
-        message: string;
-        notificationTimes: number[];
-      }>(`/api/notifications/event/${eventId}/multiple`, { notificationTimes });
-    } catch (error) {
-      throw this.transformError(
-        error,
-        "Failed to create multiple notifications",
-      );
     }
   }
 
@@ -1186,18 +1134,20 @@ export class CalendarApiService {
     input: RegisterPushDeviceRequest,
   ): Promise<PushDeviceRegistrationResult> {
     try {
-      return await this.client.put<PushDeviceRegistrationResult>(
+      return await this.client.put<Schema<"PushDeviceRegistration">>(
         "/api/push/devices",
-        input,
+        input satisfies StrictBody<Schema<"RegisterPushDeviceRequest">>,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to register push device");
     }
   }
 
-  async listPushDevices(): Promise<ListPushDevicesResult> {
+  async listPushDevices(): Promise<ApiResponse<"PushDeviceList">> {
     try {
-      return await this.client.get<ListPushDevicesResult>("/api/push/devices");
+      return await this.client.get<Schema<"PushDeviceList">>(
+        "/api/push/devices",
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to list push devices");
     }
@@ -1208,10 +1158,12 @@ export class CalendarApiService {
     headers?: Record<string, string>,
   ): Promise<PushDeviceUnregisterResult> {
     try {
-      return await this.client.delete<PushDeviceUnregisterResult>(
+      return await this.client.delete<Schema<"PushDeviceUnregistration">>(
         "/api/push/devices",
         {
-          body: JSON.stringify(token ? { token } : {}),
+          body: JSON.stringify(
+            (token ? { token } : {}) satisfies Schema<"UnregisterPushDeviceRequest">,
+          ),
           ...(headers ? { headers } : {}),
         },
       );
@@ -1222,7 +1174,7 @@ export class CalendarApiService {
 
   async sendTestPushNotification(): Promise<PushTestNotificationResult> {
     try {
-      return await this.client.post<PushTestNotificationResult>(
+      return await this.client.post<Schema<"PushTestResult">>(
         "/api/push/test",
         {},
       );

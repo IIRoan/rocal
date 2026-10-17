@@ -23,12 +23,6 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: apps/notifications/go.mod
-          cache-dependency-path: apps/notifications/go.sum
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -46,7 +40,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: backend-coverage
-          path: apps/backend/coverage
+          path: retired/backend/coverage
 
       - name: Upload UI coverage
         if: always()
@@ -54,13 +48,6 @@ jobs:
         with:
           name: ui-coverage
           path: packages/ui/coverage
-
-      - name: Upload notifications coverage
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: notifications-coverage
-          path: apps/notifications/coverage.out
 
       - name: Upload native coverage
         if: always()
@@ -71,3 +58,36 @@ jobs:
             packages/native-core/coverage
             apps/native-calendar/coverage
             apps/native-mail/coverage
+
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install sea-orm-cli
+        run: cargo install sea-orm-cli@2.0.4 --locked
+
+      - name: Start the test environment
+        run: cargo xtask test-env up && cargo xtask test-env template
+
+      # Memory budgets stay local: shared runners' RSS is too noisy for fixed MiB limits.
+      - name: Run cargo xtask check
+        run: cargo xtask check --skip-mem

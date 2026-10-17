@@ -1,0 +1,797 @@
+# Every backend Jest case (jest --json at 9867af06, parameterized rows expanded): file<TAB>full name
+retired/backend/__tests__/contracts/notification.contract.test.ts	updateEventNotificationsBodySchema › accepts the reminder title ciphertext
+retired/backend/__tests__/contracts/notification.contract.test.ts	updateEventNotificationsBodySchema › drops a plaintext reminder title from shipped clients
+retired/backend/__tests__/contracts/notification.contract.test.ts	updateEventNotificationsBodySchema › rejects a plaintext title in the ciphertext field
+retired/backend/__tests__/contracts/notification.contract.test.ts	updateEventNotificationsBodySchema › rejects oversized ciphertext
+retired/backend/__tests__/contracts/query-coercion.test.ts	optionalShareLinkBodySchema › accepts a missing body
+retired/backend/__tests__/contracts/query-coercion.test.ts	optionalShareLinkBodySchema › accepts an empty object body
+retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › coerces deleteEvents=true from subscription delete queries
+retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › coerces string query integers for event search pagination
+retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › coerces string query integers for search corpus pagination
+retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › coerces syncRemote=false from query strings
+retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › rejects invalid query booleans
+retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › rejects invalid query integers
+retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › treats omitted syncRemote as undefined
+retired/backend/__tests__/lib/auth-cookie-migration.test.ts	auth cookie migration › collects default Better Auth cookie names plus request chunks
+retired/backend/__tests__/lib/auth-cookie-migration.test.ts	auth cookie migration › documents that Expo clients must skip legacy clears after session set
+retired/backend/__tests__/lib/auth-cookie-migration.test.ts	auth cookie migration › expires host-scoped and host-only variants when root domain differs
+retired/backend/__tests__/lib/auth-cookie-migration.test.ts	auth cookie migration › is a no-op outside production or when hostname equals root domain
+retired/backend/__tests__/lib/auth-email.test.ts	auth-email › builds a password changed email for the changed action branch
+retired/backend/__tests__/lib/auth-email.test.ts	auth-email › builds a password updated email with the right action text
+retired/backend/__tests__/lib/auth-email.test.ts	auth-email › builds an escaped reset password email
+retired/backend/__tests__/lib/auth-email.test.ts	auth-email › extracts the password change recipient from a Better Auth response
+retired/backend/__tests__/lib/auth-email.test.ts	auth-email › keeps password update notifications best-effort when delivery fails
+retired/backend/__tests__/lib/auth-email.test.ts	auth-email › logs a fallback instead of throwing when a required email provider is missing in development
+retired/backend/__tests__/lib/auth-email.test.ts	auth-email › throws for required delivery failures from the email provider
+retired/backend/__tests__/lib/auth-guard.test.ts	requireAuth › forwards renewed cookies without performing a second session read
+retired/backend/__tests__/lib/auth-guard.test.ts	requireAuth › resolves routeUser from better-auth session
+retired/backend/__tests__/lib/auth-guard.test.ts	requireAuth › returns 401 when no session is available
+retired/backend/__tests__/lib/auth-guard.test.ts	requireAuth › returns 403 when passkey step-up is required
+retired/backend/__tests__/lib/auth-guard.test.ts	requireAuth › skips passkey database checks when the verification cookie is present
+retired/backend/__tests__/lib/auth-rate-limit.test.ts	auth rate limit storage › allows while the counter is within the limit
+retired/backend/__tests__/lib/auth-rate-limit.test.ts	auth rate limit storage › covers credential and account-recovery endpoints with strict rules
+retired/backend/__tests__/lib/auth-rate-limit.test.ts	auth rate limit storage › denies with retry-after once the counter passes the limit
+retired/backend/__tests__/lib/auth-rate-limit.test.ts	auth rate limit storage › never sends the raw IP-bearing key to the database
+retired/backend/__tests__/lib/auth-rate-limit.test.ts	getClientIp › uses the platform-set headers and ignores non-IP values
+retired/backend/__tests__/lib/auth-secret.test.ts	resolveBetterAuthSecret › fails fast in deployed environments when the secret is missing or short
+retired/backend/__tests__/lib/auth-secret.test.ts	resolveBetterAuthSecret › keeps a development fallback only for local and test
+retired/backend/__tests__/lib/auth-secret.test.ts	resolveBetterAuthSecret › treats NODE_ENV=production and Vercel production/preview as deployed
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › binds successful passkey verification to the newly created session
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › cannot turn expired verification into a verified session during renewal
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › cannot turn missing verification into a verified session during renewal
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › cannot turn other-session verification into a verified session during renewal
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › cannot turn other-user verification into a verified session during renewal
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › cannot turn tampered verification into a verified session during renewal
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › configures two-week app sessions with daily renewal
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › extends existing verification during a background session check
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › keeps verified passkey access beyond the original two weeks with daily use
+retired/backend/__tests__/lib/auth-session-policy.test.ts	rolling session policy › never grants verification for a failed passkey response
+retired/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › appends renewal cookies without losing existing headers: "existing=fixture; Path=/"
+retired/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › appends renewal cookies without losing existing headers: ["existing=fixture; Path=/"]
+retired/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › appends renewal cookies without losing existing headers: undefined
+retired/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › forwards clears from a revoked session without losing another cookie
+retired/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › preserves response headers when no renewal is due
+retired/backend/__tests__/lib/auth-session.test.ts	request session renewal headers › propagates an unavailable session check without clearing client cookies
+retired/backend/__tests__/lib/avatar-storage.test.ts	waits for outstanding variant writes before reporting a failed upload
+retired/backend/__tests__/lib/avatar-updates.test.ts	clears the uploaded reference on legacy removal
+retired/backend/__tests__/lib/avatar-updates.test.ts	deletes an uploaded picture only after the legacy replacement commits
+retired/backend/__tests__/lib/avatar-updates.test.ts	preserves an unchanged image and skips cleanup for name-only updates
+retired/backend/__tests__/lib/avatar-updates.test.ts	preserves the old objects when a legacy update fails to commit
+retired/backend/__tests__/lib/avatar-updates.test.ts	retains cleanup after a legacy removal when storage is unavailable
+retired/backend/__tests__/lib/better-auth-plugin.test.ts	createBetterAuthPlugin › forwards /api/auth to Better Auth with the original request
+retired/backend/__tests__/lib/better-auth-plugin.test.ts	createBetterAuthPlugin › forwards nested Better Auth paths and POST bodies
+retired/backend/__tests__/lib/calendar-access.test.ts	calendar-access › assertCalendarWritable › passes silently for writable calendars
+retired/backend/__tests__/lib/calendar-access.test.ts	calendar-access › assertCalendarWritable › throws ValidationError for read-only calendars
+retired/backend/__tests__/lib/calendar-access.test.ts	calendar-access › assertCalendarWritable › uses provided message and field
+retired/backend/__tests__/lib/calendar-access.test.ts	calendar-access › findUserCalendarById / findUserCalendarOrThrow › returns null when not found
+retired/backend/__tests__/lib/calendar-access.test.ts	calendar-access › findUserCalendarById / findUserCalendarOrThrow › returns the calendar when found
+retired/backend/__tests__/lib/calendar-access.test.ts	calendar-access › findUserCalendarById / findUserCalendarOrThrow › throws ValidationError when missing in OrThrow variant
+retired/backend/__tests__/lib/calendar-access.test.ts	calendar-access › isCalendarWritable › returns true only for owned, non-sync calendars
+retired/backend/__tests__/lib/calendar-ics-standards.test.ts	calendar-ics standards › emits VCALENDAR content with CRLF line endings
+retired/backend/__tests__/lib/calendar-ics-standards.test.ts	calendar-ics standards › exports all-day events using timezone-local dates with exclusive DTEND
+retired/backend/__tests__/lib/calendar-ics-standards.test.ts	calendar-ics standards › folds long property lines to the RFC 5545 octet limit
+retired/backend/__tests__/lib/calendar-ics-standards.test.ts	calendar-ics standards › preserves URI-valued URL properties without TEXT escaping
+retired/backend/__tests__/lib/calendar-ics-standards.test.ts	calendar-ics standards › round-trips single-day all-day imports without expanding them
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › continues across batched sync errors and waits between batches
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › rejects missing and inactive subscriptions
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › reports scheduler status when running
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › returns subscription statistics
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › returns the same singleton instance
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › starts only once and schedules initial plus interval syncs
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › swallows and logs timer-driven sync failures
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › swallows cleanup log failures
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › swallows top-level sync query failures
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › syncs a specific active subscription
+retired/backend/__tests__/lib/calendar-sync-service.test.ts	CalendarSyncService › syncs due subscriptions, skips recent ones, and cleans old logs
+retired/backend/__tests__/lib/email-delivery.test.ts	email-delivery › builds user-safe email delivery warnings
+retired/backend/__tests__/lib/email-delivery.test.ts	email-delivery › builds user-safe reminder schedule warnings
+retired/backend/__tests__/lib/errors.test.ts	errorMessage / errorString helpers › errorString stringifies non-Error values
+retired/backend/__tests__/lib/errors.test.ts	errorMessage / errorString helpers › falls back to the default for non-Error, non-string values
+retired/backend/__tests__/lib/errors.test.ts	errorMessage / errorString helpers › respects a custom fallback
+retired/backend/__tests__/lib/errors.test.ts	errorMessage / errorString helpers › returns string values directly
+retired/backend/__tests__/lib/errors.test.ts	errorMessage / errorString helpers › returns the message of an Error instance
+retired/backend/__tests__/lib/errors.test.ts	errors › falls back to a generic internal server error with request id
+retired/backend/__tests__/lib/errors.test.ts	errors › includes structured issue details for validation errors when available
+retired/backend/__tests__/lib/errors.test.ts	errors › maps Prisma-style conflict and record-missing errors
+retired/backend/__tests__/lib/errors.test.ts	errors › maps built-in Elysia error codes
+retired/backend/__tests__/lib/errors.test.ts	errors › maps custom validation and authorization errors
+retired/backend/__tests__/lib/errors.test.ts	errors › maps database and notification wrapper errors
+retired/backend/__tests__/lib/errors.test.ts	errors › maps rate limit errors with Retry-After
+retired/backend/__tests__/lib/errors.test.ts	errors › omits validation details when the issue payload is malformed
+retired/backend/__tests__/lib/errors.test.ts	errors › resolves custom error labels from the error itself without changing responses
+retired/backend/__tests__/lib/errors.test.ts	errors › stores extra properties on custom error classes
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventDescriptionLength › accepts null/undefined/empty
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventDescriptionLength › rejects description over the max
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventLocationLength › accepts a location at the max
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventLocationLength › rejects location over the max
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventReminderMinutes › rejects NaN
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventReminderMinutes › rejects negative values
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventReminderMinutes › rejects values above the maximum
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventReminderMinutes › returns a coerced numeric value
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventReminderMinutes › returns the value unchanged for null/undefined
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventTitleLength › accepts null/undefined/empty title
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventTitleLength › accepts title at the maximum length
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventTitleLength › rejects title exceeding the maximum length
+retired/backend/__tests__/lib/event-constraints.test.ts	event-constraints › validateEventTitleLength › trims whitespace before measuring length
+retired/backend/__tests__/lib/event-encryption.test.ts	backfillEncryptedEventsToCiphertextOnly › re-encrypts a single calendar
+retired/backend/__tests__/lib/event-encryption.test.ts	backfillEncryptedEventsToCiphertextOnly › returns early when no calendar scope is provided
+retired/backend/__tests__/lib/event-encryption.test.ts	backfillEncryptedEventsToCiphertextOnly › uses an in-clause and deduplicates calendar ids for multi-calendar reencryption
+retired/backend/__tests__/lib/event-encryption.test.ts	ciphertext-only event content › allows empty plaintext fields and plaintext-only bodies
+retired/backend/__tests__/lib/event-encryption.test.ts	ciphertext-only event content › only mails invitations for encrypted events from the transient copy
+retired/backend/__tests__/lib/event-encryption.test.ts	ciphertext-only event content › rejects plaintext fields alongside ciphertext
+retired/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › always normalizes to full mode
+retired/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › keeps plaintext when no encrypted payload exists
+retired/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › normalizes optional plaintext fields before encryption
+retired/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › recognizes fully encrypted rows
+retired/backend/__tests__/lib/event-encryption.test.ts	event encryption policy › stores encrypted events as ciphertext only
+retired/backend/__tests__/lib/event-invitation-delivery.test.ts	sendEventInvitationEmail › never invites a reserved system address
+retired/backend/__tests__/lib/event-invitation-delivery.test.ts	sendEventInvitationEmail › submits internal recipients as noreply, not by importing into their mailbox
+retired/backend/__tests__/lib/event-invitation-delivery.test.ts	sendEventInvitationEmail › uses Stalwart submission for external recipients
+retired/backend/__tests__/lib/event-participants.test.ts	mapEventParticipant › drops unsafe participant profile image URLs
+retired/backend/__tests__/lib/event-participants.test.ts	mapEventParticipant › preserves opaque uploaded participant picture paths
+retired/backend/__tests__/lib/event-participants.test.ts	mapEventParticipant › sanitizes participant profile image URLs
+retired/backend/__tests__/lib/event-participants.test.ts	reconcileOwnedEventParticipantsFromRemote › never adopts Stalwart-invented admin principals as invitees
+retired/backend/__tests__/lib/event-participants.test.ts	reconcileOwnedEventParticipantsFromRemote › refreshes RSVP status for already-invited attendees only
+retired/backend/__tests__/lib/event-rsvp-reply.test.ts	event RSVP reply › builds a REPLY carrying the attendee's PARTSTAT and the original UID
+retired/backend/__tests__/lib/event-rsvp-reply.test.ts	event RSVP reply › emails the organizer with the reply attached
+retired/backend/__tests__/lib/event-rsvp-reply.test.ts	event RSVP reply › never replies to itself or to a reserved system address
+retired/backend/__tests__/lib/ics-export.test.ts	ics-export › drops invalid recurrence definitions
+retired/backend/__tests__/lib/ics-export.test.ts	ics-export › falls back to a local UID when an external identifier is missing
+retired/backend/__tests__/lib/ics-export.test.ts	ics-export › falls back to calendar.ics when the name collapses to an empty value
+retired/backend/__tests__/lib/ics-export.test.ts	ics-export › includes mapped participants when event has participants
+retired/backend/__tests__/lib/ics-export.test.ts	ics-export › maps a calendar event into an ICS build payload
+retired/backend/__tests__/lib/ics-export.test.ts	ics-export › normalizes unsafe filenames and preserves the .ics extension
+retired/backend/__tests__/lib/ics-parser.test.ts	ics-parser › converts a parsed ICS event into a calendar create input
+retired/backend/__tests__/lib/ics-parser.test.ts	ics-parser › detects a participant change when emails differ
+retired/backend/__tests__/lib/ics-parser.test.ts	ics-parser › detects modified data including fallback null and timezone handling
+retired/backend/__tests__/lib/ics-parser.test.ts	ics-parser › detects no participant change when normalized lists match regardless of order
+retired/backend/__tests__/lib/ics-parser.test.ts	ics-parser › detects when a parsed event matches the stored event
+retired/backend/__tests__/lib/ics-parser.test.ts	ics-parser › does not treat omitted parsed timezone as a modification
+retired/backend/__tests__/lib/ics-parser.test.ts	ics-parser › parses ICS content through the shared package
+retired/backend/__tests__/lib/ics-parser.test.ts	ics-parser › strips Google invite boilerplate from imported descriptions
+retired/backend/__tests__/lib/ics-parser.test.ts	ics-parser › uses the default timezone and omits sync metadata when no subscription is provided
+retired/backend/__tests__/lib/inbound-mail-push.test.ts	coalescePendingMailSync › keeps pending thread changes and calendar import stats when next is empty
+retired/backend/__tests__/lib/inbound-mail-push.test.ts	coalescePendingMailSync › merges created email ids from overlapping snapshots
+retired/backend/__tests__/lib/inbound-mail-push.test.ts	coalescePendingMailSync › uses the next snapshot when nothing is pending yet
+retired/backend/__tests__/lib/inbound-mail-push.test.ts	mergeInboundMailPushItems › deduplicates by email id and keeps opaque refs only
+retired/backend/__tests__/lib/jmap-proxy-path.test.ts	jmap-proxy-path › allows same-origin JMAP redirects
+retired/backend/__tests__/lib/jmap-proxy-path.test.ts	jmap-proxy-path › allows standard JMAP paths
+retired/backend/__tests__/lib/jmap-proxy-path.test.ts	jmap-proxy-path › builds safe upstream URLs without host changes
+retired/backend/__tests__/lib/jmap-proxy-path.test.ts	jmap-proxy-path › rejects cross-origin redirects
+retired/backend/__tests__/lib/jmap-proxy-path.test.ts	jmap-proxy-path › rejects percent-encoded traversal to admin APIs
+retired/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › exposes contract policy as the single source of truth
+retired/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › extracts safe error details
+retired/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › hashes identifiers consistently without exposing raw values
+retired/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › redacts emails and urls from free-form text
+retired/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › redacts query strings from request urls
+retired/backend/__tests__/lib/log-sanitization.test.ts	log-sanitization › sanitizes structured log context
+retired/backend/__tests__/lib/mail-bridge-auth.test.ts	deriveMailBridgeSecret › changes only when the bridge key changes
+retired/backend/__tests__/lib/mail-bridge-auth.test.ts	deriveMailBridgeSecret › fails fast when the bridge key is unset
+retired/backend/__tests__/lib/mail-invitation-calendar.test.ts	resolveAcceptedInvitationTargetCalendar › never files accepted invitations into the staging calendar
+retired/backend/__tests__/lib/mail-invitation-calendar.test.ts	resolveAcceptedInvitationTargetCalendar › prefers an explicitly requested owned calendar
+retired/backend/__tests__/lib/mail-invitation-calendar.test.ts	resolveAcceptedInvitationTargetCalendar › uses the user's default owned writable calendar
+retired/backend/__tests__/lib/mail-invitation-calendar.test.ts	resolveInvitationStagingCalendar › creates a hidden invitations calendar when one does not exist
+retired/backend/__tests__/lib/mail-push-enqueue.test.ts	enqueueInboundMailPush › does not enqueue a second job after one was already stored for that email
+retired/backend/__tests__/lib/mail-push-enqueue.test.ts	enqueueInboundMailPush › enqueues a new_mail push job with opaque refs only
+retired/backend/__tests__/lib/mail-push-enqueue.test.ts	enqueueInboundMailPush › enqueues a separate pending job for each inbound message
+retired/backend/__tests__/lib/mail-push-enqueue.test.ts	enqueueInboundMailPush › rejects invalid notification payloads
+retired/backend/__tests__/lib/mail-push-enqueue.test.ts	enqueueInboundMailPush › skips when push notifications are disabled
+retired/backend/__tests__/lib/mail-push-enqueue.test.ts	enqueueInboundMailPush › skips when the account is not linked to a user
+retired/backend/__tests__/lib/mail-push-enqueue.test.ts	enqueueInboundMailPush › skips when there are no inbound items
+retired/backend/__tests__/lib/mail-push-enqueue.test.ts	enqueueInboundMailPush › treats unique-constraint races as duplicate skips
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › builds a schedule with a trimmed timezone
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › calculates multiple notification results while preserving config references
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › calculates the notification time and rounds to the minute
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › checks whether an event is still in the future
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › clamps overdue reminders to now when the event is still upcoming
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › does not schedule reminders after the event has started
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › falls back to Amsterdam when the timezone is blank
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › formats local datetime strings in UTC
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › formats notification lead times across minutes, hours, and days
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › marks future notifications as valid
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › rejects invalid dates during minute rounding
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › rejects invalid dates when formatting local datetimes
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › rejects invalid event start values
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › rejects negative or non-integer minutes
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › reports past notifications as invalid
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › returns false for invalid inputs when checking future events
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › returns false when either date is invalid during validation
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › returns the maximum safe lead time for a future event
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › returns zero future minutes when the event is already in the past
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › rounds seconds and milliseconds down to zero
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › surfaces calculation errors through the validation wrapper
+retired/backend/__tests__/lib/notification-calculator.test.ts	NotificationCalculator › validates using minute-level rounding
+retired/backend/__tests__/lib/notification-job.test.ts	notification-job payload › accepts the closed allowlist of opaque refs
+retired/backend/__tests__/lib/notification-job.test.ts	notification-job payload › builds event and mail payloads
+retired/backend/__tests__/lib/notification-job.test.ts	notification-job payload › rejects refs that belong to the other job kind
+retired/backend/__tests__/lib/notification-job.test.ts	notification-job payload › rejects the plaintext content field displayTitle
+retired/backend/__tests__/lib/notification-job.test.ts	notification-job payload › rejects the plaintext content field fromName
+retired/backend/__tests__/lib/notification-job.test.ts	notification-job payload › rejects the plaintext content field subject
+retired/backend/__tests__/lib/notification-job.test.ts	notification-job payload › rejects the plaintext content field title
+retired/backend/__tests__/lib/notification-job.test.ts	shouldScheduleEventReminder › schedules when either channel is on
+retired/backend/__tests__/lib/origin-policy.test.ts	buildMobileTrustedOriginVariants › expands a solace-dev callback into root and path prefixes
+retired/backend/__tests__/lib/origin-policy.test.ts	buildMobileTrustedOriginVariants › returns an empty list for missing values
+retired/backend/__tests__/lib/origin-policy.test.ts	getAuthTrustedOrigins › trusts production and development-client deep links for both apps by default
+retired/backend/__tests__/lib/origin-policy.test.ts	localhost trust › only includes localhost outside production
+retired/backend/__tests__/lib/origin-policy.test.ts	localhost trust › rejects localhost origins in production but keeps mobile deep links
+retired/backend/__tests__/lib/passkey-bridge-session.test.ts	passkey bridge fresh session helpers › exposes the complete-step-up path used after native passkey login
+retired/backend/__tests__/lib/passkey-bridge-session.test.ts	passkey bridge fresh session helpers › exposes the freshen-session path used after native register handoff
+retired/backend/__tests__/lib/passkey-bridge-session.test.ts	passkey bridge fresh session helpers › parses the current Better Auth session payload
+retired/backend/__tests__/lib/passkey-step-up.test.ts	passkey step-up cookies › caches positive passkey lookups instead of recounting on every request
+retired/backend/__tests__/lib/passkey-step-up.test.ts	passkey step-up cookies › detects a verified step-up cookie bound to the session
+retired/backend/__tests__/lib/passkey-step-up.test.ts	passkey step-up cookies › keeps verification for two weeks and rejects it exactly at expiry
+retired/backend/__tests__/lib/passkey-step-up.test.ts	passkey step-up cookies › renews valid verification daily without writing on every request
+retired/backend/__tests__/lib/passkey-step-up.test.ts	passkey step-up cookies › writes a clearing step-up cookie to response headers
+retired/backend/__tests__/lib/passkey-step-up.test.ts	passkey step-up cookies › writes a signed step-up cookie to response headers
+retired/backend/__tests__/lib/prisma-query.test.ts	prismaStringEquals › rejects empty strings
+retired/backend/__tests__/lib/prisma-query.test.ts	prismaStringEquals › rejects object injection payloads
+retired/backend/__tests__/lib/prisma-query.test.ts	prismaStringEquals › returns an explicit equals filter for string ids
+retired/backend/__tests__/lib/recurring-series.test.ts	recurring series category updates › assigns a newly picked category to the occurrence
+retired/backend/__tests__/lib/recurring-series.test.ts	recurring series category updates › clears the category on occurrence edits sent an empty id
+retired/backend/__tests__/lib/recurring-series.test.ts	recurring series category updates › clears the series category when sent an empty id
+retired/backend/__tests__/lib/recurring-series.test.ts	recurring series category updates › keeps the series category when the edit leaves it untouched
+retired/backend/__tests__/lib/recurring-series.test.ts	recurring series category updates › leaves the series category untouched when omitted
+retired/backend/__tests__/lib/recurring-series.test.ts	recurring series content encryption › keeps the series ciphertext on time-only occurrence edits
+retired/backend/__tests__/lib/recurring-series.test.ts	recurring series content encryption › leaves content columns untouched for schedule-only series edits
+retired/backend/__tests__/lib/recurring-series.test.ts	recurring series content encryption › rejects plaintext content edits on encrypted series
+retired/backend/__tests__/lib/recurring-series.test.ts	recurring series content encryption › stores new ciphertext without plaintext for content edits
+retired/backend/__tests__/lib/runtime-origin-policy.test.ts	runtime detection › detects Expo Go from native + storeClient hints
+retired/backend/__tests__/lib/runtime-origin-policy.test.ts	runtime detection › detects Expo web from a web platform hint
+retired/backend/__tests__/lib/runtime-origin-policy.test.ts	runtime detection › detects Next.js server runtime from NEXT_RUNTIME
+retired/backend/__tests__/lib/runtime-origin-policy.test.ts	runtime origin policy › allows same-host Expo web origins during local development
+retired/backend/__tests__/lib/runtime-origin-policy.test.ts	runtime origin policy › preserves custom trusted origins
+retired/backend/__tests__/lib/runtime-origin-policy.test.ts	runtime origin policy › rejects unrelated origins
+retired/backend/__tests__/lib/runtime-origin-policy.test.ts	runtime origin policy › treats loopback hosts as equivalent in development
+retired/backend/__tests__/lib/safe-fetch.test.ts	createValidatingLookup › rejects when any resolved address is private
+retired/backend/__tests__/lib/safe-fetch.test.ts	createValidatingLookup › validates every resolution, so a rebinding answer is rejected
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://0177.0.0.1/ before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://0x7f.1/ before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://127.0.0.1/ before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://169.254.169.254/latest/meta-data before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://2130706433/ before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://[64:ff9b::a00:1]/ before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://[::ffff:169.254.169.254]/ before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://[fd00::1]/ before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://localhost/ before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › blocks private literal http://metadata.google.internal/ before connecting
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › maps webcal to https
+retired/backend/__tests__/lib/safe-fetch.test.ts	parseSafeFetchUrl › rejects non-http schemes and credentials
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › blocks a DNS rebinding host on the redirect hop (public, then private)
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › blocks redirects to file:///etc/passwd
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › blocks redirects to hostnames resolving to private addresses
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › blocks redirects to http://10.0.0.1/
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › blocks redirects to http://169.254.169.254/latest/meta-data
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › blocks redirects to http://[::1]/
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › caps the response size, including after decompression
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › connects to the validated address and keeps the original Host header
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › decodes gzip bodies within the cap
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › limits redirects
+retired/backend/__tests__/lib/safe-fetch.test.ts	safeFetch › times out slow responses
+retired/backend/__tests__/lib/security-headers.test.ts	security headers › adds hardening headers to JSON, raw Response and error responses
+retired/backend/__tests__/lib/security-headers.test.ts	security headers › allows inline styles only on the Better Auth error page
+retired/backend/__tests__/lib/security-headers.test.ts	security headers › lets the avatar proxy load cross-origin as an <img>
+retired/backend/__tests__/lib/security-headers.test.ts	security headers › omits HSTS outside production
+retired/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing › installs beforeSend/beforeBreadcrumb scrubbers
+retired/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing › sanitizes extras before attaching them to the scope
+retired/backend/__tests__/lib/session-client-metadata.test.ts	stripSessionClientMetadata › nulls IP address and user agent before a session is stored
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › allows 2606:4700:4700::1111
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › allows 8.8.8.8
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › allows 93.184.216.34
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › allows example.com
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 0.0.0.0
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 0.1.2.3
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 0177.0.0.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 0x7f000001
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 100.127.255.254
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 100.64.0.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 127.0.0.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 127.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 169.254.169.254
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 172.16.0.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 192.168.0.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 198.18.0.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 2001:0:4136:e378::1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 2001:db8::1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 2002:7f00:1::
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 2130706433
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 224.0.0.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 255.255.255.255
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks 64:ff9b::7f00:1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks ::
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks ::1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks ::127.0.0.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks ::ffff:127.0.0.1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks fc00::1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks fd12:3456::1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks fe80::1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks fe80::1%eth0
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks ff02::1
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks foo.localhost
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks localhost
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks metadata.google.internal
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › blocks printer.local
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	ssrf-host-policy › blocks metadata and private IPv4-mapped addresses
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	ssrf-host-policy › maps dotted IPv4-mapped IPv6 to IPv4
+retired/backend/__tests__/lib/ssrf-host-policy.test.ts	ssrf-host-policy › maps hex IPv4-mapped IPv6 to IPv4
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › accepts Stalwart auth responses that return client_code
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › creates an account using the authenticated admin account id
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › creates the Solace inbound-mail webhook and reloads settings
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › destroys a Stalwart account through the admin JMAP API
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › disables encryptOnAppend when encryption is already enabled with encryptOnAppend true
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › enables AES-256 encryption at rest with safe defaults
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › registers a public key for a target account
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › rejects mismatched createAccount responses from Stalwart
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › resolves a domain by name through the JMAP registry
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › reuses an existing remote account discovered through Account/query
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › reuses an existing remote account when Stalwart reports an email primary key violation
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › reuses and updates an existing public key when Stalwart rejects create
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › sends the backend gate key on admin calls when configured
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › treats destroy as successful when the account is already absent
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › updates an existing webhook by url and removes duplicates
+retired/backend/__tests__/lib/stalwart-admin.test.ts	StalwartAdminClient › updates the inline password credential without dropping other credentials
+retired/backend/__tests__/lib/stalwart-gate.test.ts	withStalwartGate › adds the key to https requests and keeps existing headers
+retired/backend/__tests__/lib/stalwart-gate.test.ts	withStalwartGate › never sends the key over plain http
+retired/backend/__tests__/lib/stalwart-gate.test.ts	withStalwartGate › only sends the key to a configured Stalwart origin
+retired/backend/__tests__/lib/stalwart-gate.test.ts	withStalwartGate › passes requests through untouched when no key is configured
+retired/backend/__tests__/lib/stalwart-gate.test.ts	withStalwartGate › replaces a caller-supplied gate header with the server key
+retired/backend/__tests__/lib/stalwart-jmap-mailer.test.ts	sendTransactionalEmailViaStalwart › discovers session, loads identity, and submits Email/set + EmailSubmission/set
+retired/backend/__tests__/lib/stalwart-jmap-mailer.test.ts	sendTransactionalEmailViaStalwart › fails closed when the identity is missing
+retired/backend/__tests__/lib/stalwart-jmap-mailer.test.ts	sendTransactionalEmailViaStalwart › sends the backend gate key on JMAP calls when configured
+retired/backend/__tests__/lib/stalwart-jmap-mailer.test.ts	stalwart-jmap-mailer helpers › picks drafts and identity case-insensitively
+retired/backend/__tests__/lib/stalwart-jmap-mailer.test.ts	stalwart-jmap-mailer helpers › preserves JMAP upload template braces after origin rewrite
+retired/backend/__tests__/lib/stalwart-jmap-mailer.test.ts	stalwart-jmap-mailer helpers › resolves upload templates including percent-encoded braces
+retired/backend/__tests__/lib/stalwart-jmap-mailer.test.ts	stalwart-jmap-mailer helpers › rewrites internal api hosts onto the public origin
+retired/backend/__tests__/lib/stalwart-mail-limits.test.ts	fetchStalwartMailServerLimits › reads Email and Jmap singleton limits from Stalwart
+retired/backend/__tests__/lib/stalwart-mail-limits.test.ts	fetchStalwartMailServerLimits › returns partial limits when singleton calls fail
+retired/backend/__tests__/lib/stalwart-mail-limits.test.ts	getStalwartMethodResult › returns the matching method response payload
+retired/backend/__tests__/lib/stalwart-reachability.test.ts	probeStalwartReachable › GETs the session without credentials and treats 200 as reachable
+retired/backend/__tests__/lib/stalwart-reachability.test.ts	probeStalwartReachable › does not follow redirects
+retired/backend/__tests__/lib/stalwart-reachability.test.ts	probeStalwartReachable › fails on a gate 404 so a missing or wrong key is visible
+retired/backend/__tests__/lib/stalwart-reachability.test.ts	probeStalwartReachable › fails on upstream 5xx
+retired/backend/__tests__/lib/stalwart-reachability.test.ts	probeStalwartReachable › fails when the connection errors
+retired/backend/__tests__/lib/stalwart-reachability.test.ts	probeStalwartReachable › sends the gate key to an https base
+retired/backend/__tests__/lib/stalwart-reachability.test.ts	probeStalwartReachable › treats an unauthenticated 401 as reachable
+retired/backend/__tests__/lib/stalwart-user-jmap.test.ts	StalwartUserJmapClient › calls JMAP with the mailbox owner's bearer, not an admin token
+retired/backend/__tests__/lib/stalwart-user-jmap.test.ts	StalwartUserJmapClient › invalidates the cached token and retries once on a 401
+retired/backend/__tests__/lib/stalwart-user-jmap.test.ts	StalwartUserJmapClient › sends the backend gate key when configured
+retired/backend/__tests__/lib/stalwart-user-jmap.test.ts	StalwartUserJmapClient › surfaces non-401 upstream failures
+retired/backend/__tests__/lib/stalwart-webhook-verify.test.ts	verifyStalwartWebhookSignature › accepts a valid HMAC signature
+retired/backend/__tests__/lib/stalwart-webhook-verify.test.ts	verifyStalwartWebhookSignature › rejects an invalid signature
+retired/backend/__tests__/lib/stalwart-webhook-verify.test.ts	verifyStalwartWebhookSignature › rejects missing headers and secrets
+retired/backend/__tests__/lib/stalwart-webhook-verify.test.ts	verifyStalwartWebhookSignature › rejects signatures with the wrong byte length
+retired/backend/__tests__/lib/stalwart-webhook.test.ts	isSolaceReminderMail › does not match other Message-IDs
+retired/backend/__tests__/lib/stalwart-webhook.test.ts	isSolaceReminderMail › matches noreply mail with a reminder Message-ID with or without angle brackets
+retired/backend/__tests__/lib/stalwart-webhook.test.ts	isSolaceReminderMail › rejects reminder Message-IDs that a third party can forge
+retired/backend/__tests__/lib/stalwart-webhook.test.ts	parseStalwartMailIngestEvents › ignores spam and jmap-append events
+retired/backend/__tests__/lib/stalwart-webhook.test.ts	parseStalwartMailIngestEvents › parses message-ingest.ham events with telemetry ids and recipients
+retired/backend/__tests__/lib/stalwart-webhook.test.ts	parseStalwartMailIngestEvents › parses structured from/to fields and message-id aliases
+retired/backend/__tests__/lib/stalwart-webhook.test.ts	parseStalwartMailIngestEvents › skips events without a document id
+retired/backend/__tests__/lib/time-constants.test.ts	time-constants › matches expected millisecond values
+retired/backend/__tests__/lib/user-setup.test.ts	ensureUserCalendars › creates the default calendars when a user has none
+retired/backend/__tests__/lib/user-setup.test.ts	ensureUserCalendars › does not create calendars when the user already has some
+retired/backend/__tests__/lib/user-setup.test.ts	ensureUserCalendars › logs and swallows setup failures
+retired/backend/__tests__/lib/validation.test.ts	validation helpers › rejects unknown keys in strict zod objects
+retired/backend/__tests__/routes/account-auth-status.test.ts	auth-status cookie propagation › forwards cookie clears from an unauthenticated status check
+retired/backend/__tests__/routes/account-auth-status.test.ts	auth-status cookie propagation › forwards every renewed cookie while checking passkey state
+retired/backend/__tests__/routes/account.test.ts	accountRoutes › checks public sign-up email availability
+retired/backend/__tests__/routes/account.test.ts	accountRoutes › deletes the authenticated account
+retired/backend/__tests__/routes/account.test.ts	accountRoutes › returns an uncached unauthenticated auth-status response
+retired/backend/__tests__/routes/account.test.ts	accountRoutes › returns the public signup config
+retired/backend/__tests__/routes/calendar-sharing.test.ts	calendarSharingRoutes › accepts POST /calendars/:id/share-link with regenerate=true
+retired/backend/__tests__/routes/calendar-sharing.test.ts	calendarSharingRoutes › accepts POST /calendars/:id/share-link without a JSON body
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts a valid 3-digit hex color
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts a valid 6-digit hex color
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'amber'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'blue'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'cyan'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'emerald'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'indigo'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'lime'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'orange'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'pink'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'red'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'rose'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'teal'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › accepts named color 'violet'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › includes all allowed colors in the error message
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › rejects invalid color '#12345'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › rejects invalid color '#GGG'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › rejects invalid color ''
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › rejects invalid color 'BLUE'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › rejects invalid color 'chartreuse'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › rejects invalid color 'navy'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › rejects invalid color 'rgb(0,0,0)'
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › POST /calendars – create › rejects unsupported encryptionState values
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts hex colors on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'amber' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'blue' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'cyan' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'emerald' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'indigo' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'lime' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'orange' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'pink' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'red' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'rose' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'teal' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › accepts named color 'violet' on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › allows update without color field
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › rejects invalid colors on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › PUT /calendars/:id – update › rejects updates to non-owned calendars (except visibility)
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › forceFullEncryption › backfills existing encrypted events when flipping false → true
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › forceFullEncryption › does not backfill when flag is unchanged or being turned off
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › forceFullEncryption › persists forceFullEncryption on POST /calendars
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – color validation › forceFullEncryption › persists forceFullEncryption on PUT /calendars/:id
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – encrypted names › rejects a plaintext name sent alongside an encrypted name on create
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – encrypted names › rejects a plaintext name sent alongside an encrypted name on update
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – encrypted names › rejects plaintext-only names for accounts with E2EE devices
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – encrypted names › requires a name or encrypted name on create
+retired/backend/__tests__/routes/calendars.test.ts	calendarsRoutes – encrypted names › stores an empty plaintext name when ciphertext is provided
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes – encrypted names › blanks the stored name when ciphertext is uploaded on update
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes – encrypted names › rejects a plaintext name sent alongside an encrypted name
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › creates a category with trimmed names
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › deletes a category after detaching orphaned events
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › lists active categories and exposes usageCount
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects delete requests for categories the user does not own
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects duplicate category names on create
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects invalid category colors
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects invalid colors and duplicate names during update
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects missing or inaccessible categories during update
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects missing required category fields
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects unexpected category fields
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › rejects unsupported encryptionState values
+retired/backend/__tests__/routes/categories.test.ts	categoriesRoutes › updates a category after checking ownership and duplicate names
+retired/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › rejects unexpected device fields
+retired/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › returns bootstrap metadata for the authenticated user
+retired/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › returns raw records for password reset re-encryption
+retired/backend/__tests__/routes/e2ee.test.ts	e2eeRoutes › upserts a device registration with trimmed values
+retired/backend/__tests__/routes/events-query.test.ts	eventsRoutes query coercion › accepts string limit and offset on /events/search
+retired/backend/__tests__/routes/events-query.test.ts	eventsRoutes query coercion › accepts syncRemote=false on invitation lookup
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts empty plaintext fields alongside ciphertext
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts event without color (null)
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'amber'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'blue'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'cyan'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'emerald'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'indigo'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'lime'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'orange'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'pink'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'red'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'rose'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'teal'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts named color 'violet'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts participants and syncs them through the event API
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › accepts valid hex color
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › authenticates requests through requireAuth
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › includes all allowed colors in error message
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › persists encrypted shadow fields when provided on create
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects client-controlled encryptionState on create
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects invalid color '#12345'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects invalid color '#GGGGGG'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects invalid color 'BLUE'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects invalid color 'chartreuse'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects invalid color 'rgb(0,0,0)'
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects invalid participant email addresses
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects invitation content without participants
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects object-shaped participant email (query operator injection)
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects object-shaped scalar fields (query operator injection)
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects owned-calendar event creation without encrypted content
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects plaintext content sent alongside ciphertext ({ description: 'Secret notes' })
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects plaintext content sent alongside ciphertext ({ location: 'Secret place' })
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects plaintext content sent alongside ciphertext ({ title: 'Secret title' })
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › rejects plaintext content sent alongside ciphertext on update
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › stores encrypted events ciphertext-only even when reminders are enabled
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › POST /events – create › strictly rejects admin@solace.onl and reserved system addresses in participants
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › PUT /events/:id – update › accepts valid hex color on update
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › PUT /events/:id – update › accepts valid named color on update
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › PUT /events/:id – update › persists encrypted shadow fields on update
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › PUT /events/:id – update › rejects client-controlled encryptionState on update
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › PUT /events/:id – update › rejects invalid color on update
+retired/backend/__tests__/routes/events.test.ts	eventsRoutes – color validation › PUT /events/:id – update › rejects object-shaped participant email on update (query operator injection)
+retired/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › accepts passwordless mailbox bootstrap payloads
+retired/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › bootstraps a mailbox for the authenticated Solace account
+retired/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › rejects unexpected fields when bootstrapping an authenticated mailbox
+retired/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › rejects unexpected fields when updating the authenticated vault backup
+retired/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › returns mailbox status for the authenticated Solace account
+retired/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › returns the authenticated user's encrypted vault backup
+retired/backend/__tests__/routes/mail-account.test.ts	mailAccountRoutes › updates the authenticated user's encrypted vault backup
+retired/backend/__tests__/routes/mail-routes.test.ts	mailRoutes passkey step-up › blocks the mail token when passkey step-up is required
+retired/backend/__tests__/routes/mail-routes.test.ts	mailRoutes passkey step-up › returns a mail token when passkey step-up is satisfied
+retired/backend/__tests__/routes/mail-settings.test.ts	mailSettingsRoutes › returns encrypted mail settings
+retired/backend/__tests__/routes/mail-settings.test.ts	mailSettingsRoutes › returns null when no mail settings exist
+retired/backend/__tests__/routes/mail-settings.test.ts	mailSettingsRoutes › upserts encrypted mail settings
+retired/backend/__tests__/routes/mail-sync.test.ts	mailSyncRoutes › syncs mail changes for the authenticated user and requested account
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › does not invalidate the token cache when falling back from client Bearer
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › exchanges the authenticated session for a backend-issued mail token
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › follows same-origin JMAP discovery redirects server-side
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › forwards client Bearer when a session cookie is also present
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › forwards client Bearer when no session cookie is present
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › forwards proxy query strings and response cache headers for blob downloads
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › mints a session mail token when the proxy request has no Bearer
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › preserves binary upload bodies when proxying JMAP attachments
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › proxies JMAP discovery through the backend
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › proxies JMAP method calls through the backend
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › rate-limits the JMAP proxy per client IP
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › rejects Basic credentials instead of relaying them to Stalwart
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › rejects path traversal attempts on nested JMAP proxy routes
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › rejects proxied JMAP calls without mailbox credentials
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › returns a 404 envelope when no internal key exists
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › returns a 503 error when the proxied JMAP upstream is unreachable
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › returns a backend token error when the mail bridge rejects the session
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › returns internal recipient keys for compose encryption
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › returns public mail configuration
+retired/backend/__tests__/routes/mail.test.ts	mailRoutes › sends only the server gate key upstream and never returns it
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › allows reminders on encrypted events when the calendar forces full encryption
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › creates valid notifications and skips disabled or past schedules
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › deletes notifications for owned events and no-ops for recurring instances
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › enforces the update rate limit
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › rejects duplicate notification configurations
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › rejects unexpected notification fields
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › returns a no-op success when updating a recurring instance
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › returns empty notifications for synced events
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › returns mapped notification rows for owned events
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › returns no notifications for recurring instance ids
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › skips updates when the event is already in the past
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › surfaces not-found and database failures during reads
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › surfaces unexpected delete failures
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › surfaces unexpected update failures
+retired/backend/__tests__/routes/notifications.test.ts	notificationsRoutes › updates the reminder field on fully encrypted events
+retired/backend/__tests__/routes/profiles.test.ts	profilesRoutes › rejects oversized lookup batches
+retired/backend/__tests__/routes/profiles.test.ts	profilesRoutes › returns 404 when no avatar exists for the requested email
+retired/backend/__tests__/routes/profiles.test.ts	profilesRoutes › returns avatar proxy paths for matching Solace users
+retired/backend/__tests__/routes/realtime-mail.test.ts	realtimeMailRoutes › streams keepalives and avoids per-client polling work
+retired/backend/__tests__/routes/recent-contacts.test.ts	recentContactsRoutes › returns encrypted recent contacts
+retired/backend/__tests__/routes/recent-contacts.test.ts	recentContactsRoutes › returns null when no recent contacts exist
+retired/backend/__tests__/routes/recent-contacts.test.ts	recentContactsRoutes › upserts encrypted recent contacts
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › creates default settings when none exist yet
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › deletes a user's settings on reset
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › disables calendar sharing when full event encryption is enabled
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects a default calendar that does not belong to the user
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects a non-owned default calendar
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects invalid timezones during update
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects inverted working hours
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects malformed working days JSON
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects working days outside the allowed weekday range
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › returns existing user settings
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › upserts valid settings updates
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › accepts signed message-ingest.ham payloads
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › rejects invalid JSON bodies
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › rejects invalid payload shapes
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › rejects oversized bodies
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › rejects requests with an invalid signature
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › rejects unsigned webhook requests
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › returns 503 when the webhook secret is not configured
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › returns ignoredCount from the webhook service
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › with the real webhook service › queues exactly one new_mail job when only regular mail is in a mixed batch
+retired/backend/__tests__/routes/stalwart-webhook.test.ts	stalwartWebhookRoutes › with the real webhook service › queues no new_mail job for a Solace reminder mail
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'amber'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'blue'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'cyan'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'emerald'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'indigo'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'lime'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'orange'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'pink'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'red'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'rose'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'teal'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts named color 'violet'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts valid 3-digit hex color
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › accepts valid hex color
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › allows update without color field
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › includes all allowed colors in error message
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color '#12345'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color '#GGG'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color 'BLUE'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color 'chartreuse'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color 'navy'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects invalid color 'rgb(0,0,0)'
+retired/backend/__tests__/routes/subscriptions.test.ts	subscriptionsRoute – color validation › PUT /subscriptions/:id – update › rejects update for non-existent subscription
+retired/backend/__tests__/services/account.service.test.ts	AccountService › deletes non-cascading user references before removing the user
+retired/backend/__tests__/services/account.service.test.ts	AccountService › does not delete the Solace user when linked mailbox removal fails
+retired/backend/__tests__/services/account.service.test.ts	AccountService › does not discard the account when deleting its avatar fails
+retired/backend/__tests__/services/account.service.test.ts	AccountService › fails when the account no longer exists
+retired/backend/__tests__/services/account.service.test.ts	AccountService › rejects invalid sign-up handles without querying the database
+retired/backend/__tests__/services/account.service.test.ts	AccountService › reports the address as unavailable when an account already exists
+retired/backend/__tests__/services/account.service.test.ts	AccountService › returns availability details for a valid unused sign-up handle
+retired/backend/__tests__/services/account.service.test.ts	AccountService › returns the configured signup domain
+retired/backend/__tests__/services/account.service.test.ts	AccountService › strictly rejects reserved handles like admin and alert without querying the database
+retired/backend/__tests__/services/calendar-sharing.service.test.ts	CalendarSharingService.disableShareLink › disables sharing and re-encrypts shadow-write events
+retired/backend/__tests__/services/calendar-sharing.service.test.ts	CalendarSharingService.disableShareLink › rejects disabling sharing for synced calendars
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › allows visibility-only updates on subscribed calendars
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › backfills encrypted events when forceFullEncryption is enabled
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › blanks the plaintext name when a backfill uploads ciphertext
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › creates encrypted calendars without persisting the plaintext name
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › lists local calendars without syncing remote Stalwart calendars
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › never promotes the staging calendar when deleting the default
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › normalizes plaintext names for accounts without E2EE
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › prevents deleting the last editable calendar
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › refuses to make the invitations staging calendar the default
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › refuses to move events into the invitations staging calendar
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › rejects plaintext names once the account has an E2EE device
+retired/backend/__tests__/services/calendar.service.test.ts	CalendarService › rejects plaintext names sent alongside ciphertext
+retired/backend/__tests__/services/category.service.test.ts	CategoryService › creates encrypted categories without persisting the plaintext name
+retired/backend/__tests__/services/category.service.test.ts	CategoryService › detaches linked events before deleting a category
+retired/backend/__tests__/services/category.service.test.ts	CategoryService › normalizes plaintext names for accounts without E2EE
+retired/backend/__tests__/services/category.service.test.ts	CategoryService › rejects duplicate names during update
+retired/backend/__tests__/services/category.service.test.ts	CategoryService › rejects invalid category names:   
+retired/backend/__tests__/services/category.service.test.ts	CategoryService › rejects invalid category names: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+retired/backend/__tests__/services/category.service.test.ts	CategoryService › rejects invalid colors during update
+retired/backend/__tests__/services/category.service.test.ts	CategoryService › rejects plaintext names sent alongside ciphertext
+retired/backend/__tests__/services/e2ee.service.test.ts	E2eeService › includes the password envelope in bootstrap responses
+retired/backend/__tests__/services/e2ee.service.test.ts	E2eeService › parses blind-index tokens from bootstrap rows and falls back to empty arrays
+retired/backend/__tests__/services/e2ee.service.test.ts	E2eeService › rejects invalid key versions before writing to prisma
+retired/backend/__tests__/services/e2ee.service.test.ts	E2eeService › rejects weak password KDF settings before writing to prisma
+retired/backend/__tests__/services/e2ee.service.test.ts	E2eeService › returns reset snapshot records for writable encrypted items
+retired/backend/__tests__/services/e2ee.service.test.ts	E2eeService › trims and defaults device registration fields on upsert
+retired/backend/__tests__/services/e2ee.service.test.ts	E2eeService › trims and defaults password envelope fields on upsert
+retired/backend/__tests__/services/encrypted-ics-import.test.ts	encrypted ICS import › links an imported override to its series and suppresses the original occurrence
+retired/backend/__tests__/services/encrypted-ics-import.test.ts	encrypted ICS import › rejects inaccessible calendars before creating events
+retired/backend/__tests__/services/encrypted-ics-import.test.ts	encrypted ICS import › rejects plaintext alongside encrypted events and keeps legacy clients compatible
+retired/backend/__tests__/services/encrypted-ics-import.test.ts	encrypted ICS import › skips duplicates without overwriting existing events
+retired/backend/__tests__/services/encrypted-ics-import.test.ts	encrypted ICS import › stores only ciphertext and scopes deduplication by owner and calendar
+retired/backend/__tests__/services/event-participant.service.test.ts	EventParticipantService › adds the organizer, upserts attendees, and sends invitation mail for new invitees
+retired/backend/__tests__/services/event-participant.service.test.ts	EventParticipantService › deletes stale participants when an event is updated to an empty attendee list
+retired/backend/__tests__/services/event-participant.service.test.ts	EventParticipantService › links @solace.onl participants via mail directory and sends to the same address
+retired/backend/__tests__/services/event-participant.service.test.ts	EventParticipantService › purges reserved system emails like admin@solace.onl from existing participants
+retired/backend/__tests__/services/event-participant.service.test.ts	EventParticipantService › removes participants that are no longer in the updated list
+retired/backend/__tests__/services/event.service.test.ts	EventService.list › expands split series and returns detached occurrences only once
+retired/backend/__tests__/services/event.service.test.ts	EventService.list › hides declined invite copies from the calendar results
+retired/backend/__tests__/services/event.service.test.ts	EventService.search › does not keep plaintext match-all clauses when the trimmed query is blank
+retired/backend/__tests__/services/event.service.test.ts	EventService.search › loads participants only for events owned by the searching user
+retired/backend/__tests__/services/event.service.test.ts	EventService.searchCorpus › filters declined attendee copies before pagination
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › approves nobody when there is no invite to accept
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › approves the account for a mailbox when its invite is accepted
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › claims a pending invite successfully
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › refuses to claim an invite for an email that already has an account
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › refuses to claim an invite that has already been claimed
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › refuses to claim when a concurrent claim wins the race
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › rejects creating a duplicate active invite for the same sender and email
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › rejects creating an invite when the email already belongs to an account
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › strictly rejects claiming an invite with admin@solace.onl or reserved system emails
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › strictly rejects creating an invite for admin@solace.onl or reserved system emails
+retired/backend/__tests__/services/invite.service.test.ts	InviteService › strictly rejects signup check for admin@solace.onl or reserved system emails
+retired/backend/__tests__/services/mail-calendar-ingestion.service.test.ts	MailCalendarIngestionService › declines mailed invitations and records a hidden declined tombstone
+retired/backend/__tests__/services/mail-calendar-ingestion.service.test.ts	MailCalendarIngestionService › does not mirror pending ghost invitations into Stalwart until accepted
+retired/backend/__tests__/services/mail-calendar-ingestion.service.test.ts	MailCalendarIngestionService › imports accepted invitations onto the user's default calendar
+retired/backend/__tests__/services/mail-calendar-ingestion.service.test.ts	MailCalendarIngestionService › mirrors accepted invitations into Stalwart with scheduling messages
+retired/backend/__tests__/services/mail-calendar-ingestion.service.test.ts	MailCalendarIngestionService › stages new REQUEST invitations as pending ghost events during background mail sync
+retired/backend/__tests__/services/mail-calendar-ingestion.service.test.ts	MailCalendarIngestionService › still processes CANCEL messages during background mail sync
+retired/backend/__tests__/services/mail-calendar-ingestion.service.test.ts	MailCalendarIngestionService › stores client-encrypted invitation payloads during import
+retired/backend/__tests__/services/mail-calendar-ingestion.service.test.ts	MailCalendarIngestionService › updates matching existing events instead of duplicating them
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › aborts active EventSource listeners when stopped
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › coalesces rapid account changes into one synced event for all subscribers
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › does not replace an inbound snapshot with a later empty re-sync payload
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › live-syncs EventSource changes and publishes a coalesced snapshot
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › live-syncs when EventSource arrives first, then keeps a later inbound snapshot
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › merges inbound created emails from overlapping receipt-time snapshots
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › normalizes JMAP state changes into minimal mail.changed events
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › opens one owner-authorized EventSource per subscribed account
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › polls changed accounts and publishes receipt-time snapshots
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › polls linked accounts and publishes fetched sync payloads for receipt-time mail
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › publishes events only to subscribers authorized for the account
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › runs one follow-up flush when changes arrive during an active sync
+retired/backend/__tests__/services/mail-realtime.service.test.ts	mail realtime service › sends the backend gate key on the EventSource when configured
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › forces a full sync when Email/changes cannot be calculated
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › imports recent calendar invites when establishing the initial sync state
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › lists the single authorized account id for a user via the unique mailbox link
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › passes changed email records through the calendar ICS ingestion hook
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › resolves ingested telemetry document ids via RFC Message-ID
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › resolves ingested telemetry document ids via recent sender match
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › retries Email/get without bodies when the full fetch fails
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › returns Message-IDs from the direct document lookup
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › returns Message-IDs when resolving by subject search
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › returns an empty Message-ID list when the email has none
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › reuses cached mailbox authorization and sync state during repeat change detection
+retired/backend/__tests__/services/mail-sync.service.test.ts	MailSyncService › syncs all known linked mail accounts for receipt-time calendar ingestion
+retired/backend/__tests__/services/mail.service.test.ts	MailService › attaches an existing mailbox record to the authenticated user when the email matches
+retired/backend/__tests__/services/mail.service.test.ts	MailService › caches successful Stalwart config fetches between getConfig calls
+retired/backend/__tests__/services/mail.service.test.ts	MailService › cleans up orphaned Stalwart accounts when directory persistence fails
+retired/backend/__tests__/services/mail.service.test.ts	MailService › deletes the linked Stalwart account and directory entry for a user
+retired/backend/__tests__/services/mail.service.test.ts	MailService › does not cache a failed Stalwart config fetch
+retired/backend/__tests__/services/mail.service.test.ts	MailService › does not delete adopted Stalwart accounts when persistence fails
+retired/backend/__tests__/services/mail.service.test.ts	MailService › does not reset the Stalwart bridge password on subsequent token mints
+retired/backend/__tests__/services/mail.service.test.ts	MailService › fails mailbox deletion when Stalwart account removal fails
+retired/backend/__tests__/services/mail.service.test.ts	MailService › falls back to Stalwart when the directory entry is missing locally
+retired/backend/__tests__/services/mail.service.test.ts	MailService › issues a Stalwart-local access token for a provisioned mailbox
+retired/backend/__tests__/services/mail.service.test.ts	MailService › no-ops mailbox deletion when the user has no linked mailbox
+retired/backend/__tests__/services/mail.service.test.ts	MailService › provisions a mailbox for an authenticated Solace account and links it to the user
+retired/backend/__tests__/services/mail.service.test.ts	MailService › refuses to provision a mailbox for an unapproved account
+retired/backend/__tests__/services/mail.service.test.ts	MailService › refuses to provision a mailbox the server could still open
+retired/backend/__tests__/services/mail.service.test.ts	MailService › reissues a mail access token after cache invalidation
+retired/backend/__tests__/services/mail.service.test.ts	MailService › rejects a mismatched fingerprint before provisioning the account
+retired/backend/__tests__/services/mail.service.test.ts	MailService › rejects bootstrapping when the authenticated user already has a linked mailbox
+retired/backend/__tests__/services/mail.service.test.ts	MailService › rejects linking a mailbox that already belongs to another Solace account
+retired/backend/__tests__/services/mail.service.test.ts	MailService › rejects stale-entry repair when the reused mailbox is already linked to another Solace account
+retired/backend/__tests__/services/mail.service.test.ts	MailService › repairs a stale directory entry when a reused Stalwart account id points at a different old mailbox
+retired/backend/__tests__/services/mail.service.test.ts	MailService › repairs an incomplete linked mailbox instead of rejecting bootstrap
+retired/backend/__tests__/services/mail.service.test.ts	MailService › returns a cached mail access token without reissuing
+retired/backend/__tests__/services/mail.service.test.ts	MailService › returns a public key directory entry for internal encrypted sends
+retired/backend/__tests__/services/mail.service.test.ts	MailService › returns an unprovisioned mailbox status for a new authenticated account
+retired/backend/__tests__/services/mail.service.test.ts	MailService › returns public configuration for the mail demo
+retired/backend/__tests__/services/mail.service.test.ts	MailService › reuses an existing directory entry when the provisioned Stalwart account already exists
+retired/backend/__tests__/services/mail.service.test.ts	MailService › sets the bridge password only when Stalwart login is rejected
+retired/backend/__tests__/services/mail.service.test.ts	MailService › surfaces stale Stalwart mailbox conflicts without a generic 500
+retired/backend/__tests__/services/mail.service.test.ts	MailService › throws when a vault backup is requested for an unlinked mailbox
+retired/backend/__tests__/services/mail.service.test.ts	MailService › upserts encrypted vault backups and keeps the seal when an update omits it
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › allows email reminders on ciphertext-only encrypted events
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › clears the reminder field when all notifications are deleted
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › clears the reminder field when only non-email notifications remain
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › never derives a reminder title from the event row
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › preserves the stored ciphertext when the client omits it
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › stores the earliest enabled email reminder on the event row
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › stores the reminder title ciphertext when the client provides one
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › uses the earliest remaining reminder when multiple email reminders are enabled
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › wraps deleteForEvent writes in a prisma transaction
+retired/backend/__tests__/services/notification.service.test.ts	NotificationService reminder field updates › wraps setForEvent writes in a prisma transaction
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › cleans an interrupted upload before storing another picture
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › cleans partial uploads without touching the current picture
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › cleans the replacement after a commit failure
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › keeps the current objects when removal fails to commit
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › keeps the current picture until the replacement commits
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › keeps the old picture when validation rejects the replacement
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › preserves the current picture when the database update fails
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › remembers failed upload cleanup without masking the upload error
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › removes the reference before deleting objects and retries failed cleanup
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › retains failed cleanup and refuses a third photo until cleanup succeeds
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › serializes competing uploads without leaving extra pictures
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › avatar changes › uploads the first picture without leaving a pending slot
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › refuses to stream uploaded avatars that no account references
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › returns an empty list when no emails are usable
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › returns null when a referenced variant is missing from storage
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › returns null when the avatar host is blocked by the SSRF policy
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › returns opaque uploaded-avatar paths for users with a stored picture
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › returns same-origin avatar proxy paths for matching Solace users
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › serves the smallest stored variant that covers the requested size
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › streams avatar bytes for a known Solace user
+retired/backend/__tests__/services/profile.service.test.ts	ProfileService › streams uploaded avatars from storage instead of the network
+retired/backend/__tests__/services/push-device.service.test.ts	PushDeviceService › does not overwrite a learned APNs environment on token refresh
+retired/backend/__tests__/services/push-device.service.test.ts	PushDeviceService › enqueues a test push with opaque refs only
+retired/backend/__tests__/services/push-device.service.test.ts	PushDeviceService › lists enabled devices without tokens
+retired/backend/__tests__/services/push-device.service.test.ts	PushDeviceService › reassigns a token that belonged to another user
+retired/backend/__tests__/services/push-device.service.test.ts	PushDeviceService › rejects a test push when app notifications are off or no device exists
+retired/backend/__tests__/services/push-device.service.test.ts	PushDeviceService › unregisters one token or all devices
+retired/backend/__tests__/services/push-device.service.test.ts	PushDeviceService › upserts a hashed token without logging the raw value
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › clears the series category without an ownership lookup
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › copies inherited attendees to a detached occurrence without resending invitations
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › deletes the whole series including child instances and exceptions
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › does not regenerate the original anchor when the series is split at its first occurrence
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › marks existing occurrence exceptions as deleted when removing one occurrence
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › preserves duration from the updated start when splitting future occurrences
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › rejects invalid preview requests with a validation error
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › rejects recurring edits that assign another user's category
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › rejects recurring edits that move the series to another user's calendar
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › saves and invites attendees for all
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › saves and invites attendees for this_and_future
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › saves and invites attendees for this_only
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › suppresses modified occurrence 2026-05-05T09:00:00.000Z
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › suppresses modified occurrence 2026-05-12T09:00:00.000Z
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › uses the occurrence date as the default range for this_only edits
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › uses transient content for invitations without persisting it
+retired/backend/__tests__/services/recurring.service.test.ts	RecurringService › validates recurrence objects and returns their description
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › creates default settings when a user has none
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › disables calendar sharing and backfills shared calendars when switching to full encryption
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › rejects invalid timezone identifiers
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › rejects non-owned calendars as the default calendar
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › rejects the invitations staging calendar as the default calendar
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › Solace reminder mail › does not treat a Message-ID that only contains the prefix as a reminder
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › Solace reminder mail › pushes regular mail but not reminder mail in the same webhook batch
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › Solace reminder mail › recognizes the reminder Message-ID under the message-id alias key
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › Solace reminder mail › skips when any of the resolved Message-IDs is a reminder
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › Solace reminder mail › still pushes a spoofed reminder Message-ID from a foreign Message-ID domain
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › Solace reminder mail › still pushes a spoofed reminder Message-ID from an external sender
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › Solace reminder mail › still pushes when only a heuristic lookup matched a reminder
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › Solace reminder mail › still pushes when the JMAP lookup fails and the payload has no Message-ID
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › Solace reminder mail › still pushes when the JMAP lookup finds nothing
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › reports ignored non-ham events
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › resolves linked mailboxes by recipient email when telemetry accountId differs
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › skips the mail push for Solace reminder mail identified by the payload Message-ID
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › skips the mail push when the resolved email carries a Solace reminder Message-ID
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › skips unlinked accounts without enqueueing push jobs
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › still pushes other mail from the noreply sender
+retired/backend/__tests__/services/stalwart-webhook.service.test.ts	StalwartWebhookService › uses telemetry document ids when JMAP resolution is unavailable
+retired/backend/__tests__/services/subscription.service.test.ts	SubscriptionService › delete › deletes synced events and the sync-only calendar when deleteEvents is true
+retired/backend/__tests__/services/subscription.service.test.ts	SubscriptionService › delete › keeps events and converts the calendar when deleteEvents is false
+retired/backend/__tests__/services/subscription.service.test.ts	SubscriptionService › rejects redirects to private networks when creating subscriptions
+retired/backend/__tests__/services/subscription.service.test.ts	SubscriptionService › times out sync requests and records the error

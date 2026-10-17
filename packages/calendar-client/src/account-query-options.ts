@@ -7,7 +7,7 @@ import {
   PUSH_DEVICES_QUERY_KEY,
 } from "@workspace/calendar-core";
 import type { CalendarApiService } from "./calendar-api-service";
-import type { CreateInviteResponse, InviteApiService } from "./invite-api-service";
+import type { InviteApiService, InviteRecord } from "./invite-api-service";
 
 export type InviteFeedback = {
   tone: "success" | "warning" | "error";
@@ -32,7 +32,7 @@ export function createInviteMutationOptions(
 ) {
   return {
     mutationFn: (emailAddress: string) => api.createInvite(emailAddress),
-    onSuccess: (data: CreateInviteResponse, emailAddress: string) => {
+    onSuccess: (data: InviteRecord, emailAddress: string) => {
       input.onCreated();
       input.onFeedback(getInviteCreateFeedback(emailAddress, data));
       return invalidateInvites();

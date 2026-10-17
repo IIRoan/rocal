@@ -1,6 +1,6 @@
 import { type Rule, matchLines, sourceUnder } from "./engine";
 
-const COMMENTED_SOURCE = sourceUnder(["apps/", "packages/", "scripts/"], /\.(tsx?|go)$/);
+const COMMENTED_SOURCE = sourceUnder(["apps/", "packages/", "retired/", "scripts/"], /\.(tsx?|go)$/);
 
 const CODE_LINE =
   /^(import\s.+\sfrom\s|export\s+(const|function|default|class|type|interface)\s|(const|let|var)\s+[\w{[]+.*=|return\b.*;$|await\s+[\w.]+\(|if\s*\(.*\)\s*\{|\}\s*else\b|for\s*\(.*\)\s*\{|[\w$.]+\(.*\);$|<\/?[A-Z]\w*[\s/>]|\w+\s*:=\s*)/;
@@ -31,7 +31,7 @@ export const commentRules: Rule[] = [
       ),
     ],
     examples: {
-      path: "apps/backend/lib/example.ts",
+      path: "retired/backend/lib/example.ts",
       bad: ["/**\n * Loads a user.\n */\nexport function load() {}", "/* first\n   second */\nconst a = 1;", "// Loads the vault from\n// the offline store.\nexport {};"],
       good: ["/** Loads a user. */\nexport function load() {}", "// First standalone note.\n// Second standalone note.\nconst a = 1;", "// Keep the memo\n// eslint-disable-next-line no-console\nexport {};"],
     },

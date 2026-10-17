@@ -1,0 +1,26 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"aaaaaaaaaa888se1rr0b24sm4p@google.com","sourceUid":"aaaaaaaaaa888se1rr0b24sm4p@google.com","title":"TEST RECURR 3","start":"2026-02-10T17:00:00.000Z","end":"2026-02-10T17:30:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"count":3,"timezone":"America/Denver"},"timezone":"America/Denver","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"America/Denver\"}"},
+      {"uid":"aaaaaaaaaa888se1rr0b24sm4p@google.com::RECURRENCE::2026-02-11T17:00:00.000Z","sourceUid":"aaaaaaaaaa888se1rr0b24sm4p@google.com","recurrenceId":"2026-02-11T17:00:00.000Z","title":"TEST RECURR 3 - MODIFIED","start":"2026-02-11T17:30:00.000Z","end":"2026-02-11T18:00:00.000Z","allDay":false,"timezone":"America/Denver"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"aaaaaaaaaa888se1rr0b24sm4p@google.com","sourceUid":"aaaaaaaaaa888se1rr0b24sm4p@google.com","title":"TEST RECURR 3","start":"2026-02-10T17:00:00.000Z","end":"2026-02-10T17:30:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"count":3,"timezone":"America/Denver"},"timezone":"America/Denver","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"America/Denver\"}"},
+      {"uid":"aaaaaaaaaa888se1rr0b24sm4p@google.com::RECURRENCE::2026-02-11T17:00:00.000Z","sourceUid":"aaaaaaaaaa888se1rr0b24sm4p@google.com","recurrenceId":"2026-02-11T17:00:00.000Z","title":"TEST RECURR 3 - MODIFIED","start":"2026-02-11T17:30:00.000Z","end":"2026-02-11T18:00:00.000Z","allDay":false,"timezone":"America/Denver"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"aaaaaaaaaa888se1rr0b24sm4p@google.com","sourceUid":"aaaaaaaaaa888se1rr0b24sm4p@google.com","title":"TEST RECURR 3","start":"2026-02-10T17:00:00.000Z","end":"2026-02-10T17:30:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"count":3,"timezone":"America/Denver"},"timezone":"America/Denver","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":3,\"timezone\":\"America/Denver\"}"},
+      {"uid":"aaaaaaaaaa888se1rr0b24sm4p@google.com::RECURRENCE::2026-02-11T17:00:00.000Z","sourceUid":"aaaaaaaaaa888se1rr0b24sm4p@google.com","recurrenceId":"2026-02-11T17:00:00.000Z","title":"TEST RECURR 3 - MODIFIED","start":"2026-02-11T17:30:00.000Z","end":"2026-02-11T18:00:00.000Z","allDay":false,"timezone":"America/Denver"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

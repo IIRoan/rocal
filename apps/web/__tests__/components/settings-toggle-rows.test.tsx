@@ -105,8 +105,8 @@ describe("settings toggle rows", () => {
             bundleId: SOLACE_CALENDAR_IOS_BUNDLE_ID,
             environment: "production",
             isEnabled: true,
-            lastSeenAt: "2026-08-26T10:00:00.000Z",
-            createdAt: "2026-08-01T10:00:00.000Z",
+            lastSeenAt: new Date("2026-08-26T10:00:00.000Z"),
+            createdAt: new Date("2026-08-01T10:00:00.000Z"),
           },
         ]}
         devicesLoading={false}
@@ -146,8 +146,8 @@ describe("settings toggle rows", () => {
             bundleId: SOLACE_CALENDAR_IOS_BUNDLE_ID,
             environment: "production",
             isEnabled: true,
-            lastSeenAt: "2026-08-26T10:00:00.000Z",
-            createdAt: "2026-08-01T10:00:00.000Z",
+            lastSeenAt: new Date("2026-08-26T10:00:00.000Z"),
+            createdAt: new Date("2026-08-01T10:00:00.000Z"),
           },
         ]}
         devicesLoading={true}

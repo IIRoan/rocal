@@ -1,0 +1,94 @@
+{
+  "dtstamp": "2026-10-14T12:34:56.789Z",
+  "cases": [
+    {
+      "name": "participants-sorted-by-name",
+      "calendar": { "name": "Work", "timezone": "Europe/Amsterdam", "method": "REQUEST" },
+      "event": {
+        "id": "event-participants",
+        "externalId": null,
+        "title": "Quarterly planning",
+        "description": "Bring numbers",
+        "start": "2026-11-02T09:00:00.000Z",
+        "end": "2026-11-02T10:30:00.000Z",
+        "allDay": false,
+        "timezone": "Europe/Amsterdam",
+        "location": "Room 4.12",
+        "recurrence": null,
+        "createdAt": "2026-10-01T08:00:00.000Z",
+        "updatedAt": "2026-10-02T09:15:00.123Z",
+        "participants": [
+          { "id": "p-01", "email": "zoe@example.com", "displayName": "Zoë", "role": "attendee", "status": "accepted", "user": null },
+          { "id": "p-02", "email": "ALICE@Example.com", "displayName": "alice", "role": "attendee", "status": "pending", "user": null },
+          { "id": "p-03", "email": "bob@example.com", "displayName": "Bob", "role": "attendee", "status": "unknown", "user": null },
+          { "id": "p-04", "email": "emile@example.com", "displayName": "Émile", "role": "attendee", "status": "tentative", "user": null },
+          { "id": "p-05", "email": "under@example.com", "displayName": "_under", "role": "attendee", "status": "declined", "user": null },
+          { "id": "p-06", "email": "digit@example.com", "displayName": "1st Name", "role": "attendee", "status": "pending", "user": null },
+          { "id": "p-07", "email": "owner@example.com", "displayName": null, "role": "organizer", "status": "declined", "user": { "email": "owner@example.com", "name": "  Owen Owner  " } },
+          { "id": "p-08", "email": "", "displayName": null, "role": "attendee", "status": "accepted", "user": { "email": "Linked@Example.com", "name": null } },
+          { "id": "p-09", "email": "space@example.com", "displayName": "  ", "role": "attendee", "status": "pending", "user": null },
+          { "id": "p-10", "email": "anna@example.com", "displayName": "anna", "role": "attendee", "status": "accepted", "user": null },
+          { "id": "p-11", "email": "Anna2@example.com", "displayName": "Anna", "role": "chair", "status": "accepted", "user": null },
+          { "id": "p-12", "email": "co-owner@example.com", "displayName": "Co Owner", "role": "organizer", "status": "accepted", "user": null }
+        ]
+      }
+    },
+    {
+      "name": "recurring-with-external-id",
+      "calendar": { "name": "Imported", "timezone": "UTC" },
+      "event": {
+        "id": "event-recurring",
+        "externalId": "abc-123@google.com",
+        "title": "Weekly sync",
+        "description": null,
+        "start": "2024-02-01T10:00:00.000Z",
+        "end": "2024-02-01T11:00:00.000Z",
+        "allDay": false,
+        "timezone": "UTC",
+        "location": null,
+        "recurrence": "{\"frequency\":\"weekly\",\"interval\":2,\"count\":5,\"until\":\"2024-03-01T00:00:00.000Z\",\"timezone\":\"UTC\",\"byWeekDay\":[1,3],\"byMonthDay\":[1],\"byMonth\":[2]}",
+        "createdAt": "2024-01-01T08:00:00.000Z",
+        "updatedAt": "2024-01-02T09:00:00.000Z",
+        "participants": []
+      }
+    },
+    {
+      "name": "all-day-with-loose-rule",
+      "calendar": { "name": "Family", "timezone": "America/Los_Angeles" },
+      "event": {
+        "id": "event-all-day",
+        "externalId": "",
+        "title": "Birthday",
+        "description": "Cake;\nCandles, gifts",
+        "start": "2024-07-04T07:00:00.000Z",
+        "end": "2024-07-05T06:59:59.999Z",
+        "allDay": true,
+        "timezone": "America/Los_Angeles",
+        "location": "",
+        "recurrence": "{\"frequency\":\"yearly\",\"interval\":1,\"count\":2.7,\"byWeekDay\":[1.5,2,9],\"byMonth\":[7,7],\"extra\":true}",
+        "createdAt": "2024-01-01T08:00:00.000Z",
+        "updatedAt": "2024-01-02T09:00:00.000Z",
+        "participants": []
+      }
+    },
+    {
+      "name": "invalid-rules-dropped",
+      "calendar": { "name": "Odd" },
+      "event": {
+        "id": "event-odd",
+        "externalId": null,
+        "title": "Odd rules",
+        "description": null,
+        "start": "2024-02-01T10:00:00.000Z",
+        "end": "2024-02-01T11:00:00.000Z",
+        "allDay": false,
+        "timezone": "UTC",
+        "location": null,
+        "recurrence": "{\"frequency\":\"weekly\",\"interval\":0}",
+        "createdAt": "2024-01-01T08:00:00.000Z",
+        "updatedAt": "2024-01-02T09:00:00.000Z",
+        "participants": []
+      }
+    }
+  ]
+}

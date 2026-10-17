@@ -46,7 +46,7 @@ export const repositoryRules: Rule[] = [
   {
     id: "no-pii-tracking-config",
     summary: "Error reporting never sends default PII, never enables IP tracking, and the query cache is never persisted.",
-    files: sourceUnder(["apps/", "packages/"], /\.[cm]?[jt]sx?$/),
+    files: sourceUnder(["apps/", "packages/", "retired/"], /\.[cm]?[jt]sx?$/),
     check: (file) =>
       matchLines(
         file,
@@ -74,19 +74,19 @@ export const repositoryRules: Rule[] = [
           : "env files must not be committed (use .env*.example)",
       },
     ],
-    examples: { path: "apps/backend/.env", bad: ["SECRET=1"], good: [] },
+    examples: { path: "retired/backend/.env", bad: ["SECRET=1"], good: [] },
   },
   {
     id: "no-alternate-mail-transport",
     summary: "Mail runs over JMAP only: no SMTP/IMAP/POP3 URLs or Resend, and the provisioning token stays in the admin client.",
-    files: sourceUnder(["apps/backend/", ...CLIENT_SOURCE, "packages/"]),
+    files: sourceUnder(["retired/backend/", ...CLIENT_SOURCE, "packages/"]),
     check(file) {
       const findings = matchLines(
         file,
         /\b(smtps?|imaps?|pop3s?):\/\/|api\.resend\.com|from ["']resend["']/,
         (match) => `alternate mail transport "${match[0]}"; use JMAP (StalwartJmapClient or the backend proxy)`,
       );
-      if (file.path !== "apps/backend/lib/stalwart-admin.ts" && file.path !== "apps/backend/lib/env.ts") {
+      if (file.path !== "retired/backend/lib/stalwart-admin.ts" && file.path !== "retired/backend/lib/env.ts") {
         findings.push(
           ...matchLines(
             file,
@@ -98,7 +98,7 @@ export const repositoryRules: Rule[] = [
       return findings;
     },
     examples: {
-      path: "apps/backend/services/mail.service.ts",
+      path: "retired/backend/services/mail.service.ts",
       bad: ['const url = "smtp://mail.example.com";', "const token = process.env.STALWART_PROVISION_TOKEN;"],
       good: ["const jmap = await stalwartUserJmap(userId);"],
     },

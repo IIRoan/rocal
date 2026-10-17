@@ -1,10 +1,8 @@
+import type { Schema } from "@workspace/api-contracts";
 import {
   isCalendarNameBackfillCandidate,
   isCategoryNameBackfillCandidate,
   type Calendar,
-  type CalendarsResponse,
-  type CategoriesResponse,
-  type EventCategory,
 } from "@workspace/calendar-core";
 import type { E2eeProvider } from "@workspace/e2ee";
 import type { HttpClient } from "./http-client";
@@ -25,7 +23,9 @@ type BackfillInput = {
 
 type BackfillTarget = {
   path: string;
-  encrypt: () => Promise<{ name?: string; encryptedName?: string }>;
+  encrypt: () => Promise<
+    Schema<"UpdateCalendarRequest"> | Schema<"UpdateCategoryRequest">
+  >;
 };
 
 async function runInBatches(
@@ -80,12 +80,12 @@ export async function backfillEncryptedNames({
     }
 
     const [calendarsResponse, categoriesResponse] = await Promise.all([
-      client.get<CalendarsResponse>("/api/calendars"),
-      client.get<CategoriesResponse>("/api/categories"),
+      client.get<Schema<"CalendarList">>("/api/calendars"),
+      client.get<Schema<"CategoryList">>("/api/categories"),
     ]);
 
-    const calendarTargets = (calendarsResponse.calendars ?? [])
-      .filter((calendar: Calendar) => isCalendarNameBackfillCandidate(calendar))
+    const calendarTargets = ((calendarsResponse.calendars ?? []) as Calendar[])
+      .filter((calendar) => isCalendarNameBackfillCandidate(calendar))
       .map(
         (calendar): BackfillTarget => ({
           path: `/api/calendars/${encodeURIComponent(calendar.id)}`,
@@ -94,9 +94,7 @@ export async function backfillEncryptedNames({
         }),
       );
     const categoryTargets = (categoriesResponse.categories ?? [])
-      .filter((category: EventCategory) =>
-        isCategoryNameBackfillCandidate(category),
-      )
+      .filter((category) => isCategoryNameBackfillCandidate(category))
       .map(
         (category): BackfillTarget => ({
           path: `/api/categories/${encodeURIComponent(category.id)}`,

@@ -32,8 +32,8 @@ out/
 build
 dist
 apps/web/output
-apps/backend/generated/
-apps/backend/server
+retired/backend/generated/
+retired/backend/server
 
 
 # Debug
@@ -58,3 +58,6 @@ apps/stalwart/.local-certs/
 
 # Untracked third-party Bulwark (AGPL) reference; never commit.
 webmail/
+
+# Rust build output
+/target

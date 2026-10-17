@@ -5,8 +5,8 @@
 **/coverage
 **/.turbo
 **/out
-apps/backend/server
-apps/backend/dist
+retired/backend/server
+retired/backend/dist
 webmail
 **/.wrangler
 **/.vinext
@@ -25,5 +25,3 @@ apps/gatus/**
 apps/stalwart/**
 !apps/stalwart/package.json
 apps/notifications/**
-!apps/notifications/package.json
-!apps/notifications/go.mod

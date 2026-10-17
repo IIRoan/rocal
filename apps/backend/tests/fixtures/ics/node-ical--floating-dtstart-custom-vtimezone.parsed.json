@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"floating-with-custom-vtimezone@test","sourceUid":"floating-with-custom-vtimezone@test","title":"Floating DTSTART with custom VTIMEZONE","start":"2025-06-10T14:00:00.000Z","end":"2025-06-10T15:00:00.000Z","allDay":false,"timezone":"UTC"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"floating-with-custom-vtimezone@test","sourceUid":"floating-with-custom-vtimezone@test","title":"Floating DTSTART with custom VTIMEZONE","start":"2025-06-10T12:00:00.000Z","end":"2025-06-10T13:00:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"floating-with-custom-vtimezone@test","sourceUid":"floating-with-custom-vtimezone@test","title":"Floating DTSTART with custom VTIMEZONE","start":"2025-06-10T21:00:00.000Z","end":"2025-06-10T22:00:00.000Z","allDay":false,"timezone":"America/Los_Angeles"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

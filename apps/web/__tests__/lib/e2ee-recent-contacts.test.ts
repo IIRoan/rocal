@@ -100,12 +100,12 @@ describe("e2ee-recent-contacts", () => {
     mockGetRecentContacts.mockResolvedValue({
       encryptedContent: JSON.stringify(encryptedPayload),
       encryptionKeyVersion: 1,
-      updatedAt: "2026-06-19T10:00:00.000Z",
+      updatedAt: new Date("2026-06-19T10:00:00.000Z"),
     });
     mockPutRecentContacts.mockResolvedValue({
       encryptedContent: JSON.stringify(encryptedPayload),
       encryptionKeyVersion: 1,
-      updatedAt: "2026-06-19T11:00:00.000Z",
+      updatedAt: new Date("2026-06-19T11:00:00.000Z"),
     });
   });
 
@@ -143,7 +143,7 @@ describe("e2ee-recent-contacts", () => {
     mockGetRecentContacts.mockResolvedValue({
       encryptedContent: JSON.stringify({ version: 1 }),
       encryptionKeyVersion: 1,
-      updatedAt: "2026-06-19T10:00:00.000Z",
+      updatedAt: new Date("2026-06-19T10:00:00.000Z"),
     });
 
     const payload = await loadRecentContacts();

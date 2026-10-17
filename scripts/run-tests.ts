@@ -63,16 +63,6 @@ function parseTestCounts(output: string): {
     return { passed, failed, total };
   }
 
-  // Go test output: count "ok" and "FAIL" lines
-  const goOk = output.match(/^ok\s+/gm);
-  const goFail = output.match(/^FAIL\s+/gm);
-  if (goOk || goFail) {
-    passed = goOk?.length ?? 0;
-    failed = goFail?.length ?? 0;
-    total = passed + failed;
-    return { passed, failed, total };
-  }
-
   return { passed: 0, failed: 0, total: 0 };
 }
 

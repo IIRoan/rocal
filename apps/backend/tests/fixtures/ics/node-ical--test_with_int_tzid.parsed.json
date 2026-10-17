@@ -1,0 +1,26 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"df21da35-3a0b-434a-9211-da9f9095fb16","sourceUid":"df21da35-3a0b-434a-9211-da9f9095fb16","title":"test export import","description":"test","start":"2023-12-15T14:00:00.000Z","end":"2023-12-15T15:00:00.000Z","allDay":false,"location":"dijon","timezone":"Europe/Paris"},
+      {"uid":"040000008200E00074C5B7101A82E008000000008D1F7DAB8632DA010000000000000000100000008EF89A92C90D1342BF1F2CB714276CCC","sourceUid":"040000008200E00074C5B7101A82E008000000008D1F7DAB8632DA010000000000000000100000008EF89A92C90D1342BF1F2CB714276CCC","title":"Atelier groupes portail/Nuage","description":"Désolé pour ces changements de date, j'espère que ce dernier créneau conviendra à tout le monde. \n\nJe vous propose cette date pour un atelier sur les soucis avec les commandes à passer sur les serveurs nextcloud pour la mise en place des groupes. Dites moi si ça ne convient pas. Merci !","start":"2024-01-08T11:00:00.000Z","end":"2024-01-08T12:00:00.000Z","allDay":false,"location":"https://visio-agents.education.fr/","timezone":"UTC"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"df21da35-3a0b-434a-9211-da9f9095fb16","sourceUid":"df21da35-3a0b-434a-9211-da9f9095fb16","title":"test export import","description":"test","start":"2023-12-15T14:00:00.000Z","end":"2023-12-15T15:00:00.000Z","allDay":false,"location":"dijon","timezone":"Europe/Paris"},
+      {"uid":"040000008200E00074C5B7101A82E008000000008D1F7DAB8632DA010000000000000000100000008EF89A92C90D1342BF1F2CB714276CCC","sourceUid":"040000008200E00074C5B7101A82E008000000008D1F7DAB8632DA010000000000000000100000008EF89A92C90D1342BF1F2CB714276CCC","title":"Atelier groupes portail/Nuage","description":"Désolé pour ces changements de date, j'espère que ce dernier créneau conviendra à tout le monde. \n\nJe vous propose cette date pour un atelier sur les soucis avec les commandes à passer sur les serveurs nextcloud pour la mise en place des groupes. Dites moi si ça ne convient pas. Merci !","start":"2024-01-08T10:00:00.000Z","end":"2024-01-08T11:00:00.000Z","allDay":false,"location":"https://visio-agents.education.fr/","timezone":"Europe/Amsterdam"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"df21da35-3a0b-434a-9211-da9f9095fb16","sourceUid":"df21da35-3a0b-434a-9211-da9f9095fb16","title":"test export import","description":"test","start":"2023-12-15T14:00:00.000Z","end":"2023-12-15T15:00:00.000Z","allDay":false,"location":"dijon","timezone":"Europe/Paris"},
+      {"uid":"040000008200E00074C5B7101A82E008000000008D1F7DAB8632DA010000000000000000100000008EF89A92C90D1342BF1F2CB714276CCC","sourceUid":"040000008200E00074C5B7101A82E008000000008D1F7DAB8632DA010000000000000000100000008EF89A92C90D1342BF1F2CB714276CCC","title":"Atelier groupes portail/Nuage","description":"Désolé pour ces changements de date, j'espère que ce dernier créneau conviendra à tout le monde. \n\nJe vous propose cette date pour un atelier sur les soucis avec les commandes à passer sur les serveurs nextcloud pour la mise en place des groupes. Dites moi si ça ne convient pas. Merci !","start":"2024-01-08T19:00:00.000Z","end":"2024-01-08T20:00:00.000Z","allDay":false,"location":"https://visio-agents.education.fr/","timezone":"America/Los_Angeles"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

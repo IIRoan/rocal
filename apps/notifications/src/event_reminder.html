@@ -1,0 +1,161 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <link rel="preload" as="image" href="{{.LogoUrl}}" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>{{.EventTitle}} - {{.TimeUntilEvent}}</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { background-color: #ffffff !important; color: #1a1a1a !important; }
+      @media (prefers-color-scheme: dark) {
+        body { background-color: #1a1a1a !important; color: #e5e5e5 !important; }
+        .email-title { color: #ffffff !important; }
+        .email-subtitle { color: rgba(255,255,255,0.55) !important; }
+        .detail-label { color: rgba(255,255,255,0.40) !important; }
+        .detail-value { color: #e5e5e5 !important; }
+        .email-btn { background: #2a2a2a !important; color: #ffffff !important; border-color: rgba(255,255,255,0.15) !important; }
+        .email-hr { background-color: #333 !important; }
+        .email-footer { color: #666 !important; }
+        .email-footer a { color: #666 !important; }
+      }
+    </style>
+  </head>
+  <body
+    style='margin:0;padding:0;background-color:#ffffff;color:#1a1a1a;font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;-webkit-font-smoothing:antialiased'>
+    <!--$--><!--html--><!--head--><!--body-->
+    <div
+      style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">
+      {{.TimeUntilEvent}}<!-- -->
+      for
+      <!-- -->{{.EventTitle}}<!-- -->.
+    </div>
+    <div style="margin:0 auto;max-width:555px;padding:48px 28px 40px">
+      <a href="{{.CalendarUrl}}" style="outline:none;text-decoration:none"
+        ><img
+          src="{{.LogoUrl}}"
+          alt="Solace"
+          width="36"
+          height="36"
+          style="display:block;width:36px;height:36px;border:0;margin-bottom:28px"
+      /></a>
+      <h1
+        class="email-title"
+        style="margin:0;font-size:22px;line-height:130%;font-weight:700;letter-spacing:-0.01em;color:#000">
+        {{.EventTitle}}
+      </h1>
+      <p
+        class="email-subtitle"
+        style="margin:6px 0 0;font-size:15px;line-height:130%;color:rgba(0, 0, 0, 0.50)">
+        {{.TimeUntilEvent}}
+      </p>
+      <p
+        class="detail-value"
+        style="margin:18px 0 0;font-size:15px;line-height:22px;color:#1a1a1a">
+        {{.Summary}}
+      </p>
+      <div style="margin-top:28px">
+        <div style="margin-bottom:18px">
+          <div
+            class="detail-label"
+            style="font-size:11px;line-height:14px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#999;margin-bottom:4px">
+            When
+          </div>
+          <div
+            class="detail-value"
+            style="font-size:16px;line-height:22px;font-weight:400;color:#1a1a1a;word-break:break-word">
+            {{.EventDate}}<!-- -->
+            <!-- -->·<!-- -->
+            <!-- -->{{.EventTime}}
+          </div>
+        </div>
+        {{if .Duration}}
+        <div style="margin-bottom:18px">
+          <div
+            class="detail-label"
+            style="font-size:11px;line-height:14px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#999;margin-bottom:4px">
+            Duration
+          </div>
+          <div
+            class="detail-value"
+            style="font-size:16px;line-height:22px;font-weight:400;color:#1a1a1a;word-break:break-word">
+            {{.Duration}}
+          </div>
+        </div>
+        {{end}}<!-- -->{{if .EventID}}
+        <div style="margin-bottom:18px">
+          <div
+            class="detail-label"
+            style="font-size:11px;line-height:14px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#999;margin-bottom:4px">
+            Event ID
+          </div>
+          <div
+            class="detail-value"
+            style="font-size:16px;line-height:22px;font-weight:400;color:#1a1a1a;word-break:break-word">
+            {{.EventID}}
+          </div>
+        </div>
+        {{end}}
+      </div>
+      <table
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+        style="border-collapse:separate;width:fit-content;line-height:100%;padding:6px 0 0">
+        <tbody>
+          <tr>
+            <td align="center" valign="middle">
+              <a
+                class="email-btn"
+                href="{{.EventUrl}}"
+                style='display:inline-block;background:#fff;color:#000;font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;font-size:15px;font-weight:500;line-height:100%;margin:0;text-decoration:none;padding:12px 20px;border:1px solid rgba(0, 0, 0, 0.12);border-bottom:2px solid rgba(0, 0, 0, 0.12);border-radius:12px'
+                >Open Event</a
+              >
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <hr
+        class="email-hr"
+        style="border:none;height:1px;background-color:#e5e5e5;margin:36px 0 20px 0" />
+      <p
+        class="email-footer"
+        style="margin:0 0 6px;font-size:12px;line-height:1.4;color:#a8a8a8;font-weight:600">
+        Solace
+      </p>
+      <p
+        class="email-footer"
+        style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#a8a8a8">
+        This reminder was sent because email notifications are enabled for your
+        account.
+      </p>
+      <p
+        class="email-footer"
+        style="margin:0;font-size:12px;line-height:1.5;color:#a8a8a8">
+        <a
+          class="email-footer"
+          href="{{.SettingsUrl}}"
+          style="color:#a8a8a8;text-decoration:underline"
+          >Settings</a
+        >
+        ·
+        <a
+          class="email-footer"
+          href="{{.PrivacyUrl}}"
+          style="color:#a8a8a8;text-decoration:underline"
+          >Privacy</a
+        >
+        ·
+        <a
+          class="email-footer"
+          href="{{.CalendarUrl}}"
+          style="color:#a8a8a8;text-decoration:underline"
+          >Calendar</a
+        >
+      </p>
+    </div>
+    <!--/$-->
+  </body>
+</html>

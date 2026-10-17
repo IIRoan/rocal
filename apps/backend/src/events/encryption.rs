@@ -1,0 +1,237 @@
+//! `lib/event-encryption.ts`: ciphertext replaces plaintext event content, and backfills drop plaintext left beside ciphertext.
+
+use sea_orm::sea_query::Expr;
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
+
+use crate::db::entities::calendar_event;
+use crate::http::zod::js_trim;
+use crate::integrations::ics::trimmed_text;
+
+/// The content columns an event write stores.
+#[derive(Debug, PartialEq, Eq)]
+pub struct PersistencePolicy {
+    pub encryption_state: &'static str,
+    pub title: String,
+    pub description: Option<String>,
+    pub location: Option<String>,
+}
+
+/// `resolveEventPersistencePolicy`: encrypted events keep no plaintext; plaintext is trimmed and blanks become null.
+pub fn resolve_persistence_policy(
+    has_encrypted_payload: bool,
+    title: &str,
+    description: Option<&str>,
+    location: Option<&str>,
+) -> PersistencePolicy {
+    if has_encrypted_payload {
+        return PersistencePolicy {
+            encryption_state: "encrypted",
+            title: String::new(),
+            description: None,
+            location: None,
+        };
+    }
+    PersistencePolicy {
+        encryption_state: "plaintext",
+        title: js_trim(title).to_owned(),
+        description: trimmed_text(description),
+        location: trimmed_text(location),
+    }
+}
+
+pub const PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE: &str =
+    "Plaintext event content must not be sent alongside encrypted content.";
+
+/// `assertNoPlaintextEventContentWithCiphertext`: with ciphertext, the first non-blank plaintext field is refused.
+pub fn assert_no_plaintext_with_ciphertext(
+    encrypted_content: Option<&str>,
+    fields: [(&'static str, Option<&str>); 3],
+) -> Result<(), crate::error::AppError> {
+    if !encrypted_content.is_some_and(|content| !js_trim(content).is_empty()) {
+        return Ok(());
+    }
+    match fields
+        .into_iter()
+        .find(|(_, value)| value.is_some_and(|value| !js_trim(value).is_empty()))
+    {
+        Some((field, _)) => Err(crate::error::AppError::field(
+            PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
+            field,
+        )),
+        None => Ok(()),
+    }
+}
+
+/// What an invitation mail shows: the transient `invitationContent`, or plaintext an unencrypted event still has.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvitationContentSource {
+    pub title: String,
+    pub description: Option<String>,
+    pub location: Option<String>,
+}
+
+/// `resolveInvitationContent`.
+pub fn resolve_invitation_content(
+    has_encrypted_payload: bool,
+    invitation: Option<&solace_api_types::events::InvitationContent>,
+    title: Option<&str>,
+    description: Option<&str>,
+    location: Option<&str>,
+) -> Option<InvitationContentSource> {
+    if let Some(invitation) = invitation {
+        return Some(InvitationContentSource {
+            title: js_trim(&invitation.title).to_owned(),
+            description: trimmed_text(invitation.description.as_deref()),
+            location: trimmed_text(invitation.location.as_deref()),
+        });
+    }
+    let title = title.map(js_trim).filter(|title| !title.is_empty())?;
+    if has_encrypted_payload {
+        return None;
+    }
+    Some(InvitationContentSource {
+        title: title.to_owned(),
+        description: trimmed_text(description),
+        location: trimmed_text(location),
+    })
+}
+
+/// The distinct, non-empty calendar ids a backfill covers, in order.
+fn target_calendar_ids(calendar_ids: &[&str]) -> Vec<String> {
+    let mut targets: Vec<String> = Vec::new();
+    for id in calendar_ids.iter().filter(|id| !id.is_empty()) {
+        if !targets.iter().any(|target| target == id) {
+            targets.push((*id).to_owned());
+        }
+    }
+    targets
+}
+
+/// `backfillEncryptedEventsToCiphertextOnly`: events with ciphertext that still carry plaintext lose it.
+pub async fn backfill_ciphertext_only<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+    calendar_ids: &[&str],
+    now: time::PrimitiveDateTime,
+) -> Result<u64, sea_orm::DbErr> {
+    let targets = target_calendar_ids(calendar_ids);
+    if targets.is_empty() {
+        return Ok(0);
+    }
+    let result = calendar_event::Entity::update_many()
+        .col_expr(calendar_event::Column::Title, Expr::value(""))
+        .col_expr(
+            calendar_event::Column::Description,
+            Expr::value(Option::<String>::None),
+        )
+        .col_expr(
+            calendar_event::Column::Location,
+            Expr::value(Option::<String>::None),
+        )
+        .col_expr(
+            calendar_event::Column::EncryptionState,
+            Expr::value("encrypted"),
+        )
+        .col_expr(calendar_event::Column::UpdatedAt, Expr::value(now))
+        .filter(calendar_event::Column::UserId.eq(user_id))
+        .filter(calendar_event::Column::CalendarId.is_in(targets))
+        .filter(calendar_event::Column::EncryptedContent.is_not_null())
+        .filter(calendar_event::Column::EncryptionState.ne("encrypted"))
+        .exec(db)
+        .await?;
+    Ok(result.rows_affected)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plaintext_policy_trims_and_nulls_blank_fields() {
+        assert_eq!(
+            resolve_persistence_policy(false, "  Standup  ", Some("   "), Some(" Room 1 ")),
+            PersistencePolicy {
+                encryption_state: "plaintext",
+                title: "Standup".into(),
+                description: None,
+                location: Some("Room 1".into()),
+            }
+        );
+        assert_eq!(
+            resolve_persistence_policy(true, "Standup", Some("Notes"), Some("Room 1")),
+            PersistencePolicy {
+                encryption_state: "encrypted",
+                title: String::new(),
+                description: None,
+                location: None,
+            }
+        );
+    }
+
+    #[test]
+    fn invitations_use_the_transient_copy_for_encrypted_events() {
+        let copy = solace_api_types::events::InvitationContent {
+            title: " Launch ".into(),
+            description: Some("  ".into()),
+            location: None,
+        };
+        assert_eq!(
+            resolve_invitation_content(true, Some(&copy), None, None, None),
+            Some(InvitationContentSource {
+                title: "Launch".into(),
+                description: None,
+                location: None,
+            })
+        );
+        assert_eq!(
+            resolve_invitation_content(true, None, Some("Launch"), None, None),
+            None
+        );
+        assert!(resolve_invitation_content(false, None, Some("Launch"), None, None).is_some());
+        assert!(
+            assert_no_plaintext_with_ciphertext(
+                Some("ct"),
+                [
+                    ("title", Some("x")),
+                    ("description", None),
+                    ("location", None)
+                ]
+            )
+            .is_err()
+        );
+        assert!(
+            assert_no_plaintext_with_ciphertext(
+                Some("ct"),
+                [
+                    ("title", Some(" ")),
+                    ("description", None),
+                    ("location", None)
+                ]
+            )
+            .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn backfill_without_calendars_changes_nothing() {
+        let pool = sea_orm::sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://solace_test:x@127.0.0.1:1/solace_test")
+            .unwrap();
+        let db = sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(pool);
+        let changed = backfill_ciphertext_only(&db, "user", &["", ""], crate::instant::now())
+            .await
+            .unwrap();
+        assert_eq!(
+            changed, 0,
+            "no query runs, so the closed port is never reached"
+        );
+    }
+
+    #[test]
+    fn backfill_dedupes_calendar_ids() {
+        assert_eq!(
+            target_calendar_ids(&["a", "b", "a", "", "c", "b"]),
+            ["a", "b", "c"]
+        );
+    }
+}

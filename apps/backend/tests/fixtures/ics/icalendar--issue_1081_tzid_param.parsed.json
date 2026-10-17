@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"test-123","sourceUid":"test-123","title":"Test Event","start":"2025-01-01T15:00:00.000Z","end":"2025-01-01T15:00:00.000Z","allDay":false,"timezone":"America/New_York"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"test-123","sourceUid":"test-123","title":"Test Event","start":"2025-01-01T15:00:00.000Z","end":"2025-01-01T15:00:00.000Z","allDay":false,"timezone":"America/New_York"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"test-123","sourceUid":"test-123","title":"Test Event","start":"2025-01-01T15:00:00.000Z","end":"2025-01-01T15:00:00.000Z","allDay":false,"timezone":"America/New_York"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

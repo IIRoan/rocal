@@ -106,7 +106,7 @@ export function formatPushDeviceLabel(device: {
 }
 
 export function formatPushDeviceLastSeen(
-  lastSeenAt: string,
+  lastSeenAt: Date | string,
   now: Date = new Date(),
 ): string {
   const then = new Date(lastSeenAt);

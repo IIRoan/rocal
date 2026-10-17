@@ -1,0 +1,16 @@
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › creates default settings when none exist yet	suite:settings::first_read_creates_the_defaults
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › deletes a user's settings on reset	suite:settings::reset_deletes_the_row_and_the_next_read_recreates_defaults
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › disables calendar sharing when full event encryption is enabled	suite:settings::full_encryption_turns_off_calendar_share_links
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects a default calendar that does not belong to the user	suite:settings::the_default_calendar_must_be_an_own_editable_calendar
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects a non-owned default calendar	suite:settings::read_only_and_staging_calendars_cannot_be_the_default
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects invalid timezones during update	suite:settings::invalid_values_are_rejected_with_the_zod_message
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects inverted working hours	suite:settings::service_rules_reject_inconsistent_values
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects malformed working days JSON	suite:settings::service_rules_reject_inconsistent_values
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › rejects working days outside the allowed weekday range	suite:settings::service_rules_reject_inconsistent_values
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › returns existing user settings	suite:settings::first_read_creates_the_defaults
+retired/backend/__tests__/routes/settings.test.ts	settingsRoutes › upserts valid settings updates	suite:settings::updates_are_stored_and_returned
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › creates default settings when a user has none	suite:settings::first_read_creates_the_defaults
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › disables calendar sharing and backfills shared calendars when switching to full encryption	suite:settings::switching_to_full_encryption_drops_plaintext_beside_ciphertext_in_shared_calendars
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › rejects invalid timezone identifiers	suite:settings::invalid_values_are_rejected_with_the_zod_message
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › rejects non-owned calendars as the default calendar	suite:settings::the_default_calendar_must_be_an_own_editable_calendar
+retired/backend/__tests__/services/settings.service.test.ts	SettingsService › rejects the invitations staging calendar as the default calendar	suite:settings::read_only_and_staging_calendars_cannot_be_the_default

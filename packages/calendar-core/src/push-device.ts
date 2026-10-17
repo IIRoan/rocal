@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Keep in sync with apps/notifications/internal/push/bundles.go. */
+/** Keep in sync with CALENDAR_BUNDLE_IDS and MAIL_BUNDLE_IDS in apps/backend/src/push_devices.rs. */
 export const SOLACE_CALENDAR_IOS_BUNDLE_ID = "onl.solace.calendar" as const;
 export const SOLACE_CALENDAR_IOS_DEV_BUNDLE_ID = "onl.solace.calendar.dev" as const;
 export const SOLACE_MAIL_IOS_BUNDLE_ID = "onl.solace.mail" as const;
