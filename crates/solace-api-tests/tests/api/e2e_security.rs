@@ -1,4 +1,4 @@
-//! The fourteen live checks of `apps/backend/e2e/api-security.e2e.ts`, one test each, same names and assertions.
+//! The fourteen live checks of `retired/backend/e2e/api-security.e2e.ts`, one test each, same names and assertions.
 
 use regex_lite::Regex;
 use serde_json::{Value, json};

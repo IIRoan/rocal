@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "xtask"]
+members = ["apps/backend", "crates/*", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -81,7 +81,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 serde_with = { version = "3", default-features = false, features = ["macros"] }
 sha2 = "0.11"
 solace-api-tests = { path = "crates/solace-api-tests" }
-solace-server = { path = "crates/solace-server" }
+solace-server = { path = "apps/backend" }
 solace-api-types = { path = "crates/solace-api-types" }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-aws-lc-rs", "postgres", "macros"] }
 thiserror = "2"

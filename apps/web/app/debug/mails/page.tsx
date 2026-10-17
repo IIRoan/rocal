@@ -11,7 +11,7 @@ const LOGO_URL = "https://solace.onl/favicon-192x192.png";
 const APP_URL = "https://solace.example.com";
 
 // ─── Email template helpers ───────────────────────────────────────────────────
-// Mirrors apps/backend/lib/auth-email.ts — keep in sync when updating designs.
+// Mirrors retired/backend/lib/auth-email.ts — keep in sync when updating designs.
 
 function escapeHtml(value: string): string {
   return value
@@ -295,7 +295,7 @@ export default function DebugMailsPage() {
             <span className="text-foreground font-medium">{FAKE_NAME}</span>
             {" · "}
             <code className="rounded bg-muted px-1 py-0.5 text-[11px] font-mono">
-              apps/backend/lib/auth-email.ts
+              retired/backend/lib/auth-email.ts
             </code>
           </p>
         </div>

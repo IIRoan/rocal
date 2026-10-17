@@ -93,7 +93,7 @@ func loadEnv() {
 	log := logger.New("notifications")
 	files := discoverEnvFiles()
 	if len(files) == 0 {
-		log.Warn("Could not load .env file: none found in cwd, parent dirs, or apps/backend")
+		log.Warn("Could not load .env file: none found in cwd, parent dirs, or retired/backend")
 	} else {
 		loaded := make([]string, 0, len(files))
 		for _, file := range files {
@@ -175,7 +175,7 @@ func discoverEnvFiles() []string {
 	for range 8 {
 		addIfExists(filepath.Join(dir, ".env"))
 		addIfExists(filepath.Join(dir, "backend", ".env"))
-		addIfExists(filepath.Join(dir, "apps", "backend", ".env"))
+		addIfExists(filepath.Join(dir, "retired", "backend", ".env"))
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			break
@@ -705,7 +705,7 @@ func nullableString(value sql.NullString) string {
 
 const reminderMailTitle = "Event reminder"
 
-// Must match SOLACE_REMINDER_MESSAGE_ID_PREFIX in apps/backend/lib/stalwart-webhook.ts (skips the new-mail push).
+// Must match SOLACE_REMINDER_MESSAGE_ID_PREFIX in retired/backend/lib/stalwart-webhook.ts (skips the new-mail push).
 const reminderMessageIDPrefix = "solace-reminder."
 
 func (ns *NotificationServer) generateEmailContent(event EventData, user UserData, minutesBefore int, eventID string) (*EmailContent, error) {

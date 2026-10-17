@@ -7,7 +7,7 @@ const checkout = resolve(process.argv[2] ?? join(import.meta.dir, "../../../../.
 const fixtures = import.meta.dir;
 console.warn = () => {};
 
-const { parseICSFile } = await import(join(checkout, "apps/backend/lib/ics-parser.ts"));
+const { parseICSFile } = await import(join(checkout, "retired/backend/lib/ics-parser.ts"));
 for (const name of readdirSync(fixtures).filter((file) => file.endsWith(".ics")).sort()) {
   const content = readFileSync(join(fixtures, name), "utf8");
   const results: Record<string, unknown> = {};
@@ -39,7 +39,7 @@ class FixedDate extends RealDate {
 }
 globalThis.Date = FixedDate as DateConstructor;
 const { buildIcsCalendar, buildIcsEventFile } = await import(join(checkout, "packages/calendar-ics/src/index.ts"));
-const { toIcsBuildEvent } = await import(join(checkout, "apps/backend/lib/ics-export.ts"));
+const { toIcsBuildEvent } = await import(join(checkout, "retired/backend/lib/ics-export.ts"));
 const withDates = (record: Record<string, unknown>) => {
   const copy: Record<string, unknown> = { ...record };
   for (const key of ["start", "end", "createdAt", "updatedAt"]) {

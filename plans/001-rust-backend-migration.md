@@ -466,6 +466,7 @@ This happens only with explicit go-ahead.
 - The redeploy at 14:55 brought a fresh `STALWART_WEBHOOK_SECRET` (the boot re-registered the webhook with it) and calendar sync, whose first run synced every due feed. No warnings or errors afterwards; 47 MiB resident.
 - Rollback: point the CNAME back at Vercel and set Vercel's `STALWART_WEBHOOK_SECRET` to Railway's value, because only `serve.ts`, never the Vercel function, registers the webhook.
 - The Railway `test` environment (the replica, its Stalwart, Postgres and bucket) was deleted after the cutover. The suite's avatar bucket is now a local S3 mock (`adobe/s3mock`) that `cargo xtask test-env up` starts, so CI needs no bucket secrets; `deploy-test`, the test-service Dockerfiles and the guard's Railway host allowances went with it.
+- Layout after the cutover: the Rust server moved from `crates/solace-server` to `apps/backend` (crate name unchanged), and the TypeScript backend to `retired/backend`, still a Bun workspace so it can be rebuilt for a rollback (its Vercel project's root directory must follow).
 
 ### 7. Delete TypeScript and clean up
 

@@ -52,7 +52,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         .map(|(_, value)| value.clone())
         .unwrap_or_default();
 
-    let backend_dir = checkout.join("apps/backend");
+    let backend_dir = checkout.join("retired/backend");
     let mut command = Command::new(which_bun()?);
     command
         .current_dir(&backend_dir)
@@ -76,8 +76,8 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
 fn refuse_env_files(checkout: &Path) -> anyhow::Result<()> {
     for dir in [
         checkout.to_path_buf(),
-        checkout.join("apps/backend"),
-        checkout.join("apps/backend/prisma"),
+        checkout.join("retired/backend"),
+        checkout.join("retired/backend/prisma"),
     ] {
         for entry in std::fs::read_dir(&dir).with_context(|| format!("{}", dir.display()))? {
             let name = entry?.file_name();

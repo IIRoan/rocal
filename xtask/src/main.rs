@@ -18,7 +18,7 @@ tasks:
   check [--skip-mem]      everything CI runs: fmt, clippy, tests, the suite on Rust, generated-code diffs, memory budgets
   test-env up             start local Postgres 18 and the test Stalwart (podman)
   test-env down           stop and remove them
-  test-env template       rebuild solace_test_template from apps/backend/prisma/migrations
+  test-env template       rebuild solace_test_template from retired/backend/prisma/migrations
   test-env clone <name>   create database <name> from the template
   test-env seed <api> <database>
                           seed synthetic data through the backend at <api>

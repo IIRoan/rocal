@@ -1,4 +1,4 @@
-//! Regenerates `crates/solace-server/src/db/entities` with sea-orm-cli from a throwaway database built from the 53 migrations.
+//! Regenerates `apps/backend/src/db/entities` with sea-orm-cli from a throwaway database built from the 53 migrations.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -52,7 +52,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     std::fs::rename(generated.join("mod.rs"), out.join("entities.rs"))?;
     format(&out)?;
 
-    let committed = root.join("crates/solace-server/src/db");
+    let committed = root.join("apps/backend/src/db");
     if check {
         let differences = diff(&out.join("entities.rs"), &committed.join("entities.rs"))?
             + diff_dir(&generated, &committed.join("entities"))?;

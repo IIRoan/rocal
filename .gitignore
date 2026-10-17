@@ -32,8 +32,8 @@ out/
 build
 dist
 apps/web/output
-apps/backend/generated/
-apps/backend/server
+retired/backend/generated/
+retired/backend/server
 
 
 # Debug

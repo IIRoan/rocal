@@ -6,6 +6,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
+COPY apps/backend apps/backend
 COPY crates crates
 COPY xtask xtask
 # Telemetry compiles in the redaction keys shared with the TypeScript apps.

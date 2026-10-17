@@ -46,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: backend-coverage
-          path: apps/backend/coverage
+          path: retired/backend/coverage
 
       - name: Upload UI coverage
         if: always()

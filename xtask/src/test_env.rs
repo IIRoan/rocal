@@ -197,9 +197,9 @@ pub fn seed_manifest_path(env: &TestEnv, database: &str) -> std::path::PathBuf {
     ))
 }
 
-/// Runs `apps/backend/prisma/migrations/*/migration.sql` in name order, as `prisma migrate deploy` does.
+/// Runs `retired/backend/prisma/migrations/*/migration.sql` in name order, as `prisma migrate deploy` does.
 pub async fn apply_migrations(db: &mut PgConnection) -> anyhow::Result<usize> {
-    let dir = crate::repo_root().join("apps/backend/prisma/migrations");
+    let dir = crate::repo_root().join("retired/backend/prisma/migrations");
     let mut migrations: Vec<_> = std::fs::read_dir(&dir)?
         .filter_map(Result::ok)
         .map(|entry| entry.path().join("migration.sql"))

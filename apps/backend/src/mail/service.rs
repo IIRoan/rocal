@@ -1144,7 +1144,7 @@ pub mod tests {
     }
 
     pub const OWNER: &str = "mail-test-owner";
-    const KEY: &str = include_str!("../../../solace-api-tests/fixtures/pgp/test1.asc");
+    const KEY: &str = include_str!("../../../../crates/solace-api-tests/fixtures/pgp/test1.asc");
     const FINGERPRINT: &str = "CDCE225F09515A0156BBECB7D0018F17DFF405AC";
 
     /// A server on a scratch database whose Stalwart is `fake`, with an approved owner `alice@solace.test`.

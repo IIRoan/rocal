@@ -12,7 +12,7 @@ import {
 } from "railway/iac";
 
 export default defineRailway(() => {
-  // Web (Next.js) and the TypeScript API (Elysia) run on Vercel; see apps/web + apps/backend vercel.json.
+  // Web (Next.js) and the TypeScript API (Elysia) run on Vercel; see apps/web + retired/backend vercel.json.
   // The Rust API (plan 001) serves api.solace.onl (a custom domain, set outside this file); the Vercel API stays deployed for rollback.
   const solaceRepo = github("IIRoan/rocal", {
     branch: "master",
@@ -136,9 +136,10 @@ export default defineRailway(() => {
     source: solaceRepo,
     build: {
       builder: "DOCKERFILE",
-      dockerfilePath: "crates/solace-server/Dockerfile",
+      dockerfilePath: "apps/backend/Dockerfile",
       buildEnvironment: "V3",
       watchPatterns: [
+        "apps/backend/**",
         "crates/**",
         "Cargo.toml",
         "Cargo.lock",

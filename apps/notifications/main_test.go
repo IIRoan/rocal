@@ -1126,7 +1126,7 @@ func TestBuildFrontendURLEmptyQuery(t *testing.T) {
 
 func TestDiscoverEnvFilesFindsBackendEnv(t *testing.T) {
 	root := t.TempDir()
-	backendDir := filepath.Join(root, "apps", "backend")
+	backendDir := filepath.Join(root, "retired", "backend")
 	notifDir := filepath.Join(root, "apps", "notifications")
 	if err := os.MkdirAll(backendDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -1152,7 +1152,7 @@ func TestDiscoverEnvFilesFindsBackendEnv(t *testing.T) {
 
 func TestDiscoverEnvFilesPrefersLocalOverBackend(t *testing.T) {
 	root := t.TempDir()
-	backendDir := filepath.Join(root, "apps", "backend")
+	backendDir := filepath.Join(root, "retired", "backend")
 	notifDir := filepath.Join(root, "apps", "notifications")
 	if err := os.MkdirAll(backendDir, 0o755); err != nil {
 		t.Fatal(err)
