@@ -175,12 +175,12 @@ fn rp_id(passkey_origin: &str) -> String {
     }
 }
 
-fn webauthn(state: &AppState) -> Result<WebauthnCore, String> {
-    let origin = url::Url::parse(&state.config.passkey_origin).map_err(|e| e.to_string())?;
+fn webauthn(origin: &str) -> Result<WebauthnCore, String> {
+    let url = url::Url::parse(origin).map_err(|e| e.to_string())?;
     Ok(WebauthnCore::new_unsafe_experts_only(
         RP_NAME,
-        &rp_id(&state.config.passkey_origin),
-        vec![origin],
+        &rp_id(origin),
+        vec![url],
         Duration::from_millis(TIMEOUT_MS),
         None,
         None,
@@ -376,7 +376,7 @@ pub async fn verify_registration(
             return Err(not_allowed());
         }
         let registered =
-            verify_attestation(&state, &body.response, &challenge.expected_challenge).map_err(
+            verify_attestation(&state.config.passkey_origin, &body.response, &challenge.expected_challenge).map_err(
                 |error| {
                     tracing::error!(error, "Failed to verify registration");
                     registration_failed()
@@ -429,9 +429,9 @@ struct Registered {
     transports: String,
 }
 
-/// `verifyRegistrationResponse` without required user verification, plus the fields the passkey row keeps.
+/// `verifyRegistrationResponse` without required user verification, plus the fields the passkey row keeps; errors are fixed text, never the submitted response.
 fn verify_attestation(
-    state: &AppState,
+    origin: &str,
     response: &Value,
     expected_challenge: &str,
 ) -> Result<Registered, String> {
@@ -448,8 +448,8 @@ fn verify_attestation(
             .join(","),
         Some(_) => return Err("transports is not an array".into()),
     };
-    let credential: RegisterPublicKeyCredential =
-        serde_json::from_value(signed_part(response)).map_err(|e| e.to_string())?;
+    let credential: RegisterPublicKeyCredential = serde_json::from_value(signed_part(response))
+        .map_err(|_| "the credential is not a registration response")?;
     let ceremony: RegistrationState = serde_json::from_value(json!({
         "policy": "preferred",
         "exclude_credentials": [],
@@ -461,9 +461,9 @@ fn verify_attestation(
         "allow_synchronised_authenticators": true,
     }))
     .map_err(|e| e.to_string())?;
-    let verified = webauthn(state)?
+    let verified = webauthn(origin)?
         .register_credential(&credential, &ceremony, None)
-        .map_err(|e| format!("{e:?}"))?;
+        .map_err(|e| e.to_string())?;
     let (aaguid, public_key) = attested_key(credential.response.attestation_object.as_slice())?;
     Ok(Registered {
         credential_id: URL_SAFE_NO_PAD.encode(verified.cred_id.as_slice()),
@@ -512,7 +512,8 @@ fn signed_part(response: &Value) -> Value {
 /// The AAGUID and the CBOR COSE key from the attested credential data in `authData`.
 fn attested_key(attestation_object: &[u8]) -> Result<(String, Vec<u8>), String> {
     use serde_cbor_2::Value as Cbor;
-    let object: Cbor = serde_cbor_2::from_slice(attestation_object).map_err(|e| e.to_string())?;
+    let object: Cbor = serde_cbor_2::from_slice(attestation_object)
+        .map_err(|_| "the attestation object is not CBOR")?;
     let Cbor::Map(object) = object else {
         return Err("attestation object is not a map".into());
     };
@@ -530,7 +531,7 @@ fn attested_key(attestation_object: &[u8]) -> Result<(String, Vec<u8>), String> 
         .get(55 + id_length..)
         .ok_or("authData has no public key")?;
     let mut decoder = serde_cbor_2::Deserializer::from_slice(key);
-    Cbor::deserialize(&mut decoder).map_err(|e| e.to_string())?;
+    Cbor::deserialize(&mut decoder).map_err(|_| "the public key is not CBOR")?;
     let key = key[..decoder.byte_offset()].to_vec();
     let aaguid = uuid::Uuid::from_slice(aaguid).map_err(|e| e.to_string())?;
     Ok((aaguid.hyphenated().to_string(), key))
@@ -550,14 +551,19 @@ pub async fn verify_authentication(
             None => None,
         }
         .ok_or_else(|| passkey_not_found(StatusCode::UNAUTHORIZED))?;
-        let counter = verify_assertion(&state, &body.response, &challenge.expected_challenge, &row)
-            .map_err(|error| match error {
-                Failure::Signature => authentication_failed(StatusCode::UNAUTHORIZED),
-                Failure::Invalid(reason) => {
-                    tracing::warn!(reason, "Passkey authentication failed");
-                    authentication_failed(StatusCode::BAD_REQUEST)
-                }
-            })?;
+        let counter = verify_assertion(
+            &state.config.passkey_origin,
+            &body.response,
+            &challenge.expected_challenge,
+            &row,
+        )
+        .map_err(|error| match error {
+            Failure::Signature => authentication_failed(StatusCode::UNAUTHORIZED),
+            Failure::Invalid(reason) => {
+                tracing::warn!(reason, "Passkey authentication failed");
+                authentication_failed(StatusCode::BAD_REQUEST)
+            }
+        })?;
         store::set_passkey_counter(&state.db, row, i32::try_from(counter).unwrap_or(i32::MAX))
             .await?;
         let owner = owner.ok_or_else(|| {
@@ -586,17 +592,17 @@ enum Failure {
     Invalid(String),
 }
 
-/// `verifyAuthenticationResponse` against the stored COSE key; the new counter on success.
+/// `verifyAuthenticationResponse` against the stored COSE key; the new counter on success, and errors that never echo the submitted response.
 fn verify_assertion(
-    state: &AppState,
+    origin: &str,
     response: &Value,
     expected_challenge: &str,
     row: &passkey::Model,
 ) -> Result<u32, Failure> {
     let invalid = |e: String| Failure::Invalid(e);
     check_credential(response).map_err(invalid)?;
-    let assertion: PublicKeyCredential =
-        serde_json::from_value(signed_part(response)).map_err(|e| invalid(e.to_string()))?;
+    let assertion: PublicKeyCredential = serde_json::from_value(signed_part(response))
+        .map_err(|_| invalid("the credential is not an authentication response".into()))?;
     let flags = assertion
         .response
         .authenticator_data
@@ -609,7 +615,7 @@ fn verify_assertion(
         .map_err(|e| invalid(e.to_string()))?;
     let key: serde_cbor_2::Value =
         serde_cbor_2::from_slice(&key).map_err(|e| invalid(e.to_string()))?;
-    let key = COSEKey::try_from(&key).map_err(|e| invalid(format!("{e:?}")))?;
+    let key = COSEKey::try_from(&key).map_err(|e| invalid(e.to_string()))?;
     let credential_id = URL_SAFE_NO_PAD
         .decode(&row.credential_id)
         .map_err(|e| invalid(e.to_string()))?;
@@ -638,11 +644,12 @@ fn verify_assertion(
         "allow_backup_eligible_upgrade": true,
     }))
     .map_err(|e| invalid(e.to_string()))?;
-    let core = webauthn(state).map_err(invalid)?;
+    let core = webauthn(origin).map_err(invalid)?;
     match core.authenticate_credential(&assertion, &ceremony) {
         Ok(result) => Ok(result.counter()),
         Err(WebauthnError::AuthenticationFailure) => Err(Failure::Signature),
-        Err(error) => Err(invalid(format!("{error:?}"))),
+        // webauthn-rs's Display texts are fixed; its Debug carries parsed client data.
+        Err(error) => Err(invalid(error.to_string())),
     }
 }
 
@@ -801,6 +808,37 @@ mod tests {
         let (aaguid, cose) = attested_key(&object).unwrap();
         assert_eq!(aaguid, "01020304-0506-0708-090a-0b0c0d0e0f10");
         assert_eq!(cose, key, "trailing extension data is not part of the key");
+    }
+
+    #[test]
+    fn verifier_errors_never_echo_the_submitted_response() {
+        let marker = "submitted-content-marker";
+        let response = json!({"id": "a", "rawId": "a", "type": "public-key", "response": marker});
+        let origin = "https://solace.onl";
+        let Err(registration) = verify_attestation(origin, &response, "challenge") else {
+            panic!("a malformed registration verified");
+        };
+        let row = passkey::Model {
+            id: "p".into(),
+            name: None,
+            public_key: String::new(),
+            user_id: "u".into(),
+            credential_id: "a".into(),
+            counter: 0,
+            device_type: "singleDevice".into(),
+            backed_up: false,
+            transports: None,
+            created_at: None,
+            aaguid: None,
+        };
+        let Err(Failure::Invalid(authentication)) =
+            verify_assertion(origin, &response, "challenge", &row)
+        else {
+            panic!("a malformed assertion was not invalid");
+        };
+        for error in [registration, authentication] {
+            assert!(!error.contains(marker), "{error}");
+        }
     }
 
     #[test]

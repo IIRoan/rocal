@@ -74,12 +74,19 @@ pub async fn sync_due(state: &AppState) {
             if recent {
                 continue;
             }
-            if let Err(error) = service::sync_feed(state, feed).await {
-                tracing::error!(
+            // Its own task, so a feed that panics the parser cannot stop every later sync.
+            let (task_state, task_feed) = (state.clone(), feed.clone());
+            let synced =
+                tokio::spawn(async move { service::sync_feed(&task_state, &task_feed).await })
+                    .await;
+            match synced {
+                Ok(Ok(_)) => {}
+                Ok(Err(error)) => tracing::error!(
                     subscription_id = %feed.id,
                     message = redact_pii(&error.to_string()),
                     "Failed to sync subscription"
-                );
+                ),
+                Err(_) => tracing::error!(subscription_id = %feed.id, "Subscription sync panicked"),
             }
         }
     }
@@ -215,6 +222,16 @@ mod tests {
             fixture.feed_state(&feeds[2].id).await.1.as_deref(),
             Some("HTTP 404: Not Found")
         );
+    }
+
+    #[tokio::test]
+    async fn a_malformed_feed_syncs_and_later_feeds_still_do() {
+        let fixture = fixture().await;
+        let malformed = fixture.feed("/malformed.ics", None, 15).await;
+        let next = fixture.feed("/feed.ics", None, 15).await;
+        sync_due(&fixture.state).await;
+        assert_eq!(statuses(&fixture.logs(&malformed.id).await), ["success"]);
+        assert_eq!(statuses(&fixture.logs(&next.id).await), ["success"]);
     }
 
     #[tokio::test]

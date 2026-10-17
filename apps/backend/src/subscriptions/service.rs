@@ -863,6 +863,12 @@ pub(crate) mod tests {
         BEGIN:VEVENT\r\nUID:daily@example.com\r\nDTSTART;VALUE=DATE:20991102\r\nSUMMARY:Daily\r\nRRULE:FREQ=DAILY;COUNT=3\r\nEXDATE;VALUE=DATE:20991103\r\nEND:VEVENT\r\n\
         END:VCALENDAR\r\n";
 
+    /// Non-ASCII where the parser once sliced bytes: a VTIMEZONE weekday and an `X-` property name.
+    const MALFORMED_FEED: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n\
+        BEGIN:VTIMEZONE\r\nTZID:Snow time\r\nBEGIN:STANDARD\r\nDTSTART:19701025T030000\r\nTZOFFSETFROM:+0200\r\nTZOFFSETTO:+0100\r\nRRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=☃\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\n\
+        BEGIN:VEVENT\r\nUID:snow@example.com\r\nDTSTART;TZID=Snow time:20261101T090000\r\nSUMMARY:Snow\r\n€X-A:1\r\nEND:VEVENT\r\n\
+        END:VCALENDAR\r\n";
+
     /// A scratch database with one user, and a feed server that safe fetch may reach.
     pub(crate) struct Fixture {
         pub state: AppState,
@@ -878,6 +884,10 @@ pub(crate) mod tests {
                 get(|| async { ([(header::ETAG, "\"v1\"")], FEED).into_response() }),
             )
             .route("/series.ics", get(|| async { SERIES_FEED.into_response() }))
+            .route(
+                "/malformed.ics",
+                get(|| async { MALFORMED_FEED.into_response() }),
+            )
             .route(
                 "/missing.ics",
                 get(|| async { StatusCode::NOT_FOUND.into_response() }),

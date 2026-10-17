@@ -280,7 +280,7 @@ fn yearly_rule(text: &str) -> Option<YearlyRule> {
             }
             "BYDAY" => {
                 let token = value.split(',').next()?.to_uppercase();
-                let (ordinal, code) = token.split_at(token.len().checked_sub(2)?);
+                let (ordinal, code) = token.split_at_checked(token.len().checked_sub(2)?)?;
                 let ordinal = if ordinal.is_empty() {
                     0
                 } else {
@@ -367,7 +367,7 @@ pub fn instant(parts: &[Observance], local: DateTime) -> Option<Timestamp> {
     if !recurring && !single_offset && one_year {
         return None;
     }
-    let mut best: Option<(DateTime, Offset)> = None;
+    let mut best: Option<(DateTime, &Observance)> = None;
     for part in parts {
         let ends = parts
             .iter()
@@ -382,11 +382,22 @@ pub fn instant(parts: &[Observance], local: DateTime) -> Option<Timestamp> {
             .filter_map(|year| rule_onset(part, year, ends));
         for onset in fixed.chain(ruled) {
             if onset <= local && best.is_none_or(|(at, _)| onset > at) {
-                best = Some((onset, part.to));
+                best = Some((onset, part));
             }
         }
     }
-    let offset = best.map_or(first.from, |(_, offset)| offset);
+    let offset = match best {
+        None => first.from,
+        // A wall time a spring-forward skips keeps the offset before the jump, as RFC 5545 and node-ical read it.
+        Some((onset, part))
+            if onset
+                .checked_add(part.to - part.from)
+                .is_ok_and(|end| local < end) =>
+        {
+            part.from
+        }
+        Some((_, part)) => part.to,
+    };
     offset.to_timestamp(local).ok()
 }
 
@@ -575,6 +586,47 @@ mod tests {
             },
         ];
         assert_eq!(instant(&bare, wall("20240715T090000")), None);
+    }
+
+    #[test]
+    fn skipped_wall_times_keep_the_offset_before_the_jump() {
+        let offset = |hours: i8| Offset::constant(hours);
+        let wall = |text: &str| basic_date_time(text).unwrap().0;
+        let europe = [
+            Observance {
+                daylight: false,
+                start: wall("19701025T030000"),
+                from: offset(2),
+                to: offset(1),
+                rule: Some("FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU".into()),
+                dates: Vec::new(),
+            },
+            Observance {
+                daylight: true,
+                start: wall("19700329T020000"),
+                from: offset(1),
+                to: offset(2),
+                rule: Some("FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU".into()),
+                dates: Vec::new(),
+            },
+        ];
+        for (local, utc) in [
+            ("20260329T013000", "2026-03-29T00:30:00Z"),
+            ("20260329T020000", "2026-03-29T01:00:00Z"),
+            ("20260329T023000", "2026-03-29T01:30:00Z"),
+            ("20260329T030000", "2026-03-29T01:00:00Z"),
+            ("20261025T023000", "2026-10-25T00:30:00Z"),
+            ("20261025T030000", "2026-10-25T02:00:00Z"),
+        ] {
+            assert_eq!(instant(&europe, wall(local)), Some(at(utc)), "{local}");
+        }
+    }
+
+    #[test]
+    fn malformed_weekdays_read_as_no_rule() {
+        for byday in ["☃", "1☃", "€", "-1ŞU"] {
+            assert!(yearly_rule(&format!("FREQ=YEARLY;BYDAY={byday}")).is_none());
+        }
     }
 
     #[test]

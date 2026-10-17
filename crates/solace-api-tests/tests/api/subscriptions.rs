@@ -1495,6 +1495,108 @@ async fn custom_tzids_are_read_by_their_vtimezone() {
 }
 
 #[tokio::test]
+async fn skipped_wall_times_keep_the_offset_before_the_jump() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar_id = owned_calendar(&mut user).await;
+    let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VTIMEZONE",
+        "TZID:W. Europe Standard Time",
+        "BEGIN:STANDARD",
+        "DTSTART:16011028T030000",
+        "TZOFFSETFROM:+0200",
+        "TZOFFSETTO:+0100",
+        "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10",
+        "END:STANDARD",
+        "BEGIN:DAYLIGHT",
+        "DTSTART:16010325T020000",
+        "TZOFFSETFROM:+0100",
+        "TZOFFSETTO:+0200",
+        "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3",
+        "END:DAYLIGHT",
+        "END:VTIMEZONE",
+        "BEGIN:VEVENT",
+        "UID:gap@example.com",
+        "DTSTART;TZID=W. Europe Standard Time:20260329T023000",
+        "DTEND;TZID=W. Europe Standard Time:20260329T040000",
+        "SUMMARY:In the gap",
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+    ]
+    .join("\r\n");
+    ok(user
+        .post(
+            "/api/subscriptions/import-ics",
+            json!({"calendarId": calendar_id, "icsContent": ics}),
+        )
+        .await
+        .expect_status(200));
+    let stored: (String, String) = sqlx::query_as(&format!(
+        "SELECT {}, {} FROM calendar_event WHERE calendar_id = $1",
+        iso("start"),
+        iso("\"end\"")
+    ))
+    .bind(&calendar_id)
+    .fetch_one(&app.db)
+    .await
+    .expect("imported event");
+    // 02:30 does not exist that night, so it reads at +01:00 like the hour before it.
+    assert_eq!(
+        stored,
+        (
+            "2026-03-29T01:30:00.000Z".to_owned(),
+            "2026-03-29T02:00:00.000Z".to_owned()
+        )
+    );
+}
+
+#[tokio::test]
+async fn non_ascii_rule_parts_and_property_names_still_import() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar_id = owned_calendar(&mut user).await;
+    let ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VTIMEZONE",
+        "TZID:Snow time",
+        "BEGIN:STANDARD",
+        "DTSTART:19701025T030000",
+        "TZOFFSETFROM:+0200",
+        "TZOFFSETTO:+0100",
+        "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=☃",
+        "END:STANDARD",
+        "END:VTIMEZONE",
+        "BEGIN:VEVENT",
+        "UID:snow@example.com",
+        "DTSTART;TZID=Snow time:20261101T090000",
+        "SUMMARY:Snow",
+        "€X-A:1",
+        "END:VEVENT",
+        "END:VCALENDAR",
+        "",
+    ]
+    .join("\r\n");
+    ok(user
+        .post(
+            "/api/subscriptions/import-ics",
+            json!({"calendarId": calendar_id, "icsContent": ics}),
+        )
+        .await
+        .expect_status(200));
+    let events = count(
+        &app.db,
+        "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
+        &calendar_id,
+    )
+    .await;
+    assert_eq!(events, 1);
+}
+
+#[tokio::test]
 async fn legacy_imports_skip_excluded_and_overridden_occurrences() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;

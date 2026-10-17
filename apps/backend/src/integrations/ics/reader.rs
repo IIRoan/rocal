@@ -608,7 +608,9 @@ impl Reader {
                 return Ok(curr);
             }
             _ if X_NAME.is_match(name) && !self.stack.is_empty() => {
-                store_parameter(&mut curr, &name[2..], value, &parameters);
+                // JavaScript's `slice(2)`; a byte slice would panic inside a non-ASCII name.
+                let rest = name.char_indices().nth(2).map_or("", |(at, _)| &name[at..]);
+                store_parameter(&mut curr, rest, value, &parameters);
                 return Ok(curr);
             }
             _ => {
@@ -1181,6 +1183,13 @@ mod tests {
         obj.set("b", Val::Bool(true));
         let keys: Vec<String> = obj.entries().map(|(key, _)| key).collect();
         assert_eq!(keys, ["2", "10", "a", "b"]);
+    }
+
+    #[test]
+    fn non_ascii_property_names_do_not_panic() {
+        let ics =
+            "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:a\r\n€X-A:1\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+        assert!(parse(ics, "UTC").is_ok());
     }
 
     #[test]

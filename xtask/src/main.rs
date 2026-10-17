@@ -27,7 +27,7 @@ tasks:
   mem-budget [--steady-seconds N] [--soak-minutes N]
                           measure a release build against the plan's memory budgets
   openapi [--check]       write packages/api-contracts/openapi.json and regenerate its TypeScript types
-  jest-destinations [--complete] [--units]
+  jest-destinations [--complete]
                           check crates/solace-api-tests/jest/*.tsv against the Jest case list
   ts-backend --checkout <dir> [--database <name>] [--port <port>] [--production]
                           run the current TypeScript backend against the test env";
