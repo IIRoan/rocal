@@ -155,8 +155,6 @@ Verify only — **don't start dev servers, builds, tunnels, EAS builds, OTA publ
 
 CI (`.github/workflows/pr-tests.yml`) runs lint, both typechecks, the tests, and the Rust job (`cargo xtask check --skip-mem`) on every PR. API-level e2e against a deployed or local API: `cd retired/backend && E2E_API_URL=https://api.solace.onl bun --no-env-file e2e/api-security.e2e.ts`. Optional env: `E2E_WEB_URL` (web header checks), `E2E_COOKIE` (signed-in checks; reject-only, writes nothing), `E2E_RATE_LIMIT=1` (burns this IP's sign-in budget).
 
-**Cursor Cloud agents** boot a prebuilt local stack: Postgres 16 on `localhost:5432` (`postgresql://solace:solace@localhost:5432/solace`, `prisma migrate deploy` applied), API `:4001` (`/api/health`), web `:4000`, notifications `:4002`, with generated gitignored `.env` files. Signup is invite-gated — sign in with the seeded shared account from `$TEST_LOGIN_USERNAME` / `$TEST_LOGIN_PASSWORD` (`POST /api/auth/sign-in/email` with `Origin: http://localhost:4000`). Never hard-code these credentials.
-
 ## 10. Keep this file true
 
 Update both copies in the same change when you add/rename an app or package, move a feature, change routes, or change a convention here (auth, E2EE, privacy, API contract, data layer, mail). When a known gap is fixed, delete it from §2. When a rule becomes mechanically checkable, add it to `scripts/check-repo-rules.ts`. Keep it concise — no one-off scripts or experiments.
