@@ -2,7 +2,6 @@
 
 use axum::Json;
 use axum::extract::{Path, State};
-use serde_json::Value;
 use solace_api_types::events::Event;
 use solace_api_types::recurring::{
     DeleteRecurringQuery, EditRecurringRequest, PreviewRecurrenceRequest, RecurrencePatterns,
@@ -73,13 +72,13 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(patterns))
 }
 
-/// Validates a rule object or rule text and describes it; the parsed rule echoes whatever rule text held, so it is JSON.
+/// Validates a rule object or rule text and describes it.
 #[utoipa::path(post, path = "/api/recurring/validate", operation_id = "validateRecurrenceRule", tag = "Recurring", request_body = ValidateRecurrenceRequest, responses((status = 200, body = RecurrenceValidation)))]
 #[tracing::instrument(skip_all)]
 pub async fn validate(
     _: RouteUser,
     ValidJson(body): ValidJson<ValidateRecurrenceRequest>,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<RecurrenceValidation>, AppError> {
     Ok(Json(service::validate(&body.rule)))
 }
 

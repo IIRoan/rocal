@@ -153,7 +153,7 @@ async fn rule_objects_validate_with_a_description() {
             valid: true,
             errors: vec![],
             description: Some("Weekly on Mon, Wed".into()),
-            rule: Some(weekly),
+            rule: Some(serde_json::to_value(&weekly).expect("rule json")),
         }
     );
     let cases = [
@@ -277,7 +277,7 @@ async fn rule_strings_are_parsed_leniently() {
         )
     );
     assert_eq!(
-        result.rule.and_then(|r| r.until).as_deref(),
+        result.rule.as_ref().and_then(|r| r["until"].as_str()),
         Some("2099-01-01T00:00:00.000Z"),
         "a string until comes back as an instant"
     );

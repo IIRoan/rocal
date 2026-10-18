@@ -49,20 +49,27 @@ pub struct CalendarList {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateCalendarRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub name: Option<String>,
     pub color: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub is_default: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encrypted_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
     /// Accepted from older clients and ignored; ciphertext presence decides.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_state: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub force_full_encryption: Option<bool>,
 }
 
@@ -70,22 +77,31 @@ pub struct CreateCalendarRequest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateCalendarRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub color: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub is_visible: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub is_default: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encrypted_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_state: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub force_full_encryption: Option<bool>,
 }
 
@@ -125,6 +141,7 @@ pub struct CalendarShareLink {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateShareLinkRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub regenerate: Option<bool>,
 }
 

@@ -375,18 +375,25 @@ pub struct CreateEventRequest {
     pub calendar_id: CalendarId,
     /// Plaintext content is only accepted without `encryptedContent`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub location: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub all_day: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub color: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub category_id: Option<CategoryId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub timezone: Option<String>,
     /// Minutes before the start, or `null` for none.
     #[serde(
@@ -396,17 +403,23 @@ pub struct CreateEventRequest {
     )]
     pub reminder: Option<Option<i32>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub recurrence: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encrypted_content: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub participants: Option<Vec<ParticipantInput>>,
     /// Transient plaintext for invitation mail; never stored.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub invitation_content: Option<InvitationContent>,
 }
 
@@ -414,25 +427,35 @@ pub struct CreateEventRequest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateEventRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub start: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub end: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub timezone: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub all_day: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub location: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub color: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub calendar_id: Option<CalendarId>,
     /// An empty id clears the category.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub category_id: Option<String>,
     #[serde(
         default,
@@ -448,14 +471,19 @@ pub struct UpdateEventRequest {
     )]
     pub recurrence: Option<Option<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encrypted_content: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub participants: Option<Vec<ParticipantInput>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub invitation_content: Option<InvitationContent>,
 }
 
@@ -464,10 +492,13 @@ pub struct UpdateEventRequest {
 pub struct ParticipantInput {
     pub email: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub display_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub role: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub status: Option<String>,
 }
 
@@ -476,8 +507,10 @@ pub struct ParticipantInput {
 pub struct InvitationContent {
     pub title: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub location: Option<String>,
 }
 
@@ -493,8 +526,10 @@ pub struct RsvpRequest {
 pub struct SealEncryptionRequest {
     pub encrypted_content: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
 }
 
@@ -505,6 +540,7 @@ pub struct BulkEventRequest {
     pub action: String,
     pub event_ids: Vec<EventId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub target_calendar_id: Option<CalendarId>,
 }
 
@@ -515,10 +551,13 @@ pub struct ImportInvitationRequest {
     pub ics_content: String,
     /// `accepted` or `tentative`; without it the invitation is staged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub status: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub calendar_id: Option<CalendarId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption: Option<Vec<InvitationEncryptionEntry>>,
 }
 
@@ -528,8 +567,10 @@ pub struct InvitationEncryptionEntry {
     pub external_id: String,
     pub encrypted_content: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
 }
 

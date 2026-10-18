@@ -19,5 +19,6 @@ pub struct PutRecentContactsRequest {
     pub encrypted_content: String,
     /// Defaults to 1 on the first upload and is kept when omitted later.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
 }

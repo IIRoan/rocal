@@ -1,4 +1,4 @@
-//! Sign-out and session management: `sign-out`, `list-sessions`, `revoke-session`, `revoke-sessions`, `revoke-other-sessions`.
+//! Sign-out, session management (`sign-out`, `list-sessions`, `revoke-session`, `revoke-sessions`, `revoke-other-sessions`) and `list-accounts`.
 
 use std::sync::LazyLock;
 
@@ -7,7 +7,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use solace_api_types::auth::{AuthSession, StatusFlag};
+use solace_api_types::auth::{AuthSession, LinkedAccount, StatusFlag};
 
 use super::api::{ApiError, json, validate};
 use super::hooks::{self, Reply};
@@ -97,6 +97,22 @@ pub async fn list_sessions(State(state): State<AppState>, headers: HeaderMap) ->
             .map(session::auth_session)
             .collect();
         Ok(json(&sessions))
+    }
+    .await;
+    hooks::with_cookies(outcome, cookies)
+}
+
+/// `listUserAccounts`: any session will do, unlike `list-sessions`.
+pub async fn list_accounts(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let mut cookies = Vec::new();
+    let outcome = async {
+        let active = require_session(&state, &headers, &mut cookies).await?;
+        let accounts: Vec<LinkedAccount> = store::accounts(&state.db, &active.user.id)
+            .await?
+            .iter()
+            .map(session::linked_account)
+            .collect();
+        Ok(json(&accounts))
     }
     .await;
     hooks::with_cookies(outcome, cookies)

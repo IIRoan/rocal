@@ -35,6 +35,19 @@ pub struct AuthSession {
     pub user_agent: Option<String>,
 }
 
+/// A linked sign-in method (`listUserAccounts`); tokens and the password hash are never returned.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkedAccount {
+    pub id: String,
+    pub account_id: String,
+    pub provider_id: String,
+    pub user_id: UserId,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub scopes: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionWithUser {

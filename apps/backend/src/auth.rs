@@ -38,6 +38,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .route("/api/auth/sign-in/email", post(email_password::sign_in))
         .route("/api/auth/sign-out", post(sessions::sign_out))
         .route("/api/auth/list-sessions", get(sessions::list_sessions))
+        .route("/api/auth/list-accounts", get(sessions::list_accounts))
         .route("/api/auth/revoke-session", post(sessions::revoke_session))
         .route("/api/auth/revoke-sessions", post(sessions::revoke_sessions))
         .route(

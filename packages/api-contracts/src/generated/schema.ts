@@ -939,7 +939,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Validates a rule object or rule text and describes it; the parsed rule echoes whatever rule text held, so it is JSON. */
+        /** Validates a rule object or rule text and describes it. */
         post: operations["validateRecurrenceRule"];
         delete?: never;
         options?: never;
@@ -1118,7 +1118,7 @@ export interface components {
             /** @description `move`, `delete` or `duplicate`. */
             action: string;
             eventIds: components["schemas"]["EventId"][];
-            targetCalendarId?: components["schemas"]["CalendarId"] | null;
+            targetCalendarId?: components["schemas"]["CalendarId"];
         };
         BulkEventResult: {
             action: string;
@@ -1223,61 +1223,62 @@ export interface components {
             timestamp: components["schemas"]["Timestamp"];
         };
         CreateCalendarRequest: {
-            blindIndexTokens?: string[] | null;
+            blindIndexTokens?: string[];
             color: string;
-            encryptedName?: string | null;
+            encryptedName?: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
+            encryptionKeyVersion?: number;
             /** @description Accepted from older clients and ignored; ciphertext presence decides. */
-            encryptionState?: string | null;
-            forceFullEncryption?: boolean | null;
-            isDefault?: boolean | null;
-            name?: string | null;
+            encryptionState?: string;
+            forceFullEncryption?: boolean;
+            isDefault?: boolean;
+            name?: string;
         };
         CreateCategoryRequest: {
-            blindIndexTokens?: string[] | null;
+            blindIndexTokens?: string[];
             color: string;
-            encryptedName?: string | null;
+            encryptedName?: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
+            encryptionKeyVersion?: number;
             /** @description Accepted from older clients and ignored; ciphertext presence decides. */
-            encryptionState?: string | null;
-            name?: string | null;
+            encryptionState?: string;
+            name?: string;
         };
         CreateEventRequest: {
-            allDay?: boolean | null;
-            blindIndexTokens?: string[] | null;
+            allDay?: boolean;
+            blindIndexTokens?: string[];
             calendarId: components["schemas"]["CalendarId"];
-            categoryId?: components["schemas"]["CategoryId"] | null;
-            color?: string | null;
-            description?: string | null;
-            encryptedContent?: string | null;
+            categoryId?: components["schemas"]["CategoryId"];
+            color?: string;
+            description?: string;
+            encryptedContent?: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
+            encryptionKeyVersion?: number;
             end: string;
-            invitationContent?: components["schemas"]["InvitationContent"] | null;
-            location?: string | null;
-            participants?: components["schemas"]["ParticipantInput"][] | null;
-            recurrence?: string | null;
+            /** @description Transient plaintext for invitation mail; never stored. */
+            invitationContent?: components["schemas"]["InvitationContent"];
+            location?: string;
+            participants?: components["schemas"]["ParticipantInput"][];
+            recurrence?: string;
             /**
              * Format: int32
              * @description Minutes before the start, or `null` for none.
              */
             reminder?: number | null;
             start: string;
-            timezone?: string | null;
+            timezone?: string;
             /** @description Plaintext content is only accepted without `encryptedContent`. */
-            title?: string | null;
+            title?: string;
         };
         CreateInviteRequest: {
             email: string;
         };
         /** @description The whole body may be omitted or `null`. */
         CreateShareLinkRequest: {
-            regenerate?: boolean | null;
+            regenerate?: boolean;
         };
         CreateSubscriptionRequest: {
-            color?: string | null;
+            color?: string;
             name: string;
             url: string;
         };
@@ -1340,7 +1341,7 @@ export interface components {
             /** @description `this_only`, `this_and_future` or `all`. */
             editScope: string;
             /** @description The occurrence instant; required for `this_only` and `this_and_future`. */
-            occurrenceDate?: string | null;
+            occurrenceDate?: string;
             updates: components["schemas"]["RecurringUpdates"];
         };
         EmailAvailability: {
@@ -1365,19 +1366,19 @@ export interface components {
         };
         EncryptedIcsEvent: {
             allDay: boolean;
-            blindIndexTokens?: string[] | null;
+            blindIndexTokens?: string[];
             encryptedContent: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
+            encryptionKeyVersion?: number;
             end: components["schemas"]["Timestamp"];
-            excludedDates?: components["schemas"]["Timestamp"][] | null;
+            excludedDates?: components["schemas"]["Timestamp"][];
             externalId: string;
-            occurrenceDate?: components["schemas"]["Timestamp"] | null;
-            participants?: components["schemas"]["ParticipantInput"][] | null;
+            occurrenceDate?: components["schemas"]["Timestamp"];
+            participants?: components["schemas"]["ParticipantInput"][];
             /** @description A recurrence rule object as JSON text. */
-            recurrence?: string | null;
+            recurrence?: string;
             /** @description Set on an override, together with `occurrenceDate`. */
-            seriesExternalId?: string | null;
+            seriesExternalId?: string;
             start: components["schemas"]["Timestamp"];
             timezone: string;
         };
@@ -1673,11 +1674,11 @@ export interface components {
         };
         /** @description A decrypted mailed invitation the client imports. */
         ImportInvitationRequest: {
-            calendarId?: components["schemas"]["CalendarId"] | null;
-            encryption?: components["schemas"]["InvitationEncryptionEntry"][] | null;
+            calendarId?: components["schemas"]["CalendarId"];
+            encryption?: components["schemas"]["InvitationEncryptionEntry"][];
             icsContent: string;
             /** @description `accepted` or `tentative`; without it the invitation is staged. */
-            status?: string | null;
+            status?: string;
         };
         /** @description `GET /api/events/invitations/by-external-id`. */
         InvitationByExternalIdQuery: {
@@ -1685,8 +1686,8 @@ export interface components {
             syncRemote?: boolean | null;
         };
         InvitationContent: {
-            description?: string | null;
-            location?: string | null;
+            description?: string;
+            location?: string;
             title: string;
         };
         InvitationDeclined: {
@@ -1694,10 +1695,10 @@ export interface components {
             declined: true;
         };
         InvitationEncryptionEntry: {
-            blindIndexTokens?: string[] | null;
+            blindIndexTokens?: string[];
             encryptedContent: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
+            encryptionKeyVersion?: number;
             externalId: string;
         };
         /** @description What an ICS invitation import did. */
@@ -1765,7 +1766,7 @@ export interface components {
         InviteValidation: components["schemas"]["InviteValid"] | components["schemas"]["InviteInvalid"];
         LegacyIcsImportRequest: {
             calendarId: components["schemas"]["CalendarId"];
-            fileName?: string | null;
+            fileName?: string;
             icsContent: string;
         };
         ListedCategory: components["schemas"]["Category"] & {
@@ -2022,10 +2023,10 @@ export interface components {
             target?: string;
         };
         ParticipantInput: {
-            displayName?: string | null;
+            displayName?: string;
             email: string;
-            role?: string | null;
-            status?: string | null;
+            role?: string;
+            status?: string;
         };
         /** @description A passkey row as the passkey plugin returns it: the COSE key in standard base64, the credential id in base64url. */
         Passkey: {
@@ -2062,13 +2063,13 @@ export interface components {
             wrappedSearchKey: string;
         };
         PasswordEnvelopeRequest: {
-            kdfAlgorithm?: string | null;
+            kdfAlgorithm?: string;
             /** Format: int32 */
-            kdfIterations?: number | null;
+            kdfIterations?: number;
             kdfSalt: string;
             /** Format: int32 */
-            keyVersion?: number | null;
-            wrapAlgorithm?: string | null;
+            keyVersion?: number;
+            wrapAlgorithm?: string;
             wrappedAccountKey: string;
             wrappedSearchKey: string;
         };
@@ -2083,7 +2084,7 @@ export interface components {
              * Format: int32
              * @description 7 to 365 days from the start; 90 when omitted.
              */
-            previewDays?: number | null;
+            previewDays?: number;
             recurrenceRule: components["schemas"]["RecurrenceRuleInput"];
         };
         ProfileLookupRequest: {
@@ -2125,7 +2126,7 @@ export interface components {
              * Format: int32
              * @description Defaults to 1 on the first upload and is kept when omitted later.
              */
-            encryptionKeyVersion?: number | null;
+            encryptionKeyVersion?: number;
         };
         PutRecentContactsRequest: {
             encryptedContent: string;
@@ -2133,7 +2134,7 @@ export interface components {
              * Format: int32
              * @description Defaults to 1 on the first upload and is kept when omitted later.
              */
-            encryptionKeyVersion?: number | null;
+            encryptionKeyVersion?: number;
         };
         RecentContacts: {
             encryptedContent: string;
@@ -2187,8 +2188,8 @@ export interface components {
         RecurrenceValidation: {
             description: string | null;
             errors: string[];
-            /** @description The parsed rule; absent when it could not be parsed. */
-            rule?: components["schemas"]["RecurrenceRule"];
+            /** @description The parsed rule as the input held it, extra keys included and an unreadable `until` as null; absent when it could not be parsed. */
+            rule?: Record<string, never>;
             valid: boolean;
         };
         RecurringDeleted: {
@@ -2199,38 +2200,38 @@ export interface components {
             success: boolean;
         };
         RecurringUpdates: {
-            allDay?: boolean | null;
-            blindIndexTokens?: string[] | null;
-            calendarId?: components["schemas"]["CalendarId"] | null;
+            allDay?: boolean;
+            blindIndexTokens?: string[];
+            calendarId?: components["schemas"]["CalendarId"];
             /** @description An empty id clears the category. */
-            categoryId?: string | null;
-            color?: string | null;
-            description?: string | null;
-            encryptedContent?: string | null;
+            categoryId?: string;
+            color?: string;
+            description?: string;
+            encryptedContent?: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
-            end?: string | null;
-            invitationContent?: components["schemas"]["InvitationContent"] | null;
-            location?: string | null;
-            participants?: components["schemas"]["ParticipantInput"][] | null;
-            recurrence?: string | null;
+            encryptionKeyVersion?: number;
+            end?: string;
+            invitationContent?: components["schemas"]["InvitationContent"];
+            location?: string;
+            participants?: components["schemas"]["ParticipantInput"][];
+            recurrence?: string;
             /**
              * Format: double
              * @description Any number; stored truncated to whole minutes.
              */
-            reminder?: number | null;
-            start?: string | null;
-            timezone?: string | null;
-            title?: string | null;
+            reminder?: number;
+            start?: string;
+            timezone?: string;
+            title?: string;
         };
         RegisterDeviceRequest: {
             deviceId: string;
-            deviceLabel?: string | null;
+            deviceLabel?: string;
             /** Format: int32 */
-            keyVersion?: number | null;
+            keyVersion?: number;
             publicKey: string;
-            publicKeyAlgorithm?: string | null;
-            wrapAlgorithm?: string | null;
+            publicKeyAlgorithm?: string;
+            wrapAlgorithm?: string;
             wrappedAccountKey: string;
             wrappedSearchKey: string;
         };
@@ -2259,10 +2260,10 @@ export interface components {
         /** @description A decline answers `{ deleted: true }`; accept and tentative answer the updated event. */
         RsvpResult: components["schemas"]["RsvpDeleted"] | components["schemas"]["Event"];
         SealEncryptionRequest: {
-            blindIndexTokens?: string[] | null;
+            blindIndexTokens?: string[];
             encryptedContent: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
+            encryptionKeyVersion?: number;
         };
         /** @description A search hit: a subset of the row with trimmed calendar and category. */
         SearchEvent: {
@@ -2403,28 +2404,28 @@ export interface components {
         Timestamp: string;
         /** @description Without a token every device of the user is removed. */
         UnregisterPushDeviceRequest: {
-            token?: string | null;
+            token?: string;
         };
         UpdateCalendarRequest: {
-            blindIndexTokens?: string[] | null;
-            color?: string | null;
-            encryptedName?: string | null;
+            blindIndexTokens?: string[];
+            color?: string;
+            encryptedName?: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
-            encryptionState?: string | null;
-            forceFullEncryption?: boolean | null;
-            isDefault?: boolean | null;
-            isVisible?: boolean | null;
-            name?: string | null;
+            encryptionKeyVersion?: number;
+            encryptionState?: string;
+            forceFullEncryption?: boolean;
+            isDefault?: boolean;
+            isVisible?: boolean;
+            name?: string;
         };
         UpdateCategoryRequest: {
-            blindIndexTokens?: string[] | null;
-            color?: string | null;
-            encryptedName?: string | null;
+            blindIndexTokens?: string[];
+            color?: string;
+            encryptedName?: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
-            encryptionState?: string | null;
-            name?: string | null;
+            encryptionKeyVersion?: number;
+            encryptionState?: string;
+            name?: string;
         };
         UpdateEventNotificationsRequest: {
             /** @description Sent by shipped binaries; accepted and dropped, never stored. */
@@ -2434,70 +2435,70 @@ export interface components {
             notifications: components["schemas"]["NotificationSetting"][];
         };
         UpdateEventRequest: {
-            allDay?: boolean | null;
-            blindIndexTokens?: string[] | null;
-            calendarId?: components["schemas"]["CalendarId"] | null;
+            allDay?: boolean;
+            blindIndexTokens?: string[];
+            calendarId?: components["schemas"]["CalendarId"];
             /** @description An empty id clears the category. */
-            categoryId?: string | null;
-            color?: string | null;
-            description?: string | null;
-            encryptedContent?: string | null;
+            categoryId?: string;
+            color?: string;
+            description?: string;
+            encryptedContent?: string;
             /** Format: int32 */
-            encryptionKeyVersion?: number | null;
-            end?: string | null;
-            invitationContent?: components["schemas"]["InvitationContent"] | null;
-            location?: string | null;
-            participants?: components["schemas"]["ParticipantInput"][] | null;
+            encryptionKeyVersion?: number;
+            end?: string;
+            invitationContent?: components["schemas"]["InvitationContent"];
+            location?: string;
+            participants?: components["schemas"]["ParticipantInput"][];
             /** @description `null` turns a series into a single event. */
             recurrence?: string | null;
             /** Format: int32 */
             reminder?: number | null;
-            start?: string | null;
-            timezone?: string | null;
-            title?: string | null;
+            start?: string;
+            timezone?: string;
+            title?: string;
         };
         UpdateSettingsRequest: {
-            browserNotifications?: boolean | null;
-            compactView?: boolean | null;
+            browserNotifications?: boolean;
+            compactView?: boolean;
             defaultCalendarId?: components["schemas"]["CalendarId"] | null;
             /** Format: int32 */
-            defaultEventDuration?: number | null;
+            defaultEventDuration?: number;
             /** @description `month`, `week`, `3day`, `day` or `agenda`. */
-            defaultView?: string | null;
-            emailNotifications?: boolean | null;
+            defaultView?: string;
+            emailNotifications?: boolean;
             /** @description `hybrid` or `full`. */
-            eventEncryptionMode?: string | null;
-            pushNotifications?: boolean | null;
-            reminderSound?: boolean | null;
-            showDeclinedEvents?: boolean | null;
-            showWeekNumbers?: boolean | null;
+            eventEncryptionMode?: string;
+            pushNotifications?: boolean;
+            reminderSound?: boolean;
+            showDeclinedEvents?: boolean;
+            showWeekNumbers?: boolean;
             /** @description `light`, `dark` or `system`. */
-            theme?: string | null;
+            theme?: string;
             /** @description `12h` or `24h`. */
-            timeFormat?: string | null;
-            timezone?: string | null;
+            timeFormat?: string;
+            timezone?: string;
             /**
              * Format: int32
              * @description 0 is Sunday.
              */
-            weekStartDay?: number | null;
+            weekStartDay?: number;
             /** @description A JSON array of weekday numbers as text. */
-            workingDays?: string | null;
+            workingDays?: string;
             /** Format: int32 */
-            workingHoursEnd?: number | null;
+            workingHoursEnd?: number;
             /**
              * Format: int32
              * @description Minutes after midnight.
              */
-            workingHoursStart?: number | null;
+            workingHoursStart?: number;
         };
         UpdateSubscriptionRequest: {
             /** @description Recolors the mirrored calendar. */
-            color?: string | null;
-            isActive?: boolean | null;
-            name?: string | null;
+            color?: string;
+            isActive?: boolean;
+            name?: string;
             /** Format: int32 */
-            syncIntervalMinutes?: number | null;
+            syncIntervalMinutes?: number;
         };
         /** @description A base64 square crop; the API stores only re-encoded WebP variants of it. */
         UploadAvatarRequest: {

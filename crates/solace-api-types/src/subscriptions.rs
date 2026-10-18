@@ -81,6 +81,7 @@ pub struct CreateSubscriptionRequest {
     pub name: String,
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub color: Option<String>,
 }
 
@@ -88,13 +89,17 @@ pub struct CreateSubscriptionRequest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateSubscriptionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub name: Option<String>,
     /// Recolors the mirrored calendar.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub color: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub is_active: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub sync_interval_minutes: Option<i32>,
 }
 
@@ -155,10 +160,13 @@ pub struct EncryptedIcsEvent {
     pub external_id: String,
     /// Set on an override, together with `occurrenceDate`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub series_external_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub occurrence_date: Option<Timestamp>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub excluded_dates: Option<Vec<Timestamp>>,
     pub start: Timestamp,
     pub end: Timestamp,
@@ -166,13 +174,17 @@ pub struct EncryptedIcsEvent {
     pub timezone: String,
     /// A recurrence rule object as JSON text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub recurrence: Option<String>,
     pub encrypted_content: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub participants: Option<Vec<ParticipantInput>>,
 }
 
@@ -182,6 +194,7 @@ pub struct LegacyIcsImportRequest {
     pub calendar_id: CalendarId,
     pub ics_content: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub file_name: Option<String>,
 }
 

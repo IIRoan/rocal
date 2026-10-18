@@ -331,6 +331,64 @@ async fn guarded_routes_authenticate_before_they_validate() {
 }
 
 #[tokio::test]
+async fn integers_beyond_what_the_api_stores_are_validation_errors() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let int4 = "Number must be less than or equal to 2147483647";
+    let cases = [
+        (
+            Method::PUT,
+            "/api/settings",
+            Some(json!({"defaultEventDuration": 2_147_483_648_i64})),
+            int4,
+            "defaultEventDuration",
+        ),
+        (
+            Method::POST,
+            "/api/recurring/validate",
+            Some(
+                json!({"rule": {"frequency": "daily", "interval": 1, "count": 2_147_483_648_i64}}),
+            ),
+            int4,
+            "rule.count",
+        ),
+        (
+            Method::POST,
+            "/api/calendars",
+            Some(
+                json!({"color": "blue", "encryptedName": "x", "encryptionKeyVersion": 2_147_483_648_i64}),
+            ),
+            int4,
+            "encryptionKeyVersion",
+        ),
+        (
+            Method::GET,
+            "/api/events/search?q=ab&offset=9223372036854775808",
+            None,
+            "Number must be less than or equal to 9007199254740991",
+            "offset",
+        ),
+    ];
+    for (method, path, body, message, field) in cases {
+        let response = ok(user.agent.send(method, path, body, &[]).await);
+        match app.backend {
+            // TypeScript validated these and then failed in the database or the client.
+            Backend::TypeScript => assert!(!response.status.is_success(), "{path}"),
+            Backend::Rust => {
+                let error = response
+                    .expect_error(400, "Validation Error", message)
+                    .unwrap_or_else(|e| panic!("{path}: {e}"));
+                assert_eq!(
+                    error["details"]["issues"][0]["path"],
+                    json!(field),
+                    "{path}"
+                );
+            }
+        }
+    }
+}
+
+#[tokio::test]
 async fn unknown_routes_and_methods_are_not_found() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;

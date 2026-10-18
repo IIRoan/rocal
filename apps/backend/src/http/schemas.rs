@@ -42,7 +42,7 @@ pub fn encryption_shadow_fields() -> [(&'static str, Schema); 4] {
         ("encryptionState", encryption_state_schema().optional()),
         (
             "encryptionKeyVersion",
-            zod::number().int().gte(1.0).optional(),
+            zod::number().int().gte(1.0).max(zod::I32_MAX).optional(),
         ),
     ]
 }
@@ -103,7 +103,7 @@ pub fn event_content_encryption_fields() -> [(&'static str, Schema); 3] {
         ("blindIndexTokens", zod::array(zod::string()).optional()),
         (
             "encryptionKeyVersion",
-            zod::number().int().gte(1.0).optional(),
+            zod::number().int().gte(1.0).max(zod::I32_MAX).optional(),
         ),
     ]
 }
@@ -204,7 +204,10 @@ pub fn recurrence_rule_object_schema() -> Schema {
     zod::object([
         ("frequency", recurrence_frequency_schema()),
         ("interval", zod::number().int().min(1).max(999)),
-        ("count", zod::number().int().min(1).optional()),
+        (
+            "count",
+            zod::number().int().min(1).max(zod::I32_MAX).optional(),
+        ),
         ("until", zod::string().optional()),
         ("timezone", timezone_schema().optional()),
         ("byWeekDay", int_array(0, 6).optional()),
@@ -277,7 +280,7 @@ pub fn encrypted_ics_import_event_schema() -> Schema {
         ("blindIndexTokens", zod::array(zod::string()).optional()),
         (
             "encryptionKeyVersion",
-            zod::number().int().min(1).optional(),
+            zod::number().int().min(1).max(zod::I32_MAX).optional(),
         ),
         (
             "participants",

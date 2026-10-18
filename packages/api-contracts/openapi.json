@@ -2207,7 +2207,7 @@
         "tags": [
           "Recurring"
         ],
-        "summary": "Validates a rule object or rule text and describes it; the parsed rule echoes whatever rule text held, so it is JSON.",
+        "summary": "Validates a rule object or rule text and describes it.",
         "operationId": "validateRecurrenceRule",
         "requestBody": {
           "content": {
@@ -2705,14 +2705,7 @@
             }
           },
           "targetCalendarId": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/CalendarId"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/CalendarId"
           }
         },
         "additionalProperties": false
@@ -3139,10 +3132,7 @@
         ],
         "properties": {
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
@@ -3151,42 +3141,24 @@
             "type": "string"
           },
           "encryptedName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "encryptionState": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "Accepted from older clients and ignored; ciphertext presence decides."
           },
           "forceFullEncryption": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "isDefault": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "name": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -3198,10 +3170,7 @@
         ],
         "properties": {
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
@@ -3210,30 +3179,18 @@
             "type": "string"
           },
           "encryptedName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "encryptionState": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "Accepted from older clients and ignored; ciphertext presence decides."
           },
           "name": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -3247,16 +3204,10 @@
         ],
         "properties": {
           "allDay": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
@@ -3265,74 +3216,39 @@
             "$ref": "#/components/schemas/CalendarId"
           },
           "categoryId": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/CategoryId"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/CategoryId"
           },
           "color": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptedContent": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "end": {
             "type": "string"
           },
           "invitationContent": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/InvitationContent",
-                "description": "Transient plaintext for invitation mail; never stored."
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/InvitationContent",
+            "description": "Transient plaintext for invitation mail; never stored."
           },
           "location": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "participants": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/ParticipantInput"
             }
           },
           "recurrence": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "reminder": {
             "type": [
@@ -3346,16 +3262,10 @@
             "type": "string"
           },
           "timezone": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "title": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "Plaintext content is only accepted without `encryptedContent`."
           }
         },
@@ -3378,10 +3288,7 @@
         "description": "The whole body may be omitted or `null`.",
         "properties": {
           "regenerate": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -3394,10 +3301,7 @@
         ],
         "properties": {
           "color": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "name": {
             "type": "string"
@@ -3634,10 +3538,7 @@
             "description": "`this_only`, `this_and_future` or `all`."
           },
           "occurrenceDate": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "The occurrence instant; required for `this_only` and `this_and_future`."
           },
           "updates": {
@@ -3741,10 +3642,7 @@
             "type": "boolean"
           },
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
@@ -3753,20 +3651,14 @@
             "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "end": {
             "$ref": "#/components/schemas/Timestamp"
           },
           "excludedDates": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/Timestamp"
             }
@@ -3775,36 +3667,20 @@
             "type": "string"
           },
           "occurrenceDate": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Timestamp"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Timestamp"
           },
           "participants": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/ParticipantInput"
             }
           },
           "recurrence": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "A recurrence rule object as JSON text."
           },
           "seriesExternalId": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "Set on an override, together with `occurrenceDate`."
           },
           "start": {
@@ -5050,20 +4926,10 @@
         ],
         "properties": {
           "calendarId": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/CalendarId"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/CalendarId"
           },
           "encryption": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/InvitationEncryptionEntry"
             }
@@ -5072,10 +4938,7 @@
             "type": "string"
           },
           "status": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "`accepted` or `tentative`; without it the invitation is staged."
           }
         },
@@ -5107,16 +4970,10 @@
         ],
         "properties": {
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "location": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "title": {
             "type": "string"
@@ -5146,10 +5003,7 @@
         ],
         "properties": {
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
@@ -5158,10 +5012,7 @@
             "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "externalId": {
@@ -5421,10 +5272,7 @@
             "$ref": "#/components/schemas/CalendarId"
           },
           "fileName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "icsContent": {
             "type": "string"
@@ -6359,25 +6207,16 @@
         ],
         "properties": {
           "displayName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "email": {
             "type": "string"
           },
           "role": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "status": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -6527,33 +6366,21 @@
         ],
         "properties": {
           "kdfAlgorithm": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "kdfIterations": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "kdfSalt": {
             "type": "string"
           },
           "keyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "wrapAlgorithm": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "wrappedAccountKey": {
             "type": "string"
@@ -6594,10 +6421,7 @@
             "type": "string"
           },
           "previewDays": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32",
             "description": "7 to 365 days from the start; 90 when omitted."
           },
@@ -6745,10 +6569,7 @@
             "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32",
             "description": "Defaults to 1 on the first upload and is kept when omitted later."
           }
@@ -6765,10 +6586,7 @@
             "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32",
             "description": "Defaults to 1 on the first upload and is kept when omitted later."
           }
@@ -6979,8 +6797,8 @@
             }
           },
           "rule": {
-            "$ref": "#/components/schemas/RecurrenceRule",
-            "description": "The parsed rule; absent when it could not be parsed."
+            "type": "object",
+            "description": "The parsed rule as the input held it, extra keys included and an unreadable `until` as null; absent when it could not be parsed."
           },
           "valid": {
             "type": "boolean"
@@ -7015,124 +6833,65 @@
         "type": "object",
         "properties": {
           "allDay": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
           },
           "calendarId": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/CalendarId"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/CalendarId"
           },
           "categoryId": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "An empty id clears the category."
           },
           "color": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptedContent": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "end": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "invitationContent": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/InvitationContent"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/InvitationContent"
           },
           "location": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "participants": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/ParticipantInput"
             }
           },
           "recurrence": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "reminder": {
-            "type": [
-              "number",
-              "null"
-            ],
+            "type": "number",
             "format": "double",
             "description": "Any number; stored truncated to whole minutes."
           },
           "start": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "timezone": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "title": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -7150,32 +6909,20 @@
             "type": "string"
           },
           "deviceLabel": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "keyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "publicKey": {
             "type": "string"
           },
           "publicKeyAlgorithm": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "wrapAlgorithm": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "wrappedAccountKey": {
             "type": "string"
@@ -7286,10 +7033,7 @@
         ],
         "properties": {
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
@@ -7298,10 +7042,7 @@
             "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         },
@@ -7835,10 +7576,7 @@
         "description": "Without a token every device of the user is removed.",
         "properties": {
           "token": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -7847,62 +7585,35 @@
         "type": "object",
         "properties": {
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
           },
           "color": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptedName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "encryptionState": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "forceFullEncryption": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "isDefault": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "isVisible": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "name": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -7911,44 +7622,26 @@
         "type": "object",
         "properties": {
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
           },
           "color": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptedName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "encryptionState": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "name": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -7986,89 +7679,45 @@
         "type": "object",
         "properties": {
           "allDay": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "blindIndexTokens": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string"
             }
           },
           "calendarId": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/CalendarId"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/CalendarId"
           },
           "categoryId": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "An empty id clears the category."
           },
           "color": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptedContent": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "encryptionKeyVersion": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "end": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "invitationContent": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/InvitationContent"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/InvitationContent"
           },
           "location": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "participants": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/ParticipantInput"
             }
@@ -8088,22 +7737,13 @@
             "format": "int32"
           },
           "start": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "timezone": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "title": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -8112,16 +7752,10 @@
         "type": "object",
         "properties": {
           "browserNotifications": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "compactView": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "defaultCalendarId": {
             "oneOf": [
@@ -8135,103 +7769,58 @@
             ]
           },
           "defaultEventDuration": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "defaultView": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "`month`, `week`, `3day`, `day` or `agenda`."
           },
           "emailNotifications": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "eventEncryptionMode": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "`hybrid` or `full`."
           },
           "pushNotifications": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "reminderSound": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "showDeclinedEvents": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "showWeekNumbers": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "theme": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "`light`, `dark` or `system`."
           },
           "timeFormat": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "`12h` or `24h`."
           },
           "timezone": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "weekStartDay": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32",
             "description": "0 is Sunday."
           },
           "workingDays": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "A JSON array of weekday numbers as text."
           },
           "workingHoursEnd": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "workingHoursStart": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32",
             "description": "Minutes after midnight."
           }
@@ -8242,29 +7831,17 @@
         "type": "object",
         "properties": {
           "color": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "description": "Recolors the mirrored calendar."
           },
           "isActive": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": "boolean"
           },
           "name": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "syncIntervalMinutes": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": "integer",
             "format": "int32"
           }
         },

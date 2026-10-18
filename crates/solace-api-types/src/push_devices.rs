@@ -21,6 +21,7 @@ pub struct RegisterPushDeviceRequest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UnregisterPushDeviceRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub token: Option<String>,
 }
 

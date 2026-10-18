@@ -2,11 +2,11 @@
 
 use axum::http::HeaderMap;
 use sea_orm::{ActiveModelTrait, IntoActiveModel, ModelTrait, Set};
-use solace_api_types::auth::{AuthSession, AuthUser, SessionWithUser};
+use solace_api_types::auth::{AuthSession, AuthUser, LinkedAccount, SessionWithUser};
 
 use super::cookies::{self, SESSION_LIFETIME_SECONDS, SESSION_UPDATE_AGE_SECONDS};
 use super::store;
-use crate::db::entities::{session, user};
+use crate::db::entities::{account, session, user};
 use crate::instant;
 use crate::state::AppState;
 
@@ -132,6 +132,26 @@ pub fn auth_session(session: &session::Model) -> AuthSession {
         updated_at: instant::iso(session.updated_at),
         ip_address: None,
         user_agent: None,
+    }
+}
+
+/// `parseAccountOutput` plus `parseStoredScopes`: the row without its tokens or password hash.
+pub fn linked_account(account: &account::Model) -> LinkedAccount {
+    LinkedAccount {
+        id: account.id.clone(),
+        account_id: account.account_id.clone(),
+        provider_id: account.provider_id.clone(),
+        user_id: account.user_id.clone().into(),
+        created_at: instant::iso(account.created_at),
+        updated_at: instant::iso(account.updated_at),
+        scopes: account
+            .scope
+            .iter()
+            .flat_map(|scope| scope.split(','))
+            .map(str::trim)
+            .filter(|scope| !scope.is_empty())
+            .map(str::to_owned)
+            .collect(),
     }
 }
 

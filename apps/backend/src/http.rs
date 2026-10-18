@@ -1,6 +1,8 @@
 //! HTTP plumbing: middleware, extractors, origin policy and the Zod-compatible validator.
 
 pub mod client_ip;
+#[cfg(test)]
+mod contract_tests;
 pub mod extract;
 pub mod headers;
 pub mod origins;

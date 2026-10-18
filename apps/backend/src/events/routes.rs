@@ -33,7 +33,7 @@ request_schema!(EventSearchQuery => zod::object([
     ("q", zod::string().min(2)),
     ("limit", optional_query_int(Some(1), Some(50))),
     ("blindIndexTokens", zod::string().optional()),
-    ("offset", optional_query_int(Some(0), None)),
+    ("offset", optional_query_int(Some(0), Some(zod::MAX_SAFE_INTEGER))),
     ("startDate", zod::string().optional()),
     ("endDate", zod::string().optional()),
 ])
@@ -41,7 +41,7 @@ request_schema!(EventSearchQuery => zod::object([
 
 request_schema!(EventSearchCorpusQuery => zod::object([
     ("limit", optional_query_int(Some(1), Some(200))),
-    ("offset", optional_query_int(Some(0), None)),
+    ("offset", optional_query_int(Some(0), Some(zod::MAX_SAFE_INTEGER))),
     ("updatedAfter", zod::string().optional()),
 ])
 .strict());
@@ -101,7 +101,7 @@ request_schema!(RsvpRequest => zod::object([("status", rsvp_status_schema())]).s
 request_schema!(SealEncryptionRequest => zod::object([
     ("encryptedContent", zod::string().min(1)),
     ("blindIndexTokens", zod::array(zod::string().min(1)).optional()),
-    ("encryptionKeyVersion", zod::number().int().gte(1.0).optional()),
+    ("encryptionKeyVersion", zod::number().int().gte(1.0).max(zod::I32_MAX).optional()),
 ])
 .strict());
 

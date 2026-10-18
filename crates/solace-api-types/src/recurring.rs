@@ -57,10 +57,10 @@ pub struct RecurrenceValidation {
     pub errors: Vec<String>,
     #[schema(required = true)]
     pub description: Option<String>,
-    /// The parsed rule; absent when it could not be parsed.
+    /// The parsed rule as the input held it, extra keys included and an unreadable `until` as null; absent when it could not be parsed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub rule: Option<RecurrenceRule>,
+    #[schema(value_type = Object, nullable = false)]
+    pub rule: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -71,6 +71,7 @@ pub struct PreviewRecurrenceRequest {
     pub recurrence_rule: RecurrenceRuleInput,
     /// 7 to 365 days from the start; 90 when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub preview_days: Option<i32>,
 }
 
@@ -109,6 +110,7 @@ pub struct EditRecurringRequest {
     pub edit_scope: String,
     /// The occurrence instant; required for `this_only` and `this_and_future`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub occurrence_date: Option<String>,
     pub updates: RecurringUpdates,
 }
@@ -117,40 +119,57 @@ pub struct EditRecurringRequest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RecurringUpdates {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub start: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub end: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub all_day: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub location: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub color: Option<String>,
     /// Any number; stored truncated to whole minutes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub reminder: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub recurrence: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub calendar_id: Option<CalendarId>,
     /// An empty id clears the category.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub category_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub timezone: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub participants: Option<Vec<ParticipantInput>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub invitation_content: Option<InvitationContent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encrypted_content: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
 }
 

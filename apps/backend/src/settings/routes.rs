@@ -33,7 +33,7 @@ request_schema!(UpdateSettingsRequest => zod::object([
     ("browserNotifications", zod::boolean().optional()),
     ("reminderSound", zod::boolean().optional()),
     ("eventEncryptionMode", event_encryption_mode_schema().optional()),
-    ("defaultEventDuration", zod::number().int().min(1).optional()),
+    ("defaultEventDuration", zod::number().int().min(1).max(zod::I32_MAX).optional()),
     ("defaultCalendarId", zod::union(vec![zod::string(), zod::null()]).optional()),
     ("compactView", zod::boolean().optional()),
     ("showWeekNumbers", zod::boolean().optional()),

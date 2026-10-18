@@ -66,6 +66,17 @@ pub async fn credential_account<C: ConnectionTrait>(
         .await
 }
 
+pub async fn accounts<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+) -> Result<Vec<account::Model>, sea_orm::DbErr> {
+    account::Entity::find()
+        .filter(account::Column::UserId.eq(user_id))
+        .order_by_asc(account::Column::CreatedAt)
+        .all(db)
+        .await
+}
+
 pub async fn create_user<C: ConnectionTrait>(
     db: &C,
     email: &str,

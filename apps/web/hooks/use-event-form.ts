@@ -561,8 +561,10 @@ export function useEventForm({
 
       if (isRecurring && recurrenceRule) {
         try {
-          const validation =
-            await calendarApiService.validateRecurrence(recurrenceRule);
+          // The saved string form: the API cannot describe a rule object whose `until` is still text.
+          const validation = await calendarApiService.validateRecurrence(
+            JSON.stringify(recurrenceRule),
+          );
           if (!validation.valid) {
             toast.error(
               `Invalid recurrence rule: ${validation.errors.join(", ")}`,

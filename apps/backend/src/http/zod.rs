@@ -139,6 +139,11 @@ enum Kind {
     Transform(Box<Schema>, TransformFn),
 }
 
+/// The largest integer an `i32` DTO field and a Postgres `int4` column hold.
+pub const I32_MAX: usize = 2_147_483_647;
+/// JavaScript's `Number.MAX_SAFE_INTEGER`, the bound for `i64` DTO fields.
+pub const MAX_SAFE_INTEGER: usize = 9_007_199_254_740_991;
+
 #[derive(Clone)]
 pub struct Schema {
     kind: Kind,

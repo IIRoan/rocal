@@ -3,12 +3,11 @@
 use std::collections::BTreeMap;
 
 use sea_orm::Set;
-use serde_json::{Value, json};
 use solace_api_types::events::{Event, ParticipantInput};
 use solace_api_types::recurring::{
     DeleteRecurringQuery, EditRecurringRequest, PreviewInstance, PreviewRecurrenceRequest,
     RecurrencePattern, RecurrencePatterns, RecurrencePreview, RecurrenceRule, RecurrenceRuleInput,
-    RecurringDeleted, RecurringUpdates,
+    RecurrenceValidation, RecurringDeleted, RecurringUpdates,
 };
 use time::PrimitiveDateTime;
 
@@ -32,25 +31,31 @@ const DEFAULT_PREVIEW_DAYS: i32 = 90;
 const NOT_FOUND: &str = "Recurring event not found or access denied";
 
 /// `validate`: the parsed rule (echoed as JSON, unknown keys of rule text included), its errors and description.
-pub fn validate(input: &RecurrenceRuleInput) -> Value {
+pub fn validate(input: &RecurrenceRuleInput) -> RecurrenceValidation {
+    let invalid = |error: &str| RecurrenceValidation {
+        valid: false,
+        errors: vec![error.to_owned()],
+        description: None,
+        rule: None,
+    };
     let Some(parsed) = rules::parse_input(input) else {
-        return json!({"valid": false, "errors": ["Invalid recurrence rule format"], "description": null});
+        return invalid("Invalid recurrence rule format");
     };
     let errors = validate_rule(&parsed.rule);
     let description = if errors.is_empty() {
         let Some(description) = rules::describe(&parsed) else {
-            return json!({"valid": false, "errors": ["Failed to parse recurrence rule"], "description": null});
+            return invalid("Failed to parse recurrence rule");
         };
         Some(description)
     } else {
         None
     };
-    json!({
-        "valid": errors.is_empty(),
-        "errors": errors,
-        "description": description,
-        "rule": parsed.json,
-    })
+    RecurrenceValidation {
+        valid: errors.is_empty(),
+        errors,
+        description,
+        rule: Some(parsed.json),
+    }
 }
 
 fn preview_error() -> AppError {
@@ -514,20 +519,27 @@ pub async fn delete(
 
 #[cfg(test)]
 mod tests {
+    use serde_json::{Value, json};
+
     use super::*;
 
     fn rule_text(text: &str) -> RecurrenceRuleInput {
         RecurrenceRuleInput::Json(text.into())
     }
 
+    /// The validation as its wire JSON.
+    fn validated(input: &RecurrenceRuleInput) -> Value {
+        serde_json::to_value(validate(input)).unwrap()
+    }
+
     #[test]
     fn validation_reports_format_semantics_and_throws_separately() {
         assert_eq!(
-            validate(&rule_text("nope")),
+            validated(&rule_text("nope")),
             json!({"valid": false, "errors": ["Invalid recurrence rule format"], "description": null})
         );
         assert_eq!(
-            validate(&rule_text(
+            validated(&rule_text(
                 r#"{"frequency":"daily","interval":1,"count":2,"until":"2099-01-01"}"#
             )),
             json!({
@@ -548,7 +560,7 @@ mod tests {
             by_month: None,
         };
         assert_eq!(
-            validate(&RecurrenceRuleInput::Rule(rule)),
+            validated(&RecurrenceRuleInput::Rule(rule)),
             json!({"valid": false, "errors": ["Failed to parse recurrence rule"], "description": null})
         );
     }

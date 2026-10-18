@@ -39,38 +39,52 @@ pub struct UserSettings {
 pub struct UpdateSettingsRequest {
     /// `light`, `dark` or `system`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub theme: Option<String>,
     /// `month`, `week`, `3day`, `day` or `agenda`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub default_view: Option<String>,
     /// 0 is Sunday.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub week_start_day: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub timezone: Option<String>,
     /// `12h` or `24h`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub time_format: Option<String>,
     /// Minutes after midnight.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub working_hours_start: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub working_hours_end: Option<i32>,
     /// A JSON array of weekday numbers as text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub working_days: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub email_notifications: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub push_notifications: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub browser_notifications: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub reminder_sound: Option<bool>,
     /// `hybrid` or `full`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub event_encryption_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub default_event_duration: Option<i32>,
     /// `null` clears the default calendar.
     #[serde(
@@ -80,9 +94,12 @@ pub struct UpdateSettingsRequest {
     )]
     pub default_calendar_id: Option<Option<CalendarId>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub compact_view: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub show_week_numbers: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub show_declined_events: Option<bool>,
 }

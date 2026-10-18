@@ -2,8 +2,8 @@
 
 use serde_json::json;
 use solace_api_types::auth::{
-    AuthSession, MeResponse, SessionWithUser, SignInResponse, SignUpResponse, StatusFlag,
-    SuccessFlag,
+    AuthSession, LinkedAccount, MeResponse, SessionWithUser, SignInResponse, SignUpResponse,
+    StatusFlag, SuccessFlag,
 };
 
 use solace_api_tests::client::ResponseResult;
@@ -560,6 +560,35 @@ async fn list_sessions_shows_only_the_users_own_sessions() {
 
     let mut anon = app.anonymous();
     let response = ok(anon.get("/api/auth/list-sessions").await);
+    assert_eq!(response.status.as_u16(), 401, "{}", response.text());
+}
+
+#[tokio::test]
+async fn list_accounts_shows_the_credential_without_secrets() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let _other = app.user().await;
+    let response = ok(user.get("/api/auth/list-accounts").await.expect_status(200));
+    let raw = response.text();
+    assert!(
+        !raw.contains("password") && !raw.contains("Token"),
+        "no secrets: {raw}"
+    );
+    let accounts: Vec<LinkedAccount> = ok(response.dto());
+    assert_eq!(accounts.len(), 1);
+    let account = &accounts[0];
+    assert_eq!(
+        (
+            account.provider_id.as_str(),
+            account.account_id.as_str(),
+            account.user_id.0.as_str()
+        ),
+        ("credential", user.id.as_str(), user.id.as_str())
+    );
+    assert!(account.scopes.is_empty());
+
+    let mut anon = app.anonymous();
+    let response = ok(anon.get("/api/auth/list-accounts").await);
     assert_eq!(response.status.as_u16(), 401, "{}", response.text());
 }
 

@@ -27,7 +27,7 @@ request_schema!(ImportInvitationRequest => zod::object([
         ("externalId", zod::string().min(1).max(512)),
         ("encryptedContent", zod::string().min(1)),
         ("blindIndexTokens", zod::array(zod::string().min(1)).optional()),
-        ("encryptionKeyVersion", zod::number().int().gte(1.0).optional()),
+        ("encryptionKeyVersion", zod::number().int().gte(1.0).max(zod::I32_MAX).optional()),
     ]).strict()).optional()),
 ])
 .strict());

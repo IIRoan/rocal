@@ -11,6 +11,7 @@ import { getAuthHeaders } from "@workspace/native-core/lib/api";
 import { persistRenewedSessionCookie } from "@workspace/native-core/lib/session-cookie";
 import {
   createMailAccessTokenManager,
+  type ApiResponse,
   type MailAccessToken,
 } from "@workspace/calendar-client";
 
@@ -107,12 +108,7 @@ export async function upsertAccountVaultBackup(request: {
   return parseJson(response);
 }
 
-export type MailDirectoryKey = {
-  email: string;
-  publicKeyArmored: string;
-  fingerprint: string;
-  algorithm: string;
-};
+export type MailDirectoryKey = ApiResponse<"MailDirectoryKey">;
 
 export async function getRecipientKey(email: string): Promise<MailDirectoryKey> {
   const response = await mailFetch(

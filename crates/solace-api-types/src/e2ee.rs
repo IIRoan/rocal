@@ -146,15 +146,19 @@ pub struct ResetSnapshot {
 pub struct RegisterDeviceRequest {
     pub device_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub device_label: Option<String>,
     pub public_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub public_key_algorithm: Option<String>,
     pub wrapped_account_key: String,
     pub wrapped_search_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub wrap_algorithm: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub key_version: Option<i32>,
 }
 
@@ -162,14 +166,18 @@ pub struct RegisterDeviceRequest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PasswordEnvelopeRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub kdf_algorithm: Option<String>,
     pub kdf_salt: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub kdf_iterations: Option<i32>,
     pub wrapped_account_key: String,
     pub wrapped_search_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub wrap_algorithm: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
     pub key_version: Option<i32>,
 }
