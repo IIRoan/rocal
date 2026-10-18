@@ -465,6 +465,7 @@ This happens only with explicit go-ahead.
 - 14:51 UTC: `api.solace.onl`'s CNAME moved from `8d335a303195b28e.vercel-dns-017.com` to Railway's `obq4rs6q.up.railway.app`, DNS-only so Railway's `X-Real-IP` is the client. Railway issues the certificate only after it sees the CNAME, so clients already on the new record had no valid TLS until 14:54:46 (about 3.5 minutes).
 - The redeploy at 14:55 brought a fresh `STALWART_WEBHOOK_SECRET` (the boot re-registered the webhook with it) and calendar sync, whose first run synced every due feed. No warnings or errors afterwards; 47 MiB resident.
 - Rollback: point the CNAME back at Vercel and set Vercel's `STALWART_WEBHOOK_SECRET` to Railway's value, because only `serve.ts`, never the Vercel function, registers the webhook.
+- 2026-10-18: the Vercel API project was deleted after the merge made its root directory the Rust crate, so every `master` build failed (and a TypeScript build there would run `prisma migrate deploy` against production). A bad Rust deploy rolls back on Railway by redeploying the previous deployment; going back to TypeScript would need a new deployment from `retired/backend`. Prisma migrations are now applied by hand until step 7 moves them to `sea-orm-migration`.
 - The Railway `test` environment (the replica, its Stalwart, Postgres and bucket) was deleted after the cutover. The suite's avatar bucket is now a local S3 mock (`adobe/s3mock`) that `cargo xtask test-env up` starts, so CI needs no bucket secrets; `deploy-test`, the test-service Dockerfiles and the guard's Railway host allowances went with it.
 - Layout after the cutover: the Rust server moved from `crates/solace-server` to `apps/backend` (crate name unchanged), and the TypeScript backend to `retired/backend`, still a Bun workspace so it can be rebuilt for a rollback (its Vercel project's root directory must follow).
 - The Go notifications worker became the Rust crate `solace-notifications` in `apps/notifications`, with the same SQL, payload rules, APNs payloads, reminder mail, retention rules, `/health` and `/status` and test CLI. It reuses the API crate's JMAP mailer (which gained an optional Message-ID), webhook prefix, bundle routing, scratch databases and fake HTTP server, and builds from `apps/notifications/Dockerfile`; the reminder HTML is the React Email render, committed.
@@ -477,7 +478,7 @@ This happens only with explicit go-ahead.
 
 ### 7. Delete TypeScript and clean up
 
-- Remove `apps/backend`, Prisma, the Better Auth server packages, and, after confirming, the Vercel API project. Keep the frontend, shared-package, and Go tests.
+- Remove `retired/backend`, Prisma and the Better Auth server packages (the Vercel API project is already gone). Keep the frontend, shared-package, and Go tests.
 - Move migrations to `sea-orm-migration`, baselined at migration 53, keeping the `_prisma_migrations` history.
 - Fix the known privacy gaps, delete them from AGENTS §2, and remove the exception.
 - Reach Stalwart over Railway's private network (`stalwart.railway.internal`) with a scoped provisioner key instead of `STALWART_ADMIN_TOKEN` over `https://mail.solace.onl` (what the Vercel API used too; the provisioner role needs the User role and `impersonate`, see step 1), then correct AGENTS §8's gate sentence.
