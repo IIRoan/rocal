@@ -62,9 +62,6 @@ export type JsonRevived<T> = T extends Date
         }
       : T;
 
-/** `T` under strictNullChecks; `unknown` in apps/web's non-strict build, where zod-inferred bodies lose their required keys. */
-export type StrictBody<T> = undefined extends string ? unknown : T;
-
 /** An API response component as `HttpClient` returns it. */
 export type ApiResponse<Name extends keyof components["schemas"]> = JsonRevived<
   Schema<Name>

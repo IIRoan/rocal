@@ -67,7 +67,7 @@ fn utc_offset(name: &str) -> Option<jiff::tz::Offset> {
         b'-' => -1,
         _ => return None,
     };
-    let digits = &name[1..];
+    let digits = name.get(1..).filter(|digits| digits.is_ascii())?;
     let (hours, minutes) = match digits.len() {
         2 => (digits, "00"),
         4 => (&digits[..2], &digits[2..]),
@@ -132,6 +132,16 @@ mod tests {
         assert_eq!(resolve_timezone(Some("\u{0085}")), "\u{0085}");
         assert_eq!(resolve_timezone(Some(" \t")), DEFAULT_TIMEZONE);
         assert_eq!(resolve_timezone(None), DEFAULT_TIMEZONE);
+    }
+
+    #[test]
+    fn offset_zones_refuse_non_ascii_digits() {
+        assert!(time_zone("+💚").is_none());
+        assert!(time_zone("+0é0").is_none());
+        assert_eq!(
+            time_zone("+05:30").map(|zone| zone.to_offset(jiff::Timestamp::UNIX_EPOCH)),
+            jiff::tz::Offset::from_seconds(19_800).ok()
+        );
     }
 
     #[test]

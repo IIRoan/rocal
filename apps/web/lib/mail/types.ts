@@ -201,7 +201,7 @@ const jmapHeaderValuesSchema = jmapOptional(
       const normalized = normalizeJmapHeaderValues(value);
       return normalized.length > 0 ? normalized : undefined;
     },
-    z.array(z.string()),
+    z.array(z.string()).optional(),
   ),
 );
 

@@ -5,6 +5,7 @@ import {
 } from "@workspace/calendar-ics/windows-zones";
 import {
   eventParticipantInputSchema,
+  type EventParticipantInput,
   recurrenceRuleObjectSchema,
   timezoneSchema,
 } from "./route-schemas";
@@ -88,7 +89,7 @@ function recurrence(
   return JSON.stringify(parsed);
 }
 
-function participants(component: IcsComponent) {
+function participants(component: IcsComponent): EventParticipantInput[] {
   return ["organizer", "attendee"].flatMap((role) =>
     component.getAllProperties(role).map((property) => {
       const value = property.getFirstValue();
@@ -96,6 +97,7 @@ function participants(component: IcsComponent) {
       const state = property.getParameter("partstat");
       const status =
         typeof state === "string" ? state.toLowerCase() : "pending";
+      // Zod checked it; apps/web's non-strict build infers its keys as optional.
       return eventParticipantInputSchema.parse({
         email:
           typeof value === "string"
@@ -112,7 +114,7 @@ function participants(component: IcsComponent) {
             : ["accepted", "declined", "tentative"].includes(status)
               ? status
               : "pending",
-      });
+      }) as EventParticipantInput;
     }),
   );
 }

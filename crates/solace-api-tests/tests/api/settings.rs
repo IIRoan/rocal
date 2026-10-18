@@ -276,6 +276,11 @@ async fn invalid_values_are_rejected_with_the_zod_message() {
             "compactView",
         ),
         (
+            json!({"timezone": "+💚"}),
+            "Invalid timezone identifier",
+            "timezone",
+        ),
+        (
             json!({"timezone": "Mars/Base"}),
             "Invalid timezone identifier",
             "timezone",

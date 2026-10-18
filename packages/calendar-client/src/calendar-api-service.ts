@@ -1,5 +1,5 @@
 import type { Schema } from "@workspace/api-contracts";
-import { HttpClient, type ApiResponse, type StrictBody } from "./http-client";
+import { HttpClient, type ApiResponse } from "./http-client";
 import {
   NoopE2eeProvider,
   hydrateEncryptedNameWithoutSession,
@@ -555,7 +555,7 @@ export class CalendarApiService {
       const payload = await this.e2ee.attachEventEncryptionShadow(event);
       const response = await this.client.post<Schema<"Event">>(
         "/api/events",
-        payload satisfies StrictBody<Schema<"CreateEventRequest">>,
+        payload satisfies Schema<"CreateEventRequest">,
       );
       return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
@@ -571,7 +571,7 @@ export class CalendarApiService {
       const payload = await this.e2ee.attachEventEncryptionShadow(event);
       const response = await this.client.put<Schema<"Event">>(
         `/api/events/${id}`,
-        payload satisfies StrictBody<Schema<"UpdateEventRequest">>,
+        payload satisfies Schema<"UpdateEventRequest">,
       );
       return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
@@ -764,7 +764,7 @@ export class CalendarApiService {
     try {
       return await this.client.put<Schema<"RecentContacts">>(
         "/api/recent-contacts",
-        request satisfies StrictBody<Schema<"PutRecentContactsRequest">>,
+        request satisfies Schema<"PutRecentContactsRequest">,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to save recent contacts");
@@ -787,7 +787,7 @@ export class CalendarApiService {
     try {
       return await this.client.put<Schema<"MailSettings">>(
         "/api/mail-settings",
-        request satisfies StrictBody<Schema<"PutMailSettingsRequest">>,
+        request satisfies Schema<"PutMailSettingsRequest">,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to save mail settings");
@@ -897,7 +897,7 @@ export class CalendarApiService {
         {
           ...request,
           updates,
-        } satisfies StrictBody<Schema<"EditRecurringRequest">>,
+        } satisfies Schema<"EditRecurringRequest">,
       );
       return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
@@ -937,6 +937,7 @@ export class CalendarApiService {
         const { sourceUid, occurrenceDate, excludedDates, ...content } = event;
         const payload = await this.e2ee.attachEventEncryptionShadow({ ...content, calendarId: request.calendarId });
         const externalId = await this.icsImportId(JSON.stringify([sourceUid, occurrenceDate ?? null]));
+        // Zod checked it; apps/web's non-strict build infers its keys as optional.
         encryptedEvents.push(encryptedIcsImportEventSchema.parse({
           externalId,
           seriesExternalId: occurrenceDate ? await this.icsImportId(JSON.stringify([sourceUid, null])) : undefined,
@@ -945,7 +946,7 @@ export class CalendarApiService {
           recurrence: content.recurrence, participants: content.participants,
           encryptedContent: payload.encryptedContent, blindIndexTokens: payload.blindIndexTokens,
           encryptionKeyVersion: payload.encryptionKeyVersion,
-        }));
+        }) as EncryptedIcsImportEvent);
       }
       encryptedEvents.sort((left, right) => Number(Boolean(left.seriesExternalId)) - Number(Boolean(right.seriesExternalId)));
       let eventsCreated = 0;
@@ -953,7 +954,7 @@ export class CalendarApiService {
       for (let offset = 0; offset < encryptedEvents.length; offset += 100) {
         const result = await this.client.post<Schema<"ImportIcsResponse">>("/api/subscriptions/import-ics", {
           calendarId: request.calendarId, encryptedEvents: encryptedEvents.slice(offset, offset + 100),
-        } satisfies StrictBody<Schema<"EncryptedIcsImportRequest">>);
+        } satisfies Schema<"EncryptedIcsImportRequest">);
         eventsCreated += result.eventsCreated;
         errors.push(...(result.errors ?? []));
       }
@@ -1086,7 +1087,7 @@ export class CalendarApiService {
     try {
       return (await this.client.post<Schema<"BulkEventResult">>(
         "/api/events/bulk",
-        request satisfies StrictBody<Schema<"BulkEventRequest">>,
+        request satisfies Schema<"BulkEventRequest">,
       )) as BulkEventResponse;
     } catch (error) {
       throw this.transformError(
@@ -1136,7 +1137,7 @@ export class CalendarApiService {
     try {
       return await this.client.put<Schema<"PushDeviceRegistration">>(
         "/api/push/devices",
-        input satisfies StrictBody<Schema<"RegisterPushDeviceRequest">>,
+        input satisfies Schema<"RegisterPushDeviceRequest">,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to register push device");

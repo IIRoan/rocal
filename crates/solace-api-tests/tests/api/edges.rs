@@ -368,6 +368,13 @@ async fn integers_beyond_what_the_api_stores_are_validation_errors() {
             "Number must be less than or equal to 9007199254740991",
             "offset",
         ),
+        (
+            Method::GET,
+            "/api/events/search?q=ab&limit=0x%2B1",
+            None,
+            "Expected number, received nan",
+            "limit",
+        ),
     ];
     for (method, path, body, message, field) in cases {
         let response = ok(user.agent.send(method, path, body, &[]).await);
@@ -385,6 +392,13 @@ async fn integers_beyond_what_the_api_stores_are_validation_errors() {
                 );
             }
         }
+    }
+    if app.backend == Backend::Rust {
+        let large = ok(user
+            .agent
+            .get("/api/events/search?q=ab&offset=9000000000000000")
+            .await);
+        assert_eq!(large.status.as_u16(), 200, "{}", large.text());
     }
 }
 

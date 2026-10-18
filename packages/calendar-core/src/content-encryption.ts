@@ -1,3 +1,4 @@
+import type { Schema } from "@workspace/api-contracts";
 import { z } from "zod";
 import type {
   Calendar,
@@ -77,7 +78,8 @@ export const eventInvitationContentSchema = z
     location: z.string().max(255).optional(),
   })
   .strict();
-export type EventInvitationContent = z.infer<typeof eventInvitationContentSchema>;
+export type EventInvitationContent = z.infer<typeof eventInvitationContentSchema> &
+  Schema<"InvitationContent">;
 
 /** Event create/update body after client-side encryption. */
 export type EventWireRequest<T extends CreateEventRequest | UpdateEventRequest> =

@@ -386,18 +386,14 @@ export interface UpdateCalendarRequest extends Partial<CreateCalendarRequest> {
   isVisible?: boolean;
 }
 
-export interface UpdateEventRequest extends Partial<CreateEventRequest> {
-  id?: string;
-}
+export type UpdateEventRequest = Partial<CreateEventRequest>;
 
 export interface CreateCategoryRequest extends NameEncryptionShadowRequest {
   name: string;
   color: EventColor;
 }
 
-export interface UpdateCategoryRequest extends Partial<CreateCategoryRequest> {
-  id?: string;
-}
+export type UpdateCategoryRequest = Partial<CreateCategoryRequest>;
 
 export interface DeleteResponse {
   success: boolean;
@@ -447,11 +443,9 @@ export interface UserSettings {
   updatedAt: Date;
 }
 
-export interface UpdateSettingsRequest extends Partial<
+export type UpdateSettingsRequest = Partial<
   Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">
-> {
-  userId?: string;
-}
+>;
 
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 

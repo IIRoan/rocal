@@ -627,11 +627,21 @@ pub fn js_number(text: &str) -> f64 {
     if trimmed.is_empty() {
         return 0.0;
     }
+    // Digits only, as JavaScript reads them: no sign, none empty, and no `u64` ceiling.
     let radix = |prefix: &[&str], radix: u32| {
         prefix
             .iter()
             .find_map(|p| trimmed.strip_prefix(p))
-            .map(|digits| u64::from_str_radix(digits, radix).map_or(f64::NAN, |n| n as f64))
+            .map(|digits| {
+                digits
+                    .chars()
+                    .try_fold(0.0, |value, c| {
+                        c.to_digit(radix)
+                            .map(|digit| value * f64::from(radix) + f64::from(digit))
+                    })
+                    .filter(|_| !digits.is_empty())
+                    .unwrap_or(f64::NAN)
+            })
     };
     if let Some(value) = radix(&["0x", "0X"], 16)
         .or_else(|| radix(&["0o", "0O"], 8))
@@ -733,7 +743,9 @@ fn parse_number(
     }
     let value = serde_json::Number::from_f64(number)
         .map(|n| match n.as_f64() {
-            Some(f) if f.fract() == 0.0 && f.abs() < 9e15 => Value::from(f as i64),
+            Some(f) if f.fract() == 0.0 && f.abs() <= MAX_SAFE_INTEGER as f64 => {
+                Value::from(f as i64)
+            }
             _ => Value::Number(n),
         })
         .unwrap_or(Value::Null);
@@ -1067,6 +1079,26 @@ mod tests {
         );
         assert_eq!(js_number("0x10"), 16.0);
         assert!(js_number("1e").is_nan() && js_number("12px").is_nan());
+        for signed in ["0x+1", "0x-1", "0o+7", "0b+1", "0x"] {
+            assert!(js_number(signed).is_nan(), "{signed}");
+        }
+        assert_eq!(js_number("0xFFFFFFFFFFFFFFFFFF"), 4.722_366_482_869_645e21);
+        let offset = object_with_offset();
+        assert_eq!(
+            offset
+                .parse(Some(&json!({"offset": "9000000000000000"})))
+                .ok()
+                .flatten(),
+            Some(json!({"offset": 9_000_000_000_000_000_i64})),
+            "a safe integer stays an integer for i64 fields"
+        );
+    }
+
+    fn object_with_offset() -> Schema {
+        object([(
+            "offset",
+            optional_query_int(Some(0), Some(MAX_SAFE_INTEGER)),
+        )])
     }
 
     #[test]
