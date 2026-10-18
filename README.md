@@ -21,7 +21,7 @@ A calendar and mail monorepo: web frontend, native Calendar and Mail apps, API b
 ## Technology Stack
 
 - Frontend: Next.js, React, Tailwind CSS, shadcn/ui
-- Backend: Rust (axum, SeaORM), PostgreSQL; the retired Elysia.js/Bun/Prisma API stays deployed for rollback
+- Backend: Rust (axum, SeaORM) on Railway, PostgreSQL; web on Vercel
 - Notifications: Rust, Stalwart JMAP (noreply identity), APNs
 - Mail server: Stalwart (JMAP) on Railway, inbound/outbound via VPS tunnels
 - Authentication: Better Auth's protocol and tables, served by the Rust API, with passkey support
