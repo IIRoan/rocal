@@ -1751,6 +1751,54 @@ type EncryptedRow = (
 );
 
 #[tokio::test]
+async fn encrypted_import_reads_fraction_digits_like_javascript() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar_id = owned_calendar(&mut user).await;
+    let long = encrypted_event(
+        "long-fraction",
+        "2026-11-01T09:00:00.1234567890Z",
+        "2026-11-01T10:00:00.9876543210Z",
+    );
+    // `new Date` keeps three digits, so this ends a millisecond after it starts.
+    let before_epoch = encrypted_event(
+        "before-epoch",
+        "1969-12-31T23:59:59.9991Z",
+        "1970-01-01T00:00:00.000Z",
+    );
+    let imported: ImportIcsResponse = ok(user
+        .post(
+            "/api/subscriptions/import-ics",
+            encrypted_import(&calendar_id, vec![long, before_epoch]),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!((imported.events_created, imported.errors), (2, None));
+    let mut stored: Vec<(String, String, String)> = sqlx::query_as(&format!(
+        "SELECT external_id, {}, {} FROM calendar_event WHERE calendar_id = $1",
+        iso("start"),
+        iso("\"end\"")
+    ))
+    .bind(&calendar_id)
+    .fetch_all(&app.db)
+    .await
+    .expect("imported events");
+    stored.sort();
+    let times: Vec<(&str, &str)> = stored
+        .iter()
+        .map(|(_, start, end)| (start.as_str(), end.as_str()))
+        .collect();
+    assert_eq!(
+        times,
+        [
+            ("1969-12-31T23:59:59.999Z", "1970-01-01T00:00:00.000Z"),
+            ("2026-11-01T09:00:00.123Z", "2026-11-01T10:00:00.987Z"),
+        ]
+    );
+}
+
+#[tokio::test]
 async fn encrypted_import_stores_ciphertext_as_sent_and_links_overrides() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;

@@ -216,6 +216,16 @@ async fn an_update_without_a_row_creates_it() {
 }
 
 #[tokio::test]
+async fn the_pacific_new_alias_is_a_valid_timezone() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    ok(user
+        .put("/api/settings", json!({"timezone": "US/Pacific-New"}))
+        .await
+        .expect_status(200));
+}
+
+#[tokio::test]
 async fn invalid_values_are_rejected_with_the_zod_message() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
