@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: undefined is not an object (evaluating 'par[id] = curr')"
+    ],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: undefined is not an object (evaluating 'par[id] = curr')"
+    ],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [
+      "Failed to parse ICS file: undefined is not an object (evaluating 'par[id] = curr')"
+    ],
+    "method": "PUBLISH"
+  }
+}

@@ -14,7 +14,6 @@ import {
   type MailListSettings,
 } from "./mail-list-settings";
 import type { PutMailSettingsRequest } from "./route-schemas";
-import type { MailSettingsRecord } from "./types";
 
 /** Mail prefs that sync across devices as an encrypted blob; app chrome theme stays per-device. */
 export type MailSyncedSettings = {
@@ -58,7 +57,7 @@ export function sanitizeMailSyncedSettings(input: unknown): MailSyncedSettings {
 }
 
 export interface MailSettingsApi {
-  getMailSettings(): Promise<MailSettingsRecord | null>;
+  getMailSettings(): Promise<{ encryptedContent: string } | null>;
   putMailSettings(request: PutMailSettingsRequest): Promise<unknown>;
 }
 
@@ -101,7 +100,7 @@ export async function pullMailSyncedSettings(
   api: MailSettingsApi,
   cipher: MailSettingsCipher,
 ): Promise<MailSyncedSettingsPull> {
-  let record: MailSettingsRecord | null;
+  let record: { encryptedContent: string } | null;
   try {
     record = await api.getMailSettings();
   } catch {

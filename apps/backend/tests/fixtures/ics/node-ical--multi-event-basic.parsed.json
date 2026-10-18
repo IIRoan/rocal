@@ -1,0 +1,47 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"d4c826dfb701f611416d69b4df81caf9ff80b03a","sourceUid":"d4c826dfb701f611416d69b4df81caf9ff80b03a","title":"Dyncon 2011","start":"2011-03-12T20:00:00.000Z","end":"2011-03-14T00:00:00.000Z","allDay":false,"location":"Stockholm, Sweden","timezone":"Etc/UTC"},
+      {"uid":"480a3ad48af5ed8965241f14920f90524f533c18","sourceUid":"480a3ad48af5ed8965241f14920f90524f533c18","title":"[Async]: Everything Express","start":"2011-03-24T00:00:00.000Z","end":"2011-03-24T23:59:59.999Z","allDay":true,"location":"Brighton, United Kingdom","timezone":"UTC"},
+      {"uid":"ed334cc85db5ebdff5ff5a630a7a48631a677dbe","sourceUid":"ed334cc85db5ebdff5ff5a630a7a48631a677dbe","title":"JSConf US 2011","start":"2011-05-02T00:00:00.000Z","end":"2011-05-03T23:59:59.999Z","allDay":true,"location":"Portland, United States","timezone":"UTC"},
+      {"uid":"25169a7b1ba5c248278f47120a40878055dc8c15","sourceUid":"25169a7b1ba5c248278f47120a40878055dc8c15","title":"NodeConf 2011","start":"2011-05-05T00:00:00.000Z","end":"2011-05-05T23:59:59.999Z","allDay":true,"location":"Portland, United States","timezone":"UTC"},
+      {"uid":"dafee3be83624f3388c5635662229ff11766bb9c","sourceUid":"dafee3be83624f3388c5635662229ff11766bb9c","title":"BrazilJS","start":"2011-05-13T00:00:00.000Z","end":"2011-05-14T23:59:59.999Z","allDay":true,"location":"Fortaleza, Brazil","timezone":"UTC"},
+      {"uid":"73cad6a09ac4e7310979c6130f871d17d990b5ad","sourceUid":"73cad6a09ac4e7310979c6130f871d17d990b5ad","title":"Falsy Values","start":"2011-05-18T00:00:00.000Z","end":"2011-05-20T23:59:59.999Z","allDay":true,"location":"Warsaw, Poland","timezone":"UTC"},
+      {"uid":"b728a5fdb5f292b6293e4a2fd97a1ccfc69e9d6f","sourceUid":"b728a5fdb5f292b6293e4a2fd97a1ccfc69e9d6f","title":"nodecamp.eu","start":"2011-06-11T00:00:00.000Z","end":"2011-06-12T23:59:59.999Z","allDay":true,"location":"Cologne, Germany","timezone":"UTC"},
+      {"uid":"47f6ea3f28af2986a2192fa39a91fa7d60d26b76","sourceUid":"47f6ea3f28af2986a2192fa39a91fa7d60d26b76","title":"Rich Web Experience 2011","start":"2011-11-29T00:00:00.000Z","end":"2011-12-02T23:59:59.999Z","allDay":true,"location":"Fort Lauderdale, United States","timezone":"UTC"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Node.js conferences"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"d4c826dfb701f611416d69b4df81caf9ff80b03a","sourceUid":"d4c826dfb701f611416d69b4df81caf9ff80b03a","title":"Dyncon 2011","start":"2011-03-12T20:00:00.000Z","end":"2011-03-14T00:00:00.000Z","allDay":false,"location":"Stockholm, Sweden","timezone":"Etc/UTC"},
+      {"uid":"480a3ad48af5ed8965241f14920f90524f533c18","sourceUid":"480a3ad48af5ed8965241f14920f90524f533c18","title":"[Async]: Everything Express","start":"2011-03-23T23:00:00.000Z","end":"2011-03-24T22:59:59.999Z","allDay":true,"location":"Brighton, United Kingdom","timezone":"Europe/Amsterdam"},
+      {"uid":"ed334cc85db5ebdff5ff5a630a7a48631a677dbe","sourceUid":"ed334cc85db5ebdff5ff5a630a7a48631a677dbe","title":"JSConf US 2011","start":"2011-05-01T22:00:00.000Z","end":"2011-05-03T21:59:59.999Z","allDay":true,"location":"Portland, United States","timezone":"Europe/Amsterdam"},
+      {"uid":"25169a7b1ba5c248278f47120a40878055dc8c15","sourceUid":"25169a7b1ba5c248278f47120a40878055dc8c15","title":"NodeConf 2011","start":"2011-05-04T22:00:00.000Z","end":"2011-05-05T21:59:59.999Z","allDay":true,"location":"Portland, United States","timezone":"Europe/Amsterdam"},
+      {"uid":"dafee3be83624f3388c5635662229ff11766bb9c","sourceUid":"dafee3be83624f3388c5635662229ff11766bb9c","title":"BrazilJS","start":"2011-05-12T22:00:00.000Z","end":"2011-05-14T21:59:59.999Z","allDay":true,"location":"Fortaleza, Brazil","timezone":"Europe/Amsterdam"},
+      {"uid":"73cad6a09ac4e7310979c6130f871d17d990b5ad","sourceUid":"73cad6a09ac4e7310979c6130f871d17d990b5ad","title":"Falsy Values","start":"2011-05-17T22:00:00.000Z","end":"2011-05-20T21:59:59.999Z","allDay":true,"location":"Warsaw, Poland","timezone":"Europe/Amsterdam"},
+      {"uid":"b728a5fdb5f292b6293e4a2fd97a1ccfc69e9d6f","sourceUid":"b728a5fdb5f292b6293e4a2fd97a1ccfc69e9d6f","title":"nodecamp.eu","start":"2011-06-10T22:00:00.000Z","end":"2011-06-12T21:59:59.999Z","allDay":true,"location":"Cologne, Germany","timezone":"Europe/Amsterdam"},
+      {"uid":"47f6ea3f28af2986a2192fa39a91fa7d60d26b76","sourceUid":"47f6ea3f28af2986a2192fa39a91fa7d60d26b76","title":"Rich Web Experience 2011","start":"2011-11-28T23:00:00.000Z","end":"2011-12-02T22:59:59.999Z","allDay":true,"location":"Fort Lauderdale, United States","timezone":"Europe/Amsterdam"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Node.js conferences"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"d4c826dfb701f611416d69b4df81caf9ff80b03a","sourceUid":"d4c826dfb701f611416d69b4df81caf9ff80b03a","title":"Dyncon 2011","start":"2011-03-12T20:00:00.000Z","end":"2011-03-14T00:00:00.000Z","allDay":false,"location":"Stockholm, Sweden","timezone":"Etc/UTC"},
+      {"uid":"480a3ad48af5ed8965241f14920f90524f533c18","sourceUid":"480a3ad48af5ed8965241f14920f90524f533c18","title":"[Async]: Everything Express","start":"2011-03-24T07:00:00.000Z","end":"2011-03-25T06:59:59.999Z","allDay":true,"location":"Brighton, United Kingdom","timezone":"America/Los_Angeles"},
+      {"uid":"ed334cc85db5ebdff5ff5a630a7a48631a677dbe","sourceUid":"ed334cc85db5ebdff5ff5a630a7a48631a677dbe","title":"JSConf US 2011","start":"2011-05-02T07:00:00.000Z","end":"2011-05-04T06:59:59.999Z","allDay":true,"location":"Portland, United States","timezone":"America/Los_Angeles"},
+      {"uid":"25169a7b1ba5c248278f47120a40878055dc8c15","sourceUid":"25169a7b1ba5c248278f47120a40878055dc8c15","title":"NodeConf 2011","start":"2011-05-05T07:00:00.000Z","end":"2011-05-06T06:59:59.999Z","allDay":true,"location":"Portland, United States","timezone":"America/Los_Angeles"},
+      {"uid":"dafee3be83624f3388c5635662229ff11766bb9c","sourceUid":"dafee3be83624f3388c5635662229ff11766bb9c","title":"BrazilJS","start":"2011-05-13T07:00:00.000Z","end":"2011-05-15T06:59:59.999Z","allDay":true,"location":"Fortaleza, Brazil","timezone":"America/Los_Angeles"},
+      {"uid":"73cad6a09ac4e7310979c6130f871d17d990b5ad","sourceUid":"73cad6a09ac4e7310979c6130f871d17d990b5ad","title":"Falsy Values","start":"2011-05-18T07:00:00.000Z","end":"2011-05-21T06:59:59.999Z","allDay":true,"location":"Warsaw, Poland","timezone":"America/Los_Angeles"},
+      {"uid":"b728a5fdb5f292b6293e4a2fd97a1ccfc69e9d6f","sourceUid":"b728a5fdb5f292b6293e4a2fd97a1ccfc69e9d6f","title":"nodecamp.eu","start":"2011-06-11T07:00:00.000Z","end":"2011-06-13T06:59:59.999Z","allDay":true,"location":"Cologne, Germany","timezone":"America/Los_Angeles"},
+      {"uid":"47f6ea3f28af2986a2192fa39a91fa7d60d26b76","sourceUid":"47f6ea3f28af2986a2192fa39a91fa7d60d26b76","title":"Rich Web Experience 2011","start":"2011-11-29T08:00:00.000Z","end":"2011-12-03T07:59:59.999Z","allDay":true,"location":"Fort Lauderdale, United States","timezone":"America/Los_Angeles"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Node.js conferences"
+  }
+}

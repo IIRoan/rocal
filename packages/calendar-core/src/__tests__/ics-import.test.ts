@@ -61,6 +61,126 @@ END:VEVENT`),
     });
   });
 
+  it("skips only the event whose recurrence rule cannot be read", () => {
+    const result = parseIcsImport(
+      wrap(`BEGIN:VEVENT
+UID:fortnightly
+DTSTART:20260601T090000Z
+SUMMARY:Unreadable rule
+RRULE:FREQ=FORTNIGHTLY
+END:VEVENT
+BEGIN:VEVENT
+UID:weekly
+DTSTART:20260602T090000Z
+SUMMARY:Readable rule
+rrule;x-note=1:FREQ=WEEKLY;COUNT=2;BYDAY=TU
+END:VEVENT`),
+      "UTC",
+    );
+    expect(result.eventsTotal).toBe(2);
+    expect(result.errors).toEqual([
+      "Event 1 has invalid dates, participants, or an unsupported recurrence rule.",
+    ]);
+    expect(result.events.map((event) => event.sourceUid)).toEqual(["weekly"]);
+    expect(JSON.parse(result.events[0]?.recurrence ?? "{}")).toMatchObject({
+      frequency: "weekly",
+      count: 2,
+      byWeekDay: [2],
+    });
+  });
+
+  it("reads floating times in the calendar's zone, else the user's, never a VTIMEZONE's", () => {
+    const vtimezone = `BEGIN:VTIMEZONE
+TZID:Asia/Tokyo
+BEGIN:STANDARD
+DTSTART:19700101T000000
+TZOFFSETFROM:+0900
+TZOFFSETTO:+0900
+END:STANDARD
+END:VTIMEZONE`;
+    const floating = `BEGIN:VEVENT
+UID:floating
+DTSTART:20260715T090000
+SUMMARY:Floating
+END:VEVENT`;
+    const read = (header: string) =>
+      parseIcsImport(
+        `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${header}${vtimezone}\r\n${floating}\r\nEND:VCALENDAR`,
+        "Europe/Amsterdam",
+      ).events[0];
+    expect(read("X-WR-TIMEZONE:America/New_York\r\n")).toMatchObject({
+      start: "2026-07-15T13:00:00.000Z",
+      timezone: "America/New_York",
+    });
+    expect(read("")).toMatchObject({
+      start: "2026-07-15T07:00:00.000Z",
+      timezone: "Europe/Amsterdam",
+    });
+  });
+
+  it("files Windows names and labels under IANA zones and unknown ones under the user's", () => {
+    const at = (tzid: string) =>
+      `BEGIN:VEVENT\r\nUID:${tzid}\r\nDTSTART;TZID=${tzid}:20260715T090000\r\nSUMMARY:Zone\r\nEND:VEVENT`;
+    const tzids = [
+      "Romance Standard Time",
+      '"(UTC+01:00) Brussels, Copenhagen, Madrid, Paris"',
+      '"(UTC+03:00) Nowhere"',
+      '"(UTC+05:45) Somewhere new"',
+      "Mars/Olympus_Mons",
+    ];
+    const result = parseIcsImport(
+      wrap(tzids.map(at).join("\r\n")),
+      "America/Los_Angeles",
+    );
+    expect(result.errors).toEqual([]);
+    expect(
+      result.events.map((event) => [event.timezone, event.start]),
+    ).toEqual([
+      ["Europe/Paris", "2026-07-15T07:00:00.000Z"],
+      ["Europe/Paris", "2026-07-15T07:00:00.000Z"],
+      ["Etc/GMT-3", "2026-07-15T06:00:00.000Z"],
+      ["America/Los_Angeles", "2026-07-15T03:15:00.000Z"],
+      ["America/Los_Angeles", "2026-07-15T16:00:00.000Z"],
+    ]);
+  });
+
+  it("reads a custom TZID by its own VTIMEZONE, even one defined after the event", () => {
+    const result = parseIcsImport(
+      wrap(`BEGIN:VEVENT
+UID:custom
+DTSTART;TZID=Office time:20261102T090000
+SUMMARY:After the change
+END:VEVENT
+BEGIN:VEVENT
+UID:summer
+DTSTART;TZID=Office time:20260715T090000
+SUMMARY:Daylight saving time
+END:VEVENT
+BEGIN:VTIMEZONE
+TZID:Office time
+BEGIN:STANDARD
+DTSTART:19701025T030000
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
+END:STANDARD
+BEGIN:DAYLIGHT
+DTSTART:19700329T020000
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU
+END:DAYLIGHT
+END:VTIMEZONE`),
+      "UTC",
+    );
+    expect(result.events[0]).toMatchObject({
+      start: "2026-11-02T08:00:00.000Z",
+    });
+    expect(result.events[1]).toMatchObject({
+      start: "2026-07-15T07:00:00.000Z",
+    });
+  });
+
   it("rejects malformed input without echoing its contents", () => {
     expect(() => parseIcsImport("private garbage", "UTC")).toThrow(
       "Invalid calendar file",

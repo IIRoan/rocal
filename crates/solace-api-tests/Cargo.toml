@@ -1,0 +1,36 @@
+[package]
+name = "solace-api-tests"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64.workspace = true
+ciborium.workspace = true
+cookie.workspace = true
+hmac.workspace = true
+p256.workspace = true
+percent-encoding.workspace = true
+rand.workspace = true
+regex-lite.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+solace-api-types.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+solace-server.workspace = true
+
+[lints]
+workspace = true
+
+[[test]]
+name = "api"
+path = "tests/api/main.rs"

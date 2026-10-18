@@ -1,0 +1,50 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"7","sourceUid":"7","title":"Numeric uid sorts first","start":"2024-03-02T10:00:00.000Z","end":"2024-03-02T11:30:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"42","sourceUid":"42","title":"Numeric uid floating in the calendar zone","start":"2024-03-01T09:00:00.000Z","end":"2024-03-01T10:00:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"},
+      {"uid":"series@example.com","sourceUid":"series@example.com","title":"Twice daily","start":"2024-01-01T08:00:00.000Z","end":"2024-01-01T08:30:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"until":"2024-01-31T08:00:00.000Z","timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-01-31T08:00:00.000Z\",\"timezone\":\"Europe/Amsterdam\"}"},
+      {"uid":"series@example.com::RECURRENCE::2024-01-08T08:00:00.000Z","sourceUid":"series@example.com","recurrenceId":"2024-01-08T08:00:00.000Z","title":"Moved morning slot","start":"2024-01-08T09:00:00.000Z","end":"2024-01-08T09:30:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"},
+      {"uid":"series@example.com::RECURRENCE::2024-01-08T14:00:00.000Z","sourceUid":"series@example.com","recurrenceId":"2024-01-08T14:00:00.000Z","title":"Moved afternoon slot","start":"2024-01-08T15:00:00.000Z","end":"2024-01-08T16:00:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"},
+      {"uid":"dup@example.com","sourceUid":"dup@example.com","title":"Same sequence merges","start":"2024-04-03T10:00:00.000Z","end":"2024-04-03T10:00:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"alarm@example.com","sourceUid":"alarm@example.com","title":"All day with an alarm","start":"2024-04-05T00:00:00.000Z","end":"2024-04-05T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"only-override@example.com::RECURRENCE::2024-05-10T10:00:00.000Z","sourceUid":"only-override@example.com","recurrenceId":"2024-05-10T10:00:00.000Z","title":"Override without series","start":"2024-05-10T11:00:00.000Z","end":"2024-05-10T11:00:00.000Z","allDay":false,"timezone":"Etc/UTC"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Quirks",
+    "calendarTimezone": "Europe/Amsterdam"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"7","sourceUid":"7","title":"Numeric uid sorts first","start":"2024-03-02T10:00:00.000Z","end":"2024-03-02T11:30:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"42","sourceUid":"42","title":"Numeric uid floating in the calendar zone","start":"2024-03-01T09:00:00.000Z","end":"2024-03-01T10:00:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"},
+      {"uid":"series@example.com","sourceUid":"series@example.com","title":"Twice daily","start":"2024-01-01T08:00:00.000Z","end":"2024-01-01T08:30:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"until":"2024-01-31T08:00:00.000Z","timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-01-31T08:00:00.000Z\",\"timezone\":\"Europe/Amsterdam\"}"},
+      {"uid":"series@example.com::RECURRENCE::2024-01-08T08:00:00.000Z","sourceUid":"series@example.com","recurrenceId":"2024-01-08T08:00:00.000Z","title":"Moved morning slot","start":"2024-01-08T09:00:00.000Z","end":"2024-01-08T09:30:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"},
+      {"uid":"series@example.com::RECURRENCE::2024-01-08T14:00:00.000Z","sourceUid":"series@example.com","recurrenceId":"2024-01-08T14:00:00.000Z","title":"Moved afternoon slot","start":"2024-01-08T15:00:00.000Z","end":"2024-01-08T16:00:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"},
+      {"uid":"dup@example.com","sourceUid":"dup@example.com","title":"Same sequence merges","start":"2024-04-03T10:00:00.000Z","end":"2024-04-03T10:00:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"alarm@example.com","sourceUid":"alarm@example.com","title":"All day with an alarm","start":"2024-04-04T22:00:00.000Z","end":"2024-04-05T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"only-override@example.com::RECURRENCE::2024-05-10T10:00:00.000Z","sourceUid":"only-override@example.com","recurrenceId":"2024-05-10T10:00:00.000Z","title":"Override without series","start":"2024-05-10T11:00:00.000Z","end":"2024-05-10T11:00:00.000Z","allDay":false,"timezone":"Etc/UTC"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Quirks",
+    "calendarTimezone": "Europe/Amsterdam"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"7","sourceUid":"7","title":"Numeric uid sorts first","start":"2024-03-02T10:00:00.000Z","end":"2024-03-02T11:30:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"42","sourceUid":"42","title":"Numeric uid floating in the calendar zone","start":"2024-03-01T09:00:00.000Z","end":"2024-03-01T10:00:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"},
+      {"uid":"series@example.com","sourceUid":"series@example.com","title":"Twice daily","start":"2024-01-01T08:00:00.000Z","end":"2024-01-01T08:30:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"until":"2024-01-31T08:00:00.000Z","timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-01-31T08:00:00.000Z\",\"timezone\":\"Europe/Amsterdam\"}"},
+      {"uid":"series@example.com::RECURRENCE::2024-01-08T08:00:00.000Z","sourceUid":"series@example.com","recurrenceId":"2024-01-08T08:00:00.000Z","title":"Moved morning slot","start":"2024-01-08T09:00:00.000Z","end":"2024-01-08T09:30:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"},
+      {"uid":"series@example.com::RECURRENCE::2024-01-08T14:00:00.000Z","sourceUid":"series@example.com","recurrenceId":"2024-01-08T14:00:00.000Z","title":"Moved afternoon slot","start":"2024-01-08T15:00:00.000Z","end":"2024-01-08T16:00:00.000Z","allDay":false,"timezone":"Europe/Amsterdam"},
+      {"uid":"dup@example.com","sourceUid":"dup@example.com","title":"Same sequence merges","start":"2024-04-03T10:00:00.000Z","end":"2024-04-03T10:00:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"alarm@example.com","sourceUid":"alarm@example.com","title":"All day with an alarm","start":"2024-04-05T07:00:00.000Z","end":"2024-04-06T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"only-override@example.com::RECURRENCE::2024-05-10T10:00:00.000Z","sourceUid":"only-override@example.com","recurrenceId":"2024-05-10T10:00:00.000Z","title":"Override without series","start":"2024-05-10T11:00:00.000Z","end":"2024-05-10T11:00:00.000Z","allDay":false,"timezone":"Etc/UTC"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Quirks",
+    "calendarTimezone": "Europe/Amsterdam"
+  }
+}

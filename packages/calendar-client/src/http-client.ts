@@ -1,3 +1,4 @@
+import type { components, Schema } from "@workspace/api-contracts";
 import {
   isPasskeyStepUpRequiredError,
   type ApiError,
@@ -30,6 +31,41 @@ export interface RequestOptions extends RequestInit {
   timeout?: number;
   retries?: number;
 }
+
+const REVIVED_DATE_KEYS = [
+  "start",
+  "end",
+  "createdAt",
+  "updatedAt",
+  "syncedAt",
+  "lastSeenAt",
+] as const;
+
+type RevivedDateKey = (typeof REVIVED_DATE_KEYS)[number];
+
+type RevivedField<Value, Revived> = Value extends string
+  ? Revived
+  : JsonRevived<Value>;
+
+/** A JSON body as `HttpClient` returns it: `transformDates` turns these instants into `Date`s and token text into arrays. */
+export type JsonRevived<T> = T extends Date
+  ? T
+  : T extends readonly (infer Item)[]
+    ? JsonRevived<Item>[]
+    : T extends object
+      ? {
+          [Key in keyof T]: Key extends RevivedDateKey
+            ? RevivedField<T[Key], Date>
+            : Key extends "blindIndexTokens"
+              ? RevivedField<T[Key], string[]>
+              : JsonRevived<T[Key]>;
+        }
+      : T;
+
+/** An API response component as `HttpClient` returns it. */
+export type ApiResponse<Name extends keyof components["schemas"]> = JsonRevived<
+  Schema<Name>
+>;
 
 /** Parsed JSON error body, or null when the body is not JSON at all (callers then fall back to the raw text). */
 function asJsonRecord(text: string): Record<string, unknown> | null {
@@ -162,7 +198,7 @@ export class HttpClient {
   private async makeRequest<T>(
     url: string,
     options: RequestOptions = {},
-  ): Promise<T> {
+  ): Promise<JsonRevived<T>> {
     const {
       timeout = this.timeout,
       retries = this.retries,
@@ -258,12 +294,12 @@ export class HttpClient {
         // Handle empty responses (like DELETE operations)
         const contentType = response.headers.get("content-type");
         if (!contentType || !contentType.includes("application/json")) {
-          return {} as T;
+          return {} as JsonRevived<T>;
         }
 
         const data: unknown = await response.json();
         // The caller's `T` is the declared contract for this endpoint's payload.
-        return this.transformDates(data) as T;
+        return this.transformDates(data) as JsonRevived<T>;
       } catch (error) {
         clearTimeout(timeoutId);
         if (abortListener && externalSignal) {
@@ -323,12 +359,7 @@ export class HttpClient {
         }
 
         if (
-          (key === "start" ||
-            key === "end" ||
-            key === "createdAt" ||
-            key === "updatedAt" ||
-            key === "syncedAt" ||
-            key === "lastSeenAt") &&
+          REVIVED_DATE_KEYS.some((dateKey) => dateKey === key) &&
           typeof item === "string"
         ) {
           const dateValue = new Date(item);
@@ -343,11 +374,15 @@ export class HttpClient {
     return value;
   }
 
-  async get<T>(url: string, options?: RequestOptions): Promise<T> {
+  async get<T>(url: string, options?: RequestOptions): Promise<JsonRevived<T>> {
     return this.makeRequest<T>(url, { ...options, method: "GET" });
   }
 
-  async post<T>(url: string, data?: unknown, options?: RequestOptions): Promise<T> {
+  async post<T>(
+    url: string,
+    data?: unknown,
+    options?: RequestOptions,
+  ): Promise<JsonRevived<T>> {
     return this.makeRequest<T>(url, {
       ...options,
       method: "POST",
@@ -355,7 +390,11 @@ export class HttpClient {
     });
   }
 
-  async put<T>(url: string, data?: unknown, options?: RequestOptions): Promise<T> {
+  async put<T>(
+    url: string,
+    data?: unknown,
+    options?: RequestOptions,
+  ): Promise<JsonRevived<T>> {
     return this.makeRequest<T>(url, {
       ...options,
       method: "PUT",
@@ -363,7 +402,10 @@ export class HttpClient {
     });
   }
 
-  async delete<T>(url: string, options?: RequestOptions): Promise<T> {
+  async delete<T>(
+    url: string,
+    options?: RequestOptions,
+  ): Promise<JsonRevived<T>> {
     return this.makeRequest<T>(url, { ...options, method: "DELETE" });
   }
 }

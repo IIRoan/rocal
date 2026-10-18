@@ -1,0 +1,29 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"4ulvpcckkq5cclafbam43cmgok@google.com","sourceUid":"4ulvpcckkq5cclafbam43cmgok@google.com","title":"Fear TWD","start":"2020-10-17T00:00:00.000Z","end":"2020-10-17T23:59:59.999Z","allDay":true,"recurrence":{"frequency":"weekly","interval":1,"byWeekDay":[6],"timezone":"UTC"},"timezone":"UTC","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[6],\"timezone\":\"UTC\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Filme si seriale",
+    "calendarTimezone": "Europe/Bucharest"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"4ulvpcckkq5cclafbam43cmgok@google.com","sourceUid":"4ulvpcckkq5cclafbam43cmgok@google.com","title":"Fear TWD","start":"2020-10-16T22:00:00.000Z","end":"2020-10-17T21:59:59.999Z","allDay":true,"recurrence":{"frequency":"weekly","interval":1,"byWeekDay":[6],"timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[6],\"timezone\":\"Europe/Amsterdam\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Filme si seriale",
+    "calendarTimezone": "Europe/Bucharest"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"4ulvpcckkq5cclafbam43cmgok@google.com","sourceUid":"4ulvpcckkq5cclafbam43cmgok@google.com","title":"Fear TWD","start":"2020-10-17T07:00:00.000Z","end":"2020-10-18T06:59:59.999Z","allDay":true,"recurrence":{"frequency":"weekly","interval":1,"byWeekDay":[6],"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"weekly\",\"interval\":1,\"byWeekDay\":[6],\"timezone\":\"America/Los_Angeles\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Filme si seriale",
+    "calendarTimezone": "Europe/Bucharest"
+  }
+}

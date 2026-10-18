@@ -623,6 +623,34 @@ describe("useEventForm reminder hydration", () => {
       });
     });
 
+    it("validates an end-dated rule as the string it saves", async () => {
+      const rule = { frequency: "weekly", interval: 1, until: "2099-06-01T00:00:00.000Z" };
+      await act(async () => {
+        await latestFormRef.current!.loadEventData({
+          ...occurrence,
+          recurrence: JSON.stringify(rule),
+        } as any);
+      });
+      const calendarData = {
+        createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
+        editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(),
+        updateEvent: jest.fn(async (_id: string, event: any) => ({
+          ...occurrence,
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end),
+        })),
+      };
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(calendarData);
+      });
+
+      const [validated] = mockValidateRecurrence.mock.calls.at(-1)!;
+      expect(typeof validated).toBe("string");
+      expect(JSON.parse(validated as string)).toMatchObject(rule);
+    });
+
     it("keeps plain updates for saves without a scope", async () => {
       const calendarData = {
         createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),

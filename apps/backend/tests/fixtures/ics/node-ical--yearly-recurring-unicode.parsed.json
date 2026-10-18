@@ -1,0 +1,26 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"FA9831E7-C238-4FEC-95E5-CD46BD466421","sourceUid":"FA9831E7-C238-4FEC-95E5-CD46BD466421","title":"Fête Nationale - Férié","start":"2012-07-14T00:00:00.000Z","end":"2012-07-14T23:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"timezone":"UTC"},"timezone":"UTC","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"UTC\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Fête Nationale - Férié"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"FA9831E7-C238-4FEC-95E5-CD46BD466421","sourceUid":"FA9831E7-C238-4FEC-95E5-CD46BD466421","title":"Fête Nationale - Férié","start":"2012-07-13T22:00:00.000Z","end":"2012-07-14T21:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"Europe/Amsterdam\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Fête Nationale - Férié"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"FA9831E7-C238-4FEC-95E5-CD46BD466421","sourceUid":"FA9831E7-C238-4FEC-95E5-CD46BD466421","title":"Fête Nationale - Férié","start":"2012-07-14T07:00:00.000Z","end":"2012-07-15T06:59:59.999Z","allDay":true,"recurrence":{"frequency":"yearly","interval":1,"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"yearly\",\"interval\":1,\"timezone\":\"America/Los_Angeles\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Fête Nationale - Férié"
+  }
+}

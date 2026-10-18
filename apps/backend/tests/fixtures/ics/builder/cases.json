@@ -1,0 +1,108 @@
+{
+  "dtstamp": "2026-10-14T12:34:56.789Z",
+  "cases": [
+    {
+      "name": "timed-event-escaping-and-folding",
+      "calendar": { "name": "  Team; Calendar, \"Ops\"  ", "description": "Line one\r\nLine two \\ done", "timezone": " Europe/Amsterdam " },
+      "events": [
+        {
+          "uid": " planning-1@example.com ",
+          "title": "  Planning, review; and \\ backslash  ",
+          "description": "Agenda:\n1. Budget, Q3; Q4\r\n2. Hiring \\ onboarding\n\n3. ⚙️ Tooling — émoji 🎉 and 漢字 text that is long enough to force folding across several lines of output",
+          "location": "Room A; Floor 2, Building \"North\"",
+          "start": "2024-02-01T10:00:00.000Z",
+          "end": "2024-02-01T11:30:00.000Z",
+          "createdAt": "2024-01-01T08:00:00.000Z",
+          "updatedAt": "2024-01-02T09:15:30.250Z"
+        }
+      ]
+    },
+    {
+      "name": "all-day-in-zones",
+      "calendar": { "name": "Holidays", "timezone": "Europe/Amsterdam" },
+      "events": [
+        { "uid": "ams@example.com", "title": "Founders Day", "start": "2024-01-31T23:00:00.000Z", "end": "2024-02-01T22:59:59.999Z", "allDay": true, "timezone": "Europe/Amsterdam" },
+        { "uid": "calendar-zone@example.com", "title": "Calendar zone", "start": "2024-03-30T23:00:00.000Z", "end": "2024-04-02T21:59:59.999Z", "allDay": true },
+        { "uid": "la@example.com", "title": "West coast", "start": "2024-07-04T07:00:00.000Z", "end": "2024-07-05T06:59:59.999Z", "allDay": true, "timezone": "America/Los_Angeles" },
+        { "uid": "windows@example.com", "title": "Windows zone", "start": "2024-12-24T23:00:00.000Z", "end": "2024-12-25T22:59:59.999Z", "allDay": true, "timezone": "W. Europe Standard Time" },
+        { "uid": "bad-zone@example.com", "title": "Unknown zone", "start": "2024-05-01T00:00:00.000Z", "end": "2024-05-01T23:59:59.999Z", "allDay": true, "timezone": "Mars/Olympus" },
+        { "uid": "inverted@example.com", "title": "End before start", "start": "2024-06-10T00:00:00.000Z", "end": "2024-06-09T00:00:00.000Z", "allDay": true, "timezone": "UTC" },
+        { "uid": "year-end@example.com", "title": "New Year's Eve", "start": "2024-12-31T00:00:00.000Z", "end": "2024-12-31T23:59:59.999Z", "allDay": true, "timezone": "" }
+      ]
+    },
+    {
+      "name": "recurrence-rules",
+      "calendar": {},
+      "events": [
+        {
+          "uid": "weekly@example.com",
+          "title": "Standup",
+          "start": "2024-02-05T08:30:00.000Z",
+          "end": "2024-02-05T08:45:00.000Z",
+          "recurrence": { "frequency": "weekly", "interval": 2, "count": 10, "until": "2024-06-30T21:59:59.000Z", "byWeekDay": [1, 3, 1, 7, -1, 5], "byMonthDay": [1, 31, 32, 0, 15, 1], "byMonth": [2, 12, 13, 2] }
+        },
+        { "uid": "daily@example.com", "title": "Daily", "start": "2024-02-05T08:30:00.000Z", "end": "2024-02-05T09:00:00.000Z", "recurrence": { "frequency": "daily", "interval": 1, "count": 0 } },
+        { "uid": "yearly@example.com", "title": "Anniversary", "start": "2024-02-29T00:00:00.000Z", "end": "2024-02-29T23:59:59.999Z", "allDay": true, "timezone": "UTC", "recurrence": { "frequency": "yearly", "interval": 1, "until": "not a date" } },
+        { "uid": "monthly@example.com", "title": "Monthly", "start": "2024-01-31T12:00:00.000Z", "end": "2024-01-31T12:00:00.000Z", "recurrence": { "frequency": "monthly", "interval": 3, "byMonthDay": [31] } }
+      ]
+    },
+    {
+      "name": "participants-request",
+      "calendar": { "name": "Primary", "method": "REQUEST", "timezone": "UTC", "productId": "  -//Solace//Invite//EN  " },
+      "events": [
+        {
+          "uid": "invite@example.com",
+          "title": "Planning sync",
+          "start": "2026-05-27T10:00:00.000Z",
+          "end": "2026-05-27T11:00:00.000Z",
+          "status": "CONFIRMED",
+          "sequence": 3,
+          "participants": [
+            { "email": "  ", "displayName": "Blank", "role": "organizer" },
+            { "email": " owner@example.com ", "displayName": " Owner, \"The Boss\"; CEO\nLine ", "role": "organizer", "status": "accepted" },
+            { "email": "second-organizer@example.com", "displayName": "Second", "role": "organizer" },
+            { "email": "accepted@example.com", "displayName": "Ann \\ Accepted", "role": "attendee", "status": "accepted" },
+            { "email": "declined@example.com", "role": "attendee", "status": "declined" },
+            { "email": "tentative@example.com", "displayName": "  ", "role": "attendee", "status": "tentative" },
+            { "email": "pending@example.com", "displayName": "Pat", "role": "attendee", "status": "pending" },
+            { "email": "norole@example.com" },
+            { "email": "  ", "displayName": "No address", "role": "attendee" },
+            { "email": "mail\r\nto@example.com", "role": "attendee" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rsvp-reply",
+      "calendar": { "name": "Solace", "timezone": "Europe/Amsterdam", "method": "REPLY" },
+      "events": [
+        {
+          "uid": "040000008200E00074C5B7101A82E0080000000080A1F5C8C3B4DA01000000000000000010000000A1B2C3D4E5F6@outlook.example",
+          "title": "ZW5jcnlwdGVkLXRpdGxlLWNpcGhlcnRleHQtdGhhdC1pcy1sb25nZXItdGhhbi1zZXZlbnR5LWZpdmUtb2N0ZXRz",
+          "start": "2026-10-20T07:00:00.000Z",
+          "end": "2026-10-20T08:00:00.000Z",
+          "allDay": false,
+          "timezone": null,
+          "participants": [
+            { "email": "organizer@example.com", "role": "organizer" },
+            { "email": "me@solace.test", "displayName": "Me Myself", "role": "attendee", "status": "tentative" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "feed-metadata-and-edge-events",
+      "calendar": { "name": "   ", "description": "  Shared by Ann  ", "sourceUrl": " https://example.com/feed.ics?x=1,2;y=3\r\n " },
+      "events": [
+        { "uid": "untitled@example.com", "title": "   ", "start": "2024-02-01T10:00:00.000Z", "end": "2024-02-01T10:00:00.000Z", "description": "   ", "location": "" },
+        { "uid": "backwards@example.com", "title": "Backwards", "start": "2024-02-01T10:00:00.000Z", "end": "2024-02-01T09:00:00.000Z", "sequence": -3, "status": "CANCELLED", "sourceUrl": "https://example.com/e?a=1,b;c" },
+        { "uid": "tentative@example.com", "title": "Maybe", "start": "1999-12-31T23:59:59.000Z", "end": "2000-01-01T00:00:01.000Z", "status": "TENTATIVE", "sequence": 0 }
+      ]
+    },
+    {
+      "name": "empty-calendar",
+      "calendar": { "name": "Nothing here" },
+      "events": []
+    }
+  ]
+}

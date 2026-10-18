@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { calendarApiService } from "../lib/calendar-api-service";
 import { webQueryKeys } from "../lib/query-keys";
-import type { CalendarEvent as ApiCalendarEvent } from "../lib/types/calendar";
+import type { EventSearchHit } from "@workspace/calendar-core";
 
 export function useEventSearch(query: string, enabled = true) {
   return useQuery({
@@ -14,7 +14,7 @@ export function useEventSearch(query: string, enabled = true) {
         signal,
       );
       // Map API events to the shape expected by UI components
-      return result.events.map((e: ApiCalendarEvent) => ({
+      return result.events.map((e: EventSearchHit) => ({
         id: e.id,
         title: e.title,
         description: e.description ?? undefined,
@@ -29,7 +29,6 @@ export function useEventSearch(query: string, enabled = true) {
         createdAt: e.createdAt,
         updatedAt: e.updatedAt,
         recurrence: e.recurrence ?? undefined,
-        parentEventId: e.parentEventId ?? undefined,
       }));
     },
     enabled: enabled && query.trim().length >= 2,

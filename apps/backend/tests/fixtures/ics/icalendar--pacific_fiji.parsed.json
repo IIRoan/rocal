@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"noend123","sourceUid":"noend123","title":"an event with a custom tz name","start":"2014-08-28T20:00:00.000Z","end":"2014-08-28T20:00:00.000Z","allDay":false,"timezone":"Pacific/Fiji"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"noend123","sourceUid":"noend123","title":"an event with a custom tz name","start":"2014-08-28T20:00:00.000Z","end":"2014-08-28T20:00:00.000Z","allDay":false,"timezone":"Pacific/Fiji"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"noend123","sourceUid":"noend123","title":"an event with a custom tz name","start":"2014-08-28T20:00:00.000Z","end":"2014-08-28T20:00:00.000Z","allDay":false,"timezone":"Pacific/Fiji"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

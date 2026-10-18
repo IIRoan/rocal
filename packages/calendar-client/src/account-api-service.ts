@@ -1,40 +1,15 @@
+import type { Schema } from "@workspace/api-contracts";
 import { HttpClient } from "./http-client";
 
-export type AccountSignupConfigResponse = {
-  defaultEmailDomain: string;
-};
-
-export type CheckEmailAvailabilityCode =
-  | "available"
-  | "invalid_email"
-  | "already_in_use";
-
-export type CheckEmailAvailabilityResponse = {
-  email: string;
-  localPart: string | null;
-  domain: string;
-  normalizedEmail: string;
-  available: boolean;
-  code: CheckEmailAvailabilityCode;
-  message: string;
-};
-
-export type AuthStatusResponse = {
-  authenticated: boolean;
-  hasPasskeys: boolean;
-  requiresPasskeyStepUp: boolean;
-};
-
 export class AccountApiService {
-  private signupConfigRequest: Promise<AccountSignupConfigResponse> | null =
-    null;
+  private signupConfigRequest: Promise<Schema<"SignupConfig">> | null = null;
 
   constructor(private readonly client: HttpClient) {}
 
-  getSignupConfig(): Promise<AccountSignupConfigResponse> {
+  getSignupConfig(): Promise<Schema<"SignupConfig">> {
     if (!this.signupConfigRequest) {
       this.signupConfigRequest = this.client
-        .get<AccountSignupConfigResponse>("/api/account/signup-config")
+        .get<Schema<"SignupConfig">>("/api/account/signup-config")
         .finally(() => {
           this.signupConfigRequest = null;
         });
@@ -44,14 +19,14 @@ export class AccountApiService {
 
   async checkEmailAvailability(
     email: string,
-  ): Promise<CheckEmailAvailabilityResponse> {
-    return this.client.get<CheckEmailAvailabilityResponse>(
+  ): Promise<Schema<"EmailAvailability">> {
+    return this.client.get<Schema<"EmailAvailability">>(
       `/api/account/email-availability?email=${encodeURIComponent(email)}`,
     );
   }
 
-  async getAuthStatus(): Promise<AuthStatusResponse> {
-    return this.client.get<AuthStatusResponse>("/api/account/auth-status", {
+  async getAuthStatus(): Promise<Schema<"AuthStatus">> {
+    return this.client.get<Schema<"AuthStatus">>("/api/account/auth-status", {
       cache: "no-store",
       retries: 0,
       timeout: 2_000,

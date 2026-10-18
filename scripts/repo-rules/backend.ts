@@ -19,7 +19,7 @@ const PRISMA_OPERATIONS = new Set([
 const OWNER_KEYS = /^(userId|ownerId|user|owner|AND|OR|userId_\w+|\w+_userId\w*)$/;
 
 /** Backend files that fetch fixed, trusted endpoints (Stalwart, APNs, auth providers), never a user-supplied URL. */
-const TRUSTED_FETCH_FILES = new Set(["apps/backend/lib/safe-fetch.ts"]);
+const TRUSTED_FETCH_FILES = new Set(["retired/backend/lib/safe-fetch.ts"]);
 
 /** A function that receives a trusted owner id or runs an authorization helper has ownership context for its by-id follow-up writes. */
 const OWNER_CONTEXT = /\b(userId|ownerId|viewerId|session|user\.id|assert\w*(Own|Access)\w*|ensure\w*Access\w*|canAccess\w*|authorize\w*)\b/;
@@ -39,7 +39,7 @@ export const backendRules: Rule[] = [
   {
     id: "thin-routes",
     summary: "Backend routes are adapters: they may hand the Prisma client to a service constructor but never query it, and schemas come from contracts/.",
-    files: sourceUnder(["apps/backend/routes/"]),
+    files: sourceUnder(["retired/backend/routes/"]),
     check: (file) =>
       find(file, (node) => {
         if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === "zod") {
@@ -51,7 +51,7 @@ export const backendRules: Rule[] = [
         return null;
       }),
     examples: {
-      path: "apps/backend/routes/events.ts",
+      path: "retired/backend/routes/events.ts",
       bad: ['import { z } from "zod";', "const rows = await prisma.event.findMany();"],
       good: ['import { prisma } from "../lib/prisma";\nconst service = new EventService(prisma);\nconst rows = await service.list(session.user.id);'],
     },
@@ -59,7 +59,7 @@ export const backendRules: Rule[] = [
   {
     id: "owner-scoped-data",
     summary: "Service Prisma reads and writes filter by a trusted owner (userId/ownerId/user) or carry a reviewed allow comment naming the prior check.",
-    files: sourceUnder(["apps/backend/services/"]),
+    files: sourceUnder(["retired/backend/services/"]),
     check: (file) =>
       find(file, (node) => {
         if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return null;
@@ -76,7 +76,7 @@ export const backendRules: Rule[] = [
         return `prisma.${model.name.text}.${operation} filters by {${keys.join(", ")}} in a function with no owner/session context; scope by userId or allow-comment why the record is not user-owned`;
       }),
     examples: {
-      path: "apps/backend/services/event.service.ts",
+      path: "retired/backend/services/event.service.ts",
       bad: [
         "async function remove(id: string) { await prisma.event.delete({ where: { id } }); }",
         "class S { async get(input: { id: string }) { return this.prisma.calendar.findFirst({ where: { id: input.id } }); } }",
@@ -92,7 +92,7 @@ export const backendRules: Rule[] = [
   {
     id: "safe-user-url-fetch",
     summary: "Backend outbound requests go through safeFetch; raw fetch is only for fixed trusted endpoints with an allow comment.",
-    files: sourceUnder(["apps/backend/"]),
+    files: sourceUnder(["retired/backend/"]),
     check: (file) =>
       TRUSTED_FETCH_FILES.has(file.path)
         ? []
@@ -104,7 +104,7 @@ export const backendRules: Rule[] = [
               : null;
           }),
     examples: {
-      path: "apps/backend/services/subscription.service.ts",
+      path: "retired/backend/services/subscription.service.ts",
       bad: ["const response = await fetch(subscription.url);"],
       good: [
         "const response = await safeFetch(subscription.url, { timeoutMs: 10_000 });",

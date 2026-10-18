@@ -1,0 +1,17 @@
+{
+  "UTC": {
+    "events": [],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

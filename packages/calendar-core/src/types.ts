@@ -26,8 +26,43 @@ export const CALENDAR_VIEWS: readonly CalendarView[] = [
 
 export const AgendaDaysToShow = 30;
 
+/** A calendar or category as a search hit embeds it: only what labels the hit. */
+export type EventSearchLabel = Pick<
+  Calendar,
+  "id" | "name" | "color" | "encryptedName" | "encryptionKeyVersion"
+>;
+
+/** A search hit (`SearchEvent`): a subset of the event row with trimmed calendar and category labels instead of full rows. */
+export interface EventSearchHit
+  extends Pick<
+    CalendarEvent,
+    | "id"
+    | "title"
+    | "description"
+    | "encryptedContent"
+    | "blindIndexTokens"
+    | "encryptionState"
+    | "encryptionKeyVersion"
+    | "start"
+    | "end"
+    | "timezone"
+    | "allDay"
+    | "location"
+    | "color"
+    | "calendarId"
+    | "categoryId"
+    | "userId"
+    | "createdAt"
+    | "updatedAt"
+    | "recurrence"
+    | "participants"
+  > {
+  calendar?: EventSearchLabel | null;
+  category?: EventSearchLabel | null;
+}
+
 export interface EventSearchResult {
-  events: CalendarEvent[];
+  events: EventSearchHit[];
   total: number;
 }
 
@@ -150,7 +185,7 @@ export interface CalendarEvent {
   stalwartCalendarId?: string | null;
   stalwartEventId?: string | null;
   stalwartUid?: string | null;
-  stalwartSyncedAt?: Date | null;
+  stalwartSyncedAt?: string | null;
   participants?: EventParticipant[];
 }
 
@@ -323,14 +358,6 @@ export interface EventsResponse {
   calendars: Calendar[];
 }
 
-export interface CalendarsResponse {
-  calendars: Calendar[];
-}
-
-export interface CategoriesResponse {
-  categories: EventCategory[];
-}
-
 /** Client shape before encryption; the wire schema in backend contracts accepts ciphertext-only bodies, so title/name are optional there. */
 export interface CreateEventRequest extends EventContentEncryptionShadowRequest {
   title: string;
@@ -359,18 +386,14 @@ export interface UpdateCalendarRequest extends Partial<CreateCalendarRequest> {
   isVisible?: boolean;
 }
 
-export interface UpdateEventRequest extends Partial<CreateEventRequest> {
-  id?: string;
-}
+export type UpdateEventRequest = Partial<CreateEventRequest>;
 
 export interface CreateCategoryRequest extends NameEncryptionShadowRequest {
   name: string;
   color: EventColor;
 }
 
-export interface UpdateCategoryRequest extends Partial<CreateCategoryRequest> {
-  id?: string;
-}
+export type UpdateCategoryRequest = Partial<CreateCategoryRequest>;
 
 export interface DeleteResponse {
   success: boolean;
@@ -420,23 +443,9 @@ export interface UserSettings {
   updatedAt: Date;
 }
 
-export interface UpdateSettingsRequest extends Partial<
+export type UpdateSettingsRequest = Partial<
   Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">
-> {
-  userId?: string;
-}
-
-export interface RecentContactsRecord {
-  encryptedContent: string;
-  encryptionKeyVersion: number;
-  updatedAt: string;
-}
-
-export interface MailSettingsRecord {
-  encryptedContent: string;
-  encryptionKeyVersion: number;
-  updatedAt: string;
-}
+>;
 
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -449,20 +458,6 @@ export interface RecurrencePreview {
   }>;
   description: string;
   totalInstances: number;
-}
-
-export interface RecurrenceValidation {
-  valid: boolean;
-  errors: string[];
-  description?: string;
-  rule?: RecurrenceRule;
-}
-
-export interface RecurrencePatterns {
-  [key: string]: {
-    rule: RecurrenceRule;
-    description: string;
-  };
 }
 
 export type RecurrenceEditScope = "this_only" | "this_and_future" | "all";
@@ -516,19 +511,6 @@ export interface CreateNotificationRequest {
 
 export interface NotificationTestRequest {
   eventId: string;
-}
-
-export interface NotificationStatus {
-  status: string;
-  message: string;
-  features: {
-    email: boolean;
-    browser: boolean;
-    reminders: boolean;
-    push: boolean;
-  };
-  checkInterval: string;
-  queueProcessInterval: string;
 }
 
 export type CalendarSubscription = CalendarSubscriptionSummary;

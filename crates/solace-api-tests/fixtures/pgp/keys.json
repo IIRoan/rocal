@@ -1,0 +1,6 @@
+[
+  {"file": "test1.asc", "fingerprint": "CDCE225F09515A0156BBECB7D0018F17DFF405AC", "createdAt": "2026-10-14T13:08:35.000Z", "algorithm": "openpgp"},
+  {"file": "test2.asc", "fingerprint": "6628405894E8092B9108239D8E56D76A9118639E", "createdAt": "2026-10-14T13:08:35.000Z", "algorithm": "openpgp"},
+  {"file": "test3.asc", "fingerprint": "602D8F1AB4F8F4FF6DA80A11F2BB5BB04AAB2F33", "createdAt": "2026-10-14T13:08:35.000Z", "algorithm": "openpgp"},
+  {"file": "test4.asc", "fingerprint": "28911E41AC312D80E21AD71DC45F3FBEB80F8C76", "createdAt": "2026-10-14T13:08:35.000Z", "algorithm": "openpgp"}
+]

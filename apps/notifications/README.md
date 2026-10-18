@@ -1,13 +1,19 @@
 # notifications
 
-Go worker (Railway, always-on): claims due reminders and `notification_job` rows every 5s, sends noreply mail over Stalwart JMAP and APNs push.
+Rust worker (`solace-notifications`, Railway, always-on): claims due reminders and `notification_job` rows every 5s, sends noreply mail over Stalwart JMAP (the API crate's mailer) and APNs push, and serves `/health` and `/status`.
+
+```sh
+cargo run -p solace-notifications                          # local run; reads ../../retired/backend/.env if no .env is set
+cargo run -p solace-notifications -- --test --test-push --test-to you@example.com  # one test email and push
+cargo test -p solace-notifications                         # needs `cargo xtask test-env up`
+```
 
 ## Push and reminder mail content
 
 The worker never sees reminder titles or mail sender/subject. `notification_job.payload` holds opaque refs only (`kind`, `eventId`, `minutesBefore`, `emailFallback`, `inboundCount`, `emailId`, `accountId`; legacy `title`/`subject`/`fromName` keys are tolerated and ignored).
 
 - Reminder email: generic ("You have an event at 3:04 PM. Open Solace to view the details."), no title/location/description/calendar names.
-- No duplicate reminders: email is skipped when the reminder push goes out and the account email is the user's own Solace mailbox; that push carries `emailFallback`, so if it ends skipped (e.g. the device was unregistered) the email is queued instead. Reminder mail is sent from noreply with a `solace-reminder.…@<noreply domain>` Message-ID so the Stalwart webhook doesn't also send a `new_mail` push for it; both must match, since either header alone is forgeable (`apps/backend/lib/stalwart-webhook.ts`).
+- No duplicate reminders: email is skipped when the reminder push goes out and the account email is the user's own Solace mailbox; that push carries `emailFallback`, so if it ends skipped (e.g. the device was unregistered) the email is queued instead. Reminder mail is sent from noreply with a `solace-reminder.…@<noreply domain>` Message-ID so the Stalwart webhook doesn't also send a `new_mail` push for it; both must match, since either header alone is forgeable (`REMINDER_MESSAGE_ID_PREFIX` in `apps/backend/src/mail/webhook.rs`, which the worker imports).
 - APNs payloads are generic with `mutable-content: 1`; the iOS Notification Service Extension replaces the alert on-device. `body` keeps the `t`/`eid`/`mid` tap keys for older binaries.
 
 ```jsonc
@@ -23,7 +29,7 @@ The worker never sees reminder titles or mail sender/subject. `notification_job.
 
 ## Retention cleanup
 
-Hourly (`:17`), the worker deletes ephemeral rows in batches of 500 (`DELETE ... WHERE id IN (SELECT ... LIMIT n FOR UPDATE SKIP LOCKED)`, at most 200 batches per rule per run). Windows are constants in `internal/retention/retention.go`; logs contain counts only.
+Hourly (`:17`), the worker deletes ephemeral rows in batches of 500 (`DELETE ... WHERE id IN (SELECT ... LIMIT n FOR UPDATE SKIP LOCKED)`, at most 200 batches per rule per run). Windows are the rules in `src/retention.rs`; logs contain counts only.
 
 | Table                                        | Deleted when                                                     |
 | -------------------------------------------- | ---------------------------------------------------------------- |
@@ -34,4 +40,4 @@ Hourly (`:17`), the worker deletes ephemeral rows in batches of 500 (`DELETE ...
 | `notification_log`                           | `created_at` older than 30 days                                  |
 | `push_device`                                | `last_seen_at` older than 180 days (app re-registers on launch)  |
 
-`calendar_sync_log` is pruned by the backend (latest 50 per subscription). Account deletion is handled in `apps/backend/services/account.service.ts`.
+`calendar_sync_log` is pruned by the backend (latest 50 per subscription). Account deletion is handled by the API (`apps/backend/src/account/`).

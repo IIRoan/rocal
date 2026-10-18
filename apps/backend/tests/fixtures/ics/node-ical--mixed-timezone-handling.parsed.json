@@ -1,0 +1,41 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"1C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"1C9439B1-FF65-11D6-9973-003065F99D04","title":"No Timezone","start":"2002-10-28T09:20:30.000Z","end":"2002-10-29T09:20:30.000Z","allDay":false,"timezone":"US/Pacific"},
+      {"uid":"2C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"2C9439B1-FF65-11D6-9973-003065F99D04","title":"UTC Timezone","start":"2002-10-28T01:20:30.000Z","end":"2002-10-29T01:20:30.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"3C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"3C9439B1-FF65-11D6-9973-003065F99D04","title":"Inline Timezone","start":"2002-10-28T06:20:30.000Z","end":"2002-10-29T06:20:30.000Z","allDay":false,"timezone":"America/New_York"},
+      {"uid":"4C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"4C9439B1-FF65-11D6-9973-003065F99D04","title":"Date Only (Explicit)","start":"2002-10-28T00:00:00.000Z","end":"2002-10-28T23:59:59.999Z","allDay":true,"timezone":"UTC"},
+      {"uid":"5C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"5C9439B1-FF65-11D6-9973-003065F99D04","title":"Date Only (Implicit)","start":"2002-10-28T00:00:00.000Z","end":"2002-10-28T23:59:59.999Z","allDay":true,"timezone":"UTC"}
+    ],
+    "errors": [],
+    "method": "REQUEST",
+    "calendarName": "Example",
+    "calendarTimezone": "US/Pacific"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"1C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"1C9439B1-FF65-11D6-9973-003065F99D04","title":"No Timezone","start":"2002-10-28T09:20:30.000Z","end":"2002-10-29T09:20:30.000Z","allDay":false,"timezone":"US/Pacific"},
+      {"uid":"2C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"2C9439B1-FF65-11D6-9973-003065F99D04","title":"UTC Timezone","start":"2002-10-28T01:20:30.000Z","end":"2002-10-29T01:20:30.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"3C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"3C9439B1-FF65-11D6-9973-003065F99D04","title":"Inline Timezone","start":"2002-10-28T06:20:30.000Z","end":"2002-10-29T06:20:30.000Z","allDay":false,"timezone":"America/New_York"},
+      {"uid":"4C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"4C9439B1-FF65-11D6-9973-003065F99D04","title":"Date Only (Explicit)","start":"2002-10-27T23:00:00.000Z","end":"2002-10-28T22:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"},
+      {"uid":"5C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"5C9439B1-FF65-11D6-9973-003065F99D04","title":"Date Only (Implicit)","start":"2002-10-27T23:00:00.000Z","end":"2002-10-28T22:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"}
+    ],
+    "errors": [],
+    "method": "REQUEST",
+    "calendarName": "Example",
+    "calendarTimezone": "US/Pacific"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"1C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"1C9439B1-FF65-11D6-9973-003065F99D04","title":"No Timezone","start":"2002-10-28T09:20:30.000Z","end":"2002-10-29T09:20:30.000Z","allDay":false,"timezone":"US/Pacific"},
+      {"uid":"2C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"2C9439B1-FF65-11D6-9973-003065F99D04","title":"UTC Timezone","start":"2002-10-28T01:20:30.000Z","end":"2002-10-29T01:20:30.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"3C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"3C9439B1-FF65-11D6-9973-003065F99D04","title":"Inline Timezone","start":"2002-10-28T06:20:30.000Z","end":"2002-10-29T06:20:30.000Z","allDay":false,"timezone":"America/New_York"},
+      {"uid":"4C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"4C9439B1-FF65-11D6-9973-003065F99D04","title":"Date Only (Explicit)","start":"2002-10-28T08:00:00.000Z","end":"2002-10-29T07:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"},
+      {"uid":"5C9439B1-FF65-11D6-9973-003065F99D04","sourceUid":"5C9439B1-FF65-11D6-9973-003065F99D04","title":"Date Only (Implicit)","start":"2002-10-28T08:00:00.000Z","end":"2002-10-29T07:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"}
+    ],
+    "errors": [],
+    "method": "REQUEST",
+    "calendarName": "Example",
+    "calendarTimezone": "US/Pacific"
+  }
+}

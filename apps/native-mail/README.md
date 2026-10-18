@@ -109,7 +109,7 @@ PASSKEY_ORIGIN=https://app.example.com
 
 The development client uses `solace-mail-dev://api/auth`. The backend trusts the
 production and dev schemes of both apps (`solace`, `solace-dev`, `solace-mail`, `solace-mail-dev`) by default
-(`DEFAULT_MOBILE_AUTH_CALLBACK_URLS` in `apps/backend/lib/origin-policy.ts`).
+(`DEFAULT_MOBILE_AUTH_CALLBACK_URLS` in `retired/backend/lib/origin-policy.ts`).
 
 Production backend values should also use HTTPS for `BACKEND_URL` and `FRONTEND_URL`.
 

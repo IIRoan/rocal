@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"test-different-tz-until@example.com","sourceUid":"test-different-tz-until@example.com","title":"Daily Standup (Different TZ UNTIL)","description":"Daily event with non-UTC UNTIL in America/New_York timezone","start":"2024-03-01T19:00:00.000Z","end":"2024-03-01T20:00:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"until":"2024-03-15T18:00:00.000Z","timezone":"America/New_York"},"timezone":"America/New_York","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-03-15T18:00:00.000Z\",\"timezone\":\"America/New_York\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"test-different-tz-until@example.com","sourceUid":"test-different-tz-until@example.com","title":"Daily Standup (Different TZ UNTIL)","description":"Daily event with non-UTC UNTIL in America/New_York timezone","start":"2024-03-01T19:00:00.000Z","end":"2024-03-01T20:00:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"until":"2024-03-15T18:00:00.000Z","timezone":"America/New_York"},"timezone":"America/New_York","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-03-15T18:00:00.000Z\",\"timezone\":\"America/New_York\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"test-different-tz-until@example.com","sourceUid":"test-different-tz-until@example.com","title":"Daily Standup (Different TZ UNTIL)","description":"Daily event with non-UTC UNTIL in America/New_York timezone","start":"2024-03-01T19:00:00.000Z","end":"2024-03-01T20:00:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"until":"2024-03-15T18:00:00.000Z","timezone":"America/New_York"},"timezone":"America/New_York","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"until\":\"2024-03-15T18:00:00.000Z\",\"timezone\":\"America/New_York\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

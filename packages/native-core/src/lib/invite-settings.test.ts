@@ -13,7 +13,7 @@ function invite(
     token: `token-${overrides.id}`,
     email: "friend@example.com",
     expiresAt: "2026-08-25T00:00:00.000Z",
-    createdAt: "2026-08-20T00:00:00.000Z",
+    createdAt: new Date("2026-08-20T00:00:00.000Z"),
     invitedById: "user-1",
     ...overrides,
   };

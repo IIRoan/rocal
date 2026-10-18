@@ -1,0 +1,26 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"56df0d2b37ded@67.calovo","sourceUid":"56df0d2b37ded@67.calovo","title":"Sommerferien Sachsen","description":"Deine Ferien. In deinem Kalender. Immer aktuell.","start":"2018-07-02T00:00:00.000Z","end":"2018-08-10T23:59:59.999Z","allDay":true,"timezone":"UTC"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Schulferien"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"56df0d2b37ded@67.calovo","sourceUid":"56df0d2b37ded@67.calovo","title":"Sommerferien Sachsen","description":"Deine Ferien. In deinem Kalender. Immer aktuell.","start":"2018-07-01T22:00:00.000Z","end":"2018-08-10T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Schulferien"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"56df0d2b37ded@67.calovo","sourceUid":"56df0d2b37ded@67.calovo","title":"Sommerferien Sachsen","description":"Deine Ferien. In deinem Kalender. Immer aktuell.","start":"2018-07-02T07:00:00.000Z","end":"2018-08-11T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"}
+    ],
+    "errors": [],
+    "method": "PUBLISH",
+    "calendarName": "Schulferien"
+  }
+}

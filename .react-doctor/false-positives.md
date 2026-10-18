@@ -132,7 +132,7 @@ Patterns that fire diagnostics but are safe to suppress.
 
 ## react-doctor/js-hoist-intl — NotificationCalculator timezone cache
 
-- **File**: `apps/backend/lib/notification-calculator.ts`
+- **File**: `retired/backend/lib/notification-calculator.ts`
 - **Why FP**: `Intl.DateTimeFormat` options include a per-call IANA timezone.
   Formatters are cached in a module-level `Map` keyed by resolved timezone
   (`getLocalDateTimeFormatter`). Hoisting a single formatter to module scope
@@ -143,9 +143,9 @@ Patterns that fire diagnostics but are safe to suppress.
 ## react-doctor/async-await-in-loop — intentional sequential side effects
 
 - **Files**:
-  - `apps/backend/services/event.service.ts` (event duplicate fan-out)
-  - `apps/backend/services/event-participant.service.ts` (invitation email delivery)
-  - `apps/backend/services/mail-sync.service.ts` (per-account JMAP receipt poll)
+  - `retired/backend/services/event.service.ts` (event duplicate fan-out)
+  - `retired/backend/services/event-participant.service.ts` (invitation email delivery)
+  - `retired/backend/services/mail-sync.service.ts` (per-account JMAP receipt poll)
 - **Why FP**: Each iteration performs ordered side effects (create → sync
   participants → send invites; outbound mail delivery; JMAP change detection
   per mailbox). Parallelizing would race DB uniqueness, amplify rate limits,

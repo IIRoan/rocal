@@ -1,0 +1,23 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"2m6mt1p89l2anl74915ur3hsgm@google.com","sourceUid":"2m6mt1p89l2anl74915ur3hsgm@google.com","title":"TestCal_AllDayRepeatingEvent","start":"2024-10-22T23:00:00.000Z","end":"2024-10-23T00:00:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"count":4,"timezone":"UTC"},"timezone":"UTC","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":4,\"timezone\":\"UTC\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"2m6mt1p89l2anl74915ur3hsgm@google.com","sourceUid":"2m6mt1p89l2anl74915ur3hsgm@google.com","title":"TestCal_AllDayRepeatingEvent","start":"2024-10-22T21:00:00.000Z","end":"2024-10-22T22:00:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"count":4,"timezone":"Europe/Amsterdam"},"timezone":"Europe/Amsterdam","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":4,\"timezone\":\"Europe/Amsterdam\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"2m6mt1p89l2anl74915ur3hsgm@google.com","sourceUid":"2m6mt1p89l2anl74915ur3hsgm@google.com","title":"TestCal_AllDayRepeatingEvent","start":"2024-10-23T06:00:00.000Z","end":"2024-10-23T07:00:00.000Z","allDay":false,"recurrence":{"frequency":"daily","interval":1,"count":4,"timezone":"America/Los_Angeles"},"timezone":"America/Los_Angeles","recurrenceJson":"{\"frequency\":\"daily\",\"interval\":1,\"count\":4,\"timezone\":\"America/Los_Angeles\"}"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

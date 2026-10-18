@@ -1,0 +1,26 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"multi-era-2025@test","sourceUid":"multi-era-2025@test","title":"Event in 2025 (modern rule)","start":"2025-06-10T18:00:00.000Z","end":"2025-06-10T19:00:00.000Z","allDay":false,"timezone":"America/Detroit"},
+      {"uid":"multi-era-1985@test","sourceUid":"multi-era-1985@test","title":"Event in 1985 (old rule)","start":"1985-10-15T18:00:00.000Z","end":"1985-10-15T19:00:00.000Z","allDay":false,"timezone":"America/Detroit"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"multi-era-2025@test","sourceUid":"multi-era-2025@test","title":"Event in 2025 (modern rule)","start":"2025-06-10T18:00:00.000Z","end":"2025-06-10T19:00:00.000Z","allDay":false,"timezone":"America/Detroit"},
+      {"uid":"multi-era-1985@test","sourceUid":"multi-era-1985@test","title":"Event in 1985 (old rule)","start":"1985-10-15T18:00:00.000Z","end":"1985-10-15T19:00:00.000Z","allDay":false,"timezone":"America/Detroit"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"multi-era-2025@test","sourceUid":"multi-era-2025@test","title":"Event in 2025 (modern rule)","start":"2025-06-10T18:00:00.000Z","end":"2025-06-10T19:00:00.000Z","allDay":false,"timezone":"America/Detroit"},
+      {"uid":"multi-era-1985@test","sourceUid":"multi-era-1985@test","title":"Event in 1985 (old rule)","start":"1985-10-15T18:00:00.000Z","end":"1985-10-15T19:00:00.000Z","allDay":false,"timezone":"America/Detroit"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

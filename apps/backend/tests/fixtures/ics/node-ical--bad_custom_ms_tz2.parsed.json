@@ -1,0 +1,29 @@
+{
+  "UTC": {
+    "events": [
+      {"uid":"1173422081SZR322","sourceUid":"1173422081SZR322","title":"[private]","description":"[private]","start":"2021-03-25T10:35:00.000Z","end":"2021-03-25T11:50:00.000Z","allDay":false,"location":"[private]","timezone":"UTC"},
+      {"uid":"*masked-away*@google.com","sourceUid":"*masked-away*@google.com","title":"*masked-away*","start":"2021-04-01T19:30:00.000Z","end":"2021-04-01T19:30:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"*masked-away2*@google.com","sourceUid":"*masked-away2*@google.com","title":"*masked-away2*","start":"2021-04-01T00:00:00.000Z","end":"2021-04-01T23:59:59.999Z","allDay":true,"timezone":"UTC"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "Europe/Amsterdam": {
+    "events": [
+      {"uid":"1173422081SZR322","sourceUid":"1173422081SZR322","title":"[private]","description":"[private]","start":"2021-03-25T10:35:00.000Z","end":"2021-03-25T11:50:00.000Z","allDay":false,"location":"[private]","timezone":"UTC"},
+      {"uid":"*masked-away*@google.com","sourceUid":"*masked-away*@google.com","title":"*masked-away*","start":"2021-04-01T19:30:00.000Z","end":"2021-04-01T19:30:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"*masked-away2*@google.com","sourceUid":"*masked-away2*@google.com","title":"*masked-away2*","start":"2021-03-31T22:00:00.000Z","end":"2021-04-01T21:59:59.999Z","allDay":true,"timezone":"Europe/Amsterdam"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  },
+  "America/Los_Angeles": {
+    "events": [
+      {"uid":"1173422081SZR322","sourceUid":"1173422081SZR322","title":"[private]","description":"[private]","start":"2021-03-25T10:35:00.000Z","end":"2021-03-25T11:50:00.000Z","allDay":false,"location":"[private]","timezone":"UTC"},
+      {"uid":"*masked-away*@google.com","sourceUid":"*masked-away*@google.com","title":"*masked-away*","start":"2021-04-01T19:30:00.000Z","end":"2021-04-01T19:30:00.000Z","allDay":false,"timezone":"Etc/UTC"},
+      {"uid":"*masked-away2*@google.com","sourceUid":"*masked-away2*@google.com","title":"*masked-away2*","start":"2021-04-01T07:00:00.000Z","end":"2021-04-02T06:59:59.999Z","allDay":true,"timezone":"America/Los_Angeles"}
+    ],
+    "errors": [],
+    "method": "PUBLISH"
+  }
+}

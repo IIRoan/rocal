@@ -1,3 +1,4 @@
+import type { Schema } from "@workspace/api-contracts";
 import { z } from "zod";
 import { CALENDAR_COLORS, isValidCalendarColor } from "./color-utils";
 import { isReservedSystemEmail } from "./mail-addresses";
@@ -92,7 +93,8 @@ export const eventParticipantInputSchema = z
   })
   .strict();
 
-export type EventParticipantInput = z.infer<typeof eventParticipantInputSchema>;
+/** The contract half keeps required keys where apps/web's non-strict build would make every inferred key optional. */
+export type EventParticipantInput = z.infer<typeof eventParticipantInputSchema> & Schema<"ParticipantInput">;
 
 export const encryptedIcsImportEventSchema = z.object({
   externalId: z.string().min(1).max(128),
@@ -114,7 +116,8 @@ export const encryptedIcsImportEventSchema = z.object({
     catch { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid recurrence rule" }); }
   }
 });
-export type EncryptedIcsImportEvent = z.infer<typeof encryptedIcsImportEventSchema>;
+export type EncryptedIcsImportEvent = z.infer<typeof encryptedIcsImportEventSchema> &
+  Schema<"EncryptedIcsEvent">;
 export const encryptedIcsImportBodySchema = z.object({
   calendarId: z.string().min(1),
   encryptedEvents: z.array(encryptedIcsImportEventSchema).min(1).max(100),
@@ -154,7 +157,8 @@ export const putRecentContactsBodySchema = z
     encryptionKeyVersion: z.number().int().min(1).max(1000).optional(),
   })
   .strict();
-export type PutRecentContactsRequest = z.infer<typeof putRecentContactsBodySchema>;
+export type PutRecentContactsRequest = z.infer<typeof putRecentContactsBodySchema> &
+  Schema<"PutRecentContactsRequest">;
 
 export const putMailSettingsBodySchema = z
   .object({
@@ -162,7 +166,8 @@ export const putMailSettingsBodySchema = z
     encryptionKeyVersion: z.number().int().min(1).max(1000).optional(),
   })
   .strict();
-export type PutMailSettingsRequest = z.infer<typeof putMailSettingsBodySchema>;
+export type PutMailSettingsRequest = z.infer<typeof putMailSettingsBodySchema> &
+  Schema<"PutMailSettingsRequest">;
 
 export const bulkEventBodySchema = z
   .object({
@@ -171,4 +176,4 @@ export const bulkEventBodySchema = z
     targetCalendarId: z.string().optional(),
   })
   .strict();
-export type BulkEventRequest = z.infer<typeof bulkEventBodySchema>;
+export type BulkEventRequest = z.infer<typeof bulkEventBodySchema> & Schema<"BulkEventRequest">;

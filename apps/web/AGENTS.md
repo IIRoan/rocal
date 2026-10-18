@@ -1,5 +1,7 @@
 Auth uses rolling 14-day app and passkey sessions; Better Auth checks hourly and on focus/reconnect, with renewal cookies forwarded by the API.
 
+Every backend change ships with a case in the API suite (`crates/solace-api-tests`, root AGENTS §5). The API is being ported to Rust (plan 001; root AGENTS §3 "Rust backend"): wire types come from `@workspace/api-contracts`, and the port keeps the known privacy gaps of root AGENTS §2 unchanged until its step 7.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
