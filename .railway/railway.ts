@@ -100,6 +100,8 @@ export default defineRailway(() => {
     },
   });
 
+  // The reference as Railway stores it: `ref()` writes the service name quoted, then reads that back as a change on every plan.
+  const fromApi = (name: string) => `\${{"Solace API".${name}}}`;
   const api = service("Solace API", {
     source: solaceRepo,
     build: {
@@ -178,7 +180,6 @@ export default defineRailway(() => {
     healthcheck: "/health",
     healthcheckTimeout: 300,
     replicas: { "europe-west4-drams3a": 1 },
-    networking: { privateNetworkEndpoint: "notifications-rust" },
     deploy: {
       ipv6EgressEnabled: true,
       restartPolicyMaxRetries: 5,
@@ -189,13 +190,13 @@ export default defineRailway(() => {
       APNS_KEY_ID: preserve(),
       APNS_TEAM_ID: preserve(),
       DATABASE_URL: ref(postgresApp, "DATABASE_URL"),
-      EMAIL_FROM: ref(api, "EMAIL_FROM"),
-      EMAIL_FROM_NAME: ref(api, "EMAIL_FROM_NAME"),
-      FRONTEND_URL: ref(api, "FRONTEND_URL"),
-      NODE_ENV: ref(api, "NODE_ENV"),
-      STALWART_BASE_URL: ref(api, "STALWART_BASE_URL"),
-      STALWART_JMAP_PASSWORD: ref(api, "STALWART_JMAP_PASSWORD"),
-      STALWART_JMAP_USERNAME: ref(api, "STALWART_JMAP_USERNAME"),
+      EMAIL_FROM: fromApi("EMAIL_FROM"),
+      EMAIL_FROM_NAME: fromApi("EMAIL_FROM_NAME"),
+      FRONTEND_URL: fromApi("FRONTEND_URL"),
+      NODE_ENV: fromApi("NODE_ENV"),
+      STALWART_BASE_URL: fromApi("STALWART_BASE_URL"),
+      STALWART_JMAP_PASSWORD: fromApi("STALWART_JMAP_PASSWORD"),
+      STALWART_JMAP_USERNAME: fromApi("STALWART_JMAP_USERNAME"),
     },
   });
 

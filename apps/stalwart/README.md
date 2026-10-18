@@ -2,12 +2,13 @@
 
 Stalwart mail server runs on [Railway](https://railway.app). A public VPS
 (`mail.solace.onl` / `193.180.211.139`) owns the MX, TLS certificates, and
-inbound ports. Railway containers connect **outbound** to the VPS over frp. The
-only inbound Railway path is the key-gated backend gate
-(`stalwart-mail-production.up.railway.app` → HAProxy `:8081`,
-[`backend-gate.cfg`](backend-gate.cfg)), used by the Solace API so app mail does
-not depend on the VPS's upstream. Third-party clients and the notifications worker
-keep using `mail.solace.onl`.
+inbound ports. Railway containers connect **outbound** to the VPS over frp, and
+nothing reaches Stalwart on Railway directly. The Solace API (the Railway service
+"Solace API"), the notifications worker and third-party clients all use
+`https://mail.solace.onl` through the VPS. The key-gated backend gate (HAProxy
+`:8081`, [`backend-gate.cfg`](backend-gate.cfg)) still starts with the container,
+but no Railway domain points at it since the cutover; plan 001 step 7 moves the
+API to Railway's private network instead.
 
 Desired state for Stalwart objects lives in [`stalwart/plan/`](stalwart/plan/).
 WebUI edits are overwritten on the next Railway boot. This tree lives in the Solace
@@ -23,8 +24,8 @@ rights only to provision. `stalwart/plan/16-provisioner-role.ndjson` defines the
 After applying the plan, create a dedicated account bound to that role and issue
 it an API token, then set `STALWART_PROVISION_TOKEN` on the API. This step is
 manual because the account secret must never live in the repo. Until it is done
-the API falls back to the deprecated `STALWART_ADMIN_TOKEN`; retire that token
-once the scoped one works.
+the API falls back to the deprecated `STALWART_ADMIN_TOKEN`, which is what it
+does today; retire that token once the scoped one works (plan 001 step 7).
 
 ## System overview
 
@@ -33,7 +34,7 @@ flowchart TB
     subgraph Internet
         MTA[Remote MTAs / mail clients]
         RCPT[Recipient mail servers]
-        API[Solace API<br/>Vercel]
+        API[Solace API<br/>Railway service]
     end
 
     subgraph VPS["VPS (193.180.211.139)"]
@@ -51,14 +52,14 @@ flowchart TB
         FRPC[frpc<br/>smtp + http group proxies]
         REL[frpc relay visitor<br/>STCP :2525, same process]
         HEALTH[Health server<br/>:8090]
-        GATE[Backend gate<br/>HAProxy :8081]
+        GATE[Backend gate<br/>HAProxy :8081, no domain]
         SW --> REL
         FRPC --> SW
         GATE -->|"PROXY v2"| SW
     end
 
     MTA --> HAP
-    API -->|"HTTPS + X-Solace-Gate<br/>Railway domain"| GATE
+    API -->|"HTTPS<br/>mail.solace.onl"| HAP
     FRPS <-->|"TCP load-balancing groups<br/>HAProxy PROXY v2 passthrough"| FRPC
     FRPS <-->|"STCP tunnel"| REL
     REL -->|"SMTP + SASL"| FREL
@@ -212,7 +213,7 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 | `FRPC_TOKEN` | yes | frp auth token (must match `FRP_TOKEN` in GitHub Environment `mail-vps`) |
 | `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
-| `STALWART_GATE_KEY` | yes | Backend gate key (32+ chars, same value as Vercel `STALWART_GATE_KEY`); only its SHA-256 reaches HAProxy; missing key fails boot |
+| `STALWART_GATE_KEY` | yes | Backend gate key (32+ chars); only its SHA-256 reaches HAProxy; missing key fails boot. The API would send it as `X-Solace-Gate` only if its own `STALWART_GATE_KEY` were set (it is not) |
 | `PORT` | yes | Set to `8090` — Railway healthcheck port |
 | `PGHOST`, `PGPASSWORD`, etc. | yes | PostgreSQL (Railway plugin) |
 | `BUCKET` / `BUCKET_*` | yes | Railway bucket refs for S3 BlobStore |

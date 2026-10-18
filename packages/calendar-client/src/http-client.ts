@@ -240,7 +240,7 @@ export class HttpClient {
         signal: controller.signal,
         credentials: this.credentials,
         headers: {
-          // Only set JSON Content-Type when a body is present. Empty DELETE/GET with application/json makes Elysia try to parse and return 400 PARSE.
+          // Only set JSON Content-Type when a body is present. Empty DELETE/GET with application/json makes the API try to parse and return 400 PARSE.
           ...(hasBody ? { "Content-Type": "application/json" } : {}),
           ...extraHeaders,
           ...(fetchOptions as RequestInit).headers,
