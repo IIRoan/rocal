@@ -6,7 +6,7 @@ A calendar and mail monorepo: web frontend, native Calendar and Mail apps, API b
 
 - **apps/web** - Next.js frontend with shadcn/ui components
 - **apps/backend** - The Rust API (axum + SeaORM) serving `api.solace.onl`; DTOs, the API suite and tooling live in `crates/` and `xtask/` (see [plans/001-rust-backend-migration.md](plans/001-rust-backend-migration.md))
-- **retired/backend** - The previous Elysia.js API, kept deployed on Vercel for rollback until plan 001 step 7 deletes it; the Prisma migrations still live here
+- **retired/backend** - The previous Elysia.js API, no longer deployed; the Prisma migrations still live here until plan 001 step 7 deletes it
 - **apps/native-calendar** - Expo app "Solace Calendar". See [apps/native-calendar/README.md](apps/native-calendar/README.md).
 - **apps/native-mail** - Expo app "Solace Mail". See [apps/native-mail/README.md](apps/native-mail/README.md).
 - **apps/notifications** - Rust worker for scheduled reminder email and APNs notifications
