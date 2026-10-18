@@ -68,6 +68,23 @@ fn target_not_found() -> AppError {
     )
 }
 
+/// The caller's own bulk target, refused when a subscription manages it, as create and update refuse it.
+async fn writable_target(
+    state: &AppState,
+    user: &RouteUser,
+    id: &str,
+    read_only: &str,
+) -> Result<calendar::Model, AppError> {
+    let target = calendars::find(&state.db, &user.id, id)
+        .await?
+        .ok_or_else(target_not_found)?;
+    if is_writable(&target) {
+        Ok(target)
+    } else {
+        Err(AppError::field(read_only, "targetCalendarId"))
+    }
+}
+
 fn has_text(value: Option<&str>) -> bool {
     value.is_some_and(|value| !js_trim(value).is_empty())
 }
@@ -813,9 +830,13 @@ pub async fn bulk(
                     "targetCalendarId",
                 ));
             };
-            let target = calendars::find(&state.db, &user.id, &target_id.0)
-                .await?
-                .ok_or_else(target_not_found)?;
+            let target = writable_target(
+                state,
+                user,
+                &target_id.0,
+                "Cannot move events to a read-only calendar.",
+            )
+            .await?;
             if target.ics_share_enabled && events.iter().any(|e| e.encryption_state == "encrypted")
             {
                 return Err(AppError::field(
@@ -870,10 +891,14 @@ pub async fn bulk(
                 .map(|id| id.0.as_str())
                 .filter(|id| !id.is_empty());
             // Copies land only in the caller's own calendars; TypeScript wrote into any id and returned its share token.
-            if let Some(id) = target
-                && calendars::find(&state.db, &user.id, id).await?.is_none()
-            {
-                return Err(target_not_found());
+            if let Some(id) = target {
+                writable_target(
+                    state,
+                    user,
+                    id,
+                    "Cannot copy events to a read-only calendar.",
+                )
+                .await?;
             }
             duplicate(state, user, &events, &relations, target).await
         }

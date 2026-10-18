@@ -190,6 +190,58 @@ async fn cors_reflects_only_trusted_origins() {
 }
 
 #[tokio::test]
+async fn cross_site_writes_are_refused_from_untrusted_origins() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let body = || Some(json!({"name": "Planted", "color": "blue"}));
+    let cross_site = ok(user
+        .agent
+        .send(
+            Method::POST,
+            "/api/calendars",
+            body(),
+            &[("origin", "https://evil.example")],
+        )
+        .await);
+    match app.backend {
+        // TypeScript checked the Origin only on Better Auth's routes.
+        Backend::TypeScript => assert!(cross_site.status.is_success(), "{}", cross_site.text()),
+        Backend::Rust => {
+            ok(cross_site
+                .expect_error(403, "Forbidden", "Invalid origin")
+                .map(|_| ()));
+        }
+    }
+    let null_origin = ok(user
+        .agent
+        .send(
+            Method::POST,
+            "/api/calendars",
+            body(),
+            &[("origin", "null")],
+        )
+        .await);
+    if app.backend == Backend::Rust {
+        assert_eq!(null_origin.status.as_u16(), 403);
+    }
+    let trusted = ok(user
+        .agent
+        .post("/api/calendars", json!({"name": "Mine", "color": "blue"}))
+        .await);
+    assert!(trusted.status.is_success(), "{}", trusted.text());
+    let read = ok(user
+        .agent
+        .send(
+            Method::GET,
+            "/api/calendars",
+            None,
+            &[("origin", "https://evil.example")],
+        )
+        .await);
+    assert!(read.status.is_success(), "reads are left to CORS");
+}
+
+#[tokio::test]
 async fn error_envelopes_echo_the_request_id() {
     let app = TestApp::spawn().await;
     let mut agent = app.anonymous();

@@ -359,6 +359,13 @@ async fn verify_password_checks_the_current_password() {
         )
         .await;
     auth_error(&wrong, 400, "INVALID_PASSWORD", "Invalid password");
+    let long = user
+        .post(
+            "/api/auth/verify-password",
+            json!({"password": "x".repeat(129)}),
+        )
+        .await;
+    auth_error(&long, 400, "PASSWORD_TOO_LONG", "Password too long");
 }
 
 #[tokio::test]

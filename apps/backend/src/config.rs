@@ -185,12 +185,8 @@ fn trimmed(var: &impl Fn(&str) -> Option<String>, name: &str) -> Option<String> 
 
 fn noreply_email(var: &impl Fn(&str) -> Option<String>) -> String {
     trimmed(var, "EMAIL_FROM")
-        .or_else(|| {
-            var("AUTH_EMAIL_FROM")
-                .or_else(|| var("AUTH_RESET_EMAIL_FROM"))
-                .map(|header| address_of(&header))
-        })
-        .filter(|from| !from.is_empty())
+        .or_else(|| var("AUTH_EMAIL_FROM").or_else(|| var("AUTH_RESET_EMAIL_FROM")))
+        .and_then(|value| sender_address(&value))
         .unwrap_or_else(|| "noreply@solace.onl".into())
 }
 
@@ -223,12 +219,17 @@ fn avatar_bucket(var: &impl Fn(&str) -> Option<String>) -> Option<AvatarBucketCo
 }
 
 /// `Name <address>` → `address`.
-fn address_of(header: &str) -> String {
-    let trimmed = header.trim();
-    match (trimmed.rfind('<'), trimmed.ends_with('>')) {
-        (Some(open), true) => trimmed[open + 1..trimmed.len() - 1].trim().to_owned(),
-        _ => trimmed.to_owned(),
-    }
+/// A sender's bare address, shared with the notifications worker: `Name <address>`, `address (comment)` or an address; `None` without an `@`.
+pub fn sender_address(raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    let address = match (raw.rfind('<'), raw.rfind('>')) {
+        (Some(open), Some(close)) if open < close => raw[open + 1..close].trim().to_owned(),
+        _ => raw
+            .split_whitespace()
+            .find(|part| part.contains('@'))?
+            .to_owned(),
+    };
+    address.contains('@').then_some(address)
 }
 
 /// A padded secret is kept as is: changing it would sign out every session.
@@ -292,6 +293,16 @@ mod tests {
     }
 
     const DB: (&str, &str) = ("DATABASE_URL", "postgres://localhost/solace_test");
+
+    #[test]
+    fn the_noreply_address_drops_a_display_name() {
+        let named = config(&[DB, ("EMAIL_FROM", "Solace <noreply@solace.onl>")]).unwrap();
+        assert_eq!(named.noreply_email, "noreply@solace.onl");
+        let bare = config(&[DB, ("EMAIL_FROM", " noreply@solace.onl (Solace)")]).unwrap();
+        assert_eq!(bare.noreply_email, "noreply@solace.onl");
+        let unusable = config(&[DB, ("EMAIL_FROM", "Solace")]).unwrap();
+        assert_eq!(unusable.noreply_email, "noreply@solace.onl");
+    }
 
     #[test]
     fn a_missing_or_short_auth_secret_fails_when_deployed() {

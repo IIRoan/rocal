@@ -1917,6 +1917,54 @@ async fn all_day_events_export_local_dates_with_an_exclusive_end() {
 }
 
 #[tokio::test]
+async fn bulk_move_and_duplicate_refuse_a_read_only_target() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let work = calendar_id(&mut owner, "Work").await;
+    let feed = calendar_id(&mut owner, "Family").await;
+    sqlx::query("UPDATE calendar SET is_sync_only = true WHERE id = $1")
+        .bind(&feed)
+        .execute(&app.db)
+        .await
+        .expect("make the feed calendar sync-only");
+    let event = create_event(
+        &mut owner,
+        &encrypted_event(&work, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    for (action, message) in [
+        ("move", "Cannot move events to a read-only calendar."),
+        ("duplicate", "Cannot copy events to a read-only calendar."),
+    ] {
+        let response = owner
+            .post(
+                "/api/events/bulk",
+                json!({"action": action, "eventIds": [event.id], "targetCalendarId": feed}),
+            )
+            .await;
+        match app.backend {
+            // TypeScript checks only that the target is owned.
+            Backend::TypeScript => {
+                ok(response.expect_status(200));
+            }
+            Backend::Rust => {
+                let error = ok(response.expect_error(400, "Validation Error", message));
+                assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
+            }
+        }
+    }
+    if app.backend == Backend::Rust {
+        let stored = count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
+            &feed,
+        )
+        .await;
+        assert_eq!(stored, 0, "nothing landed in the feed calendar");
+    }
+}
+
+#[tokio::test]
 async fn bulk_move_checks_the_target_calendar() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;

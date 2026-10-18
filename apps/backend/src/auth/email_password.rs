@@ -154,7 +154,7 @@ async fn password_sign_in(
     if !addresses::is_zod_email(&body.email) {
         return Err(codes::invalid_email());
     }
-    if body.password.chars().count() > password::MAX_LENGTH {
+    if crate::http::zod::js_length(&body.password) > password::MAX_LENGTH {
         return Err(codes::password_too_long());
     }
     let user = store::find_user_by_email(&state.db, &body.email.to_lowercase()).await?;

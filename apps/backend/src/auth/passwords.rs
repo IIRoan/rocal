@@ -326,6 +326,10 @@ pub async fn verify_password(
     let outcome = async {
         let body: PasswordBody = validate(&VERIFY, body.as_ref(), "body")?;
         let active = require_session(&state, &headers, &mut cookies).await?;
+        // `validatePassword`: refused before any hashing, as on sign-in.
+        if crate::http::zod::js_length(&body.password) > super::password::MAX_LENGTH {
+            return Err(codes::password_too_long());
+        }
         let stored = store::credential_account(&state.db, &active.user.id)
             .await?
             .and_then(|a| a.password);

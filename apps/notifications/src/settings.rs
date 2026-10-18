@@ -60,21 +60,13 @@ impl Settings {
         }
     }
 
-    /// `EMAIL_FROM` (or its older names) as a bare address; a "Name <address>" form keeps the address.
+    /// `EMAIL_FROM` (or its older names) as a bare address, read as the API reads it.
     pub fn sender_address(&self) -> Option<String> {
         let raw = self
             .get("EMAIL_FROM")
             .or_else(|| self.get("EMAIL_FROM_ADDRESS"))
             .or_else(|| self.get("FROM_EMAIL"))?;
-        // RFC 5322 forms: "Name <address>", or an address with a trailing "(comment)".
-        let address = match (raw.rfind('<'), raw.rfind('>')) {
-            (Some(open), Some(close)) if open < close => raw[open + 1..close].trim().to_owned(),
-            _ => raw
-                .split_whitespace()
-                .find(|part| part.contains('@'))?
-                .to_owned(),
-        };
-        address.contains('@').then_some(address)
+        solace_server::config::sender_address(&raw)
     }
 
     /// The noreply mailer, or `None` while its credentials or sender are missing.

@@ -74,15 +74,24 @@ fn enforce_at(store: &'static str, key: &str, limit: Limit, now: Instant) -> Res
             if store.entries.len() >= MAX_KEYS_PER_STORE {
                 store.entries.retain(|_, entry| entry.reset > now);
             }
-            if store.entries.len() < MAX_KEYS_PER_STORE {
-                store.entries.insert(
-                    key.to_owned(),
-                    Entry {
-                        count: 1,
-                        reset: now + limit.window,
-                    },
-                );
+            // A full store drops the entry nearest its reset, so a new key is always counted rather than let through.
+            // ponytail: O(n) scan only while 50,000 live keys are held; a time-ordered index if floods become routine.
+            if store.entries.len() >= MAX_KEYS_PER_STORE
+                && let Some(oldest) = store
+                    .entries
+                    .iter()
+                    .min_by_key(|(_, entry)| entry.reset)
+                    .map(|(key, _)| key.clone())
+            {
+                store.entries.remove(&oldest);
             }
+            store.entries.insert(
+                key.to_owned(),
+                Entry {
+                    count: 1,
+                    reset: now + limit.window,
+                },
+            );
         }
     }
     Ok(())
@@ -110,6 +119,19 @@ mod tests {
         assert!(
             enforce("test-store", "b", limit).is_ok(),
             "keys are separate"
+        );
+    }
+
+    #[test]
+    fn a_full_store_still_counts_new_keys() {
+        let limit = Limit::per_minute(1);
+        for index in 0..MAX_KEYS_PER_STORE {
+            assert!(enforce("full-store", &format!("key-{index}"), limit).is_ok());
+        }
+        assert!(enforce("full-store", "late", limit).is_ok());
+        assert!(
+            enforce("full-store", "late", limit).is_err(),
+            "the new key was counted"
         );
     }
 

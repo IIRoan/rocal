@@ -229,6 +229,20 @@ async fn sign_in_with_the_password() {
 }
 
 #[tokio::test]
+async fn sign_in_counts_password_length_in_utf16_units() {
+    let app = TestApp::spawn().await;
+    let user = app.user().await;
+    let mut agent = app.anonymous();
+    let emoji = ok(agent
+        .post(
+            "/api/auth/sign-in/email",
+            json!({"email": user.email, "password": "💚".repeat(65)}),
+        )
+        .await);
+    auth_error(&emoji, 400, "PASSWORD_TOO_LONG", "Password too long");
+}
+
+#[tokio::test]
 async fn sign_in_failures_do_not_reveal_which_part_was_wrong() {
     let app = TestApp::spawn().await;
     let user = app.user().await;

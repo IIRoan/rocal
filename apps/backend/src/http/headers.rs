@@ -5,6 +5,7 @@ use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, header}
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
+use crate::error::AppError;
 use crate::state::AppState;
 
 const JSON_API_CSP: &str = "default-src 'none'; frame-ancestors 'none'";
@@ -72,6 +73,18 @@ pub async fn cors(State(state): State<AppState>, request: Request, next: Next) -
         .as_deref()
         .filter(|origin| state.origins.is_allowed(origin, host.as_deref()));
     let allowed = allowed.and_then(|origin| HeaderValue::from_str(origin).ok());
+    // Browsers name the page on every cross-site write, form posts and no-cors fetches included; native apps and servers send no Origin. Better Auth's routes check their own.
+    let writes = !matches!(
+        *request.method(),
+        Method::GET | Method::HEAD | Method::OPTIONS
+    );
+    if writes
+        && origin.is_some()
+        && allowed.is_none()
+        && !request.uri().path().starts_with("/api/auth/")
+    {
+        return AppError::Forbidden("Invalid origin".into()).into_response();
+    }
     let is_options = request.method() == Method::OPTIONS;
     let is_preflight = is_options
         && request
