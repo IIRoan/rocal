@@ -455,7 +455,10 @@ export function AttachmentPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(92dvh,900px)] w-[min(96dvw,1100px)] max-w-[96dvw] flex-col p-0">
+      <DialogContent
+        className="flex h-[min(92dvh,900px)] w-[min(96dvw,1100px)] max-w-[96dvw] flex-col p-0"
+        onEscapeKeyDown={(event) => event.stopPropagation()}
+      >
         {/* Fallback title/description for Radix accessibility — overridden by each preview */}
         <DialogHeader className="sr-only">
           <DialogTitle>Attachment Preview</DialogTitle>

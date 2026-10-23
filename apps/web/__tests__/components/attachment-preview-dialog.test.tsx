@@ -3,7 +3,10 @@
 import React, { act } from "react";
 import { afterEach, beforeEach, expect, it, jest } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
-import { PdfAttachmentThumbnail } from "../../components/mail/attachment-preview-dialog";
+import {
+  AttachmentPreviewDialog,
+  PdfAttachmentThumbnail,
+} from "../../components/mail/attachment-preview-dialog";
 
 const mockGetDocument = jest.fn();
 
@@ -12,6 +15,7 @@ jest.mock("lucide-react", () => ({
   Loader2: () => null,
   Minus: () => null,
   Plus: () => null,
+  XIcon: () => null,
 }));
 
 jest.mock("pdfjs-dist", () => ({
@@ -86,4 +90,30 @@ it("handles rejected loading-task cleanup when a thumbnail unmounts", async () =
   await act(async () => root.render(null));
 
   expect(destroy).toHaveBeenCalledTimes(1);
+});
+
+it("closes the attachment on Escape without triggering the reader shortcut", async () => {
+  const readerShortcut = jest.fn();
+  const onOpenChange = jest.fn();
+  window.addEventListener("keydown", readerShortcut);
+
+  try {
+    await act(async () => root.render(
+      <AttachmentPreviewDialog
+        preview={{ kind: "text", name: "note.txt", type: "text/plain", text: "Note" }}
+        onOpenChange={onOpenChange}
+      />,
+    ));
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+      }));
+    });
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(readerShortcut).not.toHaveBeenCalled();
+  } finally {
+    window.removeEventListener("keydown", readerShortcut);
+  }
 });
