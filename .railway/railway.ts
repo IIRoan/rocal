@@ -53,6 +53,45 @@ export default defineRailway(() => {
   const stalwartBlobs = bucket("stalwart-blobs", { region: "ams" });
   // Private; the API serves uploaded profile pictures through /api/profiles/avatars/:id.
   const profilePictures = bucket("profile-pictures", { region: "ams" });
+  const gatusData = volume("gatus-data", {
+    region: "europe-west4-drams3a",
+    sizeMB: 1000,
+  });
+
+  const monitoring = service("Monitoring", {
+    source: github("IIRoan/rocal", {
+      branch: "master",
+      checkSuites: false,
+      rootDirectory: "apps/gatus",
+    }),
+    build: {
+      builder: "DOCKERFILE",
+      dockerfilePath: "Dockerfile",
+      watchPatterns: ["apps/gatus/**"],
+    },
+    start: "/usr/local/bin/entrypoint.sh",
+    healthcheck: "/health",
+    healthcheckTimeout: 300,
+    replicas: { "europe-west4-drams3a": 1 },
+    volumeMounts: { "/data": gatusData },
+    deploy: {
+      restartPolicyType: "ON_FAILURE",
+      restartPolicyMaxRetries: 5,
+      limitOverride: { containers: { cpu: 1, memoryBytes: 250000000 } },
+    },
+    domains: [
+      { domain: "status.solace.onl", port: 8080 },
+      { domain: "monitoring-solace.roan.dev", port: 8080 },
+    ],
+    env: {
+      DISCORD_WEBHOOK_URL: preserve(),
+      GATUS_CONFIG_PATH: "/data/config.yaml",
+      PORT: "8080",
+      TZ: "Europe/Amsterdam",
+      prometheus_password: preserve(),
+      prometheus_user: preserve(),
+    },
+  });
 
   const stalwartMail = service("stalwart-mail", {
     source: stalwartRepo,
@@ -137,7 +176,10 @@ export default defineRailway(() => {
       AVATAR_BUCKET_ACCESS_KEY_ID: ref(profilePictures, "ACCESS_KEY_ID"),
       AVATAR_BUCKET_ENDPOINT: ref(profilePictures, "ENDPOINT"),
       AVATAR_BUCKET_REGION: ref(profilePictures, "REGION"),
-      AVATAR_BUCKET_SECRET_ACCESS_KEY: ref(profilePictures, "SECRET_ACCESS_KEY"),
+      AVATAR_BUCKET_SECRET_ACCESS_KEY: ref(
+        profilePictures,
+        "SECRET_ACCESS_KEY",
+      ),
       BACKEND_URL: "https://api.solace.onl",
       BETTER_AUTH_SECRET: preserve(),
       EMAIL_FROM: preserve(),
@@ -145,7 +187,8 @@ export default defineRailway(() => {
       FRONTEND_URL: "https://solace.onl",
       MAIL_BRIDGE_HMAC_KEY: preserve(),
       MOBILE_AUTH_CALLBACK_URL: preserve(),
-      SENTRY_DSN: "https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace",
+      SENTRY_DSN:
+        "https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace",
       // The same Stalwart admin token the server itself is configured with.
       STALWART_ADMIN_TOKEN: ref(stalwartMail, "STALWART_ADMIN_TOKEN"),
       STALWART_BASE_URL: "https://mail.solace.onl",
@@ -212,6 +255,7 @@ export default defineRailway(() => {
       postgresStalwartVolume,
       stalwartBlobs,
       profilePictures,
+      monitoring,
       apiGroup,
       mailServer,
       notificationGroup,
