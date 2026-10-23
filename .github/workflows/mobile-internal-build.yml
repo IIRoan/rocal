@@ -180,15 +180,15 @@ jobs:
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       PROFILE: ${{ needs.meta.outputs.profile }}
+      EAS_LOCAL_BUILD_WORKINGDIR: ${{ runner.temp }}/eas-local-build
+      TMPDIR: ${{ runner.temp }}
       # Hosted runners OOM with Gradle's default heap on RN 0.86 builds.
       GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" -Dorg.gradle.parallel=true -Dorg.gradle.daemon=false
     steps:
       - uses: actions/checkout@v6
 
-      - name: Reclaim space for Android native builds
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/share/swift /usr/local/share/powershell /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
-          df -h "$GITHUB_WORKSPACE"
+      - name: Check Android build storage
+        run: df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP" /tmp
 
       - uses: oven-sh/setup-bun@v2
 
