@@ -120,13 +120,15 @@ describe("session cookie helpers", () => {
     jest.mocked(readChunkedSecureValue).mockResolvedValue(raw);
     jest.mocked(getChunkedSecureValueSync).mockReturnValue(raw);
     const headers = new Headers();
+    const passkeyExpires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toUTCString();
     headers.append("set-cookie", "better-auth.session_token=current-token; Max-Age=1209600; HttpOnly");
-    headers.append("set-cookie", "solace-passkey-step-up=signed-verification; Expires=Thu, 22 Oct 2026 12:00:00 GMT; HttpOnly");
+    headers.append("set-cookie", `solace-passkey-step-up=signed-verification; Expires=${passkeyExpires}; HttpOnly`);
     await persistRenewedSessionCookie(headers, new Headers({ cookie: "better-auth.session_token=current-token" }));
     const stored: Record<string, { value: string; expires: string }> = JSON.parse(jest.mocked(setChunkedSecureValueSync).mock.calls[0]?.[1] ?? "{}");
     expect(stored["better-auth.session_token"]?.value).toBe("current-token");
     expect(Date.parse(stored["better-auth.session_token"]?.expires ?? "") - Date.now()).toBeGreaterThan(13 * 24 * 60 * 60 * 1000);
     expect(stored["solace-passkey-step-up"]?.value).toBe("signed-verification");
+    expect(Date.parse(stored["solace-passkey-step-up"]?.expires ?? "")).toBe(Date.parse(passkeyExpires));
   });
 
   it("ignores renewal from a previous account and after sign-out", async () => {
