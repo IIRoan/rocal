@@ -180,8 +180,6 @@ jobs:
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       PROFILE: ${{ needs.meta.outputs.profile }}
-      EAS_LOCAL_BUILD_WORKINGDIR: ${{ runner.temp }}/eas-local-build
-      TMPDIR: ${{ runner.temp }}
       # Hosted runners OOM with Gradle's default heap on RN 0.86 builds.
       GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" -Dorg.gradle.parallel=true -Dorg.gradle.daemon=false
     steps:
@@ -209,6 +207,8 @@ jobs:
         working-directory: ${{ matrix.dir }}
         env:
           APP_VARIANT: ${{ needs.meta.outputs.app_variant }}
+          EAS_LOCAL_BUILD_WORKINGDIR: ${{ runner.temp }}/eas-local-build
+          TMPDIR: ${{ runner.temp }}
         run: |
           set -o pipefail
           eas build \
