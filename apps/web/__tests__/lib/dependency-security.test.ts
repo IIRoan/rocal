@@ -11,7 +11,7 @@ function runDependencyCheck(source: string) {
   const result = spawnSync(process.execPath, ["--input-type=commonjs", "-"], {
     cwd: repoRoot,
     encoding: "utf8",
-    input: `const assert = require("node:assert/strict");\n${source}`,
+    input: `const assert = require("node:assert/strict");\n(async () => {${source}})().catch(error => { console.error(error); process.exitCode = 1; });`,
     timeout: 15_000,
   });
   expect(result.error).toBeUndefined();
@@ -19,7 +19,7 @@ function runDependencyCheck(source: string) {
   expect(result.status).toBe(0);
 }
 
-describe("security dependency compatibility", () => {
+describe("dependency compatibility", () => {
   it("decodes Expo Router query strings through the patched CommonJS adapter", () => {
     runDependencyCheck(`
       const queryString = require("query-string");
@@ -30,18 +30,32 @@ describe("security dependency compatibility", () => {
     `);
   });
 
-  it("reads image dimensions with both Metro dependency trees", () => {
+  it("reads image buffers and Expo file assets with both Metro dependency trees", () => {
     runDependencyCheck(`
       const { createRequire } = require("node:module");
-      const rootMetro = require.resolve("metro/package.json");
+      const path = require("node:path");
+      const fs = require("node:fs");
+      const expoRequire = createRequire(require.resolve("@expo/metro/package.json"));
+      const rootMetro = expoRequire.resolve("metro/package.json");
       const rnRequire = createRequire(require.resolve("@react-native/metro-config"));
       const configRequire = createRequire(rnRequire.resolve("metro-config"));
       const nativeMetro = configRequire.resolve("metro/package.json");
       const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6wXUAAAAASUVORK5CYII=", "base64");
+      const assetPath = path.join(path.dirname(require.resolve("expo-router/package.json")), "assets/pkg.png");
       for (const entry of new Set([rootMetro, nativeMetro])) {
         const metroRequire = createRequire(entry);
         const assets = metroRequire("./src/Assets.js");
         assert.deepEqual(assets.getAssetSize("png", image, "test.png"), { width: 1, height: 1 });
+        const expected = assets.getAssetSize("png", fs.readFileSync(assetPath), assetPath);
+        const actual = await assets.getAssetData(assetPath, "assets/pkg.png", [], "ios", "/assets");
+        assert.equal(actual.width, expected.width);
+        assert.equal(actual.height, expected.height);
+      }
+      const { getUniversalAssetData } = require("@expo/metro-config/build/transform-worker/getAssets");
+      for (const platform of ["ios", "android"]) {
+        const actual = await getUniversalAssetData(assetPath, "assets/pkg.png", [], platform, "/assets");
+        assert.ok(actual.width > 0 && actual.height > 0);
+        assert.equal(actual.fileHashes.length, actual.files.length);
       }
     `);
   });
@@ -74,7 +88,9 @@ describe("security dependency compatibility", () => {
       "build/pdf.worker.min.mjs",
     );
     expect(
-      readFileSync(path.join(repoRoot, "apps/web/public/pdf.worker.min.mjs")),
-    ).toEqual(readFileSync(installedWorker));
+      readFileSync(
+        path.join(repoRoot, "apps/web/public/pdf.worker.min.mjs"),
+      ).equals(readFileSync(installedWorker)),
+    ).toBe(true);
   });
 });
