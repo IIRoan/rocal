@@ -59,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           docker run --detach --name solace-web --publish 127.0.0.1:8080:8080 solace-web:test
-          curl --retry 40 --retry-delay 1 --retry-connrefused --fail --silent --show-error http://127.0.0.1:8080/login --output /tmp/solace-login.html
+          curl --retry 40 --retry-delay 1 --retry-all-errors --fail --silent --show-error http://127.0.0.1:8080/login --output /tmp/solace-login.html
           python3 - <<'PY'
           import urllib.request
           from html.parser import HTMLParser
@@ -99,4 +99,6 @@ jobs:
 
       - name: Stop test containers
         if: always()
-        run: docker rm --force solace-web solace-runtime-reject 2>/dev/null || true
+        run: |
+          docker logs solace-web 2>/dev/null || true
+          docker rm --force solace-web solace-runtime-reject 2>/dev/null || true
