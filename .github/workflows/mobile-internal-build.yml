@@ -101,7 +101,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -188,7 +195,14 @@ jobs:
       - name: Check Android build storage
         run: df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP" /tmp
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
 
       - uses: actions/setup-java@v4
         with:
@@ -256,7 +270,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
 
       - name: Install qrencode
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends qrencode

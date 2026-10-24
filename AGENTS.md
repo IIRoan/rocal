@@ -2,7 +2,7 @@
 
 `CLAUDE.md` is a symlink to `AGENTS.md` (same in `apps/web/`); edit `AGENTS.md`. Rules marked **MUST** are non-negotiable; `scripts/check-repo-rules.ts` enforces the mechanical ones.
 
-Solace is a privacy-first calendar + mail product: one web app and two native apps (Solace Calendar, Solace Mail). Bun workspaces monorepo.
+Solace is a privacy-first calendar + mail product: one web app and two native apps (Solace Calendar, Solace Mail). Bun workspaces monorepo; tooling uses Bun 1.4.4 (`.bun-version`) and Node 22.23.4 (`.node-version`).
 
 ## 1. Map
 
