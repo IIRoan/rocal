@@ -1,6 +1,6 @@
 Auth uses rolling 14-day app and passkey sessions; Better Auth checks hourly and on focus/reconnect, with renewal cookies forwarded by the API.
 
-Production uses the root `Dockerfile.vercel` and `vercel.json` on Vercel's container runtime. The image contains the standalone Next.js server with pinned Node 22.23.4; instrumentation refuses unsupported production runtimes. Keep the Vercel project root at the repository root.
+Production uses `web-container.yml` to build the root `Dockerfile.vercel` and deploy its immutable image on Vercel. A Node preload checks the runtime before the standalone Next.js server starts. Keep the Vercel project root at the repository root, framework at Other, and Git deployments disabled; deployment submits the root `vercel.json`.
 
 Every backend change ships with a case in the API suite (`crates/solace-api-tests`, root AGENTS §5). The API is Rust (`apps/backend`, plan 001; root AGENTS §3 "Rust backend"): wire types come from `@workspace/api-contracts`, and the known privacy gaps of root AGENTS §2 stay until plan 001 step 7.
 

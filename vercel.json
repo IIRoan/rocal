@@ -1,9 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "git": { "deploymentEnabled": false },
   "services": {
     "web": {
       "root": ".",
+      "runtime": "container",
       "entrypoint": "Dockerfile.vercel"
     }
   },

@@ -12,6 +12,8 @@ on:
       - ".bun-version"
       - "Dockerfile.vercel*"
       - "scripts/check-web-runtime.ts"
+      - "scripts/deploy-web-container.py"
+      - "scripts/test_deploy_web_container.py"
       - "vercel.json"
       - ".github/workflows/web-container.yml"
   push:
@@ -26,6 +28,8 @@ on:
       - ".bun-version"
       - "Dockerfile.vercel*"
       - "scripts/check-web-runtime.ts"
+      - "scripts/deploy-web-container.py"
+      - "scripts/test_deploy_web_container.py"
       - "vercel.json"
       - ".github/workflows/web-container.yml"
   workflow_dispatch:
@@ -35,7 +39,7 @@ permissions:
 
 concurrency:
   group: web-container-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   smoke:
@@ -44,6 +48,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+
+      - name: Check deployment boundaries
+        run: python3 scripts/test_deploy_web_container.py
 
       - name: Build and verify the container
         run: |
@@ -104,3 +111,43 @@ jobs:
         run: |
           docker logs solace-web 2>/dev/null || true
           docker rm --force solace-web solace-runtime-reject 2>/dev/null || true
+
+  deploy:
+    name: Deploy web
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: web-production
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: prj_AxYhs6cn2KZ6PnbEdZF22RPctb79
+      VERCEL_ORG_ID: team_rGOQj2q34Fwz7XzHy4QpZDff
+      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+      NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - name: Install deployment CLI
+        run: npm install --global vercel@65.2.0
+      - name: Build and publish production image
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN"
+          image="vcr.vercel.com/astralgrove/solace-web/web:$GITHUB_SHA"
+          docker build --file Dockerfile.vercel --build-arg NEXT_PUBLIC_API_URL --build-arg NEXT_PUBLIC_APP_URL --build-arg NEXT_PUBLIC_SENTRY_DSN --tag "$image" .
+          docker run --rm --entrypoint node "$image" -e 'require("node:assert/strict").equal(process.versions.node, process.argv[1])' "$(cat .node-version)"
+          vercel vcr login docker --project "$VERCEL_PROJECT_ID" --scope astralgrove
+          vercel vcr push docker "web:$GITHUB_SHA" --project "$VERCEL_PROJECT_ID" --scope astralgrove
+          vercel vcr tag inspect web "$GITHUB_SHA" --project "$VERCEL_PROJECT_ID" --scope astralgrove --json > /tmp/web-image.json
+          digest=$(python3 -c 'import json; print(json.load(open("/tmp/web-image.json"))["manifestDigest"])')
+          python3 scripts/deploy-web-container.py --image "vcr.vercel.com/astralgrove/solace-web/web@$digest" --apply
+      - name: Verify production
+        run: |
+          curl --retry 10 --retry-all-errors --fail --silent --show-error https://solace.onl/login --output /tmp/web-login.html
+      - name: Remove registry credentials
+        if: always()
+        run: docker logout vcr.vercel.com
