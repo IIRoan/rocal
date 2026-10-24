@@ -1,5 +1,4 @@
-import { createAuthEndpoint } from "@better-auth/core/api";
-import { sessionMiddleware } from "better-auth/api";
+import { createAuthEndpoint, sessionMiddleware } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import type { User } from "better-auth";
 import { createLogger } from "@workspace/logger";
