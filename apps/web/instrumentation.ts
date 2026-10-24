@@ -5,6 +5,10 @@ export async function register() {
   installGlobalConsoleLogger("next");
 
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    if (process.env.NODE_ENV === "production") {
+      const { assertSupportedProductionRuntime } = await import("./lib/runtime-version");
+      assertSupportedProductionRuntime();
+    }
     await import("./sentry.server.config");
 
     // Indirect access only: a literal process.stdout reference breaks Next.js edge static analysis.

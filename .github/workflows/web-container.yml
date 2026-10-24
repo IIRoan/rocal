@@ -1,0 +1,102 @@
+name: Web container
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "patches/**"
+      - "package.json"
+      - "bun.lock"
+      - ".node-version"
+      - ".bun-version"
+      - "Dockerfile.vercel*"
+      - "vercel.json"
+      - ".github/workflows/web-container.yml"
+  push:
+    branches: [master]
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "patches/**"
+      - "package.json"
+      - "bun.lock"
+      - ".node-version"
+      - ".bun-version"
+      - "Dockerfile.vercel*"
+      - "vercel.json"
+      - ".github/workflows/web-container.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-container-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Web container
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build and verify the container
+        run: |
+          set -euo pipefail
+          echo 'CONTAINER_CONTEXT_CANARY=excluded' > apps/web/.env.production
+          args=(--file Dockerfile.vercel --build-arg NEXT_PUBLIC_API_URL=https://api.example.test --build-arg NEXT_PUBLIC_APP_URL=https://web.example.test)
+          docker build "${args[@]}" --target build --tag solace-web:build .
+          docker run --rm --entrypoint node solace-web:build -e 'require("node:assert/strict").equal(require("node:fs").existsSync("/app/apps/web/.env.production"), false)'
+          test "$(docker run --rm --entrypoint bun solace-web:build --version)" = "$(cat .bun-version)"
+          docker build "${args[@]}" --tag solace-web:test .
+          docker run --rm --entrypoint node solace-web:test -e 'require("node:assert/strict").equal(process.versions.node, process.argv[1])' "$(cat .node-version)"
+          docker run --rm --entrypoint node solace-web:test -e 'const a=require("node:assert/strict"),z=require("node:zlib");a.equal(z.constants.BROTLI_DECODER_ERROR_FORMAT_BLOCK_SWITCH,-17);a.throws(()=>z.brotliDecompressSync(Buffer.from("200010414141fcffff07002228f00b60f7f41f000000","hex")),{errno:-17})'
+
+      - name: Check page delivery and security headers
+        run: |
+          set -euo pipefail
+          docker run --detach --name solace-web --publish 127.0.0.1:8080:8080 solace-web:test
+          curl --retry 40 --retry-delay 1 --retry-connrefused --fail --silent --show-error http://127.0.0.1:8080/login --output /tmp/solace-login.html
+          python3 - <<'PY'
+          import urllib.request
+          from html.parser import HTMLParser
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.sources = []
+              def handle_starttag(self, tag, attrs):
+                  if tag == 'script':
+                      self.sources.extend(value for key, value in attrs if key == 'src')
+          with urllib.request.urlopen('http://127.0.0.1:8080/login') as response:
+              assert response.status == 200
+              assert response.headers['X-Content-Type-Options'] == 'nosniff'
+              assert 'api.example.test' in response.headers['Content-Security-Policy']
+              assert 'max-age=' in response.headers['Strict-Transport-Security']
+              scripts = Scripts()
+              scripts.feed(response.read().decode())
+          assert scripts.sources
+          for source in scripts.sources[:3]:
+              assert source.startswith('/_next/')
+              with urllib.request.urlopen('http://127.0.0.1:8080' + source) as response:
+                  assert response.status == 200
+                  assert 'javascript' in response.headers['Content-Type']
+          PY
+
+      - name: Refuse an unsupported production runtime
+        run: |
+          set -euo pipefail
+          echo 'Object.defineProperty(process.versions, "node", { value: "24.21.0" });' > /tmp/old-runtime.cjs
+          set +e
+          timeout 30 docker run --name solace-runtime-reject --volume /tmp/old-runtime.cjs:/tmp/old-runtime.cjs:ro --env NODE_OPTIONS=--require=/tmp/old-runtime.cjs solace-web:test > /tmp/old-runtime.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          test "$status" -ne 124
+          grep -q 'Unsupported JavaScript runtime' /tmp/old-runtime.log
+
+      - name: Stop test containers
+        if: always()
+        run: docker rm --force solace-web solace-runtime-reject 2>/dev/null || true

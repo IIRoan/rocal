@@ -18,6 +18,8 @@ const workspacePackages = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: repoRoot,
   cacheComponents: true,
   partialPrefetching: true,
   allowedDevOrigins: getAllowedNextDevOrigins(),
