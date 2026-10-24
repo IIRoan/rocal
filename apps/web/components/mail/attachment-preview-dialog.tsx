@@ -10,7 +10,11 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 
-import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import type {
+  PDFDocumentLoadingTask,
+  PDFDocumentProxy,
+  RenderTask,
+} from "pdfjs-dist";
 
 type MailAttachmentPreview =
   | {
@@ -152,10 +156,7 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
 
     let cancelled = false;
     let renderTask: RenderTask | null = null;
-    let loadingTask: {
-      destroy: () => void;
-      promise: Promise<PDFDocumentProxy>;
-    } | null = null;
+    let loadingTask: PDFDocumentLoadingTask | null = null;
 
     void (async () => {
       const { getDocument } = await loadPdfjs();
@@ -168,11 +169,9 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
         ...PDF_DOCUMENT_OPTIONS,
       });
 
-      void loadingTask
-        .promise.then(async (document) => {
+      void loadingTask.promise
+        .then(async (document) => {
           if (cancelled) {
-            // Best-effort cleanup of a cancelled document; destroy failure is harmless here.
-            void document.destroy().catch(() => undefined);
             return;
           }
 
@@ -196,7 +195,7 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
             viewport,
           });
           await renderTask.promise;
-          await document.destroy();
+          await loadingTask?.destroy();
         })
         .catch((thumbnailError) => {
           if (cancelled) {
@@ -228,7 +227,7 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
     return () => {
       cancelled = true;
       renderTask?.cancel();
-      loadingTask?.destroy();
+      void loadingTask?.destroy().catch(() => undefined);
     };
   }, [url]);
 
@@ -256,7 +255,11 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
   );
 }
 
-function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPreview, { kind: "pdf" }> }) {
+function PdfAttachmentPreview({
+  preview,
+}: {
+  preview: Extract<MailAttachmentPreview, { kind: "pdf" }>;
+}) {
   const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [scale, setScale] = useState(1.15);
@@ -265,8 +268,7 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
 
   useEffect(() => {
     let cancelled = false;
-    let loadingTask: { destroy: () => void; promise: Promise<PDFDocumentProxy> } | null =
-      null;
+    let loadingTask: PDFDocumentLoadingTask | null = null;
 
     void (async () => {
       const { getDocument } = await loadPdfjs();
@@ -280,30 +282,28 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
       });
 
       void loadingTask.promise
-      .then((document) => {
-        if (cancelled) {
-          // Best-effort cleanup of a cancelled document; destroy failure is harmless here.
-          void document.destroy().catch(() => undefined);
-          return;
-        }
-        setPdfDocument(document);
-        setPageCount(document.numPages);
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-        setPdfError(
-          error instanceof Error
-            ? error.message
-            : "Could not load this PDF preview.",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoadingDocument(false);
-        }
-      });
+        .then((document) => {
+          if (cancelled) {
+            return;
+          }
+          setPdfDocument(document);
+          setPageCount(document.numPages);
+        })
+        .catch((error) => {
+          if (cancelled) {
+            return;
+          }
+          setPdfError(
+            error instanceof Error
+              ? error.message
+              : "Could not load this PDF preview.",
+          );
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsLoadingDocument(false);
+          }
+        });
     })().catch((loadError) => {
       if (cancelled) {
         return;
@@ -318,16 +318,9 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
 
     return () => {
       cancelled = true;
-      loadingTask?.destroy();
+      void loadingTask?.destroy().catch(() => undefined);
     };
   }, [preview.url]);
-
-  useEffect(() => {
-    return () => {
-      // Best-effort teardown of the loaded document on unmount; destroy failure is harmless here.
-      void pdfDocument?.destroy().catch(() => undefined);
-    };
-  }, [pdfDocument]);
 
   return (
     <>
@@ -345,7 +338,9 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
             <button
               type="button"
               className="inline-flex size-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground disabled:opacity-40"
-              onClick={() => setScale((current) => Math.max(0.6, current - 0.15))}
+              onClick={() =>
+                setScale((current) => Math.max(0.6, current - 0.15))
+              }
               disabled={isLoadingDocument || !pdfDocument}
               aria-label="Zoom out PDF"
             >
@@ -357,7 +352,9 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
             <button
               type="button"
               className="inline-flex size-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground disabled:opacity-40"
-              onClick={() => setScale((current) => Math.min(2.4, current + 0.15))}
+              onClick={() =>
+                setScale((current) => Math.min(2.4, current + 0.15))
+              }
               disabled={isLoadingDocument || !pdfDocument}
               aria-label="Zoom in PDF"
             >
@@ -404,7 +401,9 @@ function TextAttachmentPreview({
     <>
       <DialogHeader className="border-b border-border/50 px-4 py-3 pr-12">
         <div className="min-w-0">
-          <DialogTitle className="truncate text-base">{preview.name}</DialogTitle>
+          <DialogTitle className="truncate text-base">
+            {preview.name}
+          </DialogTitle>
           <div className="text-muted-foreground mt-1 text-xs uppercase tracking-wide">
             Text preview
           </div>
@@ -428,7 +427,9 @@ function ImageAttachmentPreview({
     <>
       <DialogHeader className="border-b border-border/50 px-4 py-3 pr-12">
         <div className="min-w-0">
-          <DialogTitle className="truncate text-base">{preview.name}</DialogTitle>
+          <DialogTitle className="truncate text-base">
+            {preview.name}
+          </DialogTitle>
           <div className="text-muted-foreground mt-1 text-xs uppercase tracking-wide">
             Image preview
           </div>
@@ -454,7 +455,10 @@ export function AttachmentPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(92dvh,900px)] w-[min(96dvw,1100px)] max-w-[96dvw] flex-col p-0">
+      <DialogContent
+        className="flex h-[min(92dvh,900px)] w-[min(96dvw,1100px)] max-w-[96dvw] flex-col p-0"
+        onEscapeKeyDown={(event) => event.stopPropagation()}
+      >
         {/* Fallback title/description for Radix accessibility — overridden by each preview */}
         <DialogHeader className="sr-only">
           <DialogTitle>Attachment Preview</DialogTitle>

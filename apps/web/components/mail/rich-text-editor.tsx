@@ -149,7 +149,7 @@ export function RichTextEditor({
 
   useEffect(() => {
     if (editor) {
-      editor.setEditable(!disabled);
+      editor.setEditable(!disabled, false);
     }
   }, [disabled, editor]);
 

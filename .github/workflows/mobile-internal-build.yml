@@ -185,6 +185,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Check Android build storage
+        run: df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP" /tmp
+
       - uses: oven-sh/setup-bun@v2
 
       - uses: actions/setup-java@v4
@@ -204,6 +207,8 @@ jobs:
         working-directory: ${{ matrix.dir }}
         env:
           APP_VARIANT: ${{ needs.meta.outputs.app_variant }}
+          EAS_LOCAL_BUILD_WORKINGDIR: ${{ runner.temp }}/eas-local-build
+          TMPDIR: ${{ runner.temp }}
         run: |
           set -o pipefail
           eas build \
