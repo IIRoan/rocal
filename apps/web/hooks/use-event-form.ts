@@ -775,7 +775,8 @@ export function useEventForm({
           queryClient.setQueriesData<CalendarEvent[]>(
             { queryKey: EVENTS_QUERY_KEY },
             (oldEvents) => {
-              if (!oldEvents) {
+              // The "events" prefix also holds single-event detail and search entries.
+              if (!Array.isArray(oldEvents)) {
                 return oldEvents;
               }
 

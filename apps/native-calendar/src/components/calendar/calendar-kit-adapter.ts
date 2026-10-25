@@ -357,7 +357,12 @@ export function kitBackgroundToCreateSlot(
   const resolvedTimezone = resolveTimezone(timezone);
 
   if ("date" in slot && slot.date) {
-    return { date: slot.date, hour: "0" };
+    return {
+      date: formatCalendarDayKey(
+        parseKitVisibleDate(slot.date, resolvedTimezone),
+      ),
+      hour: "0",
+    };
   }
 
   if (!("dateTime" in slot) || !slot.dateTime) {

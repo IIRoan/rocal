@@ -839,5 +839,25 @@ describe("useEventForm reminder hydration", () => {
       const [request] = calendarData.createEvent.mock.calls[0] as any[];
       expect(request).not.toHaveProperty("categoryId");
     });
+
+    it("adds the created event to range lists next to a cached event detail", async () => {
+      const detailKey = ["events", "detail", "event-1"] as const;
+      const rangeKey = ["events", "range"] as const;
+      queryClient.setQueryData(detailKey, baseEvent);
+      queryClient.setQueryData(rangeKey, []);
+      act(() => {
+        latestFormRef.current!.setEventTitle("Lunch");
+        latestFormRef.current!.setEventCalendarId("cal-1");
+      });
+
+      await act(async () => {
+        await latestFormRef.current!.handleEventSave(makeCalendarData());
+      });
+
+      expect(queryClient.getQueryData(detailKey)).toBe(baseEvent);
+      expect(queryClient.getQueryData<any[]>(rangeKey)).toEqual([
+        expect.objectContaining({ id: "event-new" }),
+      ]);
+    });
   });
 });

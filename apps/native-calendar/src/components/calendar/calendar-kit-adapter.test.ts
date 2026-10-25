@@ -480,6 +480,13 @@ describe("kitBackgroundToCreateSlot", () => {
       kitBackgroundToCreateSlot({ date: "2026-08-18" }, TIMEZONE),
     ).toEqual({ date: "2026-08-18", hour: "0" });
   });
+
+  it("reads the kit's UTC all-day press as the user-timezone day", () => {
+    const midnight = wallClockToUtc(new Date(2026, 7, 18), 0, 0, TIMEZONE);
+    expect(
+      kitBackgroundToCreateSlot({ date: midnight.toISOString() }, TIMEZONE),
+    ).toEqual({ date: "2026-08-18", hour: "0" });
+  });
 });
 
 describe("parseKitVisibleDate", () => {

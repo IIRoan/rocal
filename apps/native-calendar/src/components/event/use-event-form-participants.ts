@@ -81,7 +81,7 @@ export function useEventFormParticipants(
 
   const sortedParticipants = useMemo(
     () =>
-      participants.toSorted((left, right) => {
+      [...participants].sort((left, right) => {
         const roleDiff =
           (left.role === "organizer" ? 0 : 1) -
           (right.role === "organizer" ? 0 : 1);
