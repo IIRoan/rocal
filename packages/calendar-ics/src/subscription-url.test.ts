@@ -61,4 +61,12 @@ describe("normalizeSubscriptionFeedUrl", () => {
       normalizeSubscriptionFeedUrl("webcal://example.com/calendar.ics"),
     ).toBe("https://example.com/calendar.ics");
   });
+
+  it("keeps the path's case, which servers such as iCloud treat as part of the feed id", () => {
+    expect(
+      normalizeSubscriptionFeedUrl(
+        "webcal://P42-caldav.icloud.com/published/2/MTk0AbCdEf/",
+      ),
+    ).toBe("https://p42-caldav.icloud.com/published/2/MTk0AbCdEf");
+  });
 });

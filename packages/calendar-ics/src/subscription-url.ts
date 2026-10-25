@@ -26,7 +26,7 @@ export function isLikelyIcsFeedUrl(rawUrl: string): boolean {
       return false;
     }
 
-    const pathname = normalizePathname(parsed.pathname);
+    const pathname = normalizePathname(parsed.pathname).toLowerCase();
 
     if (ICS_FEED_FILE_EXTENSIONS.some((extension) => pathname.endsWith(extension))) {
       return true;
@@ -46,12 +46,11 @@ export function isLikelyIcsFeedUrl(rawUrl: string): boolean {
 }
 
 function normalizePathname(pathname: string): string {
-  const normalized = pathname.toLowerCase();
-  if (normalized.length > 1) {
-    return normalized.replace(/\/+$/, "");
+  if (pathname.length > 1) {
+    return pathname.replace(/\/+$/, "");
   }
 
-  return normalized;
+  return pathname;
 }
 
 export function normalizeSubscriptionFeedUrl(value: string): string {
