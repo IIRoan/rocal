@@ -205,7 +205,7 @@ export async function resetEncryptionPasswordForActiveSession(
       session.blindIndexKey,
       keyVersion,
     );
-    await httpClient.put(`/api/calendars/${calendar.id}`, request);
+    await httpClient.put(`/api/calendars/${encodeURIComponent(calendar.id)}`, request);
   });
 
   await runInBatches(snapshot.categories, async (category) => {
@@ -216,7 +216,7 @@ export async function resetEncryptionPasswordForActiveSession(
       session.blindIndexKey,
       keyVersion,
     );
-    await httpClient.put(`/api/categories/${category.id}`, request);
+    await httpClient.put(`/api/categories/${encodeURIComponent(category.id)}`, request);
   });
 
   await runInBatches(snapshot.events, async (event) => {
@@ -226,7 +226,7 @@ export async function resetEncryptionPasswordForActiveSession(
       session.blindIndexKey,
       keyVersion,
     );
-    await httpClient.put(`/api/events/${event.id}`, request);
+    await httpClient.put(`/api/events/${encodeURIComponent(event.id)}`, request);
   });
 
   const envelope = await createPasswordEnvelope(

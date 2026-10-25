@@ -228,6 +228,27 @@ export const clientRules: Rule[] = [
     },
   },
   {
+    id: "api-path-ids",
+    summary: "Values interpolated into an `/api/` path are wrapped in encodeURIComponent, so an id from a link cannot leave its path segment.",
+    files: appSourceUnder([...CLIENT_SOURCE, "packages/calendar-client/src/"]),
+    check: (file) =>
+      find(file, (node) => {
+        if (!ts.isTemplateExpression(node) || !node.head.text.startsWith("/api/")) return null;
+        let inQuery = node.head.text.includes("?");
+        for (const span of node.templateSpans) {
+          const encoded = ts.isCallExpression(span.expression) && span.expression.expression.getText() === "encodeURIComponent";
+          if (!inQuery && !encoded) return `\${${span.expression.getText()}} in an /api/ path; wrap it in encodeURIComponent`;
+          inQuery ||= span.literal.text.includes("?");
+        }
+        return null;
+      }),
+    examples: {
+      path: "packages/calendar-client/src/events.ts",
+      bad: ["const path = `/api/events/${id}/rsvp`;"],
+      good: ["const path = `/api/events/${encodeURIComponent(id)}?scope=${scope}`;"],
+    },
+  },
+  {
     id: "hermes-safe-builtins",
     summary: "Code the native apps bundle uses no built-in the shipped Hermes lacks (packages/native-core/hermes-missing-builtins.ts) outside a typeof feature check.",
     files: appSourceUnder(NATIVE_BUNDLED_SOURCE),

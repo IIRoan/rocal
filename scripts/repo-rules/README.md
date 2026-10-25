@@ -37,6 +37,7 @@ Add it to the matching module (`repository`, `comments`, `backend`, `client`, `t
 | `owner-scoped-data` | Service Prisma queries without an owner filter must sit in a function with owner/session context, or be allow-commented. |
 | `safe-user-url-fetch` | Backend outbound requests go through `safeFetch`; raw `fetch` only for fixed trusted endpoints, allow-commented. |
 | `client-api-boundary` | App code reaches Solace APIs through `@workspace/calendar-client`; raw `fetch`/`XMLHttpRequest` needs an allow comment naming the protocol. |
+| `api-path-ids` | Values interpolated into an `/api/` path are wrapped in `encodeURIComponent`, so an id from a link cannot leave its path segment. |
 | `e2ee-client-content` | Payloads never carry plaintext title/description/location/name next to ciphertext. |
 | `client-safe-logging` | Web and native code log only static strings to the console. |
 | `secure-email-html` | Raw HTML is only inserted by reviewed sanitizing renderers, and frames never allow scripts. |

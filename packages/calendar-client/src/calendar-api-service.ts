@@ -308,7 +308,7 @@ export class CalendarApiService {
   async getEvent(id: string): Promise<CalendarEvent> {
     try {
       const response = await this.client.get<Schema<"Event">>(
-        `/api/events/${id}`,
+        `/api/events/${encodeURIComponent(id)}`,
       );
       return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
@@ -437,7 +437,7 @@ export class CalendarApiService {
 
     try {
       const response = await this.client.post<Schema<"Event">>(
-        `/api/events/${event.id}/seal-encryption`,
+        `/api/events/${encodeURIComponent(event.id)}/seal-encryption`,
         {
           encryptedContent: shadow.encryptedContent,
           ...(shadow.blindIndexTokens
@@ -471,7 +471,7 @@ export class CalendarApiService {
   ): Promise<CalendarEvent | { deleted: true }> {
     try {
       const response = await this.client.post<Schema<"RsvpResult">>(
-        `/api/events/${id}/rsvp`,
+        `/api/events/${encodeURIComponent(id)}/rsvp`,
         { status } satisfies Schema<"RsvpRequest">,
       );
       if ("deleted" in response) {
@@ -530,6 +530,7 @@ export class CalendarApiService {
 
       const query = searchParams.toString();
       const response = await this.client.get<Schema<"EventSearchCorpus">>(
+        // repo-rules-allow api-path-ids: appends a URLSearchParams query string, not a path segment.
         `/api/events/search-corpus${query ? `?${query}` : ""}`,
         { signal },
       );
@@ -570,7 +571,7 @@ export class CalendarApiService {
     try {
       const payload = await this.e2ee.attachEventEncryptionShadow(event);
       const response = await this.client.put<Schema<"Event">>(
-        `/api/events/${id}`,
+        `/api/events/${encodeURIComponent(id)}`,
         payload satisfies Schema<"UpdateEventRequest">,
       );
       return await this.hydrateEncryptedEvent(response as CalendarEvent);
@@ -582,7 +583,7 @@ export class CalendarApiService {
   async deleteEvent(id: string): Promise<DeleteResponse> {
     try {
       return await this.client.delete<Schema<"EventDeleted">>(
-        `/api/events/${id}`,
+        `/api/events/${encodeURIComponent(id)}`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete event");
@@ -621,7 +622,7 @@ export class CalendarApiService {
     try {
       const payload = await this.e2ee.attachCalendarEncryptionShadow(calendar);
       const response = await this.client.put<Schema<"Calendar">>(
-        `/api/calendars/${id}`,
+        `/api/calendars/${encodeURIComponent(id)}`,
         payload satisfies Schema<"UpdateCalendarRequest">,
       );
       return await this.hydrateCalendar(response as Calendar);
@@ -633,7 +634,7 @@ export class CalendarApiService {
   async deleteCalendar(id: string): Promise<DeleteResponse> {
     try {
       return await this.client.delete<Schema<"CalendarDeleteResult">>(
-        `/api/calendars/${id}`,
+        `/api/calendars/${encodeURIComponent(id)}`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete calendar");
@@ -651,7 +652,7 @@ export class CalendarApiService {
       if (targetCalendarId) params.append("targetCalendarId", targetCalendarId);
 
       return await this.client.delete<Schema<"CalendarDeleteResult">>(
-        `/api/calendars/${id}?${params}`,
+        `/api/calendars/${encodeURIComponent(id)}?${params}`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete calendar");
@@ -694,7 +695,7 @@ export class CalendarApiService {
     try {
       const payload = await this.e2ee.attachCategoryEncryptionShadow(category);
       const response = await this.client.put<Schema<"Category">>(
-        `/api/categories/${id}`,
+        `/api/categories/${encodeURIComponent(id)}`,
         payload satisfies Schema<"UpdateCategoryRequest">,
       );
       return await this.hydrateCategory(response as EventCategory);
@@ -706,7 +707,7 @@ export class CalendarApiService {
   async deleteCategory(id: string): Promise<DeleteResponse> {
     try {
       return await this.client.delete<Schema<"SuccessMessage">>(
-        `/api/categories/${id}`,
+        `/api/categories/${encodeURIComponent(id)}`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete category");
@@ -893,7 +894,7 @@ export class CalendarApiService {
         request.updates,
       );
       const response = await this.client.put<Schema<"Event">>(
-        `/api/recurring/event/${id}`,
+        `/api/recurring/event/${encodeURIComponent(id)}`,
         {
           ...request,
           updates,
@@ -915,7 +916,7 @@ export class CalendarApiService {
       if (occurrenceDate) params.append("occurrenceDate", occurrenceDate);
 
       return await this.client.delete<Schema<"RecurringDeleted">>(
-        `/api/recurring/event/${id}?${params}`,
+        `/api/recurring/event/${encodeURIComponent(id)}?${params}`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete recurring event");
@@ -1006,7 +1007,7 @@ export class CalendarApiService {
   ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
       return (await this.client.put<Schema<"CalendarSubscription">>(
-        `/api/subscriptions/${id}`,
+        `/api/subscriptions/${encodeURIComponent(id)}`,
         request satisfies Schema<"UpdateSubscriptionRequest">,
       )) as Omit<CalendarSubscription, "_count">;
     } catch (error) {
@@ -1023,7 +1024,7 @@ export class CalendarApiService {
       if (deleteEvents) params.append("deleteEvents", "true");
 
       return await this.client.delete<Schema<"DeleteSubscriptionResponse">>(
-        `/api/subscriptions/${id}?${params}`,
+        `/api/subscriptions/${encodeURIComponent(id)}?${params}`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete subscription");
@@ -1033,7 +1034,7 @@ export class CalendarApiService {
   async syncSubscription(id: string): Promise<SyncSubscriptionResponse> {
     try {
       return (await this.client.post<Schema<"SubscriptionSyncResult">>(
-        `/api/subscriptions/${id}/sync`,
+        `/api/subscriptions/${encodeURIComponent(id)}/sync`,
         {},
       )) as SyncSubscriptionResponse;
     } catch (error) {
@@ -1046,7 +1047,7 @@ export class CalendarApiService {
   async getCalendarShareLink(calendarId: string): Promise<CalendarShareLink> {
     try {
       return await this.client.get<Schema<"CalendarShareLink">>(
-        `/api/calendars/${calendarId}/share-link`,
+        `/api/calendars/${encodeURIComponent(calendarId)}/share-link`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to get calendar share link");
@@ -1059,7 +1060,7 @@ export class CalendarApiService {
   ): Promise<CalendarShareLink> {
     try {
       return await this.client.post<Schema<"CalendarShareLink">>(
-        `/api/calendars/${calendarId}/share-link`,
+        `/api/calendars/${encodeURIComponent(calendarId)}/share-link`,
         (request || {}) satisfies Schema<"CreateShareLinkRequest">,
       );
     } catch (error) {
@@ -1072,7 +1073,7 @@ export class CalendarApiService {
   ): Promise<DisableCalendarShareLinkResponsePayload> {
     try {
       return await this.client.delete<Schema<"DisableShareLinkResponse">>(
-        `/api/calendars/${calendarId}/share-link`,
+        `/api/calendars/${encodeURIComponent(calendarId)}/share-link`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to disable calendar share link");
@@ -1104,7 +1105,7 @@ export class CalendarApiService {
   ): Promise<ApiResponse<"EventNotifications">> {
     try {
       return await this.client.get<Schema<"EventNotifications">>(
-        `/api/notifications/event/${eventId}`,
+        `/api/notifications/event/${encodeURIComponent(eventId)}`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to get event notifications");
@@ -1118,7 +1119,7 @@ export class CalendarApiService {
   ): Promise<Schema<"NotificationUpdateResult">> {
     try {
       return await this.client.put<Schema<"NotificationUpdateResult">>(
-        `/api/notifications/event/${eventId}`,
+        `/api/notifications/event/${encodeURIComponent(eventId)}`,
         {
           notifications,
           ...(options?.encryptedDisplayTitle !== undefined
