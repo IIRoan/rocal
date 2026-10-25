@@ -1,6 +1,24 @@
 import ts from "typescript";
 
+import { HERMES_MISSING_BUILTINS } from "../../packages/native-core/hermes-missing-builtins";
 import { type Rule, CLIENT_SOURCE, appSourceUnder, calleeName, enclosingFunctionName, find, sourceUnder, walk } from "./engine";
+
+const NATIVE_BUNDLED_SOURCE = [
+  "apps/native-calendar/",
+  "apps/native-mail/",
+  "packages/native-core/src/",
+  "packages/calendar-core/src/",
+  "packages/calendar-client/src/",
+  "packages/calendar-ics/src/",
+  "packages/design-tokens/src/",
+  "packages/e2ee/src/",
+  "packages/logger/src/",
+  "packages/runtime/src/",
+];
+
+const HERMES_MISSING_STATICS = new Set(HERMES_MISSING_BUILTINS.filter((path) => !path.includes(".prototype.")));
+
+const HERMES_MISSING_METHODS = new Set(HERMES_MISSING_BUILTINS.flatMap((path) => path.split(".prototype.").slice(1)));
 
 const QUERY_PRIMITIVES = new Set(["useQuery", "useQueries", "useInfiniteQuery", "useSuspenseQuery", "useSuspenseInfiniteQuery", "useMutation"]);
 
@@ -207,6 +225,25 @@ export const clientRules: Rule[] = [
       path: "apps/web/components/event-editor/time-row.tsx",
       bad: ['import { startOfDay, format } from "date-fns";', "start.setHours(9, 0, 0, 0);"],
       good: ['import { addMinutes } from "date-fns";\nconst end = wallClockToUtc(day, "09:00", timezone);'],
+    },
+  },
+  {
+    id: "hermes-safe-builtins",
+    summary: "Code the native apps bundle uses no built-in the shipped Hermes lacks (packages/native-core/hermes-missing-builtins.ts) outside a typeof feature check.",
+    files: appSourceUnder(NATIVE_BUNDLED_SOURCE),
+    check: (file) =>
+      find(file, (node) => {
+        if (!ts.isPropertyAccessExpression(node) || ts.isTypeOfExpression(node.parent)) return null;
+        const access = `${node.expression.getText()}.${node.name.text}`;
+        if (HERMES_MISSING_STATICS.has(access)) return `${access} is missing from the app's Hermes and crashes the native app; feature-detect it with typeof`;
+        return HERMES_MISSING_METHODS.has(node.name.text)
+          ? `.${node.name.text}() is missing from the app's Hermes and crashes the native app; use a supported alternative such as [...items].sort()`
+          : null;
+      }),
+    examples: {
+      path: "packages/calendar-core/src/participants.ts",
+      bad: ["const sorted = participants.toSorted(byName);", "const byDay = Object.groupBy(events, dayKey);", 'const label = new Intl.RelativeTimeFormat().format(-1, "day");'],
+      good: ["const sorted = [...participants].sort(byName);", 'const relative = typeof Intl.RelativeTimeFormat === "function";'],
     },
   },
 ];

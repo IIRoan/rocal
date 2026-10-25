@@ -144,6 +144,7 @@ function formatRelativeTime(
   unit: Intl.RelativeTimeFormatUnit,
 ): string {
   if (typeof Intl.RelativeTimeFormat === "function") {
+    // repo-rules-allow hermes-safe-builtins: feature-detected on the line above; Hermes takes the English fallback.
     return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(
       value,
       unit,

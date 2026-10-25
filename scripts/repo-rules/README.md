@@ -44,6 +44,7 @@ Add it to the matching module (`repository`, `comments`, `backend`, `client`, `t
 | `query-domain-hooks` | `useQuery`/`useMutation` live in named `use*` domain hooks. |
 | `no-blanket-invalidate` | Invalidate the precise key; never invalidate or refetch every query. |
 | `timezone-safe-calendar-code` | Event times use calendar-core zoned helpers, never local `Date` setters or date-fns local-day/format helpers. |
+| `hermes-safe-builtins` | Code the native apps bundle uses no built-in the shipped Hermes lacks (`packages/native-core/hermes-missing-builtins.ts`) outside a `typeof` feature check. |
 | `type-escape-hatches` | `any`, `as unknown as`, and non-null `!` need an explaining comment; `@ts-ignore`/`@ts-nocheck` are banned. |
 | `typescript-untrusted-input` | `JSON.parse` and `response.json()` results are validated, not cast to a domain type. |
 | `typescript-null-safety` | `Array.find` results are checked or optional-chained before they are dereferenced. |

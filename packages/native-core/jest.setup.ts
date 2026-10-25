@@ -1,5 +1,6 @@
 import { webcrypto } from "crypto";
 import { TextDecoder, TextEncoder } from "util";
+import { HERMES_MISSING_BUILTINS } from "./hermes-missing-builtins";
 
 jest.mock("expo-constants", () => ({
   __esModule: true,
@@ -83,4 +84,17 @@ if (typeof globalThis.TextDecoder === "undefined") {
     value: TextDecoder,
     writable: true,
   });
+}
+
+// Native tests run without what the device's Hermes lacks, so they fail where the app would crash.
+for (const path of HERMES_MISSING_BUILTINS) {
+  const keys = path.split(".");
+  const name = keys.pop() ?? "";
+  const owner: unknown = keys.reduce<unknown>(
+    (value, key) => (value as Record<string, unknown>)[key],
+    globalThis,
+  );
+  if (!owner || !Reflect.deleteProperty(owner as object, name)) {
+    throw new Error(`Could not remove ${path} for Hermes parity`);
+  }
 }
