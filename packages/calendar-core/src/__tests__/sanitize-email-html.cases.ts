@@ -112,6 +112,15 @@ export function expectBypassNeutralized(
   }
 }
 
+/** Both paths render these identically: a tag the input ends inside is dropped, and CSS never carries a raw `<`. */
+export const READER_PARITY = [
+  { html: '<p>kept</p><a href="https://e.test" title="cut off', output: "<p>kept</p>" },
+  {
+    html: '<style><!-- p::before{content:"<b>"} --></style><p>x</p>',
+    output: '<style>  p::before{content:"\\3c b>"}  </style><p>x</p>',
+  },
+];
+
 export const READER_KEEPS = {
   html:
     '<style>.card{color:#111;background:url(cid:logo@x)}</style>' +

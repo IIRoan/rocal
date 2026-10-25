@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -83,37 +83,32 @@ export function HtmlEmailView({
 }: HtmlEmailViewProps) {
   const [webViewHeight, setWebViewHeight] = useState(400);
   const [isLoaded, setIsLoaded] = useState(false);
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
 
   const canvasColor = theme.colors.background;
 
-  const document = useMemo(() => {
-    const processedHtml = processEmailHtml({
+  if (!WebView) {
+    return (
+      <View style={[styles.fallback, style]}>
+        <Text style={styles.fallbackText}>{stripToPlainText(html)}</Text>
+      </View>
+    );
+  }
+
+  const document = buildEmailHtmlDocument({
+    processedHtml: processEmailHtml({
       html,
       isDark,
       blockTrackingPixels,
       blockRemoteImages,
       canvasColor,
-    });
-    return buildEmailHtmlDocument({
-      processedHtml,
-      isDark,
-      blockRemoteImages,
-      mobileViewport: true,
-      canvasColor,
-      flush: true,
-    });
-  }, [html, isDark, blockTrackingPixels, blockRemoteImages, canvasColor]);
-
-  const fallbackText = useMemo(() => stripToPlainText(html), [html]);
-
-  if (!WebView) {
-    return (
-      <View style={[styles.fallback, style]}>
-        <Text style={styles.fallbackText}>{fallbackText}</Text>
-      </View>
-    );
-  }
+    }),
+    isDark,
+    blockRemoteImages,
+    mobileViewport: true,
+    canvasColor,
+    flush: true,
+  });
 
   const onMessage = (event: WebViewMessageEvent) => {
     const msg = event.nativeEvent.data;
@@ -182,11 +177,11 @@ export function HtmlEmailView({
 }
 
 function stripToPlainText(html: string): string {
+  // An unclosed element or tag runs to the end in one match, so hostile mail cannot make this quadratic.
   return html
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<(style|script)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, "")
     .replace(/<\/(p|div|br|li|tr|h[1-6])>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[a-z/!?][^>]*(?:>|$)/gi, "")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")

@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import { describe, expect, it } from "@jest/globals";
 import { sanitizeUntrustedEmailHtml } from "../sanitize-email-html";
-import { BYPASS_CASES, expectBypassNeutralized, READER_KEEPS } from "./sanitize-email-html.cases";
+import { BYPASS_CASES, expectBypassNeutralized, READER_KEEPS, READER_PARITY } from "./sanitize-email-html.cases";
 
 // Runs with a DOM: exercises the DOMPurify path used on web.
 
@@ -21,6 +21,10 @@ describe("sanitizeUntrustedEmailHtml (DOMPurify)", () => {
     it.each(BYPASS_CASES)("$name", (testCase) => {
       expectBypassNeutralized(testCase, profile);
     });
+  });
+
+  it.each(READER_PARITY)("renders $html like the tokenizer path", ({ html, output }) => {
+    expect(sanitizeUntrustedEmailHtml(html, { profile: "reader" })).toBe(output);
   });
 
   it("keeps layout, safe links, style blocks, and inline images for the reader", () => {

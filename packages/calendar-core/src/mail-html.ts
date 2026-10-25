@@ -28,11 +28,11 @@ const DARK_CANVAS = "#1a1a1a";
 const DARK_TEXT = "#e0e0e0";
 const DARK_SCHEME_PATTERN = /prefers-color-scheme\s*:\s*dark/i;
 const DARK_MEDIA_BLOCK_PATTERN =
-  /@media[^{]*prefers-color-scheme\s*:\s*dark[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/gi;
+  /@media[^{]{0,256}prefers-color-scheme\s*:\s*dark[^{]{0,256}\{(?:[^{}]|\{[^{}]*\})*\}/gi;
 const COLOR_DECLARATION_PATTERN =
   /((?:^|[\s;{])(color|background(?:-color|-image)?|border(?:-(?:top|right|bottom|left))?(?:-color)?|outline(?:-color)?)\s*:)([^;}]*)/gi;
 const COLOR_TOKEN_PATTERN =
-  /url\([^)]*\)|#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\b|rgba?\([^)]*\)|\b[a-z]+\b/gi;
+  /url\([^)]*(?:\)|$)|#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\b|rgba?\([^)]*(?:\)|$)|\b[a-z]+\b/gi;
 const STYLE_ATTRIBUTE_VALUE_PATTERN = /(\sstyle\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi;
 const COLOR_ATTRIBUTE_VALUE_PATTERN =
   /(\s(bgcolor|color)\s*=\s*)(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
@@ -262,7 +262,8 @@ export function processEmailHtml({
   blockRemoteImages = false,
   canvasColor,
 }: ProcessEmailHtmlOptions): string {
-  let processed = extractBodyHtml(html);
+  // The transforms below run on sanitized markup, where every `<` starts a closed tag, so hostile input cannot make their regexes quadratic.
+  let processed = sanitizeUntrustedEmailHtml(extractBodyHtml(html), { profile: "reader" });
 
   if (blockTrackingPixels || blockRemoteImages) {
     processed = processed.replace(/<img\b[^>]*>/gi, (tag) => {
@@ -275,10 +276,6 @@ export function processEmailHtml({
   if (isDark && !DARK_SCHEME_PATTERN.test(html)) {
     processed = darkenEmailColors(processed, canvasLightnessOf(canvasColor));
   } else if (!isDark) {
-    processed = processed.replace(
-      /<meta[^>]*name=["'](?:color-scheme|supported-color-schemes)["'][^>]*\/?>/gi,
-      "",
-    );
     processed = processed.replace(DARK_MEDIA_BLOCK_PATTERN, "");
   }
 
@@ -331,19 +328,23 @@ export function buildEmailHtmlDocument({
   return `<!DOCTYPE html><html><head><meta charset="utf-8">${viewport}<meta name="color-scheme" content="${scheme}">${csp}<meta name="referrer" content="no-referrer"><base target="_blank"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;color-scheme:${scheme}}body{background:${bg};font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.6;padding:${flush ? "0" : "16px 20px"};color:${fg};overflow-wrap:break-word;overflow-x:hidden}img{max-width:100%;height:auto}${layoutStyles}${richTextStyles}p{margin:0 0 1em}p:last-child{margin:0}</style></head><body>${processedHtml}</body></html>`;
 }
 
+/** Content of the first `name` element, found with bounded scans because this runs on unsanitized mail. */
+function elementContent(html: string, lowerHtml: string, name: string): string | null {
+  const open = new RegExp(`<${name}\\b[^<>]*>`, "i").exec(html);
+  if (!open) return null;
+  const start = open.index + open[0].length;
+  const end = lowerHtml.indexOf(`</${name}`, start);
+  return end === -1 ? null : html.slice(start, end);
+}
+
 function extractBodyHtml(html: string): string {
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body\s*>/i);
-  if (!bodyMatch) return html;
+  const lowerHtml = html.toLowerCase();
+  const body = elementContent(html, lowerHtml, "body");
+  if (body === null) return html;
 
-  const headStyles: string[] = [];
-  const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head\s*>/i);
-  const headHtml = headMatch?.[1];
-  if (headHtml) {
-    const styleMatches = headHtml.matchAll(/<style[^>]*>[\s\S]*?<\/style\s*>/gi);
-    for (const match of styleMatches) headStyles.push(match[0]);
-  }
-
-  return headStyles.join("") + bodyMatch[1];
+  const headStyles =
+    elementContent(html, lowerHtml, "head")?.match(/<style\b[^<>]*>[\s\S]*?(?:<\/style\s*>|$)/gi) ?? [];
+  return headStyles.join("") + body;
 }
 
 function isRemoteImageTag(tag: string): boolean {
@@ -364,11 +365,11 @@ function isRemoteUrl(value: string): boolean {
 function cssHasRemoteUrl(css: string): boolean {
   const normalized = decodeCssEscapes(css)
     .replace(/@import[^;]*;?/gi, "")
-    .replace(/@font-face\s*\{[^}]*\}/gi, "");
-  for (const match of normalized.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*\)/gi)) {
+    .replace(/@font-face\s*\{[^}]*(?:\}|$)/gi, "");
+  for (const match of normalized.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*(?:\)|$)/gi)) {
     if (isRemoteUrl(match[1] ?? match[2] ?? match[3] ?? "")) return true;
   }
-  for (const imageSet of normalized.matchAll(/image-set\(([^)]*)\)/gi)) {
+  for (const imageSet of normalized.matchAll(/image-set\(([^)]*)(?:\)|$)/gi)) {
     for (const match of (imageSet[1] ?? "").matchAll(/"([^"]*)"|'([^']*)'/g)) {
       if (isRemoteUrl(match[1] ?? match[2] ?? "")) return true;
     }

@@ -34,9 +34,10 @@ function decodeHtmlEntities(value: string): string {
 
 function stripHtml(html: string): string {
   return decodeHtmlEntities(
+    // An unclosed element or tag runs to the end in one match, so hostile mail cannot make this quadratic.
     html
-      .replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, " ")
-      .replace(/<[^>]+>/g, " "),
+      .replace(/<(script|style|head)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")
+      .replace(/<[a-z/!?][^>]*(?:>|$)/gi, " "),
   );
 }
 

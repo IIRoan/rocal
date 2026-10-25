@@ -124,8 +124,8 @@ type ParsedTag = {
 
 const ATTR_PATTERN = /[\s/]*([^\s/>"'=][^\s/>"'=]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]*)))?/y;
 
-/** Tokenize one tag starting at `<`, following the HTML attribute grammar. */
-function parseTag(html: string, start: number): ParsedTag | null {
+/** Tokenize one tag starting at `<`, following the HTML attribute grammar; "eof" when the input ends inside the tag. */
+function parseTag(html: string, start: number): ParsedTag | "eof" | null {
   const nameMatch = /<(\/?)([a-z][^\s/>]*)/iy;
   nameMatch.lastIndex = start;
   const head = nameMatch.exec(html);
@@ -156,7 +156,12 @@ function parseTag(html: string, start: number): ParsedTag | null {
     index = ATTR_PATTERN.lastIndex;
     attrs.push([(attr[1] ?? "").toLowerCase(), attr[2] ?? attr[3] ?? attr[4] ?? ""]);
   }
-  return null;
+  return "eof";
+}
+
+/** CSS needs no raw `<`, so escaping it means every `<` in sanitized output starts a real tag; CDO/CDC become spaces so no tokens join. */
+function escapeStyleMarkup(css: string): string {
+  return css.replace(/<!--|-->/g, " ").replace(/</g, "\\3c ");
 }
 
 function indexOfClosingTag(html: string, tag: string, from: number): number {
@@ -217,6 +222,8 @@ function sanitizeWithoutDom(input: string, reader: boolean): string {
     }
 
     const tag = parseTag(html, lt);
+    // Browsers drop a tag the input ends inside; rescanning from the next `<` would be quadratic.
+    if (tag === "eof") break;
     if (!tag) {
       out += "&lt;";
       index = lt + 1;
@@ -230,7 +237,7 @@ function sanitizeWithoutDom(input: string, reader: boolean): string {
 
     if (tag.name === "style" && reader && !tag.closing) {
       const closeIndex = indexOfClosingTag(html, "style", index);
-      const css = html.slice(index, closeIndex === -1 ? html.length : closeIndex);
+      const css = escapeStyleMarkup(html.slice(index, closeIndex === -1 ? html.length : closeIndex));
       if (!isDangerousCss(css)) out += `<style>${css}</style>`;
       index = skipPastClosingTag(html, "style", index);
       continue;
@@ -279,9 +286,9 @@ function getDomPurify(): DomPurifyInstance | null {
     }
   });
   instance.addHook("uponSanitizeElement", (node, data) => {
-    if (data.tagName === "style" && isDangerousCss(node.textContent ?? "")) {
-      node.textContent = "";
-    }
+    if (data.tagName !== "style") return;
+    const css = escapeStyleMarkup(node.textContent ?? "");
+    node.textContent = isDangerousCss(css) ? "" : css;
   });
   instance.addHook("afterSanitizeAttributes", (node) => {
     if (activeReaderProfile && node.nodeName === "A" && node instanceof Element && node.hasAttribute("href")) {
