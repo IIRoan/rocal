@@ -47,7 +47,6 @@ export type EventSheetMode =
       type: "edit";
       eventId: string;
       scope?: RecurrenceEditScope;
-      occurrenceDate?: string;
     };
 
 export interface EventSheetProps {
@@ -62,7 +61,6 @@ interface EventSheetEditState {
   mode: EventSheetMode | null;
   viewMode: "view" | "edit";
   editScope?: RecurrenceEditScope;
-  editOccurrenceDate?: string;
 }
 
 function editStateForMode(mode: EventSheetMode | null): EventSheetEditState {
@@ -70,7 +68,6 @@ function editStateForMode(mode: EventSheetMode | null): EventSheetEditState {
     mode,
     viewMode: mode?.type === "view" ? "view" : "edit",
     editScope: mode?.type === "edit" ? mode.scope : undefined,
-    editOccurrenceDate: mode?.type === "edit" ? mode.occurrenceDate : undefined,
   };
 }
 
@@ -93,7 +90,7 @@ export function EventSheet({
     setEditState(editStateForMode(mode));
     setServerErrors([]);
   }
-  const { viewMode, editScope, editOccurrenceDate } = editState;
+  const { viewMode, editScope } = editState;
 
   const isCreate = mode?.type === "create";
   const isViewOrEdit = mode?.type === "view" || mode?.type === "edit";
@@ -128,15 +125,14 @@ export function EventSheet({
 
   const { handleSubmit, isSubmitting } = useEventSheetSubmit({
     isCreate,
-    eventId,
+    event,
     editScope,
-    editOccurrenceDate,
     onDismiss: dismissSheet,
     onServerErrors: setServerErrors,
   });
 
   const deleteMutation = useDeleteEventMutation({
-    eventId,
+    event,
     onDismiss: dismissSheet,
   });
 
@@ -161,12 +157,11 @@ export function EventSheet({
 
   const { mutate: deleteEvent } = deleteMutation;
   const startEdit = useCallback(
-    (scope?: RecurrenceEditScope, occurrenceDate?: string) =>
+    (scope?: RecurrenceEditScope) =>
       setEditState((current) => ({
         ...current,
         viewMode: "edit",
         editScope: scope,
-        editOccurrenceDate: occurrenceDate,
       })),
     [],
   );

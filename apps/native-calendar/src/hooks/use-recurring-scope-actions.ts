@@ -20,11 +20,8 @@ export function useRecurringScopeActions({
   onDelete,
 }: {
   event: CalendarEvent | undefined;
-  onStartEdit: (scope?: RecurrenceEditScope, occurrenceDate?: string) => void;
-  onDelete: (input: {
-    scope?: RecurrenceDeleteScope;
-    occurrenceDate?: string;
-  }) => void;
+  onStartEdit: (scope?: RecurrenceEditScope) => void;
+  onDelete: (input: { scope?: RecurrenceDeleteScope }) => void;
 }) {
   // The action outlives the prompt so the modal keeps its title while fading out.
   const [scopeAction, setScopeAction] = useState<"edit" | "delete">("edit");
@@ -53,13 +50,10 @@ export function useRecurringScopeActions({
     (scope: RecurringScope) => {
       if (!scopeVisible) return;
       setScopeVisible(false);
-      const occurrenceDate = event?.start
-        ? new Date(event.start).toISOString()
-        : undefined;
-      if (scopeAction === "edit") onStartEdit(scope, occurrenceDate);
-      else confirmDelete(() => onDelete({ scope, occurrenceDate }));
+      if (scopeAction === "edit") onStartEdit(scope);
+      else confirmDelete(() => onDelete({ scope }));
     },
-    [scopeVisible, scopeAction, event, onStartEdit, onDelete],
+    [scopeVisible, scopeAction, onStartEdit, onDelete],
   );
 
   const closeScopePrompt = useCallback(() => setScopeVisible(false), []);

@@ -1,5 +1,8 @@
 import { useCallback, useState } from "react";
-import type { RecurrenceEditScope } from "@workspace/calendar-core";
+import type {
+  CalendarEvent,
+  RecurrenceEditScope,
+} from "@workspace/calendar-core";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { useRecentContacts } from "@workspace/native-core/hooks/use-recent-contacts";
 import { calendarApiService } from "@workspace/native-core/lib/api";
@@ -13,16 +16,14 @@ import {
 
 export function useEventSheetSubmit({
   isCreate,
-  eventId,
+  event,
   editScope,
-  editOccurrenceDate,
   onDismiss,
   onServerErrors,
 }: {
   isCreate: boolean;
-  eventId?: string;
+  event?: CalendarEvent;
   editScope?: RecurrenceEditScope;
-  editOccurrenceDate?: string;
   onDismiss: () => void;
   onServerErrors: (errors: string[]) => void;
 }) {
@@ -41,9 +42,8 @@ export function useEventSheetSubmit({
   });
 
   const updateMutation = useUpdateEventMutation({
-    eventId,
+    event,
     editScope,
-    editOccurrenceDate,
     userEmail: user?.email,
     encryptReminderTitle,
     recordUsage,

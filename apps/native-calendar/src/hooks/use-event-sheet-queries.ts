@@ -18,6 +18,9 @@ export function useEventSheetEvent(
     queryFn: () => calendarApiService.getEvent(detailId),
     enabled: !!eventId && visible,
     placeholderData: cachedEvent,
+    // An occurrence id loads its series row; keep the tapped occurrence so its date shows and recurring edits target it.
+    select: (event) =>
+      event.id === detailId ? event : (cachedEvent ?? { ...event, id: detailId }),
   });
 }
 

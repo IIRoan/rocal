@@ -2,11 +2,16 @@ import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getErrorMessage,
+  type CalendarEvent,
   type RecentContactContext,
   type RecentContactUsageInput,
   type RecurrenceDeleteScope,
   type RecurrenceEditScope,
 } from "@workspace/calendar-core";
+import {
+  persistRecurringEventDelete,
+  persistRecurringEventEdit,
+} from "@workspace/calendar-client";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import { toastOperationWarnings } from "@workspace/native-core/lib/operation-warnings";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
@@ -103,9 +108,8 @@ export function useCreateEventMutation(input: {
 }
 
 export function useUpdateEventMutation(input: {
-  eventId: string | undefined;
+  event: CalendarEvent | undefined;
   editScope: RecurrenceEditScope | undefined;
-  editOccurrenceDate: string | undefined;
   userEmail: string | undefined;
   encryptReminderTitle: ReminderTitleEncryptor;
   recordUsage: (
@@ -116,30 +120,30 @@ export function useUpdateEventMutation(input: {
   onServerErrors: (errors: string[]) => void;
 }) {
   const {
-    eventId,
+    event,
     editScope,
-    editOccurrenceDate,
     userEmail,
     encryptReminderTitle,
     recordUsage,
     onDismiss,
     onServerErrors,
   } = input;
+  const eventId = event?.id;
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async ({ request, reminders }: EventFormSubmission) => {
-      if (!eventId) {
+      if (!event) {
         throw new Error("An existing event is required to update it.");
       }
       const saved = editScope
-        ? await calendarApiService.editRecurringEvent(eventId, {
-            editScope,
-            occurrenceDate: editOccurrenceDate,
+        ? await persistRecurringEventEdit(calendarApiService, {
+            event,
+            scope: editScope,
             updates: request,
           })
-        : await calendarApiService.updateEvent(eventId, request);
+        : await calendarApiService.updateEvent(event.id, request);
       await persistEventReminderNotifications(
         saved.id,
         request.title,
@@ -177,33 +181,25 @@ export function useUpdateEventMutation(input: {
 }
 
 export function useDeleteEventMutation(input: {
-  eventId: string | undefined;
+  event: CalendarEvent | undefined;
   onDismiss: () => void;
 }) {
-  const { eventId, onDismiss } = input;
+  const { event, onDismiss } = input;
+  const eventId = event?.id;
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const snapshotRef = useRef<CacheSnapshot>([]);
 
   return useMutation({
-    mutationFn: async ({
-      scope,
-      occurrenceDate,
-    }: {
-      scope?: RecurrenceDeleteScope;
-      occurrenceDate?: string;
-    }) => {
-      if (!eventId) {
+    mutationFn: async ({ scope }: { scope?: RecurrenceDeleteScope }) => {
+      if (!event) {
         throw new Error("An existing event is required to delete it.");
       }
       if (scope) {
-        return calendarApiService.deleteRecurringEvent(
-          eventId,
-          scope,
-          occurrenceDate,
-        );
+        await persistRecurringEventDelete(calendarApiService, { event, scope });
+        return;
       }
-      return calendarApiService.deleteEvent(eventId);
+      await calendarApiService.deleteEvent(event.id);
     },
     onMutate: async () => {
       if (eventId) {

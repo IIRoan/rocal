@@ -28,11 +28,15 @@ import {
   invitationByExternalIdQueryKey,
   isRecurringSeriesMember,
   resolveRecurringEventTarget,
-  shiftRecurringSeriesTimes,
-  toRecurringEventUpdates,
   type RecurrenceDeleteScope,
   type RecurrenceEditScope,
 } from "@workspace/calendar-core";
+import {
+  persistRecurringEventDelete as deleteRecurringWith,
+  persistRecurringEventEdit as editRecurringWith,
+  type DeleteRecurringEventInput,
+  type EditRecurringEventInput,
+} from "@workspace/calendar-client";
 import {
   useCalendarEventsLoader,
   EVENTS_QUERY_KEY,
@@ -43,17 +47,7 @@ import {
 
 const log = createLogger("calendar-data");
 
-export interface EditRecurringEventInput {
-  /** The event as it was before the edit, so the original occurrence date is used. */
-  event: CalendarEvent;
-  scope: RecurrenceEditScope;
-  updates: UpdateEventRequest;
-}
-
-export interface DeleteRecurringEventInput {
-  event: CalendarEvent;
-  scope: RecurrenceDeleteScope;
-}
+export type { DeleteRecurringEventInput, EditRecurringEventInput };
 
 type EventCacheSnapshot = Array<[QueryKey, CalendarEvent[] | undefined]>;
 
@@ -149,60 +143,16 @@ function isAffectedByScope(
   return scope === "all" || isAtOrAfter(candidate, event.start);
 }
 
-export async function persistRecurringEventEdit({
-  event,
-  scope,
-  updates,
-}: EditRecurringEventInput): Promise<CalendarEvent> {
-  const target = resolveRecurringEventTarget(event);
-  if (!target) return calendarApiService.updateEvent(event.id, updates);
-  if (scope === "this_only" && target.detachedEventId) {
-    return calendarApiService.updateEvent(target.detachedEventId, updates);
-  }
-
-  let recurringUpdates = toRecurringEventUpdates(updates);
-  if (scope === "all" && (recurringUpdates.start || recurringUpdates.end)) {
-    const series =
-      target.parentEventId === event.id
-        ? event
-        : await calendarApiService.getEvent(target.parentEventId);
-    const { start, end, ...rest } = recurringUpdates;
-    recurringUpdates = {
-      ...rest,
-      ...shiftRecurringSeriesTimes({
-        series,
-        occurrence: event,
-        next: { start, end },
-        timezone: updates.timezone ?? series.timezone,
-      }),
-    };
-  }
-
-  return calendarApiService.editRecurringEvent(target.parentEventId, {
-    editScope: scope,
-    occurrenceDate: scope === "all" ? undefined : target.occurrenceDate,
-    updates: recurringUpdates,
-  });
+export function persistRecurringEventEdit(
+  input: EditRecurringEventInput,
+): Promise<CalendarEvent> {
+  return editRecurringWith(calendarApiService, input);
 }
 
-export async function persistRecurringEventDelete({
-  event,
-  scope,
-}: DeleteRecurringEventInput): Promise<void> {
-  const target = resolveRecurringEventTarget(event);
-  if (!target) {
-    await calendarApiService.deleteEvent(event.id);
-    return;
-  }
-  if (scope === "this_only" && target.detachedEventId) {
-    await calendarApiService.deleteEvent(target.detachedEventId);
-    return;
-  }
-  await calendarApiService.deleteRecurringEvent(
-    target.parentEventId,
-    scope,
-    scope === "all" ? undefined : target.occurrenceDate,
-  );
+export function persistRecurringEventDelete(
+  input: DeleteRecurringEventInput,
+): Promise<void> {
+  return deleteRecurringWith(calendarApiService, input);
 }
 
 export function invalidateEventRanges(

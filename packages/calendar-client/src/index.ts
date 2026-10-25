@@ -10,6 +10,14 @@ export type {
 export { AccountApiService } from "./account-api-service";
 
 export { CalendarApiService } from "./calendar-api-service";
+export {
+  persistRecurringEventDelete,
+  persistRecurringEventEdit,
+} from "./recurring-event-persistence";
+export type {
+  DeleteRecurringEventInput,
+  EditRecurringEventInput,
+} from "./recurring-event-persistence";
 export { createSolaceProfileLookupBatcher } from "./solace-profile-lookup";
 
 export { InviteApiService } from "./invite-api-service";
