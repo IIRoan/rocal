@@ -36,9 +36,26 @@ export function getDeviceTimezone(): string {
   return DEFAULT_CALENDAR_TIMEZONE;
 }
 
+const runtimeTimezoneSupport = new Map<string, boolean>();
+
+function isRuntimeTimezone(timezone: string): boolean {
+  let supported = runtimeTimezoneSupport.get(timezone);
+  if (supported === undefined) {
+    try {
+      new Intl.DateTimeFormat(undefined, { timeZone: timezone });
+      supported = true;
+    } catch {
+      supported = false;
+    }
+    runtimeTimezoneSupport.set(timezone, supported);
+  }
+  return supported;
+}
+
+/** A zone this runtime's Intl rejects throws in every zoned helper, so it resolves to the default instead. */
 export function resolveTimezone(timezone?: string | null): string {
   const trimmed = timezone?.trim();
-  if (trimmed) {
+  if (trimmed && isRuntimeTimezone(trimmed)) {
     return trimmed;
   }
 

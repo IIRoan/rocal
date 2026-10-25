@@ -44,6 +44,13 @@ describe("resolveTimezone", () => {
     expect(resolveTimezone("  America/New_York  ")).toBe("America/New_York");
     expect(resolveTimezone("Europe/Paris")).toBe("Europe/Paris");
   });
+
+  it("falls back to the default for a zone this runtime rejects, so views keep rendering", () => {
+    expect(resolveTimezone("Asia/Beijing")).toBe(DEFAULT_CALENDAR_TIMEZONE);
+    expect(() =>
+      getZonedDateParts(new Date(), resolveTimezone("Asia/Beijing")),
+    ).not.toThrow();
+  });
 });
 
 describe("getDeviceTimezone", () => {

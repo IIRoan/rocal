@@ -1,11 +1,9 @@
-// Timezone-related constants and types
-
-export type TimezoneOption = {
+export interface TimezoneEntry {
   value: string;
   label: string;
-};
+}
 
-export const TIMEZONE_GROUPS: Record<string, TimezoneOption[]> = {
+export const TIMEZONE_GROUPS: Record<string, TimezoneEntry[]> = {
   Popular: [
     { value: "UTC", label: "UTC (Coordinated Universal Time)" },
     { value: "America/New_York", label: "Eastern Time (New York)" },
@@ -50,7 +48,6 @@ export const TIMEZONE_GROUPS: Record<string, TimezoneOption[]> = {
   ],
   "Asia & Pacific": [
     { value: "Asia/Bangkok", label: "Bangkok" },
-    { value: "Asia/Beijing", label: "Beijing" },
     { value: "Asia/Calcutta", label: "Mumbai" },
     { value: "Asia/Dubai", label: "Dubai" },
     { value: "Asia/Hong_Kong", label: "Hong Kong" },
@@ -71,16 +68,3 @@ export const TIMEZONE_GROUPS: Record<string, TimezoneOption[]> = {
     { value: "Pacific/Honolulu", label: "Honolulu" },
   ],
 };
-
-export const ALL_TIMEZONES: TimezoneOption[] =
-  Object.values(TIMEZONE_GROUPS).flat();
-
-export const WORKING_DAYS: Array<{ value: number; label: string }> = [
-  { value: 0, label: "Sunday" },
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
-];

@@ -775,7 +775,7 @@ export function useEventForm({
           queryClient.setQueriesData<CalendarEvent[]>(
             { queryKey: EVENTS_QUERY_KEY },
             (oldEvents) => {
-              // The "events" prefix also holds single-event detail and search entries.
+              // The "events" prefix also holds the mail reader's single-event detail.
               if (!Array.isArray(oldEvents)) {
                 return oldEvents;
               }

@@ -24,4 +24,12 @@ describe("command palette timezone options", () => {
       options.some((option) => option.searchText.includes("cest")),
     ).toBe(true);
   });
+
+  it("only offers zones Intl accepts", () => {
+    for (const { value } of getAllTimezonePickerOptions(summerDate)) {
+      expect(
+        () => new Intl.DateTimeFormat("en-US", { timeZone: value }),
+      ).not.toThrow();
+    }
+  });
 });
