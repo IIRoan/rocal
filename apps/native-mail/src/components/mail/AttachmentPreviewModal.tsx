@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Image,
   Modal,
@@ -76,7 +76,7 @@ export function AttachmentPreviewModal({
   onShare,
   onOpen,
 }: AttachmentPreviewModalProps) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const sheetHeight = screenHeight * SHEET_HEIGHT_FRACTION;
@@ -221,6 +221,8 @@ export function AttachmentPreviewModal({
                   backgroundColor={theme.colors.card}
                   allowFileAccess
                   allowingReadAccessToURL={cached.uri}
+                  // PDFs render natively; a sender-supplied file must never run script in the app.
+                  javaScriptEnabled={false}
                 />
                 {onOpen ? (
                   <View style={styles.footer}>

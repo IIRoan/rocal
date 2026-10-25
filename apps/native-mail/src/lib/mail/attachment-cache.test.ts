@@ -21,4 +21,19 @@ describe("attachment path helpers", () => {
     expect(path).toContain("LOGO_REV_BLUE_1");
     expect(path).toContain("cp3khzyld1zg");
   });
+
+  it("caches a file as the type it is previewed as, so a page named like HTML never loads as HTML", () => {
+    expect(
+      buildAttachmentCachePath("key", "invoice.html", "application/pdf", "/cache/"),
+    ).toMatch(/\.pdf$/);
+  });
+
+  it("keeps sender-chosen extension characters out of the cache path", () => {
+    expect(
+      buildAttachmentCachePath("key", "invoice.(pdf", "application/zip", "/cache/"),
+    ).toBe("/cache/invoice._pdf-key.bin");
+    expect(
+      buildAttachmentCachePath("key", "a./x", "application/zip", "/cache/"),
+    ).toBe("/cache/a._x-key.bin");
+  });
 });

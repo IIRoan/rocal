@@ -20,7 +20,8 @@ export function getAttachmentExtension(name?: string | null): string {
   if (!trimmed) return "";
   const dotIndex = trimmed.lastIndexOf(".");
   if (dotIndex < 0 || dotIndex === trimmed.length - 1) return "";
-  return trimmed.slice(dotIndex + 1).toLowerCase();
+  const extension = trimmed.slice(dotIndex + 1).toLowerCase();
+  return /^[a-z0-9]{1,10}$/.test(extension) ? extension : "";
 }
 
 export function inferAttachmentMimeType(
@@ -41,7 +42,10 @@ export function inferAttachmentMimeType(
 }
 
 function sanitizeBaseName(name: string, extension: string): string {
-  const withoutExt = name.replace(new RegExp(`\\.${extension}$`, "i"), "");
+  const suffix = `.${extension}`;
+  const withoutExt = name.toLowerCase().endsWith(suffix)
+    ? name.slice(0, -suffix.length)
+    : name;
   const sanitized =
     withoutExt.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_") ||
     "attachment";
@@ -56,13 +60,16 @@ export function buildAttachmentCachePath(
   cacheDirectory = "",
 ): string {
   const mime = inferAttachmentMimeType(fileName, mimeType);
-  let extension = getAttachmentExtension(fileName);
-  if (!extension) {
-    extension =
-      Object.entries(MIME_BY_EXTENSION).find(([, value]) => value === mime)?.[0] ??
-      "bin";
-  }
-  const base = sanitizeBaseName(fileName, extension);
+  const nameExtension = getAttachmentExtension(fileName);
+  const typeExtension = Object.entries(MIME_BY_EXTENSION).find(
+    ([, value]) => value === mime,
+  )?.[0];
+  // The viewer renders by extension, so a known type wins over the sender's name: "invoice.html" sent as a PDF stays a PDF.
+  const extension =
+    typeExtension && MIME_BY_EXTENSION[nameExtension] !== mime
+      ? typeExtension
+      : nameExtension || "bin";
+  const base = sanitizeBaseName(fileName, nameExtension || extension);
   const safeKey = cacheKey.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 48);
   return `${cacheDirectory}${base}-${safeKey}.${extension}`;
 }
