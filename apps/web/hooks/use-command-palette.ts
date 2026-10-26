@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 export function useCommandPalette() {
   const [open, setOpen] = useState(false);
@@ -29,15 +29,15 @@ export function useCommandPalette() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const openPalette = useCallback((query = "") => {
+  const openPalette = (query = "") => {
     setInitialQuery(query);
     setOpen(true);
-  }, []);
+  };
 
-  const closePalette = useCallback(() => {
+  const closePalette = () => {
     setOpen(false);
     setInitialQuery("");
-  }, []);
+  };
 
   return {
     open,

@@ -1,9 +1,8 @@
 import {
-  formatDateTimeLabel,
+  formatQuotedMailDate,
   resolveMessageReplyFrom,
   resolveMessageReplyRecipients,
-  resolveTimezone,
-  type TimeFormat,
+  type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { extractMessageBodies } from "@/lib/mail/message-security";
@@ -31,24 +30,6 @@ type SeedResult = {
   patch: Partial<MailComposeState>;
   identityId?: string | null;
 };
-
-export interface QuotedDateOptions {
-  timeFormat: TimeFormat;
-  timezone?: string;
-}
-
-/** "On <date>, X wrote:" header date, rendered in the user's timezone and clock format. */
-export function formatQuotedMailDate(
-  receivedAt: string | undefined,
-  options: QuotedDateOptions,
-): string {
-  if (!receivedAt) return "";
-  return formatDateTimeLabel(
-    new Date(receivedAt),
-    resolveTimezone(options.timezone),
-    options.timeFormat,
-  );
-}
 
 function resolveSeedIdentity(
   identities: JmapIdentity[],

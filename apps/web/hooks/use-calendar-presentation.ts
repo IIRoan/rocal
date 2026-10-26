@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   CalendarEvent as UiCalendarEvent,
   CalendarView,
@@ -55,71 +55,39 @@ export function useCalendarPresentation({
   const defaultCalendarId =
     settings?.defaultCalendarId || calendarData.calendars[0]?.id || "";
 
-  const workingDays = useMemo(
-    () => parseWorkingDays(settings?.workingDays),
-    [settings?.workingDays],
+  const workingDays = parseWorkingDays(settings?.workingDays);
+
+  const calendarMap = createCalendarMap(calendarData.calendars);
+
+  const visibleCalendarIds = createVisibleCalendarIdSet(calendarData.calendars, isCalendarVisible);
+
+  const baseTransformedEvents = transformCalendarEvents(
+    calendarData.events,
+    calendarMap,
+    visibleCalendarIds,
   );
 
-  const calendarMap = useMemo(
-    () => createCalendarMap(calendarData.calendars),
-    [calendarData.calendars],
-  );
+  const transformedEvents = mergePreviewCalendarEvents({
+    baseEvents: baseTransformedEvents,
+    calendarMap,
+    previewEvents: [previewEvent, contextPreviewEvent],
+  });
 
-  const visibleCalendarIds = useMemo(
-    () => createVisibleCalendarIdSet(calendarData.calendars, isCalendarVisible),
-    [calendarData.calendars, isCalendarVisible],
-  );
+  const loadingState = resolveCalendarLoadingState({
+    settingsLoading,
+    calendarsLoading: calendarData.calendarsLoading,
+    calendarCount: calendarData.calendars.length,
+    categoriesLoading: calendarData.categoriesLoading,
+    categoryCount: calendarData.categories.length,
+    eventsLoading: calendarData.eventsLoading,
+    eventCount: calendarData.events.length,
+  });
 
-  const baseTransformedEvents = useMemo(
-    () =>
-      transformCalendarEvents(
-        calendarData.events,
-        calendarMap,
-        visibleCalendarIds,
-      ),
-    [calendarData.events, calendarMap, visibleCalendarIds],
-  );
-
-  const transformedEvents = useMemo(
-    () =>
-      mergePreviewCalendarEvents({
-        baseEvents: baseTransformedEvents,
-        calendarMap,
-        previewEvents: [previewEvent, contextPreviewEvent],
-      }),
-    [baseTransformedEvents, calendarMap, previewEvent, contextPreviewEvent],
-  );
-
-  const loadingState = useMemo(
-    () =>
-      resolveCalendarLoadingState({
-        settingsLoading,
-        calendarsLoading: calendarData.calendarsLoading,
-        calendarCount: calendarData.calendars.length,
-        categoriesLoading: calendarData.categoriesLoading,
-        categoryCount: calendarData.categories.length,
-        eventsLoading: calendarData.eventsLoading,
-        eventCount: calendarData.events.length,
-      }),
-    [
-      settingsLoading,
-      calendarData.calendarsLoading,
-      calendarData.calendars.length,
-      calendarData.categoriesLoading,
-      calendarData.categories.length,
-      calendarData.eventsLoading,
-      calendarData.events.length,
-    ],
-  );
-
-  const handleSetPreview = useCallback(
-    (event: UiCalendarEvent | null) => {
-      setContextPreviewEvent(
-        normalizePreviewEventCalendarId(event, defaultCalendarId),
-      );
-    },
-    [defaultCalendarId],
-  );
+  const handleSetPreview = (event: UiCalendarEvent | null) => {
+    setContextPreviewEvent(
+      normalizePreviewEventCalendarId(event, defaultCalendarId),
+    );
+  };
 
   const { prefetchRange } = calendarData;
 

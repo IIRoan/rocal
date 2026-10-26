@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { composeTextToHtml, hasComposeFormatting } from "@workspace/calendar-core";
 import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
@@ -60,7 +60,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
   const queryClient = useQueryClient();
   const draftHasContent = hasDraftContent(input);
 
-  const saveDraftOnce = useCallback(async (): Promise<DraftSaveResult> => {
+  const saveDraftOnce = async (): Promise<DraftSaveResult> => {
     if (!draftHasContent) return { status: "empty" };
     if (!input.runtime) return { status: "failed" };
 
@@ -99,9 +99,10 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
     input.setDraftSaveStatus("saving");
 
-    try {
-      const savedDraftId = await input.runtime.client.saveDraft(
-        input.runtime.session,
+    const { runtime } = input;
+    const persistDraft = async (): Promise<DraftSaveResult> => {
+      const savedDraftId = await runtime.client.saveDraft(
+        runtime.session,
         {
           draftsMailboxId,
           fromEmail,
@@ -125,27 +126,16 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       input.setDraftSaveStatus("saved");
       setTimeout(() => input.setDraftSaveStatus("idle"), 2000);
       return { status: "saved", draftId: savedDraftId };
-    } catch (error) {
+    };
+    return persistDraft().catch((error: unknown): DraftSaveResult => {
       log.error("Failed to auto-save draft", sanitizeContext({ error }));
       input.setDraftSaveStatus("error");
       setTimeout(() => input.setDraftSaveStatus("idle"), 3000);
       return { status: "failed" };
-    }
-  }, [
-    draftHasContent,
-    input.bcc,
-    input.body,
-    input.cc,
-    input.draftId,
-    input.identityId,
-    input.runtime,
-    input.setDraftId,
-    input.setDraftSaveStatus,
-    input.subject,
-    input.to,
-  ]);
+    });
+  };
 
-  const saveDraft = useCallback((): Promise<DraftSaveResult> => {
+  const saveDraft = (): Promise<DraftSaveResult> => {
     const previous = inflightSaveRef.current;
     const promise = (async () => {
       if (previous) {
@@ -164,7 +154,13 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       }
     });
     return promise;
-  }, [saveDraftOnce]);
+  };
+
+  const autosave = useEffectEvent(() => {
+    void saveDraft().catch((error) =>
+      log.error("Draft autosave failed unexpectedly", sanitizeContext({ error })),
+    );
+  });
 
   useEffect(() => {
     if (!input.enabled || !input.runtime) {
@@ -182,9 +178,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     }
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      void saveDraft().catch((error) =>
-        log.error("Draft autosave failed unexpectedly", sanitizeContext({ error })),
-      );
+      autosave();
     }, AUTOSAVE_DEBOUNCE_MS);
 
     return () => {
@@ -202,7 +196,6 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     input.runtime,
     input.subject,
     input.to,
-    saveDraft,
   ]);
 
   // Each save replaces the draft id, so refresh the Drafts list once compose unmounts to reopen the latest copy.

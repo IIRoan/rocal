@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   getEncryptionStatusMeta,
   resolveEncryptionState,
-} from "./encryption-status";
+} from "./encryption-status-utils";
 
 describe("calendar encryption notices", () => {
   it("does not infer encrypted data from a calendar encryption requirement", () => {

@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   Pressable,
   ScrollView,
@@ -28,7 +27,7 @@ export function ComposeAttachmentList({
 }: ComposeAttachmentListProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
 
   return (
     <ScrollView

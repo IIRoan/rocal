@@ -18,6 +18,11 @@ export type {
   DeleteRecurringEventInput,
   EditRecurringEventInput,
 } from "./recurring-event-persistence";
+export { respondToMailInvitation } from "./mail-invitation-response";
+export type {
+  MailInvitationResponse,
+  MailInvitationResponseInput,
+} from "./mail-invitation-response";
 export { createSolaceProfileLookupBatcher } from "./solace-profile-lookup";
 
 export { InviteApiService } from "./invite-api-service";

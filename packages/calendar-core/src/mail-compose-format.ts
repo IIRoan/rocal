@@ -1,3 +1,4 @@
+import { stripHtmlTags } from "./html-text";
 export type TextSelection = {
   start: number;
   end: number;
@@ -154,7 +155,7 @@ function wrapStyledHtml(html: string): string {
   let current = html;
   for (let pass = 0; pass < 6; pass += 1) {
     const next = current.replace(
-      /<(span|font)\b([^>]*)>([\s\S]*?)<\/\1>/gi,
+      /<(span|font)\b([^>]*)(?:>|$)([\s\S]*?)(?:<\/\1>|$)/gi,
       (_full, _tag: string, attributes: string, inner: string) => {
         const style = `${attributes} ${styleAttr(attributes)}`;
         let wrapped = inner;
@@ -181,23 +182,23 @@ export function htmlToComposeText(html: string): string {
   if (!html.trim()) return "";
 
   let value = html.replace(/\r\n/g, "\n");
-  value = value.replace(/<script[\s\S]*?<\/script>/gi, "");
-  value = value.replace(/<style[\s\S]*?<\/style>/gi, "");
+  // Every tag and element pattern below ends at the end of input, so an unclosed one is one match and hostile mail stays linear.
+  value = value.replace(/<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, "");
   value = wrapStyledHtml(value);
-  value = value.replace(/<(strong|b)(\s[^>]*)?>/gi, "**");
+  value = value.replace(/<(strong|b)(\s[^>]*)?(?:>|$)/gi, "**");
   value = value.replace(/<\/(strong|b)>/gi, "**");
-  value = value.replace(/<(em|i)(\s[^>]*)?>/gi, "_");
+  value = value.replace(/<(em|i)(\s[^>]*)?(?:>|$)/gi, "_");
   value = value.replace(/<\/(em|i)>/gi, "_");
-  value = value.replace(/<u(\s[^>]*)?>/gi, "__");
+  value = value.replace(/<u(\s[^>]*)?(?:>|$)/gi, "__");
   value = value.replace(/<\/u>/gi, "__");
   value = value.replace(/<br\s*\/?>/gi, "\n");
   value = value.replace(/<\/p>/gi, "\n\n");
   value = value.replace(/<\/div>/gi, "\n");
   value = value.replace(/<\/h[1-6]>/gi, "\n\n");
-  value = value.replace(/<li[^>]*>/gi, "- ");
+  value = value.replace(/<li\b[^>]*(?:>|$)/gi, "- ");
   value = value.replace(/<\/li>/gi, "\n");
   value = value.replace(/<\/(ul|ol)>/gi, "\n");
-  value = value.replace(/<[^>]+>/g, "");
+  value = stripHtmlTags(value, "");
   value = decodeHtmlEntities(value);
   return value.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }

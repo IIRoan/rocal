@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import {
   useQueries,
   useQueryClient,
@@ -54,57 +54,47 @@ export function useConversationDecryptedPreviews(
   const selectedMessageId = selected?.messageId ?? null;
   const selectedDecrypted = selected?.decrypted ?? null;
 
-  const encryptedMessages = useMemo(
-    () => messages.filter((message) => messageNeedsDecryptedPreview(message)),
-    [messages],
-  );
+  const encryptedMessages = messages.filter((message) => messageNeedsDecryptedPreview(message));
 
   // A stable combine keeps the map (and every list row) unchanged until a decrypt actually lands.
-  const combineDecrypted = useCallback(
-    (results: UseQueryResult<MailDecryptResult>[]) => {
-      const map = new Map<string, DecryptedMailPreviewContent>();
-      for (let index = 0; index < encryptedMessages.length; index += 1) {
-        const message = encryptedMessages[index];
-        const data = results[index]?.data;
-        if (message && data) {
-          map.set(message.id, {
-            text: data.plaintext,
-            html: data.html,
-          });
-        }
+  const combineDecrypted = (results: UseQueryResult<MailDecryptResult>[]) => {
+    const map = new Map<string, DecryptedMailPreviewContent>();
+    for (let index = 0; index < encryptedMessages.length; index += 1) {
+      const message = encryptedMessages[index];
+      const data = results[index]?.data;
+      if (message && data) {
+        map.set(message.id, {
+          text: data.plaintext,
+          html: data.html,
+        });
       }
-      return map;
-    },
-    [encryptedMessages],
-  );
+    }
+    return map;
+  };
 
-  const queries = useMemo(
-    () =>
-      encryptedMessages.map((message) => {
-        const encryption = classifyMessageEncryption(message);
-        const hasSelectedDecrypt =
-          message.id === selectedMessageId &&
-          Boolean(selectedDecrypted?.text || selectedDecrypted?.html);
+  const queries = encryptedMessages.map((message) => {
+    const encryption = classifyMessageEncryption(message);
+    const hasSelectedDecrypt =
+      message.id === selectedMessageId &&
+      Boolean(selectedDecrypted?.text || selectedDecrypted?.html);
 
-        return {
-          queryKey: QUERY_KEYS.mailDecrypted(message.id),
-          enabled:
-            Boolean(runtime) &&
-            (encryption === "inline_pgp" || encryption === "pgp_mime") &&
-            !hasSelectedDecrypt,
-          retry: 1,
-          staleTime: Infinity,
-          gcTime: 5 * 60 * 1000,
-          queryFn: async (): Promise<MailDecryptResult> => {
-            if (!runtime) {
-              throw new Error("Runtime not available");
-            }
-            return decryptEncryptedMessage(runtime, message);
-          },
-        };
-      }),
-    [encryptedMessages, runtime, selectedDecrypted, selectedMessageId],
-  );
+    return {
+      queryKey: QUERY_KEYS.mailDecrypted(message.id),
+      enabled:
+        Boolean(runtime) &&
+        (encryption === "inline_pgp" || encryption === "pgp_mime") &&
+        !hasSelectedDecrypt,
+      retry: 1,
+      staleTime: Infinity,
+      gcTime: 5 * 60 * 1000,
+      queryFn: async (): Promise<MailDecryptResult> => {
+        if (!runtime) {
+          throw new Error("Runtime not available");
+        }
+        return decryptEncryptedMessage(runtime, message);
+      },
+    };
+  });
 
   const decryptedById = useQueries({
     queries: queries.map((query) => ({ ...query, enabled: false })),
@@ -126,21 +116,18 @@ export function useConversationDecryptedPreviews(
     };
   }, [queries, queryClient]);
 
-  return useMemo(() => {
-    const previews: Record<string, string> = {};
-    for (const message of encryptedMessages) {
-      const selectedOverride =
-        message.id === selectedMessageId ? selectedDecrypted : null;
-      const decrypted =
-        selectedOverride ?? decryptedById.get(message.id) ?? null;
-      if (!decrypted) {
-        continue;
-      }
-      const snippet = listPreviewSnippet(message, decrypted);
-      if (snippet) {
-        previews[message.id] = snippet;
-      }
+  const previews: Record<string, string> = {};
+  for (const message of encryptedMessages) {
+    const selectedOverride =
+      message.id === selectedMessageId ? selectedDecrypted : null;
+    const decrypted = selectedOverride ?? decryptedById.get(message.id) ?? null;
+    if (!decrypted) {
+      continue;
     }
-    return previews;
-  }, [decryptedById, encryptedMessages, selectedDecrypted, selectedMessageId]);
+    const snippet = listPreviewSnippet(message, decrypted);
+    if (snippet) {
+      previews[message.id] = snippet;
+    }
+  }
+  return previews;
 }

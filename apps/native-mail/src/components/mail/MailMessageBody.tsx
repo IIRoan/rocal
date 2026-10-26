@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -53,7 +53,7 @@ export function MailMessageBody({
   const { toast } = useToast();
   const isDark = useColorScheme() === "dark";
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const styles = createStyles(theme, skin);
   const {
     calendarInvitation,
     eventReminderView,
@@ -68,15 +68,11 @@ export function MailMessageBody({
   const [loadedMessageId, setLoadedMessageId] = useState<string | null>(null);
   const senderEmail = content.message?.from?.[0]?.email ?? null;
   const emailIsDark = isDark && resolveMailContentIsDark(displaySettings) && !showOriginalLook;
-  const hasRemoteContent = useMemo(
-    () =>
-      emailHtmlHasRemoteContent({
-        html: htmlContent ?? "",
-        isDark: emailIsDark,
-        blockTrackingPixels: displaySettings.blockTrackingPixels,
-      }),
-    [htmlContent, emailIsDark, displaySettings.blockTrackingPixels],
-  );
+  const hasRemoteContent = emailHtmlHasRemoteContent({
+    html: htmlContent ?? "",
+    isDark: emailIsDark,
+    blockTrackingPixels: displaySettings.blockTrackingPixels,
+  });
   const remoteContent = resolveReaderRemoteContent({
     settings: displaySettings,
     hasRemoteContent,

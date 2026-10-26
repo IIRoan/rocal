@@ -1,8 +1,6 @@
 import {
   createContext,
-  useCallback,
   useContext,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -37,25 +35,25 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const openCompose = useCallback((next: ComposeRequest = {}) => {
+  const openCompose = (next: ComposeRequest = {}) => {
     visibleRef.current = true;
     setRequest(next);
     setVisible(true);
     setPresentKey((key) => key + 1);
-  }, []);
+  };
 
-  const closeCompose = useCallback(() => {
+  const closeCompose = () => {
     visibleRef.current = false;
     setVisible(false);
-  }, []);
+  };
 
-  const handleCloseComplete = useCallback(() => {
+  const handleCloseComplete = () => {
     if (!visibleRef.current) {
       setRequest(null);
     }
-  }, []);
+  };
 
-  const contextValue = useMemo(() => ({ openCompose }), [openCompose]);
+  const contextValue = { openCompose };
 
   return (
     <MailComposeContext.Provider value={contextValue}>

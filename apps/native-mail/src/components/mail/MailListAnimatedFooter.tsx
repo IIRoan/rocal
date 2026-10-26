@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { selectionFooterHeight } from "./mail-selection-anim-utils";
 import { useSelectionProgress } from "./mail-selection-anim";
@@ -14,10 +14,7 @@ export function MailListAnimatedFooter({
   bulkPadding,
 }: MailListAnimatedFooterProps) {
   const progress = useSelectionProgress();
-  const maxPadding = useMemo(
-    () => Math.max(idlePadding, bulkPadding, 1),
-    [idlePadding, bulkPadding],
-  );
+  const maxPadding = Math.max(idlePadding, bulkPadding, 1);
 
   const style = useAnimatedStyle(() => {
     const height = selectionFooterHeight(

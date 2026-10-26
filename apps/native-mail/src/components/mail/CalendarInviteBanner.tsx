@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -43,7 +42,7 @@ export function CalendarInviteBanner({
   onOpenEvent,
 }: CalendarInviteBannerProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const isPending = !invitationStatus || invitationStatus === "pending";
 
   return (

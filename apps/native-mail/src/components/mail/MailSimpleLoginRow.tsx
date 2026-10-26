@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import {
   Alert,
   Modal,
@@ -60,7 +60,7 @@ export function MailSimpleLoginRow({
   const { theme } = useTheme();
   const skin = useMailSkin();
   const { toast } = useToast();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const styles = createStyles(theme, skin);
   const [open, setOpen] = useState(false);
   const forward = getSimpleLoginForward(message);
   if (!forward) return null;

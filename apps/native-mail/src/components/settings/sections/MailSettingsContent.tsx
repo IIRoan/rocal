@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   getSettingsMailItems,
   settingsSectionPath,
@@ -22,12 +22,8 @@ export function MailSettingsContent() {
   const inSheet = useInSettingsSheet();
   const { contacts } = useRecentContacts();
   // Mailbox management only exists as a drawer page, so the standalone settings stack cannot open it.
-  const items = useMemo(
-    () =>
-      getSettingsMailItems("native").filter(
-        (item) => inSheet || item.id !== "mailboxes",
-      ),
-    [inSheet],
+  const items = getSettingsMailItems("native").filter(
+    (item) => inSheet || item.id !== "mailboxes",
   );
   const contactsCount = contacts.length;
 

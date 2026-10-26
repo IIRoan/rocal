@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { getErrorMessage, MAIL_LABEL_CUSTOM_DEFAULT_COLOR } from "@workspace/calendar-core";
@@ -27,7 +27,7 @@ import {
 export function LabelsSettingsContent() {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
   const { toast } = useToast();
   const accountQuery = useMailAccount();
   const provisioned = accountQuery.data?.provisioned ?? false;
@@ -50,9 +50,8 @@ export function LabelsSettingsContent() {
       toast(`Created "${trimmed}"`);
     } catch (error) {
       toast(getErrorMessage(error, "Failed to create label"), "error");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const handleDelete = (labelId: string, labelName: string) => {

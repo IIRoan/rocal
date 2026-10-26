@@ -1,4 +1,4 @@
-import { useMemo, type ComponentProps } from "react";
+import { type ComponentProps } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -27,7 +27,7 @@ export function EventReminderBanner({
   onOpenEvent,
 }: EventReminderBannerProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
 
   const title = loading
     ? null

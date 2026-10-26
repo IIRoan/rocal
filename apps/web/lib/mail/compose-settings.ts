@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DEFAULT_MAIL_COMPOSE_SETTINGS,
   parseMailComposeSettings,
@@ -61,12 +61,9 @@ export function useMailComposeSettings() {
     };
   }, []);
 
-  const updateSettings = useCallback(
-    (patch: Partial<MailComposeSettings>) => {
-      setSettings(writeMailComposeSettings((current) => ({ ...current, ...patch })));
-    },
-    [],
-  );
+  const updateSettings = (patch: Partial<MailComposeSettings>) => {
+    setSettings(writeMailComposeSettings((current) => ({ ...current, ...patch })));
+  };
 
   return { settings, updateSettings };
 }

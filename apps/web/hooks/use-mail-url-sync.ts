@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useEffectEvent, useRef, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { createLogger } from "@workspace/logger";
 import {
@@ -71,7 +71,7 @@ export function useMailUrlSync({
   const isUpdatingUrlRef = useRef(false);
   const lastAppliedRouteKeyRef = useRef<string | null>(null);
 
-  const applyRouteFromUrl = useCallback(async () => {
+  const applyRouteFromUrl = useEffectEvent(async () => {
     if (!activeMailbox || typeof window === "undefined") return;
     if (isUpdatingUrlRef.current) return;
     if (lastAppliedRouteKeyRef.current === browserLocation) return;
@@ -80,9 +80,7 @@ export function useMailUrlSync({
     const normalizedLocation = normalizeMailLocation(pathname, search);
     const route = parseMailLocation(pathname, search);
 
-    isApplyingRouteRef.current = true;
-    lastAppliedRouteKeyRef.current = browserLocation;
-    try {
+    const followRoute = async () => {
       if (!locationsEqual(browserLocation, normalizedLocation)) {
         replaceMailBrowserUrl(normalizedLocation);
         lastAppliedRouteKeyRef.current = normalizedLocation;
@@ -105,20 +103,16 @@ export function useMailUrlSync({
       } else if (shouldClearMessageSelection(route, selectedMessageId)) {
         onSelectMessageId(null);
       }
-    } finally {
+    };
+
+    isApplyingRouteRef.current = true;
+    lastAppliedRouteKeyRef.current = browserLocation;
+    await followRoute().finally(() => {
       queueMicrotask(() => {
         isApplyingRouteRef.current = false;
       });
-    }
-  }, [
-    activeMailbox,
-    browserLocation,
-    onSelectMailbox,
-    onSelectMessageId,
-    openMessageById,
-    pathname,
-    selectedMessageId,
-  ]);
+    });
+  });
 
   useEffect(() => {
     if (!activeMailbox) return;
@@ -130,7 +124,7 @@ export function useMailUrlSync({
     void applyRouteFromUrl().catch((error) => {
       log.warn("Failed to apply the mail route from the URL", error);
     });
-  }, [activeMailbox, applyRouteFromUrl, browserLocation]);
+  }, [activeMailbox, browserLocation]);
 
   useEffect(() => {
     if (!initializedRef.current || !activeMailbox) return;

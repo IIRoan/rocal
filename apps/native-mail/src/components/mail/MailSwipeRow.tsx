@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React from "react";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -43,19 +43,19 @@ export function MailSwipeRow({
   const armed = useSharedValue(false);
   const canTrash = Boolean(onTrash);
 
-  const pulse = useCallback(() => {
+  const pulse = () => {
     // Haptics are unavailable on some devices; a dropped pulse is harmless.
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
       () => undefined,
     );
-  }, []);
+  };
 
-  const runTrash = useCallback(() => {
+  const runTrash = () => {
     const reset = () => {
-      translateX.value = withSpring(0, SPRING);
+      translateX.set(withSpring(0, SPRING));
     };
     void Promise.resolve(onTrash?.()).then(reset, reset);
-  }, [onTrash, translateX]);
+  };
 
   const pan = Gesture.Pan()
     .enabled(enabled)
@@ -64,38 +64,40 @@ export function MailSwipeRow({
     .onUpdate((e) => {
       "worklet";
       const minX = canTrash ? -MAX_SWIPE : 0;
-      translateX.value = Math.max(minX, Math.min(MAX_SWIPE, e.translationX));
-      const past = Math.abs(translateX.value) >= ACTION_THRESHOLD;
-      if (past !== armed.value) {
-        armed.value = past;
+      translateX.set(Math.max(minX, Math.min(MAX_SWIPE, e.translationX)));
+      const past = Math.abs(translateX.get()) >= ACTION_THRESHOLD;
+      if (past !== armed.get()) {
+        armed.set(past);
         if (past) scheduleOnRN(pulse);
       }
     })
     .onEnd(() => {
       "worklet";
-      const x = translateX.value;
-      armed.value = false;
+      const x = translateX.get();
+      armed.set(false);
       if (x >= ACTION_THRESHOLD) {
         scheduleOnRN(onToggleRead);
-        translateX.value = withSpring(0, SPRING);
+        translateX.set(withSpring(0, SPRING));
         return;
       }
       if (x <= -ACTION_THRESHOLD && canTrash) {
-        translateX.value = withTiming(-600, { duration: 180 }, () => {
-          scheduleOnRN(runTrash);
-        });
+        translateX.set(
+          withTiming(-600, { duration: 180 }, () => {
+            scheduleOnRN(runTrash);
+          }),
+        );
         return;
       }
-      translateX.value = withSpring(0, SPRING);
+      translateX.set(withSpring(0, SPRING));
     });
 
   const rowStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
+    transform: [{ translateX: translateX.get() }],
   }));
 
   const readActionStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
-      translateX.value,
+      translateX.get(),
       [0, 24, ACTION_THRESHOLD],
       [0, 0.6, 1],
       Extrapolation.CLAMP,
@@ -104,20 +106,17 @@ export function MailSwipeRow({
 
   const trashActionStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
-      translateX.value,
+      translateX.get(),
       [-ACTION_THRESHOLD, -24, 0],
       [1, 0.6, 0],
       Extrapolation.CLAMP,
     ),
   }));
 
-  const accessibilityActions = useMemo(
-    () => [
-      { name: "toggleRead", label: read ? "Mark as unread" : "Mark as read" },
-      ...(canTrash ? [{ name: "trash", label: "Move to trash" }] : []),
-    ],
-    [canTrash, read],
-  );
+  const accessibilityActions = [
+    { name: "toggleRead", label: read ? "Mark as unread" : "Mark as read" },
+    ...(canTrash ? [{ name: "trash", label: "Move to trash" }] : []),
+  ];
 
   return (
     <View style={styles.container}>

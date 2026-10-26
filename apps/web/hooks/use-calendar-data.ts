@@ -1,4 +1,3 @@
-import { useCallback, useMemo } from "react";
 import {
   useQuery,
   useMutation,
@@ -46,6 +45,7 @@ import {
 } from "./use-calendar-events-loader";
 
 const log = createLogger("calendar-data");
+const DEFAULT_CACHE_TIMEOUT_MS = 5 * 60 * 1000;
 
 export type { DeleteRecurringEventInput, EditRecurringEventInput };
 
@@ -254,7 +254,7 @@ export interface UseCalendarDataReturn {
 export function useCalendarData(
   options: UseCalendarDataOptions = {},
 ): UseCalendarDataReturn {
-  const { cacheTimeout = 5 * 60 * 1000, autoRefetch = true } = options;
+  const { cacheTimeout = DEFAULT_CACHE_TIMEOUT_MS, autoRefetch = true } = options;
 
   const queryClient = useQueryClient();
 
@@ -480,30 +480,30 @@ export function useCalendarData(
 
   // --- Actions ---
 
-  const refetchCalendars = useCallback(async () => {
+  const refetchCalendars = async () => {
     const res = await calendarsQuery.refetch();
     return res.data || [];
-  }, [calendarsQuery]);
+  };
 
-  const refetchCategories = useCallback(async () => {
+  const refetchCategories = async () => {
     await categoriesQuery.refetch();
-  }, [categoriesQuery]);
+  };
 
-  const refetch = useCallback(async () => {
+  const refetch = async () => {
     await Promise.all([
       refetchEvents(),
       calendarsQuery.refetch(),
       categoriesQuery.refetch(),
     ]);
-  }, [refetchEvents, calendarsQuery, categoriesQuery]);
+  };
 
-  const clearCache = useCallback(() => {
+  const clearCache = () => {
     queryClient.clear();
-  }, [queryClient]);
+  };
 
   // --- Notification Handlers ---
 
-  const loadNotifications = useCallback(async (eventId: string) => {
+  const loadNotifications = async (eventId: string) => {
     try {
       const response = await calendarApiService.getEventNotifications(eventId);
       return response.data.notifications.flatMap((n) =>
@@ -522,202 +522,132 @@ export function useCalendarData(
       log.error("Failed to load event notifications:", error);
       return [];
     }
-  }, []);
+  };
 
-  const updateNotifications = useCallback(
-    async (
-      eventId: string,
-      notifications: EventNotification[],
-      title?: string | null,
-    ) => {
-      try {
-        const notificationData = notifications.map((n) => ({
-          notificationType: n.notificationType,
-          minutesBefore: n.minutesBefore,
-          isEnabled: n.isEnabled,
-        }));
-        await calendarApiService.updateEventNotifications(
-          eventId,
-          notificationData,
-          {
-            // undefined keeps the stored ciphertext, null clears it.
-            encryptedDisplayTitle:
-              title === undefined
-                ? undefined
-                : await encryptReminderTitle(eventId, title),
-          },
-        );
-      } catch (error) {
-        log.error("Failed to update event notifications:", error);
-        throw error;
-      }
-    },
-    [],
-  );
+  const updateNotifications = async (
+    eventId: string,
+    notifications: EventNotification[],
+    title?: string | null,
+  ) => {
+    const saveNotifications = async () => {
+      const notificationData = notifications.map((n) => ({
+        notificationType: n.notificationType,
+        minutesBefore: n.minutesBefore,
+        isEnabled: n.isEnabled,
+      }));
+      await calendarApiService.updateEventNotifications(
+        eventId,
+        notificationData,
+        {
+          // undefined keeps the stored ciphertext, null clears it.
+          encryptedDisplayTitle:
+            title === undefined
+              ? undefined
+              : await encryptReminderTitle(eventId, title),
+        },
+      );
+    };
+    await saveNotifications().catch((error: unknown) => {
+      log.error("Failed to update event notifications:", error);
+      throw error;
+    });
+  };
 
-  const createEvent = useCallback(
-    (event: CreateEventRequest) => createEventMutation.mutateAsync(event),
-    [createEventMutation],
-  );
+  const createEvent = (event: CreateEventRequest) => createEventMutation.mutateAsync(event);
 
-  const updateEvent = useCallback(
-    (id: string, event: UpdateEventRequest) =>
-      updateEventMutation.mutateAsync({ id, event }),
-    [updateEventMutation],
-  );
+  const updateEvent = (id: string, event: UpdateEventRequest) =>
+    updateEventMutation.mutateAsync({ id, event });
 
-  const deleteEvent = useCallback(
-    async (id: string) => {
-      await deleteEventMutation.mutateAsync(id);
-    },
-    [deleteEventMutation],
-  );
+  const deleteEvent = async (id: string) => {
+    await deleteEventMutation.mutateAsync(id);
+  };
 
-  const editRecurringEvent = useCallback(
-    (input: EditRecurringEventInput) =>
-      editRecurringEventMutation.mutateAsync(input),
-    [editRecurringEventMutation],
-  );
+  const editRecurringEvent = (input: EditRecurringEventInput) =>
+    editRecurringEventMutation.mutateAsync(input);
 
-  const deleteRecurringEvent = useCallback(
-    async (input: DeleteRecurringEventInput) => {
-      await deleteRecurringEventMutation.mutateAsync(input);
-    },
-    [deleteRecurringEventMutation],
-  );
+  const deleteRecurringEvent = async (input: DeleteRecurringEventInput) => {
+    await deleteRecurringEventMutation.mutateAsync(input);
+  };
 
-  const createCalendar = useCallback(
-    (calendar: CreateCalendarRequest) =>
-      createCalendarMutation.mutateAsync(calendar),
-    [createCalendarMutation],
-  );
+  const createCalendar = (calendar: CreateCalendarRequest) =>
+    createCalendarMutation.mutateAsync(calendar);
 
-  const updateCalendar = useCallback(
-    (id: string, calendar: UpdateCalendarRequest) =>
-      updateCalendarMutation.mutateAsync({ id, calendar }),
-    [updateCalendarMutation],
-  );
+  const updateCalendar = (id: string, calendar: UpdateCalendarRequest) =>
+    updateCalendarMutation.mutateAsync({ id, calendar });
 
-  const deleteCalendar = useCallback(
-    async (
-      id: string,
-      action = "delete_events",
-      targetCalendarId?: string,
-    ) => {
-      await deleteCalendarMutation.mutateAsync({
-        id,
-        action,
-        targetCalendarId,
-      });
-    },
-    [deleteCalendarMutation],
-  );
+  const deleteCalendar = async (
+    id: string,
+    action = "delete_events",
+    targetCalendarId?: string,
+  ) => {
+    await deleteCalendarMutation.mutateAsync({
+      id,
+      action,
+      targetCalendarId,
+    });
+  };
 
-  const createCategory = useCallback(
-    (category: CreateCategoryRequest) =>
-      createCategoryMutation.mutateAsync(category),
-    [createCategoryMutation],
-  );
+  const createCategory = (category: CreateCategoryRequest) =>
+    createCategoryMutation.mutateAsync(category);
 
-  const updateCategory = useCallback(
-    (id: string, category: UpdateCategoryRequest) =>
-      updateCategoryMutation.mutateAsync({ id, category }),
-    [updateCategoryMutation],
-  );
+  const updateCategory = (id: string, category: UpdateCategoryRequest) =>
+    updateCategoryMutation.mutateAsync({ id, category });
 
-  const deleteCategory = useCallback(
-    async (id: string) => {
-      await deleteCategoryMutation.mutateAsync(id);
-    },
-    [deleteCategoryMutation],
-  );
+  const deleteCategory = async (id: string) => {
+    await deleteCategoryMutation.mutateAsync(id);
+  };
 
-  return useMemo(
-    () => ({
-      // Data
-      events,
-      calendars: calendarsQuery.data || [],
-      categories: categoriesQuery.data || [],
+  return ({
+    // Data
+    events,
+    calendars: calendarsQuery.data || [],
+    categories: categoriesQuery.data || [],
 
-      // Loading states
-      loading:
-        eventsLoading ||
-        calendarsQuery.isLoading ||
-        categoriesQuery.isLoading,
-      eventsLoading,
-      calendarsLoading: calendarsQuery.isLoading,
-      categoriesLoading: categoriesQuery.isLoading,
-
-      // Error states
-      error: eventsError || calendarsQuery.error || categoriesQuery.error,
-      eventsError,
-      calendarsError: calendarsQuery.error,
-      categoriesError: categoriesQuery.error,
-
-      // Actions
-      refetch,
-      refetchEvents,
-      refetchCalendars,
-      refetchCategories,
-
-      // CRUD operations
-      createEvent,
-      updateEvent,
-      deleteEvent,
-      editRecurringEvent,
-      deleteRecurringEvent,
-      createCalendar,
-      updateCalendar,
-      deleteCalendar,
-      createCategory,
-      updateCategory,
-      deleteCategory,
-
-      // Utility
-      setDateRange,
-      setMonth,
-      clearCache,
-
-      // Mini calendar support
-      prefetchRange,
-      getCachedEventsForRange,
-
-      // Notification handlers
-      loadNotifications,
-      updateNotifications,
-    }),
-    [
-      events,
-      calendarsQuery.data,
-      calendarsQuery.isLoading,
-      calendarsQuery.error,
-      categoriesQuery.data,
+    // Loading states
+    loading:
+      eventsLoading ||
+      calendarsQuery.isLoading ||
       categoriesQuery.isLoading,
-      categoriesQuery.error,
-      eventsLoading,
-      eventsError,
-      refetch,
-      refetchEvents,
-      refetchCalendars,
-      refetchCategories,
-      createEvent,
-      updateEvent,
-      deleteEvent,
-      editRecurringEvent,
-      deleteRecurringEvent,
-      createCalendar,
-      updateCalendar,
-      deleteCalendar,
-      createCategory,
-      updateCategory,
-      deleteCategory,
-      setDateRange,
-      setMonth,
-      clearCache,
-      prefetchRange,
-      getCachedEventsForRange,
-      loadNotifications,
-      updateNotifications,
-    ],
-  );
+    eventsLoading,
+    calendarsLoading: calendarsQuery.isLoading,
+    categoriesLoading: categoriesQuery.isLoading,
+
+    // Error states
+    error: eventsError || calendarsQuery.error || categoriesQuery.error,
+    eventsError,
+    calendarsError: calendarsQuery.error,
+    categoriesError: categoriesQuery.error,
+
+    // Actions
+    refetch,
+    refetchEvents,
+    refetchCalendars,
+    refetchCategories,
+
+    // CRUD operations
+    createEvent,
+    updateEvent,
+    deleteEvent,
+    editRecurringEvent,
+    deleteRecurringEvent,
+    createCalendar,
+    updateCalendar,
+    deleteCalendar,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+
+    // Utility
+    setDateRange,
+    setMonth,
+    clearCache,
+
+    // Mini calendar support
+    prefetchRange,
+    getCachedEventsForRange,
+
+    // Notification handlers
+    loadNotifications,
+    updateNotifications,
+  });
 }

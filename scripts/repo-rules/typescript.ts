@@ -24,7 +24,14 @@ const isUntrustedSource = (node: ts.Expression) => {
 /** TanStack Query methods that resolve even when the underlying fetch fails. */
 const NON_REJECTING_METHODS = new Set(["invalidateQueries", "prefetchQuery", "prefetchInfiniteQuery", "refetchQueries", "cancelQueries", "resetQueries"]);
 
-/** True when the same-file declaration of `name` wraps its body in try/catch, so its promise does not reject. */
+/** True for a top-level `await x.catch(...)` or `return x.catch(...)`, the compiler-friendly form of try/catch. */
+function awaitsCaughtPromise(statement: ts.Statement) {
+  const expression = ts.isExpressionStatement(statement) || ts.isReturnStatement(statement) ? statement.expression : undefined;
+  const call = expression && unwrap(expression);
+  return !!call && ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === "catch";
+}
+
+/** True when the same-file declaration of `name` catches at its top level, so its promise does not reject. */
 function catchesInternally(file: FileContext, name: string) {
   let handled = false;
   walk(file.ast(), (node) => {
@@ -35,7 +42,7 @@ function catchesInternally(file: FileContext, name: string) {
       if (ts.isCallExpression(init) && /^use(Callback|EffectEvent)$/.test(init.expression.getText()) && init.arguments[0]) init = init.arguments[0];
       if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) body = init.body;
     }
-    if (body && ts.isBlock(body) && body.statements.some((statement) => ts.isTryStatement(statement) && statement.catchClause)) handled = true;
+    if (body && ts.isBlock(body) && body.statements.some((statement) => (ts.isTryStatement(statement) && statement.catchClause) || awaitsCaughtPromise(statement))) handled = true;
   });
   return handled;
 }
@@ -122,13 +129,14 @@ export const typescriptRules: Rule[] = [
       }),
     examples: {
       path: "apps/web/hooks/use-sync.ts",
-      bad: ["void syncInbox();", "void SecureStore.deleteItemAsync(key);"],
+      bad: ["void syncInbox();", "void SecureStore.deleteItemAsync(key);", "const save = async () => { await put(); };\nvoid save();"],
       good: [
         "void syncInbox().catch(reportError);",
         "await syncInbox();",
         "void load().then(apply, reportError);",
         "void queryClient.invalidateQueries({ queryKey });",
         "const save = useCallback(async () => { try { await put(); } catch { toast.error('Failed'); } }, []);\nvoid save();",
+        "const save = async () => { await put().catch(() => toast.error('Failed')); };\nvoid save();",
       ],
     },
   },

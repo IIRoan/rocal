@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
@@ -18,6 +18,26 @@ function getErrorMessage(error: unknown): string {
   return getErrorMessageCore(error, "Unable to reset your password.");
 }
 
+async function resetPassword(token: string, newPassword: string) {
+  const result = await authClient.resetPassword({ token, newPassword });
+  if (result?.error) {
+    throw new Error(result.error.message || "Unable to reset your password.");
+  }
+}
+
+function resetLinkProblem(
+  resetError: string | null,
+  token: string | null,
+): string | null {
+  if (resetError === "INVALID_TOKEN") {
+    return "This reset link is invalid or has expired. Request a new password reset email.";
+  }
+  if (!token) {
+    return "This reset link is incomplete. Request a new password reset email.";
+  }
+  return null;
+}
+
 export default function ResetPasswordContent() {
   const { replace } = useRouter();
   const searchParams = useSearchParams();
@@ -29,17 +49,7 @@ export default function ResetPasswordContent() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const unavailableMessage = useMemo(() => {
-    if (resetError === "INVALID_TOKEN") {
-      return "This reset link is invalid or has expired. Request a new password reset email.";
-    }
-
-    if (!token) {
-      return "This reset link is incomplete. Request a new password reset email.";
-    }
-
-    return null;
-  }, [resetError, token]);
+  const unavailableMessage = resetLinkProblem(resetError, token);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -63,24 +73,13 @@ export default function ResetPasswordContent() {
     setSubmitting(true);
 
     try {
-      const result = await authClient.resetPassword({
-        token,
-        newPassword,
-      });
-
-      if (result?.error) {
-        throw new Error(
-          result.error.message || "Unable to reset your password.",
-        );
-      }
-
+      await resetPassword(token, newPassword);
       replace("/login?reset=success");
     } catch (submitError) {
       log.error("Password reset failed:", submitError);
       setError(getErrorMessage(submitError));
-    } finally {
-      setSubmitting(false);
     }
+    setSubmitting(false);
   };
 
   return (

@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -31,7 +30,7 @@ export function MailAttachmentCards({
 }: MailAttachmentCardsProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const styles = createStyles(theme, skin);
 
   if (attachments.length === 0) return null;
 

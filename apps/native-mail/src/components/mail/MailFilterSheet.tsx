@@ -1,4 +1,4 @@
-import React, { useMemo, useState, type ReactNode } from "react";
+import React, { useState, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -104,14 +104,11 @@ export function MailFilterSheet({
 }: MailFilterSheetProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const styles = createStyles(theme, skin);
   const [draftFields, setDraftFields] =
     useState<MailSearchFieldValues>(searchFields);
   const [expanded, setExpanded] = useState<FilterDisclosureId | null>(null);
-  const selectedLabelIds = useMemo(
-    () => new Set(filters.labelIds),
-    [filters.labelIds],
-  );
+  const selectedLabelIds = new Set(filters.labelIds);
   const draftDirty = !sameSearchFields(draftFields, searchFields);
   const draftFieldCount = countMailSearchFieldValues(draftFields);
   const activeCount =

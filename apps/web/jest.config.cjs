@@ -1,5 +1,6 @@
 const path = require("path");
 const { createReactDedupeMapper } = require("../../jest.react-dedupe.cjs");
+const { REACT_COMPILER_JEST_OPTIONS } = require("../../jest.react-compiler.cjs");
 
 const repoRoot = path.join(__dirname, "../..");
 
@@ -18,7 +19,10 @@ module.exports = {
   transform: {
     "^.+\\.(js|jsx|ts|tsx)$": [
       "babel-jest",
-      { configFile: require.resolve("../../babel.config.cts") },
+      {
+        configFile: require.resolve("../../babel.config.cts"),
+        ...REACT_COMPILER_JEST_OPTIONS,
+      },
     ],
   },
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],

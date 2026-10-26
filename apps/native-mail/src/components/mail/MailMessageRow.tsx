@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -127,9 +127,9 @@ function useThreadExpansion({
     canExpandThread && threadExpanded && threadMessages
       ? threadMessages.filter((entry) => entry.id !== message.id)
       : null;
-  const toggleThreadExpanded = useCallback(() => {
+  const toggleThreadExpanded = () => {
     setThreadExpanded((prev) => !prev);
-  }, []);
+  };
   return {
     threadExpanded,
     canExpandThread,
@@ -185,7 +185,7 @@ function useMailRowSelection({
   return { checkFillStyle, applyToggle, handleRowPress, handleLongPress };
 }
 
-function MailMessageRowComponent({
+export function MailMessageRow({
   message,
   threadMessages,
   threadCount = 1,
@@ -547,8 +547,6 @@ function MailRowThreadList({
     </View>
   );
 }
-
-export const MailMessageRow = React.memo(MailMessageRowComponent);
 
 const getStyles = memoizeStyles(createStyles);
 

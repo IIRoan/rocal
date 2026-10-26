@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   X,
   Paperclip,
@@ -14,7 +14,7 @@ import { Input } from "@workspace/ui/components/ui/input";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   SEARCH_FILTER_FIELDS,
-  conditionToChip,
+  filtersToChips,
   type MailSearchFilters,
   type MailSearchFilterCondition,
   type MailSearchChip,
@@ -42,21 +42,15 @@ export function AdvancedSearchPanel({
     useState<keyof MailSearchFilterCondition>("from");
   const [draftValue, setDraftValue] = useState("");
 
-  const chips = filtersToChipsWithText(filters);
+  const chips = filtersToChips(filters);
   const activeFieldMeta =
     ADDABLE_FIELDS.find((field) => field.field === activeField) ?? ADDABLE_FIELDS[0];
 
-  const activeBooleanFields = useMemo(() => {
-    const set = new Set<keyof MailSearchFilterCondition>();
-    for (const condition of filters.conditions) {
-      for (const field of QUICK_BOOLEAN_FIELDS) {
-        if (condition[field.field] === true) {
-          set.add(field.field);
-        }
-      }
-    }
-    return set;
-  }, [filters.conditions]);
+  const activeBooleanFields = new Set<keyof MailSearchFilterCondition>(
+    QUICK_BOOLEAN_FIELDS.filter((field) =>
+      filters.conditions.some((condition) => condition[field.field] === true),
+    ).map((field) => field.field),
+  );
 
   const addDraftCondition = () => {
     if (!activeFieldMeta || !draftValue.trim()) return;
@@ -284,19 +278,4 @@ function QuickFilterIcon({
     default:
       return null;
   }
-}
-
-function filtersToChipsWithText(filters: MailSearchFilters): MailSearchChip[] {
-  const chips: MailSearchChip[] = [];
-  if (filters.text) {
-    chips.push({ field: "subject", value: filters.text, label: filters.text });
-  }
-  for (const condition of filters.conditions) {
-    chips.push(...conditionToChip(condition));
-  }
-  return chips;
-}
-
-export function countActiveFilters(filters: MailSearchFilters): number {
-  return filtersToChipsWithText(filters).length;
 }

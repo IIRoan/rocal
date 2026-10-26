@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   Pressable,
   ScrollView,
@@ -37,7 +37,7 @@ export function MailBulkMoveSheet({
   onSelectMailbox,
 }: MailBulkMoveSheetProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const type = mailTypography(theme);
 
   return (

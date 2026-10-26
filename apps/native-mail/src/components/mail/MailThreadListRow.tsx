@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React from "react";
 import type { ListDensity, TimeFormat } from "@workspace/calendar-core";
 import {
   sameItems,
@@ -61,20 +61,11 @@ function MailThreadListRowComponent({
   const { onOpen, onToggleSelect, onToggleRead, onTrash } = handlers;
   const read = unreadCount === 0;
   const latestId = row.latestMessage.id;
-  const swipeIds = useMemo(
-    () => (selectableIds.length > 0 ? selectableIds : [latestId]),
-    [latestId, selectableIds],
-  );
+  const swipeIds = (selectableIds.length > 0 ? selectableIds : [latestId]);
 
-  const handleToggleRead = useCallback(
-    () => onToggleRead(swipeIds, read),
-    [onToggleRead, read, swipeIds],
-  );
-  const handleTrash = useCallback(() => onTrash?.(swipeIds), [onTrash, swipeIds]);
-  const handleToggleSelect = useCallback(
-    (message: JmapEmailMessage) => onToggleSelect(message, selectableIds),
-    [onToggleSelect, selectableIds],
-  );
+  const handleToggleRead = () => onToggleRead(swipeIds, read);
+  const handleTrash = () => onTrash?.(swipeIds);
+  const handleToggleSelect = (message: JmapEmailMessage) => onToggleSelect(message, selectableIds);
 
   return (
     <MailSwipeRow

@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Platform,
   ScrollView,
@@ -78,9 +78,9 @@ function AndroidZoomScrollView({
   const originTX = useSharedValue(0);
   const originTY = useSharedValue(0);
 
-  const setZoomed = useCallback((active: boolean) => {
+  const setZoomed = (active: boolean) => {
     setScrollEnabled(!active);
-  }, []);
+  };
 
   const clampTranslation = (
     nextX: number,

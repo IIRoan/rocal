@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { clearLocalSearchIndexDatabase } from "@/lib/search/local-index-store";
 
 const ENABLED_KEY = "search:private-content-index-enabled";
@@ -37,13 +37,13 @@ export function usePrivateSearchIndexControls() {
   );
   const [isClearing, setIsClearing] = useState(false);
 
-  const setConsent = useCallback((value: PrivateSearchIndexConsent) => {
+  const setConsent = (value: PrivateSearchIndexConsent) => {
     setConsentState(value);
     window.localStorage.setItem(CONSENT_KEY, value);
     notifyPrivateSearchIndexChanged();
-  }, []);
+  };
 
-  const setEnabled = useCallback((value: boolean) => {
+  const setEnabled = (value: boolean) => {
     setEnabledState(value);
     window.localStorage.setItem(ENABLED_KEY, String(value));
     setConsent(value ? "accepted" : "declined");
@@ -51,23 +51,20 @@ export function usePrivateSearchIndexControls() {
       setPausedState(false);
       window.localStorage.setItem(PAUSED_KEY, "false");
     }
-  }, [setConsent]);
+  };
 
-  const setPaused = useCallback((value: boolean) => {
+  const setPaused = (value: boolean) => {
     setPausedState(value);
     window.localStorage.setItem(PAUSED_KEY, String(value));
     notifyPrivateSearchIndexChanged();
-  }, []);
+  };
 
-  const clearIndex = useCallback(async () => {
+  const clearIndex = async () => {
     setIsClearing(true);
-    try {
-      await clearLocalSearchIndexDatabase();
-      setEnabled(false);
-    } finally {
-      setIsClearing(false);
-    }
-  }, [setEnabled]);
+    await clearLocalSearchIndexDatabase()
+      .then(() => setEnabled(false))
+      .finally(() => setIsClearing(false));
+  };
 
   return {
     enabled,

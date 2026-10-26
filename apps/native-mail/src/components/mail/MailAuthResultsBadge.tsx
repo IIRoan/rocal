@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { Alert, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -24,7 +24,7 @@ export function MailAuthResultsBadge({
   const { theme } = useTheme();
   const palette = useMailPalette();
   const trustedHeader = getTrustedAuthResultsHeader(message);
-  const results = useMemo(() => parseAuthResults(trustedHeader), [trustedHeader]);
+  const results = parseAuthResults(trustedHeader);
 
   if (!hasAuthResults(results)) {
     return null;

@@ -12,6 +12,7 @@ import {
   hasComposeUserContent,
   type ComposeTextFields,
   type MailServerLimits,
+  type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
@@ -29,7 +30,6 @@ import {
   buildNewMessageSeed,
   buildOpenNewComposeSeed,
   buildReplySeed,
-  type QuotedDateOptions,
 } from "./mail-compose-seed";
 import {
   initialMailComposeState,

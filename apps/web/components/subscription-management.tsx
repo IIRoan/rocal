@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/calendar-ui-helpers";
 import { useCalendarData } from "@/hooks/use-calendar-data";
@@ -102,6 +102,19 @@ interface SubscriptionManagementProps {
   initialEditCalendarId?: string;
 }
 
+function filterHolidayCalendars(query: string): HolidayCalendar[] {
+  const search = query.trim().toLowerCase();
+  return NATIONAL_HOLIDAY_CALENDARS.filter(
+    (holidayCalendar) =>
+      !search ||
+      [holidayCalendar.label, holidayCalendar.countryName, holidayCalendar.language]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(search),
+  );
+}
+
 export function SubscriptionManagement({
   open,
   onOpenChange,
@@ -179,18 +192,15 @@ export function SubscriptionManagement({
       ? editFormOverride
       : null;
 
-  const editingSubscriptionData: CalendarSubscription | null = useMemo(() => {
-    if (!editTargetCalendarId) return null;
-    return (
-      subscriptions.find((sub) => sub.calendar.id === editTargetCalendarId) ??
-      null
-    );
-  }, [editTargetCalendarId, subscriptions]);
+  const editingSubscriptionData: CalendarSubscription | null =
+    editTargetCalendarId
+      ? (subscriptions.find((sub) => sub.calendar.id === editTargetCalendarId) ??
+        null)
+      : null;
 
-  const editingCalendarEntry = useMemo(() => {
-    if (!editTargetCalendarId) return undefined;
-    return calendars.find((c) => c.id === editTargetCalendarId);
-  }, [editTargetCalendarId, calendars]);
+  const editingCalendarEntry = editTargetCalendarId
+    ? calendars.find((c) => c.id === editTargetCalendarId)
+    : undefined;
 
   // Effective form values: user override > subscription detail > calendar entry.
   const editingName =
@@ -255,77 +265,41 @@ export function SubscriptionManagement({
 
   const normalizeSubscriptionUrl = normalizeSubscriptionFeedUrl;
 
-  const subscribedUrls = useMemo(
-    () =>
-      new Set(
-        subscriptions.map((subscription: CalendarSubscription) =>
-          normalizeSubscriptionUrl(subscription.url),
-        ),
-      ),
-    [subscriptions],
+  const subscribedUrls = new Set(
+    subscriptions.map((subscription: CalendarSubscription) =>
+      normalizeSubscriptionUrl(subscription.url),
+    ),
   );
-  const calendarById = useMemo(
-    () => new Map(calendars.map((calendar) => [calendar.id, calendar])),
-    [calendars],
+  const calendarById = new Map(calendars.map((calendar) => [calendar.id, calendar]));
+  const subscriptionByNormalizedUrl = new Map<string, CalendarSubscription>(
+    subscriptions.map((subscription) => [
+      normalizeSubscriptionUrl(subscription.url),
+      subscription,
+    ]),
   );
-  const subscriptionByNormalizedUrl = useMemo(
-    () =>
-      new Map<string, CalendarSubscription>(
-        subscriptions.map((subscription) => [
-          normalizeSubscriptionUrl(subscription.url),
-          subscription,
-        ]),
-      ),
-    [subscriptions],
+  const publicHolidaySubscriptions = subscriptions.filter(
+    (subscription) => subscription.calendar.kind === "public_holiday",
   );
-  const publicHolidaySubscriptions = useMemo(
-    () =>
-      subscriptions.filter(
-        (subscription) => subscription.calendar.kind === "public_holiday",
-      ),
-    [subscriptions],
-  );
-  const readOnlyCalendars = useMemo<ReadOnlyCalendarEntry[]>(
-    () =>
-      [...subscriptions]
-        .map((subscription) => ({
-          subscription,
-          calendar: calendarById.get(subscription.calendar.id),
-        }))
-        .sort((left, right) => {
-          if (
-            left.subscription.calendar.kind !== right.subscription.calendar.kind
-          ) {
-            return left.subscription.calendar.kind === "public_holiday"
-              ? -1
-              : 1;
-          }
+  const readOnlyCalendars: ReadOnlyCalendarEntry[] = [...subscriptions]
+    .map((subscription) => ({
+      subscription,
+      calendar: calendarById.get(subscription.calendar.id),
+    }))
+    .sort((left, right) => {
+      if (
+        left.subscription.calendar.kind !== right.subscription.calendar.kind
+      ) {
+        return left.subscription.calendar.kind === "public_holiday"
+          ? -1
+          : 1;
+      }
 
-          return left.subscription.calendar.name.localeCompare(
-            right.subscription.calendar.name,
-          );
-        }),
-    [calendarById, subscriptions],
-  );
-
-  const filteredHolidayCalendars = useMemo(() => {
-    const search = holidaySearch.trim().toLowerCase();
-
-    return NATIONAL_HOLIDAY_CALENDARS.filter((holidayCalendar) => {
-      if (!search) return true;
-
-      const haystack = [
-        holidayCalendar.label,
-        holidayCalendar.countryName,
-        holidayCalendar.language,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(search);
+      return left.subscription.calendar.name.localeCompare(
+        right.subscription.calendar.name,
+      );
     });
-  }, [holidaySearch]);
+
+  const filteredHolidayCalendars = filterHolidayCalendars(holidaySearch);
 
   const validateForm = (): CustomSubscriptionForm | null => {
     const parsed = customSubscriptionSchema.safeParse(newSubscription);

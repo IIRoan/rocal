@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CalendarEvent } from "@workspace/calendar-core";
+import type {
+  CalendarEvent,
+  InvitationResponseStatus,
+} from "@workspace/calendar-core";
+import { respondToMailInvitation } from "@workspace/calendar-client";
 import { invitationByExternalIdQueryKey, isUserDeclinedInvitationEvent } from "@workspace/calendar-core";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
@@ -8,12 +12,10 @@ import {
   extractMailCalendarInvite,
   hasCalendarInvitationMetadata,
   listCalendarAttachmentCandidates,
-  type MailCalendarInvite,
 } from "../lib/mail/calendar-invite";
 import type { JmapAttachment, JmapEmailMessage } from "../lib/mail/types";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
 
-type InvitationResponseStatus = "accepted" | "declined" | "tentative";
 
 type CalendarInviteEventState = {
   eventId: string;
@@ -31,8 +33,32 @@ type UseMailCalendarInvitationInput = {
   enabled?: boolean;
 };
 
-function eventHasRemoteSync(event: CalendarEvent | null | undefined): boolean {
-  return Boolean(event?.stalwartEventId);
+/** Fetches each candidate ICS blob the message did not already carry inline. */
+async function loadCalendarAttachments(
+  runtime: MailRuntime,
+  candidates: ReturnType<typeof listCalendarAttachmentCandidates>,
+  inlineAttachments: JmapAttachment[],
+): Promise<JmapAttachment[]> {
+  return Promise.all(
+    candidates.map(async (candidate) => {
+      const existing = inlineAttachments.find(
+        (attachment) => attachment.blobId === candidate.blobId,
+      );
+      if (existing?.content) {
+        return existing;
+      }
+      const content = await runtime.client.getBlobAsText(
+        runtime.session,
+        candidate.blobId,
+      );
+      return {
+        blobId: candidate.blobId,
+        name: candidate.name,
+        type: candidate.type ?? "text/calendar",
+        content,
+      } satisfies JmapAttachment;
+    }),
+  );
 }
 
 export function useMailCalendarInvitation({
@@ -49,9 +75,6 @@ export function useMailCalendarInvitation({
   const [inviteResponsePending, setInviteResponsePending] =
     useState<InvitationResponseStatus | null>(null);
   const [inviteDeclined, setInviteDeclined] = useState(false);
-  const [loadedCalendarAttachments, setLoadedCalendarAttachments] = useState<
-    JmapAttachment[] | null
-  >(null);
 
   // Reset during render when the message changes, so a declined invite never sticks to the next one.
   const [renderedMessageId, setRenderedMessageId] = useState(message?.id);
@@ -60,76 +83,35 @@ export function useMailCalendarInvitation({
     setInviteDeclined(false);
   }
 
-  const hasCalendarInvitationHint = useMemo(
-    () => (message ? hasCalendarInvitationMetadata(message) : false),
-    [message],
+  const hasCalendarInvitationHint = (message ? hasCalendarInvitationMetadata(message) : false);
+
+  const calendarCandidates =
+    enabled && message && runtime ? listCalendarAttachmentCandidates(message) : [];
+  const inlineAttachments = attachments.filter((attachment) =>
+    Boolean(attachment.content),
   );
+  const calendarAttachmentsQuery = useQuery({
+    queryKey: QUERY_KEYS.mailCalendarAttachments(message?.id ?? ""),
+    queryFn: () =>
+      runtime
+        ? loadCalendarAttachments(runtime, calendarCandidates, inlineAttachments)
+        : inlineAttachments,
+    enabled: calendarCandidates.length > 0,
+    staleTime: Infinity,
+  });
+  // Attachments whose ICS could not be fetched fall back to the ones the message already carries.
+  const loadedCalendarAttachments =
+    !enabled || !message || !runtime
+      ? null
+      : calendarCandidates.length === 0 || calendarAttachmentsQuery.isError
+        ? inlineAttachments
+        : (calendarAttachmentsQuery.data ?? null);
 
-  useEffect(() => {
-    if (!enabled || !message || !runtime) {
-      setLoadedCalendarAttachments(null);
-      return;
-    }
-
-    const candidates = listCalendarAttachmentCandidates(message);
-    const inlineAttachments = attachments.filter((attachment) =>
-      Boolean(attachment.content),
-    );
-    if (candidates.length === 0) {
-      setLoadedCalendarAttachments(inlineAttachments);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadCalendarAttachments = async () => {
-      try {
-        const loaded = await Promise.all(
-          candidates.map(async (candidate) => {
-            const existing = inlineAttachments.find(
-              (attachment) => attachment.blobId === candidate.blobId,
-            );
-            if (existing?.content) {
-              return existing;
-            }
-
-            const content = await runtime.client.getBlobAsText(
-              runtime.session,
-              candidate.blobId,
-            );
-            return {
-              blobId: candidate.blobId,
-              name: candidate.name,
-              type: candidate.type ?? "text/calendar",
-              content,
-            } satisfies JmapAttachment;
-          }),
-        );
-        if (!cancelled) {
-          setLoadedCalendarAttachments(loaded);
-        }
-      } catch {
-        if (!cancelled) {
-          setLoadedCalendarAttachments(inlineAttachments);
-        }
-      }
-    };
-    void loadCalendarAttachments();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attachments, enabled, message, runtime]);
-
-  const mailCalendarInvite = useMemo(
-    () =>
-      extractMailCalendarInvite({
-        message,
-        plaintext,
-        attachments: loadedCalendarAttachments ?? attachments,
-      }),
-    [attachments, loadedCalendarAttachments, message, plaintext],
-  );
+  const mailCalendarInvite = extractMailCalendarInvite({
+    message,
+    plaintext,
+    attachments: loadedCalendarAttachments ?? attachments,
+  });
 
   const mailCalendarInviteUid = mailCalendarInvite?.uid ?? null;
 
@@ -163,106 +145,64 @@ export function useMailCalendarInvitation({
     let cancelled = false;
 
     const resolveInviteEvent = async () => {
-      try {
-        const existing = existingInvitation ?? null;
-        if (cancelled) return;
+      const existing = existingInvitation ?? null;
+      if (cancelled) return;
 
-        if (mailCalendarInvite?.method === "CANCEL") {
-          const importSummary = mailCalendarInvite.icsContent
-            ? await calendarApiService.importInvitationIcs(
-                mailCalendarInvite.icsContent,
-              )
-            : null;
-          if (cancelled) return;
-
-          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
-          await refetchInvitation();
-
-          const event = await calendarApiService.getInvitationByExternalId(
-            mailCalendarInviteUid,
-            { syncRemote: false },
-          );
-          if (cancelled) return;
-
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event,
-            loading: false,
-            error:
-              !event && importSummary && importSummary.errors.length > 0
-                ? (importSummary.errors[0] ??
-                  "Unable to process cancellation details.")
-                : null,
-          });
-          return;
-        }
-
-        if (inviteDeclined) {
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: null,
-            loading: false,
-            error: null,
-          });
-          return;
-        }
-
-        if (existing) {
-          if (isUserDeclinedInvitationEvent(existing)) {
-            setInviteDeclined(true);
-            setCalendarInviteEvent({
-              eventId: mailCalendarInviteUid,
-              event: null,
-              loading: false,
-              error: null,
-            });
-            return;
-          }
-
-          const sealed = await calendarApiService.sealImportedInvitationIfNeeded(
-            existing,
-          );
-          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
-          setInviteDeclined(false);
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: sealed,
-            loading: false,
-            error: null,
-          });
-          return;
-        }
-
-        const importSummary = mailCalendarInvite?.icsContent
+      if (mailCalendarInvite?.method === "CANCEL") {
+        const importSummary = mailCalendarInvite.icsContent
           ? await calendarApiService.importInvitationIcs(
               mailCalendarInvite.icsContent,
             )
           : null;
         if (cancelled) return;
 
-        if (importSummary && importSummary.errors.length > 0) {
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: null,
-            loading: false,
-            error:
-              importSummary.errors[0] ??
-              "Unable to add this invitation to your calendar.",
-          });
-          return;
-        }
-
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
         await refetchInvitation();
+
         const event = await calendarApiService.getInvitationByExternalId(
           mailCalendarInviteUid,
           { syncRemote: false },
         );
         if (cancelled) return;
 
-        const sealed = event
-          ? await calendarApiService.sealImportedInvitationIfNeeded(event)
-          : null;
+        setCalendarInviteEvent({
+          eventId: mailCalendarInviteUid,
+          event,
+          loading: false,
+          error:
+            !event && importSummary && importSummary.errors.length > 0
+              ? (importSummary.errors[0] ??
+                "Unable to process cancellation details.")
+              : null,
+        });
+        return;
+      }
 
+      if (inviteDeclined) {
+        setCalendarInviteEvent({
+          eventId: mailCalendarInviteUid,
+          event: null,
+          loading: false,
+          error: null,
+        });
+        return;
+      }
+
+      if (existing) {
+        if (isUserDeclinedInvitationEvent(existing)) {
+          setInviteDeclined(true);
+          setCalendarInviteEvent({
+            eventId: mailCalendarInviteUid,
+            event: null,
+            loading: false,
+            error: null,
+          });
+          return;
+        }
+
+        const sealed = await calendarApiService.sealImportedInvitationIfNeeded(
+          existing,
+        );
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
         setInviteDeclined(false);
         setCalendarInviteEvent({
@@ -271,20 +211,60 @@ export function useMailCalendarInvitation({
           loading: false,
           error: null,
         });
-      } catch (error) {
-        if (cancelled) return;
+        return;
+      }
+
+      const importSummary = mailCalendarInvite?.icsContent
+        ? await calendarApiService.importInvitationIcs(
+            mailCalendarInvite.icsContent,
+          )
+        : null;
+      if (cancelled) return;
+
+      if (importSummary && importSummary.errors.length > 0) {
         setCalendarInviteEvent({
           eventId: mailCalendarInviteUid,
           event: null,
           loading: false,
           error:
-            error instanceof Error
-              ? error.message
-              : "Unable to load invitation details.",
+            importSummary.errors[0] ??
+            "Unable to add this invitation to your calendar.",
         });
+        return;
       }
+
+      await refetchInvitation();
+      const event = await calendarApiService.getInvitationByExternalId(
+        mailCalendarInviteUid,
+        { syncRemote: false },
+      );
+      if (cancelled) return;
+
+      const sealed = event
+        ? await calendarApiService.sealImportedInvitationIfNeeded(event)
+        : null;
+
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
+      setInviteDeclined(false);
+      setCalendarInviteEvent({
+        eventId: mailCalendarInviteUid,
+        event: sealed,
+        loading: false,
+        error: null,
+      });
     };
-    void resolveInviteEvent();
+    void resolveInviteEvent().catch((error: unknown) => {
+      if (cancelled) return;
+      setCalendarInviteEvent({
+        eventId: mailCalendarInviteUid,
+        event: null,
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load invitation details.",
+      });
+    });
 
     return () => {
       cancelled = true;
@@ -302,31 +282,22 @@ export function useMailCalendarInvitation({
     refetchInvitation,
   ]);
 
-  const currentCalendarInviteEvent = useMemo(() => {
-    if (!mailCalendarInviteUid) return null;
-    if (calendarInviteEvent?.eventId === mailCalendarInviteUid) {
-      return calendarInviteEvent;
-    }
-    return {
-      eventId: mailCalendarInviteUid,
-      event: null,
-      loading: true,
-      error: null,
-    };
-  }, [calendarInviteEvent, mailCalendarInviteUid]);
+  const currentCalendarInviteEvent: CalendarInviteEventState | null =
+    !mailCalendarInviteUid
+      ? null
+      : calendarInviteEvent?.eventId === mailCalendarInviteUid
+        ? calendarInviteEvent
+        : { eventId: mailCalendarInviteUid, event: null, loading: true, error: null };
 
-  const invitationStatus = useMemo(() => {
-    if (!currentCalendarInviteEvent?.event || !userId) {
-      return null;
-    }
+  const invitationStatus =
+    currentCalendarInviteEvent?.event && userId
+      ? currentCalendarInviteEvent.event.participants?.find(
+          (participant) =>
+            participant.userId === userId && participant.role !== "organizer",
+        )?.status
+      : null;
 
-    return currentCalendarInviteEvent.event.participants?.find(
-      (participant) =>
-        participant.userId === userId && participant.role !== "organizer",
-    )?.status;
-  }, [currentCalendarInviteEvent?.event, userId]);
-
-  const invalidateInvitationLookup = useCallback(async () => {
+  const invalidateInvitationLookup = async () => {
     if (!mailCalendarInviteUid) {
       return;
     }
@@ -334,150 +305,44 @@ export function useMailCalendarInvitation({
     await queryClient.invalidateQueries({
       queryKey: invitationByExternalIdQueryKey(mailCalendarInviteUid),
     });
-  }, [mailCalendarInviteUid, queryClient]);
+  };
 
-  const handleInvitationResponse = useCallback(
-    async (status: InvitationResponseStatus) => {
-      if (!mailCalendarInviteUid) {
-        return { ok: false as const, error: "Invitation not found." };
-      }
+  const handleInvitationResponse = async (status: InvitationResponseStatus) => {
+    if (!mailCalendarInviteUid) {
+      return { ok: false as const, error: "Invitation not found." };
+    }
 
-      const calendarInviteResponseEventId =
-        currentCalendarInviteEvent?.event?.id ?? null;
-      const calendarInviteHasRemoteSync = eventHasRemoteSync(
-        currentCalendarInviteEvent?.event,
-      );
-
-      setInviteResponsePending(status);
-      try {
-        const shouldRespondViaIcs =
-          !calendarInviteResponseEventId || !calendarInviteHasRemoteSync;
-
-        if (shouldRespondViaIcs) {
-          if (!mailCalendarInvite?.icsContent) {
-            throw new Error("Invitation details are unavailable.");
-          }
-
-          if (status === "declined") {
-            await calendarApiService.declineInvitationIcs(
-              mailCalendarInvite.icsContent,
-            );
-            if (calendarInviteResponseEventId) {
-              await calendarApiService.deleteEvent(calendarInviteResponseEventId);
-            }
-            setInviteDeclined(true);
-            setCalendarInviteEvent({
-              eventId: mailCalendarInviteUid,
-              event: null,
-              loading: false,
-              error: null,
-            });
-            void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
-            await invalidateInvitationLookup();
-            return { ok: true as const, message: "Invitation declined." };
-          }
-
-          const importSummary = await calendarApiService.importInvitationIcs(
-            mailCalendarInvite.icsContent,
-            { status },
-          );
-          if (importSummary.errors.length > 0) {
-            throw new Error(
-              importSummary.errors[0] ??
-                "Unable to add this invitation to your calendar.",
-            );
-          }
-
-          const event = await calendarApiService.getInvitationByExternalId(
-            mailCalendarInviteUid,
-            { syncRemote: false },
-          );
-          if (!event) {
-            throw new Error("Invitation was accepted but could not be loaded.");
-          }
-
-          const sealed =
-            await calendarApiService.sealImportedInvitationIfNeeded(event);
-
-          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
-          await invalidateInvitationLookup();
-          setInviteDeclined(false);
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: sealed,
-            loading: false,
-            error: null,
-          });
-          return {
-            ok: true as const,
-            message:
-              status === "accepted"
-                ? "Invitation accepted."
-                : "Marked as tentative.",
-          };
-        }
-
-        const result = await calendarApiService.respondToInvitation(
-          calendarInviteResponseEventId,
-          status,
-        );
+    setInviteResponsePending(status);
+    const response = await respondToMailInvitation(calendarApiService, {
+      status,
+      inviteUid: mailCalendarInviteUid,
+      icsContent: mailCalendarInvite?.icsContent,
+      event: currentCalendarInviteEvent?.event,
+    })
+      .then(async (outcome) => {
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
         await invalidateInvitationLookup();
-
-        if ("deleted" in result && result.deleted) {
-          setInviteDeclined(true);
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: null,
-            loading: false,
-            error: null,
-          });
-          return {
-            ok: true as const,
-            message: "Invitation declined and removed from your calendar.",
-          };
-        }
-
-        const sealed =
-          await calendarApiService.sealImportedInvitationIfNeeded(
-            result as CalendarEvent,
-          );
-        setInviteDeclined(false);
+        setInviteDeclined(outcome.declined);
         setCalendarInviteEvent({
           eventId: mailCalendarInviteUid,
-          event: sealed,
+          event: outcome.event,
           loading: false,
           error: null,
         });
-        return {
-          ok: true as const,
-          message:
-            status === "accepted"
-              ? "Invitation accepted."
-              : "Marked as tentative.",
-        };
-      } catch (error) {
-        return {
-          ok: false as const,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to update invitation response.",
-        };
-      } finally {
-        setInviteResponsePending(null);
-      }
-    },
-    [
-      currentCalendarInviteEvent?.event,
-      invalidateInvitationLookup,
-      mailCalendarInvite?.icsContent,
-      mailCalendarInviteUid,
-      queryClient,
-    ],
-  );
+        return { ok: true as const, message: outcome.message };
+      })
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update invitation response.",
+      }));
+    setInviteResponsePending(null);
+    return response;
+  };
 
-  const handleCancelRemove = useCallback(async () => {
+  const handleCancelRemove = async () => {
     const eventId = currentCalendarInviteEvent?.event?.id;
     if (!eventId || !mailCalendarInviteUid) {
       return { ok: false as const, error: "Event not found." };
@@ -501,12 +366,7 @@ export function useMailCalendarInvitation({
           error instanceof Error ? error.message : "Failed to remove event.",
       };
     }
-  }, [
-    currentCalendarInviteEvent?.event?.id,
-    invalidateInvitationLookup,
-    mailCalendarInviteUid,
-    queryClient,
-  ]);
+  };
 
   return {
     hasCalendarInvitationHint,

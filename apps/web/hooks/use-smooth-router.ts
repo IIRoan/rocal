@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   useRouteTransition,
@@ -18,71 +17,49 @@ export function useSmoothRouter() {
     isRouteTransitionActive,
   } = useRouteTransition();
 
-  const push = useCallback(
-    (
-      href: string,
-      options?: NavigateOptions,
-      transitionOptions?: RouteTransitionOptions,
-    ) => {
-      if (typeof href !== "string" || href.length === 0) {
-        return;
-      }
-      startRouteTransition(transitionOptions);
-      router.push(href, options);
-    },
-    [router, startRouteTransition],
-  );
+  const push = (
+    href: string,
+    options?: NavigateOptions,
+    transitionOptions?: RouteTransitionOptions,
+  ) => {
+    if (typeof href !== "string" || href.length === 0) {
+      return;
+    }
+    startRouteTransition(transitionOptions);
+    router.push(href, options);
+  };
 
-  const replace = useCallback(
-    (
-      href: string,
-      options?: NavigateOptions,
-      transitionOptions?: RouteTransitionOptions,
-    ) => {
-      if (typeof href !== "string" || href.length === 0) {
-        return;
-      }
-      startRouteTransition(transitionOptions);
-      router.replace(href, options);
-    },
-    [router, startRouteTransition],
-  );
+  const replace = (
+    href: string,
+    options?: NavigateOptions,
+    transitionOptions?: RouteTransitionOptions,
+  ) => {
+    if (typeof href !== "string" || href.length === 0) {
+      return;
+    }
+    startRouteTransition(transitionOptions);
+    router.replace(href, options);
+  };
 
-  const prefetch = useCallback(
-    (
-      href: string,
-      options?: Parameters<AppRouterInstance["prefetch"]>[1],
-    ) => {
-      if (typeof href !== "string" || href.length === 0) {
-        return;
-      }
-      router.prefetch(href, options);
-    },
-    [router],
-  );
+  const prefetch = (
+    href: string,
+    options?: Parameters<AppRouterInstance["prefetch"]>[1],
+  ) => {
+    if (typeof href !== "string" || href.length === 0) {
+      return;
+    }
+    router.prefetch(href, options);
+  };
 
-  return useMemo(
-    () => ({
-      back: router.back,
-      forward: router.forward,
-      prefetch,
-      refresh: router.refresh,
-      push,
-      replace,
-      startRouteTransition,
-      finishRouteTransition,
-      isRouteTransitionActive,
-    }),
-    [
-      finishRouteTransition,
-      isRouteTransitionActive,
-      push,
-      replace,
-      router.back,
-      router.forward,
-      prefetch,
-      router.refresh,
-      startRouteTransition,
-    ],
-  );
+  return ({
+    back: router.back,
+    forward: router.forward,
+    prefetch,
+    refresh: router.refresh,
+    push,
+    replace,
+    startRouteTransition,
+    finishRouteTransition,
+    isRouteTransitionActive,
+  });
 }

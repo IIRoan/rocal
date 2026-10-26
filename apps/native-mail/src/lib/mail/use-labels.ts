@@ -1,5 +1,4 @@
 /** Label definitions ({ id, name, color }) live in the encrypted vault; assignments are `keywords/label:<id>`. */
-import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
 import * as ExpoCrypto from "expo-crypto";
@@ -123,46 +122,37 @@ export function useLabels(options: UseLabelsOptions = {}) {
 
   const labels = query.data ?? NO_LABELS;
 
-  const persistLabels = useCallback(
-    async (updated: LabelDef[]) => {
-      if (!runtime) {
-        throw new Error("Mail is not ready yet.");
-      }
-      await ensureVaultLoaded(runtime);
-      await saveVaultLabels(updated);
-      queryClient.setQueryData(QUERY_KEYS.mailLabels(), updated);
-    },
-    [queryClient, runtime],
-  );
+  const persistLabels = async (updated: LabelDef[]) => {
+    if (!runtime) {
+      throw new Error("Mail is not ready yet.");
+    }
+    await ensureVaultLoaded(runtime);
+    await saveVaultLabels(updated);
+    queryClient.setQueryData(QUERY_KEYS.mailLabels(), updated);
+  };
 
-  const createLabel = useCallback(
-    async (name: string, color: string): Promise<LabelDef> => {
-      const newLabel: LabelDef = {
-        id: ExpoCrypto.randomUUID(),
-        name,
-        color,
-      };
-      const updated = [...labels, newLabel];
-      await persistLabels(updated);
-      return newLabel;
-    },
-    [labels, persistLabels],
-  );
+  const createLabel = async (name: string, color: string): Promise<LabelDef> => {
+    const newLabel: LabelDef = {
+      id: ExpoCrypto.randomUUID(),
+      name,
+      color,
+    };
+    const updated = [...labels, newLabel];
+    await persistLabels(updated);
+    return newLabel;
+  };
 
-  const deleteLabel = useCallback(
-    async (labelId: string): Promise<void> => {
-      const updated = labels.filter((l) => l.id !== labelId);
-      await persistLabels(updated);
-    },
-    [labels, persistLabels],
-  );
+  const deleteLabel = async (labelId: string): Promise<void> => {
+    const updated = labels.filter((l) => l.id !== labelId);
+    await persistLabels(updated);
+  };
 
-  const refreshLabels = useCallback(() => {
+  const refreshLabels = () => {
     if (canLoad) {
       // A failed refresh leaves the previously loaded labels in place.
       void query.refetch().catch(() => undefined);
     }
-  }, [canLoad, query]);
+  };
 
   return {
     labels,

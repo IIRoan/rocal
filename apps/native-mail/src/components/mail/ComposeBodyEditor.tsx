@@ -1,9 +1,7 @@
 import {
   forwardRef,
-  useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -210,7 +208,7 @@ export const ComposeBodyEditor = forwardRef<
 ) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
   const injectJavaScriptRef = useRef<((script: string) => void) | null>(null);
   const lastEmittedRef = useRef(value);
   const [selection, setSelection] = useState<TextSelection>({
@@ -218,49 +216,47 @@ export const ComposeBodyEditor = forwardRef<
     end: 0,
   });
   const [editorReady, setEditorReady] = useState(false);
-
-  const document = useMemo(
-    () =>
-      buildEditorDocument({
-        html: composeTextToHtml(value),
-        placeholder,
-        theme,
-        skin,
-      }),
-    // Recreate only when chrome changes; typing updates via setHtml.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [placeholder, theme, skin],
-  );
-
-  const isFirstDocument = useRef(true);
-  useEffect(() => {
-    if (isFirstDocument.current) {
-      isFirstDocument.current = false;
-      return;
-    }
+  const buildDocument = () =>
+    buildEditorDocument({
+      html: composeTextToHtml(value),
+      placeholder,
+      theme,
+      skin,
+    });
+  // Typing updates the page through setHtml, so the document is rebuilt (and the editor reloads) only when its chrome changes.
+  const [editorPage, setEditorPage] = useState(() => ({
+    placeholder,
+    theme,
+    skin,
+    document: buildDocument(),
+  }));
+  if (
+    editorPage.placeholder !== placeholder ||
+    editorPage.theme !== theme ||
+    editorPage.skin !== skin
+  ) {
+    setEditorPage({ placeholder, theme, skin, document: buildDocument() });
     setEditorReady(false);
-  }, [document]);
+  }
+  const { document } = editorPage;
 
-  const applyFallback = useCallback(
-    (
-      fn: (
-        text: string,
-        nextSelection: TextSelection,
-      ) => { text: string; selection: TextSelection },
-    ) => {
-      const next = fn(value, selection);
-      lastEmittedRef.current = next.text;
-      onChangeText(next.text);
-      setSelection(next.selection);
-    },
-    [onChangeText, selection, value],
-  );
+  const applyFallback = (
+    fn: (
+      text: string,
+      nextSelection: TextSelection,
+    ) => { text: string; selection: TextSelection },
+  ) => {
+    const next = fn(value, selection);
+    lastEmittedRef.current = next.text;
+    onChangeText(next.text);
+    setSelection(next.selection);
+  };
 
-  const injectFormat = useCallback((command: string) => {
+  const injectFormat = (command: string) => {
     injectJavaScriptRef.current?.(
       `window.applyFormat(${JSON.stringify(command)}); true;`,
     );
-  }, []);
+  };
 
   useImperativeHandle(
     ref,
@@ -294,7 +290,6 @@ export const ComposeBodyEditor = forwardRef<
         applyFallback(toggleComposeList);
       },
     }),
-    [applyFallback, editorReady, injectFormat],
   );
 
   useEffect(() => {
@@ -307,39 +302,33 @@ export const ComposeBodyEditor = forwardRef<
     );
   }, [editorReady, value]);
 
-  const onMessage = useCallback(
-    (event: WebViewMessageEvent) => {
-      const message = parseEditorMessage(event.nativeEvent.data);
-      if (!message) return;
-      if (message.type === "ready") {
-        setEditorReady(true);
-        return;
-      }
-      if (message.type === "focus") {
-        onFocusChange?.(true);
-        return;
-      }
-      if (message.type === "blur") {
-        onFocusChange?.(false);
-        return;
-      }
-      const sanitizedHtml = sanitizeUntrustedEmailHtml(message.html);
-      const next = htmlToComposeText(sanitizedHtml);
-      lastEmittedRef.current = next;
-      if (next !== value) {
-        onChangeText(next);
-      }
-    },
-    [onChangeText, onFocusChange, value],
-  );
+  const onMessage = (event: WebViewMessageEvent) => {
+    const message = parseEditorMessage(event.nativeEvent.data);
+    if (!message) return;
+    if (message.type === "ready") {
+      setEditorReady(true);
+      return;
+    }
+    if (message.type === "focus") {
+      onFocusChange?.(true);
+      return;
+    }
+    if (message.type === "blur") {
+      onFocusChange?.(false);
+      return;
+    }
+    const sanitizedHtml = sanitizeUntrustedEmailHtml(message.html);
+    const next = htmlToComposeText(sanitizedHtml);
+    lastEmittedRef.current = next;
+    if (next !== value) {
+      onChangeText(next);
+    }
+  };
 
-  const onShouldStartLoadWithRequest = useCallback(
-    (request: ShouldStartLoadRequest) => {
-      const url = request.url;
-      return url === "about:blank" || url.startsWith("data:");
-    },
-    [],
-  );
+  const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest) => {
+    const url = request.url;
+    return url === "about:blank" || url.startsWith("data:");
+  };
 
   if (!WebView) {
     return (

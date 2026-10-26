@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import {
   useMutation,
   useQuery,
@@ -78,15 +78,12 @@ function useMailSyncedSettings() {
   });
 
   const { mutate } = mutation;
-  const update = useCallback(
-    (change: (current: MailSyncedSettings) => MailSyncedSettings) => {
-      const current =
-        queryClient.getQueryData<MailSyncedSettings>(SYNCED_KEY) ??
-        DEFAULT_MAIL_SYNCED_SETTINGS;
-      mutate(change(current));
-    },
-    [mutate, queryClient],
-  );
+  const update = (change: (current: MailSyncedSettings) => MailSyncedSettings) => {
+    const current =
+      queryClient.getQueryData<MailSyncedSettings>(SYNCED_KEY) ??
+      DEFAULT_MAIL_SYNCED_SETTINGS;
+    mutate(change(current));
+  };
 
   return {
     settings: query.data ?? DEFAULT_MAIL_SYNCED_SETTINGS,
@@ -99,30 +96,21 @@ function useMailSyncedSettings() {
 export function useMailDisplaySettings() {
   const { settings, isLoaded, update } = useMailSyncedSettings();
 
-  const updateSettings = useCallback(
-    (patch: Partial<MailDisplaySettings>) =>
-      update((current) => ({
-        ...current,
-        display: { ...current.display, ...patch },
-      })),
-    [update],
-  );
-  const addTrustedSender = useCallback(
-    (email: string) =>
-      update((current) => ({
-        ...current,
-        display: withTrustedSender(current.display, email),
-      })),
-    [update],
-  );
-  const removeTrustedSender = useCallback(
-    (email: string) =>
-      update((current) => ({
-        ...current,
-        display: withoutTrustedSender(current.display, email),
-      })),
-    [update],
-  );
+  const updateSettings = (patch: Partial<MailDisplaySettings>) =>
+    update((current) => ({
+      ...current,
+      display: { ...current.display, ...patch },
+    }));
+  const addTrustedSender = (email: string) =>
+    update((current) => ({
+      ...current,
+      display: withTrustedSender(current.display, email),
+    }));
+  const removeTrustedSender = (email: string) =>
+    update((current) => ({
+      ...current,
+      display: withoutTrustedSender(current.display, email),
+    }));
 
   return {
     settings: settings.display,
@@ -136,14 +124,11 @@ export function useMailDisplaySettings() {
 export function useMailComposeSettings() {
   const { settings, isLoaded, update } = useMailSyncedSettings();
 
-  const updateSettings = useCallback(
-    (patch: Partial<MailComposeSettings>) =>
-      update((current) => ({
-        ...current,
-        compose: { ...current.compose, ...patch },
-      })),
-    [update],
-  );
+  const updateSettings = (patch: Partial<MailComposeSettings>) =>
+    update((current) => ({
+      ...current,
+      compose: { ...current.compose, ...patch },
+    }));
 
   return { settings: settings.compose, isLoaded, updateSettings };
 }
@@ -151,14 +136,11 @@ export function useMailComposeSettings() {
 export function useMailListSettings() {
   const { settings, isLoaded, update } = useMailSyncedSettings();
 
-  const updateSettings = useCallback(
-    (patch: Partial<MailListSettings>) =>
-      update((current) => ({
-        ...current,
-        list: { ...current.list, ...patch },
-      })),
-    [update],
-  );
+  const updateSettings = (patch: Partial<MailListSettings>) =>
+    update((current) => ({
+      ...current,
+      list: { ...current.list, ...patch },
+    }));
 
   return { settings: settings.list, isLoaded, updateSettings };
 }

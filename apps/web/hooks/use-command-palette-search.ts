@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ChangeEventHandler,
@@ -110,25 +108,14 @@ export function useCommandPaletteSearch({
   const isCommandMode = isCommandPaletteMode(searchQuery);
   const commandQuery = getCommandPaletteCommandQuery(searchQuery);
 
-  const matchingCommands = useMemo(
-    () => getMatchingPaletteCommands(COMMANDS, isCommandMode, commandQuery),
-    [isCommandMode, commandQuery],
-  );
-  const filteredItems = useMemo(
-    () =>
-      filterPaletteNavigationItems(SEARCH_INDEX, isCommandMode, debouncedQuery),
-    [isCommandMode, debouncedQuery],
-  );
-  const visibleNavigationItems = useMemo(
-    () =>
-      getVisiblePaletteNavigationItems({
-        filteredItems,
-        isCommandMode,
-        query: debouncedQuery,
-        rootItems: NAVIGATION_ITEMS.filter((item) => item.parent === null),
-      }),
-    [filteredItems, isCommandMode, debouncedQuery],
-  );
+  const matchingCommands = getMatchingPaletteCommands(COMMANDS, isCommandMode, commandQuery);
+  const filteredItems = filterPaletteNavigationItems(SEARCH_INDEX, isCommandMode, debouncedQuery);
+  const visibleNavigationItems = getVisiblePaletteNavigationItems({
+    filteredItems,
+    isCommandMode,
+    query: debouncedQuery,
+    rootItems: NAVIGATION_ITEMS.filter((item) => item.parent === null),
+  });
   const showEventSearch = !isCommandMode && debouncedQuery.trim().length >= 2;
   const {
     results: rawSearchResults,
@@ -141,11 +128,10 @@ export function useCommandPaletteSearch({
     limit: 15,
   });
   // Reorder so array indices match the visual layout (mail first, then calendar)
-  const searchResults = useMemo(() => {
-    const mail = rawSearchResults.filter((r) => r.source === "mail");
-    const calendar = rawSearchResults.filter((r) => r.source === "calendar");
-    return [...mail, ...calendar];
-  }, [rawSearchResults]);
+  const searchResults = [
+    ...rawSearchResults.filter((r) => r.source === "mail"),
+    ...rawSearchResults.filter((r) => r.source === "calendar"),
+  ];
   const searchEvents = searchResults.flatMap((result) =>
     result.source === "calendar" ? [result.event] : [],
   );
@@ -238,131 +224,93 @@ export function useCommandPaletteSearch({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open, setSearchQuery, showMainView]);
 
-  const clearSearchQuery = useCallback(() => {
+  const clearSearchQuery = () => {
     setSearchQuery("");
-  }, [setSearchQuery]);
+  };
 
-  const selectCommand = useCallback(
-    (command: Command) => {
-      executeCommand(command);
-    },
-    [executeCommand],
-  );
+  const selectCommand = (command: Command) => {
+    executeCommand(command);
+  };
 
-  const selectNavigationItem = useCallback(
-    (item: PaletteSearchItem) => {
-      goForward(item.targetView as PaletteView);
-    },
-    [goForward],
-  );
+  const selectNavigationItem = (item: PaletteSearchItem) => {
+    goForward(item.targetView as PaletteView);
+  };
 
-  const selectSearchResult = useCallback(
-    (result: UnifiedSearchResult<JmapEmailMessage>) => {
-      onSearchResultSelect(result);
-    },
-    [onSearchResultSelect],
-  );
+  const selectSearchResult = (result: UnifiedSearchResult<JmapEmailMessage>) => {
+    onSearchResultSelect(result);
+  };
 
-  const handleSearchInputChange = useCallback<
-    ChangeEventHandler<HTMLInputElement>
-  >(
-    (event) => {
-      stopEventPropagation(event);
-      setSearchQuery(event.target.value);
-    },
-    [setSearchQuery],
-  );
+  const handleSearchInputChange: ChangeEventHandler<HTMLInputElement> = (event) => {
+    stopEventPropagation(event);
+    setSearchQuery(event.target.value);
+  };
 
-  const handleSearchInputKeyDown = useCallback<
-    KeyboardEventHandler<HTMLInputElement>
-  >(
-    (event) => {
-      if (event.key === "Backspace" && searchQuery === ">") {
-        setSearchQuery("");
-        return;
-      }
+  const handleSearchInputKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) => {
+    if (event.key === "Backspace" && searchQuery === ">") {
+      setSearchQuery("");
+      return;
+    }
 
-      if (event.key === "Escape") {
-        onOpenChange(false);
-        return;
-      }
+    if (event.key === "Escape") {
+      onOpenChange(false);
+      return;
+    }
 
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        setSelectedIndex((previousIndex) =>
-          moveCommandPaletteSelection(previousIndex, 1, currentListLength),
-        );
-        return;
-      }
-
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        setSelectedIndex((previousIndex) =>
-          moveCommandPaletteSelection(previousIndex, -1, currentListLength),
-        );
-        return;
-      }
-
-      if (event.key !== "Enter" || currentListLength <= 0) {
-        return;
-      }
-
+    if (event.key === "ArrowDown") {
       event.preventDefault();
+      setSelectedIndex((previousIndex) =>
+        moveCommandPaletteSelection(previousIndex, 1, currentListLength),
+      );
+      return;
+    }
 
-      const selection = resolvePaletteEnterSelection({
-        isCommandMode,
-        showEventSearch,
-        selectedIndex,
-        totalSearchEvents,
-        isSearchOnly,
-        matchingCommands,
-        searchEvents: searchResults,
-        filteredItems: visibleNavigationItems,
-      });
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedIndex((previousIndex) =>
+        moveCommandPaletteSelection(previousIndex, -1, currentListLength),
+      );
+      return;
+    }
 
-      switch (selection.type) {
-        case "command":
-          selectCommand(selection.command);
-          break;
-        case "search-event":
-          selectSearchResult(selection.event);
-          break;
-        case "navigation":
-          selectNavigationItem(selection.item);
-          break;
-        default:
-          break;
-      }
-    },
-    [
-      searchQuery,
-      setSearchQuery,
-      onOpenChange,
-      currentListLength,
+    if (event.key !== "Enter" || currentListLength <= 0) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const selection = resolvePaletteEnterSelection({
       isCommandMode,
       showEventSearch,
       selectedIndex,
       totalSearchEvents,
       isSearchOnly,
       matchingCommands,
-      searchResults,
-      visibleNavigationItems,
-      selectCommand,
-      selectSearchResult,
-      selectNavigationItem,
-    ],
-  );
+      searchEvents: searchResults,
+      filteredItems: visibleNavigationItems,
+    });
 
-  const searchInputInteractionProps = useMemo(
-    () => ({
-      onBlur: stopEventPropagation,
-      onChange: handleSearchInputChange,
-      onClick: stopEventPropagation,
-      onFocus: stopEventPropagation,
-      onKeyDown: handleSearchInputKeyDown,
-    }),
-    [handleSearchInputChange, handleSearchInputKeyDown],
-  );
+    switch (selection.type) {
+      case "command":
+        selectCommand(selection.command);
+        break;
+      case "search-event":
+        selectSearchResult(selection.event);
+        break;
+      case "navigation":
+        selectNavigationItem(selection.item);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const searchInputInteractionProps = {
+    onBlur: stopEventPropagation,
+    onChange: handleSearchInputChange,
+    onClick: stopEventPropagation,
+    onFocus: stopEventPropagation,
+    onKeyDown: handleSearchInputKeyDown,
+  };
 
   return {
     clearSearchQuery,

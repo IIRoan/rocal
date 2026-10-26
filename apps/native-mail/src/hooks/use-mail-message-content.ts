@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { useMailMessage, useMailRuntime } from "../lib/mail/use-mail";
@@ -50,13 +49,9 @@ export function useMailMessageContent(messageId: string) {
     },
   });
 
-  const selectedDecryptedPreview = useMemo(
-    () =>
-      decryptResult
-        ? { text: decryptResult.plaintext, html: decryptResult.html }
-        : null,
-    [decryptResult],
-  );
+  const selectedDecryptedPreview = decryptResult
+    ? { text: decryptResult.plaintext, html: decryptResult.html }
+    : null;
 
   const conversationPreviews = useConversationDecryptedPreviews(
     runtime,
@@ -77,23 +72,13 @@ export function useMailMessageContent(messageId: string) {
   const decryptError = isEncrypted ? decryptQueryError : null;
   const rawHtmlSource = decryptResult?.html ?? bodies?.html ?? null;
 
-  const displayAttachments = useMemo(
-    () =>
-      resolveDisplayAttachments({
-        encryption,
-        isDecrypting,
-        decryptSucceeded: isDecryptSuccess,
-        decryptedAttachments: decryptResult?.attachments,
-        messageAttachments: message?.attachments,
-      }),
-    [
-      encryption,
-      isDecrypting,
-      isDecryptSuccess,
-      decryptResult?.attachments,
-      message?.attachments,
-    ],
-  );
+  const displayAttachments = resolveDisplayAttachments({
+    encryption,
+    isDecrypting,
+    decryptSucceeded: isDecryptSuccess,
+    decryptedAttachments: decryptResult?.attachments,
+    messageAttachments: message?.attachments,
+  });
 
   return {
     runtime,

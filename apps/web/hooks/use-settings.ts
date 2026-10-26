@@ -1,4 +1,4 @@
-import { useEffect, createContext, use, useMemo, useRef } from "react";
+import { useEffect, createContext, use, useRef } from "react";
 import { getAccountTimezoneSeed } from "@workspace/calendar-core";
 import { webQueryKeys } from "@/lib/query-keys";
 import { calendarApiService } from "@/lib/calendar-api-service";
@@ -31,10 +31,7 @@ export function useSettingsState(): SettingsContextValue {
   const seededSettingsId = useRef<string | null>(null);
 
   // Scope indefinitely cached settings to the signed-in user to prevent cross-account reuse.
-  const settingsQueryKey = useMemo(
-    () => webQueryKeys.settings(session?.user?.id ?? null),
-    [session?.user?.id],
-  );
+  const settingsQueryKey = webQueryKeys.settings(session?.user?.id ?? null);
 
   const settingsQuery = useQuery<UserSettings, ApiError>({
     queryKey: settingsQueryKey,

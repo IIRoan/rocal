@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import {
   getErrorMessage,
   partitionCalendarsByKind,
@@ -38,10 +38,7 @@ export function IcsImportPanel({ calendars, onBack }: IcsImportPanelProps) {
   const [fileError, setFileError] = useState<string | null>(null);
   const [importCalendarId, setImportCalendarId] = useState<string>();
 
-  const { ownedCalendars } = useMemo(
-    () => partitionCalendarsByKind(calendars),
-    [calendars],
-  );
+  const { ownedCalendars } = partitionCalendarsByKind(calendars);
   const selectedCalendarId =
     importCalendarId ??
     (ownedCalendars.find((calendar) => calendar.isDefault) ?? ownedCalendars[0])

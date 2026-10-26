@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { ViewToken } from "react-native";
 import { shouldPrefetchNextMailboxPage } from "../lib/mail/mail-pagination";
 
@@ -38,23 +38,20 @@ export function useMailboxPagePrefetch(query: NextPageQuery, rowCount: number) {
     };
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, rowCount]);
 
-  const onEndReached = useCallback(() => {
+  const onEndReached = () => {
     loadAheadRef.current(Number.MAX_SAFE_INTEGER);
-  }, []);
+  };
 
   // FlatList rejects a changing onViewableItemsChanged, so this stays stable and reads the latest state via ref.
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      let lastVisibleIndex = -1;
-      for (const token of viewableItems) {
-        if (token.index != null && token.index > lastVisibleIndex) {
-          lastVisibleIndex = token.index;
-        }
+  const onViewableItemsChanged = ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    let lastVisibleIndex = -1;
+    for (const token of viewableItems) {
+      if (token.index != null && token.index > lastVisibleIndex) {
+        lastVisibleIndex = token.index;
       }
-      if (lastVisibleIndex >= 0) loadAheadRef.current(lastVisibleIndex);
-    },
-    [],
-  );
+    }
+    if (lastVisibleIndex >= 0) loadAheadRef.current(lastVisibleIndex);
+  };
 
   return { onEndReached, onViewableItemsChanged };
 }

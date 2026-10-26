@@ -1,4 +1,3 @@
-import { useCallback, useMemo } from "react";
 import { useRouter } from "expo-router";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -37,62 +36,44 @@ export function useMailRowHandlers({
   const markUnreadMutate = mutations.bulkMarkAsUnread.mutate;
   const moveToTrashMutate = mutations.bulkMoveToTrash.mutate;
 
-  const handleOpenMessage = useCallback(
-    (message: JmapEmailMessage) => {
-      const mailboxes = runtime?.mailboxes ?? [];
-      if (isDraftMessage(message, mailboxId, mailboxes)) {
-        openCompose({ mode: "draft", messageId: message.id });
-        return;
-      }
-      router.push(mailMessageRoute(message.id) as never);
-    },
-    [openCompose, router, runtime?.mailboxes, mailboxId],
-  );
+  const handleOpenMessage = (message: JmapEmailMessage) => {
+    const mailboxes = runtime?.mailboxes ?? [];
+    if (isDraftMessage(message, mailboxId, mailboxes)) {
+      openCompose({ mode: "draft", messageId: message.id });
+      return;
+    }
+    router.push(mailMessageRoute(message.id) as never);
+  };
 
-  const handleSwipeToggleRead = useCallback(
-    (ids: string[], read: boolean) => {
-      if (ids.length === 0) return;
-      const mutate = read ? markUnreadMutate : markReadMutate;
-      mutate(ids, {
+  const handleSwipeToggleRead = (ids: string[], read: boolean) => {
+    if (ids.length === 0) return;
+    const mutate = read ? markUnreadMutate : markReadMutate;
+    mutate(ids, {
+      onError: (error) =>
+        toast(getErrorMessage(error, "Failed to update message."), "error"),
+    });
+  };
+
+  const handleSwipeTrash = (ids: string[]) => {
+    if (ids.length === 0) return;
+    return new Promise<void>((resolve) => {
+      moveToTrashMutate(ids, {
+        onSuccess: (_data, _ids, snapshot) =>
+          showMoveToast("Moved to trash", snapshot),
         onError: (error) =>
-          toast(getErrorMessage(error, "Failed to update message."), "error"),
+          toast(
+            getErrorMessage(error, "Failed to move message to trash."),
+            "error",
+          ),
+        onSettled: () => resolve(),
       });
-    },
-    [markReadMutate, markUnreadMutate, toast],
-  );
+    });
+  };
 
-  const handleSwipeTrash = useCallback(
-    (ids: string[]) => {
-      if (ids.length === 0) return;
-      return new Promise<void>((resolve) => {
-        moveToTrashMutate(ids, {
-          onSuccess: (_data, _ids, snapshot) =>
-            showMoveToast("Moved to trash", snapshot),
-          onError: (error) =>
-            toast(
-              getErrorMessage(error, "Failed to move message to trash."),
-              "error",
-            ),
-          onSettled: () => resolve(),
-        });
-      });
-    },
-    [moveToTrashMutate, showMoveToast, toast],
-  );
-
-  return useMemo(
-    () => ({
-      onOpen: handleOpenMessage,
-      onToggleSelect,
-      onToggleRead: handleSwipeToggleRead,
-      onTrash: isInTrash ? undefined : handleSwipeTrash,
-    }),
-    [
-      handleOpenMessage,
-      onToggleSelect,
-      handleSwipeToggleRead,
-      handleSwipeTrash,
-      isInTrash,
-    ],
-  );
+  return ({
+    onOpen: handleOpenMessage,
+    onToggleSelect,
+    onToggleRead: handleSwipeToggleRead,
+    onTrash: isInTrash ? undefined : handleSwipeTrash,
+  });
 }

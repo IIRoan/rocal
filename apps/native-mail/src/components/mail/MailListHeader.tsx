@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import Animated, {
   Extrapolation,
@@ -30,7 +30,7 @@ export function MailListHeader({
   onSelectAll,
 }: MailListHeaderProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const progress = useSelectionProgress();
 
   const toolbarStyle = useAnimatedStyle(() => ({

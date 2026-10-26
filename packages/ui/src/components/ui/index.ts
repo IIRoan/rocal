@@ -1,6 +1,6 @@
 export { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 export { BlobatarAvatar } from "./blobatar-avatar";
-export { Badge, badgeVariants } from "./badge";
+export { Badge } from "./badge";
 export { Button } from "./button";
 export { buttonVariants } from "./button-variants";
 export { Calendar } from "./calendar";
@@ -33,11 +33,7 @@ export {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
-export {
-  ErrorBoundary,
-  withErrorBoundary,
-  useErrorBoundary,
-} from "./error-boundary";
+export { ErrorBoundary } from "./error-boundary";
 export { Input } from "./input";
 export { Label } from "./label";
 export { Popover, PopoverContent, PopoverTrigger } from "./popover";

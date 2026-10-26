@@ -1,3 +1,4 @@
+import { stripHtmlTags } from "./html-text";
 export type SignatureSource = {
   textSignature?: string | null;
   htmlSignature?: string | null;
@@ -42,8 +43,7 @@ export function htmlToPlainText(html: string): string {
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n");
 
-  const plain = withBreaks
-    .replace(/<[^>]+>/g, "")
+  const plain = stripHtmlTags(withBreaks, "")
     .replace(/[ \t]+/g, " ")
     .replace(/ *\n */g, "\n");
 

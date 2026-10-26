@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DEFAULT_MAIL_DISPLAY_SETTINGS,
   parseMailDisplaySettings,
@@ -80,12 +80,9 @@ export function useMailDisplaySettings() {
     };
   }, []);
 
-  const updateSettings = useCallback(
-    (patch: Partial<MailDisplaySettings>) => {
-      setSettings(writeMailDisplaySettings((current) => ({ ...current, ...patch })));
-    },
-    [],
-  );
+  const updateSettings = (patch: Partial<MailDisplaySettings>) => {
+    setSettings(writeMailDisplaySettings((current) => ({ ...current, ...patch })));
+  };
 
   return { settings, updateSettings };
 }

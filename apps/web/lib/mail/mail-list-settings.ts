@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DEFAULT_MAIL_LIST_SETTINGS,
   parseMailListSettings,
@@ -59,12 +59,9 @@ export function useMailListSettings() {
     };
   }, []);
 
-  const updateSettings = useCallback(
-    (patch: Partial<MailListSettings>) => {
-      setSettings(writeMailListSettings((current) => ({ ...current, ...patch })));
-    },
-    [],
-  );
+  const updateSettings = (patch: Partial<MailListSettings>) => {
+    setSettings(writeMailListSettings((current) => ({ ...current, ...patch })));
+  };
 
   return { settings, updateSettings };
 }

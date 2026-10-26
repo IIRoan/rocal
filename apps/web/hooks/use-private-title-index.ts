@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   useSyncExternalStore,
@@ -68,7 +68,7 @@ export function usePrivateTitleIndex() {
     };
   }, []);
 
-  const refreshFromStore = useCallback(async () => {
+  const refreshFromStore = async () => {
     if (!accountId) {
       setDocuments([]);
       setIndexedAt(null);
@@ -77,25 +77,29 @@ export function usePrivateTitleIndex() {
     const snapshot = await loadPrivateTitleIndex(accountId);
     setDocuments(snapshot.documents);
     setIndexedAt(snapshot.indexedAt);
-  }, [accountId]);
+  };
 
-  const rebuild = useCallback(async () => {
+  const rebuild = async () => {
     if (!accountId || !canIndex || inFlightRef.current) return;
     inFlightRef.current = true;
     setIsIndexing(true);
-    try {
+    const indexTitles = async () => {
       const snapshot = await rebuildPrivateTitleIndex({ accountId });
       setDocuments(snapshot.documents);
       setIndexedAt(snapshot.indexedAt);
       // Only chase the backlog while passes make progress, so a locked vault cannot loop.
       setPendingBodies(snapshot.loadedBodies > 0 ? snapshot.pendingBodies : 0);
-    } catch {
-      await refreshFromStore();
-    } finally {
-      inFlightRef.current = false;
-      setIsIndexing(false);
-    }
-  }, [accountId, canIndex, refreshFromStore]);
+    };
+    await indexTitles().catch(async () => {
+      // A failed index read only delays this pass, and the flags below must reset either way.
+      await refreshFromStore().catch(() => undefined);
+    });
+    inFlightRef.current = false;
+    setIsIndexing(false);
+  };
+
+  const refreshIndex = useEffectEvent(() => refreshFromStore());
+  const rebuildIndex = useEffectEvent(() => rebuild());
 
   useEffect(() => {
     if (!accountId || !flags.enabled) {
@@ -104,8 +108,8 @@ export function usePrivateTitleIndex() {
 
     let cancelled = false;
     void (async () => {
-      await refreshFromStore();
-      if (!cancelled && canIndex) await rebuild();
+      await refreshIndex();
+      if (!cancelled && canIndex) await rebuildIndex();
     })().catch((error) => {
       log.warn("Failed to refresh the private title index", error);
     });
@@ -113,23 +117,26 @@ export function usePrivateTitleIndex() {
     if (!canIndex) return undefined;
 
     const interval = window.setInterval(() => {
-      void rebuild();
+      void rebuildIndex().catch((error) => {
+        log.warn("Failed to rebuild the private title index", error);
+      });
     }, REINDEX_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [accountId, canIndex, flags.enabled, rebuild, refreshFromStore]);
+  }, [accountId, canIndex, flags.enabled]);
 
   useEffect(() => {
     if (pendingBodies <= 0 || isIndexing || !canIndex) return;
-    const timeout = window.setTimeout(
-      () => void rebuild(),
-      BODY_BACKFILL_DELAY_MS,
-    );
+    const timeout = window.setTimeout(() => {
+      void rebuildIndex().catch((error) => {
+        log.warn("Failed to rebuild the private title index", error);
+      });
+    }, BODY_BACKFILL_DELAY_MS);
     return () => window.clearTimeout(timeout);
-  }, [canIndex, isIndexing, pendingBodies, rebuild]);
+  }, [canIndex, isIndexing, pendingBodies]);
 
   const indexActive = Boolean(accountId) && flags.enabled;
 

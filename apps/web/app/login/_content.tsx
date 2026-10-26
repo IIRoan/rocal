@@ -455,6 +455,78 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     return waitForSettledAuthStatus(refreshAuthStatus, options);
   }
 
+  async function handlePasskeyStepUp() {
+    dispatchChrome({ type: "start-passkey-auth" });
+
+    const verifyPasskey = async () => {
+      const result = await authClient.signIn.passkey();
+
+      if (result?.error) {
+        if (isPasskeyAuthCancelled(result.error)) {
+          dispatchChrome({
+            type: "set-notice",
+            notice: "Passkey authentication was cancelled.",
+          });
+          dispatchChrome({ type: "finish-passkey-auth" });
+          return;
+        }
+
+        log.error("Passkey login failed:", result.error);
+        dispatchChrome({
+          type: "set-error",
+          error:
+            result.error.message ||
+            "Passkey authentication failed. Please try again.",
+        });
+        dispatchChrome({ type: "finish-passkey-auth" });
+        return;
+      }
+
+      const authStatus = await waitForSettledAuthStatusForLogin();
+
+      if (authStatus?.authenticated && authStatus.requiresPasskeyStepUp) {
+        dispatchChrome({
+          type: "set-error",
+          error: "Passkey verification is still required. Please try again.",
+        });
+        dispatchChrome({ type: "finish-passkey-auth" });
+        return;
+      }
+
+      redirectAfterAuth();
+      dispatchChrome({ type: "finish-passkey-auth" });
+    };
+    await verifyPasskey().catch((error: unknown) => {
+      if (isPasskeyAuthCancelled(error)) {
+        dispatchChrome({
+          type: "set-notice",
+          notice: "Passkey authentication was cancelled.",
+        });
+        dispatchChrome({ type: "finish-passkey-auth" });
+        return;
+      }
+
+      log.error("Passkey login failed:", error);
+      dispatchChrome({
+        type: "set-error",
+        error: getErrorMessage(
+          error,
+          "Passkey authentication failed. Please try again.",
+        ),
+      });
+      dispatchChrome({ type: "finish-passkey-auth" });
+    });
+  }
+
+  function triggerAutoPasskeyStepUp() {
+    hasAutoPromptedStepUpRef.current = true;
+    dispatchChrome({
+      type: "set-notice",
+      notice: "Check your device to finish signing in with your passkey.",
+    });
+    void handlePasskeyStepUp();
+  }
+
   const handleSessionRedirect = useEffectEvent(
     async (isCancelled: () => boolean) => {
       if (isAuthNavigationPending() || emailLoading || passkeyLoading) return;
@@ -610,77 +682,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     });
     return () => animation?.cancel();
   }, [authMode]);
-
-  async function handlePasskeyStepUp() {
-    dispatchChrome({ type: "start-passkey-auth" });
-
-    try {
-      const result = await authClient.signIn.passkey();
-
-      if (result?.error) {
-        if (isPasskeyAuthCancelled(result.error)) {
-          dispatchChrome({
-            type: "set-notice",
-            notice: "Passkey authentication was cancelled.",
-          });
-          dispatchChrome({ type: "finish-passkey-auth" });
-          return;
-        }
-
-        log.error("Passkey login failed:", result.error);
-        dispatchChrome({
-          type: "set-error",
-          error:
-            result.error.message ||
-            "Passkey authentication failed. Please try again.",
-        });
-        dispatchChrome({ type: "finish-passkey-auth" });
-        return;
-      }
-
-      const authStatus = await waitForSettledAuthStatusForLogin();
-
-      if (authStatus?.authenticated && authStatus.requiresPasskeyStepUp) {
-        dispatchChrome({
-          type: "set-error",
-          error: "Passkey verification is still required. Please try again.",
-        });
-        dispatchChrome({ type: "finish-passkey-auth" });
-        return;
-      }
-
-      redirectAfterAuth();
-      dispatchChrome({ type: "finish-passkey-auth" });
-    } catch (error) {
-      if (isPasskeyAuthCancelled(error)) {
-        dispatchChrome({
-          type: "set-notice",
-          notice: "Passkey authentication was cancelled.",
-        });
-        dispatchChrome({ type: "finish-passkey-auth" });
-        return;
-      }
-
-      log.error("Passkey login failed:", error);
-      dispatchChrome({
-        type: "set-error",
-        error: getErrorMessage(
-          error,
-          "Passkey authentication failed. Please try again.",
-        ),
-      });
-      dispatchChrome({ type: "finish-passkey-auth" });
-    }
-  }
-
-  function triggerAutoPasskeyStepUp() {
-    hasAutoPromptedStepUpRef.current = true;
-    dispatchChrome({
-      type: "set-notice",
-      notice: "Check your device to finish signing in with your passkey.",
-    });
-    void handlePasskeyStepUp();
-  }
 
   async function finalizePasswordAuth(submittedPassword: string) {
     storePendingAuthPassword(submittedPassword);

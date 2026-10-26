@@ -1,4 +1,5 @@
 import { formatInTimeZone } from "date-fns-tz";
+import { resolveTimezone } from "./timezone";
 
 export type TimeFormat = "12h" | "24h";
 
@@ -33,6 +34,22 @@ export function formatDateTimeLabel(
     timeZone: timezone,
   });
   return `${day}, ${formatClockTime(date, timezone, timeFormat)}`;
+}
+
+export interface QuotedDateOptions {
+  timeFormat: TimeFormat;
+  timezone?: string | null;
+}
+
+/** The "On <date>, X wrote:" and "Date:" line of a reply or forward; mail can carry a missing or invalid receivedAt. */
+export function formatQuotedMailDate(
+  receivedAt: string | null | undefined,
+  { timeFormat, timezone }: QuotedDateOptions,
+): string {
+  const date = new Date(receivedAt ?? "");
+  return Number.isNaN(date.getTime())
+    ? "Unknown date"
+    : formatDateTimeLabel(date, resolveTimezone(timezone), timeFormat);
 }
 
 export function formatClockTimeRange(

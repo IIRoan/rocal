@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   buildPaddedCalendarMonthRanges,
@@ -118,6 +118,11 @@ function validateAndCleanEvents(
 // Hook
 // ---------------------------------------------------------------------------
 
+function activeMonthFetchRange(activeMonth: string): DateRange {
+  const [year, month] = activeMonth.split("-").map(Number);
+  return monthFetchRange(new Date(year, month - 1, 15));
+}
+
 export function useCalendarEventsLoader(
   options: UseCalendarEventsLoaderOptions = {},
 ) {
@@ -131,11 +136,9 @@ export function useCalendarEventsLoader(
   const [activeMonth, setActiveMonth] = useState<string | null>(null);
 
   // Stable fetch range derived from the active month string.
-  const fetchRange = useMemo<DateRange | null>(() => {
-    if (!activeMonth) return null;
-    const [year, month] = activeMonth.split("-").map(Number);
-    return monthFetchRange(new Date(year, month - 1, 15));
-  }, [activeMonth]);
+  const fetchRange: DateRange | null = activeMonth
+    ? activeMonthFetchRange(activeMonth)
+    : null;
 
   const queryClient = useQueryClient();
 
@@ -199,62 +202,53 @@ export function useCalendarEventsLoader(
   }, [activeMonth, cacheTimeout, preloadMonthsAhead, queryClient]);
 
   /** Set the active month from a Date.  Called by CalendarDateSync. */
-  const setMonth = useCallback((date: Date) => {
+  const setMonth = (date: Date) => {
     const key = monthKey(date);
     setActiveMonth((prev) => (prev === key ? prev : key));
-  }, []);
+  };
 
   /** No-op kept for EventCalendar's onDateRangeChange; month selection is driven by CalendarDateSync → setMonth. */
-  const setDateRange = useCallback((_dateRange: DateRange) => {}, []);
+  const setDateRange = (_dateRange: DateRange) => {};
 
-  const refetchEvents = useCallback(
-    async (dateRange?: DateRange) => {
-      if (dateRange) {
-        const midpoint = new Date(
-          (dateRange.start.getTime() + dateRange.end.getTime()) / 2,
+  const refetchEvents = async (dateRange?: DateRange) => {
+    if (dateRange) {
+      const midpoint = new Date(
+        (dateRange.start.getTime() + dateRange.end.getTime()) / 2,
+      );
+      setMonth(midpoint);
+    } else {
+      await eventsQuery.refetch();
+    }
+  };
+
+  const prefetchRange = (range: DateRange) => {
+    const midpoint = new Date(
+      (range.start.getTime() + range.end.getTime()) / 2,
+    );
+    const key = monthKey(midpoint);
+    const fetchRangeForMonth = monthFetchRange(midpoint);
+
+    queryClient.prefetchQuery({
+      queryKey: getMonthQueryKey(key),
+      queryFn: async () => {
+        const res = await calendarApiService.getEvents(
+          fetchRangeForMonth.start,
+          fetchRangeForMonth.end,
         );
-        setMonth(midpoint);
-      } else {
-        await eventsQuery.refetch();
-      }
-    },
-    [eventsQuery, setMonth],
-  );
+        return validateAndCleanEvents(res.events, fetchRangeForMonth);
+      },
+      staleTime: cacheTimeout,
+    });
+  };
 
-  const prefetchRange = useCallback(
-    (range: DateRange) => {
-      const midpoint = new Date(
-        (range.start.getTime() + range.end.getTime()) / 2,
-      );
-      const key = monthKey(midpoint);
-      const fetchRangeForMonth = monthFetchRange(midpoint);
-
-      queryClient.prefetchQuery({
-        queryKey: getMonthQueryKey(key),
-        queryFn: async () => {
-          const res = await calendarApiService.getEvents(
-            fetchRangeForMonth.start,
-            fetchRangeForMonth.end,
-          );
-          return validateAndCleanEvents(res.events, fetchRangeForMonth);
-        },
-        staleTime: cacheTimeout,
-      });
-    },
-    [queryClient, cacheTimeout],
-  );
-
-  const getCachedEventsForRange = useCallback(
-    (range: DateRange): CalendarEvent[] | undefined => {
-      const midpoint = new Date(
-        (range.start.getTime() + range.end.getTime()) / 2,
-      );
-      return queryClient.getQueryData<CalendarEvent[]>(
-        getMonthQueryKey(monthKey(midpoint)),
-      );
-    },
-    [queryClient],
-  );
+  const getCachedEventsForRange = (range: DateRange): CalendarEvent[] | undefined => {
+    const midpoint = new Date(
+      (range.start.getTime() + range.end.getTime()) / 2,
+    );
+    return queryClient.getQueryData<CalendarEvent[]>(
+      getMonthQueryKey(monthKey(midpoint)),
+    );
+  };
 
   return {
     events: eventsQuery.data ?? [],

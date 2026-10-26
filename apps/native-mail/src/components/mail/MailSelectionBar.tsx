@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   Pressable,
   StyleSheet,
@@ -23,7 +23,7 @@ export function MailSelectionBar({
   onSelectAll,
 }: MailSelectionBarProps) {
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(skin), [skin]);
+  const styles = createStyles(skin);
   const allSelected = totalCount > 0 && selectedCount >= totalCount;
   const title =
     selectedCount === 0

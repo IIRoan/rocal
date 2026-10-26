@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { resolveLabelDisplayColor } from "@workspace/calendar-core";
@@ -14,7 +14,7 @@ interface MailLabelChipProps {
 export function MailLabelChip({ name, color }: MailLabelChipProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const styles = createStyles(theme, skin);
 
   return (
     <View style={styles.chip}>

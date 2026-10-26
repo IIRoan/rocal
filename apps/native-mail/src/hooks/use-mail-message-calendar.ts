@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   buildEventReminderMailView,
@@ -36,14 +35,8 @@ export function useMailMessageCalendar({
   isDecrypting: boolean;
 }) {
   const { isReady: isE2eeReady } = useE2ee();
-  const calendarEventLinkSource = useMemo(
-    () => (message ? getCalendarEventLinkSource(message, plainContent) : null),
-    [message, plainContent],
-  );
-  const linkedCalendarEventId = useMemo(
-    () => (message ? extractLinkedCalendarEventId(message, plainContent) : null),
-    [message, plainContent],
-  );
+  const calendarEventLinkSource = (message ? getCalendarEventLinkSource(message, plainContent) : null);
+  const linkedCalendarEventId = (message ? extractLinkedCalendarEventId(message, plainContent) : null);
 
   const calendarInvitation = useMailCalendarInvitation({
     message,
@@ -84,34 +77,29 @@ export function useMailMessageCalendar({
     staleTime: 5 * 60_000,
   });
   const timeFormat = useUserTimeFormat();
-  const eventReminderView = useMemo(() => {
-    if (!linkedEvent || !isDecryptedEventReminderContent(linkedEvent)) {
-      return null;
-    }
-
-    return buildEventReminderMailView({
-      event: linkedEvent,
-      minutesBefore: calendarEventLinkSource
-        ? extractReminderLeadMinutes(calendarEventLinkSource)
-        : null,
-      timezone: userSettings?.timezone,
-      timeFormat,
-    });
-  }, [calendarEventLinkSource, linkedEvent, timeFormat, userSettings?.timezone]);
+  const eventReminderView =
+    linkedEvent && isDecryptedEventReminderContent(linkedEvent)
+      ? buildEventReminderMailView({
+          event: linkedEvent,
+          minutesBefore: calendarEventLinkSource
+            ? extractReminderLeadMinutes(calendarEventLinkSource)
+            : null,
+          timezone: userSettings?.timezone,
+          timeFormat,
+        })
+      : null;
   const isReminderEventLoading =
     isEventReminderEmail &&
     (!isE2eeReady || isLinkedEventLoading || isLinkedEventFetching);
 
-  const formattedInviteStart = useMemo(() => {
-    const start = calendarInvitation.mailCalendarInvite?.start;
-    if (!start) return null;
-
-    return formatDateTimeLabel(
-      start,
-      resolveTimezone(userSettings?.timezone),
-      timeFormat,
-    );
-  }, [calendarInvitation.mailCalendarInvite?.start, timeFormat, userSettings?.timezone]);
+  const inviteStart = calendarInvitation.mailCalendarInvite?.start;
+  const formattedInviteStart = inviteStart
+    ? formatDateTimeLabel(
+        inviteStart,
+        resolveTimezone(userSettings?.timezone),
+        timeFormat,
+      )
+    : null;
 
   return {
     calendarInvitation,

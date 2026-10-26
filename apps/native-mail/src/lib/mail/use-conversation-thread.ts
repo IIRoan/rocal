@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   useQueries,
   useQuery,
@@ -69,25 +68,17 @@ export function usePrefetchThreadMessages(
   runtime: MailRuntime | undefined,
   messages: JmapEmailMessage[],
 ) {
-  const threadIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const message of messages) {
-      if (message.threadId) {
-        ids.add(message.threadId);
-      }
-    }
-    return [...ids].slice(0, MAX_PREFETCH_THREADS);
-  }, [messages]);
+  const threadIds = [
+    ...new Set(
+      messages.flatMap((message) => (message.threadId ? [message.threadId] : [])),
+    ),
+  ].slice(0, MAX_PREFETCH_THREADS);
 
   // One Thread/get + Email/get serves every thread query that starts in the same tick.
-  const loadThread = useMemo(
-    () =>
-      createBatchLoader<JmapEmailMessage[]>(
-        // Non-null: the queries below are only enabled once runtime exists.
-        (ids) => runtime!.client.getThreadsMessages(runtime!.session, ids),
-        [],
-      ),
-    [runtime],
+  const loadThread = createBatchLoader<JmapEmailMessage[]>(
+    // Non-null: the queries below are only enabled once runtime exists.
+    (ids) => runtime!.client.getThreadsMessages(runtime!.session, ids),
+    [],
   );
 
   return useQueries({
@@ -124,34 +115,21 @@ export function useConversationListExtras(
     runtime,
     mailboxMessages,
   );
-  const allowedMailboxIdSet = useMemo(
-    () => new Set(allowedMailboxIds),
-    [allowedMailboxIds],
-  );
+  const allowedMailboxIdSet = new Set(allowedMailboxIds);
 
-  return useMemo(
-    () =>
-      filterRelatedThreadMessages(
-        mailboxMessages,
-        mergeConversationSourceMessages(
-          filterMessagesToMailboxes(companionMessages, allowedMailboxIdSet),
-          filterMessagesToMailboxes(
-            prefetchedThreadMessages,
-            allowedMailboxIdSet,
-          ),
-          filterMessagesToMailboxes(
-            getCachedThreadMessages(queryClient),
-            allowedMailboxIdSet,
-          ),
-        ),
+  return filterRelatedThreadMessages(
+    mailboxMessages,
+    mergeConversationSourceMessages(
+      filterMessagesToMailboxes(companionMessages, allowedMailboxIdSet),
+      filterMessagesToMailboxes(
+        prefetchedThreadMessages,
+        allowedMailboxIdSet,
       ),
-    [
-      mailboxMessages,
-      companionMessages,
-      prefetchedThreadMessages,
-      queryClient,
-      allowedMailboxIdSet,
-    ],
+      filterMessagesToMailboxes(
+        getCachedThreadMessages(queryClient),
+        allowedMailboxIdSet,
+      ),
+    ),
   );
 }
 
@@ -174,7 +152,7 @@ export function useConversationThread(
     staleTime: 60_000,
   });
 
-  const conversationMessages = useMemo(() => {
+  const buildConversation = (): JmapEmailMessage[] => {
     if (!message) return [];
 
     const threadId = message.threadId;
@@ -199,7 +177,8 @@ export function useConversationThread(
     }
 
     return [message];
-  }, [message, queryClient, threadQuery.data]);
+  };
+  const conversationMessages = buildConversation();
 
   return {
     conversationMessages,
