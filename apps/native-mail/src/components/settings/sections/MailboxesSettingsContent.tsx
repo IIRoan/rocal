@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
@@ -56,21 +56,18 @@ export function MailboxesSettingsContent() {
   const runtime = runtimeQuery.data;
   const { hiddenIds, toggleHidden } = useHiddenMailboxIds();
 
-  const mailboxes = useMemo(
-    () => (runtime ? sortMailboxes(runtime.mailboxes) : []),
-    [runtime],
-  );
+  const mailboxes = (runtime ? sortMailboxes(runtime.mailboxes) : []);
   const policy = runtime?.mailServerPolicy;
   const canCreate = policy ? canCreateMailbox(mailboxes.length, policy) : false;
-  const hidden = useMemo(() => new Set(hiddenIds), [hiddenIds]);
+  const hidden = new Set(hiddenIds);
 
-  const refreshRuntime = useCallback(async () => {
+  const refreshRuntime = async () => {
     await queryClient.invalidateQueries({
       queryKey: QUERY_KEYS.mailRuntime(),
     });
-  }, [queryClient]);
+  };
 
-  const handleCreate = useCallback(async () => {
+  const handleCreate = async () => {
     if (!runtime || !policy) return;
     const validationError = validateMailboxCreate(
       { name, existingMailboxCount: mailboxes.length },
@@ -89,107 +86,91 @@ export function MailboxesSettingsContent() {
       await refreshRuntime();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to create mailbox."));
-    } finally {
-      setBusyId(null);
     }
-  }, [mailboxes.length, name, policy, refreshRuntime, runtime, toast]);
+    setBusyId(null);
+  };
 
-  const handleRename = useCallback(
-    async (mailbox: JmapMailbox) => {
-      if (!runtime || !policy) return;
-      const validationError = validateMailboxName(editingName, policy);
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
-      setError(null);
-      setBusyId(mailbox.id);
-      try {
-        await runtime.client.renameMailbox(
-          runtime.session,
-          mailbox.id,
-          editingName.trim(),
-        );
-        setEditingId(null);
-        toast("Mailbox renamed");
-        await refreshRuntime();
-      } catch (err) {
-        setError(getErrorMessage(err, "Failed to rename mailbox."));
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [editingName, policy, refreshRuntime, runtime, toast],
-  );
-
-  const handleDelete = useCallback(
-    (mailbox: JmapMailbox) => {
-      if (!runtime) return;
-      Alert.alert(
-        "Delete mailbox?",
-        `Delete “${getMailboxDisplayName(mailbox)}”? Messages in it may be removed.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: () => {
-              setBusyId(mailbox.id);
-              setError(null);
-              void runtime.client
-                .deleteMailbox(runtime.session, mailbox.id)
-                .then(async () => {
-                  toast("Mailbox deleted");
-                  await refreshRuntime();
-                })
-                .catch((err) => {
-                  setError(getErrorMessage(err, "Failed to delete mailbox."));
-                })
-                .finally(() => setBusyId(null));
-            },
-          },
-        ],
+  const handleRename = async (mailbox: JmapMailbox) => {
+    if (!runtime || !policy) return;
+    const validationError = validateMailboxName(editingName, policy);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setError(null);
+    setBusyId(mailbox.id);
+    try {
+      await runtime.client.renameMailbox(
+        runtime.session,
+        mailbox.id,
+        editingName.trim(),
       );
-    },
-    [refreshRuntime, runtime, toast],
-  );
+      setEditingId(null);
+      toast("Mailbox renamed");
+      await refreshRuntime();
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to rename mailbox."));
+    }
+    setBusyId(null);
+  };
 
-  const handleMove = useCallback(
-    async (index: number, direction: "up" | "down") => {
-      if (!runtime) return;
-      const next = moveMailboxIndex(mailboxes, index, direction);
-      if (next === mailboxes) return;
-      setBusyId(mailboxes[index]?.id ?? "reorder");
-      setError(null);
-      try {
-        await runtime.client.updateMailboxSortOrders(
-          runtime.session,
-          mailboxSortUpdates(next),
-        );
-        await refreshRuntime();
-      } catch (err) {
-        setError(getErrorMessage(err, "Failed to reorder mailboxes."));
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [mailboxes, refreshRuntime, runtime],
-  );
+  const handleDelete = (mailbox: JmapMailbox) => {
+    if (!runtime) return;
+    Alert.alert(
+      "Delete mailbox?",
+      `Delete “${getMailboxDisplayName(mailbox)}”? Messages in it may be removed.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            setBusyId(mailbox.id);
+            setError(null);
+            void runtime.client
+              .deleteMailbox(runtime.session, mailbox.id)
+              .then(async () => {
+                toast("Mailbox deleted");
+                await refreshRuntime();
+              })
+              .catch((err) => {
+                setError(getErrorMessage(err, "Failed to delete mailbox."));
+              })
+              .finally(() => setBusyId(null));
+          },
+        },
+      ],
+    );
+  };
 
-  const handleToggleHidden = useCallback(
-    async (mailbox: JmapMailbox) => {
-      if (!canHideMailbox(mailbox)) return;
-      setBusyId(mailbox.id);
-      try {
-        await toggleHidden(mailbox.id);
-      } catch (err) {
-        setError(getErrorMessage(err, "Failed to update hidden mailboxes."));
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [toggleHidden],
-  );
+  const handleMove = async (index: number, direction: "up" | "down") => {
+    if (!runtime) return;
+    const next = moveMailboxIndex(mailboxes, index, direction);
+    if (next === mailboxes) return;
+    setBusyId(mailboxes[index]?.id ?? "reorder");
+    setError(null);
+    try {
+      await runtime.client.updateMailboxSortOrders(
+        runtime.session,
+        mailboxSortUpdates(next),
+      );
+      await refreshRuntime();
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to reorder mailboxes."));
+    }
+    setBusyId(null);
+  };
+
+  const handleToggleHidden = async (mailbox: JmapMailbox) => {
+    if (!canHideMailbox(mailbox)) return;
+    setBusyId(mailbox.id);
+    try {
+      await toggleHidden(mailbox.id);
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to update hidden mailboxes."));
+    }
+    setBusyId(null);
+  };
 
   return (
     <SettingsPage title="Mailboxes">
@@ -300,7 +281,7 @@ function MailboxRow({
 }) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
   const displayName = getMailboxDisplayName(mailbox);
   const canEdit = canRenameOrDeleteMailbox(mailbox);
   const canHide = canHideMailbox(mailbox);
@@ -400,7 +381,7 @@ function IconButton({
 }) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
   return (
     <Pressable
       onPress={onPress}

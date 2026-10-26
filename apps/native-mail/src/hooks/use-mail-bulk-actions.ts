@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Alert } from "react-native";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -62,7 +62,7 @@ export function useMailBulkActions({
     setMessageLabel.isPending,
   ].some(Boolean);
 
-  const handleBulkMarkRead = useCallback(() => {
+  const handleBulkMarkRead = () => {
     if (unreadSelectedIds.length === 0) return;
     bulkMarkAsRead.mutate(unreadSelectedIds, {
       onSuccess: () => {
@@ -76,9 +76,9 @@ export function useMailBulkActions({
           "error",
         ),
     });
-  }, [unreadSelectedIds, bulkMarkAsRead, clearSelection, closeSheet, toast]);
+  };
 
-  const handleBulkMarkUnread = useCallback(() => {
+  const handleBulkMarkUnread = () => {
     if (readSelectedIds.length === 0) return;
     bulkMarkAsUnread.mutate(readSelectedIds, {
       onSuccess: () => {
@@ -92,9 +92,9 @@ export function useMailBulkActions({
           "error",
         ),
     });
-  }, [readSelectedIds, bulkMarkAsUnread, clearSelection, closeSheet, toast]);
+  };
 
-  const handleBulkDeleteForever = useCallback(() => {
+  const handleBulkDeleteForever = () => {
     if (bulkIds.length === 0) return;
     closeSheet();
     const ids = bulkIds;
@@ -117,9 +117,9 @@ export function useMailBulkActions({
           }),
       },
     ]);
-  }, [bulkDestroyMessages, bulkIds, clearSelection, closeSheet, toast]);
+  };
 
-  const handleBulkTrash = useCallback(() => {
+  const handleBulkTrash = () => {
     if (bulkIds.length === 0) return;
     if (isInTrash) {
       handleBulkDeleteForever();
@@ -138,73 +138,49 @@ export function useMailBulkActions({
           "error",
         ),
     });
-  }, [
-    bulkIds,
-    bulkMoveToTrash,
-    clearSelection,
-    closeSheet,
-    handleBulkDeleteForever,
-    isInTrash,
-    showMoveToast,
-    toast,
-  ]);
+  };
 
-  const handleBulkMove = useCallback(
-    (targetMailboxId: string) => {
-      if (bulkIds.length === 0) return;
-      const targetName =
-        mailboxes.find((m) => m.id === targetMailboxId)?.name ?? "mailbox";
-      bulkMoveToMailbox.mutate(
-        { messageIds: bulkIds, targetMailboxId },
-        {
-          onSuccess: (_data, _input, snapshot) => {
-            clearSelection();
-            closeSheet();
-            showMoveToast(`Moved ${bulkIds.length} to ${targetName}`, snapshot);
-          },
-          onError: (error) =>
-            toast(getErrorMessage(error, "Failed to move messages."), "error"),
+  const handleBulkMove = (targetMailboxId: string) => {
+    if (bulkIds.length === 0) return;
+    const targetName =
+      mailboxes.find((m) => m.id === targetMailboxId)?.name ?? "mailbox";
+    bulkMoveToMailbox.mutate(
+      { messageIds: bulkIds, targetMailboxId },
+      {
+        onSuccess: (_data, _input, snapshot) => {
+          clearSelection();
+          closeSheet();
+          showMoveToast(`Moved ${bulkIds.length} to ${targetName}`, snapshot);
         },
+        onError: (error) =>
+          toast(getErrorMessage(error, "Failed to move messages."), "error"),
+      },
+    );
+  };
+
+  const runBulkFlagUpdate = async (
+    ids: string[],
+    flagged: boolean,
+    successMessage: string,
+    errorMessage: string,
+  ) => {
+    setBulkActionPending(true);
+    closeSheet();
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          toggleFlagged.mutateAsync({ messageId: id, flagged }),
+        ),
       );
-    },
-    [
-      bulkIds,
-      bulkMoveToMailbox,
-      clearSelection,
-      closeSheet,
-      mailboxes,
-      showMoveToast,
-      toast,
-    ],
-  );
+      toast(successMessage);
+      clearSelection();
+    } catch (error) {
+      toast(getErrorMessage(error, errorMessage), "error");
+    }
+    setBulkActionPending(false);
+  };
 
-  const runBulkFlagUpdate = useCallback(
-    async (
-      ids: string[],
-      flagged: boolean,
-      successMessage: string,
-      errorMessage: string,
-    ) => {
-      setBulkActionPending(true);
-      closeSheet();
-      try {
-        await Promise.all(
-          ids.map((id) =>
-            toggleFlagged.mutateAsync({ messageId: id, flagged }),
-          ),
-        );
-        toast(successMessage);
-        clearSelection();
-      } catch (error) {
-        toast(getErrorMessage(error, errorMessage), "error");
-      } finally {
-        setBulkActionPending(false);
-      }
-    },
-    [clearSelection, closeSheet, toggleFlagged, toast],
-  );
-
-  const handleBulkStar = useCallback(() => {
+  const handleBulkStar = () => {
     if (unflaggedSelectedIds.length === 0) return;
     return runBulkFlagUpdate(
       unflaggedSelectedIds,
@@ -212,9 +188,9 @@ export function useMailBulkActions({
       `Starred ${messageCountLabel(unflaggedSelectedIds.length)}`,
       "Failed to star messages.",
     );
-  }, [runBulkFlagUpdate, unflaggedSelectedIds]);
+  };
 
-  const handleBulkUnstar = useCallback(() => {
+  const handleBulkUnstar = () => {
     if (flaggedSelectedIds.length === 0) return;
     return runBulkFlagUpdate(
       flaggedSelectedIds,
@@ -222,36 +198,32 @@ export function useMailBulkActions({
       `Unstarred ${messageCountLabel(flaggedSelectedIds.length)}`,
       "Failed to unstar messages.",
     );
-  }, [flaggedSelectedIds, runBulkFlagUpdate]);
+  };
 
-  const handleBulkApplyLabel = useCallback(
-    async (labelId: string) => {
-      if (bulkIds.length === 0) return;
-      const label = labels.find((l) => l.id === labelId);
-      setBulkActionPending(true);
-      closeSheet();
-      try {
-        await Promise.all(
-          bulkIds.map((id) =>
-            setMessageLabel.mutateAsync({
-              messageId: id,
-              labelId,
-              assigned: true,
-            }),
-          ),
-        );
-        toast(
-          `Applied "${label?.name ?? labelId}" to ${bulkIds.length} messages`,
-        );
-        clearSelection();
-      } catch (error) {
-        toast(getErrorMessage(error, "Failed to apply label."), "error");
-      } finally {
-        setBulkActionPending(false);
-      }
-    },
-    [bulkIds, labels, setMessageLabel, clearSelection, closeSheet, toast],
-  );
+  const handleBulkApplyLabel = async (labelId: string) => {
+    if (bulkIds.length === 0) return;
+    const label = labels.find((l) => l.id === labelId);
+    setBulkActionPending(true);
+    closeSheet();
+    try {
+      await Promise.all(
+        bulkIds.map((id) =>
+          setMessageLabel.mutateAsync({
+            messageId: id,
+            labelId,
+            assigned: true,
+          }),
+        ),
+      );
+      toast(
+        `Applied "${label?.name ?? labelId}" to ${bulkIds.length} messages`,
+      );
+      clearSelection();
+    } catch (error) {
+      toast(getErrorMessage(error, "Failed to apply label."), "error");
+    }
+    setBulkActionPending(false);
+  };
 
   return {
     isActionBusy,

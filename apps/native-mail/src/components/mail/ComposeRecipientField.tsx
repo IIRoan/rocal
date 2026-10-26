@@ -1,10 +1,9 @@
 import {
-  useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   Pressable,
@@ -54,6 +53,13 @@ export type ComposeRecipientFieldProps = {
   onSubmitEmpty?: () => void;
 };
 
+function clearTimer(timerRef: RefObject<ReturnType<typeof setTimeout> | null>) {
+  if (timerRef.current) {
+    clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }
+}
+
 export function ComposeRecipientField({
   value,
   onChangeText,
@@ -64,7 +70,7 @@ export function ComposeRecipientField({
 }: ComposeRecipientFieldProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
   const inputRef = useRef<TextInput>(null);
   const selectingRef = useRef(false);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,19 +87,9 @@ export function ComposeRecipientField({
     draftRef.current = draft;
   }, [chips, draft]);
 
-  const excluded = useMemo(() => {
-    const seen = new Set<string>();
-    const emails: string[] = [];
-    for (const email of [
-      ...chips.map((chip) => chip.email),
-      ...excludeEmails,
-    ]) {
-      if (seen.has(email)) continue;
-      seen.add(email);
-      emails.push(email);
-    }
-    return emails;
-  }, [chips, excludeEmails]);
+  const excluded = [
+    ...new Set([...chips.map((chip) => chip.email), ...excludeEmails]),
+  ];
 
   const { suggestions, isAvailable, isLoading } = useRecentContacts({
     query: draft,
@@ -101,25 +97,19 @@ export function ComposeRecipientField({
     limit: draft.trim() ? 8 : 12,
   });
 
-  const emit = useCallback(
-    (nextChips: ParsedMailAddress[], nextDraft: string) => {
-      const serialized = serializeRecipientField(nextChips, nextDraft);
-      lastEmittedRef.current = serialized;
-      onChangeText(serialized);
-    },
-    [onChangeText],
-  );
+  const emit = (nextChips: ParsedMailAddress[], nextDraft: string) => {
+    const serialized = serializeRecipientField(nextChips, nextDraft);
+    lastEmittedRef.current = serialized;
+    onChangeText(serialized);
+  };
 
-  const applyField = useCallback(
-    (nextChips: ParsedMailAddress[], nextDraft: string) => {
-      chipsRef.current = nextChips;
-      draftRef.current = nextDraft;
-      setChips(nextChips);
-      setDraft(nextDraft);
-      emit(nextChips, nextDraft);
-    },
-    [emit],
-  );
+  const applyField = (nextChips: ParsedMailAddress[], nextDraft: string) => {
+    chipsRef.current = nextChips;
+    draftRef.current = nextDraft;
+    setChips(nextChips);
+    setDraft(nextDraft);
+    emit(nextChips, nextDraft);
+  };
 
   useEffect(() => {
     if (value === lastEmittedRef.current) {
@@ -133,86 +123,64 @@ export function ComposeRecipientField({
     setDraft(next.draft);
   }, [value]);
 
-  const clearBlurTimer = useCallback(() => {
-    if (blurTimerRef.current) {
-      clearTimeout(blurTimerRef.current);
-      blurTimerRef.current = null;
+  const clearBlurTimer = () => clearTimer(blurTimerRef);
+
+  useEffect(() => () => clearTimer(blurTimerRef), []);
+
+  const commitDraft = (nextDraft: string, currentChips?: ParsedMailAddress[]) => {
+    const consumed = consumeRecipientDraft(nextDraft);
+    const nextChips = consumed.chips.reduce(
+      (result, chip) => addRecipientChip(result, chip),
+      currentChips ?? chipsRef.current,
+    );
+    applyField(nextChips, consumed.draft);
+  };
+
+  const handleDraftChange = (text: string) => {
+    if (shouldCommitDraftOnChange(text)) {
+      commitDraft(text);
+      return;
     }
-  }, []);
+    applyField(chipsRef.current, text);
+  };
 
-  useEffect(() => {
-    return () => clearBlurTimer();
-  }, [clearBlurTimer]);
+  const handleRemove = (email: string) => {
+    applyField(
+      removeRecipientChip(chipsRef.current, email),
+      draftRef.current,
+    );
+    inputRef.current?.focus();
+  };
 
-  const commitDraft = useCallback(
-    (nextDraft: string, currentChips = chipsRef.current) => {
-      const consumed = consumeRecipientDraft(nextDraft);
-      const nextChips = consumed.chips.reduce(
-        (result, chip) => addRecipientChip(result, chip),
-        currentChips,
-      );
-      applyField(nextChips, consumed.draft);
-    },
-    [applyField],
-  );
+  const handleKeyPress = (event: { nativeEvent: { key: string } }) => {
+    if (
+      event.nativeEvent.key !== "Backspace" ||
+      draftRef.current.length > 0
+    ) {
+      return;
+    }
+    const last = chipsRef.current[chipsRef.current.length - 1];
+    if (!last) return;
+    handleRemove(last.email);
+  };
 
-  const handleDraftChange = useCallback(
-    (text: string) => {
-      if (shouldCommitDraftOnChange(text)) {
-        commitDraft(text);
-        return;
-      }
-      applyField(chipsRef.current, text);
-    },
-    [applyField, commitDraft],
-  );
-
-  const handleRemove = useCallback(
-    (email: string) => {
-      applyField(
-        removeRecipientChip(chipsRef.current, email),
-        draftRef.current,
-      );
+  const selectSuggestion = (entry: RecentContactEntry) => {
+    selectingRef.current = true;
+    clearBlurTimer();
+    applyField(addRecipientChip(chipsRef.current, entry), "");
+    setFocused(true);
+    requestAnimationFrame(() => {
       inputRef.current?.focus();
-    },
-    [applyField],
-  );
+      selectingRef.current = false;
+    });
+  };
 
-  const handleKeyPress = useCallback(
-    (event: { nativeEvent: { key: string } }) => {
-      if (
-        event.nativeEvent.key !== "Backspace" ||
-        draftRef.current.length > 0
-      ) {
-        return;
-      }
-      const last = chipsRef.current[chipsRef.current.length - 1];
-      if (!last) return;
-      handleRemove(last.email);
-    },
-    [handleRemove],
-  );
-
-  const selectSuggestion = useCallback(
-    (entry: RecentContactEntry) => {
-      selectingRef.current = true;
-      clearBlurTimer();
-      applyField(addRecipientChip(chipsRef.current, entry), "");
-      setFocused(true);
-      requestAnimationFrame(() => {
-        inputRef.current?.focus();
-        selectingRef.current = false;
-      });
-    },
-    [applyField, clearBlurTimer],
-  );
-
-  const handleFocus = useCallback(() => {
+  const handleFocus = () => {
     clearBlurTimer();
     setFocused(true);
-  }, [clearBlurTimer]);
+  };
 
-  const handleBlur = useCallback(() => {
+  const handleBlur = () => {
     if (selectingRef.current) {
       return;
     }
@@ -228,7 +196,7 @@ export function ComposeRecipientField({
         commitDraft(pendingDraft, pendingChips);
       }
     }, BLUR_CLOSE_MS);
-  }, [commitDraft]);
+  };
 
   const { visible, hiddenCount } = collapseRecipientChips(chips, focused);
   const collapsed = !focused && chips.length > 0;

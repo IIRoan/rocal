@@ -1,8 +1,6 @@
 import {
-  useCallback,
   useEffect,
   useEffectEvent,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -36,14 +34,11 @@ import {
   getSimpleLoginComposeNotice,
   hasComposeUserContent,
   hasPlainTextSignatureBlock,
-  prependPlainTextSignature,
   replacePlainTextSignatureBlock,
   resolveMessageReplyFrom,
-  resolveMessageReplyRecipients,
   shouldWarnAboutMissingAttachment,
   validateComposeRecipients,
   resolveComposeSendBodies,
-  messageBodiesToComposeText,
   type ComposeTextFields,
   type SimpleLoginComposeNotice,
 } from "@workspace/calendar-core";
@@ -58,10 +53,7 @@ import {
   useMailRuntime,
   useSendMessage,
 } from "../../lib/mail/use-mail";
-import {
-  formatReplyAllRecipientFields,
-  validateComposeInput,
-} from "../../lib/mail/mail-helpers";
+import { validateComposeInput } from "../../lib/mail/mail-helpers";
 import {
   createPendingComposeAttachment,
   toJmapAttachmentInput,
@@ -70,15 +62,6 @@ import {
 import { decodeBase64ToBytes } from "../../lib/mail/binary-utils";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import {
-  classifyMessageEncryption,
-  extractMessageBodies,
-  resolveInlinePgpArmoredCiphertext,
-} from "../../lib/mail/message-security";
-import {
-  decryptMailMessage,
-  decryptPgpMimeMessage,
-} from "../../lib/mail/mail-crypto";
 import { resolveOutgoingMessageBody } from "../../lib/mail/outgoing-message-crypto";
 import { useMailComposeSettings } from "../../hooks/use-mail-settings";
 import {
@@ -87,12 +70,7 @@ import {
   type DraftSaveStatus,
 } from "../../hooks/use-compose-draft-autosave";
 import type { JmapIdentity } from "../../lib/mail/types";
-import {
-  buildForwardBody,
-  buildReplyBody,
-  formatAddressList,
-  prefixSubject,
-} from "../../lib/mail/compose-quote";
+import { decryptDraftFields, planComposeSeed } from "../../lib/mail/compose-seed";
 import { ComposeRecipientField } from "./ComposeRecipientField";
 import {
   ComposeBodyEditor,
@@ -155,7 +133,7 @@ function ComposeSession({
   const keyboardHeight = useKeyboardInset();
   const sheetRef = useRef<BottomSheetHandle>(null);
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
   const { toast } = useToast();
   const timezone = useUserTimezone();
   const timeFormat = useUserTimeFormat();
@@ -178,9 +156,7 @@ function ComposeSession({
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [seedFields, setSeedFields] = useState<ComposeTextFields | null>(null);
-  const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(
-    null,
-  );
+  const [pickedIdentityId, setPickedIdentityId] = useState<string | null>(null);
   const [identityPickerOpen, setIdentityPickerOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftSaveStatus, setDraftSaveStatus] =
@@ -191,20 +167,29 @@ function ComposeSession({
   const [isDraftDecrypting, setIsDraftDecrypting] = useState(false);
   const [bodyFocused, setBodyFocused] = useState(false);
   const subjectInputRef = useRef<TextInput>(null);
-  const focusSubject = useCallback(() => subjectInputRef.current?.focus(), []);
+  const focusSubject = () => subjectInputRef.current?.focus();
   const bodyEditorRef = useRef<ComposeBodyEditorHandle>(null);
 
+  const { settings: composeSettings, isLoaded: composeSettingsLoaded } =
+    useMailComposeSettings();
+  const identities = runtime?.pickerIdentities ?? NO_IDENTITIES;
+  const replyFromIdentityId =
+    composeSettings.autoSelectReplyIdentity &&
+    sourceMessage &&
+    (params.mode === "reply" ||
+      params.mode === "reply-all" ||
+      params.mode === "forward")
+      ? resolveMessageReplyFrom(identities, sourceMessage)?.identityId
+      : undefined;
+  const autoReplyIdentityId =
+    identities.find((entry) => entry.id === replyFromIdentityId)?.id ?? null;
+  // An explicit pick wins, then the identity a reply was addressed to, then the first identity.
+  const selectedIdentityId =
+    pickedIdentityId ?? autoReplyIdentityId ?? identities[0]?.id ?? null;
   const composeContext = resolveComposeContext(
     runtime,
     selectedIdentityId ?? undefined,
   );
-  const identities = runtime?.pickerIdentities ?? NO_IDENTITIES;
-
-  useEffect(() => {
-    if (!selectedIdentityId && identities[0]?.id) {
-      setSelectedIdentityId(identities[0].id);
-    }
-  }, [identities, selectedIdentityId]);
 
   const hasUserContent = hasComposeUserContent(
     { to, cc, bcc, subject, body },
@@ -225,22 +210,13 @@ function ComposeSession({
     setDraftSaveStatus,
   });
 
-  const selectedIdentity = useMemo(
-    () =>
-      identities.find((entry) => entry.id === selectedIdentityId) ??
-      identities[0] ??
-      null,
-    [identities, selectedIdentityId],
-  );
+  const selectedIdentity = identities.find((entry) => entry.id === selectedIdentityId) ??
+  identities[0] ??
+  null;
 
-  const { settings: composeSettings, isLoaded: composeSettingsLoaded } =
-    useMailComposeSettings();
-  const signatureOptions = useMemo(
-    () => ({ separator: composeSettings.signatureSeparatorEnabled }),
-    [composeSettings.signatureSeparatorEnabled],
-  );
+  const signatureOptions = { separator: composeSettings.signatureSeparatorEnabled };
 
-  const sendNow = useCallback(async () => {
+  const sendNow = async () => {
     const validation = validateComposeInput({ to, cc, bcc, subject });
 
     // A signature seeded above the quote already sits mid-body, so only append when it is missing.
@@ -337,28 +313,9 @@ function ComposeSession({
     } catch (err) {
       setError(getErrorMessage(err, "Failed to send message"));
     }
-  }, [
-    to,
-    cc,
-    bcc,
-    subject,
-    body,
-    selectedIdentity,
-    selectedIdentityId,
-    signatureOptions,
-    composeSettings.plainTextMode,
-    draftId,
-    runtime,
-    saveDraft,
-    sendMessage,
-    composeContext,
-    recordUsage,
-    onClose,
-    toast,
-    attachments,
-  ]);
+  };
 
-  const handleSend = useCallback(() => {
+  const handleSend = () => {
     setError(null);
     const validation = validateComposeInput({ to, cc, bcc, subject });
     const firstError =
@@ -389,46 +346,33 @@ function ComposeSession({
       return;
     }
     void sendNow();
-  }, [
-    attachments.length,
-    bcc,
-    body,
-    cc,
-    composeSettings.attachmentReminderEnabled,
-    composeSettings.attachmentReminderKeywords,
-    sendNow,
-    subject,
-    to,
-  ]);
+  };
 
-  const handleInsertSignature = useCallback(() => {
+  const handleInsertSignature = () => {
     if (!getPlainTextSignature(selectedIdentity)) return;
     setBody((current) =>
       hasPlainTextSignatureBlock(current, selectedIdentity)
         ? current
         : appendPlainTextSignature(current, selectedIdentity, signatureOptions),
     );
-  }, [selectedIdentity, signatureOptions]);
+  };
 
-  const handleSelectIdentity = useCallback(
-    (id: string) => {
-      const nextIdentity = identities.find((entry) => entry.id === id) ?? null;
-      setBody(
-        (current) =>
-          replacePlainTextSignatureBlock(
-            current,
-            selectedIdentity,
-            nextIdentity,
-            signatureOptions,
-          ) ?? current,
-      );
-      setSelectedIdentityId(id);
-      setIdentityPickerOpen(false);
-    },
-    [identities, selectedIdentity, signatureOptions],
-  );
+  const handleSelectIdentity = (id: string) => {
+    const nextIdentity = identities.find((entry) => entry.id === id) ?? null;
+    setBody(
+      (current) =>
+        replacePlainTextSignatureBlock(
+          current,
+          selectedIdentity,
+          nextIdentity,
+          signatureOptions,
+        ) ?? current,
+    );
+    setPickedIdentityId(id);
+    setIdentityPickerOpen(false);
+  };
 
-  const handleAttach = useCallback(async () => {
+  const handleAttach = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: "*/*",
@@ -453,7 +397,7 @@ function ComposeSession({
     } catch (err) {
       setError(getErrorMessage(err, "Failed to attach file."));
     }
-  }, []);
+  };
 
   const isDirty = hasUserContent || attachments.length > 0;
 
@@ -465,26 +409,26 @@ function ComposeSession({
       mountedRef.current = false;
     };
   }, []);
-  const leaveCompose = useCallback(() => {
+  const leaveCompose = () => {
     if (mountedRef.current) onClose();
-  }, [onClose]);
+  };
 
-  const handleDiscard = useCallback(() => {
+  const handleDiscard = () => {
     if (draftId && runtime) {
       moveToTrash.mutate(draftId);
     }
     leaveCompose();
-  }, [draftId, leaveCompose, moveToTrash, runtime]);
+  };
 
-  const leaveClean = useCallback(() => {
+  const leaveClean = () => {
     // Drop a draft autosaved earlier in this session once its content was removed again.
     if (draftId && params.mode !== "draft" && runtime) {
       moveToTrash.mutate(draftId);
     }
     leaveCompose();
-  }, [draftId, leaveCompose, moveToTrash, params.mode, runtime]);
+  };
 
-  const saveAndLeave = useCallback(async () => {
+  const saveAndLeave = async () => {
     try {
       const result = await saveDraft();
       if (result.status === "failed") {
@@ -504,9 +448,9 @@ function ComposeSession({
       toast("Couldn't save draft", "error");
       sheetRef.current?.snapTo(0);
     }
-  }, [leaveClean, leaveCompose, saveDraft, toast]);
+  };
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = () => {
     if (!isDirty) {
       leaveClean();
       return;
@@ -528,21 +472,10 @@ function ComposeSession({
         ...saveOption,
       ],
     );
-  }, [
-    attachments.length,
-    bcc,
-    body,
-    cc,
-    handleDiscard,
-    isDirty,
-    leaveClean,
-    saveAndLeave,
-    subject,
-    to,
-  ]);
+  };
 
   // Swipe-down and backdrop taps keep text as a draft; drafts don't store attachments, so those still prompt.
-  const handleSheetDismiss = useCallback(() => {
+  const handleSheetDismiss = () => {
     if (!isDirty) {
       leaveClean();
       return;
@@ -553,7 +486,7 @@ function ComposeSession({
       return;
     }
     void saveAndLeave();
-  }, [attachments.length, handleCancel, isDirty, leaveClean, saveAndLeave]);
+  };
 
   const handleHardwareBack = useEffectEvent(() => {
     if (identityPickerOpen) {
@@ -587,192 +520,68 @@ function ComposeSession({
       attachmentCount: attachments.length,
     });
 
-  useEffect(() => {
-    if (seedFields) {
-      return;
+  // The seeded fields are the baseline: closing without edits never saves or prompts.
+  const seedCompose = (fields: ComposeTextFields) => {
+    setTo(fields.to);
+    setCc(fields.cc);
+    setBcc(fields.bcc);
+    setSubject(fields.subject);
+    setBody(fields.body);
+    if (fields.cc || fields.bcc) {
+      setShowCcBcc(true);
     }
+    setSeedFields(fields);
+  };
 
-    // The seeded fields are the baseline: closing without edits never saves or prompts.
-    const seedCompose = (fields: ComposeTextFields) => {
-      setTo(fields.to);
-      setCc(fields.cc);
-      setBcc(fields.bcc);
-      setSubject(fields.subject);
-      setBody(fields.body);
-      if (fields.cc || fields.bcc) {
-        setShowCcBcc(true);
-      }
-      setSeedFields(fields);
-    };
-
-    const toParam = params.to;
-    if (toParam) {
-      const trimmedName = params.toName?.trim();
-      seedCompose({
-        ...EMPTY_COMPOSE_FIELDS,
-        to:
-          trimmedName && trimmedName.toLowerCase() !== toParam.toLowerCase()
-            ? `${trimmedName} <${toParam}>`
-            : toParam,
-      });
-      return;
-    }
-
-    if (!sourceMessage || !composeSettingsLoaded) {
-      return;
-    }
-
-    const isReplyLike =
-      params.mode === "reply" ||
-      params.mode === "reply-all" ||
-      params.mode === "forward";
-    const autoIdentity =
-      isReplyLike && composeSettings.autoSelectReplyIdentity
-        ? (identities.find(
-            (entry) =>
-              entry.id ===
-              resolveMessageReplyFrom(identities, sourceMessage)?.identityId,
-          ) ?? null)
-        : null;
-    if (autoIdentity) {
-      setSelectedIdentityId(autoIdentity.id);
-    }
-    const seedIdentity = autoIdentity ?? selectedIdentity;
-    const fromEmail =
-      autoIdentity?.email ??
-      composeContext?.fromEmail ??
-      runtime?.session.username ??
-      null;
-    const dateOptions = { timeFormat, timezone };
-    const withSeedSignature = (quoteBody: string) =>
-      composeSettings.signaturePosition === "above_quote"
-        ? prependPlainTextSignature(quoteBody, seedIdentity, signatureOptions)
-        : quoteBody;
-    if (params.mode === "reply") {
-      seedCompose({
-        ...EMPTY_COMPOSE_FIELDS,
-        to: resolveMessageReplyRecipients(sourceMessage, {
-          mode: "reply",
-          fromEmail,
+  // Seeded during render once the source message and settings are in, so the form never paints empty first.
+  const seedPlan =
+    seedFields || isDraftDecrypting
+      ? null
+      : planComposeSeed({
+          params,
+          sourceMessage,
+          settingsLoaded: composeSettingsLoaded,
+          signaturePosition: composeSettings.signaturePosition,
+          signatureOptions,
+          identity: selectedIdentity,
           identities,
-        }).to.join(", "),
-        subject: prefixSubject(sourceMessage.subject, "Re:"),
-        body: withSeedSignature(buildReplyBody(sourceMessage, dateOptions)),
-      });
-    } else if (params.mode === "reply-all") {
-      const fields = formatReplyAllRecipientFields(sourceMessage, {
-        fromEmail,
-        identities,
-      });
-      seedCompose({
-        ...EMPTY_COMPOSE_FIELDS,
-        to: fields.to,
-        cc: fields.cc,
-        subject: prefixSubject(sourceMessage.subject, "Re:"),
-        body: withSeedSignature(buildReplyBody(sourceMessage, dateOptions)),
-      });
-    } else if (params.mode === "forward") {
-      seedCompose({
-        ...EMPTY_COMPOSE_FIELDS,
-        subject: prefixSubject(sourceMessage.subject, "Fwd:"),
-        body: withSeedSignature(buildForwardBody(sourceMessage, dateOptions)),
-      });
-    } else if (params.mode === "draft") {
-      const headers = {
-        to: formatAddressList(sourceMessage.to),
-        cc: formatAddressList(sourceMessage.cc),
-        bcc: formatAddressList(sourceMessage.bcc),
-        subject: sourceMessage.subject ?? "",
-      };
-      setDraftId(sourceMessage.id);
+          fromEmail:
+            (autoReplyIdentityId ? selectedIdentity?.email : null) ??
+            composeContext?.fromEmail ??
+            runtime?.session.username ??
+            null,
+          dateOptions: { timeFormat, timezone },
+          runtime,
+        });
+  if (seedPlan?.draftId) setDraftId(seedPlan.draftId);
+  if (seedPlan?.kind === "fields") seedCompose(seedPlan.fields);
+  if (seedPlan?.kind === "decrypt-draft") setIsDraftDecrypting(true);
 
-      const encryption = classifyMessageEncryption(sourceMessage);
-      if (encryption === "inline_pgp" || encryption === "pgp_mime") {
-        if (!runtime) {
-          return;
-        }
+  const finishDraftDecrypt = useEffectEvent(
+    (fields: ComposeTextFields, decryptError: string | null) => {
+      if (decryptError) setError(decryptError);
+      setIsDraftDecrypting(false);
+      seedCompose(fields);
+    },
+  );
 
-        let cancelled = false;
-        setIsDraftDecrypting(true);
-        const decryptSeededDraft = async () => {
-          let plaintext = "";
-          try {
-            if (encryption === "inline_pgp") {
-              const armoredMessage = await resolveInlinePgpArmoredCiphertext({
-                message: sourceMessage,
-                fetchBlob: (blobId) =>
-                  runtime.client.getBlobAsText(runtime.session, blobId),
-              });
-              const decrypted = await decryptMailMessage(
-                runtime,
-                sourceMessage.id,
-                armoredMessage,
-              );
-              plaintext = decrypted.plaintext;
-            } else {
-              const decrypted = await decryptPgpMimeMessage(
-                runtime,
-                sourceMessage.id,
-                sourceMessage.bodyStructure,
-              );
-              plaintext = decrypted.plaintext;
-            }
-          } catch (err) {
-            if (!cancelled) {
-              setError(getErrorMessage(err, "Could not decrypt this draft."));
-            }
-          } finally {
-            if (!cancelled) {
-              setIsDraftDecrypting(false);
-              seedCompose({ ...headers, body: plaintext });
-            }
-          }
-        };
-        void decryptSeededDraft();
-
-        return () => {
-          cancelled = true;
-        };
-      }
-
-      seedCompose({
-        ...headers,
-        body: messageBodiesToComposeText(extractMessageBodies(sourceMessage)),
-      });
-    } else {
-      setSeedFields(EMPTY_COMPOSE_FIELDS);
-    }
-  }, [
-    composeContext?.fromEmail,
-    composeSettings.autoSelectReplyIdentity,
-    composeSettings.signaturePosition,
-    composeSettingsLoaded,
-    identities,
-    params.mode,
-    params.to,
-    params.toName,
-    runtime,
-    seedFields,
-    selectedIdentity,
-    signatureOptions,
-    sourceMessage,
-    timeFormat,
-    timezone,
-  ]);
+  useEffect(() => {
+    if (!isDraftDecrypting || !runtime || !sourceMessage) return;
+    let cancelled = false;
+    void decryptDraftFields(runtime, sourceMessage)
+      .then(({ fields, error: decryptError }) => {
+        if (!cancelled) finishDraftDecrypt(fields, decryptError);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isDraftDecrypting, runtime, sourceMessage]);
 
   const hasSignature = Boolean(getPlainTextSignature(selectedIdentity));
-  const toExcludeEmails = useMemo(
-    () => collectCommittedEmails(cc, bcc),
-    [bcc, cc],
-  );
-  const ccExcludeEmails = useMemo(
-    () => collectCommittedEmails(to, bcc),
-    [bcc, to],
-  );
-  const bccExcludeEmails = useMemo(
-    () => collectCommittedEmails(to, cc),
-    [cc, to],
-  );
+  const toExcludeEmails = collectCommittedEmails(cc, bcc);
+  const ccExcludeEmails = collectCommittedEmails(to, bcc);
+  const bccExcludeEmails = collectCommittedEmails(to, cc);
   const canChooseIdentity = Boolean(composeContext) && identities.length > 1;
   const parsedRecipients = validateComposeInput({ to, cc, bcc, subject });
   const simpleLoginNotice =

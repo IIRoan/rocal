@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { Alert, StyleSheet } from "react-native";
 import {
   formatContactContextSummary,
@@ -43,19 +43,12 @@ export function ContactsSettingsContent() {
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
 
-  const contacts = useMemo(
-    () => filterContacts(payload, { query }),
-    [filterContacts, payload, query],
-  );
+  const contacts = filterContacts(payload, { query });
 
-  const selectedContact = useMemo(
-    () =>
-      selectedEmail
-        ? (payload?.contacts.find((entry) => entry.email === selectedEmail) ??
-          null)
-        : null,
-    [payload?.contacts, selectedEmail],
-  );
+  const selectedContact = selectedEmail
+    ? (payload?.contacts.find((entry) => entry.email === selectedEmail) ??
+      null)
+    : null;
 
   if (isLoading && !payload) {
     return (
@@ -81,12 +74,9 @@ export function ContactsSettingsContent() {
         onBack={() => setSelectedEmail(null)}
         onSave={async (patch) => {
           setIsSaving(true);
-          try {
-            await updateContact(selectedContact.email, patch);
-            setSelectedEmail(null);
-          } finally {
-            setIsSaving(false);
-          }
+          await updateContact(selectedContact.email, patch)
+            .then(() => setSelectedEmail(null))
+            .finally(() => setIsSaving(false));
         }}
         onRemove={() => {
           Alert.alert(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -119,16 +119,12 @@ export function useMailMessageActions({
   const spamMailboxId =
     runtime?.mailboxes.find((mailbox) => isSpamMailboxRole(mailbox.role))?.id ??
     null;
-  const moveTargets = useMemo(() => {
-    if (!runtime || !message) {
-      return [];
-    }
-
-    const activeMailboxIds = new Set(Object.keys(message.mailboxIds ?? {}));
-    return runtime.mailboxes.filter(
-      (mailbox) => !activeMailboxIds.has(mailbox.id),
-    );
-  }, [message, runtime]);
+  const moveTargets =
+    runtime && message
+      ? runtime.mailboxes.filter(
+          (mailbox) => !Object.hasOwn(message.mailboxIds ?? {}, mailbox.id),
+        )
+      : [];
   const isActionBusy =
     markAsUnread.isPending ||
     toggleFlagged.isPending ||
@@ -144,7 +140,7 @@ export function useMailMessageActions({
     });
 
   // Stable per preview so the modal loads once instead of on every screen render.
-  const loadPreview = useCallback(async () => {
+  const loadPreview = async () => {
     if (!preview) throw new Error("No attachment selected.");
     const { attachment } = preview;
     return writeAttachmentToCache({
@@ -153,7 +149,7 @@ export function useMailMessageActions({
         attachment.blobId ?? `preview-${attachment.name ?? "attachment"}`,
       runtime,
     });
-  }, [preview, runtime]);
+  };
 
   const handleOpenAttachment = async (
     attachment: JmapAttachment,
@@ -175,9 +171,8 @@ export function useMailMessageActions({
       await shareCachedAttachment(cached);
     } catch (err) {
       toast(getErrorMessage(err, "Could not download attachment."), "error");
-    } finally {
-      setDownloadingBlobId(null);
     }
+    setDownloadingBlobId(null);
   };
 
   const openCompose = (mode: "reply" | "reply-all" | "forward") => {

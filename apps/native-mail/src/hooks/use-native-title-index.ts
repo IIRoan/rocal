@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { TitleIndexDocument } from "@workspace/calendar-core";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { useMailAccount, useMailRuntime } from "../lib/mail/use-mail";
@@ -32,33 +32,35 @@ export function useNativeTitleIndex() {
 
   useEffect(() => {
     let cancelled = false;
+    const applyEnabled = (value: boolean) => {
+      setEnabledState(value);
+      if (!value) setDocuments([]);
+    };
     // If the stored preference cannot be read, keep the enabled default.
     void isNativeTitleIndexEnabled()
       .then((value) => {
-        if (!cancelled) setEnabledState(value);
+        if (!cancelled) applyEnabled(value);
       })
       .catch(() => undefined);
-    const unsubscribe = subscribeNativeTitleIndexEnabled((value) => {
-      setEnabledState(value);
-    });
+    const unsubscribe = subscribeNativeTitleIndexEnabled(applyEnabled);
     return () => {
       cancelled = true;
       unsubscribe();
     };
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = async () => {
     if (!accountId) {
       setDocuments([]);
       return;
     }
     const stored = await readNativeTitleIndex(accountId);
     setDocuments(stored);
-  }, [accountId]);
+  };
 
   const runtime = runtimeQuery.data;
 
-  const rebuild = useCallback(async () => {
+  const rebuild = async () => {
     // Without an unlocked mailbox there is nothing to index; keep the stored index until there is.
     if (!accountId || !runtime || !enabled || inFlightRef.current) return;
     inFlightRef.current = true;
@@ -73,55 +75,56 @@ export function useNativeTitleIndex() {
       setPendingBodies(next.pendingBodies);
       setBackfillActive(next.pendingBodies > 0 && next.loadedBodies > 0);
     } catch {
-      await refresh();
-    } finally {
-      inFlightRef.current = false;
-      setIsIndexing(false);
+      // A failed index read only delays this pass, and the flags below must reset either way.
+      await refresh().catch(() => undefined);
     }
-  }, [accountId, enabled, refresh, runtime]);
+    inFlightRef.current = false;
+    setIsIndexing(false);
+  };
 
-  const setEnabled = useCallback(
-    async (value: boolean) => {
-      setEnabledState(value);
-      await setNativeTitleIndexEnabled(value);
-      if (!value) {
-        setDocuments([]);
-        return;
-      }
-      await rebuild();
-    },
-    [rebuild],
-  );
-
-  useEffect(() => {
-    if (!accountId || !enabled) {
-      if (!enabled) setDocuments([]);
+  const setEnabled = async (value: boolean) => {
+    setEnabledState(value);
+    await setNativeTitleIndexEnabled(value);
+    if (!value) {
+      setDocuments([]);
       return;
     }
+    await rebuild();
+  };
+
+  const refreshIndex = useEffectEvent(() => refresh());
+  const rebuildIndex = useEffectEvent(() => rebuild());
+
+  // A newly unlocked mailbox (runtime) starts a pass right away instead of at the next interval.
+  useEffect(() => {
+    if (!accountId || !enabled) return;
 
     let cancelled = false;
     // A failed index read only delays this pass; the interval retries.
     const syncIndex = async () => {
-      await refresh();
-      if (!cancelled) await rebuild();
+      await refreshIndex();
+      if (!cancelled) await rebuildIndex();
     };
     void syncIndex().catch(() => undefined);
 
     const interval = setInterval(() => {
-      void rebuild();
+      void rebuildIndex().catch(() => undefined);
     }, REINDEX_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [accountId, enabled, rebuild, refresh]);
+  }, [accountId, enabled, runtime]);
 
   useEffect(() => {
     if (!backfillActive || isIndexing || !enabled) return;
-    const timeout = setTimeout(() => void rebuild(), BODY_BACKFILL_DELAY_MS);
+    const timeout = setTimeout(
+      () => void rebuildIndex().catch(() => undefined),
+      BODY_BACKFILL_DELAY_MS,
+    );
     return () => clearTimeout(timeout);
-  }, [backfillActive, enabled, isIndexing, rebuild]);
+  }, [backfillActive, enabled, isIndexing]);
 
   return {
     documents,
