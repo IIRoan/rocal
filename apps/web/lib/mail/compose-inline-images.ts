@@ -12,6 +12,22 @@ let composeInlineImages: ComposeInlineImage[] = [];
 let pendingQuotedInlineHydrations = 0;
 const quotedInlineHydrationWaiters: Array<() => void> = [];
 
+/** Reads an image as a data URL for the editor preview; rejects when the browser cannot read it. */
+export function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string" && reader.result) {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Failed to read image preview"));
+      }
+    };
+    reader.onerror = () => reject(new Error("Failed to read image preview"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function resetComposeInlineImages(): void {
   composeInlineImages = [];
   pendingQuotedInlineHydrations = 0;

@@ -12,6 +12,7 @@ import {
   beginQuotedInlineImageHydration,
   completeQuotedInlineImageHydration,
   getComposeInlineImages,
+  readBlobAsDataUrl,
   registerComposeInlineImage,
 } from "@/lib/mail/compose-inline-images";
 
@@ -22,23 +23,63 @@ type ActiveMailbox = {
 
 const log = createLogger("compose-quoted-inline-images");
 
-export function useComposeQuotedInlineImages(input: {
+/** Downloads one quoted inline image and registers it for sending; null when it cannot be previewed. */
+async function loadQuotedInlineImage(
+  activeMailbox: ActiveMailbox,
+  attachment: QuotedInlineAttachment & { cid: string; blobId: string },
+  isCancelled: () => boolean,
+): Promise<string | null> {
+  try {
+    const blob = await activeMailbox.client.downloadBlob(
+      activeMailbox.session,
+      attachment.blobId,
+      attachment.name || "inline",
+      attachment.type || "application/octet-stream",
+    );
+    if (isCancelled()) return null;
+    const dataUrl = await readBlobAsDataUrl(blob);
+    if (isCancelled()) return null;
+    const buffer = await blob.arrayBuffer();
+    registerComposeInlineImage({
+      cid: attachment.cid,
+      blobId: attachment.blobId,
+      type: attachment.type || "application/octet-stream",
+      name: attachment.name || "inline",
+      size: attachment.size ?? buffer.byteLength,
+      dataUrl,
+      content: new Uint8Array(buffer),
+    });
+    return dataUrl;
+  } catch {
+    // Inline preview is best-effort; send still carries the original blob.
+    return null;
+  }
+}
+
+export function useComposeQuotedInlineImages({
+  enabled,
+  setHtmlBody,
+  quotedAttachments,
+  activeMailbox,
+}: {
   enabled: boolean;
   setHtmlBody: Dispatch<SetStateAction<string>>;
   quotedAttachments: QuotedInlineAttachment[];
   activeMailbox: ActiveMailbox | null;
 }) {
   useEffect(() => {
-    const activeMailbox = input.activeMailbox;
-    if (!input.enabled || !activeMailbox) return;
-    if (input.quotedAttachments.length === 0) return;
+    if (!enabled || !activeMailbox) return;
+    if (quotedAttachments.length === 0) return;
 
-    const inlineAttachments = input.quotedAttachments.filter(
-      (attachment) =>
-        attachment.cid &&
+    const inlineAttachments = quotedAttachments.filter(
+      (attachment): attachment is QuotedInlineAttachment & {
+        cid: string;
+        blobId: string;
+      } =>
+        Boolean(attachment.cid) &&
         attachment.disposition === "inline" &&
         (attachment.type || "").startsWith("image/") &&
-        attachment.blobId,
+        Boolean(attachment.blobId),
     );
     if (inlineAttachments.length === 0) return;
 
@@ -52,72 +93,36 @@ export function useComposeQuotedInlineImages(input: {
 
     beginQuotedInlineImageHydration();
     void (async () => {
-      try {
-        const updates = new Map<string, string>();
-        for (const attachment of inlineAttachments) {
-          if (!attachment.cid || !attachment.blobId) continue;
-          if (
-            getComposeInlineImages().some((entry) => entry.cid === attachment.cid)
-          ) {
-            const existing = getComposeInlineImages().find(
-              (entry) => entry.cid === attachment.cid,
-            );
-            if (existing?.dataUrl) {
-              updates.set(attachment.cid, existing.dataUrl);
-            }
-            continue;
-          }
-          try {
-            const blob = await activeMailbox.client.downloadBlob(
-              activeMailbox.session,
-              attachment.blobId,
-              attachment.name || "inline",
-              attachment.type || "application/octet-stream",
-            );
-            if (cancelled) return;
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = () => reject(reader.error);
-              reader.readAsDataURL(blob);
-            });
-            if (cancelled) return;
-            const buffer = await blob.arrayBuffer();
-            registerComposeInlineImage({
-              cid: attachment.cid,
-              blobId: attachment.blobId,
-              type: attachment.type || "application/octet-stream",
-              name: attachment.name || "inline",
-              size: attachment.size ?? buffer.byteLength,
-              dataUrl,
-              content: new Uint8Array(buffer),
-            });
-            updates.set(attachment.cid, dataUrl);
-          } catch {
-            // Inline preview is best-effort; send still carries the original blob.
-          }
-        }
-        if (cancelled || updates.size === 0) return;
-        input.setHtmlBody((current) =>
-          replaceInlineImagePlaceholders(current, updates),
+      const updates = new Map<string, string>();
+      for (const attachment of inlineAttachments) {
+        const existing = getComposeInlineImages().find(
+          (entry) => entry.cid === attachment.cid,
         );
-      } finally {
-        finishHydration();
+        const dataUrl = existing
+          ? existing.dataUrl
+          : await loadQuotedInlineImage(
+            activeMailbox,
+            attachment,
+            () => cancelled,
+          );
+        if (cancelled) return;
+        if (dataUrl) {
+          updates.set(attachment.cid, dataUrl);
+        }
       }
-    })().catch((error) => {
-      log.error("Failed to hydrate quoted inline images", error);
-    });
+      if (updates.size === 0) return;
+      setHtmlBody((current) =>
+        replaceInlineImagePlaceholders(current, updates),
+      );
+    })()
+      .finally(finishHydration)
+      .catch((error) => {
+        log.error("Failed to hydrate quoted inline images", error);
+      });
 
     return () => {
       cancelled = true;
       finishHydration();
     };
-    // Hydrate once per quoted attachment set when compose opens.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    input.enabled,
-    input.activeMailbox,
-    input.quotedAttachments,
-    input.setHtmlBody,
-  ]);
+  }, [enabled, activeMailbox, quotedAttachments, setHtmlBody]);
 }

@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { ComponentPropsWithoutRef, CSSProperties, ReactNode } from "react";
 import {
   EVENT_REMINDER_MAIL_CONTENT_HEIGHT_PX,
   EVENT_REMINDER_MAIL_MAX_WIDTH_PX,
@@ -8,6 +8,14 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@workspace/ui/lib/utils";
+
+const REMINDER_FRAME_STYLE: CSSProperties = {
+  ["--event-reminder-max-width" as string]: `${EVENT_REMINDER_MAIL_MAX_WIDTH_PX}px`,
+  ["--event-reminder-height-ratio" as string]: String(
+    EVENT_REMINDER_MAIL_CONTENT_HEIGHT_PX / EVENT_REMINDER_MAIL_MAX_WIDTH_PX,
+  ),
+  ["--event-reminder-min-fill" as string]: `${EVENT_REMINDER_MAIL_MIN_FILL_RATIO * 100}%`,
+};
 
 type EventReminderBodyShellProps = {
   isDark?: boolean;
@@ -31,13 +39,7 @@ function EventReminderBodyShell({
         isDark ? "bg-[#1a1a1a] [color-scheme:dark]" : "bg-white [color-scheme:light]",
         className,
       )}
-      style={{
-        ["--event-reminder-max-width" as string]: `${EVENT_REMINDER_MAIL_MAX_WIDTH_PX}px`,
-        ["--event-reminder-height-ratio" as string]: String(
-          EVENT_REMINDER_MAIL_CONTENT_HEIGHT_PX / EVENT_REMINDER_MAIL_MAX_WIDTH_PX,
-        ),
-        ["--event-reminder-min-fill" as string]: `${EVENT_REMINDER_MAIL_MIN_FILL_RATIO * 100}%`,
-      }}
+      style={REMINDER_FRAME_STYLE}
     >
       <div className="mx-auto flex h-full w-full max-w-[555px] flex-1 flex-col px-7 pt-12 pb-10">
         {children}

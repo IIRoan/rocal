@@ -69,15 +69,15 @@ export function AccountProfileSection({
   const handleAvatarSave = async (image: string | null) => {
     if (!handleUpdateProfile) return;
     dispatch({ type: "setMessage", message: null });
+    const successText = image
+      ? "Profile picture updated."
+      : "Profile picture removed.";
     try {
       await handleUpdateProfile({ image });
       closeForm();
       dispatch({
         type: "setMessage",
-        message: {
-          kind: "success",
-          text: image ? "Profile picture updated." : "Profile picture removed.",
-        },
+        message: { kind: "success", text: successText },
       });
     } catch (error) {
       dispatch({

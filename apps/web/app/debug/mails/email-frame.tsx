@@ -2,6 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
+/** The preview's document, or null if the browser denies access to it. */
+function frameDocument(iframe: HTMLIFrameElement): Document | null {
+  try {
+    return iframe.contentDocument;
+  } catch {
+    return null;
+  }
+}
+
 export function EmailFrame({ html }: { html: string }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(400);
@@ -11,15 +20,11 @@ export function EmailFrame({ html }: { html: string }) {
     if (!iframe) return;
 
     function measure() {
-      try {
-        const doc = iframe.contentDocument;
-        if (doc?.documentElement) {
-          const h =
-            doc.documentElement.scrollHeight || doc.body?.scrollHeight || 400;
-          setHeight(h);
-        }
-      } catch {
-        // srcdoc is same-origin, this shouldn't fire
+      const doc = frameDocument(iframe);
+      if (doc?.documentElement) {
+        const h =
+          doc.documentElement.scrollHeight || doc.body?.scrollHeight || 400;
+        setHeight(h);
       }
     }
 
@@ -29,14 +34,10 @@ export function EmailFrame({ html }: { html: string }) {
     let observer: ResizeObserver | undefined;
     const handleLoad = () => {
       measure();
-      try {
-        const doc = iframe.contentDocument;
-        if (doc?.body) {
-          observer = new ResizeObserver(measure);
-          observer.observe(doc.body);
-        }
-      } catch {
-        // ignore
+      const doc = frameDocument(iframe);
+      if (doc?.body) {
+        observer = new ResizeObserver(measure);
+        observer.observe(doc.body);
       }
     };
     iframe.addEventListener("load", handleLoad);

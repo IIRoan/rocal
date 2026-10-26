@@ -162,7 +162,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
     bridge.setDraftSaveStatus("saving");
 
-    try {
+    const persistDraft = async () => {
       const savedDraftId = await client.saveDraft(session, {
         draftsMailboxId,
         fromEmail,
@@ -203,14 +203,15 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       });
 
       return savedDraftId;
-    } catch (error) {
+    };
+    return persistDraft().catch((error: unknown) => {
       log.error("Failed to auto-save draft", error);
       bridge.setDraftSaveStatus("error");
       window.setTimeout(() => {
         bridge.setDraftSaveStatus("idle");
       }, 3000);
       return null;
-    }
+    });
   };
 
   const cancelPendingSave = () => clearPendingSave(saveTimeoutRef);
@@ -287,11 +288,12 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       composeHtmlBody.trim();
     if (!hasContent) return;
 
-    saveTimeoutRef.current = setTimeout(() => {
+    const timeout = setTimeout(() => {
       saveTimeoutRef.current = null;
       autosave();
     }, AUTOSAVE_DEBOUNCE_MS);
-    return () => clearPendingSave(saveTimeoutRef);
+    saveTimeoutRef.current = timeout;
+    return () => clearTimeout(timeout);
   }, [
     composeTo,
     composeCc,

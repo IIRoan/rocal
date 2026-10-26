@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createLogger } from "@workspace/logger";
 import type {
   CalendarEvent,
@@ -41,7 +41,11 @@ import { validateEventForm } from "@/components/command-palette/event-utils";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { encryptReminderTitle } from "@/lib/e2ee-notification-title";
 import { toast } from "sonner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { useSession } from "@/lib/auth-client";
 import {
   isAutomatedMailAddress,
@@ -231,6 +235,31 @@ interface UseEventFormReturn {
   ) => Promise<void>;
 }
 
+/** The event's email reminders, or null when the server sent no reminder list. */
+async function fetchEmailNotifications(
+  queryClient: QueryClient,
+  eventId: string,
+): Promise<EventNotification[] | null> {
+  const response = await queryClient.fetchQuery({
+    queryKey: eventNotificationsQueryKey(eventId),
+    queryFn: () => calendarApiService.getEventNotifications(eventId),
+    staleTime: 1000 * 60 * 5,
+  });
+  if (!response.success || !response.data?.notifications) return null;
+  return response.data.notifications.flatMap((n) =>
+    n.notificationType === "email"
+      ? [
+        {
+          id: n.id,
+          notificationType: "email" as const,
+          minutesBefore: n.minutesBefore,
+          isEnabled: n.isEnabled,
+        },
+      ]
+      : [],
+  );
+}
+
 export function useEventForm({
   calendars,
   localSettings,
@@ -285,32 +314,29 @@ export function useEventForm({
   const [showNotifications, setShowNotificationsState] = useState(false);
   const eventReminder = getReminderFromNotifications(eventNotifications);
 
-  const setEventReminder = useCallback((reminder: number | null) => {
+  const setEventReminder = (reminder: number | null) => {
     setEventNotificationsState((currentNotifications) =>
       replaceLegacyReminder(currentNotifications, reminder),
     );
-  }, []);
+  };
 
-  const setEventNotifications = useCallback(
-    (notifications: EventNotification[]) => {
-      setEventNotificationsState(notifications);
-    },
-    [],
-  );
+  const setEventNotifications = (notifications: EventNotification[]) => {
+    setEventNotificationsState(notifications);
+  };
 
-  const setShowNotifications = useCallback((show: boolean) => {
+  const setShowNotifications = (show: boolean) => {
     setShowNotificationsState(show);
     if (!show) {
       setEventNotificationsState([]);
     }
-  }, []);
+  };
 
-  const setIsRecurring = useCallback((recurring: boolean) => {
+  const setIsRecurring = (recurring: boolean) => {
     setIsRecurringState(recurring);
     if (!recurring) {
       setRecurrenceRule(null);
     }
-  }, []);
+  };
 
   const updateNotificationsMutation = useMutation({
     mutationFn: async ({
@@ -333,121 +359,88 @@ export function useEventForm({
     },
   });
 
-  const loadEventData = useCallback(
-    async (event: CalendarEvent) => {
-      const isNewEvent = !event.id || event.id === "" || event.id === undefined;
-      const fallbackNotifications = getFallbackNotifications(event.reminder);
+  const loadEventData = async (event: CalendarEvent) => {
+    const isNewEvent = !event.id || event.id === "" || event.id === undefined;
+    const fallbackNotifications = getFallbackNotifications(event.reminder);
 
-      setSelectedEvent(event);
-      setEventViewMode(isNewEvent ? "edit" : "view");
-      setEventTitle(event.title || "");
-      setEventDescription(event.description || "");
-      const { startDate, endDate } = getEventPickerDateRange(
-        event,
-        localSettings.timezone,
-      );
-      setEventStartDate(startDate);
-      setEventEndDate(endDate);
-      setEventStartTime(
-        formatTimeForInput(new Date(event.start), localSettings.timezone),
-      );
-      setEventEndTime(
-        formatTimeForInput(new Date(event.end), localSettings.timezone),
-      );
-      setEventAllDay(event.allDay || false);
-      setEventLocation(event.location || "");
-      setEventCalendarId(
-        event.calendarId ||
-        calendarsRef.current?.find((c) => !c.isSyncOnly)?.id ||
-        "",
-      );
-      setEventCategoryId(event.categoryId || "");
-      setEventNotifications(fallbackNotifications);
-      setEventParticipants(
-        (event.participants ?? []).map((participant: EventParticipant) => ({
-          email: participant.email,
-          displayName: participant.displayName ?? undefined,
-          role: participant.role,
-          status: participant.status,
-        })),
-      );
-      setShowNotifications(fallbackNotifications.length > 0);
+    setSelectedEvent(event);
+    setEventViewMode(isNewEvent ? "edit" : "view");
+    setEventTitle(event.title || "");
+    setEventDescription(event.description || "");
+    const { startDate, endDate } = getEventPickerDateRange(
+      event,
+      localSettings.timezone,
+    );
+    setEventStartDate(startDate);
+    setEventEndDate(endDate);
+    setEventStartTime(
+      formatTimeForInput(new Date(event.start), localSettings.timezone),
+    );
+    setEventEndTime(
+      formatTimeForInput(new Date(event.end), localSettings.timezone),
+    );
+    setEventAllDay(event.allDay || false);
+    setEventLocation(event.location || "");
+    setEventCalendarId(
+      event.calendarId ||
+      calendarsRef.current?.find((c) => !c.isSyncOnly)?.id ||
+      "",
+    );
+    setEventCategoryId(event.categoryId || "");
+    setEventNotifications(fallbackNotifications);
+    setEventParticipants(
+      (event.participants ?? []).map((participant: EventParticipant) => ({
+        email: participant.email,
+        displayName: participant.displayName ?? undefined,
+        role: participant.role,
+        status: participant.status,
+      })),
+    );
+    setShowNotifications(fallbackNotifications.length > 0);
 
-      const hasRecurrence = !!event.recurrence;
-      setIsRecurring(hasRecurrence);
-      if (hasRecurrence && event.recurrence) {
-        const parsedRule = RecurrenceEngine.parseRecurrenceRule(
-          event.recurrence,
-        );
-        if (parsedRule) {
-          setRecurrenceRule(parsedRule as RecurrenceRule);
-        } else {
-          log.error("Failed to parse recurrence rule:", event.recurrence);
-          setIsRecurring(false);
-          setRecurrenceRule(null);
-        }
+    const hasRecurrence = !!event.recurrence;
+    setIsRecurring(hasRecurrence);
+    if (hasRecurrence && event.recurrence) {
+      const parsedRule = RecurrenceEngine.parseRecurrenceRule(
+        event.recurrence,
+      );
+      if (parsedRule) {
+        setRecurrenceRule(parsedRule as RecurrenceRule);
       } else {
+        log.error("Failed to parse recurrence rule:", event.recurrence);
+        setIsRecurring(false);
         setRecurrenceRule(null);
       }
+    } else {
+      setRecurrenceRule(null);
+    }
 
-      if (!isNewEvent && event.id) {
-        setNotificationsLoading(true);
-        try {
-          const response = await queryClient.fetchQuery({
-            queryKey: eventNotificationsQueryKey(event.id),
-            queryFn: () => calendarApiService.getEventNotifications(event.id),
-            staleTime: 1000 * 60 * 5,
-          });
-
-          if (
-            response.success &&
-            response.data &&
-            response.data.notifications
-          ) {
-            const emailNotifications = response.data.notifications.flatMap(
-              (n) =>
-                n.notificationType === "email"
-                  ? [
-                    {
-                      id: n.id,
-                      notificationType: "email" as const,
-                      minutesBefore: n.minutesBefore,
-                      isEnabled: n.isEnabled,
-                    },
-                  ]
-                  : [],
-            );
-            const notificationsToUse =
-              emailNotifications.length > 0
-                ? emailNotifications
-                : fallbackNotifications;
-
-            setEventNotifications(notificationsToUse);
-            setShowNotifications(notificationsToUse.length > 0);
-          }
-        } catch (error) {
-          log.error("Failed to load event notifications:", error);
-          setEventNotifications(fallbackNotifications);
-          setShowNotifications(fallbackNotifications.length > 0);
-        } finally {
-          setNotificationsLoading(false);
-        }
-      } else {
-        setEventNotifications([]);
-        setEventParticipants([]);
-        setShowNotifications(false);
+    if (!isNewEvent && event.id) {
+      setNotificationsLoading(true);
+      const emailNotifications = await fetchEmailNotifications(
+        queryClient,
+        event.id,
+      ).catch((error: unknown) => {
+        log.error("Failed to load event notifications:", error);
+        return [];
+      });
+      if (emailNotifications) {
+        const notificationsToUse =
+          emailNotifications.length > 0
+            ? emailNotifications
+            : fallbackNotifications;
+        setEventNotifications(notificationsToUse);
+        setShowNotifications(notificationsToUse.length > 0);
       }
-    },
-    [
-      queryClient,
-      setEventNotifications,
-      setIsRecurring,
-      setShowNotifications,
-      localSettings.timezone,
-    ],
-  );
+      setNotificationsLoading(false);
+    } else {
+      setEventNotifications([]);
+      setEventParticipants([]);
+      setShowNotifications(false);
+    }
+  };
 
-  const resetForm = useCallback(() => {
+  const resetForm = () => {
     const startDate = new Date();
     const endDate = new Date();
     endDate.setHours(startDate.getHours() + 1);
@@ -477,431 +470,382 @@ export function useEventForm({
     setEndTimeOpen(false);
     setTimeErrors({});
     setShowNotifications(false);
-  }, [setEventNotifications, setIsRecurring, setShowNotifications]);
+  };
 
-  const handleStartTimeChange = useCallback(
-    (newStartTime: string) => {
-      const validation = validateTime(newStartTime);
+  const handleStartTimeChange = (newStartTime: string) => {
+    const validation = validateTime(newStartTime);
 
-      if (validation.isValid && validation.time) {
-        setEventStartTime(validation.time);
-        setTimeErrors((prev) => ({ ...prev, start: undefined }));
+    if (validation.isValid && validation.time) {
+      setEventStartTime(validation.time);
+      setTimeErrors((prev) => ({ ...prev, start: undefined }));
 
-        const startMinutes = timeToMinutes(validation.time);
-        const endMinutes = timeToMinutes(eventEndTime);
+      const startMinutes = timeToMinutes(validation.time);
+      const endMinutes = timeToMinutes(eventEndTime);
 
-        if (endMinutes <= startMinutes) {
-          const newEndMinutes = startMinutes + 60;
-          const newEndTime = minutesToTime(newEndMinutes);
-          setEventEndTime(newEndTime);
-          setTimeErrors((prev) => ({ ...prev, end: undefined }));
-        }
-      } else {
-        setEventStartTime(newStartTime);
-        setTimeErrors((prev) => ({ ...prev, start: validation.error }));
-      }
-    },
-    [eventEndTime],
-  );
-
-  const handleEndTimeChange = useCallback(
-    (newEndTime: string) => {
-      const validation = validateTime(newEndTime);
-
-      if (validation.isValid && validation.time) {
-        setEventEndTime(validation.time);
-        setTimeErrors((prev) => ({ ...prev, end: undefined }));
-
-        const startMinutes = timeToMinutes(eventStartTime);
-        const endMinutes = timeToMinutes(validation.time);
-
-        if (endMinutes <= startMinutes) {
-          const newStartMinutes = Math.max(0, endMinutes - 60);
-          const newStartTime = minutesToTime(newStartMinutes);
-          setEventStartTime(newStartTime);
-          setTimeErrors((prev) => ({ ...prev, start: undefined }));
-        }
-      } else {
+      if (endMinutes <= startMinutes) {
+        const newEndMinutes = startMinutes + 60;
+        const newEndTime = minutesToTime(newEndMinutes);
         setEventEndTime(newEndTime);
-        setTimeErrors((prev) => ({ ...prev, end: validation.error }));
+        setTimeErrors((prev) => ({ ...prev, end: undefined }));
       }
-    },
-    [eventStartTime],
-  );
+    } else {
+      setEventStartTime(newStartTime);
+      setTimeErrors((prev) => ({ ...prev, start: validation.error }));
+    }
+  };
 
-  const handleNotificationChange = useCallback(
-    (notifications: EventNotification[]) => {
-      setEventNotifications(notifications);
-    },
-    [setEventNotifications],
-  );
+  const handleEndTimeChange = (newEndTime: string) => {
+    const validation = validateTime(newEndTime);
 
-  const handleEventSave = useCallback(
-    async (
-      calendarData: Pick<
-        UseCalendarDataReturn,
-        "createEvent" | "updateEvent" | "editRecurringEvent"
-      >,
-      recurringScope?: RecurrenceEditScope,
-    ) => {
-      const validationError = validateEventForm(
-        eventTitle,
-        eventCalendarId,
-        eventStartDate,
-        eventEndDate,
-        eventAllDay,
-        eventStartTime,
-        eventEndTime,
-        localSettings.timezone,
-      );
-      if (validationError) {
-        toast.error(validationError);
-        return;
+    if (validation.isValid && validation.time) {
+      setEventEndTime(validation.time);
+      setTimeErrors((prev) => ({ ...prev, end: undefined }));
+
+      const startMinutes = timeToMinutes(eventStartTime);
+      const endMinutes = timeToMinutes(validation.time);
+
+      if (endMinutes <= startMinutes) {
+        const newStartMinutes = Math.max(0, endMinutes - 60);
+        const newStartTime = minutesToTime(newStartMinutes);
+        setEventStartTime(newStartTime);
+        setTimeErrors((prev) => ({ ...prev, start: undefined }));
       }
+    } else {
+      setEventEndTime(newEndTime);
+      setTimeErrors((prev) => ({ ...prev, end: validation.error }));
+    }
+  };
 
-      if (isRecurring && recurrenceRule) {
-        try {
-          // The saved string form: the API cannot describe a rule object whose `until` is still text.
-          const validation = await calendarApiService.validateRecurrence(
-            JSON.stringify(recurrenceRule),
-          );
-          if (!validation.valid) {
-            toast.error(
-              `Invalid recurrence rule: ${validation.errors.join(", ")}`,
-            );
-            return;
-          }
-        } catch (error) {
-          log.error("Failed to validate recurrence rule:", error);
-          toast.error("Failed to validate recurrence settings");
-          return;
-        }
-      }
+  const handleNotificationChange = (notifications: EventNotification[]) => {
+    setEventNotifications(notifications);
+  };
 
-      const duplicateTimes = getDuplicateNotificationTimes(eventNotifications);
-
-      if (duplicateTimes.length > 0) {
-        const uniqueDuplicates = [...new Set(duplicateTimes)];
-        const timeText =
-          uniqueDuplicates.length === 1
-            ? `${uniqueDuplicates[0]} minutes before`
-            : uniqueDuplicates.map((time) => `${time} minutes`).join(", ") +
-            " before";
-
-        toast.error(
-          `Cannot have multiple notifications for the same time: ${timeText}`,
-        );
-        return;
-      }
-
-      const timezone = resolveTimezone(localSettings.timezone);
-      let start: Date;
-      let end: Date;
-
-      if (!eventAllDay) {
-        start = pickerDateAndTimeToUtc(
-          eventStartDate,
-          eventStartTime,
-          timezone,
-        );
-        end = pickerDateAndTimeToUtc(eventEndDate, eventEndTime, timezone);
-      } else {
-        ({ start, end } = pickerDateToAllDayUtcRange(
-          eventStartDate,
-          eventEndDate,
-          timezone,
-        ));
-      }
-
-      const selectedCalendar = calendars.find(
-        (cal) => cal.id === eventCalendarId,
-      );
-      const calendarColor = selectedCalendar?.color || "blue";
-      const submittedCategoryId = resolveSubmittedCategoryId(
-        eventCategoryId,
-        selectedEvent?.categoryId,
-      );
-      const categoryField =
-        submittedCategoryId === undefined
-          ? {}
-          : { categoryId: submittedCategoryId };
-
-      const eventData = {
-        id: selectedEvent?.id || "",
-        title: eventTitle.trim(),
-        description: eventDescription.trim(),
-        start,
-        end,
-        timezone,
-        allDay: eventAllDay,
-        location: eventLocation.trim(),
-        color: calendarColor,
-        calendarId: eventCalendarId,
-        categoryId: eventCategoryId || null,
-        userId: selectedEvent?.userId || "demo-user",
-        createdAt: selectedEvent?.createdAt || new Date(),
-        updatedAt: new Date(),
-        reminder: undefined,
-        recurrence:
-          isRecurring && recurrenceRule ? JSON.stringify(recurrenceRule) : null,
-        participants: eventParticipants.map((participant) => ({
-          email: participant.email.trim().toLowerCase(),
-          displayName: participant.displayName?.trim() || undefined,
-          role: participant.role,
-          status: participant.status,
-        })),
-      } satisfies Omit<CalendarEvent, "participants"> & {
-        participants: EventParticipantInput[];
-      };
-
-      const notificationData = normalizeNotificationPayload(
-        showNotifications ? eventNotifications : [],
-      );
-      eventData.reminder = getReminderFromNotifications(notificationData);
-
-      setEventSaving(true);
-      try {
-        const isUpdate =
-          selectedEvent?.id &&
-          selectedEvent.id !== "" &&
-          selectedEvent.id !== undefined;
-        let savedEventId = selectedEvent?.id;
-        let persistedEvent: CalendarEvent | null = null;
-
-        if (isUpdate) {
-          const updates = {
-            title: eventData.title,
-            description: eventData.description,
-            start: eventData.start.toISOString(),
-            end: eventData.end.toISOString(),
-            timezone: eventData.timezone ?? undefined,
-            allDay: eventData.allDay,
-            location: eventData.location,
-            calendarId: eventData.calendarId,
-            ...categoryField,
-            reminder: eventData.reminder ?? null,
-            recurrence: eventData.recurrence ?? null,
-            participants: eventData.participants,
-          };
-          persistedEvent = recurringScope
-            ? await calendarData.editRecurringEvent({
-                event: selectedEvent,
-                scope: recurringScope,
-                updates,
-              })
-            : await calendarData.updateEvent(selectedEvent.id, updates);
-          savedEventId = persistedEvent?.id ?? selectedEvent.id;
-          toast.success(`Event "${eventTitle}" updated`);
-          for (const warningMessage of getOperationWarningMessages(
-            persistedEvent,
-          )) {
-            toast.warning(warningMessage);
-          }
-        } else {
-          const newEvent = await calendarData.createEvent({
-            title: eventData.title,
-            description: eventData.description,
-            start: eventData.start.toISOString(),
-            end: eventData.end.toISOString(),
-            timezone: eventData.timezone ?? undefined,
-            allDay: eventData.allDay,
-            location: eventData.location,
-            calendarId: eventData.calendarId,
-            ...categoryField,
-            reminder: eventData.reminder ?? null,
-            recurrence: eventData.recurrence ?? undefined,
-            participants: eventData.participants,
-          });
-          persistedEvent = newEvent;
-          savedEventId = newEvent.id;
-          toast.success(`Event "${eventTitle}" created`);
-          for (const warningMessage of getOperationWarningMessages(newEvent)) {
-            toast.warning(warningMessage);
-          }
-        }
-
-        if (savedEventId) {
-          // Past events skip future reminders but still send an empty update to clear existing rows.
-          const now = new Date();
-          const startsInFuture = new Date(eventData.start) > now;
-          const shouldSyncNotifications =
-            notificationData.length === 0 || startsInFuture;
-          if (shouldSyncNotifications) {
-            try {
-              await updateNotificationsMutation.mutateAsync({
-                eventId: savedEventId,
-                data: notificationData,
-                title: eventTitle,
-              });
-            } catch (notifError) {
-              log.warn(
-                "Failed to update event notifications (non-fatal):",
-                notifError,
-              );
-              // Do not block saving the event on notification failures
-              toast.warning?.("Saved event without notifications", {
-                description:
-                  "Notification settings could not be updated right now.",
-                position: "bottom-left",
-              });
-            }
-          }
-        }
-
-        if (savedEventId) {
-          const nextEvent: CalendarEvent = {
-            ...(selectedEvent ?? {}),
-            ...eventData,
-            ...(persistedEvent ?? {}),
-            id: persistedEvent?.id ?? savedEventId,
-            reminder:
-              persistedEvent && "reminder" in persistedEvent
-                ? (persistedEvent.reminder ?? null)
-                : (eventData.reminder ?? null),
-            start: new Date(persistedEvent?.start ?? eventData.start),
-            end: new Date(persistedEvent?.end ?? eventData.end),
-            createdAt: new Date(
-              persistedEvent?.createdAt ??
-              selectedEvent?.createdAt ??
-              eventData.createdAt,
-            ),
-            updatedAt: new Date(
-              persistedEvent?.updatedAt ?? eventData.updatedAt,
-            ),
-            participants:
-              persistedEvent?.participants ?? selectedEvent?.participants ?? [],
-          };
-
-          queryClient.setQueriesData<CalendarEvent[]>(
-            { queryKey: EVENTS_QUERY_KEY },
-            (oldEvents) => {
-              // The "events" prefix also holds the mail reader's single-event detail.
-              if (!Array.isArray(oldEvents)) {
-                return oldEvents;
-              }
-
-              if (oldEvents.some((event) => event.id === nextEvent.id)) {
-                return oldEvents.map((event) =>
-                  event.id === nextEvent.id
-                    ? { ...event, ...nextEvent }
-                    : event,
-                );
-              }
-
-              return isUpdate ? oldEvents : [...oldEvents, nextEvent];
-            },
-          );
-
-          setSelectedEvent(nextEvent);
-        }
-
-        if (eventData.participants.length > 0) {
-          const accountEmail = session?.user?.email ?? null;
-          const entries: Array<{
-            email: string;
-            displayName: string | null | undefined;
-          }> = [];
-          for (const participant of eventData.participants) {
-            if (
-              isCurrentUserMailAddress(participant.email, accountEmail) ||
-              isAutomatedMailAddress(participant.email) ||
-              isReservedSystemEmail(participant.email)
-            ) {
-              continue;
-            }
-            entries.push({
-              email: participant.email,
-              displayName: participant.displayName,
-            });
-          }
-          if (entries.length > 0) {
-            recordUsage(entries, "calendar");
-          }
-        }
-
-        onEventSaved?.();
-
-        setTimeout(() => {
-          onClose();
-          resetForm();
-        }, 100);
-      } catch (error) {
-        log.error("Failed to save event:", error);
-
-        let errorMessage = "Failed to save event";
-        if (isApiError(error)) {
-          if (error.message.includes("Network")) {
-            errorMessage =
-              "Network error - please check your connection and try again";
-          } else if (error.message.includes("validation")) {
-            errorMessage = "Invalid event data - please check all fields";
-          } else if (error.statusCode === 422) {
-            if (
-              error.message.includes("Duplicate notification") ||
-              error.message.includes("duplicate")
-            ) {
-              errorMessage =
-                "Cannot have multiple notifications for the same time. Please remove duplicate notification times.";
-            } else {
-              errorMessage =
-                "Invalid data - please check all fields and try again";
-            }
-          } else if (error.statusCode === 404) {
-            errorMessage = "Event not found - it may have been deleted";
-            setSelectedEvent(null);
-          } else if (error.statusCode === 403) {
-            errorMessage = "You don't have permission to save this event";
-          } else if (error.statusCode === 500) {
-            errorMessage = "Server error - please try again later";
-          }
-        } else if (error instanceof Error) {
-          if (error.message.includes("Network")) {
-            errorMessage =
-              "Network error - please check your connection and try again";
-          }
-        }
-
-        toast.error(errorMessage);
-      } finally {
-        setEventSaving(false);
-      }
-    },
-    [
+  const handleEventSave = async (
+    calendarData: Pick<
+      UseCalendarDataReturn,
+      "createEvent" | "updateEvent" | "editRecurringEvent"
+    >,
+    recurringScope?: RecurrenceEditScope,
+  ) => {
+    const validationError = validateEventForm(
       eventTitle,
       eventCalendarId,
-      eventCategoryId,
       eventStartDate,
       eventEndDate,
       eventAllDay,
       eventStartTime,
       eventEndTime,
-      isRecurring,
-      recurrenceRule,
-      eventNotifications,
-      eventParticipants,
-      eventDescription,
-      eventLocation,
-      showNotifications,
-      calendars,
-      selectedEvent,
-      onEventSaved,
-      onClose,
-      queryClient,
-      resetForm,
-      updateNotificationsMutation,
       localSettings.timezone,
-      session,
-      recordUsage,
-    ],
-  );
+    );
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
 
-  const handleEventDelete = useCallback<
-    (calendarData: Pick<UseCalendarDataReturn, "deleteEvent">) => Promise<void>
-  >(async (calendarData) => {
+    if (isRecurring && recurrenceRule) {
+      try {
+        // The saved string form: the API cannot describe a rule object whose `until` is still text.
+        const validation = await calendarApiService.validateRecurrence(
+          JSON.stringify(recurrenceRule),
+        );
+        if (!validation.valid) {
+          toast.error(
+            `Invalid recurrence rule: ${validation.errors.join(", ")}`,
+          );
+          return;
+        }
+      } catch (error) {
+        log.error("Failed to validate recurrence rule:", error);
+        toast.error("Failed to validate recurrence settings");
+        return;
+      }
+    }
+
+    const duplicateTimes = getDuplicateNotificationTimes(eventNotifications);
+
+    if (duplicateTimes.length > 0) {
+      const uniqueDuplicates = [...new Set(duplicateTimes)];
+      const timeText =
+        uniqueDuplicates.length === 1
+          ? `${uniqueDuplicates[0]} minutes before`
+          : uniqueDuplicates.map((time) => `${time} minutes`).join(", ") +
+          " before";
+
+      toast.error(
+        `Cannot have multiple notifications for the same time: ${timeText}`,
+      );
+      return;
+    }
+
+    const timezone = resolveTimezone(localSettings.timezone);
+    let start: Date;
+    let end: Date;
+
+    if (!eventAllDay) {
+      start = pickerDateAndTimeToUtc(
+        eventStartDate,
+        eventStartTime,
+        timezone,
+      );
+      end = pickerDateAndTimeToUtc(eventEndDate, eventEndTime, timezone);
+    } else {
+      ({ start, end } = pickerDateToAllDayUtcRange(
+        eventStartDate,
+        eventEndDate,
+        timezone,
+      ));
+    }
+
+    const selectedCalendar = calendars.find(
+      (cal) => cal.id === eventCalendarId,
+    );
+    const calendarColor = selectedCalendar?.color || "blue";
+    const submittedCategoryId = resolveSubmittedCategoryId(
+      eventCategoryId,
+      selectedEvent?.categoryId,
+    );
+    const categoryField =
+      submittedCategoryId === undefined
+        ? {}
+        : { categoryId: submittedCategoryId };
+
+    const eventData = {
+      id: selectedEvent?.id || "",
+      title: eventTitle.trim(),
+      description: eventDescription.trim(),
+      start,
+      end,
+      timezone,
+      allDay: eventAllDay,
+      location: eventLocation.trim(),
+      color: calendarColor,
+      calendarId: eventCalendarId,
+      categoryId: eventCategoryId || null,
+      userId: selectedEvent?.userId || "demo-user",
+      createdAt: selectedEvent?.createdAt || new Date(),
+      updatedAt: new Date(),
+      reminder: undefined,
+      recurrence:
+        isRecurring && recurrenceRule ? JSON.stringify(recurrenceRule) : null,
+      participants: eventParticipants.map((participant) => ({
+        email: participant.email.trim().toLowerCase(),
+        displayName: participant.displayName?.trim() || undefined,
+        role: participant.role,
+        status: participant.status,
+      })),
+    } satisfies Omit<CalendarEvent, "participants"> & {
+      participants: EventParticipantInput[];
+    };
+
+    const notificationData = normalizeNotificationPayload(
+      showNotifications ? eventNotifications : [],
+    );
+    eventData.reminder = getReminderFromNotifications(notificationData);
+
+    setEventSaving(true);
+    const saveEvent = async () => {
+      const isUpdate =
+        selectedEvent?.id &&
+        selectedEvent.id !== "" &&
+        selectedEvent.id !== undefined;
+      let savedEventId = selectedEvent?.id;
+      let persistedEvent: CalendarEvent | null = null;
+
+      if (isUpdate) {
+        const updates = {
+          title: eventData.title,
+          description: eventData.description,
+          start: eventData.start.toISOString(),
+          end: eventData.end.toISOString(),
+          timezone: eventData.timezone ?? undefined,
+          allDay: eventData.allDay,
+          location: eventData.location,
+          calendarId: eventData.calendarId,
+          ...categoryField,
+          reminder: eventData.reminder ?? null,
+          recurrence: eventData.recurrence ?? null,
+          participants: eventData.participants,
+        };
+        persistedEvent = recurringScope
+          ? await calendarData.editRecurringEvent({
+              event: selectedEvent,
+              scope: recurringScope,
+              updates,
+            })
+          : await calendarData.updateEvent(selectedEvent.id, updates);
+        savedEventId = persistedEvent?.id ?? selectedEvent.id;
+        toast.success(`Event "${eventTitle}" updated`);
+        for (const warningMessage of getOperationWarningMessages(
+          persistedEvent,
+        )) {
+          toast.warning(warningMessage);
+        }
+      } else {
+        const newEvent = await calendarData.createEvent({
+          title: eventData.title,
+          description: eventData.description,
+          start: eventData.start.toISOString(),
+          end: eventData.end.toISOString(),
+          timezone: eventData.timezone ?? undefined,
+          allDay: eventData.allDay,
+          location: eventData.location,
+          calendarId: eventData.calendarId,
+          ...categoryField,
+          reminder: eventData.reminder ?? null,
+          recurrence: eventData.recurrence ?? undefined,
+          participants: eventData.participants,
+        });
+        persistedEvent = newEvent;
+        savedEventId = newEvent.id;
+        toast.success(`Event "${eventTitle}" created`);
+        for (const warningMessage of getOperationWarningMessages(newEvent)) {
+          toast.warning(warningMessage);
+        }
+      }
+
+      if (savedEventId) {
+        // Past events skip future reminders but still send an empty update to clear existing rows.
+        const now = new Date();
+        const startsInFuture = new Date(eventData.start) > now;
+        const shouldSyncNotifications =
+          notificationData.length === 0 || startsInFuture;
+        if (shouldSyncNotifications) {
+          try {
+            await updateNotificationsMutation.mutateAsync({
+              eventId: savedEventId,
+              data: notificationData,
+              title: eventTitle,
+            });
+          } catch (notifError) {
+            log.warn(
+              "Failed to update event notifications (non-fatal):",
+              notifError,
+            );
+            // Do not block saving the event on notification failures
+            toast.warning?.("Saved event without notifications", {
+              description:
+                "Notification settings could not be updated right now.",
+              position: "bottom-left",
+            });
+          }
+        }
+      }
+
+      if (savedEventId) {
+        const nextEvent: CalendarEvent = {
+          ...(selectedEvent ?? {}),
+          ...eventData,
+          ...(persistedEvent ?? {}),
+          id: persistedEvent?.id ?? savedEventId,
+          reminder:
+            persistedEvent && "reminder" in persistedEvent
+              ? (persistedEvent.reminder ?? null)
+              : (eventData.reminder ?? null),
+          start: new Date(persistedEvent?.start ?? eventData.start),
+          end: new Date(persistedEvent?.end ?? eventData.end),
+          createdAt: new Date(
+            persistedEvent?.createdAt ??
+            selectedEvent?.createdAt ??
+            eventData.createdAt,
+          ),
+          updatedAt: new Date(
+            persistedEvent?.updatedAt ?? eventData.updatedAt,
+          ),
+          participants:
+            persistedEvent?.participants ?? selectedEvent?.participants ?? [],
+        };
+
+        queryClient.setQueriesData<CalendarEvent[]>(
+          { queryKey: EVENTS_QUERY_KEY },
+          (oldEvents) => {
+            // The "events" prefix also holds the mail reader's single-event detail.
+            if (!Array.isArray(oldEvents)) {
+              return oldEvents;
+            }
+
+            if (oldEvents.some((event) => event.id === nextEvent.id)) {
+              return oldEvents.map((event) =>
+                event.id === nextEvent.id
+                  ? { ...event, ...nextEvent }
+                  : event,
+              );
+            }
+
+            return isUpdate ? oldEvents : [...oldEvents, nextEvent];
+          },
+        );
+
+        setSelectedEvent(nextEvent);
+      }
+
+      if (eventData.participants.length > 0) {
+        const accountEmail = session?.user?.email ?? null;
+        const entries = eventData.participants
+          .filter(
+            (participant) =>
+              !isCurrentUserMailAddress(participant.email, accountEmail) &&
+              !isAutomatedMailAddress(participant.email) &&
+              !isReservedSystemEmail(participant.email),
+          )
+          .map(({ email, displayName }) => ({ email, displayName }));
+        if (entries.length > 0) {
+          recordUsage(entries, "calendar");
+        }
+      }
+
+      onEventSaved?.();
+
+      setTimeout(() => {
+        onClose();
+        resetForm();
+      }, 100);
+    };
+    await saveEvent().catch((error: unknown) => {
+      log.error("Failed to save event:", error);
+
+      let errorMessage = "Failed to save event";
+      if (isApiError(error)) {
+        if (error.message.includes("Network")) {
+          errorMessage =
+            "Network error - please check your connection and try again";
+        } else if (error.message.includes("validation")) {
+          errorMessage = "Invalid event data - please check all fields";
+        } else if (error.statusCode === 422) {
+          if (
+            error.message.includes("Duplicate notification") ||
+            error.message.includes("duplicate")
+          ) {
+            errorMessage =
+              "Cannot have multiple notifications for the same time. Please remove duplicate notification times.";
+          } else {
+            errorMessage =
+              "Invalid data - please check all fields and try again";
+          }
+        } else if (error.statusCode === 404) {
+          errorMessage = "Event not found - it may have been deleted";
+          setSelectedEvent(null);
+        } else if (error.statusCode === 403) {
+          errorMessage = "You don't have permission to save this event";
+        } else if (error.statusCode === 500) {
+          errorMessage = "Server error - please try again later";
+        }
+      } else if (error instanceof Error) {
+        if (error.message.includes("Network")) {
+          errorMessage =
+            "Network error - please check your connection and try again";
+        }
+      }
+
+      toast.error(errorMessage);
+    });
+    setEventSaving(false);
+  };
+
+  const handleEventDelete: (calendarData: Pick<UseCalendarDataReturn, "deleteEvent">) => Promise<void> = async (calendarData) => {
     if (!selectedEvent?.id) return;
 
     setEventSaving(true);
-    try {
+    const deleteEvent = async () => {
       await calendarData.deleteEvent(selectedEvent.id);
       toast.success(`Event "${eventTitle}" deleted`);
       onEventSaved?.();
@@ -910,42 +854,39 @@ export function useEventForm({
         onClose();
         resetForm();
       }, 100);
-    } catch (error) {
+    };
+    await deleteEvent().catch((error: unknown) => {
       log.error("Failed to delete event:", error);
       toast.error("Failed to delete event");
-    } finally {
-      setEventSaving(false);
-    }
-  }, [selectedEvent, eventTitle, onEventSaved, onClose, resetForm]);
+    });
+    setEventSaving(false);
+  };
 
-  const handleRecurringDelete = useCallback(
-    async (
-      calendarData: Pick<UseCalendarDataReturn, "deleteRecurringEvent">,
-      scope: RecurrenceDeleteScope,
-    ) => {
-      if (!selectedEvent?.id || eventSaving) return;
+  const handleRecurringDelete = async (
+    calendarData: Pick<UseCalendarDataReturn, "deleteRecurringEvent">,
+    scope: RecurrenceDeleteScope,
+  ) => {
+    if (!selectedEvent?.id || eventSaving) return;
 
-      setShowRecurringDeleteModal(false);
-      setEventSaving(true);
-      try {
-        await calendarData.deleteRecurringEvent({
-          event: selectedEvent,
-          scope,
-        });
-        toast.success(RECURRING_DELETE_SUCCESS_MESSAGES[scope]);
-        onEventSaved?.();
-        onClose();
-      } catch (error) {
-        log.error("Failed to delete recurring event:", error);
-        toast.error(
-          getErrorMessage(error, RECURRING_DELETE_FAILURE_MESSAGES[scope]),
-        );
-      } finally {
-        setEventSaving(false);
-      }
-    },
-    [selectedEvent, eventSaving, onEventSaved, onClose],
-  );
+    setShowRecurringDeleteModal(false);
+    setEventSaving(true);
+    const deleteOccurrences = async () => {
+      await calendarData.deleteRecurringEvent({
+        event: selectedEvent,
+        scope,
+      });
+      toast.success(RECURRING_DELETE_SUCCESS_MESSAGES[scope]);
+      onEventSaved?.();
+      onClose();
+    };
+    await deleteOccurrences().catch((error: unknown) => {
+      log.error("Failed to delete recurring event:", error);
+      toast.error(
+        getErrorMessage(error, RECURRING_DELETE_FAILURE_MESSAGES[scope]),
+      );
+    });
+    setEventSaving(false);
+  };
 
   return {
     selectedEvent,

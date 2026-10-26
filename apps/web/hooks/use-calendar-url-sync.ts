@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import {
   formatCalendarDayKey,
@@ -58,34 +58,23 @@ export function useCalendarUrlSync() {
     }
   }, [searchParams, setCurrentDate, setCurrentView]);
 
-  // Update URL whenever currentDate or currentView changes
-  const updateUrl = useCallback(
-    (date: Date, view: CalendarView) => {
-      if (!initializedRef.current) return;
-      if (isUpdatingUrlRef.current) return;
-
-      isUpdatingUrlRef.current = true;
-      try {
-        const params = new URLSearchParams(window.location.search);
-
-        params.set(DATE_PARAM, formatDateParam(date));
-        params.set(VIEW_PARAM, view);
-
-        const newSearch = params.toString();
-        const path = pathname ?? window.location.pathname;
-        const newUrl = `${path}${newSearch ? `?${newSearch}` : ""}`;
-
-        window.history.replaceState(null, "", newUrl);
-      } finally {
-        queueMicrotask(() => {
-          isUpdatingUrlRef.current = false;
-        });
-      }
-    },
-    [pathname],
-  );
-
   useEffect(() => {
-    updateUrl(currentDate, currentView);
-  }, [currentDate, currentView, updateUrl]);
+    if (!initializedRef.current) return;
+    if (isUpdatingUrlRef.current) return;
+
+    isUpdatingUrlRef.current = true;
+    queueMicrotask(() => {
+      isUpdatingUrlRef.current = false;
+    });
+    const params = new URLSearchParams(window.location.search);
+
+    params.set(DATE_PARAM, formatDateParam(currentDate));
+    params.set(VIEW_PARAM, currentView);
+
+    const newSearch = params.toString();
+    const path = pathname ?? window.location.pathname;
+    const newUrl = `${path}${newSearch ? `?${newSearch}` : ""}`;
+
+    window.history.replaceState(null, "", newUrl);
+  }, [currentDate, currentView, pathname]);
 }

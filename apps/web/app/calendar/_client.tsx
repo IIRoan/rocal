@@ -110,28 +110,26 @@ function CalendarSearchParamHandlers() {
     handledEventIdRef.current = eventId;
 
     const openLinkedEvent = async () => {
-      try {
-        const existingEvent = calendarData.events.find(
-          (event) => event.id === eventId,
-        );
-        const event =
-          existingEvent || (await calendarApiService.getEvent(eventId));
+      const existingEvent = calendarData.events.find(
+        (event) => event.id === eventId,
+      );
+      const event =
+        existingEvent || (await calendarApiService.getEvent(eventId));
 
-        if (cancelled) {
-          return;
-        }
-
-        if (event?.start) {
-          calendarData.setMonth(new Date(event.start));
-        }
-
-        openEventEditor(event, { eventViewMode: "view" });
-      } catch (error) {
-        log.error("Failed to open event from email link:", error);
+      if (cancelled) {
+        return;
       }
+
+      if (event?.start) {
+        calendarData.setMonth(new Date(event.start));
+      }
+
+      openEventEditor(event, { eventViewMode: "view" });
     };
 
-    void openLinkedEvent();
+    void openLinkedEvent().catch((error: unknown) => {
+      log.error("Failed to open event from email link:", error);
+    });
 
     return () => {
       cancelled = true;

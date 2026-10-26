@@ -403,42 +403,36 @@ export function E2eeBootstrap() {
     }
 
     dispatchGate({ type: "start-submit" });
-
-    try {
-      const outcome = await runEncryptionPasswordSetup({
-        userId,
-        password: gate.password,
-        confirmPassword: gate.confirmPassword,
-        queryClient,
-      });
-
-      if (outcome.ok === false) {
-        if (outcome.error === "Encryption session is not ready on this device.") {
-          log.warn("Failed to refresh encrypted data for password setup", {
-            userId,
-          });
-          dispatchGate({
-            type: "set-error",
-            error:
-              "Could not save your encryption password and refresh encrypted data.",
-          });
-          return;
-        }
-
-        dispatchGate({ type: "set-error", error: outcome.error });
-        return;
-      }
-
-      dispatchGate({ type: "success-hide" });
-    } catch (error) {
+    const outcome = await runEncryptionPasswordSetup({
+      userId,
+      password: gate.password,
+      confirmPassword: gate.confirmPassword,
+      queryClient,
+    }).catch((error: unknown) => {
       log.warn("Failed to set the E2EE password", { userId, error });
-      dispatchGate({
-        type: "set-error",
+      return {
+        ok: false as const,
         error: "Could not set your encryption password. Please try again.",
-      });
-    } finally {
-      dispatchGate({ type: "end-submit" });
+      };
+    });
+
+    if (outcome.ok === false) {
+      if (outcome.error === "Encryption session is not ready on this device.") {
+        log.warn("Failed to refresh encrypted data for password setup", {
+          userId,
+        });
+        dispatchGate({
+          type: "set-error",
+          error:
+            "Could not save your encryption password and refresh encrypted data.",
+        });
+      } else {
+        dispatchGate({ type: "set-error", error: outcome.error });
+      }
+    } else {
+      dispatchGate({ type: "success-hide" });
     }
+    dispatchGate({ type: "end-submit" });
   }
 
   async function handleUnlock() {
@@ -447,40 +441,35 @@ export function E2eeBootstrap() {
     }
 
     dispatchGate({ type: "start-submit" });
-
-    try {
-      const outcome = await runEncryptionPasswordUnlock({
-        userId,
-        password: gate.password,
-        queryClient,
-      });
-
-      if (outcome.ok === false) {
-        if (
-          outcome.error.includes("did not unlock") ||
-          outcome.error.includes("didn't match")
-        ) {
-          log.warn("Failed to unlock E2EE password envelope", {
-            userId,
-          });
-        }
-        dispatchGate({ type: "set-error", error: outcome.error });
-        return;
-      }
-
-      dispatchGate({ type: "success-hide" });
-    } catch (error) {
+    const outcome = await runEncryptionPasswordUnlock({
+      userId,
+      password: gate.password,
+      queryClient,
+    }).catch((error: unknown) => {
       log.warn("Failed to unlock the E2EE password envelope", {
         userId,
         error,
       });
-      dispatchGate({
-        type: "set-error",
+      return {
+        ok: false as const,
         error: "Could not unlock encryption. Please try again.",
-      });
-    } finally {
-      dispatchGate({ type: "end-submit" });
+      };
+    });
+
+    if (outcome.ok === false) {
+      if (
+        outcome.error.includes("did not unlock") ||
+        outcome.error.includes("didn't match")
+      ) {
+        log.warn("Failed to unlock E2EE password envelope", {
+          userId,
+        });
+      }
+      dispatchGate({ type: "set-error", error: outcome.error });
+    } else {
+      dispatchGate({ type: "success-hide" });
     }
+    dispatchGate({ type: "end-submit" });
   }
 
   async function handleSignOut() {
@@ -493,11 +482,10 @@ export function E2eeBootstrap() {
     if (gate.isSubmitting || gate.mode === "legacy") {
       return;
     }
-    if (gate.mode === "unlock") {
-      void handleUnlock();
-    } else {
-      void handleSetup();
-    }
+    const submit = gate.mode === "unlock" ? handleUnlock : handleSetup;
+    void submit().catch((error) => {
+      log.error("Encryption setup failed", error);
+    });
   };
 
   if (gate.mode === "hidden") {

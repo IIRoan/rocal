@@ -130,9 +130,8 @@ export function CalendarManager({
       setShareLinkInfo(shareInfo);
     } catch (error: unknown) {
       setShareLinkError(getErrorMessage(error, "Failed to load share link"));
-    } finally {
-      setShareLinkLoading(false);
     }
+    setShareLinkLoading(false);
   };
 
   const handleEnableShareLink = async (regenerate = false) => {
@@ -141,7 +140,7 @@ export function CalendarManager({
     setShareLinkLoading(true);
     setShareLinkError(null);
 
-    try {
+    const createShareLink = async () => {
       const shareInfo = await calendarApiService.enableCalendarShareLink(
         editingCalendar.id,
         { regenerate },
@@ -150,13 +149,13 @@ export function CalendarManager({
       toast.success(
         regenerate ? "ICS share link regenerated" : "ICS share link enabled",
       );
-    } catch (error: unknown) {
+    };
+    await createShareLink().catch((error: unknown) => {
       const message = getErrorMessage(error, "Failed to enable share link");
       setShareLinkError(message);
       toast.error(message);
-    } finally {
-      setShareLinkLoading(false);
-    }
+    });
+    setShareLinkLoading(false);
   };
 
   const handleDisableShareLink = async () => {
@@ -178,9 +177,8 @@ export function CalendarManager({
       const message = getErrorMessage(error, "Failed to disable share link");
       setShareLinkError(message);
       toast.error(message);
-    } finally {
-      setShareLinkLoading(false);
     }
+    setShareLinkLoading(false);
   };
 
   const handleCopyShareLink = async () => {
