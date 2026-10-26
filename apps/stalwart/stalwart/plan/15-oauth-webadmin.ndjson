@@ -1,2 +1,2 @@
-{"@type":"reconcile","object":"OAuthClient","matchOn":["clientId"],"value":{"stalwart-webui":{"clientId":"stalwart-webui","redirectUris":{"https://mail.solace.onl/admin/oauth/callback":true,"http://127.0.0.1:8080/admin/oauth/callback":true}}}}
-{"@type":"update","object":"OidcProvider","value":{"authCodeMaxAttempts":25}}
+{"@type":"upsert","object":"OAuthClient","matchOn":["clientId"],"value":{"stalwart-webui":{"clientId":"stalwart-webui","redirectUris":{"https://mail.solace.onl/admin/oauth/callback":true,"http://127.0.0.1:8080/admin/oauth/callback":true}}}}
+{"@type":"upsert","object":"Application","matchOn":["description"],"value":{"webui":{"description":"Stalwart Web Interface","resourceUrl":"https://github.com/stalwartlabs/webui/releases/download/v2.0.0/webui.zip","urlPrefix":{"/account":true,"/admin":true},"enable":true}}}

@@ -3,16 +3,19 @@
 Stalwart mail server runs on [Railway](https://railway.app). A public VPS
 (`mail.solace.onl` / `193.180.211.139`) owns the MX, TLS certificates, and
 inbound ports. Railway containers connect **outbound** to the VPS over frp, and
-nothing reaches Stalwart on Railway directly. The Solace API (the Railway service
+client mail traffic enters through the VPS. The Solace API (the Railway service
 "Solace API"), the notifications worker and third-party clients all use
 `https://mail.solace.onl` through the VPS. The key-gated backend gate (HAProxy
 `:8081`, [`backend-gate.cfg`](backend-gate.cfg)) still starts with the container,
-but no Railway domain points at it since the cutover; plan 001 step 7 moves the
+and the Railway service domain still points at it; plan 001 step 7 moves the
 API to Railway's private network instead.
 
 Desired state for Stalwart objects lives in [`stalwart/plan/`](stalwart/plan/).
 WebUI edits are overwritten on the next Railway boot. This tree lives in the Solace
 monorepo at `apps/stalwart` (not a nested git repo).
+
+The image and plans target **1.0.0**. Follow [the 1.0 migration runbook](UPGRADE-1.0.md)
+before deploying them onto a populated 0.16 database; changing the image alone cannot upgrade it.
 
 ## Backend provisioning principal
 
@@ -52,7 +55,7 @@ flowchart TB
         FRPC[frpc<br/>smtp + http group proxies]
         REL[frpc relay visitor<br/>STCP :2525, same process]
         HEALTH[Health server<br/>:8090]
-        GATE[Backend gate<br/>HAProxy :8081, no domain]
+        GATE[Backend gate<br/>HAProxy :8081, key required]
         SW --> REL
         FRPC --> SW
         GATE -->|"PROXY v2"| SW
@@ -84,7 +87,7 @@ Failing apply fails the boot.
 
 **In git:** Domain `solace.onl`, DNS/ACME/DKIM *policy*, NetworkListeners, HTTP security, Cache/JMAP/SystemSettings, MTA-STS, SenderAuth, ReportSettings, BlobStore (S3 via `EnvironmentVariable`), MetricsStore/TracingStore, Alerts, WebHooks.
 
-**Not in git:** user accounts, mailbox data, Certificates, DkimSignature private keys, `MtaRoute.address` (container IP), Tasks/queues/logs.
+**Not in git:** user accounts, mailbox data, Certificates, DkimSignature private keys, `MtaRoute.host` (container IP), Tasks/queues/logs.
 
 **Secrets** stay in Railway variables. Plan objects use `{"@type":"EnvironmentVariable","variableName":"..."}`. Snapshot strips secrets; omit a secret field on apply so live credentials are not wiped.
 
@@ -124,7 +127,7 @@ The DATA stage on port 25 runs the system Sieve script [`stalwart/sieve/solace-s
 ## Outbound mail (Solace / JMAP → Internet)
 
 Railway **blocks outbound SMTP ports** (25, 587, 465). Outbound mail uses an
-frp **STCP** tunnel. At boot the entrypoint starts the visitor on `:2525`, patches `MtaRoute.address` to the container private IP, then reloads settings.
+frp **STCP** tunnel. At boot the entrypoint starts the visitor on `:2525`, patches `MtaRoute.host` to the container private IP, then reloads settings.
 
 See [vps/OUTBOUND_RELAY.md](vps/OUTBOUND_RELAY.md).
 
@@ -144,28 +147,38 @@ sequenceDiagram
     P->>R: Deliver from VPS public IP
 ```
 
-## Zero-downtime deploys
+## Rolling deployments
+
+Mail containers have no attached volume. PostgreSQL stores mail metadata and the queue;
+S3 stores blobs. The private `Redis-stalwart` service supplies shared ephemeral state
+(`InMemoryStore/Redis`) and coordination (`Coordinator/Default`) while old and new
+containers overlap. `STALWART_REDIS_URL` comes from a Railway variable reference and is
+injected into a mode-0600 temporary plan; never commit its credentials. Stalwart's
+standalone Redis configuration stores that URL in its protected settings database.
 
 ```mermaid
 sequenceDiagram
     participant N as New container
     participant O as Old container
+    participant R as Redis
     participant F as frps groups (VPS)
 
-    N->>N: Stalwart + gate up, plan applied, relay route set
-    N->>F: frpc registers smtp/http proxies (join groups)
-    Note over F: frps now spreads connections over old + new
-    N->>N: Health 200 → platform retires the old container
-    O->>F: SIGTERM: health 503, frpc exits first (leave groups)
+    O->>F: Continue serving
+    N->>R: Join shared coordination
+    N->>N: Stalwart + gate up, local plan applied, relay route set
+    N->>F: Register ready smtp/http proxies
+    N->>N: Health 200
+    Note over O,N: Railway overlaps deployments for 90 seconds
+    O->>F: SIGTERM: health 503, leave groups
     O->>O: Drain FRPC_DRAIN_SECONDS, then stop Stalwart
 ```
 
-Joining the groups is the last boot step, so a registered container is a ready one; there
-is no coordination with the VPS and no deploy order between VPS and image. If frpc cannot
-register within `FRPC_READY_TIMEOUT_SECONDS`, boot fails and the platform keeps the old
-container. For a few seconds both containers serve. They share Postgres and the blob store but no cache coordinator,
-so a client may briefly see state cached on the other container; long-lived IMAP IDLE /
-JMAP push connections on the old container drop and clients reconnect.
+Joining the groups is the last boot step, so a registered container is ready to serve.
+If frpc cannot register within `FRPC_READY_TIMEOUT_SECONDS`, boot fails. Configure Redis
+and the coordinator before starting concurrent nodes: changing stores requires a restart,
+not just `Action/ReloadSettings`. Long-lived JMAP push connections reconnect when their
+container stops. Redis itself is a single ephemeral instance; rolling mail deployments
+do not make Redis, PostgreSQL or the VPS highly available.
 
 Railway probes `GET /healthz/ready` on `PORT` (8090). Healthcheck, overlap, and drain live in the repo-root [`.railway/railway.ts`](../../.railway/railway.ts).
 Readiness needs a ready boot state, live Stalwart and frpc processes, and open

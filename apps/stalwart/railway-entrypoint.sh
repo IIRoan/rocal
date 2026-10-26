@@ -164,7 +164,7 @@ bindAddr = "0.0.0.0"
 bindPort = ${FRPC_RELAY_LOCAL_PORT}
 EOF
 
-	# Every container joins the same frps groups, so a deploy overlaps old and new; HAProxy already sends PROXY v2.
+	# The frps groups keep the VPS routing stable while Redis coordinates overlapping mail instances.
 	if [ "$RECOVERY_MODE" != "true" ]; then
 		write_frpc_group_proxy smtp 25 10025
 	fi
@@ -391,7 +391,7 @@ update_relay_route() {
 		if stalwart_api_ready \
 			&& stalwart-cli --url "$stalwart_url" --api-key "$STALWART_ADMIN_TOKEN" \
 				update MtaRoute "$RELAY_ROUTE_ID" \
-				--field "address=${relay_addr}" \
+				--field "host=${relay_addr}" \
 				--field "port=${FRPC_RELAY_LOCAL_PORT}" \
 				2>"$err_log"; then
 			stalwart-cli --url "$stalwart_url" --api-key "$STALWART_ADMIN_TOKEN" \
@@ -432,22 +432,55 @@ reload_stalwart_settings() {
 	done
 }
 
+verify_stalwart_cluster() {
+	python3 - "$(stalwart_management_url)" <<'PY'
+import json, os, sys, urllib.request
+try:
+    methods = ["x:InMemoryStore/get", "x:Coordinator/get"]
+    body = {"using": ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+            "methodCalls": [[method, {"ids": ["singleton"]}, str(i)] for i, method in enumerate(methods)]}
+    request = urllib.request.Request(sys.argv[1] + "/jmap/", json.dumps(body).encode(),
+        headers={"Authorization": "Bearer " + os.environ["STALWART_ADMIN_TOKEN"], "Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        rows = json.load(response)["methodResponses"]
+    values = {row[0]: row[1]["list"][0] for row in rows}
+    memory = values[methods[0]]
+    if memory["@type"] != "Redis" or memory["url"] != os.environ["STALWART_REDIS_URL"] or values[methods[1]]["@type"] != "Default":
+        raise ValueError("Cluster store mismatch")
+except Exception:
+    sys.exit("Redis and Coordinator must be configured before startup; storage changes require a restart.")
+PY
+}
+
+render_stalwart_plan() {
+	python3 - "$1" <<'PY'
+import json, os, pathlib, sys
+for path in sorted(pathlib.Path(sys.argv[1]).glob("*.ndjson")):
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        entry = json.loads(line)
+        if entry.get("object") == "InMemoryStore":
+            entry["value"]["url"] = os.environ["STALWART_REDIS_URL"]
+        print(json.dumps(entry))
+PY
+}
+
 apply_stalwart_plan() {
 	[ -n "${STALWART_ADMIN_TOKEN:-}" ] || die "STALWART_ADMIN_TOKEN required to apply config plan."
 	plan_dir="${STALWART_PLAN_DIR:-/usr/local/share/stalwart/plan}"
 	[ -d "$plan_dir" ] || die "Config plan missing at ${plan_dir}."
 	plan="$(mktemp)"
-	cat "$plan_dir"/*.ndjson >"$plan"
+	render_stalwart_plan "$plan_dir" >"$plan"
 	[ -s "$plan" ] || {
 		rm -f "$plan"
 		die "Config plan is empty at ${plan_dir}."
 	}
 
-	# /api/schema 404s on this Stalwart build; seed the CLI cache so apply can run.
+	# Pin validation to the schema shipped with this server image.
 	ipv4_loopback_url="http://127.0.0.1:${STALWART_HTTP_PORT}"
 	private_url="$(stalwart_management_url)"
-	public_url="${STALWART_PUBLIC_URL:-https://mail.solace.onl}"
-	for seed_url in "$ipv4_loopback_url" "$private_url" "$public_url"; do
+	for seed_url in "$ipv4_loopback_url" "$private_url"; do
 		seed_stalwart_cli_schema "$seed_url"
 	done
 	log info "Seeded stalwart-cli schema cache for plan apply."
@@ -457,8 +490,8 @@ apply_stalwart_plan() {
 	: >"$err_log"
 	while [ "$i" -lt "$max_attempts" ]; do
 		applied=""
-		# Public URL is the proven CLI path (cached schema + JMAP). Local URLs reload this container.
-		for try_url in "$public_url" "$private_url" "$ipv4_loopback_url"; do
+		# Apply only to this container, including when the public edge still serves the previous store.
+		for try_url in "$private_url" "$ipv4_loopback_url"; do
 			if ! curl -fsSL --max-time 2 \
 				-H "Authorization: Bearer ${STALWART_ADMIN_TOKEN}" \
 				"${try_url}/jmap/session" >/dev/null 2>&1; then
@@ -471,7 +504,7 @@ apply_stalwart_plan() {
 			fi
 		done
 		if [ -n "$applied" ]; then
-			reload_stalwart_settings "$private_url" "$ipv4_loopback_url" "$public_url"
+			reload_stalwart_settings "$private_url" "$ipv4_loopback_url"
 			rm -f "$plan"
 			log info "Applied Stalwart config plan from ${plan_dir} via ${applied}."
 			return 0
@@ -484,7 +517,7 @@ apply_stalwart_plan() {
 	done
 	tail -n 20 "$err_log" >&2 || true
 	rm -f "$plan"
-	die "Could not apply Stalwart config plan via ${public_url}, ${private_url}, or ${ipv4_loopback_url}."
+	die "Could not apply Stalwart config plan via ${private_url} or ${ipv4_loopback_url}."
 }
 
 mark_health_ready() {
@@ -552,6 +585,7 @@ cleanup() {
 [ -n "${FRPC_RELAY_STCP_KEY:-}" ] || die "FRPC_RELAY_STCP_KEY is required for the outbound relay tunnel."
 STALWART_GATE_KEY="${STALWART_GATE_KEY:-}"
 [ "${#STALWART_GATE_KEY}" -ge 32 ] || die "STALWART_GATE_KEY (32+ characters) is required for the backend gate."
+[ -n "${STALWART_REDIS_URL:-}" ] || die "STALWART_REDIS_URL is required for coordinated deployment overlap."
 STALWART_GATE_KEY_SHA256="$(printf '%s' "$STALWART_GATE_KEY" | sha256sum | cut -d' ' -f1)"
 unset STALWART_GATE_KEY
 export STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT
@@ -564,6 +598,7 @@ start_health_server
 start_stalwart
 start_gate
 sleep "${STALWART_BOOT_DELAY_SECONDS:-3}"
+verify_stalwart_cluster
 apply_stalwart_plan
 update_relay_route || die "Relay route update failed; refusing to open health gate."
 # Joining the tunnel groups is the last boot step: from here the VPS sends this container traffic.

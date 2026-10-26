@@ -846,6 +846,16 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
         .await
         .expect("session JSON");
     assert_eq!(session["username"], json!(user.email));
+    assert!(
+        session["capabilities"]
+            .get("urn:ietf:params:jmap:mail")
+            .is_some(),
+        "the scoped OAuth bearer can access mail"
+    );
+    assert!(
+        session["capabilities"].get("urn:stalwart:jmap").is_none(),
+        "the bridge never grants registry access"
+    );
     assert_eq!(
         session["accounts"]
             .as_object()

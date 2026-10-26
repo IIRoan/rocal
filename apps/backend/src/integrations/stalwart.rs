@@ -7,6 +7,7 @@ pub mod gate;
 pub mod jmap;
 pub mod limits;
 pub mod mailer;
+mod oauth;
 pub mod reachability;
 
 use std::time::Duration;

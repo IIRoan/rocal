@@ -81,6 +81,9 @@ mod tests {
             _ if request.first_method() == "x:OAuthClient/set" => Reply::json(
                 json!({"methodResponses": [["x:OAuthClient/set", {"created": {"client1": {"id": "c"}}}, "c1"]]}),
             ),
+            _ if request.first_method() == "x:OAuthClient/get" => Reply::json(
+                json!({"methodResponses": [["x:OAuthClient/get", {"list": [{"id": "c", "clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}, "description": "Solace mail backend bridge"}]}, "c1"]]}),
+            ),
             _ => jmap(request),
         }
     }

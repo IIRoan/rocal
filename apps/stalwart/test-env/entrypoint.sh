@@ -51,7 +51,7 @@ ADMIN_HOST="$(hostname -I | tr ' ' '\n' | grep -E '^[0-9]+\.' | grep -v '^127\.'
 ADMIN_URL="http://${ADMIN_HOST}:${STALWART_HTTP_PORT}"
 start_stalwart
 
-# Mailbox provisioning on Stalwart 0.16 needs more than the git role grants: the User role (to grant it) and impersonate (keys, settings).
+# Mailbox provisioning also needs the User role (to grant it) and impersonate (keys, settings).
 SOLACE_TEST_USER_ROLE_ID="$(curl -fsS -u "${STALWART_RECOVERY_ADMIN}" -H 'Content-Type: application/json' "${ADMIN_URL}/jmap/" \
 	-d '{"using":["urn:ietf:params:jmap:core","urn:stalwart:jmap"],"methodCalls":[["x:Role/query",{},"q"],["x:Role/get",{"#ids":{"resultOf":"q","name":"x:Role/query","path":"/ids"},"properties":["id","description"]},"g"]]}' \
 	| python3 -c 'import json,sys; print(next(r["id"] for r in json.load(sys.stdin)["methodResponses"][1][1]["list"] if r["description"] == "User"))')" \
@@ -69,7 +69,7 @@ stalwart-cli --url "$ADMIN_URL" --user admin --password "$SOLACE_TEST_ADMIN_PASS
 rm -f "$PLAN"
 log info "Test plan applied."
 
-# Reloading settings fails on a built-in expression (bit_and), and listeners only pick up PROXY trust on start, so restart.
+# Listeners pick up PROXY trust on start, so restart after applying the plan.
 kill "$STALWART_PID" && wait "$STALWART_PID" 2>/dev/null || true
 start_stalwart
 

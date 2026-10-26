@@ -3,6 +3,7 @@ import {
   defineRailway,
   github,
   group,
+  image,
   postgres,
   preserve,
   project,
@@ -51,6 +52,22 @@ export default defineRailway(() => {
     alerts: { usage: { "80": {}, "95": {}, "100": {} } },
   });
   const stalwartBlobs = bucket("stalwart-blobs", { region: "ams" });
+  const stalwartRedis = service("Redis-stalwart", {
+    source: image("redis:8.10.3-alpine@sha256:896f241f438ab6a210cfb24f573b84bea721a4cbe67f1b4fd07eb638b3b02a7b"),
+    start: 'sh -ec \'exec redis-server --bind 0.0.0.0 :: --protected-mode yes --requirepass "$REDIS_PASSWORD" --save "" --appendonly no --maxmemory 256mb --maxmemory-policy noeviction\'',
+    replicas: { "europe-west4-drams3a": 1 },
+    networking: { privateNetworkEndpoint: "redis-stalwart" },
+    deploy: {
+      overlapSeconds: 0,
+      drainingSeconds: 5,
+      restartPolicyType: "ALWAYS",
+      limitOverride: { containers: { cpu: 1, memoryBytes: 500000000 } },
+    },
+    env: {
+      REDIS_PASSWORD: preserve(),
+      REDIS_URL: "redis://:${{REDIS_PASSWORD}}@${{RAILWAY_PRIVATE_DOMAIN}}:6379/0",
+    },
+  });
   // Private; the API serves uploaded profile pictures through /api/profiles/avatars/:id.
   const profilePictures = bucket("profile-pictures", { region: "ams" });
   const gatusData = volume("gatus-data", {
@@ -118,14 +135,16 @@ export default defineRailway(() => {
       BUCKET_REGION: ref(stalwartBlobs, "REGION"),
       BUCKET_SECRET_ACCESS_KEY: ref(stalwartBlobs, "SECRET_ACCESS_KEY"),
       FRPC_RELAY_STCP_KEY: preserve(),
+      FRPC_SHA256: preserve(),
       FRPC_SLOT: preserve(),
       // The frp mutual-TLS client certificate (railway-entrypoint.sh); kept through applies once set.
       FRPC_TLS_CA: preserve(),
       FRPC_TLS_CERT: preserve(),
       FRPC_TLS_KEY: preserve(),
       FRPC_TOKEN: preserve(),
+      FRPC_VERSION: preserve(),
       FRPS_ADDR: preserve(),
-      PGDATABASE: ref(postgresStalwart, "PGDATABASE"),
+      PGDATABASE: "stalwart_v1",
       PGHOST: ref(postgresStalwart, "PGHOST"),
       PGPASSWORD: ref(postgresStalwart, "PGPASSWORD"),
       PGPORT: ref(postgresStalwart, "PGPORT"),
@@ -135,6 +154,7 @@ export default defineRailway(() => {
       STALWART_ADMIN_TOKEN: preserve(),
       STALWART_GATE_KEY: preserve(),
       STALWART_RECOVERY_MODE: preserve(),
+      STALWART_REDIS_URL: ref(stalwartRedis, "REDIS_URL"),
       STALWART_TOKEN: preserve(),
     },
   });
@@ -244,7 +264,7 @@ export default defineRailway(() => {
   });
 
   const apiGroup = group("API", [api]);
-  const mailServer = group("Mail server", [stalwartMail, postgresStalwart]);
+  const mailServer = group("Mail server", [stalwartMail, postgresStalwart, stalwartRedis]);
   const notificationGroup = group("Notifications", [notifications]);
 
   return project("Solace", {

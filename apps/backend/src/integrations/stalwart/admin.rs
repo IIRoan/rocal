@@ -11,6 +11,8 @@ use crate::telemetry;
 /// The registry capabilities; mail capabilities are never requested with the provisioning token.
 const USING: [&str; 2] = ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"];
 const WEBHOOK_ID: &str = "solace-inbound-mail";
+// Concurrent first mints must not create or update the same registry object together.
+static OAUTH_REGISTRATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Debug, Error)]
 pub enum AdminError {
@@ -491,51 +493,89 @@ impl<'a> Admin<'a> {
         redirect_uri: &str,
         description: Option<&str>,
     ) -> Result<(), AdminError> {
+        let _registration = OAUTH_REGISTRATION.lock().await;
         let ids = self.ids("x:OAuthClient/query", json!({})).await?;
-        if !ids.is_empty() {
-            let clients = self.list("x:OAuthClient/get", ids).await?;
-            if let Some(existing) = clients
-                .iter()
-                .find(|client| str_field(client, "clientId") == Some(client_id))
-            {
-                let mut redirect_uris = existing
-                    .get("redirectUris")
-                    .and_then(Value::as_array)
-                    .cloned()
-                    .unwrap_or_default();
-                let uri = json!(redirect_uri);
-                let stored_description = existing.get("description").unwrap_or(&Value::Null);
-                if redirect_uris.contains(&uri) && *stored_description == json!(description) {
-                    return Ok(());
-                }
-                redirect_uris.push(uri);
-                let mut next: Vec<Value> = Vec::new();
-                for value in redirect_uris {
-                    if !next.contains(&value) {
-                        next.push(value);
-                    }
-                }
-                let id = str_field(existing, "id").unwrap_or_default();
-                self.call(
-                    "x:OAuthClient/set",
-                    json!({"update": {id: {"redirectUris": next, "description": description}}}),
-                    "c1",
-                )
-                .await?;
-                return Ok(());
+        let clients = if ids.is_empty() {
+            Vec::new()
+        } else {
+            self.list("x:OAuthClient/get", ids).await?
+        };
+        let existing = match clients
+            .into_iter()
+            .find(|client| str_field(client, "clientId") == Some(client_id))
+        {
+            Some(existing) => existing,
+            None => {
+                let result = self
+                    .call(
+                        "x:OAuthClient/set",
+                        json!({"create": {"client1": {
+                            "clientId": client_id,
+                            "redirectUris": {redirect_uri: true},
+                            "description": description,
+                        }}}),
+                        "c1",
+                    )
+                    .await?;
+                let id = result
+                    .pointer("/created/client1/id")
+                    .and_then(Value::as_str)
+                    .filter(|id| !id.is_empty())
+                    .ok_or_else(|| {
+                        AdminError::Failed(
+                            "Stalwart OAuth client creation was not acknowledged.".into(),
+                        )
+                    })?;
+                self.list("x:OAuthClient/get", vec![json!(id)])
+                    .await?
+                    .into_iter()
+                    .next()
+                    .filter(|client| str_field(client, "clientId") == Some(client_id))
+                    .ok_or_else(|| {
+                        AdminError::Failed(
+                            "Stalwart OAuth client was not found after creation.".into(),
+                        )
+                    })?
+            }
+        };
+        let id = str_field(&existing, "id")
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| AdminError::Failed("Stalwart OAuth client has no id.".into()))?;
+        let mut patch = Map::new();
+        let redirects = existing
+            .get("redirectUris")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                AdminError::Failed("Stalwart OAuth client has invalid redirect URIs.".into())
+            })?;
+        if redirects.get(redirect_uri) != Some(&json!(true)) {
+            let path = redirect_uri.replace('~', "~0").replace('/', "~1");
+            patch.insert(format!("redirectUris/{path}"), json!(true));
+        }
+        if existing.get("description") != Some(&json!(description)) {
+            patch.insert("description".into(), json!(description));
+        }
+        // Only v1 exposes scopes; reading the object keeps registration compatible with 0.16.27.
+        if let Some(scopes) = existing.get("scopes") {
+            let scopes = scopes.as_object().ok_or_else(|| {
+                AdminError::Failed("Stalwart OAuth client has invalid scopes.".into())
+            })?;
+            if scopes.get("mail") != Some(&json!(true)) {
+                patch.insert("scopes/mail".into(), json!(true));
             }
         }
-        self.call(
-            "x:OAuthClient/set",
-            json!({"create": {"client1": {
-                "clientId": client_id,
-                "redirectUris": [redirect_uri],
-                "description": description,
-            }}}),
-            "c1",
+        if patch.is_empty() {
+            return Ok(());
+        }
+        let result = self
+            .call("x:OAuthClient/set", json!({"update": {id: patch}}), "c1")
+            .await?;
+        acknowledged(
+            &result,
+            id,
+            "Stalwart OAuth client update failed.",
+            "Stalwart OAuth client update was not acknowledged.",
         )
-        .await?;
-        Ok(())
     }
 
     /// Logs in as the mailbox (authorization code with PKCE) and exchanges the code for its bearer.
@@ -547,17 +587,17 @@ impl<'a> Admin<'a> {
         redirect_uri: &str,
         pkce: crate::mail::bridge::Pkce,
     ) -> Result<OAuthToken, AdminError> {
+        let state = uuid::Uuid::new_v4().to_string();
         let response = self
             .post("/api/auth")
-            .json(&json!({
-                "type": "authCode",
-                "accountName": account_name,
-                "accountSecret": account_secret,
-                "clientId": client_id,
-                "redirectUri": redirect_uri,
-                "codeChallenge": pkce.challenge,
-                "codeChallengeMethod": "S256",
-            }))
+            .json(&super::oauth::login_request(
+                account_name,
+                account_secret,
+                client_id,
+                redirect_uri,
+                &pkce,
+                &state,
+            ))
             .send()
             .await?;
         let status = response.status();
@@ -568,9 +608,7 @@ impl<'a> Admin<'a> {
                 status.as_u16()
             )));
         }
-        let code = (str_field(&payload, "type") == Some("authenticated"))
-            .then(|| str_field(&payload, "clientCode").or(str_field(&payload, "client_code")))
-            .flatten()
+        let code = super::oauth::authorization_code(&payload, redirect_uri, &state)
             .ok_or_else(|| AdminError::Failed("Stalwart mailbox login was rejected.".into()))?;
         let response = self
             .post("/auth/token")
@@ -578,7 +616,7 @@ impl<'a> Admin<'a> {
                 ("grant_type", "authorization_code"),
                 ("client_id", client_id),
                 ("redirect_uri", redirect_uri),
-                ("code", code),
+                ("code", &code),
                 ("code_verifier", &pkce.verifier),
             ])
             .send()
@@ -1189,6 +1227,88 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn registers_mail_scope_without_replacing_existing_redirects_or_scopes() {
+        let fake = FakeStalwart::scripted(vec![
+            envelope("x:OAuthClient/query", json!({"ids": ["client-1"]}), "c1"),
+            envelope("x:OAuthClient/get", json!({"list": [{"id": "client-1", "clientId": "bridge", "redirectUris": {"https://old.test/callback": true}, "description": "bridge", "scopes": {"contacts": true}}]}), "c1"),
+            envelope("x:OAuthClient/set", json!({"updated": {"client-1": null}}), "c1"),
+        ]).await;
+        admin(&fake)
+            .ensure_oauth_client("bridge", "https://new.test/~callback", Some("bridge"))
+            .await
+            .unwrap();
+        assert_eq!(
+            fake.requests()[2].json()["methodCalls"][0][1],
+            json!({"update": {"client-1": {"redirectUris/https:~1~1new.test~1~0callback": true, "scopes/mail": true}}})
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_unacknowledged_oauth_registration() {
+        let fake = FakeStalwart::scripted(vec![
+            envelope("x:OAuthClient/query", json!({"ids": []}), "c1"),
+            envelope(
+                "x:OAuthClient/set",
+                json!({"notCreated": {"client1": {"type": "forbidden"}}}),
+                "c1",
+            ),
+        ])
+        .await;
+        assert!(
+            admin(&fake)
+                .ensure_oauth_client("bridge", "https://new.test/callback", None)
+                .await
+                .is_err()
+        );
+        assert_eq!(fake.requests().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn accepts_v1_authorization_redirect() {
+        let fake = FakeStalwart::start(|request| {
+            if request.path == "/auth/token" {
+                return Reply::json(json!({"access_token": "v1-token", "expires_in": 3600}));
+            }
+            let body = request.json();
+            let Some(query) = body.get("query").and_then(Value::as_str) else {
+                return Reply::status(400);
+            };
+            let query: std::collections::HashMap<_, _> =
+                url::form_urlencoded::parse(query.as_bytes()).collect();
+            assert_eq!(query.get("response_type").map(|v| v.as_ref()), Some("code"));
+            assert_eq!(
+                query.get("code_challenge_method").map(|v| v.as_ref()),
+                Some("S256")
+            );
+            assert_eq!(
+                query.get("scope").map(|v| v.as_ref()),
+                Some("urn:ietf:params:oauth:scope:mail")
+            );
+            assert_eq!(body["consent"], json!(true));
+            let mut location =
+                url::Url::parse("https://api.solace.test/api/mail/oauth/callback").unwrap();
+            location
+                .query_pairs_mut()
+                .append_pair("code", "v1-code")
+                .append_pair("state", query.get("state").unwrap());
+            Reply::json(json!({"type": "authenticated", "location": location.as_str()}))
+        })
+        .await;
+        let token = admin(&fake)
+            .issue_oauth_access_token(
+                "alice@solace.test",
+                "solace-test-password",
+                "solace-mail-bridge",
+                "https://api.solace.test/api/mail/oauth/callback",
+                crate::mail::bridge::pkce(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(token.access_token, "v1-token");
+        assert!(fake.requests()[1].body.contains("code=v1-code"));
+    }
+
+    #[tokio::test]
     async fn accepts_client_code_auth_responses() {
         let fake = FakeStalwart::scripted(vec![
             Reply::json(json!({"type": "authenticated", "client_code": "client-code-1"})),
@@ -1223,8 +1343,12 @@ mod tests {
             requests[0].authorization, None,
             "the login carries no admin token"
         );
+        let mut legacy_body = requests[0].json();
+        let object = legacy_body.as_object_mut().unwrap();
+        assert!(object.remove("query").unwrap().is_string());
+        assert_eq!(object.remove("consent"), Some(json!(true)));
         assert_eq!(
-            requests[0].json(),
+            legacy_body,
             json!({"type": "authCode", "accountName": "alice@solace.onl", "accountSecret": "StrongPassw0rd!",
                 "clientId": "solace-mail-bridge", "redirectUri": "https://api.solace.test/api/mail/oauth/callback",
                 "codeChallenge": "challenge-1", "codeChallengeMethod": "S256"})

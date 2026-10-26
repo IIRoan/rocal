@@ -12,10 +12,14 @@ pub const REGISTRY: [&str; 2] = ["urn:ietf:params:jmap:core", "urn:stalwart:jmap
 pub async fn provision_key(env: &TestEnv) -> Result<String> {
     let host = url_host_port(&env.stalwart_url);
     // Shared by every checkout and worktree, so one checkout never revokes the key another backend runs with.
-    let home = std::env::var("HOME").map_err(|_| Error::Unexpected("HOME is not set".into()))?;
-    let cache = std::path::PathBuf::from(home).join(format!(
-        ".local/share/solace-test-tools/provision-keys/{host}"
-    ));
+    let data_dir = match std::env::var("XDG_DATA_HOME") {
+        Ok(path) => std::path::PathBuf::from(path),
+        Err(_) => std::path::PathBuf::from(
+            std::env::var("HOME").map_err(|_| Error::Unexpected("HOME is not set".into()))?,
+        )
+        .join(".local/share"),
+    };
+    let cache = data_dir.join(format!("solace-test-tools/provision-keys/{host}"));
     if let Ok(key) = std::fs::read_to_string(&cache) {
         let mut request = reqwest::Client::new()
             .get(format!("{}/jmap/session", env.stalwart_url))

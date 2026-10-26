@@ -268,7 +268,7 @@ async fn mail_flows_between_users_and_tokens_stay_in_their_own_account() {
             .and_then(|r| r.iter().find(|r| r[2] == json!(call)))
             .expect("response");
         assert_eq!(response[0], json!("error"), "{foreign}");
-        assert_eq!(response[1]["type"], json!("forbidden"), "{foreign}");
+        assert_eq!(response[1]["type"], json!("accountNotFound"), "{foreign}");
     }
     let still_there = recipient
         .jmap(json!([["Email/get", {"accountId": recipient.account_id(), "ids": [delivered], "properties": ["id"]}, "g"]]))

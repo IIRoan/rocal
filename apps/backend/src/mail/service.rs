@@ -1332,6 +1332,9 @@ pub mod tests {
                 "x:AccountSettings/set" => json!({"updated": {"singleton": null}}),
                 "x:OAuthClient/query" => json!({"ids": []}),
                 "x:OAuthClient/set" => json!({"created": {"client1": {"id": "client-1"}}}),
+                "x:OAuthClient/get" => {
+                    json!({"list": [{"id": "client-1", "clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}, "description": "Solace mail backend bridge"}]})
+                }
                 _ => return Reply::status(500),
             };
             Reply::json(json!({"methodResponses": [[call[0], answer, call[2]]]}))
@@ -1443,7 +1446,7 @@ pub mod tests {
                 .find(|r| r.first_method() == "x:OAuthClient/set")
                 .map(|r| r.json()["methodCalls"][0][1]["create"]["client1"].clone()),
             Some(
-                json!({"clientId": "solace-mail-bridge", "redirectUris": ["http://localhost:4001/api/mail/oauth/stalwart/callback"], "description": "Solace mail backend bridge"})
+                json!({"clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}, "description": "Solace mail backend bridge"})
             )
         );
     }

@@ -1,0 +1,17 @@
+version = 1
+
+[global.blob_store]
+mode = "reuse"
+
+[global.categories]
+include = ["settings", "principals", "mail", "calendars", "contacts", "files", "sieve", "identities", "push_subscriptions", "spam_samples", "reports", "archive", "spam_model", "queue", "tasks", "telemetry"]
+
+[instance.oauth_registration."x:OidcProvider"]
+action = "accept"
+
+[global.new_permissions]
+action = "none"
+
+[global.changed_defaults]
+policy = "pin"
+overrides = {}
