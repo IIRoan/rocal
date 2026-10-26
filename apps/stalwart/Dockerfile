@@ -36,8 +36,8 @@ RUN sed -i 's/\r$//' /usr/local/bin/railway-entrypoint.sh \
 
 USER root
 
-# Return unused allocator pages after bursts without waiting for request threads.
-ENV MALLOC_CONF=background_thread:true
+# The binary's network capability disables jemalloc environment configuration.
+RUN ln -sfn 'background_thread:true' /etc/malloc.conf
 
 EXPOSE 25 8080 8081 8090
 

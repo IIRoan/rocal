@@ -257,7 +257,9 @@ Leave `STALWART_RECOVERY_MODE` unset for normal operation; set it only for a pla
 
 The mail PostgreSQL instance allows 100 connections, enough for two overlapping Stalwart pools of 32 plus administration. Its 128 MiB shared buffer cache is unchanged. The setting lives in PostgreSQL's persistent `postgresql.auto.conf`; recovery details are in [UPGRADE-1.0.md](UPGRADE-1.0.md).
 
-The official GNU/Linux 1.0 binary reads jemalloc settings from `MALLOC_CONF`; `_RJEM_MALLOC_CONF` is ignored. The Dockerfile enables background release of unused allocator pages so idle mail servers can return memory after bursts.
+The Dockerfile enables background release of unused allocator pages through jemalloc's `/etc/malloc.conf` symlink. The official binary's network-binding capability disables environment-based allocator configuration under the service user, so neither `MALLOC_CONF` nor `_RJEM_MALLOC_CONF` works for this deployment. Arena counts and decay times retain upstream defaults.
+
+The backend gate caps HAProxy at eight worker threads, matching the Railway CPU quota. Automatic detection otherwise follows the host's larger CPU set and wastes memory on extra workers. Review this cap if the service's CPU quota changes.
 
 ## HA verification
 
@@ -276,8 +278,8 @@ old one leaves without a failed connection. It uses temporary ports/configs and 
 credentials; it does not access mail.
 For the backend gate test, set `HAPROXY_TEST_BINARY`; it runs `backend-gate.cfg`
 in front of a loopback PROXY v2 stub.
-Set `STALWART_TEST_BINARY` to the official GNU/Linux binary to verify that the
-Dockerfile's allocator settings actually enable background page release.
+Set `STALWART_TEST_IMAGE` to a built mail image to verify background page release
+under the container's service user, preserving the official binary's capabilities.
 
 ## Status page
 
