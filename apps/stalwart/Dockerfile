@@ -36,8 +36,8 @@ RUN sed -i 's/\r$//' /usr/local/bin/railway-entrypoint.sh \
 
 USER root
 
-# Fewer jemalloc arenas plus idle-time page release, to keep RSS from creeping up over weeks.
-ENV _RJEM_MALLOC_CONF=background_thread:true,narenas:2
+# Return unused allocator pages after bursts without waiting for request threads.
+ENV MALLOC_CONF=background_thread:true
 
 EXPOSE 25 8080 8081 8090
 

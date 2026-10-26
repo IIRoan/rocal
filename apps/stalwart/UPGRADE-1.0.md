@@ -38,6 +38,14 @@ Project: `2f38e580-18c7-473a-897d-28cb8327faa1`; production environment: `b643af
 
 ## Backups and recovery evidence
 
+The follow-up memory tuning lowered PostgreSQL `max_connections` from 500 to 100 on 26 October. `shared_buffers` remains 128 MiB and Stalwart's pool remains 32 per node. PostgreSQL reported 152 MiB shared memory after restart, previously 175 MiB. The owner-scoped bootstrap monitor observed two failed one-second probes during the database restart and recovered without restarting mail.
+
+The Dockerfile also uses `MALLOC_CONF=background_thread:true` for the official GNU/Linux 1.0 binary. The former `_RJEM_MALLOC_CONF` variable was ignored. Arena counts and decay times retain upstream defaults. A synthetic comparison of 6,144 requests per configuration, including 2 MiB blob downloads at concurrency eight, measured about 960 versus 971 requests/second and 186 versus 139 MiB RSS after 20 seconds idle. This is local workload evidence, not a production capacity guarantee. The allocator regression test failed before the fix and passed afterward.
+
+The allocator change needs only a rolling mail-container replacement. Its rollback is the previous 1.0 image from commit `f3c4cf7d`, using the current database and Redis settings; no data migration or database restore is involved.
+
+`memory-tuning-before-postgres-config.gpg` and `memory-tuning-after-postgres-config.gpg` preserve the database configuration. `memory-tuning-before-v1-postgres.gpg` was decrypted and independently restored into isolated PostgreSQL 18.6 with all 29 public tables. To undo only the connection limit, set `max_connections` back to 500 with `ALTER SYSTEM` and restart the database; retain every other setting. Do not restore the data snapshot merely to reverse a configuration change, because that would discard subsequent mail.
+
 Local encrypted recovery directory:
 
 ```text

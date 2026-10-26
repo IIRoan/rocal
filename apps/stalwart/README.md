@@ -255,6 +255,10 @@ Use the **private** Postgres hostname (`*.railway.internal`). Message bodies liv
 
 Leave `STALWART_RECOVERY_MODE` unset for normal operation; set it only for a planned recovery. The CLI helper uses `STALWART_ADMIN_TOKEN` unless a local `STALWART_TOKEN` override is supplied. Webhook registration uses the API's `STALWART_WEBHOOK_SECRET`.
 
+The mail PostgreSQL instance allows 100 connections, enough for two overlapping Stalwart pools of 32 plus administration. Its 128 MiB shared buffer cache is unchanged. The setting lives in PostgreSQL's persistent `postgresql.auto.conf`; recovery details are in [UPGRADE-1.0.md](UPGRADE-1.0.md).
+
+The official GNU/Linux 1.0 binary reads jemalloc settings from `MALLOC_CONF`; `_RJEM_MALLOC_CONF` is ignored. The Dockerfile enables background release of unused allocator pages so idle mail servers can return memory after bursts.
+
 ## HA verification
 
 ```sh
@@ -272,6 +276,8 @@ old one leaves without a failed connection. It uses temporary ports/configs and 
 credentials; it does not access mail.
 For the backend gate test, set `HAPROXY_TEST_BINARY`; it runs `backend-gate.cfg`
 in front of a loopback PROXY v2 stub.
+Set `STALWART_TEST_BINARY` to the official GNU/Linux binary to verify that the
+Dockerfile's allocator settings actually enable background page release.
 
 ## Status page
 
