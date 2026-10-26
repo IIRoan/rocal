@@ -6,3 +6,4 @@
 {"@type":"update","object":"Security","value":{"authBanRate":null,"abuseBanRate":null,"loiterBanRate":null,"scanBanRate":null}}
 {"@type":"update","object":"Jmap","value":{"maxConcurrentRequests":32,"maxUploadCount":100000}}
 {"@type":"update","object":"Http","value":{"rateLimitAnonymous":null,"rateLimitAuthenticated":null}}
+{"@type":"upsert","object":"OAuthClient","matchOn":["clientId"],"value":{"solace-mail-bridge":{"clientId":"solace-mail-bridge","description":"Solace mail backend bridge","redirectUris":{"http://localhost:4001/api/mail/oauth/stalwart/callback":true},"firstParty":true,"scopes":{"mail":true}}}}

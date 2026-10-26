@@ -17,6 +17,15 @@ monorepo at `apps/stalwart` (not a nested git repo).
 The image and plans target **1.0.0**. Follow [the 1.0 migration runbook](UPGRADE-1.0.md)
 before deploying them onto a populated 0.16 database; changing the image alone cannot upgrade it.
 
+The admin-applied plan registers `solace-mail-bridge` as a first-party OAuth client.
+Stalwart 1.0 mail-only third-party tokens exclude `x:AccountSettings/get` and `set`,
+which both Solace apps need for encryption setup. First-party tokens retain the
+account's existing permissions; they do not grant users administrator access.
+Only a superuser can configure this client, so apply it before the API starts;
+the scoped provisioner must not create or modify it. Keep its description and
+callback aligned with the backend bridge. After changing its trust setting,
+clear the API token cache by restarting the API and reload clients for fresh tokens.
+
 ## Backend provisioning principal
 
 The Solace API must **not** hold an admin token. It reads mailbox, calendar and

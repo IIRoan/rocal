@@ -812,6 +812,11 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
         .expect_status(200)
         .and_then(|r| r.dto()));
     let account_id = signup.stalwart_account_id.0;
+    let mut other = app.user().await;
+    let other_signup: MailSignup = ok(bootstrap(&app, &mut other, &bootstrap_request(4))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
 
     let before = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -850,11 +855,7 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
         session["capabilities"]
             .get("urn:ietf:params:jmap:mail")
             .is_some(),
-        "the scoped OAuth bearer can access mail"
-    );
-    assert!(
-        session["capabilities"].get("urn:stalwart:jmap").is_none(),
-        "the bridge never grants registry access"
+        "the owner OAuth bearer can access mail"
     );
     assert_eq!(
         session["accounts"]
@@ -862,6 +863,84 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
             .map(|a| a.keys().cloned().collect::<Vec<_>>()),
         Some(vec![account_id.clone()]),
         "the bearer opens only this mailbox"
+    );
+
+    let mut request = reqwest::Client::new()
+        .post(format!("{}/jmap/", app.env.stalwart_url))
+        .bearer_auth(&token.access_token);
+    if let Some(key) = &app.env.stalwart_gate_key {
+        request = request.header("X-Solace-Gate", key);
+    }
+    let bootstrap: Value = request
+        .try_clone()
+        .expect("clone bootstrap request")
+        .json(&json!({
+            "using": ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail", "urn:ietf:params:jmap:submission", "urn:stalwart:jmap"],
+            "methodCalls": [
+                ["x:AccountSettings/get", {"accountId": account_id, "ids": ["singleton"]}, "settings"],
+                ["Mailbox/get", {"accountId": account_id}, "mailboxes"],
+                ["Identity/get", {"accountId": account_id}, "identities"],
+                ["x:Account/query", {}, "administration"],
+                ["x:AccountSettings/get", {"accountId": other_signup.stalwart_account_id.0, "ids": ["singleton"]}, "foreignSettings"],
+                ["x:AccountSettings/set", {"accountId": other_signup.stalwart_account_id.0, "update": {"singleton": {"locale": "en"}}}, "foreignUpdate"]
+            ]
+        }))
+        .send()
+        .await
+        .expect("app mailbox bootstrap")
+        .json()
+        .await
+        .expect("bootstrap JSON");
+    let response = |id: &str| {
+        bootstrap["methodResponses"]
+            .as_array()
+            .expect("method responses")
+            .iter()
+            .find(|row| row[2] == json!(id))
+            .expect("matching method response")
+    };
+    for (id, method) in [
+        ("settings", "x:AccountSettings/get"),
+        ("mailboxes", "Mailbox/get"),
+        ("identities", "Identity/get"),
+    ] {
+        assert_eq!(response(id)[0], json!(method), "{bootstrap}");
+    }
+    assert_eq!(
+        response("settings")[1]["list"][0]["encryptionAtRest"]["@type"],
+        "Aes256"
+    );
+    for (id, error) in [
+        ("administration", "forbidden"),
+        ("foreignSettings", "accountNotFound"),
+        ("foreignUpdate", "accountNotFound"),
+    ] {
+        assert_eq!(response(id)[0], "error", "{bootstrap}");
+        assert_eq!(response(id)[1]["type"], error, "{bootstrap}");
+    }
+
+    let mut encryption = response("settings")[1]["list"][0]["encryptionAtRest"].clone();
+    encryption["encryptOnAppend"] = json!(false);
+    let updated: Value = request
+        .json(&json!({
+            "using": ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+            "methodCalls": [["x:AccountSettings/set", {
+                "accountId": account_id,
+                "update": {"singleton": {"encryptionAtRest": encryption}}
+            }, "updateSettings"]]
+        }))
+        .send()
+        .await
+        .expect("owner encryption settings update")
+        .json()
+        .await
+        .expect("settings update JSON");
+    assert_eq!(updated["methodResponses"][0][0], "x:AccountSettings/set");
+    assert!(
+        updated["methodResponses"][0][1]["updated"]
+            .get("singleton")
+            .is_some(),
+        "{updated}"
     );
 
     // The bridge password is the HMAC derivation the next backend must reproduce exactly.
