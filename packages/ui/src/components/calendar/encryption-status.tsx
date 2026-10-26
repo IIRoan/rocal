@@ -7,13 +7,6 @@ import {
   getEncryptionStatusMeta,
 } from "./encryption-status-utils";
 
-export {
-  type EncryptableCalendarItem,
-  type EncryptionDisplayState,
-  getEncryptionStatusMeta,
-  resolveEncryptionState,
-} from "./encryption-status-utils";
-
 interface EncryptionStatusBadgeProps {
   item: EncryptableCalendarItem;
   kind?: CalendarEncryptionKind;

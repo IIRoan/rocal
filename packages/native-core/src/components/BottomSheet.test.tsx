@@ -2,7 +2,7 @@
 
 import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import type { ScrollViewProps } from "react-native";
+import { View, type ScrollViewProps } from "react-native";
 import type { BottomSheetProps as GorhomProps } from "@gorhom/bottom-sheet";
 import {
   BottomSheet,
@@ -158,7 +158,9 @@ it("registers only the focused page with Gorhom and restores it after navigating
       root.render(
         <BottomSheet visible onDismiss={jest.fn()}>
           <SheetScrollFocusProvider focused={focused}>
-            <BottomSheetScrollView>Settings</BottomSheetScrollView>
+            <BottomSheetScrollView>
+              <View />
+            </BottomSheetScrollView>
           </SheetScrollFocusProvider>
         </BottomSheet>,
       );
@@ -179,7 +181,7 @@ it("retains handle dragging and swipe-down dismissal", async () => {
   await act(async () => {
     root.render(
       <BottomSheet visible onDismiss={onDismiss}>
-        Content
+        <View />
       </BottomSheet>,
     );
   });
@@ -198,7 +200,7 @@ it("registers the back handler once per open even when onDismiss changes", async
     await act(async () => {
       root.render(
         <BottomSheet visible onDismiss={onDismiss}>
-          Content
+          <View />
         </BottomSheet>,
       );
     });

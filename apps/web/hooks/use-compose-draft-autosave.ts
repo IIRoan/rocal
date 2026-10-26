@@ -274,16 +274,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
   });
 
   useEffect(() => {
-    const cancel = () => clearPendingSave(saveTimeoutRef);
-    if (!enabled || !composeActive) {
-      cancel();
-      return cancel;
-    }
-
-    const bridge = getMailComposeBridge();
-    if (!bridge?.isComposeDirty()) {
-      return cancel;
-    }
+    clearPendingSave(saveTimeoutRef);
+    if (!enabled || !composeActive) return;
+    if (!getMailComposeBridge()?.isComposeDirty()) return;
 
     const hasContent =
       composeTo.trim() ||
@@ -292,17 +285,13 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       composeSubject.trim() ||
       composeBody.trim() ||
       composeHtmlBody.trim();
-    if (!hasContent) {
-      return cancel;
-    }
+    if (!hasContent) return;
 
-    cancel();
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
       autosave();
-    }, AUTOSAVE_DEBOUNCE_MS) as ReturnType<typeof setTimeout>;
-
-    return cancel;
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => clearPendingSave(saveTimeoutRef);
   }, [
     composeTo,
     composeCc,

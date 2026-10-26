@@ -91,6 +91,14 @@
         "rules": ["react-doctor/prefer-tag-over-role"]
       },
       {
+        "files": ["**/components/mail/message-list/use-message-list-virtualizer.ts"],
+        "rules": ["react-hooks-js/incompatible-library"]
+      },
+      {
+        "files": ["**/components/sheet/SheetViewport.tsx"],
+        "rules": ["react-doctor/rn-animate-layout-property"]
+      },
+      {
         "files": ["**/components/mail/MailThreadListRow.tsx"],
         "rules": ["react-doctor/react-compiler-no-manual-memoization"]
       }

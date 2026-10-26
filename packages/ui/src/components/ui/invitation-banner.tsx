@@ -182,6 +182,5 @@ export {
   InvitationBannerMeta,
   InvitationBannerMetaItem,
   InvitationBannerActions,
-  invitationBannerVariants,
   type InvitationBannerVariant,
 };

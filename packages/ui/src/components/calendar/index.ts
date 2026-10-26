@@ -18,11 +18,11 @@ export {
 } from "./notification-manager";
 export { DraggableEvent } from "./draggable-event";
 export { DroppableCell } from "./droppable-cell";
+export { EncryptionStatusBadge } from "./encryption-status";
 export {
-  EncryptionStatusBadge,
   getEncryptionStatusMeta,
   resolveEncryptionState,
-} from "./encryption-status";
+} from "./encryption-status-utils";
 export { formatEventDescription } from "./event-description-formatter";
 export {
   CalendarSkeleton,
