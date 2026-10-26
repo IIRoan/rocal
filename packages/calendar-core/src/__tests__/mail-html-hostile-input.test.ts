@@ -1,5 +1,9 @@
+import { stripHtmlTags } from "../html-text";
 import { buildMailBodyExcerpt } from "../mail-body-index";
+import { htmlToComposeText } from "../mail-compose-format";
 import { emailHtmlHasRemoteContent, processEmailHtml } from "../mail-html";
+import { scoreMailSearchMessage } from "../mail-search-relevance";
+import { htmlToPlainText } from "../mail-signature";
 import { sanitizeUntrustedEmailHtml } from "../sanitize-email-html";
 
 // Linear work on 64 KB takes milliseconds; a quadratic scan takes minutes, so the budget only trips on a real regression.
@@ -26,6 +30,15 @@ const UNITS = [
   "@media (prefers-color-scheme: dark) {",
   "color:url(",
   "color:rgb(",
+  "<span",
+  "<span>",
+  '<span style="font-weight:bold">',
+  "<font",
+  "<b x",
+  "<i x",
+  "<u x",
+  "<li",
+  "<br ",
 ];
 
 const ENTRY_POINTS: Record<string, (html: string) => unknown> = {
@@ -35,6 +48,11 @@ const ENTRY_POINTS: Record<string, (html: string) => unknown> = {
   "light reader": (html) => processEmailHtml({ html, isDark: false, blockTrackingPixels: true, blockRemoteImages: true }),
   "remote content check": (html) => emailHtmlHasRemoteContent({ html, isDark: true, blockTrackingPixels: true }),
   "search excerpt": (html) => buildMailBodyExcerpt({ html }),
+  "search ranking": (html) =>
+    scoreMailSearchMessage({ id: "m", subject: "x", htmlBody: [{ partId: "1" }], bodyValues: { "1": { value: html } } }, "solace"),
+  "tag stripper": (html) => stripHtmlTags(html),
+  "draft to compose text": (html) => htmlToComposeText(html),
+  "signature to plain text": (html) => htmlToPlainText(html),
 };
 
 describe("hostile mail HTML stays linear", () => {

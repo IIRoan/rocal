@@ -1,3 +1,5 @@
+import { stripHtmlTags } from "@workspace/calendar-core";
+
 export type QuoteSplit = {
   body: string;
   quote: string | null;
@@ -140,7 +142,7 @@ export function splitHtmlQuote(html: string): {
     // If stripping leaves an empty body, return the original unstripped HTML
     if (
       hasQuote &&
-      stripped.replace(/<[^>]+>/g, "").trim().length === 0
+      stripHtmlTags(stripped, "").trim().length === 0
     ) {
       return { html, hasQuote: false };
     }

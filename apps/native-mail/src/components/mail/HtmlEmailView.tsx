@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import { stripHtmlTags } from "@workspace/calendar-core";
 import {
   buildEmailHtmlDocument,
   processEmailHtml,
@@ -177,11 +178,11 @@ export function HtmlEmailView({
 }
 
 function stripToPlainText(html: string): string {
-  // An unclosed element or tag runs to the end in one match, so hostile mail cannot make this quadratic.
-  return html
+  // An unclosed element runs to the end in one match, so hostile mail cannot make this quadratic.
+  const withoutBlocks = html
     .replace(/<(style|script)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, "")
-    .replace(/<\/(p|div|br|li|tr|h[1-6])>/gi, "\n")
-    .replace(/<[a-z/!?][^>]*(?:>|$)/gi, "")
+    .replace(/<\/(p|div|br|li|tr|h[1-6])>/gi, "\n");
+  return stripHtmlTags(withoutBlocks, "")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")

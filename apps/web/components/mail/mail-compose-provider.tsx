@@ -7,7 +7,7 @@ import {
   MailComposeChromeContext,
   MailComposeFieldsContext,
 } from "./mail-compose-contexts";
-import type { QuotedDateOptions } from "./mail-compose-seed";
+import type { QuotedDateOptions } from "@workspace/calendar-core";
 import { useMailComposeController } from "./use-mail-compose-controller";
 
 const EMPTY_IDENTITIES: JmapIdentity[] = [];

@@ -1,4 +1,4 @@
-import { containsArmoredPgpMessage } from "@workspace/calendar-core";
+import { containsArmoredPgpMessage, stripHtmlTags } from "@workspace/calendar-core";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
@@ -16,9 +16,6 @@ function collapseWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function stripHtmlToText(html: string): string {
-  return html.replace(/<[^>]+>/g, " ");
-}
 
 function stripQuotedReply(raw: string): string {
   const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -75,13 +72,13 @@ export function buildMailPreviewSnippet(
     return finalizePreview(decrypted.text);
   }
   if (decrypted?.html?.trim()) {
-    return finalizePreview(stripHtmlToText(decrypted.html));
+    return finalizePreview(stripHtmlTags(decrypted.html));
   }
 
   const bodies = extractMessageBodies(message);
   let raw: string;
   if (bodies.html && !bodies.text) {
-    raw = stripHtmlToText(bodies.html);
+    raw = stripHtmlTags(bodies.html);
   } else {
     raw = bodies.text ?? message.preview ?? "";
   }

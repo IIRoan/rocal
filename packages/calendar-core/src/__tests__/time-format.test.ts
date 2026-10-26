@@ -5,6 +5,7 @@ import {
   formatClockTime,
   formatClockTimeRange,
   formatDateTimeLabel,
+  formatQuotedMailDate,
   resolveTimeFormat,
 } from "../time-format";
 
@@ -73,5 +74,17 @@ describe("buildEventReminderMailView", () => {
     expect(JSON.stringify(view24)).toContain("14:30");
     expect(JSON.stringify(view24)).not.toMatch(/AM|PM/);
     expect(JSON.stringify(view12)).toContain("2:30 PM");
+  });
+});
+
+describe("formatQuotedMailDate", () => {
+  it("renders a reply or forward date in the user's zone and clock", () => {
+    expect(
+      formatQuotedMailDate("2026-10-25T08:05:00Z", { timezone: "Europe/Amsterdam", timeFormat: "24h" }),
+    ).toMatch(/2026.*09:05$/);
+  });
+
+  it.each([undefined, "", "not a date"])("falls back instead of throwing for receivedAt %j", (receivedAt) => {
+    expect(formatQuotedMailDate(receivedAt, { timeFormat: "24h" })).toBe("Unknown date");
   });
 });

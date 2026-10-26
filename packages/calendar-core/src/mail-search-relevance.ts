@@ -1,3 +1,4 @@
+import { stripHtmlTags } from "./html-text";
 const MAX_SNIPPET_LENGTH = 180;
 
 type SearchField = {
@@ -56,11 +57,8 @@ function getBodyValue(
   return typeof value === "string" ? value : null;
 }
 
-function stripHtmlTags(value: string): string {
-  return value
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function htmlToSearchText(value: string): string {
+  return stripHtmlTags(value).replace(/\s+/g, " ").trim();
 }
 
 function extractSearchableBody(message: MailSearchScorableMessage): string {
@@ -70,7 +68,7 @@ function extractSearchableBody(message: MailSearchScorableMessage): string {
   const html = getBodyValue(message.bodyValues, htmlPartId);
 
   if (text) return text;
-  if (html) return stripHtmlTags(html);
+  if (html) return htmlToSearchText(html);
 
   const firstValue = Object.values(message.bodyValues ?? {}).find(
     (entry) => typeof entry.value === "string" && entry.value.length > 0,
@@ -78,7 +76,7 @@ function extractSearchableBody(message: MailSearchScorableMessage): string {
 
   if (!firstValue) return "";
   if (firstValue.includes("<") && firstValue.includes(">")) {
-    return stripHtmlTags(firstValue);
+    return htmlToSearchText(firstValue);
   }
   return firstValue;
 }

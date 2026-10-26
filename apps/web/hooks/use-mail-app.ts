@@ -31,13 +31,11 @@ import {
   resolveAttachmentPreviewKind,
   appendMailboxMessages,
   hasMoreMailboxMessages,
+  formatQuotedMailDate,
+  type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
-import {
-  formatQuotedMailDate,
-  type QuotedDateOptions,
-} from "@/components/mail/mail-compose-seed";
 import { toast } from "sonner";
 import { createLogger } from "@workspace/logger";
 import { useSession, signOut } from "@/lib/auth-client";

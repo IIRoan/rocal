@@ -1,5 +1,6 @@
 import type { TitleIndexDocument } from "./title-search-index";
 import { looksLikeMimeMessage } from "./outgoing-mime";
+import { stripHtmlTags } from "./html-text";
 
 /** Per-message cap so the encrypted on-device index stays small. */
 export const MAIL_BODY_EXCERPT_MAX_CHARS = 5000;
@@ -34,10 +35,8 @@ function decodeHtmlEntities(value: string): string {
 
 function stripHtml(html: string): string {
   return decodeHtmlEntities(
-    // An unclosed element or tag runs to the end in one match, so hostile mail cannot make this quadratic.
-    html
-      .replace(/<(script|style|head)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")
-      .replace(/<[a-z/!?][^>]*(?:>|$)/gi, " "),
+    // An unclosed element runs to the end in one match, so hostile mail cannot make this quadratic.
+    stripHtmlTags(html.replace(/<(script|style|head)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")),
   );
 }
 

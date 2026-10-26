@@ -1,5 +1,9 @@
 /** Message body extraction and encryption classification, ported from the web app's crypto-free subset. */
-import { containsArmoredPgpMessage, isCompleteArmoredPgpMessage } from "@workspace/calendar-core";
+import {
+  containsArmoredPgpMessage,
+  isCompleteArmoredPgpMessage,
+  stripHtmlTags,
+} from "@workspace/calendar-core";
 import type {
   JmapAttachment,
   JmapBodyStructure,
@@ -20,11 +24,8 @@ function getBodyValue(
   return typeof value === "string" ? value : null;
 }
 
-function stripHtmlTags(value: string): string {
-  return value
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function htmlToText(value: string): string {
+  return stripHtmlTags(value).replace(/\s+/g, " ").trim();
 }
 
 export function extractMessageBodies(message: JmapEmailMessage): {
@@ -56,7 +57,7 @@ export function extractMessageBodies(message: JmapEmailMessage): {
 
   if (firstValue.includes("<") && firstValue.includes(">")) {
     return {
-      text: stripHtmlTags(firstValue),
+      text: htmlToText(firstValue),
       html: firstValue,
     };
   }

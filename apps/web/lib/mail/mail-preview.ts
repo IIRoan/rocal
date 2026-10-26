@@ -1,4 +1,4 @@
-import { containsArmoredPgpMessage } from "@workspace/calendar-core";
+import { containsArmoredPgpMessage, stripHtmlTags } from "@workspace/calendar-core";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
@@ -19,7 +19,7 @@ function collapseWhitespace(value: string): string {
 
 function stripHtmlToText(html: string): string {
   const { html: cleanedHtml } = splitHtmlQuote(html);
-  return cleanedHtml.replace(/<[^>]+>/g, " ");
+  return stripHtmlTags(cleanedHtml);
 }
 
 function finalizePreview(raw: string): string {
