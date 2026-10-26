@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -41,7 +41,7 @@ export function MailLabelsSheet({
   onBack,
 }: MailLabelsSheetProps) {
   const { theme } = useTheme();
-  const { styles, dividerInset } = useMemo(() => createStyles(theme), [theme]);
+  const { styles, dividerInset } = createStyles(theme);
   const type = mailTypography(theme);
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState<string>(MAIL_LABEL_CUSTOM_DEFAULT_COLOR);

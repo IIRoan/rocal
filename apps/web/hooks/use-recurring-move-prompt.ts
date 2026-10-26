@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RecurrenceEditScope } from "@workspace/calendar-core";
 import type { MoveRecurringCalendarEvent } from "@workspace/ui/components/calendar";
@@ -17,30 +17,27 @@ export function useRecurringMovePrompt(
   const resolverRef = useRef<ScopeResolver | null>(null);
   const [pendingTitle, setPendingTitle] = useState<string | null>(null);
 
-  const settle = useCallback((scope: RecurrenceEditScope | null) => {
+  const settle = (scope: RecurrenceEditScope | null) => {
     const resolve = resolverRef.current;
     resolverRef.current = null;
     setPendingTitle(null);
     resolve?.(scope);
-  }, []);
+  };
 
-  const moveRecurringEvent = useCallback<MoveRecurringCalendarEvent>(
-    async (originalEvent, update) => {
-      const event = findEventInCache(queryClient, originalEvent.id);
-      if (!event) throw new Error("Event not found");
+  const moveRecurringEvent: MoveRecurringCalendarEvent = async (originalEvent, update) => {
+    const event = findEventInCache(queryClient, originalEvent.id);
+    if (!event) throw new Error("Event not found");
 
-      resolverRef.current?.(null);
-      const scope = await new Promise<RecurrenceEditScope | null>((resolve) => {
-        resolverRef.current = resolve;
-        setPendingTitle(originalEvent.title);
-      });
-      if (!scope) return false;
+    resolverRef.current?.(null);
+    const scope = await new Promise<RecurrenceEditScope | null>((resolve) => {
+      resolverRef.current = resolve;
+      setPendingTitle(originalEvent.title);
+    });
+    if (!scope) return false;
 
-      await editRecurringEvent({ event, scope, updates: update });
-      return true;
-    },
-    [editRecurringEvent, queryClient],
-  );
+    await editRecurringEvent({ event, scope, updates: update });
+    return true;
+  };
 
   return {
     moveRecurringEvent,

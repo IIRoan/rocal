@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import {
   applyMailListFilters,
   type MailListFilters,
@@ -30,6 +30,19 @@ interface MailboxThreadRowsParams {
   refetchRuntime: () => Promise<unknown>;
 }
 
+/** Conversation rows pull replies from the opposite folder: Sent for Inbox, Inbox for Sent. */
+function companionMailboxIdFor(
+  mailboxes: MailRuntime["mailboxes"],
+  mailboxId: string | null,
+): string | null {
+  const role = mailboxes
+    .find((mailbox) => mailbox.id === mailboxId)
+    ?.role?.toLowerCase();
+  if (role === "inbox") return getPrimaryMailboxId(mailboxes, "sent");
+  if (role === "sent") return getPrimaryMailboxId(mailboxes, "inbox");
+  return null;
+}
+
 export function useMailboxThreadRows({
   runtime,
   mailboxId,
@@ -44,19 +57,10 @@ export function useMailboxThreadRows({
   const messagesQuery = useMailboxMessages(runtime, mailboxId);
 
   // Inbox and Sent are read as a pair so a thread shows both sides of the conversation.
-  const companionMailboxId = useMemo(() => {
-    const mailboxes = runtime?.mailboxes ?? [];
-    const role = mailboxes
-      .find((mailbox) => mailbox.id === mailboxId)
-      ?.role?.toLowerCase();
-    if (role === "inbox") {
-      return getPrimaryMailboxId(mailboxes, "sent");
-    }
-    if (role === "sent") {
-      return getPrimaryMailboxId(mailboxes, "inbox");
-    }
-    return null;
-  }, [runtime?.mailboxes, mailboxId]);
+  const companionMailboxId = companionMailboxIdFor(
+    runtime?.mailboxes ?? [],
+    mailboxId,
+  );
 
   const companionMessagesQuery = useMailboxMessages(
     runtime,
@@ -66,25 +70,15 @@ export function useMailboxThreadRows({
   );
 
   // Background refetches re-read pages at old offsets, so new mail can repeat a row across a page boundary.
-  const mailboxMessages = useMemo(
-    () =>
-      uniqueMessagesById(
-        messagesQuery.data?.pages.flatMap((page) => page.messages) ?? [],
-      ),
-    [messagesQuery.data?.pages],
+  const mailboxMessages = uniqueMessagesById(
+    messagesQuery.data?.pages.flatMap((page) => page.messages) ?? [],
   );
-  const companionMessages = useMemo(() => {
-    if (!companionMailboxId) return [];
-    return (
-      companionMessagesQuery.data?.pages.flatMap((page) => page.messages) ?? []
-    );
-  }, [companionMailboxId, companionMessagesQuery.data?.pages]);
+  const companionMessages = companionMailboxId
+    ? (companionMessagesQuery.data?.pages.flatMap((page) => page.messages) ??
+      [])
+    : [];
 
-  const allowedMailboxIds = useMemo(
-    () =>
-      [mailboxId, companionMailboxId].filter((id): id is string => Boolean(id)),
-    [mailboxId, companionMailboxId],
-  );
+  const allowedMailboxIds = [mailboxId, companionMailboxId].filter((id): id is string => Boolean(id));
 
   const conversationExtras = useConversationListExtras(
     runtime,
@@ -93,57 +87,35 @@ export function useMailboxThreadRows({
     allowedMailboxIds,
   );
 
-  const primaryMessageIds = useMemo(
-    () =>
-      new Set(
-        [...mailboxMessages, ...searchMessages].map((message) => message.id),
-      ),
-    [mailboxMessages, searchMessages],
+  const primaryMessageIds = new Set(
+    [...mailboxMessages, ...searchMessages].map((message) => message.id),
   );
 
-  const allThreadRows = useMemo(
-    () => buildMailboxThreadRows(mailboxMessages, conversationExtras),
-    [mailboxMessages, conversationExtras],
-  );
+  const allThreadRows = buildMailboxThreadRows(mailboxMessages, conversationExtras);
 
-  const threadRows = useMemo(() => {
-    if (!listFilterActive) return allThreadRows;
-    const source = searchActive ? searchMessages : mailboxMessages;
-    const filtered = applyMailListFilters(source, listFilters, {
-      now: new Date(),
-      timezone,
-    });
-    return buildMailboxThreadRows(filtered, conversationExtras);
-  }, [
-    allThreadRows,
-    conversationExtras,
-    listFilters,
-    listFilterActive,
-    mailboxMessages,
-    searchActive,
-    searchMessages,
-    timezone,
-  ]);
+  const threadRows = listFilterActive
+    ? buildMailboxThreadRows(
+        applyMailListFilters(
+          searchActive ? searchMessages : mailboxMessages,
+          listFilters,
+          { now: new Date(), timezone },
+        ),
+        conversationExtras,
+      )
+    : allThreadRows;
 
-  const latestMessages = useMemo(
-    () => threadRows.map((row) => row.latestMessage),
-    [threadRows],
-  );
+  const latestMessages = threadRows.map((row) => row.latestMessage);
   const decryptedPreviews = useConversationDecryptedPreviews(
     runtime,
     latestMessages,
   );
 
-  const unreadThreadCount = useMemo(
-    () =>
-      allThreadRows.filter((row) =>
-        row.messages.some(
-          (entry) =>
-            primaryMessageIds.has(entry.id) && !entry.keywords?.["$seen"],
-        ),
-      ).length,
-    [allThreadRows, primaryMessageIds],
-  );
+  const unreadThreadCount = allThreadRows.filter((row) =>
+    row.messages.some(
+      (entry) =>
+        primaryMessageIds.has(entry.id) && !entry.keywords?.["$seen"],
+    ),
+  ).length;
 
   const activeMessagesQuery = searchActive ? searchQuery : messagesQuery;
   const pagePrefetch = useMailboxPagePrefetch(
@@ -153,22 +125,19 @@ export function useMailboxThreadRows({
   const readerPrefetch = useMailReaderPrefetch(runtime);
   const pageViewableChanged = pagePrefetch.onViewableItemsChanged;
   // FlatList throws if these pairs change after mount; both callbacks are stable.
-  const viewabilityConfigCallbackPairs = useMemo(
-    () => [
-      {
-        viewabilityConfig: LIST_VIEWABILITY_CONFIG,
-        onViewableItemsChanged: pageViewableChanged,
-      },
-      readerPrefetch,
-    ],
-    [pageViewableChanged, readerPrefetch],
-  );
+  const viewabilityConfigCallbackPairs = [
+    {
+      viewabilityConfig: LIST_VIEWABILITY_CONFIG,
+      onViewableItemsChanged: pageViewableChanged,
+    },
+    readerPrefetch,
+  ];
 
   // Only a user pull shows the spinner; background sync refetches stay invisible.
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const refetchActiveMessages = activeMessagesQuery.refetch;
   const refetchCompanionMessages = companionMessagesQuery.refetch;
-  const handlePullRefresh = useCallback(() => {
+  const handlePullRefresh = () => {
     setPullRefreshing(true);
     // allSettled never rejects, so the catch only backstops the spinner reset.
     void Promise.allSettled([
@@ -178,7 +147,7 @@ export function useMailboxThreadRows({
     ])
       .finally(() => setPullRefreshing(false))
       .catch(() => undefined);
-  }, [refetchActiveMessages, refetchCompanionMessages, refetchRuntime]);
+  };
 
   return {
     mailboxMessages,

@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -35,7 +34,7 @@ export function ComposeIdentitySheet({
 }: ComposeIdentitySheetProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
 
   return (
     <BottomSheet visible={visible} onDismiss={onDismiss} snapPoints={[0.45]}>

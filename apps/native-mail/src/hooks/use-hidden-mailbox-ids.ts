@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import {
@@ -24,12 +23,9 @@ export function useHiddenMailboxIds() {
 
   const hiddenIds = query.data ?? [];
 
-  const toggleHidden = useCallback(
-    async (mailboxId: string) => {
-      await persist.mutateAsync(toggleHiddenMailboxId(hiddenIds, mailboxId));
-    },
-    [hiddenIds, persist],
-  );
+  const toggleHidden = async (mailboxId: string) => {
+    await persist.mutateAsync(toggleHiddenMailboxId(hiddenIds, mailboxId));
+  };
 
   return {
     hiddenIds,

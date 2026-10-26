@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import {
   DEFAULT_MAIL_LIST_FILTERS,
   buildMailboxFieldSearchFilter,
@@ -39,46 +39,35 @@ export function useMailListSearch({
   }
 
   const fieldSearchActive = hasMailSearchFieldValues(fieldSearch.fields);
-  const fieldSearchFilter = useMemo(
-    () =>
-      fieldSearchActive && mailboxId
-        ? buildMailboxFieldSearchFilter(
-            mailboxId,
-            fieldSearch.fields,
-            listFilters,
-            {
-              timezone,
-              now: new Date(),
-            },
-          )
-        : null,
-    [fieldSearch.fields, fieldSearchActive, listFilters, mailboxId, timezone],
-  );
+  const fieldSearchFilter = fieldSearchActive && mailboxId
+    ? buildMailboxFieldSearchFilter(
+        mailboxId,
+        fieldSearch.fields,
+        listFilters,
+        {
+          timezone,
+          now: new Date(),
+        },
+      )
+    : null;
   const fieldSearchQuery = useMailboxFieldSearch(
     runtime,
     mailboxId,
     fieldSearchFilter,
     fieldSearch.revision,
   );
-  const searchMessages = useMemo(
-    () =>
-      fieldSearchActive
-        ? (fieldSearchQuery.data?.pages.flatMap((page) => page.messages) ?? [])
-        : [],
-    [fieldSearchActive, fieldSearchQuery.data?.pages],
-  );
+  const searchMessages = fieldSearchActive
+    ? (fieldSearchQuery.data?.pages.flatMap((page) => page.messages) ?? [])
+    : [];
 
-  const handleSearchFieldsChange = useCallback(
-    (fields: MailSearchFieldValues) =>
-      setFieldSearch((prev) => ({ fields, revision: prev.revision + 1 })),
-    [],
-  );
+  const handleSearchFieldsChange = (fields: MailSearchFieldValues) =>
+    setFieldSearch((prev) => ({ fields, revision: prev.revision + 1 }));
 
   // Toggles fold into the server query, so a new revision keeps each distinct search in its own cache entry.
-  const handleListFiltersChange = useCallback((next: MailListFilters) => {
+  const handleListFiltersChange = (next: MailListFilters) => {
     setListFilters(next);
     setFieldSearch((prev) => ({ ...prev, revision: prev.revision + 1 }));
-  }, []);
+  };
 
   return {
     listFilters,

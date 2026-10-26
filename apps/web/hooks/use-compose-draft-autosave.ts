@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef, type RefObject } from "react";
 import { createLogger } from "@workspace/logger";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type { JmapEmailMessage, JmapSession } from "@/lib/mail/types";
@@ -23,6 +23,15 @@ import { readMailComposeSettings } from "@/lib/mail/compose-settings";
 
 const log = createLogger("compose-draft-autosave");
 const AUTOSAVE_DEBOUNCE_MS = 2000;
+
+function clearPendingSave(
+  timeoutRef: RefObject<ReturnType<typeof setTimeout> | null>,
+) {
+  if (timeoutRef.current) {
+    clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+  }
+}
 
 function getPrimaryMailboxId(
   mailboxes: Array<{ id: string; role?: string | null }>,
@@ -76,7 +85,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = useRef<string>("");
 
-  const saveDraftOnce = useCallback(async (): Promise<string | null> => {
+  const saveDraftOnce = async (): Promise<string | null> => {
     const bridge = getMailComposeBridge();
     if (!bridge || !client || !session) return null;
 
@@ -202,24 +211,11 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       }, 3000);
       return null;
     }
-  }, [
-    client,
-    fallbackFromEmail,
-    identities,
-    mailboxes,
-    mailServerPolicy,
-    onDraftSaved,
-    session,
-  ]);
+  };
 
-  const cancelPendingSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
-  }, []);
+  const cancelPendingSave = () => clearPendingSave(saveTimeoutRef);
 
-  const saveDraft = useCallback((): Promise<string | null> => {
+  const saveDraft = (): Promise<string | null> => {
     const previous = inflightSaveRef.current;
     const promise = (async () => {
       if (previous) {
@@ -238,9 +234,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       }
     });
     return promise;
-  }, [saveDraftOnce]);
+  };
 
-  const flushDraftSave = useCallback(async (): Promise<string | null> => {
+  const flushDraftSave = async (): Promise<string | null> => {
     cancelPendingSave();
     const previous = inflightSaveRef.current;
     if (previous) {
@@ -251,8 +247,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       }
     }
     return saveDraftOnce();
-  }, [cancelPendingSave, saveDraftOnce]);
+  };
 
+  // Re-registered every commit, so the compose bridge always reaches this render's save functions.
   useEffect(() => {
     registerComposeDraftSaver({
       save: saveDraft,
@@ -260,17 +257,32 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       cancelPending: cancelPendingSave,
     });
     return () => registerComposeDraftSaver(null);
-  }, [cancelPendingSave, flushDraftSave, saveDraft]);
+  });
+
+  const autosave = useEffectEvent(() => {
+    void saveDraft().catch((error) => {
+      log.error("Failed to auto-save draft", error);
+    });
+  });
+
+  const flushBeforeUnload = useEffectEvent(() => {
+    const bridge = getMailComposeBridge();
+    if (!bridge?.isComposeDirty() || !bridge.hasUserContent()) return;
+    void flushDraftSave().catch((error) => {
+      log.error("Failed to flush draft save before unload", error);
+    });
+  });
 
   useEffect(() => {
+    const cancel = () => clearPendingSave(saveTimeoutRef);
     if (!enabled || !composeActive) {
-      cancelPendingSave();
-      return cancelPendingSave;
+      cancel();
+      return cancel;
     }
 
     const bridge = getMailComposeBridge();
     if (!bridge?.isComposeDirty()) {
-      return cancelPendingSave;
+      return cancel;
     }
 
     const hasContent =
@@ -281,18 +293,16 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       composeBody.trim() ||
       composeHtmlBody.trim();
     if (!hasContent) {
-      return cancelPendingSave;
+      return cancel;
     }
 
-    cancelPendingSave();
+    cancel();
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      void saveDraft().catch((error) => {
-        log.error("Failed to auto-save draft", error);
-      });
+      autosave();
     }, AUTOSAVE_DEBOUNCE_MS) as ReturnType<typeof setTimeout>;
 
-    return cancelPendingSave;
+    return cancel;
   }, [
     composeTo,
     composeCc,
@@ -303,21 +313,13 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     selectedIdentityId,
     enabled,
     composeActive,
-    saveDraft,
-    cancelPendingSave,
   ]);
 
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      const bridge = getMailComposeBridge();
-      if (!bridge?.isComposeDirty() || !bridge.hasUserContent()) return;
-      void flushDraftSave().catch((error) => {
-        log.error("Failed to flush draft save before unload", error);
-      });
-    };
+    const handleBeforeUnload = () => flushBeforeUnload();
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [flushDraftSave]);
+  }, []);
 
   return { saveDraft, flushDraftSave, inflightSaveRef };
 }

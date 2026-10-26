@@ -89,6 +89,10 @@
       {
         "files": ["**/components/mail/message-list/message-list-row.tsx"],
         "rules": ["react-doctor/prefer-tag-over-role"]
+      },
+      {
+        "files": ["**/components/mail/MailThreadListRow.tsx"],
+        "rules": ["react-doctor/react-compiler-no-manual-memoization"]
       }
     ]
   }

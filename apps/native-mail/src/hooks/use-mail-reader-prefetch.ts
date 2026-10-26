@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { ViewToken } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import type { MailConversation } from "../lib/mail/conversation-thread";
@@ -21,20 +21,14 @@ export function useMailReaderPrefetch(runtime: MailRuntime | undefined) {
   }, [runtime]);
 
   // FlatList rejects a changing viewability callback, so this reads the runtime through a ref.
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken<MailConversation>[] }) => {
-      const current = runtimeRef.current;
-      if (!current) return;
-      const messages = [...viewableItems]
-        .sort((left, right) => (left.index ?? 0) - (right.index ?? 0))
-        .map((token) => token.item.latestMessage);
-      prefetchReaderData(queryClient, current, messages);
-    },
-    [queryClient],
-  );
+  const onViewableItemsChanged = ({ viewableItems }: { viewableItems: ViewToken<MailConversation>[] }) => {
+    const current = runtimeRef.current;
+    if (!current) return;
+    const messages = [...viewableItems]
+      .sort((left, right) => (left.index ?? 0) - (right.index ?? 0))
+      .map((token) => token.item.latestMessage);
+    prefetchReaderData(queryClient, current, messages);
+  };
 
-  return useMemo(
-    () => ({ viewabilityConfig: READER_PREFETCH_VIEWABILITY, onViewableItemsChanged }),
-    [onViewableItemsChanged],
-  );
+  return ({ viewabilityConfig: READER_PREFETCH_VIEWABILITY, onViewableItemsChanged });
 }

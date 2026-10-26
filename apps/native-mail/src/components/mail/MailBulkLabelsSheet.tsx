@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   Pressable,
   StyleSheet,
@@ -27,7 +27,7 @@ export function MailBulkLabelsSheet({
   onApplyLabel,
 }: MailBulkLabelsSheetProps) {
   const { theme } = useTheme();
-  const { styles, dividerInset } = useMemo(() => createStyles(theme), [theme]);
+  const { styles, dividerInset } = createStyles(theme);
 
   return (
     <>

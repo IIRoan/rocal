@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useRef } from "react";
 import { toast } from "sonner";
 
 export type UndoableAction = {
@@ -16,37 +16,34 @@ export function useUndoToast(
 ) {
   const pendingUndoRef = useRef<UndoableAction | null>(null);
 
-  const showUndoToast = useCallback(
-    (action: UndoableAction) => {
-      pendingUndoRef.current = action;
+  const showUndoToast = (action: UndoableAction) => {
+    pendingUndoRef.current = action;
 
-      const count = action.messageIds.length;
-      const label =
-        count > 1
-          ? `${count} messages ${action.label}`
-          : `Message ${action.label}`;
+    const count = action.messageIds.length;
+    const label =
+      count > 1
+        ? `${count} messages ${action.label}`
+        : `Message ${action.label}`;
 
-      toast(label, {
-        duration: undoDurationMs,
-        action: {
-          label: "Undo",
-          onClick: () => {
-            const pending = pendingUndoRef.current;
-            if (pending) {
-              pendingUndoRef.current = null;
-              void Promise.resolve(pending.undo()).catch(() => {
-                toast.error("Could not undo this action.");
-              });
-            }
-          },
+    toast(label, {
+      duration: undoDurationMs,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          const pending = pendingUndoRef.current;
+          if (pending) {
+            pendingUndoRef.current = null;
+            void Promise.resolve(pending.undo()).catch(() => {
+              toast.error("Could not undo this action.");
+            });
+          }
         },
-        onDismiss: () => {
-          pendingUndoRef.current = null;
-        },
-      });
-    },
-    [undoDurationMs],
-  );
+      },
+      onDismiss: () => {
+        pendingUndoRef.current = null;
+      },
+    });
+  };
 
   return { showUndoToast };
 }

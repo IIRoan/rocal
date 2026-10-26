@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { createLogger } from "@workspace/logger";
 import { getApiBaseUrl } from "@/lib/api-url";
 import { mailDemoApiService } from "@/lib/mail/api-service";
@@ -24,20 +24,20 @@ export function useMailRealtime(input: {
     onSyncRef.current = input.onSync;
   }, [input.onSync]);
 
-  const runSync = useCallback(async () => {
-    if (!input.accountId) return;
-    const result = await mailDemoApiService.syncAccount(input.accountId);
-    await onSyncRef.current(result);
-  }, [input.accountId]);
-
   // Single effect: runs initial sync, then opens the SSE EventSource to receive server-pushed mail.changed signals. Debounces rapid signals before calling sync. The server polls JMAP every 30 s per connected client, so no client-side polling needed.
   useEffect(() => {
     if (!input.enabled || !input.accountId || typeof window === "undefined") {
       return;
     }
 
+    const accountId = input.accountId;
     const debounceMs = input.debounceMs ?? 750;
     let closed = false;
+
+    const runSync = async () => {
+      const result = await mailDemoApiService.syncAccount(accountId);
+      await onSyncRef.current(result);
+    };
     let eventSource: EventSource | null = null;
 
     const scheduleDebouncedSync = () => {
@@ -123,5 +123,5 @@ export function useMailRealtime(input: {
       eventSource?.removeEventListener("mail.changed", handleMailChanged);
       eventSource?.close();
     };
-  }, [input.accountId, input.debounceMs, input.enabled, runSync]);
+  }, [input.accountId, input.debounceMs, input.enabled]);
 }

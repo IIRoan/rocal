@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   Pressable,
   StyleSheet,
@@ -36,7 +36,7 @@ export function MailTopToolbar({
 }: MailTopToolbarProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [skin, theme]);
+  const styles = createStyles(theme, skin);
 
   return (
     <View style={styles.shell}>

@@ -190,7 +190,6 @@ jest.mock("@workspace/ui/components/ui/tooltip", () => ({
 jest.mock("../../components/mail/advanced-search-panel", () => ({
   AdvancedSearchPanel: () => null,
   AdvancedSearchToggle: () => null,
-  countActiveFilters: () => 0,
 }));
 
 jest.mock("../../lib/mail/api-service", () => ({

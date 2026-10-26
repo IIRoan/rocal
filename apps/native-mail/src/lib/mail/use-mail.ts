@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
@@ -354,9 +353,9 @@ export function useMailMutations(
     return runtime;
   };
 
-  const invalidateMessages = useCallback(() => {
+  const invalidateMessages = () => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mailMessagesAll() });
-  }, [queryClient]);
+  };
 
   const markAsRead = useMutation({
     mutationFn: (messageId: string) => {

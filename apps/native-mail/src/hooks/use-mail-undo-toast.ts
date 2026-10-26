@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import {
@@ -24,20 +23,17 @@ export function useMailUndoToast(runtime: MailRuntime | undefined) {
   });
   const duration = settings.undoToastDurationMs;
 
-  return useCallback(
-    (message: string, snapshot: MailMoveSnapshot | undefined) => {
-      if (!snapshot || snapshot.restores.length === 0) {
-        toast(message);
-        return;
-      }
-      toast(message, "success", {
-        duration,
-        action: {
-          label: "Undo",
-          onPress: () => undoMove(snapshot),
-        },
-      });
-    },
-    [duration, toast, undoMove],
-  );
+  return (message: string, snapshot: MailMoveSnapshot | undefined) => {
+    if (!snapshot || snapshot.restores.length === 0) {
+      toast(message);
+      return;
+    }
+    toast(message, "success", {
+      duration,
+      action: {
+        label: "Undo",
+        onPress: () => undoMove(snapshot),
+      },
+    });
+  };
 }

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -30,7 +30,7 @@ export function MailBottomActionBar({
   children,
 }: MailBottomActionBarProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createBarStyles(theme), [theme]);
+  const styles = createBarStyles(theme);
   const pad = mailSpacing(theme);
 
   return (
@@ -77,7 +77,7 @@ export function MailBottomAction({
   loading,
 }: MailBottomActionProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createActionStyles(theme), [theme]);
+  const styles = createActionStyles(theme);
   const type = mailTypography(theme);
   const iconColor = destructive
     ? theme.colors.destructive

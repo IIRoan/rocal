@@ -1,4 +1,3 @@
-import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -171,7 +170,7 @@ function MailScreenBody({ controller }: { controller: MailListController }) {
 
 function MailThreadList({ controller }: { controller: MailListController }) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const {
     rowHandlers,
     showRecipient,
@@ -197,77 +196,47 @@ function MailThreadList({ controller }: { controller: MailListController }) {
     fetchingNextPage,
   } = controller;
 
-  const renderItem = useCallback(
-    ({ item }: { item: (typeof threadRows)[number] }) => {
-      const rowState = getThreadRowState(item, primaryMessageIds, selectedIds);
+  const renderItem = ({ item }: { item: (typeof threadRows)[number] }) => {
+    const rowState = getThreadRowState(item, primaryMessageIds, selectedIds);
 
-      return (
-        <MailThreadListRow
-          row={item}
-          selectableIds={rowState.selectableIds}
-          unreadCount={rowState.unreadCount}
-          hasAttachments={rowState.hasAttachments}
-          selected={rowState.selected}
-          selectionActive={selectionActive}
-          preview={decryptedPreviews[item.latestMessage.id]}
-          showRecipient={showRecipient}
-          labels={labels}
-          identities={identities}
-          timeFormat={timeFormat}
-          timezone={timezone}
-          density={listSettings.density}
-          showLabelChips={listSettings.showLabelChipsInList}
-          threadExpandable={listSettings.threadExpandInList}
-          handlers={rowHandlers}
+    return (
+      <MailThreadListRow
+        row={item}
+        selectableIds={rowState.selectableIds}
+        unreadCount={rowState.unreadCount}
+        hasAttachments={rowState.hasAttachments}
+        selected={rowState.selected}
+        selectionActive={selectionActive}
+        preview={decryptedPreviews[item.latestMessage.id]}
+        showRecipient={showRecipient}
+        labels={labels}
+        identities={identities}
+        timeFormat={timeFormat}
+        timezone={timezone}
+        density={listSettings.density}
+        showLabelChips={listSettings.showLabelChipsInList}
+        threadExpandable={listSettings.threadExpandInList}
+        handlers={rowHandlers}
+      />
+    );
+  };
+
+  const renderSeparator = () => <View style={styles.separator} />;
+
+  const listFooter = (
+    <>
+      {fetchingNextPage ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color={theme.colors.primaryBase} />
+        </View>
+      ) : null}
+      {showMailChrome ? (
+        <MailListAnimatedFooter
+          idlePadding={idleListPadding}
+          bulkPadding={bulkListPadding}
         />
-      );
-    },
-    [
-      rowHandlers,
-      showRecipient,
-      labels,
-      identities,
-      primaryMessageIds,
-      selectedIds,
-      selectionActive,
-      decryptedPreviews,
-      timeFormat,
-      timezone,
-      listSettings.density,
-      listSettings.showLabelChipsInList,
-      listSettings.threadExpandInList,
-    ],
-  );
-
-  const renderSeparator = useCallback(
-    () => <View style={styles.separator} />,
-    [styles.separator],
-  );
-
-  const listFooter = useMemo(
-    () => (
-      <>
-        {fetchingNextPage ? (
-          <View style={styles.centered}>
-            <ActivityIndicator color={theme.colors.primaryBase} />
-          </View>
-        ) : null}
-        {showMailChrome ? (
-          <MailListAnimatedFooter
-            idlePadding={idleListPadding}
-            bulkPadding={bulkListPadding}
-          />
-        ) : null}
-      </>
-    ),
-    [
-      showMailChrome,
-      idleListPadding,
-      bulkListPadding,
-      fetchingNextPage,
-      styles.centered,
-      theme.colors.primaryBase,
-    ],
+      ) : null}
+    </>
   );
 
   return (
@@ -394,7 +363,7 @@ function ErrorState({
   message: string;
   onRetry: () => void;
 }) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   return (
     <View style={styles.centered}>
       <Feather
@@ -428,7 +397,7 @@ function SetupState({
   errorMessage: string | null;
   onSetup: () => void;
 }) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   return (
     <View style={styles.centered}>
       <Feather

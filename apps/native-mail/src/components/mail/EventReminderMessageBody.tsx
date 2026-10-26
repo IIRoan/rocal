@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   Image,
   Linking,
@@ -33,10 +32,7 @@ export function EventReminderMessageBody({
 }: EventReminderMessageBodyProps) {
   const { theme } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const styles = useMemo(
-    () => createStyles(theme, windowWidth, windowHeight),
-    [theme, windowWidth, windowHeight],
-  );
+  const styles = createStyles(theme, windowWidth, windowHeight);
 
   const openFooterLink = (url: string) => {
     // A device without a handler for the URL just no-ops the tap.

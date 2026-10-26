@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Animated, StyleSheet, View, type ViewStyle } from "react-native";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -45,7 +45,7 @@ export function MessageDecryptingSkeleton({
   attachedBelowBanner = false,
 }: MessageDecryptingSkeletonProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const pulse = useSkeletonPulse();
   const barColor = theme.colors.muted;
 

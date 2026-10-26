@@ -1,7 +1,6 @@
 import React, {
   createContext,
   useContext,
-  useMemo,
   useState,
 } from "react";
 
@@ -37,10 +36,7 @@ export function MailSelectionProvider({
     null,
   );
 
-  const value = useMemo<MailSelectionContextValue>(
-    () => ({ selectedMailboxId, setSelectedMailboxId }),
-    [selectedMailboxId],
-  );
+  const value: MailSelectionContextValue = { selectedMailboxId, setSelectedMailboxId };
 
   return (
     <MailSelectionContext.Provider value={value}>

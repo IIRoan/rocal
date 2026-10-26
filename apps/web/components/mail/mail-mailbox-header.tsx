@@ -15,7 +15,8 @@ import {
   TypographyWeight,
   WarmTooltipGroup,
 } from "@workspace/ui/solace";
-import { AdvancedSearchPanel, AdvancedSearchToggle, countActiveFilters } from "./advanced-search-panel";
+import { AdvancedSearchPanel, AdvancedSearchToggle } from "./advanced-search-panel";
+import { filtersToChips } from "@/lib/mail/mail-search-filter";
 import type { MailSearchFilters } from "@/lib/mail/mail-search-filter";
 import {
   MAIL_LIST_VIEW_FILTERS,
@@ -126,7 +127,7 @@ export function MailMailboxHeader({
             <AdvancedSearchToggle
               expanded={advanced.expanded}
               onExpandedChange={advanced.onExpandedChange}
-              activeCount={countActiveFilters(advanced.filters)}
+              activeCount={filtersToChips(advanced.filters).length}
             />
           ) : (
             <>

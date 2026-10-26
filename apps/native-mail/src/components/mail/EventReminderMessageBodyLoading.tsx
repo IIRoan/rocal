@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -25,10 +24,7 @@ export function EventReminderMessageBodyLoading({
 }: EventReminderMessageBodyLoadingProps) {
   const { theme } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const styles = useMemo(
-    () => createStyles(theme, windowWidth, windowHeight),
-    [theme, windowWidth, windowHeight],
-  );
+  const styles = createStyles(theme, windowWidth, windowHeight);
   const skeleton = theme.colors.muted;
 
   return (

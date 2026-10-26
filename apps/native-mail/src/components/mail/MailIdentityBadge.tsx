@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { StyleSheet, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import {
@@ -25,10 +25,7 @@ export function MailIdentityBadge({
   subAddressDelimiter = DEFAULT_SUB_ADDRESS_DELIMITER,
 }: MailIdentityBadgeProps) {
   const { theme } = useTheme();
-  const styles = useMemo(
-    () => createStyles(theme, compact),
-    [compact, theme],
-  );
+  const styles = createStyles(theme, compact);
 
   const info = resolveMailIdentityBadge(message, identities, {
     subAddressDelimiter,

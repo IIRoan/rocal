@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   Modal,
   Pressable,
@@ -46,7 +46,7 @@ export function RecipientSheet({
   const { toast } = useToast();
   const { openCompose } = useMailCompose();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const [open, setOpen] = React.useState(false);
 
   const displayName = recipient.name?.trim() || recipient.email;

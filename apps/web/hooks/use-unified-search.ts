@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type {
   EventSearchHit,
@@ -167,7 +166,7 @@ export function useUnifiedSearch({
     staleTime: 5 * 60_000,
   });
 
-  const response = useMemo<UnifiedSearchResponse<JmapEmailMessage>>(() => {
+  const buildResponse = (): UnifiedSearchResponse<JmapEmailMessage> => {
     if (!canSearch) {
       return {
         results: [],
@@ -214,21 +213,8 @@ export function useUnifiedSearch({
         ((includeMail && searchableMailMessages.length === 0) ||
           mailQuery.isError === true),
     };
-  }, [
-    canSearch,
-    includeMail,
-    includeCalendar,
-    mailMessages,
-    mailQuery.data,
-    mailQuery.isError,
-    normalizedQuery,
-    perSourceLimit,
-    calendarQuery.data,
-    limit,
-    titleIndex.documents,
-    titleIndex.enabled,
-    titleIndex.isIndexing,
-  ]);
+  };
+  const response = buildResponse();
 
   return {
     ...response,

@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -65,7 +64,7 @@ export function MailMessageActionsSheet({
   const { theme } = useTheme();
   const { toast } = useToast();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const sheetPad = sheetBottomPadding(insets.bottom);
   const sheetH = mailSpacing(theme).sheetH;
   const { activeSheetView, setActiveSheetView } = actions;

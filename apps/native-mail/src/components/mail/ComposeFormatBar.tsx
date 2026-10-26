@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -37,7 +36,7 @@ export function ComposeFormatBar({
 }: ComposeFormatBarProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
   const buttonStyle = ({ pressed }: { pressed: boolean }) => [
     styles.formatButton,
     pressed && styles.pressed,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getErrorMessage } from "@workspace/calendar-core";
@@ -54,19 +54,13 @@ export function useMailListController() {
   const { runtime, provisioned } = account;
   const { selectedMailboxId, setSelectedMailboxId } = useMailSelection();
 
-  const resolvedMailboxId = useMemo(() => {
-    if (selectedMailboxId) {
-      return selectedMailboxId;
-    }
-    if (!runtime) {
-      return null;
-    }
-    return (
-      getPrimaryMailboxId(runtime.mailboxes, "inbox") ??
-      runtime.mailboxes[0]?.id ??
-      null
-    );
-  }, [runtime, selectedMailboxId]);
+  const resolvedMailboxId =
+    selectedMailboxId ||
+    (runtime
+      ? (getPrimaryMailboxId(runtime.mailboxes, "inbox") ??
+        runtime.mailboxes[0]?.id ??
+        null)
+      : null);
 
   useEffect(() => {
     if (!resolvedMailboxId || selectedMailboxId) {
@@ -109,7 +103,7 @@ export function useMailListController() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const closeSheet = useCallback(() => setActiveSheetView(null), []);
+  const closeSheet = () => setActiveSheetView(null);
 
   const mailboxes = runtime?.mailboxes ?? NO_MAILBOXES;
   const selectedMailbox = mailboxes.find((m) => m.id === resolvedMailboxId);
@@ -141,84 +135,59 @@ export function useMailListController() {
   });
 
   const { clearSelection } = selection;
-  const handleSelectMailbox = useCallback(
-    (mailboxId: string) => {
-      clearSelection();
-      setSelectedMailboxId(mailboxId);
-    },
-    [clearSelection, setSelectedMailboxId],
-  );
+  const handleSelectMailbox = (mailboxId: string) => {
+    clearSelection();
+    setSelectedMailboxId(mailboxId);
+  };
 
   const { emptyMailbox } = mutations;
   const [emptyingMailboxId, setEmptyingMailboxId] = useState<string | null>(
     null,
   );
-  const handleEmptyMailbox = useCallback(
-    (mailbox: JmapMailbox) => {
-      const name = getMailboxDisplayName(mailbox);
-      Alert.alert(
-        `Empty ${name}?`,
-        `Every message in ${name} will be permanently deleted. This cannot be undone.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Empty",
-            style: "destructive",
-            onPress: () => {
-              setEmptyingMailboxId(mailbox.id);
-              emptyMailbox.mutate(mailbox.id, {
-                onSuccess: (count) => toast(emptyMailboxResultMessage(count)),
-                onError: (error) =>
-                  toast(
-                    getErrorMessage(error, `Failed to empty ${name}.`),
-                    "error",
-                  ),
-                onSettled: () => setEmptyingMailboxId(null),
-              });
-            },
+  const handleEmptyMailbox = (mailbox: JmapMailbox) => {
+    const name = getMailboxDisplayName(mailbox);
+    Alert.alert(
+      `Empty ${name}?`,
+      `Every message in ${name} will be permanently deleted. This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Empty",
+          style: "destructive",
+          onPress: () => {
+            setEmptyingMailboxId(mailbox.id);
+            emptyMailbox.mutate(mailbox.id, {
+              onSuccess: (count) => toast(emptyMailboxResultMessage(count)),
+              onError: (error) =>
+                toast(
+                  getErrorMessage(error, `Failed to empty ${name}.`),
+                  "error",
+                ),
+              onSettled: () => setEmptyingMailboxId(null),
+            });
           },
-        ],
-      );
-    },
-    [emptyMailbox, toast],
+        },
+      ],
+    );
+  };
+
+  const drawerMailboxes = filterVisibleMailboxes(sortMailboxes(mailboxes), hiddenIds);
+
+  const bulkMoveTargets = mailboxes.filter(
+    (mailbox) =>
+      mailbox.id !== resolvedMailboxId &&
+      !MOVE_EXCLUDED_ROLES.has(mailbox.role?.toLowerCase() ?? ""),
   );
 
-  const drawerMailboxes = useMemo(
-    () => filterVisibleMailboxes(sortMailboxes(mailboxes), hiddenIds),
-    [hiddenIds, mailboxes],
-  );
+  const bulkSheetSnapPoints = bulkSheetSnapPointsFor(activeSheetView, bulkMoveTargets.length);
 
-  const bulkMoveTargets = useMemo(
-    () =>
-      mailboxes.filter(
-        (mailbox) =>
-          mailbox.id !== resolvedMailboxId &&
-          !MOVE_EXCLUDED_ROLES.has(mailbox.role?.toLowerCase() ?? ""),
-      ),
-    [mailboxes, resolvedMailboxId],
-  );
-
-  const bulkSheetSnapPoints = useMemo(
-    () => bulkSheetSnapPointsFor(activeSheetView, bulkMoveTargets.length),
-    [activeSheetView, bulkMoveTargets.length],
-  );
-
-  const listExtraData = useMemo(
-    () => ({
-      mailboxId: resolvedMailboxId,
-      selectionActive: selection.selectionActive,
-      selectedKey: Array.from(selection.selectedIds).sort().join(","),
-      previewKey: Object.keys(list.decryptedPreviews).sort().join(","),
-      listSettings,
-    }),
-    [
-      resolvedMailboxId,
-      selection.selectionActive,
-      selection.selectedIds,
-      list.decryptedPreviews,
-      listSettings,
-    ],
-  );
+  const listExtraData = {
+    mailboxId: resolvedMailboxId,
+    selectionActive: selection.selectionActive,
+    selectedKey: Array.from(selection.selectedIds).sort().join(","),
+    previewKey: Object.keys(list.decryptedPreviews).sort().join(","),
+    listSettings,
+  };
 
   return {
     // Header toolbar

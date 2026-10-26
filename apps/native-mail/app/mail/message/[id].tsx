@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -71,7 +71,7 @@ export default function MailMessageScreen() {
   const isDark = useColorScheme() === "dark";
   const { replace, back, canGoBack } = useRouter();
   const { openCompose } = useMailCompose();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   const scrollBottomPad =
     theme.spacing["4"] + mailBottomBarTotalHeight(insets.bottom);
   const { toast } = useToast();
@@ -333,7 +333,7 @@ function MailReaderState({
   children: ReactNode;
 }) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = createStyles(theme);
   if (content.message) return children;
   if (content.isMessageLoading) return <CenteredLoader theme={theme} />;
   return (

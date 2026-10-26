@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { PARTICIPANTS_INVITE_HELP_TEXT } from "@workspace/calendar-core";
 import {
   Popover,
@@ -15,34 +15,34 @@ export function ParticipantsInviteInfo() {
   const [open, setOpen] = useState(false);
   const closeTimerRef = useRef<number | null>(null);
 
-  const clearCloseTimer = useCallback(() => {
+  const clearCloseTimer = () => {
     if (closeTimerRef.current !== null) {
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
-  }, []);
+  };
 
-  const scheduleClose = useCallback(() => {
+  const scheduleClose = () => {
     clearCloseTimer();
     closeTimerRef.current = window.setTimeout(() => setOpen(false), 120);
-  }, [clearCloseTimer]);
+  };
 
-  const handlePointerEnter = useCallback(() => {
+  const handlePointerEnter = () => {
     if (isMobile) {
       return;
     }
 
     clearCloseTimer();
     setOpen(true);
-  }, [clearCloseTimer, isMobile]);
+  };
 
-  const handlePointerLeave = useCallback(() => {
+  const handlePointerLeave = () => {
     if (isMobile) {
       return;
     }
 
     scheduleClose();
-  }, [isMobile, scheduleClose]);
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

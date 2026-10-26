@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -36,7 +35,7 @@ export function ComposeHeader({
 }: ComposeHeaderProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const styles = createStyles(theme, skin);
   const sendDisabled = !canSend || sending;
 
   return (
