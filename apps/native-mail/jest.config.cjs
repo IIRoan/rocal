@@ -2,6 +2,7 @@ const {
   nativeJestModuleNameMapper,
   nativeJestTransformIgnorePatterns,
 } = require("../../packages/native-core/jest.shared.cjs");
+const { REACT_COMPILER_JEST_OPTIONS } = require("../../jest.react-compiler.cjs");
 
 module.exports = {
   displayName: "native-mail",
@@ -12,7 +13,10 @@ module.exports = {
   transform: {
     "^.+\\.(js|jsx|ts|tsx|mjs)$": [
       "babel-jest",
-      { configFile: require.resolve("../../babel.config.cts") },
+      {
+        configFile: require.resolve("../../babel.config.cts"),
+        ...REACT_COMPILER_JEST_OPTIONS,
+      },
     ],
   },
   transformIgnorePatterns: nativeJestTransformIgnorePatterns,

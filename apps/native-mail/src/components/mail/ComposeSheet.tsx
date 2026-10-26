@@ -235,7 +235,7 @@ function ComposeSession({
       ...validation.bcc,
     ];
 
-    try {
+    const send = async () => {
       const { textBody, encrypted } = runtime
         ? await resolveOutgoingMessageBody({
             runtime,
@@ -310,9 +310,10 @@ function ComposeSession({
             setError(getErrorMessage(err, "Failed to send message")),
         },
       );
-    } catch (err) {
+    };
+    await send().catch((err: unknown) => {
       setError(getErrorMessage(err, "Failed to send message"));
-    }
+    });
   };
 
   const handleSend = () => {
@@ -373,7 +374,7 @@ function ComposeSession({
   };
 
   const handleAttach = async () => {
-    try {
+    const pickAttachments = async () => {
       const result = await DocumentPicker.getDocumentAsync({
         type: "*/*",
         copyToCacheDirectory: true,
@@ -394,9 +395,10 @@ function ComposeSession({
           bytes,
         }),
       ]);
-    } catch (err) {
+    };
+    await pickAttachments().catch((err: unknown) => {
       setError(getErrorMessage(err, "Failed to attach file."));
-    }
+    });
   };
 
   const isDirty = hasUserContent || attachments.length > 0;
@@ -429,7 +431,7 @@ function ComposeSession({
   };
 
   const saveAndLeave = async () => {
-    try {
+    const leaveWithDraft = async () => {
       const result = await saveDraft();
       if (result.status === "failed") {
         // Stay open (reopening a swiped-away sheet) so a failed save never silently drops the message.
@@ -443,11 +445,12 @@ function ComposeSession({
       }
       toast("Draft saved", "success");
       leaveCompose();
-    } catch {
+    };
+    await leaveWithDraft().catch(() => {
       // saveDraft reports its own failures; this only guards the leave path.
       toast("Couldn't save draft", "error");
       sheetRef.current?.snapTo(0);
-    }
+    });
   };
 
   const handleCancel = () => {

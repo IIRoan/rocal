@@ -205,7 +205,7 @@ export function useMailBulkActions({
     const label = labels.find((l) => l.id === labelId);
     setBulkActionPending(true);
     closeSheet();
-    try {
+    const applyLabel = async () => {
       await Promise.all(
         bulkIds.map((id) =>
           setMessageLabel.mutateAsync({
@@ -219,9 +219,10 @@ export function useMailBulkActions({
         `Applied "${label?.name ?? labelId}" to ${bulkIds.length} messages`,
       );
       clearSelection();
-    } catch (error) {
+    };
+    await applyLabel().catch((error: unknown) => {
       toast(getErrorMessage(error, "Failed to apply label."), "error");
-    }
+    });
     setBulkActionPending(false);
   };
 

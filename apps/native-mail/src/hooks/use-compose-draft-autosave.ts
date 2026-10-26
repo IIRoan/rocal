@@ -99,9 +99,10 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
     input.setDraftSaveStatus("saving");
 
-    try {
-      const savedDraftId = await input.runtime.client.saveDraft(
-        input.runtime.session,
+    const { runtime } = input;
+    const persistDraft = async (): Promise<DraftSaveResult> => {
+      const savedDraftId = await runtime.client.saveDraft(
+        runtime.session,
         {
           draftsMailboxId,
           fromEmail,
@@ -125,12 +126,13 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       input.setDraftSaveStatus("saved");
       setTimeout(() => input.setDraftSaveStatus("idle"), 2000);
       return { status: "saved", draftId: savedDraftId };
-    } catch (error) {
+    };
+    return persistDraft().catch((error: unknown): DraftSaveResult => {
       log.error("Failed to auto-save draft", sanitizeContext({ error }));
       input.setDraftSaveStatus("error");
       setTimeout(() => input.setDraftSaveStatus("idle"), 3000);
       return { status: "failed" };
-    }
+    });
   };
 
   const saveDraft = (): Promise<DraftSaveResult> => {

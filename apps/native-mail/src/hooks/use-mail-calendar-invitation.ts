@@ -145,106 +145,64 @@ export function useMailCalendarInvitation({
     let cancelled = false;
 
     const resolveInviteEvent = async () => {
-      try {
-        const existing = existingInvitation ?? null;
-        if (cancelled) return;
+      const existing = existingInvitation ?? null;
+      if (cancelled) return;
 
-        if (mailCalendarInvite?.method === "CANCEL") {
-          const importSummary = mailCalendarInvite.icsContent
-            ? await calendarApiService.importInvitationIcs(
-                mailCalendarInvite.icsContent,
-              )
-            : null;
-          if (cancelled) return;
-
-          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
-          await refetchInvitation();
-
-          const event = await calendarApiService.getInvitationByExternalId(
-            mailCalendarInviteUid,
-            { syncRemote: false },
-          );
-          if (cancelled) return;
-
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event,
-            loading: false,
-            error:
-              !event && importSummary && importSummary.errors.length > 0
-                ? (importSummary.errors[0] ??
-                  "Unable to process cancellation details.")
-                : null,
-          });
-          return;
-        }
-
-        if (inviteDeclined) {
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: null,
-            loading: false,
-            error: null,
-          });
-          return;
-        }
-
-        if (existing) {
-          if (isUserDeclinedInvitationEvent(existing)) {
-            setInviteDeclined(true);
-            setCalendarInviteEvent({
-              eventId: mailCalendarInviteUid,
-              event: null,
-              loading: false,
-              error: null,
-            });
-            return;
-          }
-
-          const sealed = await calendarApiService.sealImportedInvitationIfNeeded(
-            existing,
-          );
-          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
-          setInviteDeclined(false);
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: sealed,
-            loading: false,
-            error: null,
-          });
-          return;
-        }
-
-        const importSummary = mailCalendarInvite?.icsContent
+      if (mailCalendarInvite?.method === "CANCEL") {
+        const importSummary = mailCalendarInvite.icsContent
           ? await calendarApiService.importInvitationIcs(
               mailCalendarInvite.icsContent,
             )
           : null;
         if (cancelled) return;
 
-        if (importSummary && importSummary.errors.length > 0) {
-          setCalendarInviteEvent({
-            eventId: mailCalendarInviteUid,
-            event: null,
-            loading: false,
-            error:
-              importSummary.errors[0] ??
-              "Unable to add this invitation to your calendar.",
-          });
-          return;
-        }
-
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
         await refetchInvitation();
+
         const event = await calendarApiService.getInvitationByExternalId(
           mailCalendarInviteUid,
           { syncRemote: false },
         );
         if (cancelled) return;
 
-        const sealed = event
-          ? await calendarApiService.sealImportedInvitationIfNeeded(event)
-          : null;
+        setCalendarInviteEvent({
+          eventId: mailCalendarInviteUid,
+          event,
+          loading: false,
+          error:
+            !event && importSummary && importSummary.errors.length > 0
+              ? (importSummary.errors[0] ??
+                "Unable to process cancellation details.")
+              : null,
+        });
+        return;
+      }
 
+      if (inviteDeclined) {
+        setCalendarInviteEvent({
+          eventId: mailCalendarInviteUid,
+          event: null,
+          loading: false,
+          error: null,
+        });
+        return;
+      }
+
+      if (existing) {
+        if (isUserDeclinedInvitationEvent(existing)) {
+          setInviteDeclined(true);
+          setCalendarInviteEvent({
+            eventId: mailCalendarInviteUid,
+            event: null,
+            loading: false,
+            error: null,
+          });
+          return;
+        }
+
+        const sealed = await calendarApiService.sealImportedInvitationIfNeeded(
+          existing,
+        );
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
         setInviteDeclined(false);
         setCalendarInviteEvent({
@@ -253,20 +211,60 @@ export function useMailCalendarInvitation({
           loading: false,
           error: null,
         });
-      } catch (error) {
-        if (cancelled) return;
+        return;
+      }
+
+      const importSummary = mailCalendarInvite?.icsContent
+        ? await calendarApiService.importInvitationIcs(
+            mailCalendarInvite.icsContent,
+          )
+        : null;
+      if (cancelled) return;
+
+      if (importSummary && importSummary.errors.length > 0) {
         setCalendarInviteEvent({
           eventId: mailCalendarInviteUid,
           event: null,
           loading: false,
           error:
-            error instanceof Error
-              ? error.message
-              : "Unable to load invitation details.",
+            importSummary.errors[0] ??
+            "Unable to add this invitation to your calendar.",
         });
+        return;
       }
+
+      await refetchInvitation();
+      const event = await calendarApiService.getInvitationByExternalId(
+        mailCalendarInviteUid,
+        { syncRemote: false },
+      );
+      if (cancelled) return;
+
+      const sealed = event
+        ? await calendarApiService.sealImportedInvitationIfNeeded(event)
+        : null;
+
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
+      setInviteDeclined(false);
+      setCalendarInviteEvent({
+        eventId: mailCalendarInviteUid,
+        event: sealed,
+        loading: false,
+        error: null,
+      });
     };
-    void resolveInviteEvent();
+    void resolveInviteEvent().catch((error: unknown) => {
+      if (cancelled) return;
+      setCalendarInviteEvent({
+        eventId: mailCalendarInviteUid,
+        event: null,
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load invitation details.",
+      });
+    });
 
     return () => {
       cancelled = true;

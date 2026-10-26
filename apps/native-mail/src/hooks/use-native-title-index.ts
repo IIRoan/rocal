@@ -65,7 +65,7 @@ export function useNativeTitleIndex() {
     if (!accountId || !runtime || !enabled || inFlightRef.current) return;
     inFlightRef.current = true;
     setIsIndexing(true);
-    try {
+    const indexTitles = async () => {
       const next = await rebuildNativeTitleIndex({
         accountId,
         runtime,
@@ -74,10 +74,11 @@ export function useNativeTitleIndex() {
       // Only chase the backlog while passes make progress, so a locked vault cannot loop.
       setPendingBodies(next.pendingBodies);
       setBackfillActive(next.pendingBodies > 0 && next.loadedBodies > 0);
-    } catch {
+    };
+    await indexTitles().catch(async () => {
       // A failed index read only delays this pass, and the flags below must reset either way.
       await refresh().catch(() => undefined);
-    }
+    });
     inFlightRef.current = false;
     setIsIndexing(false);
   };
