@@ -234,12 +234,13 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 | `FRPS_ADDR` | yes | VPS IP or hostname |
 | `FRPC_TOKEN` | yes | frp auth token (must match `FRP_TOKEN` in GitHub Environment `mail-vps`) |
 | `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
+| `FRPC_VERSION` | build | Pins the frpc version used by the Docker build; production currently uses `0.71.1` |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
 | `STALWART_GATE_KEY` | yes | Backend gate key (32+ chars); only its SHA-256 reaches HAProxy; missing key fails boot. The API would send it as `X-Solace-Gate` only if its own `STALWART_GATE_KEY` were set (it is not) |
+| `STALWART_REDIS_URL` | yes | Private Redis connection for shared transient state and coordination during overlapping mail deployments |
 | `PORT` | yes | Set to `8090` — Railway healthcheck port |
 | `PGHOST`, `PGPASSWORD`, etc. | yes | PostgreSQL (Railway plugin) |
 | `BUCKET` / `BUCKET_*` | yes | Railway bucket refs for S3 BlobStore |
-| `STALWART_MAIL_INGEST_WEBHOOK_SECRET` | no | HMAC for Solace `message-ingest.ham` webhook (omit from plan if unset; live HMAC is kept) |
 | `FRPC_READY_TIMEOUT_SECONDS` | no | Deadline for frpc's proxies to register and the relay visitor to listen (default `120` seconds); timeout fails boot |
 | `FRPC_DRAIN_SECONDS` | no | Wait between leaving the tunnel groups and stopping Stalwart on SIGTERM (default `10`) |
 | `FRPC_TLS_CERT`, `FRPC_TLS_KEY` | rollout | Base64 PEM client cert/key from `scripts/frp-tls-certs.sh`; required once frps enforces mutual TLS |
@@ -251,6 +252,8 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 | `PG_POOL_MAX_CONNECTIONS` | no | Stalwart → Postgres pool size (default `32`, matching JMAP's 32 concurrent requests) |
 
 Use the **private** Postgres hostname (`*.railway.internal`). Message bodies live in the Railway bucket (`BlobStore` S3); Postgres holds metadata.
+
+Leave `STALWART_RECOVERY_MODE` unset for normal operation; set it only for a planned recovery. The CLI helper uses `STALWART_ADMIN_TOKEN` unless a local `STALWART_TOKEN` override is supplied. Webhook registration uses the API's `STALWART_WEBHOOK_SECRET`.
 
 ## HA verification
 

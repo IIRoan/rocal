@@ -135,8 +135,6 @@ export default defineRailway(() => {
       BUCKET_REGION: ref(stalwartBlobs, "REGION"),
       BUCKET_SECRET_ACCESS_KEY: ref(stalwartBlobs, "SECRET_ACCESS_KEY"),
       FRPC_RELAY_STCP_KEY: preserve(),
-      FRPC_SHA256: preserve(),
-      FRPC_SLOT: preserve(),
       // The frp mutual-TLS client certificate (railway-entrypoint.sh); kept through applies once set.
       FRPC_TLS_CA: preserve(),
       FRPC_TLS_CERT: preserve(),
@@ -150,12 +148,9 @@ export default defineRailway(() => {
       PGPORT: ref(postgresStalwart, "PGPORT"),
       PGUSER: ref(postgresStalwart, "PGUSER"),
       PORT: preserve(),
-      SLOT_MANAGER_TOKEN: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
       STALWART_GATE_KEY: preserve(),
-      STALWART_RECOVERY_MODE: preserve(),
       STALWART_REDIS_URL: ref(stalwartRedis, "REDIS_URL"),
-      STALWART_TOKEN: preserve(),
     },
   });
 
