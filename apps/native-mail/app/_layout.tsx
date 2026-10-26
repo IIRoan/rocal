@@ -5,6 +5,7 @@ import { QueryProvider } from "@workspace/native-core/providers/QueryProvider";
 import { AuthProvider } from "@workspace/native-core/providers/AuthProvider";
 import { PushProvider } from "@workspace/native-core/providers/PushProvider";
 import { ThemeProvider } from "@workspace/native-core/providers/ThemeProvider";
+import { AppErrorBoundary } from "@workspace/native-core/components/AppErrorBoundary";
 import { AppUpdateProvider } from "@workspace/native-core/providers/AppUpdateProvider";
 import { AppUpdateScreen } from "@workspace/native-core/components/settings/AppUpdateScreen";
 import { E2eeProvider } from "@workspace/native-core/providers/E2eeProvider";
@@ -42,46 +43,48 @@ function RootLayout() {
         <AuthProvider lifecycle={MAIL_AUTH_LIFECYCLE}>
           <PushProvider>
             <ThemeProvider>
-              <AppUpdateProvider>
-                <AppUpdateScreen />
-                <E2eeProvider>
-                  <MailSelectionProvider>
-                    <NavigationGuard
-                      homeRoute={MAIL_HOME_ROUTE}
-                      prepareSession={prepareMailSession}
-                      restoreSession={restoreMailSession}
-                      pushTapHandler={MAIL_PUSH_TAP_HANDLER}
-                      notificationExtensionSecrets={
-                        NOTIFICATION_EXTENSION_SECRETS
-                      }
-                    >
-                      <ToastProvider>
-                        <MailComposeProvider>
-                          <CommandPaletteProvider>
-                            <Stack screenOptions={NATIVE_STACK_SCREEN_OPTIONS}>
-                              <Stack.Screen
-                                name="index"
-                                options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
-                              />
-                              <Stack.Screen
-                                name="(auth)"
-                                options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
-                              />
-                              <Stack.Screen
-                                name="mail"
-                                options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
-                              />
-                            </Stack>
-                            <AuthenticatedChrome>
-                              <CommandPalette />
-                            </AuthenticatedChrome>
-                          </CommandPaletteProvider>
-                        </MailComposeProvider>
-                      </ToastProvider>
-                    </NavigationGuard>
-                  </MailSelectionProvider>
-                </E2eeProvider>
-              </AppUpdateProvider>
+              <AppErrorBoundary>
+                <AppUpdateProvider>
+                  <AppUpdateScreen />
+                  <E2eeProvider>
+                    <MailSelectionProvider>
+                      <NavigationGuard
+                        homeRoute={MAIL_HOME_ROUTE}
+                        prepareSession={prepareMailSession}
+                        restoreSession={restoreMailSession}
+                        pushTapHandler={MAIL_PUSH_TAP_HANDLER}
+                        notificationExtensionSecrets={
+                          NOTIFICATION_EXTENSION_SECRETS
+                        }
+                      >
+                        <ToastProvider>
+                          <MailComposeProvider>
+                            <CommandPaletteProvider>
+                              <Stack screenOptions={NATIVE_STACK_SCREEN_OPTIONS}>
+                                <Stack.Screen
+                                  name="index"
+                                  options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
+                                />
+                                <Stack.Screen
+                                  name="(auth)"
+                                  options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
+                                />
+                                <Stack.Screen
+                                  name="mail"
+                                  options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
+                                />
+                              </Stack>
+                              <AuthenticatedChrome>
+                                <CommandPalette />
+                              </AuthenticatedChrome>
+                            </CommandPaletteProvider>
+                          </MailComposeProvider>
+                        </ToastProvider>
+                      </NavigationGuard>
+                    </MailSelectionProvider>
+                  </E2eeProvider>
+                </AppUpdateProvider>
+              </AppErrorBoundary>
             </ThemeProvider>
           </PushProvider>
         </AuthProvider>

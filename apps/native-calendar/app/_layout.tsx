@@ -5,6 +5,7 @@ import { QueryProvider } from "@workspace/native-core/providers/QueryProvider";
 import { AuthProvider } from "@workspace/native-core/providers/AuthProvider";
 import { PushProvider } from "@workspace/native-core/providers/PushProvider";
 import { ThemeProvider } from "@workspace/native-core/providers/ThemeProvider";
+import { AppErrorBoundary } from "@workspace/native-core/components/AppErrorBoundary";
 import { AppUpdateProvider } from "@workspace/native-core/providers/AppUpdateProvider";
 import { AppUpdateScreen } from "@workspace/native-core/components/settings/AppUpdateScreen";
 import { E2eeProvider } from "@workspace/native-core/providers/E2eeProvider";
@@ -41,45 +42,47 @@ function RootLayout() {
         <AuthProvider>
           <PushProvider>
             <ThemeProvider>
-              <AppUpdateProvider>
-                <AppUpdateScreen />
-                <E2eeProvider>
-                  <CalendarViewProvider>
-                    <NavigationGuard
-                      homeRoute={CALENDAR_HOME_ROUTE}
-                      prepareSession={enforceFullEventEncryption}
-                      pushTapHandler={CALENDAR_PUSH_TAP_HANDLER}
-                      notificationExtensionSecrets={
-                        NOTIFICATION_EXTENSION_SECRETS
-                      }
-                    >
-                      <ToastProvider>
-                        <SheetProvider>
-                          <CommandPaletteProvider>
-                            <Stack screenOptions={NATIVE_STACK_SCREEN_OPTIONS}>
-                              <Stack.Screen
-                                name="index"
-                                options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
-                              />
-                              <Stack.Screen
-                                name="(auth)"
-                                options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
-                              />
-                              <Stack.Screen
-                                name="calendar"
-                                options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
-                              />
-                            </Stack>
-                            <AuthenticatedChrome>
-                              <CommandPalette />
-                            </AuthenticatedChrome>
-                          </CommandPaletteProvider>
-                        </SheetProvider>
-                      </ToastProvider>
-                    </NavigationGuard>
-                  </CalendarViewProvider>
-                </E2eeProvider>
-              </AppUpdateProvider>
+              <AppErrorBoundary>
+                <AppUpdateProvider>
+                  <AppUpdateScreen />
+                  <E2eeProvider>
+                    <CalendarViewProvider>
+                      <NavigationGuard
+                        homeRoute={CALENDAR_HOME_ROUTE}
+                        prepareSession={enforceFullEventEncryption}
+                        pushTapHandler={CALENDAR_PUSH_TAP_HANDLER}
+                        notificationExtensionSecrets={
+                          NOTIFICATION_EXTENSION_SECRETS
+                        }
+                      >
+                        <ToastProvider>
+                          <SheetProvider>
+                            <CommandPaletteProvider>
+                              <Stack screenOptions={NATIVE_STACK_SCREEN_OPTIONS}>
+                                <Stack.Screen
+                                  name="index"
+                                  options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
+                                />
+                                <Stack.Screen
+                                  name="(auth)"
+                                  options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
+                                />
+                                <Stack.Screen
+                                  name="calendar"
+                                  options={NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS}
+                                />
+                              </Stack>
+                              <AuthenticatedChrome>
+                                <CommandPalette />
+                              </AuthenticatedChrome>
+                            </CommandPaletteProvider>
+                          </SheetProvider>
+                        </ToastProvider>
+                      </NavigationGuard>
+                    </CalendarViewProvider>
+                  </E2eeProvider>
+                </AppUpdateProvider>
+              </AppErrorBoundary>
             </ThemeProvider>
           </PushProvider>
         </AuthProvider>
