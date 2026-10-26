@@ -13,6 +13,8 @@ on:
       - "package.json"
       - "bun.lock"
       - "babel.config.cts"
+      - "scripts/native-publish-update.ts"
+      - "scripts/eas-build-profile.ts"
       - ".github/workflows/expo-update.yml"
   pull_request:
     types:
@@ -26,6 +28,8 @@ on:
       - "package.json"
       - "bun.lock"
       - "babel.config.cts"
+      - "scripts/native-publish-update.ts"
+      - "scripts/eas-build-profile.ts"
       - ".github/workflows/expo-update.yml"
   workflow_dispatch:
 
