@@ -2,12 +2,11 @@
 
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import type { UserSettings } from "@/lib/types/calendar";
-import { createDraftCalendarEvent } from "@/lib/calendar-event-drafts";
 import { parseWorkingDays } from "@/lib/calendar-view-model";
 import type { UseCommandPaletteSearchResult } from "@/hooks/use-command-palette-search";
 import { PasskeySettings } from "../passkey-settings";
 import { SubscriptionManagement } from "../subscription-management";
-import { EventEditor } from "../event-editor";
+import { PaletteNewEventEditor } from "./palette-new-event-editor";
 import { CalendarManager } from "../calendar-manager";
 import { CategoryManager } from "../category-manager";
 import { AppearanceSettings } from "./appearance-settings";
@@ -272,15 +271,12 @@ export function CommandPaletteViewContent({
   }
 
   if (currentView === "events") {
-    const newEvent = createDraftCalendarEvent({
-      defaultCalendarId: localSettings.defaultCalendarId,
-      fallbackCalendarId: calendars?.[0]?.id,
-    });
     return (
-      <EventEditor
+      <PaletteNewEventEditor
+        defaultCalendarId={localSettings.defaultCalendarId}
+        fallbackCalendarId={calendars?.[0]?.id}
         open={open}
         onOpenChange={onOpenChange}
-        eventToEdit={newEvent}
         onEventSaved={onEventSaved}
         onBack={() => goBack()}
         localSettings={localSettings}
