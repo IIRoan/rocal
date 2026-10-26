@@ -43,6 +43,8 @@ const REVIVED_DATE_KEYS = [
 
 type RevivedDateKey = (typeof REVIVED_DATE_KEYS)[number];
 
+const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "OPTIONS", "PUT", "DELETE"]);
+
 type RevivedField<Value, Revived> = Value extends string
   ? Revived
   : JsonRevived<Value>;
@@ -129,26 +131,22 @@ export class HttpClient {
     return typeof record.statusCode === "number" ? record.statusCode : undefined;
   }
 
-  private isRetryableError(error: unknown): boolean {
-    // Retry on network errors and timeouts
+  /** A POST may already be applied when it fails or times out, so it repeats only on answers that mean "not processed". */
+  private isRetryableError(error: unknown, idempotent: boolean): boolean {
+    const status = this.errorStatus(error);
+    if (status === 408 || status === 429) {
+      return true;
+    }
+    if (!idempotent) {
+      return false;
+    }
+
     const name = this.errorName(error);
     if (name === "TypeError" || name === "AbortError") {
       return true;
     }
 
-    const status = this.errorStatus(error);
-
-    // Retry on 5xx server errors
-    if (status !== undefined && status >= 500 && status < 600) {
-      return true;
-    }
-
-    // Retry on specific 4xx errors that might be transient
-    if (status === 408 || status === 429) {
-      return true;
-    }
-
-    return false;
+    return status !== undefined && status >= 500 && status < 600;
   }
 
   private logHttpError(response: Response, details: unknown): void {
@@ -206,6 +204,9 @@ export class HttpClient {
     } = options;
 
     const fullUrl = url.startsWith("http") ? url : `${this.baseURL}${url}`;
+    const idempotent = IDEMPOTENT_METHODS.has(
+      (fetchOptions.method ?? "GET").toUpperCase(),
+    );
 
     // Resolve platform-specific headers once per request
     const extraHeaders = this.getHeaders ? await this.getHeaders() : {};
@@ -266,7 +267,7 @@ export class HttpClient {
             throw error;
           }
 
-          const retryable = this.isRetryableError(error);
+          const retryable = this.isRetryableError(error, idempotent);
           if (attempt < retries && retryable) {
             let delayMs = this.retryDelay * Math.pow(2, attempt);
 
@@ -320,7 +321,7 @@ export class HttpClient {
           throw error;
         }
 
-        if (attempt < retries && this.isRetryableError(error)) {
+        if (attempt < retries && this.isRetryableError(error, idempotent)) {
           const delayMs = this.retryDelay * Math.pow(2, attempt);
           const jitter = Math.floor(Math.random() * 250);
           await this.delay(delayMs + jitter);

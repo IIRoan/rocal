@@ -211,4 +211,59 @@ describe("HttpClient retry behavior - Property Tests", () => {
       );
     });
   });
+
+  describe("A POST that may already be applied is never sent twice", () => {
+    const failures: Array<[string, () => Response]> = [
+      ["500", () => mockResponse(500)],
+      ["502", () => mockResponse(502)],
+      ["network error", () => { throw new TypeError("Network request failed"); }],
+      ["timeout", () => { throw Object.assign(new Error("Aborted"), { name: "AbortError" }); }],
+      [
+        "200 whose body cannot be read",
+        () =>
+          ({
+            ok: true,
+            status: 200,
+            headers: new Headers({ "content-type": "application/json" }),
+            json: async () => {
+              throw new TypeError("Body is unusable");
+            },
+          }) as unknown as Response,
+      ],
+    ];
+
+    it.each(failures)("sends a POST once after a %s", async (_label, respond) => {
+      let attemptCount = 0;
+      globalThis.fetch = async () => {
+        attemptCount++;
+        return respond();
+      };
+
+      await expect(createClient(3).post("/api/events", { title: "x" })).rejects.toBeDefined();
+      expect(attemptCount).toBe(1);
+    });
+
+    it.each([408, 429])("repeats a POST the server answered %i without processing", async (status) => {
+      let attemptCount = 0;
+      globalThis.fetch = async () => {
+        attemptCount++;
+        return attemptCount === 1 ? mockResponse(status) : mockResponse(200);
+      };
+
+      await expect(createClient(3).post("/api/events", { title: "x" })).resolves.toEqual({ ok: true });
+      expect(attemptCount).toBe(2);
+    });
+
+    it.each(["put", "delete"] as const)("still repeats an idempotent %s after a 5xx", async (method) => {
+      let attemptCount = 0;
+      globalThis.fetch = async () => {
+        attemptCount++;
+        return attemptCount === 1 ? mockResponse(503) : mockResponse(200);
+      };
+
+      const client = createClient(3);
+      await expect(method === "put" ? client.put("/api/events/1", {}) : client.delete("/api/events/1")).resolves.toEqual({ ok: true });
+      expect(attemptCount).toBe(2);
+    });
+  });
 });
