@@ -1,11 +1,17 @@
-# Temporary security validation
+# Completed security validation controls
 
-This draft PR exists only to validate the merged security workflows. It must never be merged or deployed.
+This temporary draft PR must never be merged. The deliberately vulnerable dependency and inert source/Dockerfile fixtures have been removed; the remaining workflow guards isolate only this test branch from mobile publishing.
 
-- An unused, test-only Lodash 4.17.20 development dependency should trigger GitHub's new-dependency vulnerability gate and appear in Bun audit.
-- The unexecuted Express route in `command-injection.js` should produce a CodeQL command-injection alert. Nothing imports this file or starts its application.
-- The unused Dockerfile should produce Trivy's root-user configuration finding. It is not part of any application image build.
+Positive controls on commit `570a6684`:
 
-After detection, all fixtures and dependency changes will be removed, the recovery checks will run, and this PR will be closed without merging.
+| Control | Observed result |
+| --- | --- |
+| Lodash 4.17.20, unused development dependency | Native dependency review failed for GHSA-35jh-r3h4-6jhm and GHSA-r5fr-rjxr-66jc; Bun also reported its advisories |
+| Unexecuted Express-to-process command flow | CodeQL reported critical js/command-line-injection (alert 4253) and high js/missing-rate-limiting (alert 4252) |
+| Unused root-user Dockerfile | Trivy reported high DS-0002 (alert 4250) and low DS-0026 (alert 4251) |
 
-Branch-local guards in the mobile workflows prevent this temporary PR from publishing builds or OTA updates. They are test isolation only and will not be merged.
+The merged master baseline passed both Security and CodeQL. Local tests of the actual merged Bun-reporting step distinguish valid advisory responses from missing/malformed reports. Secret protection settings are enabled; no real credentials were used as test fixtures.
+
+An existing automatic PR publisher briefly published a Calendar testing-channel update before cancellation. That test group was deleted, its absence verified, and the previous testing update remains latest. Mail did not publish a test update. Production publishing jobs were skipped. Branch-local guards prevent subsequent test pushes from publishing anything.
+
+The PR will be closed after clean recovery checks finish. Production workflows and dependencies are not changed by this validation branch.
