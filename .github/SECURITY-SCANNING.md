@@ -28,4 +28,4 @@ trivy fs --scanners vuln,misconfig --include-dev-deps --skip-files bun.lock --sk
 trivy convert --format table --severity HIGH,CRITICAL --exit-code 1 /tmp/solace-security.json
 ```
 
-Reports need not be committed. Secrets are handled by GitHub secret protection, and no raw secret-scan output is uploaded as a public artifact. Official Actions are pinned to commits; Dependabot proposes updates. If the repository becomes private, revisit GitHub feature eligibility and runner billing before retaining this setup.
+Reports need not be committed. Secrets are handled by GitHub secret protection, and no raw secret-scan output is uploaded as a public artifact. The workflows use SHA-pinned Chainguard hardened Actions; Dependabot proposes updates. If the repository becomes private, revisit GitHub feature eligibility and runner billing before retaining this setup.
