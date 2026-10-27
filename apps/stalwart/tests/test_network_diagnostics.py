@@ -19,6 +19,7 @@ def report():
         "window": {"start": START, "end": END}, "observedAt": END, "uptimeSeconds": 100000,
         "services": {name: {"state": "active", "restarts": 0, "activeSinceMonotonicMicroseconds": 100} for name in diagnostics.SERVICES},
         "tunnel": diagnostics.journal_summary(""), "kernel": diagnostics.journal_summary(""), "bans": diagnostics.journal_summary(""),
+        "banCorrelation": {"parsedBans": 0, "sshBans": 0, "otherBans": 0, "observedTunnelPeers": 0, "bannedTunnelPeers": 0},
         "cumulativeTcpCounters": {"TCPTimeouts": 3},
     }
 
@@ -51,11 +52,19 @@ class NetworkDiagnosticsTests(unittest.TestCase):
                             "2026-01-01 10:00:00,000 [sshd] Unban 198.51.100.2\n"
                             "2026-01-01 10:04:00,000 [sshd] Ban 198.51.100.3\n")
             with patch.dict(diagnostics.os.environ, {"TZ": "UTC"}):
-                result = diagnostics.ban_history(START, END, path)
+                result, correlation = diagnostics.ban_history(START, END, path, {"198.51.100.2", "198.51.100.3"})
             self.assertEqual(result["categories"]["address_banned"], 1)
             self.assertEqual(result["categories"]["address_unbanned"], 1)
             self.assertFalse(result["truncated"])
             self.assertNotIn("198.51.100", json.dumps(result))
+            self.assertEqual(correlation, {"parsedBans": 1, "sshBans": 1, "otherBans": 0, "observedTunnelPeers": 2, "bannedTunnelPeers": 1})
+            self.assertNotIn("198.51.100", json.dumps(correlation))
+
+    def test_tunnel_peers_match_login_records_and_live_sockets_without_loopback(self):
+        journal = json.dumps({"MESSAGE": "client login info: ip [198.51.100.2:1234] version [0.71.1]"})
+        sockets = "ESTAB 0 0 0.0.0.0:7000 [2001:db8::2]:1234\nESTAB 0 0 127.0.0.1:7000 127.0.0.1:1234\n"
+        self.assertEqual(diagnostics.tunnel_peers(journal, sockets), {"198.51.100.2", "2001:db8::2"})
+        self.assertEqual(diagnostics.tunnel_peers(None, None), set())
 
     def test_remote_requires_host_pinning_and_removes_temporary_credentials(self):
         paths = []
@@ -92,11 +101,11 @@ class NetworkDiagnosticsTests(unittest.TestCase):
         def read(path, **kwargs):
             return "100000.0 0.0" if str(path) == "/proc/uptime" else "TcpExt: TCPTimeouts\nTcpExt: 3\n"
 
-        with patch.object(diagnostics, "command", side_effect=command), patch.object(diagnostics, "ban_history", return_value=diagnostics.journal_summary(None)), patch.object(diagnostics.os, "geteuid", return_value=0), patch.object(Path, "read_text", read):
+        with patch.object(diagnostics, "command", side_effect=command), patch.object(diagnostics, "ban_history", return_value=(diagnostics.journal_summary(None), report()["banCorrelation"])), patch.object(diagnostics.os, "geteuid", return_value=0), patch.object(Path, "read_text", read):
             result = diagnostics.collect(START, END)
         diagnostics.validate_report(result, START, END)
         self.assertNotIn("secret-canary", json.dumps(result))
-        self.assertTrue(all(args[0] in {"systemctl", "journalctl"} for args in calls))
+        self.assertTrue(all(args[0] in {"systemctl", "journalctl", "ss"} for args in calls))
         self.assertTrue(all(not ({"restart", "reload", "stop", "start"} & set(args)) for args in calls))
 
 
