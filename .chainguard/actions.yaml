@@ -1,0 +1,5 @@
+enabled: true
+migrate:
+  enabled: true
+  period: "24h"
+  version-strategy: exact
