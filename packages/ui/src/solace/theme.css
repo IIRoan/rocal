@@ -1,6 +1,6 @@
-/* Nightwatch tokens, scoped to the mail route via [data-solace]. Portals inherit from html:has(). */
+/* Nightwatch tokens, scoped to the mail route via [data-solace]. Portals inherit from html:has() unless the root is [data-solace-scoped]. */
 
-html:has([data-solace]),
+html:has([data-solace]:not([data-solace-scoped])),
 [data-solace] {
   --red-400: 255, 143, 143;
   --red-600: 215, 40, 40;
@@ -120,8 +120,8 @@ html:has([data-solace]),
   color: var(--text-primary);
 }
 
-.dark html:has([data-solace]),
-html.dark:has([data-solace]),
+.dark html:has([data-solace]:not([data-solace-scoped])),
+html.dark:has([data-solace]:not([data-solace-scoped])),
 .dark [data-solace] {
   --text-primary: rgb(255, 255, 255);
   --text-secondary: rgba(255, 255, 255, 0.54);
@@ -209,7 +209,7 @@ html.dark:has([data-solace]),
 }
 
 /* Fallback Nightwatch chrome for shared shadcn menus in mail (e.g. NavUser); mail menus use solace/dropdown. */
-html:has([data-solace])
+html:has([data-solace]:not([data-solace-scoped]))
   :is(
     [data-slot="dropdown-menu-content"],
     [data-slot="dropdown-menu-sub-content"],
@@ -224,7 +224,7 @@ html:has([data-solace])
   box-shadow: var(--shadow-l2);
 }
 
-html:has([data-solace])
+html:has([data-solace]:not([data-solace-scoped]))
   :is(
     [data-slot="dropdown-menu-content"],
     [data-slot="dropdown-menu-sub-content"],
@@ -234,7 +234,7 @@ html:has([data-solace])
   padding: 4px;
 }
 
-html:has([data-solace])
+html:has([data-solace]:not([data-solace-scoped]))
   :is(
     [data-slot="dropdown-menu-item"],
     [data-slot="dropdown-menu-checkbox-item"],
@@ -253,7 +253,7 @@ html:has([data-solace])
   font-weight: 380;
 }
 
-html:has([data-solace])
+html:has([data-solace]:not([data-solace-scoped]))
   :is([data-slot$="-item"], [data-slot$="-sub-trigger"]):is(
     [data-slot^="dropdown-menu"],
     [data-slot^="context-menu"],
@@ -262,7 +262,7 @@ html:has([data-solace])
   color: var(--text-primary);
 }
 
-html:has([data-solace])
+html:has([data-solace]:not([data-solace-scoped]))
   :is([data-slot$="-item"], [data-slot$="-sub-trigger"]):is(
     [data-slot^="dropdown-menu"],
     [data-slot^="context-menu"],
@@ -271,7 +271,7 @@ html:has([data-solace])
   background: var(--bg-cell-hover);
 }
 
-html:has([data-solace])
+html:has([data-solace]:not([data-solace-scoped]))
   :is(
     [data-slot="dropdown-menu-separator"],
     [data-slot="context-menu-separator"],
@@ -281,7 +281,7 @@ html:has([data-solace])
   background: var(--border-tertiary);
 }
 
-html:has([data-solace])
+html:has([data-solace]:not([data-solace-scoped]))
   :is(
     [data-slot="dropdown-menu-label"],
     [data-slot="context-menu-label"],
@@ -292,7 +292,7 @@ html:has([data-solace])
   color: var(--text-tertiary);
 }
 
-html:has([data-solace])
+html:has([data-solace]:not([data-solace-scoped]))
   :is(
     [data-slot="dropdown-menu-shortcut"],
     [data-slot="context-menu-shortcut"]

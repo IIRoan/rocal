@@ -18,22 +18,23 @@ import {
   FORCE_LOADING_DESIGN_PREVIEW,
   PageLoadingOverlay,
 } from "@workspace/ui/components/ui";
-import { Button } from "@workspace/ui/components/ui/button";
+import Image from "next/image";
 import Link from "next/link";
-import { WallpaperBackdrop } from "@/components/landing/wallpaper-backdrop";
+import { AppPreview } from "@/components/landing/app-preview";
 import { LandingNavbar } from "@/components/landing/landing-navbar";
 import { LandingSignInButton } from "@/components/landing/landing-sign-in-button";
+import { WarpCta } from "@/components/landing/warp-cta";
 
 const PILLARS = [
   {
     id: "calendar",
     title: "Calendar",
-    body: "Shared schedules, recurring events, and reminders that actually arrive.",
+    body: "Shared calendars, recurring events, and reminders. Your event titles, notes, and locations are encrypted on your device.",
   },
   {
     id: "mail",
     title: "Mail",
-    body: "Your own mailbox. Encrypted at rest. No ads, no profiling.",
+    body: "A private inbox for everyday conversations. Your own mailbox, encrypted at rest, without ads or profiling.",
   },
 ] as const;
 
@@ -54,10 +55,7 @@ export function HomePageClient() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const hasSession = Boolean(session?.user);
   const shouldShowLoadingOverlay =
-    FORCE_LOADING_DESIGN_PREVIEW ||
-    !hasHydrated ||
-    isPending ||
-    hasSession;
+    FORCE_LOADING_DESIGN_PREVIEW || !hasHydrated || isPending || hasSession;
 
   const redirectToHome = useEffectEvent(() => {
     router.startRouteTransition({ messageContext: "AUTH_FLOW" });
@@ -74,22 +72,13 @@ export function HomePageClient() {
     const root = rootRef.current;
     if (!root || prefersReducedMotion || shouldShowLoadingOverlay) return;
     return revealSequence(root, [
-      { selector: "[data-hero-scrim]", offset: null, duration: 700 },
       {
-        selector: "[data-hero-heading], [data-hero-copy], [data-hero-cta]",
-        offset: { y: 22 },
-        duration: 620,
-        delay: 120,
+        selector:
+          "[data-hero-copy], [data-hero-art], [data-hero-preview], [data-hero-pillar]",
+        offset: { y: 12 },
+        duration: 550,
         stagger: 90,
       },
-      {
-        selector: "[data-hero-pillar]",
-        offset: { y: 16 },
-        duration: 500,
-        delay: 420,
-        stagger: 80,
-      },
-      { selector: "[data-hero-footer]", offset: null, duration: 400, delay: 580 },
     ]);
   }, [prefersReducedMotion, shouldShowLoadingOverlay]);
 
@@ -108,50 +97,50 @@ export function HomePageClient() {
   return (
     <section
       ref={rootRef}
-      className="relative flex min-h-dvh flex-col overflow-clip bg-background"
+      className="relative isolate flex min-h-dvh flex-col overflow-clip bg-background"
     >
-      <div data-hero-scrim className="absolute inset-0">
-        <WallpaperBackdrop />
-      </div>
-
       <LandingNavbar onSignIn={handleSignIn} isLeaving={isLeaving} />
 
-      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-10 sm:px-8 lg:px-10">
-        <div className="flex max-w-xl flex-1 flex-col justify-center pt-10 pb-16 sm:pt-16 lg:pt-20">
-          <h1
-            data-hero-heading
-            className="text-4xl leading-[1.12] font-semibold tracking-tight text-balance text-foreground sm:text-5xl lg:text-6xl lg:leading-[1.08]"
-          >
-            Calendar and mail,
-            <br className="hidden sm:block" /> without the noise.
+      <main className="relative z-10 flex w-full flex-1 flex-col pb-12">
+        <div
+          data-hero-copy
+          className="mx-auto grid w-full max-w-6xl gap-6 px-6 pt-8 pb-12 sm:px-8 sm:pt-12 sm:pb-14 lg:grid-cols-[1.6fr_1fr] lg:items-end lg:gap-16 lg:px-10 lg:pt-14 lg:pb-16"
+        >
+          <h1 className="max-w-3xl font-display text-[clamp(2.5rem,5.4vw,5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-foreground">
+            Calendar and mail, without the noise.
           </h1>
-
-          <p
-            data-hero-copy
-            className="mt-6 max-w-lg text-base leading-relaxed text-pretty text-foreground sm:text-lg"
-          >
-            Solace is a calm calendar and a private inbox: shared schedules,
-            real notifications, and a mailbox that isn&apos;t a product. Not
-            open to the public yet.
-          </p>
-
-          <div data-hero-cta className="mt-8 flex items-center gap-3">
-            <LandingSignInButton
-              onSignIn={handleSignIn}
-              isLeaving={isLeaving}
-            />
-            <Button
-              size="lg"
-              variant="outline"
-              className="relative rounded-lg after:absolute after:inset-x-0 after:-inset-y-0.5"
-              asChild
-            >
-              <Link href="/privacy">Privacy</Link>
-            </Button>
+          <div className="flex min-w-0 flex-col items-start gap-6">
+            <p className="max-w-sm text-base leading-7 text-pretty text-muted-foreground">
+              A calm calendar and a private inbox. Make plans, share your
+              schedule, and keep your mail to yourself.
+            </p>
+            <LandingSignInButton onSignIn={handleSignIn} isLeaving={isLeaving} />
           </div>
         </div>
 
-        <ul className="grid gap-8 border-t border-border/50 py-10 sm:grid-cols-2 sm:gap-10 lg:grid-cols-3">
+        <div className="mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-10">
+          <div
+            data-hero-art
+            className="relative aspect-[4/5] overflow-hidden rounded-2xl sm:aspect-[4/3] lg:aspect-video"
+          >
+            <Image
+              src="/wallpaper.jpg"
+              alt=""
+              fill
+              preload
+              sizes="(min-width: 1152px) 1072px, 100vw"
+              className="object-cover"
+            />
+          </div>
+          <div
+            data-hero-preview
+            className="relative mx-auto -mt-16 sm:-mt-[22%] sm:w-[92%] lg:-mt-[17%]"
+          >
+            <AppPreview />
+          </div>
+        </div>
+
+        <ul className="mx-auto grid w-full max-w-6xl gap-8 px-6 pt-10 sm:grid-cols-2 sm:gap-16 sm:px-8 lg:gap-28 lg:px-10 lg:pt-12">
           {PILLARS.map((pillar) => (
             <li
               key={pillar.title}
@@ -159,22 +148,26 @@ export function HomePageClient() {
               data-hero-pillar
               className="min-w-0 scroll-mt-28"
             >
-              <p className="text-base font-semibold tracking-tight text-foreground lg:text-sm">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
                 {pillar.title}
-              </p>
-              <p className="mt-2 text-base leading-relaxed text-pretty text-foreground lg:text-sm">
+              </h2>
+              <p className="mt-3 max-w-md text-sm leading-7 text-pretty text-muted-foreground">
                 {pillar.body}
               </p>
             </li>
           ))}
         </ul>
+
+        <div className="mx-auto w-full max-w-6xl px-6 pt-16 sm:px-8 lg:px-10 lg:pt-20">
+          <WarpCta onAction={handleSignIn} isLeaving={isLeaving} />
+        </div>
       </main>
 
       <footer
         data-hero-footer
-        className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-start gap-1 px-6 py-5 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-8 lg:px-10"
+        className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-start gap-1 px-6 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-8 lg:px-10"
       >
-        <p>Solace. Private, for now.</p>
+        <p>Solace. Calendar and mail, kept private.</p>
         <Link
           href="/privacy"
           className="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 lg:min-h-0"

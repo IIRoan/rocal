@@ -80,10 +80,15 @@ jest.mock("@workspace/ui/components/ui/tooltip", () => ({
 }));
 jest.mock("next/link", () => ({
   __esModule: true,
-  default: (props: React.ComponentProps<"a">) => <a {...props} />,
+  default: (props: React.ComponentProps<"a">) => (
+    <a {...props}>{props.children}</a>
+  ),
 }));
-jest.mock("@/components/landing/wallpaper-backdrop", () => ({
-  WallpaperBackdrop: () => null,
+jest.mock("@/components/landing/warp-cta", () => ({
+  WarpCta: () => null,
+}));
+jest.mock("@/components/landing/app-preview", () => ({
+  AppPreview: () => null,
 }));
 jest.mock("@/components/landing/landing-navbar", () => ({
   LandingNavbar: () => null,

@@ -31,7 +31,7 @@ export function LandingNavbar({ onSignIn, isLeaving }: LandingNavbarProps) {
     <header className="sticky top-0 z-20 mx-auto w-full max-w-6xl px-6 py-4 sm:px-8 lg:px-10">
       <nav
         aria-label="Main navigation"
-        className="flex w-full items-center justify-between gap-2 rounded-2xl bg-muted/95 py-2 pr-2 pl-4 shadow-sm ring-1 ring-border sm:gap-3 sm:pl-6"
+        className="flex w-full items-center justify-between gap-2 rounded-2xl bg-muted py-2 pr-2 pl-4 shadow-sm ring-1 ring-border sm:gap-3 sm:pl-6"
       >
         <div className="flex flex-1">
           <Link
