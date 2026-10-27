@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -17,7 +18,7 @@ def report():
     return {
         "window": {"start": START, "end": END}, "observedAt": END, "uptimeSeconds": 100000,
         "services": {name: {"state": "active", "restarts": 0, "activeSinceMonotonicMicroseconds": 100} for name in diagnostics.SERVICES},
-        "tunnel": diagnostics.journal_summary(""), "kernel": diagnostics.journal_summary(""),
+        "tunnel": diagnostics.journal_summary(""), "kernel": diagnostics.journal_summary(""), "bans": diagnostics.journal_summary(""),
         "cumulativeTcpCounters": {"TCPTimeouts": 3},
     }
 
@@ -41,6 +42,20 @@ class NetworkDiagnosticsTests(unittest.TestCase):
     def test_tcp_counters_keep_only_named_numeric_metrics(self):
         raw = "TcpExt: TCPTimeouts ListenDrops Other\nTcpExt: 3 4 99\n"
         self.assertEqual(diagnostics.tcp_counters(raw), {"TCPTimeouts": 3, "ListenDrops": 4})
+
+    def test_ban_history_filters_the_window_and_never_returns_addresses(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "fail2ban.log")
+            path.write_text("2026-01-01 09:56:00,000 [sshd] Ban 198.51.100.1\n"
+                            "2026-01-01 09:58:00,000 [sshd] Ban 198.51.100.2\n"
+                            "2026-01-01 10:00:00,000 [sshd] Unban 198.51.100.2\n"
+                            "2026-01-01 10:04:00,000 [sshd] Ban 198.51.100.3\n")
+            with patch.dict(diagnostics.os.environ, {"TZ": "UTC"}):
+                result = diagnostics.ban_history(START, END, path)
+            self.assertEqual(result["categories"]["address_banned"], 1)
+            self.assertEqual(result["categories"]["address_unbanned"], 1)
+            self.assertFalse(result["truncated"])
+            self.assertNotIn("198.51.100", json.dumps(result))
 
     def test_remote_requires_host_pinning_and_removes_temporary_credentials(self):
         paths = []
@@ -77,7 +92,7 @@ class NetworkDiagnosticsTests(unittest.TestCase):
         def read(path, **kwargs):
             return "100000.0 0.0" if str(path) == "/proc/uptime" else "TcpExt: TCPTimeouts\nTcpExt: 3\n"
 
-        with patch.object(diagnostics, "command", side_effect=command), patch.object(diagnostics.os, "geteuid", return_value=0), patch.object(Path, "read_text", read):
+        with patch.object(diagnostics, "command", side_effect=command), patch.object(diagnostics, "ban_history", return_value=diagnostics.journal_summary(None)), patch.object(diagnostics.os, "geteuid", return_value=0), patch.object(Path, "read_text", read):
             result = diagnostics.collect(START, END)
         diagnostics.validate_report(result, START, END)
         self.assertNotIn("secret-canary", json.dumps(result))
