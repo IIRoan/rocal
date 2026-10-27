@@ -34,7 +34,7 @@ jobs:
         run: python3 -B -m unittest discover -s scripts -p 'verify_chainguard_images_test.py' -v
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        uses: chainguard-actions/sigstore-cosign-installer@b87981cc3b0232e11827d1a8c6bcfa63d6cbd97a # v4.1.2
         with:
           cosign-release: v3.1.4
 
@@ -42,7 +42,7 @@ jobs:
         run: python3 -B scripts/verify_chainguard_images.py --output "$RUNNER_TEMP/chainguard-verification"
 
       - name: Save verified signatures, SBOMs and provenance
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
         with:
           name: chainguard-image-verification
           path: ${{ runner.temp }}/chainguard-verification
