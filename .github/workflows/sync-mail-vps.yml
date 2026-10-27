@@ -17,6 +17,19 @@ on:
         required: false
         type: boolean
         default: false
+      diagnose_only:
+        description: 'Read-only network diagnostics; skips all deploy and reload steps'
+        required: false
+        type: boolean
+        default: false
+      since:
+        description: 'Diagnostic window start (UTC ISO 8601)'
+        required: false
+        type: string
+      until:
+        description: 'Diagnostic window end (UTC ISO 8601, at most 20 minutes later)'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -58,7 +71,20 @@ jobs:
           fetch-depth: 1
           ref: ${{ github.sha }}
 
+      - name: Read-only VPS diagnostics
+        if: github.event_name == 'workflow_dispatch' && inputs.diagnose_only
+        env:
+          WINDOW_START: ${{ inputs.since }}
+          WINDOW_END: ${{ inputs.until }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_HOST: ${{ secrets.VPS_SSH_HOST }}
+          VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: python3 -B apps/stalwart/vps/diagnose-network.py
+
       - name: Stage allowlisted artifacts only
+        if: github.event_name != 'workflow_dispatch' || !inputs.diagnose_only
         env:
           APPLY_FRP_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.apply_frp || false }}
         run: |
@@ -99,6 +125,7 @@ jobs:
           fi
 
       - name: Deploy allowlisted artifacts
+        if: github.event_name != 'workflow_dispatch' || !inputs.diagnose_only
         env:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           VPS_SSH_HOST: ${{ secrets.VPS_SSH_HOST }}

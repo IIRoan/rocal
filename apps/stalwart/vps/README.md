@@ -72,6 +72,12 @@ These must be on for the model to hold (script below applies them when you have 
    - Optional: required reviewers if you want a second click after merge (solo owners usually skip this so deploy stays automatic after a protected merge)
 3. Never attach `mail-vps` secrets to workflows that run on `pull_request` from forks.
 
+For a read-only incident check, dispatch **Sync mail VPS** with `diagnose_only=true`
+and UTC ISO `since`/`until` values at most 20 minutes apart. This skips staging,
+deployment and reloads. It emits service states, uptime, cumulative TCP counters and
+journal event-category counts; journal messages, client addresses and credentials
+never enter the report.
+
 Local / emergency apply (bypasses GitHub; trusted shell only):
 
 ```bash
