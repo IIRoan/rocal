@@ -99,7 +99,7 @@ jobs:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       PROFILE: ${{ needs.meta.outputs.profile }}
     steps:
-      - uses: chainguard-actions/actions-checkout@40e53bf063d4f87f0a6e0a83231c09bcfb22bc19 # v6
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Setup Node.js
         uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
@@ -190,7 +190,7 @@ jobs:
       # Hosted runners OOM with Gradle's default heap on RN 0.86 builds.
       GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" -Dorg.gradle.parallel=true -Dorg.gradle.daemon=false
     steps:
-      - uses: chainguard-actions/actions-checkout@40e53bf063d4f87f0a6e0a83231c09bcfb22bc19 # v6
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Check Android build storage
         run: df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP" /tmp
@@ -268,7 +268,7 @@ jobs:
       PROFILE: ${{ needs.meta.outputs.profile }}
       TITLE: Solace ${{ matrix.name }} ${{ needs.meta.outputs.title_suffix }}
     steps:
-      - uses: chainguard-actions/actions-checkout@40e53bf063d4f87f0a6e0a83231c09bcfb22bc19 # v6
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Setup Node.js
         uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
