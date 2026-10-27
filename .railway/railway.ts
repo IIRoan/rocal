@@ -154,6 +154,7 @@ export default defineRailway(() => {
       PGUSER: ref(postgresStalwart, "PGUSER"),
       PORT: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
+      STALWART_ADMIN_ALLOW_IPS: preserve(),
       STALWART_GATE_KEY: preserve(),
       STALWART_REDIS_URL: ref(stalwartRedis, "REDIS_URL"),
       // The mail plan signs the ingest webhook with it; the API verifies with the same value.
