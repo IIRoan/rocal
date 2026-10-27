@@ -92,8 +92,23 @@ func TestSolaceSSHMissingKnownHosts(t *testing.T) {
 	}
 }
 
-func TestSolaceSSHHandshakeTimeout(t *testing.T) {
+func TestSolaceSSHRequiresKnownHosts(t *testing.T) {
 	t.Setenv("GATUS_SSH_KNOWN_HOSTS", "")
+	connected, cli, err := CanCreateSSHConnection("127.0.0.1:1", "monitor", "", "", &Config{Timeout: time.Second})
+	if cli != nil {
+		cli.Close()
+	}
+	if connected || err == nil || err.Error() != "SSH known hosts are required" {
+		t.Fatal("missing host pins must fail before dialing")
+	}
+}
+
+func TestSolaceSSHHandshakeTimeout(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	if err := os.WriteFile(path, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GATUS_SSH_KNOWN_HOSTS", path)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +132,6 @@ func TestSolaceSSHHandshakeTimeout(t *testing.T) {
 }
 
 func TestSolaceSSHCommandTimeout(t *testing.T) {
-	t.Setenv("GATUS_SSH_KNOWN_HOSTS", "")
 	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -131,6 +145,12 @@ func TestSolaceSSHCommandTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	line := knownhosts.Line([]string{listener.Addr().String()}, signer.PublicKey()) + "\n"
+	if err := os.WriteFile(path, []byte(line), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GATUS_SSH_KNOWN_HOSTS", path)
 	serverConfig := &ssh.ServerConfig{NoClientAuth: true}
 	serverConfig.AddHostKey(signer)
 	go func() {

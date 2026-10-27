@@ -86,10 +86,6 @@ append_vps_ssh_endpoints() {
 		return 0
 	fi
 
-	if grep -q 'name: vps-health' /data/config.yaml 2>/dev/null; then
-		return 0
-	fi
-
 	if [ -z "${VPS_MONITOR_SSH_PRIVATE_KEY:-}" ] && [ -z "${VPS_MONITOR_SSH_PRIVATE_KEY_B64:-}" ]; then
 		echo "VPS SSH monitoring requires a private key." >&2
 		exit 1
@@ -104,6 +100,9 @@ append_vps_ssh_endpoints() {
 		printf '%s\n' "$VPS_MONITOR_SSH_PRIVATE_KEY" > /data/vps_monitor_key
 	fi
 	chmod 600 /data/vps_monitor_key
+	if grep -q 'name: vps-health' /data/config.yaml 2>/dev/null; then
+		return 0
+	fi
 
 	VPS_MONITOR_SSH_HOST="${VPS_MONITOR_SSH_HOST:-mail.solace.onl}"
 	VPS_MONITOR_SSH_PORT="${VPS_MONITOR_SSH_PORT:-22}"

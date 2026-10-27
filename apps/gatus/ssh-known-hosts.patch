@@ -14,13 +14,13 @@
  
 -	cli, err := ssh.Dial("tcp", net.JoinHostPort(address, port), &ssh.ClientConfig{
 -		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-+	hostKeyCallback := ssh.InsecureIgnoreHostKey()
-+	if path := os.Getenv("GATUS_SSH_KNOWN_HOSTS"); path != "" {
-+		callback, err := knownhosts.New(path)
-+		if err != nil {
-+			return false, nil, fmt.Errorf("invalid SSH known hosts: %w", err)
-+		}
-+		hostKeyCallback = callback
++	path := os.Getenv("GATUS_SSH_KNOWN_HOSTS")
++	if path == "" {
++		return false, nil, errors.New("SSH known hosts are required")
++	}
++	hostKeyCallback, err := knownhosts.New(path)
++	if err != nil {
++		return false, nil, fmt.Errorf("invalid SSH known hosts: %w", err)
 +	}
 +	target := net.JoinHostPort(address, port)
 +	conn, err := net.DialTimeout("tcp", target, config.Timeout)
