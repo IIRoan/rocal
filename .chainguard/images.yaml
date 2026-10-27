@@ -1,0 +1,5 @@
+enabled: true
+prefer_fips: false
+migrate:
+  enabled: true
+  period: "24h"
