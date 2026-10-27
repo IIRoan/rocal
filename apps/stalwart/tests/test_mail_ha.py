@@ -61,6 +61,15 @@ class EntrypointTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("STALWART_REDIS_URL is required", result.stderr)
 
+    def test_missing_webhook_secret_fails_before_any_service_is_started(self):
+        env = {"PATH": os.environ["PATH"], "PGHOST": "test", "PGUSER": "test", "PGPASSWORD": "test",
+               "FRPS_ADDR": "test", "FRPC_TOKEN": "test", "FRPC_RELAY_STCP_KEY": "test", "STALWART_GATE_KEY": "k" * 64,
+               "STALWART_REDIS_URL": "redis://:test@redis.test:6379/0"}
+        result = subprocess.run(["sh", str(ROOT / "railway-entrypoint.sh")], env=env,
+                                capture_output=True, text=True, timeout=3)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("STALWART_WEBHOOK_SECRET is required", result.stderr)
+
     def test_redis_credentials_are_rendered_without_shell_interpretation(self):
         url = 'redis://:password-with-$(false)-and-"@redis.test:6379/0'
         result = subprocess.run(["sh", "-euc", shell_functions("render_stalwart_plan") +

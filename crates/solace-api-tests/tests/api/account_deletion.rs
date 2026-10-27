@@ -772,7 +772,7 @@ async fn a_stale_mailbox_id_still_removes_the_mailbox_found_by_name() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let stalwart_account = bootstrap_mailbox(&app, &mut user).await;
-    // Stalwart 0.16 neither destroys nor refuses this unknown id, so the backend falls back to the mailbox name.
+    // The stored id names no Stalwart account, so deletion falls back to the mailbox name.
     exec(
         &app.db,
         "UPDATE mail_directory_entry SET stalwart_account_id = 'zz2345' WHERE user_id = $1",

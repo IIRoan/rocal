@@ -100,7 +100,7 @@ Failing apply fails the boot.
 
 **Secrets** stay in Railway variables. Plan objects use `{"@type":"EnvironmentVariable","variableName":"..."}`. Snapshot strips secrets; omit a secret field on apply so live credentials are not wiped.
 
-DKIM keys rotate automatically (`dkimManagement: Automatic`). Stalwart does **not** continuously reconcile Cloudflare; after a new selector, run `scripts/stalwart-plan.sh dns-publish`. Do not flip MTA-STS to `enforce` until TLS-RPT reports arrive.
+DKIM keys rotate through a scheduled `Task/DkimManagement` (`dkimManagement: Automatic`, every 90 days), and `dnsManagement: Automatic` publishes records through the `DnsServer` Cloudflare token. Check `stalwart-cli query Task` shows a pending `DkimManagement`; if none is pending (the 1.0 migration carried none over), create one for domain `b`. Stalwart adds and updates records but never deletes ones it stops advertising. `scripts/stalwart-plan.sh dns-publish` republishes on demand. `SystemSettings.services` advertises only JMAP, the one protocol the edge exposes. Do not flip MTA-STS to `enforce` until TLS-RPT reports arrive.
 
 Admin UI is allowlisted on public HTTPS via VPS file `/etc/haproxy/admin-allow.lst` (from GitHub Environment secret `ADMIN_ALLOW_IP` on `mail-vps`; never committed). Tunnel fallback: `ssh -N -L 8080:127.0.0.1:8080 USER@mail.solace.onl` then `http://127.0.0.1:8080/admin/`.
 
@@ -238,6 +238,7 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
 | `STALWART_GATE_KEY` | yes | Backend gate key (32+ chars); only its SHA-256 reaches HAProxy; missing key fails boot. The API would send it as `X-Solace-Gate` only if its own `STALWART_GATE_KEY` were set (it is not) |
 | `STALWART_REDIS_URL` | yes | Private Redis connection for shared transient state and coordination during overlapping mail deployments |
+| `STALWART_WEBHOOK_SECRET` | yes | HMAC key the plan's mail-ingest webhook signs with; missing key fails boot |
 | `PORT` | yes | Set to `8090` — Railway healthcheck port |
 | `PGHOST`, `PGPASSWORD`, etc. | yes | PostgreSQL (Railway plugin) |
 | `BUCKET` / `BUCKET_*` | yes | Railway bucket refs for S3 BlobStore |
@@ -253,7 +254,7 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 
 Use the **private** Postgres hostname (`*.railway.internal`). Message bodies live in the Railway bucket (`BlobStore` S3); Postgres holds metadata.
 
-Leave `STALWART_RECOVERY_MODE` unset for normal operation; set it only for a planned recovery. The CLI helper uses `STALWART_ADMIN_TOKEN` unless a local `STALWART_TOKEN` override is supplied. Webhook registration uses the API's `STALWART_WEBHOOK_SECRET`.
+Leave `STALWART_RECOVERY_MODE` unset for normal operation; set it only for a planned recovery. The CLI helper uses `STALWART_ADMIN_TOKEN` unless a local `STALWART_TOKEN` override is supplied. The plan signs the ingest webhook with this service's `STALWART_WEBHOOK_SECRET`; the API references the same variable to verify it.
 
 The mail PostgreSQL instance allows 100 connections, enough for two overlapping Stalwart pools of 32 plus administration. Its 128 MiB shared buffer cache is unchanged. The setting lives in PostgreSQL's persistent `postgresql.auto.conf`; recovery details are in [UPGRADE-1.0.md](UPGRADE-1.0.md).
 

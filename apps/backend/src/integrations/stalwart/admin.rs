@@ -10,9 +10,6 @@ use crate::telemetry;
 
 /// The registry capabilities; mail capabilities are never requested with the provisioning token.
 const USING: [&str; 2] = ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"];
-const WEBHOOK_ID: &str = "solace-inbound-mail";
-// Concurrent first mints must not create or update the same registry object together.
-static OAUTH_REGISTRATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Debug, Error)]
 pub enum AdminError {
@@ -487,88 +484,41 @@ impl<'a> Admin<'a> {
         )
     }
 
-    pub async fn ensure_oauth_client(
+    /// Adds this backend's callback to the plan-registered bridge client; creating it here would make it third-party.
+    pub async fn ensure_oauth_redirect(
         &self,
         client_id: &str,
         redirect_uri: &str,
-        description: Option<&str>,
     ) -> Result<(), AdminError> {
-        let _registration = OAUTH_REGISTRATION.lock().await;
         let ids = self.ids("x:OAuthClient/query", json!({})).await?;
         let clients = if ids.is_empty() {
             Vec::new()
         } else {
             self.list("x:OAuthClient/get", ids).await?
         };
-        let existing = match clients
-            .into_iter()
+        let client = clients
+            .iter()
             .find(|client| str_field(client, "clientId") == Some(client_id))
-        {
-            Some(existing) => existing,
-            None => {
-                let result = self
-                    .call(
-                        "x:OAuthClient/set",
-                        json!({"create": {"client1": {
-                            "clientId": client_id,
-                            "redirectUris": {redirect_uri: true},
-                            "description": description,
-                        }}}),
-                        "c1",
-                    )
-                    .await?;
-                let id = result
-                    .pointer("/created/client1/id")
-                    .and_then(Value::as_str)
-                    .filter(|id| !id.is_empty())
-                    .ok_or_else(|| {
-                        AdminError::Failed(
-                            "Stalwart OAuth client creation was not acknowledged.".into(),
-                        )
-                    })?;
-                self.list("x:OAuthClient/get", vec![json!(id)])
-                    .await?
-                    .into_iter()
-                    .next()
-                    .filter(|client| str_field(client, "clientId") == Some(client_id))
-                    .ok_or_else(|| {
-                        AdminError::Failed(
-                            "Stalwart OAuth client was not found after creation.".into(),
-                        )
-                    })?
-            }
-        };
-        let id = str_field(&existing, "id")
+            .ok_or_else(|| {
+                AdminError::Failed("Stalwart has no OAuth client for the mail bridge.".into())
+            })?;
+        let id = str_field(client, "id")
             .filter(|id| !id.is_empty())
             .ok_or_else(|| AdminError::Failed("Stalwart OAuth client has no id.".into()))?;
-        let mut patch = Map::new();
-        let redirects = existing
-            .get("redirectUris")
-            .and_then(Value::as_object)
-            .ok_or_else(|| {
-                AdminError::Failed("Stalwart OAuth client has invalid redirect URIs.".into())
-            })?;
-        if redirects.get(redirect_uri) != Some(&json!(true)) {
-            let path = redirect_uri.replace('~', "~0").replace('/', "~1");
-            patch.insert(format!("redirectUris/{path}"), json!(true));
-        }
-        if existing.get("description") != Some(&json!(description)) {
-            patch.insert("description".into(), json!(description));
-        }
-        // Only v1 exposes scopes; reading the object keeps registration compatible with 0.16.27.
-        if let Some(scopes) = existing.get("scopes") {
-            let scopes = scopes.as_object().ok_or_else(|| {
-                AdminError::Failed("Stalwart OAuth client has invalid scopes.".into())
-            })?;
-            if scopes.get("mail") != Some(&json!(true)) {
-                patch.insert("scopes/mail".into(), json!(true));
-            }
-        }
-        if patch.is_empty() {
+        if client
+            .pointer("/redirectUris")
+            .and_then(|uris| uris.get(redirect_uri))
+            == Some(&json!(true))
+        {
             return Ok(());
         }
+        let path = redirect_uri.replace('~', "~0").replace('/', "~1");
         let result = self
-            .call("x:OAuthClient/set", json!({"update": {id: patch}}), "c1")
+            .call(
+                "x:OAuthClient/set",
+                json!({"update": {id: {format!("redirectUris/{path}"): true}}}),
+                "c1",
+            )
             .await?;
         acknowledged(
             &result,
@@ -781,116 +731,6 @@ impl<'a> Admin<'a> {
             "Stalwart encryption-at-rest update failed.",
             "Stalwart encryption-at-rest update was not acknowledged.",
         )
-    }
-
-    /// Creates or updates the signed mail-ingest webhook by URL, removes duplicates, then reloads Stalwart's settings.
-    pub async fn ensure_mail_ingest_webhook(
-        &self,
-        url: &str,
-        secret: &str,
-    ) -> Result<(), AdminError> {
-        let ids = self
-            .call("x:WebHook/query", json!({}), "q1")
-            .await?
-            .get("ids")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        let wanted = url.trim_end_matches('/');
-        let mut existing: Option<String> = None;
-        let mut duplicates: Vec<String> = Vec::new();
-        if !ids.is_empty() {
-            let hooks = list_of(
-                &self
-                    .call("x:WebHook/get", json!({"ids": ids}), "g1")
-                    .await?,
-            );
-            for hook in &hooks {
-                let (Some(id), Some(hook_url)) = (
-                    str_field(hook, "id").filter(|id| !id.is_empty()),
-                    str_field(hook, "url"),
-                ) else {
-                    continue;
-                };
-                if hook_url.trim_end_matches('/') != wanted {
-                    continue;
-                }
-                match &existing {
-                    None => existing = Some(id.to_owned()),
-                    Some(kept) if kept != id => duplicates.push(id.to_owned()),
-                    Some(_) => {}
-                }
-            }
-        }
-        if existing.is_none() && ids.contains(&json!(WEBHOOK_ID)) {
-            existing = Some(WEBHOOK_ID.to_owned());
-        }
-        let payload = json!({
-            "url": url,
-            "enable": true,
-            "events": {"message-ingest.ham": true},
-            "eventsPolicy": "include",
-            "level": "info",
-            "throttle": 1000,
-            "timeout": 30_000,
-            "discardAfter": 300_000,
-            "allowInvalidCerts": false,
-            "lossy": false,
-            "httpHeaders": {"X-Solace-Source": "solace-mail-ingest"},
-            "httpAuth": {"@type": "Unauthenticated"},
-            "signatureKey": {"@type": "Value", "secret": secret},
-        });
-        let id = existing.as_deref().unwrap_or(WEBHOOK_ID);
-        let operation = if existing.is_some() {
-            "update"
-        } else {
-            "create"
-        };
-        let result = self
-            .call("x:WebHook/set", json!({operation: {id: payload}}), "s1")
-            .await?;
-        let create_error = result.pointer(&format!("/notCreated/{WEBHOOK_ID}"));
-        let update_error = existing
-            .as_deref()
-            .and_then(|id| result.get("notUpdated")?.get(id));
-        let errors = [create_error, update_error];
-        if errors.iter().flatten().any(|error| truthy(error)) {
-            return Err(AdminError::Failed(
-                errors
-                    .into_iter()
-                    .find_map(description_of)
-                    .unwrap_or("Stalwart mail ingest webhook update failed.")
-                    .to_owned(),
-            ));
-        }
-        if !duplicates.is_empty() {
-            let result = self
-                .call("x:WebHook/set", json!({"destroy": duplicates}), "d1")
-                .await?;
-            if let Some(error) = result
-                .get("notDestroyed")
-                .and_then(Value::as_object)
-                .and_then(|refused| refused.values().next())
-                .filter(|error| truthy(error))
-            {
-                return Err(AdminError::Failed(
-                    description_of(Some(error))
-                        .unwrap_or("Stalwart duplicate mail ingest webhook cleanup failed.")
-                        .to_owned(),
-                ));
-            }
-        }
-        self.call(
-            "x:Action/set",
-            json!({"create": {"reload": {"@type": "ReloadSettings"}}}),
-            "r1",
-        )
-        .await?;
-        tracing::info!(
-            webhook_ref = telemetry::log_ref(id),
-            "Ensured Stalwart mail ingest webhook"
-        );
-        Ok(())
     }
 }
 
@@ -1227,40 +1067,37 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn registers_mail_scope_without_replacing_existing_redirects_or_scopes() {
+    async fn adds_a_missing_callback_without_replacing_existing_redirects() {
         let fake = FakeStalwart::scripted(vec![
             envelope("x:OAuthClient/query", json!({"ids": ["client-1"]}), "c1"),
-            envelope("x:OAuthClient/get", json!({"list": [{"id": "client-1", "clientId": "bridge", "redirectUris": {"https://old.test/callback": true}, "description": "bridge", "scopes": {"contacts": true}}]}), "c1"),
+            envelope("x:OAuthClient/get", json!({"list": [{"id": "client-1", "clientId": "bridge", "redirectUris": {"https://old.test/callback": true}}]}), "c1"),
             envelope("x:OAuthClient/set", json!({"updated": {"client-1": null}}), "c1"),
         ]).await;
         admin(&fake)
-            .ensure_oauth_client("bridge", "https://new.test/~callback", Some("bridge"))
+            .ensure_oauth_redirect("bridge", "https://new.test/~callback")
             .await
             .unwrap();
         assert_eq!(
             fake.requests()[2].json()["methodCalls"][0][1],
-            json!({"update": {"client-1": {"redirectUris/https:~1~1new.test~1~0callback": true, "scopes/mail": true}}})
+            json!({"update": {"client-1": {"redirectUris/https:~1~1new.test~1~0callback": true}}})
         );
     }
 
     #[tokio::test]
-    async fn refuses_unacknowledged_oauth_registration() {
-        let fake = FakeStalwart::scripted(vec![
-            envelope("x:OAuthClient/query", json!({"ids": []}), "c1"),
-            envelope(
-                "x:OAuthClient/set",
-                json!({"notCreated": {"client1": {"type": "forbidden"}}}),
-                "c1",
-            ),
-        ])
+    async fn never_creates_the_bridge_client() {
+        let fake = FakeStalwart::scripted(vec![envelope(
+            "x:OAuthClient/query",
+            json!({"ids": []}),
+            "c1",
+        )])
         .await;
         assert!(
             admin(&fake)
-                .ensure_oauth_client("bridge", "https://new.test/callback", None)
+                .ensure_oauth_redirect("bridge", "https://new.test/callback")
                 .await
                 .is_err()
         );
-        assert_eq!(fake.requests().len(), 2);
+        assert_eq!(fake.requests().len(), 1);
     }
 
     #[tokio::test]
@@ -1305,65 +1142,25 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(token.access_token, "v1-token");
-        assert!(fake.requests()[1].body.contains("code=v1-code"));
-    }
-
-    #[tokio::test]
-    async fn accepts_client_code_auth_responses() {
-        let fake = FakeStalwart::scripted(vec![
-            Reply::json(json!({"type": "authenticated", "client_code": "client-code-1"})),
-            Reply::json(json!({"access_token": "access-token-1", "expires_in": 3600})),
-        ])
-        .await;
-        let pkce = crate::mail::bridge::Pkce {
-            verifier: "verifier-1".into(),
-            challenge: "challenge-1".into(),
-        };
-        let token = admin(&fake)
-            .issue_oauth_access_token(
-                "alice@solace.onl",
-                "StrongPassw0rd!",
-                "solace-mail-bridge",
-                "https://api.solace.test/api/mail/oauth/callback",
-                pkce,
-            )
-            .await
-            .unwrap();
-        assert_eq!(
-            (
-                token.access_token.as_str(),
-                token.expires_in,
-                token.expires_at
-            ),
-            ("access-token-1", Some(3600), None)
-        );
         let requests = fake.requests();
         assert_eq!(requests[0].path, "/api/auth");
         assert_eq!(
             requests[0].authorization, None,
             "the login carries no admin token"
         );
-        let mut legacy_body = requests[0].json();
-        let object = legacy_body.as_object_mut().unwrap();
+        let mut login = requests[0].json();
+        let object = login.as_object_mut().unwrap();
         assert!(object.remove("query").unwrap().is_string());
-        assert_eq!(object.remove("consent"), Some(json!(true)));
         assert_eq!(
-            legacy_body,
-            json!({"type": "authCode", "accountName": "alice@solace.onl", "accountSecret": "StrongPassw0rd!",
-                "clientId": "solace-mail-bridge", "redirectUri": "https://api.solace.test/api/mail/oauth/callback",
-                "codeChallenge": "challenge-1", "codeChallengeMethod": "S256"})
+            login,
+            json!({"type": "authCode", "accountName": "alice@solace.test", "accountSecret": "solace-test-password", "consent": true})
         );
         assert_eq!(requests[1].path, "/auth/token");
         assert_eq!(
             requests[1].content_type.as_deref(),
             Some("application/x-www-form-urlencoded")
         );
-        assert!(
-            requests[1].body.contains("code=client-code-1"),
-            "{}",
-            requests[1].body
-        );
-        assert!(requests[1].body.contains("code_verifier=verifier-1"));
+        assert!(requests[1].body.contains("code=v1-code"));
     }
 
     #[tokio::test]
@@ -1432,92 +1229,6 @@ mod tests {
         assert_eq!(
             unacknowledged.to_string(),
             "Stalwart account deletion was not acknowledged."
-        );
-    }
-
-    #[tokio::test]
-    async fn creates_the_ingest_webhook_and_reloads_settings() {
-        let fake = FakeStalwart::scripted(vec![
-            envelope("x:WebHook/query", json!({"ids": []}), "q1"),
-            envelope(
-                "x:WebHook/set",
-                json!({"created": {"solace-inbound-mail": {"id": "hook-1"}}}),
-                "s1",
-            ),
-            envelope(
-                "x:Action/set",
-                json!({"created": {"reload": {"id": "reload-1"}}}),
-                "r1",
-            ),
-        ])
-        .await;
-        admin(&fake)
-            .ensure_mail_ingest_webhook(
-                "https://api.solace.onl/api/internal/stalwart/webhook",
-                "shared-secret",
-            )
-            .await
-            .unwrap();
-        let requests = fake.requests();
-        assert_eq!(requests.len(), 3);
-        let hook = &requests[1].json()["methodCalls"][0][1]["create"]["solace-inbound-mail"];
-        assert_eq!(
-            hook["url"],
-            json!("https://api.solace.onl/api/internal/stalwart/webhook")
-        );
-        assert_eq!(hook["events"], json!({"message-ingest.ham": true}));
-        assert_eq!(
-            hook["httpHeaders"],
-            json!({"X-Solace-Source": "solace-mail-ingest"})
-        );
-        assert_eq!(
-            hook["signatureKey"],
-            json!({"@type": "Value", "secret": "shared-secret"})
-        );
-        assert_eq!(
-            requests[2].json()["methodCalls"][0],
-            json!(["x:Action/set", {"create": {"reload": {"@type": "ReloadSettings"}}}, "r1"])
-        );
-    }
-
-    #[tokio::test]
-    async fn updates_the_webhook_by_url_and_removes_duplicates() {
-        let url = "https://api.solace.onl/api/internal/stalwart/webhook";
-        let fake = FakeStalwart::scripted(vec![
-            envelope(
-                "x:WebHook/query",
-                json!({"ids": ["hook-1", "hook-2"]}),
-                "q1",
-            ),
-            envelope(
-                "x:WebHook/get",
-                json!({"list": [{"id": "hook-1", "url": url}, {"id": "hook-2", "url": url}]}),
-                "g1",
-            ),
-            envelope("x:WebHook/set", json!({"updated": {"hook-1": null}}), "s1"),
-            envelope("x:WebHook/set", json!({"destroyed": ["hook-2"]}), "d1"),
-            envelope(
-                "x:Action/set",
-                json!({"created": {"reload": {"id": "reload-1"}}}),
-                "r1",
-            ),
-        ])
-        .await;
-        admin(&fake)
-            .ensure_mail_ingest_webhook(&format!("{url}/"), "shared-secret")
-            .await
-            .unwrap();
-        let requests = fake.requests();
-        let update = &requests[2].json()["methodCalls"][0];
-        assert_eq!(update[0], json!("x:WebHook/set"));
-        assert_eq!(
-            update[1]["update"]["hook-1"]["url"],
-            json!(format!("{url}/"))
-        );
-        assert_eq!(update[2], json!("s1"));
-        assert_eq!(
-            requests[3].json()["methodCalls"][0],
-            json!(["x:WebHook/set", {"destroy": ["hook-2"]}, "d1"])
         );
     }
 

@@ -71,19 +71,16 @@ mod tests {
     /// The mailbox owner's Stalwart: the registry and login for minting, and JMAP that refuses `stale-token`.
     fn stalwart(jmap: fn(&Recorded) -> Reply) -> impl Fn(&Recorded) -> Reply {
         move |request| match request.path.as_str() {
-            "/api/auth" => Reply::json(json!({"type": "authenticated", "clientCode": "code-1"})),
+            "/api/auth" => Reply::authenticated(request, "code-1"),
+            _ if request.first_method() == "x:OAuthClient/query" => Reply::json(
+                json!({"methodResponses": [["x:OAuthClient/query", {"ids": ["c"]}, "c1"]]}),
+            ),
+            _ if request.first_method() == "x:OAuthClient/get" => Reply::json(
+                json!({"methodResponses": [["x:OAuthClient/get", {"list": [{"id": "c", "clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}}]}, "c1"]]}),
+            ),
             "/auth/token" => {
                 Reply::json(json!({"access_token": "fresh-token", "expires_in": 3600}))
             }
-            _ if request.first_method() == "x:OAuthClient/query" => Reply::json(
-                json!({"methodResponses": [["x:OAuthClient/query", {"ids": []}, "c1"]]}),
-            ),
-            _ if request.first_method() == "x:OAuthClient/set" => Reply::json(
-                json!({"methodResponses": [["x:OAuthClient/set", {"created": {"client1": {"id": "c"}}}, "c1"]]}),
-            ),
-            _ if request.first_method() == "x:OAuthClient/get" => Reply::json(
-                json!({"methodResponses": [["x:OAuthClient/get", {"list": [{"id": "c", "clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}, "description": "Solace mail backend bridge"}]}, "c1"]]}),
-            ),
             _ => jmap(request),
         }
     }

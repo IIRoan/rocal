@@ -22,15 +22,10 @@ pub fn login_request(
             ("code_challenge_method", "S256"),
         ])
         .finish();
-    // The legacy fields keep the bridge working during the 0.16.27 rollout and a rollback.
     json!({
         "type": "authCode",
         "accountName": account_name,
         "accountSecret": account_secret,
-        "clientId": client_id,
-        "redirectUri": redirect_uri,
-        "codeChallenge": pkce.challenge,
-        "codeChallengeMethod": "S256",
         "query": query,
         "consent": true,
     })
@@ -40,33 +35,25 @@ pub fn authorization_code(payload: &Value, redirect_uri: &str, state: &str) -> O
     if payload.get("type")?.as_str()? != "authenticated" {
         return None;
     }
-    if let Some(location) = payload.get("location") {
-        let mut location = Url::parse(location.as_str()?).ok()?;
-        let expected = Url::parse(redirect_uri).ok()?;
-        let pairs: Vec<_> = location
-            .query_pairs()
-            .map(|(k, v)| (k.into_owned(), v.into_owned()))
-            .collect();
-        location.set_query(expected.query());
-        if location != expected || pairs.iter().any(|(key, _)| key == "error") {
-            return None;
-        }
-        let one = |name: &str| {
-            let mut values = pairs.iter().filter(|(key, _)| key == name);
-            let value = &values.next()?.1;
-            (values.next().is_none() && !value.is_empty()).then_some(value.as_str())
-        };
-        if one("state")? != state {
-            return None;
-        }
-        return one("code").map(str::to_owned);
+    let mut location = Url::parse(payload.get("location")?.as_str()?).ok()?;
+    let expected = Url::parse(redirect_uri).ok()?;
+    let pairs: Vec<_> = location
+        .query_pairs()
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    location.set_query(expected.query());
+    if location != expected || pairs.iter().any(|(key, _)| key == "error") {
+        return None;
     }
-    payload
-        .get("clientCode")
-        .or_else(|| payload.get("client_code"))?
-        .as_str()
-        .filter(|code| !code.is_empty())
-        .map(str::to_owned)
+    let one = |name: &str| {
+        let mut values = pairs.iter().filter(|(key, _)| key == name);
+        let value = &values.next()?.1;
+        (values.next().is_none() && !value.is_empty()).then_some(value.as_str())
+    };
+    if one("state")? != state {
+        return None;
+    }
+    one("code").map(str::to_owned)
 }
 
 #[cfg(test)]
@@ -89,7 +76,7 @@ mod tests {
         ] {
             assert_eq!(
                 authorization_code(
-                    &json!({"type": "authenticated", "location": location, "clientCode": "fallback"}),
+                    &json!({"type": "authenticated", "location": location}),
                     callback,
                     "expected"
                 ),
