@@ -205,7 +205,6 @@ state = {
     "frpc_pid": int(os.environ.get("FRPC_PID", "0") or 0),
     "http_port": int(os.environ.get("STALWART_HTTP_PORT", "8080")),
     "gate_port": int(os.environ.get("STALWART_GATE_PORT", "8081")),
-    "relay_port": int(os.environ.get("FRPC_RELAY_LOCAL_PORT", "2525")),
 }
 with open(path + ".tmp", "w", encoding="utf-8") as handle:
     json.dump(state, handle)
@@ -274,7 +273,7 @@ def ready():
     # Tunnel reachability is checked once at boot; probing the VPS here would also take down the VPS-independent gate.
     if not pid_alive(state.get("stalwart_pid")) or not pid_alive(state.get("frpc_pid")):
         return False
-    for port in (25, state.get("http_port", 8080), state.get("gate_port", 8081), state.get("relay_port", 2525)):
+    for port in (25, state.get("http_port", 8080), state.get("gate_port", 8081)):
         if not port_open(port):
             return False
     return True

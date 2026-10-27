@@ -191,8 +191,8 @@ do not make Redis, PostgreSQL or the VPS highly available.
 
 Railway probes `GET /healthz/ready` on `PORT` (8090). Healthcheck, overlap, and drain live in the repo-root [`.railway/railway.ts`](../../.railway/railway.ts).
 Readiness needs a ready boot state, live Stalwart and frpc processes, and open
-:25/:8080/:8081/relay ports. It deliberately does not probe the VPS, so a tunnel blip
-never marks the container (and with it the VPS-independent API gate) unhealthy.
+:25/:8080/:8081 ports. The relay listener is required at startup only: FRP closes it
+while reconnecting, which must not mark the private API gate unhealthy.
 
 ### Tunnel mutual TLS (one-time rollout)
 

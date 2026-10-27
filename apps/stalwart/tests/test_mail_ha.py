@@ -186,6 +186,17 @@ class EntrypointTests(unittest.TestCase):
         state["ready"] = False
         self.assertFalse(namespace["ready"]())
 
+    def test_health_stays_ready_while_the_relay_listener_reconnects(self):
+        code = "def ready():" + ENTRYPOINT.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]
+        state = {"ready": True, "stalwart_pid": 1, "frpc_pid": 2}
+        listening = {25, 8080, 8081}
+        namespace = {"load_state": lambda: state, "pid_alive": lambda _: True,
+                     "port_open": lambda port: port in listening}
+        exec(code, namespace)
+        self.assertTrue(namespace["ready"](), "a closed relay must not take the private JMAP gate offline")
+        listening.remove(8081)
+        self.assertFalse(namespace["ready"](), "the private JMAP gate must still be reachable")
+
 
 if __name__ == "__main__":
     unittest.main()
