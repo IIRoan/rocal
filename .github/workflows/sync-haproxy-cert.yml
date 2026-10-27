@@ -44,14 +44,12 @@ jobs:
           test "${GITHUB_EVENT_NAME}" = "schedule" -o "${GITHUB_EVENT_NAME}" = "workflow_dispatch"
 
       - name: Checkout
-        # actions/checkout@v4.2.2
         uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Python
-        # actions/setup-python@v5.4.0
-        uses: chainguard-actions/actions-setup-python@464c237e9a66c5be2a79648c30539c5e0aab6f17 # v5.4.0
+        uses: chainguard-actions/actions-setup-python@aa9fa180ff273b8e01a98ec8583cf6985edd88bd # v7.1.0
         with:
           python-version: "3.12"
 

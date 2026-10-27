@@ -204,7 +204,7 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      - uses: actions/setup-java@v4
+      - uses: chainguard-actions/actions-setup-java@4abbff4c3bfc93084ea2ff1796c8b4e0c255e47d # v6.1.0
         with:
           distribution: temurin
           java-version: "17"

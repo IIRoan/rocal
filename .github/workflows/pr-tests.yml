@@ -40,7 +40,7 @@ jobs:
         run: bun run typecheck && bun run typecheck:native
 
       - name: Run tests with coverage
-        run: bun run scripts/run-tests.ts --coverage --summary=$GITHUB_STEP_SUMMARY
+        run: bun run scripts/run-tests.ts --coverage --summary="$GITHUB_STEP_SUMMARY"
 
       - name: Check mail service helpers
         run: |
