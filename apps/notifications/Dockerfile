@@ -13,14 +13,15 @@ COPY xtask xtask
 COPY packages/calendar-core/src/redaction-policy.js packages/calendar-core/src/redaction-policy.js
 COPY packages/calendar-ics/src/windows-zones.json packages/calendar-ics/src/windows-zones.json
 ENV RUSTFLAGS="-C target-cpu=x86-64-v3"
-RUN cargo build --release --locked -p solace-notifications \
+RUN OPENSSL_STATIC=1 \
+    OPENSSL_LIB_DIR="$(pkg-config --variable=libdir openssl)" \
+    OPENSSL_INCLUDE_DIR="$(pkg-config --variable=includedir openssl)" \
+    cargo build --release --locked -p solace-notifications \
  && cp target/release/solace-notifications /solace-notifications
+RUN readelf -d /solace-notifications > /tmp/runtime-libraries \
+ && ! grep -E 'NEEDED.*lib(ssl|crypto)\.so' /tmp/runtime-libraries
 
-FROM docker.io/library/debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates libssl3 \
- && rm -rf /var/lib/apt/lists/* \
- && useradd --system --uid 10001 --no-create-home solace
+FROM cgr.dev/chainguard/glibc-dynamic:latest@sha256:5bb932663cff4fb276186720e0357af55c5e47f12e4d9f44ea0060fa3e7bca88
 COPY --from=build /solace-notifications /usr/local/bin/solace-notifications
-USER solace
-CMD ["solace-notifications"]
+USER 10001:10001
+ENTRYPOINT ["/usr/local/bin/solace-notifications"]
