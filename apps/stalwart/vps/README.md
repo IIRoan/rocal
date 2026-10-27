@@ -78,6 +78,13 @@ deployment and reloads. It emits service states, uptime, cumulative TCP counters
 journal event-category counts; journal messages, client addresses and credentials
 never enter the report.
 
+Read the JSON under **Actions → Sync mail VPS → Apply VPS repo → Read-only VPS diagnostics**.
+This repository is public, so those logs expose operational counters and service
+states publicly. The command uses the existing administrator deploy credential;
+its read-only behavior is enforced by the checked-in script, not a restricted SSH
+role. Only trusted default-branch code may use it. Repository write access remains
+production access, so protect the default branch as described above.
+
 Local / emergency apply (bypasses GitHub; trusted shell only):
 
 ```bash

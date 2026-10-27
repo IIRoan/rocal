@@ -67,6 +67,16 @@ class MonitorTest(unittest.TestCase):
         with patch.object(monitor.urllib.request, "urlopen", side_effect=TimeoutError):
             self.assertEqual(monitor.fetch_frp_proxies(), {})
 
+    def test_service_state_never_copies_raw_command_output(self):
+        for stdout, stderr, status in [
+            ("active\n", "", "active"),
+            ("failed\n", "", "failed"),
+            ("", "private-user@example.test secret-canary", "unknown"),
+            ("active\nsecret-canary", "", "unknown"),
+        ]:
+            with self.subTest(status=status, stdout=stdout), patch.object(monitor.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout, stderr)):
+                self.assertEqual(monitor.service_active("frps"), status)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -54,7 +54,8 @@ def service_active(unit: str) -> str:
         )
     except (OSError, subprocess.TimeoutExpired):
         return "unknown"
-    return (result.stdout or result.stderr or "unknown").strip()
+    state = result.stdout.strip()
+    return state if state in {"active", "inactive", "failed", "activating", "deactivating", "reloading", "maintenance", "refreshing"} else "unknown"
 
 
 def fetch_frp_proxies() -> dict[str, str]:
