@@ -1,0 +1,178 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "47 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOCKER_BUILD_RECORD_UPLOAD: "false"
+
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  javascript:
+    name: JavaScript dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: chainguard-actions/actions-checkout@40e53bf063d4f87f0a6e0a83231c09bcfb22bc19 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: .bun-version
+
+      - name: Audit all JavaScript workspaces, including development dependencies
+        run: bun audit --audit-level high
+
+  repository:
+    name: Rust dependencies and Dockerfiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: chainguard-actions/actions-checkout@40e53bf063d4f87f0a6e0a83231c09bcfb22bc19 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+
+      - name: Scan Cargo dependencies and Dockerfiles
+        run: >-
+          trivy fs --scanners vuln,misconfig --include-dev-deps
+          --skip-files bun.lock --skip-dirs node_modules,target,.git,webmail
+          --format json --output "$RUNNER_TEMP/repository.json" .
+
+      - name: Create code scanning report
+        run: trivy convert --format sarif --output "$RUNNER_TEMP/repository.sarif" "$RUNNER_TEMP/repository.json"
+
+      - name: Publish findings
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: ${{ runner.temp }}/repository.sarif
+          category: /trivy/repository
+
+      - name: Fail on high or critical findings
+        run: trivy convert --format table --severity HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/repository.json"
+
+  containers:
+    name: Container (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            context: .
+            dockerfile: apps/backend/Dockerfile
+            builder: true
+          - image: notifications
+            context: .
+            dockerfile: apps/notifications/Dockerfile
+            builder: true
+          - image: stalwart
+            context: apps/stalwart
+            dockerfile: apps/stalwart/Dockerfile
+            builder: false
+          - image: gatus
+            context: apps/gatus
+            dockerfile: apps/gatus/Dockerfile
+            builder: false
+          - image: errex
+            context: apps/errex
+            dockerfile: apps/errex/Dockerfile
+            builder: false
+
+    steps:
+      - name: Checkout
+        uses: chainguard-actions/actions-checkout@40e53bf063d4f87f0a6e0a83231c09bcfb22bc19 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Build the application image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          tags: solace-security:${{ matrix.image }}
+          load: true
+          pull: true
+          cache-from: type=gha,scope=security-${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=security-${{ matrix.image }}
+
+      - name: Setup Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+
+      - name: Scan the application image
+        env:
+          IMAGE: solace-security:${{ matrix.image }}
+        run: trivy image --image-src docker --scanners vuln --format json --output "$RUNNER_TEMP/runtime.json" "$IMAGE"
+
+      - name: Create code scanning report
+        run: trivy convert --format sarif --output "$RUNNER_TEMP/runtime.sarif" "$RUNNER_TEMP/runtime.json"
+
+      - name: Publish application image findings
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: ${{ runner.temp }}/runtime.sarif
+          category: /trivy/container/${{ matrix.image }}/runtime
+
+      - name: Load the Rust build stage for statically linked OpenSSL scanning
+        if: matrix.builder
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          target: build
+          tags: solace-security:${{ matrix.image }}-build
+          load: true
+
+      - name: Scan the Rust build stage
+        id: build-scan
+        if: matrix.builder
+        env:
+          IMAGE: solace-security:${{ matrix.image }}-build
+        run: |
+          trivy image --image-src docker --scanners vuln --pkg-types os --format json --output "$RUNNER_TEMP/build.json" "$IMAGE"
+          trivy convert --format sarif --output "$RUNNER_TEMP/build.sarif" "$RUNNER_TEMP/build.json"
+
+      - name: Publish build stage findings
+        if: matrix.builder
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: ${{ runner.temp }}/build.sarif
+          category: /trivy/container/${{ matrix.image }}/build
+
+      - name: Fail on high or critical application vulnerabilities
+        run: trivy convert --format table --severity HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/runtime.json"
+
+      - name: Fail on high or critical build stage vulnerabilities
+        if: ${{ !cancelled() && matrix.builder && steps.build-scan.outcome == 'success' }}
+        run: trivy convert --format table --severity HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/build.json"
