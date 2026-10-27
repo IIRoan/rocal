@@ -52,7 +52,8 @@ does today; retire that token once the scoped one works (plan 001 step 7).
 ```mermaid
 flowchart TB
     subgraph Internet
-        MTA[Remote MTAs / mail clients]
+        MTA[Remote MTAs]
+        JMAP[Third-party JMAP clients]
         RCPT[Recipient mail servers]
         API[Solace API<br/>Railway service]
     end
@@ -73,12 +74,15 @@ flowchart TB
         REL[frpc relay visitor<br/>STCP :2525, same process]
         HEALTH[Health server<br/>:8090]
         GATE[Backend gate<br/>HAProxy :8081, key required]
+        PUBLIC[Public JMAP gateway<br/>HAProxy :8082]
         SW --> REL
         FRPC --> SW
         GATE -->|"PROXY v2"| SW
+        PUBLIC -->|"PROXY v2"| SW
     end
 
     MTA --> HAP
+    JMAP -->|"Railway HTTPS<br/>mail.solace.onl"| PUBLIC
     API -->|"Private network<br/>X-Solace-Gate"| GATE
     FRPS <-->|"TCP load-balancing groups<br/>HAProxy PROXY v2 passthrough"| FRPC
     FRPS <-->|"STCP tunnel"| REL
@@ -116,16 +120,16 @@ Admin UI is blocked on Railway public HTTPS. Use the pinned SSH tunnel: `ssh -N 
 
 ```mermaid
 sequenceDiagram
-    participant C as Mail client / MTA
+    participant C as Remote MTA
     participant H as HAProxy (VPS)
     participant F as frps → frpc tunnel
     participant S as Stalwart (Railway)
 
-    C->>H: SMTP :25 / HTTPS :443
-    Note over H: TLS termination on :443<br/>one PROXY v2 header from HAProxy; frpc must not add another
+    C->>H: SMTP :25
+    Note over H: One PROXY v2 header from HAProxy; frpc must not add another
     H->>F: Forward to the localhost frps group port
     F->>S: frpc TCP proxy → Stalwart listener
-    S-->>C: Mail delivery / JMAP
+    S-->>C: SMTP response
 ```
 
 Every container runs one frpc that registers its proxies into frp **load-balancing

@@ -156,6 +156,11 @@ class BackendGateTests(unittest.TestCase):
         self.assertNotIn("x-solace-gate", forwarded["headers"])
         self.assertEqual(self.request("/jmap/session", key=None), 404)
 
+    def test_public_gateway_preserves_ipv6_client_addresses(self):
+        before = len(self.upstream.requests)
+        self.assertEqual(self.request("/jmap/session", headers={"X-Real-IP": "2001:db8::9"}, public=True), 200)
+        self.assertEqual(self.upstream.requests[before]["source"], "2001:db8::9")
+
 
 if __name__ == "__main__":
     unittest.main()
