@@ -24,6 +24,8 @@ EVENTS = {
     "out_of_memory": ("out of memory", "oom-kill", "oom killer"),
     "conntrack_full": ("nf_conntrack: table full",),
     "network_reset": ("netdev watchdog", "link is down", "link down", "reset adapter"),
+    "address_banned": (" ban ",),
+    "address_unbanned": (" unban ",),
 }
 COUNTERS = ("ListenDrops", "ListenOverflows", "TCPTimeouts", "TCPSynRetrans", "TCPAbortOnTimeout", "TCPMemoryPressures")
 STATES = {"active", "inactive", "failed", "activating", "deactivating", "unknown"}
@@ -70,6 +72,32 @@ def tcp_counters(raw):
     return result
 
 
+def ban_history(start, end, path=Path("/var/log/fail2ban.log")):
+    start_time, end_time = [datetime.datetime.fromisoformat(value.replace("Z", "+00:00")) for value in (start, end)]
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, 2)
+            offset = max(0, handle.tell() - 4_000_000)
+            handle.seek(offset)
+            if offset:
+                handle.readline()
+            lines = handle.read(4_000_000).decode("utf-8", "replace").splitlines()
+    except OSError:
+        return journal_summary(None)
+    selected, first = [], None
+    for line in lines:
+        try:
+            date = datetime.datetime.strptime(line[:23], "%Y-%m-%d %H:%M:%S,%f").astimezone(datetime.timezone.utc)
+        except ValueError:
+            continue
+        first = first or date
+        if start_time <= date <= end_time:
+            selected.append(json.dumps({"MESSAGE": line}))
+    result = journal_summary("\n".join(selected))
+    result["truncated"] = first is None or first > start_time
+    return result
+
+
 def collect(start, end):
     start, end = window(start, end)
     if os.geteuid() != 0:
@@ -94,12 +122,13 @@ def collect(start, end):
         "services": services,
         "tunnel": tunnel,
         "kernel": kernel,
+        "bans": ban_history(start, end),
         "cumulativeTcpCounters": tcp_counters(Path("/proc/net/netstat").read_text()),
     }
 
 
 def validate_report(report, start, end):
-    if not isinstance(report, dict) or set(report) != {"window", "observedAt", "uptimeSeconds", "services", "tunnel", "kernel", "cumulativeTcpCounters"}:
+    if not isinstance(report, dict) or set(report) != {"window", "observedAt", "uptimeSeconds", "services", "tunnel", "kernel", "bans", "cumulativeTcpCounters"}:
         raise ValueError("invalid_report")
     if report["window"] != {"start": start, "end": end} or type(report["uptimeSeconds"]) is not int:
         raise ValueError("invalid_report")
@@ -113,7 +142,7 @@ def validate_report(report, start, end):
             raise ValueError("invalid_report")
         if any(value is not None and type(value) is not int for key, value in service.items() if key != "state"):
             raise ValueError("invalid_report")
-    for name in ("tunnel", "kernel"):
+    for name in ("tunnel", "kernel", "bans"):
         data = report[name]
         if not isinstance(data, dict) or set(data) != {"available", "truncated", "categories"} or type(data["available"]) is not bool or type(data["truncated"]) is not bool or not isinstance(data["categories"], dict) or set(data["categories"]) != set(EVENTS):
             raise ValueError("invalid_report")
