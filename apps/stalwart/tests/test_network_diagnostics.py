@@ -1,6 +1,8 @@
 """Read-only diagnostics retain counters and categories, never raw journal content or credentials."""
 
 import importlib.util
+import contextlib
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -85,9 +87,30 @@ class NetworkDiagnosticsTests(unittest.TestCase):
         self.assertFalse(paths[0].exists())
 
     def test_remote_rejects_unexpected_report_fields_and_non_numeric_counters(self):
-        for value in [report() | {"message": "private-data"}, report() | {"uptimeSeconds": "private-data"}, report() | {"services": []}]:
+        for value in [report() | {"message": "private-data"}, report() | {"uptimeSeconds": "private-data"}, report() | {"services": []}, report() | {"banCorrelation": report()["banCorrelation"] | {"address": "198.51.100.2"}}, report() | {"observedAt": "private-data"}]:
             with self.assertRaises(ValueError):
                 diagnostics.validate_report(value, START, END)
+
+    def test_failed_ssh_never_emits_captured_output_and_removes_credentials(self):
+        paths = []
+
+        def ssh(args, **kwargs):
+            paths.append(Path(args[args.index("-i") + 1]))
+            return subprocess.CompletedProcess(args, 1, "private-user@example.test secret-canary", "secret-private-key")
+
+        output = io.StringIO()
+        env = {"WINDOW_START": START, "WINDOW_END": END, "VPS_SSH_PRIVATE_KEY": "secret-private-key", "VPS_SSH_KNOWN_HOSTS": "test-pin"}
+        with patch.object(diagnostics.subprocess, "run", side_effect=ssh), patch.object(diagnostics.sys, "argv", ["diagnostics"]), patch.dict(diagnostics.os.environ, env), contextlib.redirect_stdout(output):
+            self.assertEqual(diagnostics.main(), 1)
+        self.assertEqual(json.loads(output.getvalue()), {"error": "diagnostic_unavailable"})
+        self.assertFalse(paths[0].exists())
+
+    def test_host_and_user_cannot_inject_ssh_arguments(self):
+        for field, value in [("VPS_SSH_HOST", "mail.test;echo secret-canary"), ("VPS_SSH_USER", "-oProxyCommand=secret-canary"), ("VPS_SSH_PORT", "22 -F secret-canary")]:
+            with self.subTest(field=field), patch.object(diagnostics.subprocess, "run") as run:
+                with self.assertRaises(ValueError):
+                    diagnostics.remote(START, END, {field: value})
+                run.assert_not_called()
 
     def test_collection_runs_only_read_only_commands(self):
         calls = []
