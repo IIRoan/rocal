@@ -1,0 +1,50 @@
+name: Verify Chainguard images
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+    paths:
+      - apps/backend/Dockerfile
+      - apps/notifications/Dockerfile
+      - scripts/verify_chainguard_images.py
+      - scripts/verify_chainguard_images_test.py
+      - .github/workflows/verify-chainguard-images.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-chainguard-images-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Chainguard image verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: chainguard-actions/actions-checkout@40e53bf063d4f87f0a6e0a83231c09bcfb22bc19 # v6
+        with:
+          persist-credentials: false
+
+      - name: Test verification policy
+        run: python3 -B -m unittest discover -s scripts -p 'verify_chainguard_images_test.py' -v
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.4
+
+      - name: Verify pinned runtime images and signed metadata
+        run: python3 -B scripts/verify_chainguard_images.py --output "$RUNNER_TEMP/chainguard-verification"
+
+      - name: Save verified signatures, SBOMs and provenance
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: chainguard-image-verification
+          path: ${{ runner.temp }}/chainguard-verification
+          retention-days: 30
+          if-no-files-found: error
