@@ -46,7 +46,7 @@ env:
 jobs:
   meta:
     # Fork PRs have no access to EXPO_TOKEN / R2 secrets.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository && github.head_ref != 'test/security-checks-validation'
     runs-on: ubuntu-latest
     outputs:
       profile: ${{ steps.meta.outputs.profile }}

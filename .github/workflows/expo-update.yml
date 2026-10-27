@@ -152,7 +152,7 @@ jobs:
 
   publish-testing-update:
     name: Publish Testing EAS Update
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref != 'test/security-checks-validation'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:

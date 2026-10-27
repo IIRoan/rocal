@@ -7,3 +7,5 @@ This draft PR exists only to validate the merged security workflows. It must nev
 - The unused Dockerfile should produce Trivy's root-user configuration finding. It is not part of any application image build.
 
 After detection, all fixtures and dependency changes will be removed, the recovery checks will run, and this PR will be closed without merging.
+
+Branch-local guards in the mobile workflows prevent this temporary PR from publishing builds or OTA updates. They are test isolation only and will not be merged.
