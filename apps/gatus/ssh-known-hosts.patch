@@ -1,0 +1,50 @@
+--- a/client/client.go
++++ b/client/client.go
+@@ -28,6 +28,7 @@
+ 	"github.com/registrobr/rdap"
+ 	"github.com/registrobr/rdap/protocol"
+ 	"golang.org/x/crypto/ssh"
++	"golang.org/x/crypto/ssh/knownhosts"
+ )
+ 
+ const (
+@@ -274,16 +275,36 @@
+ 		authMethods = append(authMethods, ssh.Password(password))
+ 	}
+ 
+-	cli, err := ssh.Dial("tcp", net.JoinHostPort(address, port), &ssh.ClientConfig{
+-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
++	hostKeyCallback := ssh.InsecureIgnoreHostKey()
++	if path := os.Getenv("GATUS_SSH_KNOWN_HOSTS"); path != "" {
++		callback, err := knownhosts.New(path)
++		if err != nil {
++			return false, nil, fmt.Errorf("invalid SSH known hosts: %w", err)
++		}
++		hostKeyCallback = callback
++	}
++	target := net.JoinHostPort(address, port)
++	conn, err := net.DialTimeout("tcp", target, config.Timeout)
++	if err != nil {
++		return false, nil, err
++	}
++	if config.Timeout > 0 {
++		if err := conn.SetDeadline(time.Now().Add(config.Timeout)); err != nil {
++			conn.Close()
++			return false, nil, err
++		}
++	}
++	clientConn, channels, requests, err := ssh.NewClientConn(conn, target, &ssh.ClientConfig{
++		HostKeyCallback: hostKeyCallback,
+ 		User:            username,
+ 		Auth:            authMethods,
+ 		Timeout:         config.Timeout,
+ 	})
+ 	if err != nil {
++		conn.Close()
+ 		return false, nil, err
+ 	}
+-	return true, cli, nil
++	return true, ssh.NewClient(clientConn, channels, requests), nil
+ }
+ 
+ func CheckSSHBanner(address string, cfg *Config) (bool, int, error) {

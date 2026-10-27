@@ -2,6 +2,8 @@
 
 Rust worker (`solace-notifications`, Railway, always-on): claims due reminders and `notification_job` rows every 5s, sends noreply mail over Stalwart JMAP (the API crate's mailer) and APNs push, and serves `/health` and `/status`.
 
+Production JMAP uses `http://stalwart.railway.internal:8081` through Railway's encrypted private network. `STALWART_GATE_KEY` references the API's gate key; the worker passes it through the shared origin-restricted `StalwartGate`.
+
 ```sh
 cargo run -p solace-notifications                          # local run; reads ../../retired/backend/.env if no .env is set
 cargo run -p solace-notifications -- --test --test-push --test-to you@example.com  # one test email and push

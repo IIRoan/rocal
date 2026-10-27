@@ -5,3 +5,5 @@ apps/backend/tests/fixtures/ics/** -text
 packages/api-contracts/openapi.json linguist-generated
 packages/api-contracts/src/generated/** linguist-generated
 apps/backend/src/db/entities/** linguist-generated
+# Patch context preserves tabs and otherwise empty lines.
+apps/gatus/*.patch -whitespace
