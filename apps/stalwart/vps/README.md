@@ -30,7 +30,7 @@ All systemd units should be enabled (`systemctl enable`) for boot.
 
 - **Role:** Public TCP/HTTP edge; TLS on :443; PROXY v2 to frps mail backends.
 - **Ports:** 25, 80 (HTTPS redirect), 443.
-  - **Public mail:** `/jmap`, `/.well-known`, `/api/discover`, `/api/auth`, `/auth/*` for third-party clients and the notifications worker. The Solace API reaches Stalwart through the Railway backend gate instead (see [README.md](../README.md)).
+  - **Legacy HTTPS rollback:** `/jmap`, `/.well-known`, `/api/discover`, `/api/auth`, `/auth/*` for rollback while DNS caches expire. Public JMAP uses Railway HTTPS; the API and notifications use the private gate. The Solace API reaches Stalwart through the Railway backend gate instead (see [README.md](../README.md)).
   - **Allowlisted only:** `/admin`, `/login`, `/logo`, `/account`, `/oauth`, and other `/api/*`.
   - Non-allowlisted hits to `/` or admin surfaces return a small **HTML 404** (not an empty body — empty 404s made browsers download a `.bin`).
   - Allowlist file: `/etc/haproxy/admin-allow.lst` from GitHub Environment secret `ADMIN_ALLOW_IP` on `IIRoan/rocal` `mail-vps` (never in git).
@@ -191,7 +191,7 @@ GitHub Environment **`mail-vps`** (`master`/`main` only) holds:
 | `FRP_RELAY_STCP_KEY` | Relay STCP secret (32+ alphanumeric); same value as Railway `FRPC_RELAY_STCP_KEY`; never in git |
 | `FRP_TLS_CA`, `FRP_TLS_SERVER_CERT`, `FRP_TLS_SERVER_KEY`, `FRP_TLS_CLIENT_CERT`, `FRP_TLS_CLIENT_KEY` | Base64 PEMs from `scripts/frp-tls-certs.sh` for frps and `frpc-relay`; `apply_frp` refuses to run without a matching set |
 
-Public mailbox `/account` and `/login` are blocked except for the allowlisted IP (admin OAuth only). JMAP (`/jmap`) stays public for Solace clients.
+Public JMAP uses Railway HTTPS at `mail.solace.onl`; VPS HTTPS remains a rollback route. Connect SSH and SMTP to `mx.solace.onl`.
 
 HAProxy / VPS deploy is automated on protected `master` merges ([`.github/workflows/sync-mail-vps.yml`](../../../.github/workflows/sync-mail-vps.yml)); see [Automated VPS deploy](#automated-vps-deploy-protected). Legacy manual alias: [`.github/workflows/sync-haproxy-cfg.yml`](../../../.github/workflows/sync-haproxy-cfg.yml).
 

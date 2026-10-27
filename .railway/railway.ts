@@ -105,6 +105,7 @@ export default defineRailway(() => {
       GATUS_CONFIG_PATH: "/data/config.yaml",
       PORT: "8080",
       TZ: "Europe/Amsterdam",
+      VPS_MONITOR_SSH_HOST: "mx.solace.onl",
       VPS_MONITOR_SSH_USERNAME: preserve(),
       VPS_MONITOR_SSH_PRIVATE_KEY_B64: preserve(),
       VPS_MONITOR_SSH_KNOWN_HOSTS: preserve(),
@@ -125,6 +126,7 @@ export default defineRailway(() => {
     healthcheckTimeout: 300,
     replicas: { "europe-west4-drams3a": 1 },
     networking: { privateNetworkEndpoint: "stalwart" },
+    domains: [{ domain: "mail.solace.onl", port: 8082 }],
     deploy: {
       ipv6EgressEnabled: true,
       drainingSeconds: 120,
@@ -152,6 +154,7 @@ export default defineRailway(() => {
       PGUSER: ref(postgresStalwart, "PGUSER"),
       PORT: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
+      STALWART_ADMIN_ALLOW_IPS: preserve(),
       STALWART_GATE_KEY: preserve(),
       STALWART_REDIS_URL: ref(stalwartRedis, "REDIS_URL"),
       // The mail plan signs the ingest webhook with it; the API verifies with the same value.

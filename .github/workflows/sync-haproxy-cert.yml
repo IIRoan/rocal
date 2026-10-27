@@ -67,7 +67,7 @@ jobs:
           VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
           VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
           VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
-          CERT_HOST: mail.solace.onl
+          CERT_HOST: mx.solace.onl
           RENEW_BEFORE_DAYS: "14"
           # Passed via env so untrusted context is never interpolated into the shell script.
           EVENT_NAME: ${{ github.event_name }}
@@ -77,7 +77,7 @@ jobs:
           : "${STALWART_DATABASE_URL:?set Environment secret STALWART_DATABASE_URL on mail-vps}"
           : "${VPS_SSH_PRIVATE_KEY:?set Environment secret VPS_SSH_PRIVATE_KEY on mail-vps}"
           : "${VPS_SSH_KNOWN_HOSTS:?set Environment secret VPS_SSH_KNOWN_HOSTS on mail-vps (ssh-keyscan output for the VPS)}"
-          export VPS_SSH_HOST="${VPS_SSH_HOST:-mail.solace.onl}"
+          export VPS_SSH_HOST="${VPS_SSH_HOST:-mx.solace.onl}"
           export VPS_SSH_USER="${VPS_SSH_USER:-Roan}"
           export VPS_SSH_PORT="${VPS_SSH_PORT:-22}"
           echo "Deploy target: ${VPS_SSH_USER}@${VPS_SSH_HOST}:${VPS_SSH_PORT}"

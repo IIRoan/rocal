@@ -108,6 +108,15 @@ jobs:
       - name: Start the test environment
         run: cargo xtask test-env up && cargo xtask test-env template
 
+      - name: Verify JMAP gateway access controls
+        run: >-
+          podman run --rm --network none
+          -e HAPROXY_TEST_BINARY=/usr/sbin/haproxy
+          -v "${GITHUB_WORKSPACE}/apps/stalwart:/work:ro"
+          --workdir /work --entrypoint python3
+          localhost/solace-test-stalwart
+          -B -m unittest discover -s tests -p test_backend_gate.py -v
+
       # Memory budgets stay local: shared runners' RSS is too noisy for fixed MiB limits.
       - name: Run cargo xtask check
         run: cargo xtask check --skip-mem
