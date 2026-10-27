@@ -116,7 +116,7 @@ endpoints:
       - "[RESPONSE_TIME] < 10000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
-  # Mail path is Railway/VPS — poll often; no Vercel cost.
+  # Public JMAP goes directly through Railway HTTPS.
   - name: jmap-session
     <<: *discord-alerts-soft
     group: Mail

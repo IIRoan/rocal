@@ -13,6 +13,7 @@ FRPC_RELAY_LOCAL_PORT="${FRPC_RELAY_LOCAL_PORT:-2525}"
 RELAY_ROUTE_ID="${RELAY_ROUTE_ID:-ivnbzc1aaba9}"
 STALWART_HTTP_PORT="${STALWART_HTTP_PORT:-8080}"
 STALWART_GATE_PORT="${STALWART_GATE_PORT:-8081}"
+STALWART_PUBLIC_PORT="${STALWART_PUBLIC_PORT:-8082}"
 HEALTH_PORT="${PORT:-8090}"
 HEALTH_STATE_PATH="${HEALTH_STATE_PATH:-/tmp/railway-health.json}"
 PG_POOL_MAX_CONNECTIONS="${PG_POOL_MAX_CONNECTIONS:-32}"
@@ -205,6 +206,7 @@ state = {
     "frpc_pid": int(os.environ.get("FRPC_PID", "0") or 0),
     "http_port": int(os.environ.get("STALWART_HTTP_PORT", "8080")),
     "gate_port": int(os.environ.get("STALWART_GATE_PORT", "8081")),
+    "public_port": int(os.environ.get("STALWART_PUBLIC_PORT", "8082")),
 }
 with open(path + ".tmp", "w", encoding="utf-8") as handle:
     json.dump(state, handle)
@@ -273,7 +275,7 @@ def ready():
     # Tunnel reachability is checked once at boot; probing the VPS here would also take down the VPS-independent gate.
     if not pid_alive(state.get("stalwart_pid")) or not pid_alive(state.get("frpc_pid")):
         return False
-    for port in (25, state.get("http_port", 8080), state.get("gate_port", 8081)):
+    for port in (25, state.get("http_port", 8080), state.get("gate_port", 8081), state.get("public_port", 8082)):
         if not port_open(port):
             return False
     return True
@@ -324,9 +326,13 @@ start_stalwart() {
 }
 
 start_gate() {
+	STALWART_ADMIN_ALLOW_FILE="$(mktemp /tmp/stalwart-admin-allow.XXXXXX)"
+	chown stalwart:stalwart "$STALWART_ADMIN_ALLOW_FILE"
+	run_as_stalwart python3 /usr/local/share/stalwart/render-admin-allow.py "$STALWART_ADMIN_ALLOW_FILE" || die "Invalid administrator network allowlist."
+	export STALWART_ADMIN_ALLOW_FILE
 	run_as_stalwart haproxy -db -f /usr/local/share/stalwart/backend-gate.cfg &
 	GATE_PID=$!
-	log info "Backend gate pid=${GATE_PID} on :${STALWART_GATE_PORT}."
+	log info "JMAP gateway pid=${GATE_PID} (private :${STALWART_GATE_PORT}, public :${STALWART_PUBLIC_PORT})."
 }
 
 detect_container_ip() {
@@ -498,7 +504,7 @@ apply_stalwart_plan() {
 mark_health_ready() {
 	export STALWART_PID STALWART_HTTP_PORT FRPC_RELAY_LOCAL_PORT RECOVERY_MODE FRPC_PID
 	write_health_state true
-	log info "Railway health gate open (Stalwart + frpc + relay ready)."
+	log info "Railway health gate open (Stalwart and local JMAP gateways ready)."
 }
 
 write_frpc_tls() {
@@ -519,11 +525,12 @@ sys.exit(0 if proxies and all(proxy.get("status") == "running" for proxy in prox
 start_frpc() {
 	write_frpc_tls || die "FRPC_TLS_* must be base64-encoded PEM."
 	write_frpc_config
+	/usr/local/bin/frpc verify -c "$FRPC_CONFIG" >/dev/null || die "Invalid frpc configuration."
 	/usr/local/bin/frpc -c "$FRPC_CONFIG" >&2 &
 	FRPC_PID=$!
 
 	i=0
-	max_wait="${FRPC_READY_TIMEOUT_SECONDS:-120}"
+	max_wait="${FRPC_READY_TIMEOUT_SECONDS:-10}"
 	while [ "$i" -lt "$max_wait" ]; do
 		kill -0 "$FRPC_PID" 2>/dev/null || die "frpc exited before its proxies were running."
 		if frpc_proxies_running && port_listening "$FRPC_RELAY_LOCAL_PORT"; then
@@ -533,8 +540,7 @@ start_frpc() {
 		i=$((i + 1))
 		sleep 1
 	done
-	# "port already used" here means a non-group (blue/green) proxy still holds the VPS port.
-	die "frpc proxies were not running within ${max_wait}s."
+	log warn "SMTP tunnel is unavailable; JMAP remains ready while frpc reconnects in the background."
 }
 
 cleanup() {
@@ -550,6 +556,7 @@ cleanup() {
 	for child in "${GATE_PID:-}" "${STALWART_PID:-}" "${HEALTH_PID:-}"; do
 		[ -z "$child" ] || kill "$child" 2>/dev/null || true
 	done
+	[ -z "${STALWART_ADMIN_ALLOW_FILE:-}" ] || rm -f "$STALWART_ADMIN_ALLOW_FILE"
 }
 
 # --- main ---
@@ -564,7 +571,7 @@ STALWART_GATE_KEY="${STALWART_GATE_KEY:-}"
 [ -n "${STALWART_WEBHOOK_SECRET:-}" ] || die "STALWART_WEBHOOK_SECRET is required to sign the mail-ingest webhook."
 STALWART_GATE_KEY_SHA256="$(printf '%s' "$STALWART_GATE_KEY" | sha256sum | cut -d' ' -f1)"
 unset STALWART_GATE_KEY
-export STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT
+export STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT STALWART_PUBLIC_PORT
 trap cleanup EXIT
 trap 'exit 0' TERM INT
 
