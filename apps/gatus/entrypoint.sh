@@ -1,6 +1,7 @@
 #!/bin/sh
 # Railway entrypoint: Gatus on :8081, public PORT proxies Gatus plus /hooks/stalwart.
 set -eu
+umask 077
 
 mkdir -p /data
 
@@ -90,9 +91,12 @@ append_vps_ssh_endpoints() {
 	fi
 
 	if [ -z "${VPS_MONITOR_SSH_PRIVATE_KEY:-}" ] && [ -z "${VPS_MONITOR_SSH_PRIVATE_KEY_B64:-}" ]; then
-		echo "VPS_MONITOR_SSH_USERNAME is set but no private key was provided; skipping VPS SSH monitors." >&2
-		return 0
+		echo "VPS SSH monitoring requires a private key." >&2
+		exit 1
 	fi
+	: "${VPS_MONITOR_SSH_KNOWN_HOSTS:?VPS SSH monitoring requires pinned host keys}"
+	printf '%s\n' "$VPS_MONITOR_SSH_KNOWN_HOSTS" > /data/vps_monitor_known_hosts
+	export GATUS_SSH_KNOWN_HOSTS=/data/vps_monitor_known_hosts
 
 	if [ -n "${VPS_MONITOR_SSH_PRIVATE_KEY_B64:-}" ]; then
 		printf '%s' "$VPS_MONITOR_SSH_PRIVATE_KEY_B64" | base64 -d > /data/vps_monitor_key
@@ -113,6 +117,9 @@ append_vps_ssh_endpoints() {
 		echo "    interval: 1m"
 		echo "    ui:"
 		echo "      period: 90d"
+		echo "      hide-url: true"
+		echo "    client:"
+		echo "      timeout: 25s"
 		echo "    alerts:"
 		echo "      - type: discord"
 		echo "    ssh:"
@@ -127,10 +134,14 @@ append_vps_ssh_endpoints() {
 		echo "      - \"[CONNECTED] == true\""
 		echo "      - \"[STATUS] == 0\""
 		echo "      - \"[BODY].status == healthy\""
+		echo "      - \"[BODY].groupMembers.http > 0\""
+		echo "      - \"[BODY].groupMembers.smtp > 0\""
+		echo "      - \"[BODY].http == true\""
 	} >> /data/config.yaml
 }
 
 write_base_config
+chmod 600 /data/config.yaml
 inject_theme_css
 inject_basic_auth
 inject_prometheus_auth

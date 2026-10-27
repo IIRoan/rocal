@@ -9,6 +9,14 @@ RUN git init \
     && git remote add origin https://github.com/CarmJos/gatus.git \
     && git fetch --depth 1 origin "$GATUS_COMMIT" \
     && git checkout FETCH_HEAD
+COPY ssh-known-hosts.patch /tmp/ssh-known-hosts.patch
+RUN git apply /tmp/ssh-known-hosts.patch
+COPY ssh-known-hosts_test.go client/solace_ssh_test.go
+RUN go test ./client -run '^TestSolaceSSH' -count=1
+COPY discord-field-limit.patch /tmp/discord-field-limit.patch
+RUN git apply /tmp/discord-field-limit.patch
+COPY discord-field-limit_test.go alerting/provider/discord/solace_field_limit_test.go
+RUN go test ./alerting/provider/discord -count=1
 COPY assets/solace-logo.png web/static/solace-logo.png
 COPY assets/favicon.ico web/static/favicon.ico
 COPY assets/favicon-16x16.png web/static/favicon-16x16.png

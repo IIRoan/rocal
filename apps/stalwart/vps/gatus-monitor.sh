@@ -36,8 +36,9 @@ def http_ready(port: int) -> bool:
             ],
             check=False,
             capture_output=True,
+            timeout=3,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return False
     return result.returncode == 0
 
@@ -49,8 +50,9 @@ def service_active(unit: str) -> str:
             check=False,
             capture_output=True,
             text=True,
+            timeout=3,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return "unknown"
     return (result.stdout or result.stderr or "unknown").strip()
 
@@ -81,8 +83,9 @@ def postfix_queue_count() -> int | None:
             check=False,
             capture_output=True,
             text=True,
+            timeout=3,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return None
 
     lines = [line for line in result.stdout.splitlines() if line.strip()]

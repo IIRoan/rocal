@@ -3,6 +3,28 @@ use solace_server::db::scratch::ScratchDatabase;
 
 use super::*;
 
+#[tokio::test]
+async fn mailer_uses_the_configured_private_gate() {
+    let settings = Settings::from_pairs(&[
+        ("STALWART_BASE_URL", "http://stalwart.railway.internal:8081"),
+        ("STALWART_GATE_KEY", "solace-test-private-gate"),
+        ("STALWART_JMAP_USERNAME", "noreply@solace.test"),
+        ("STALWART_JMAP_PASSWORD", "test-password"),
+        ("EMAIL_FROM", "noreply@solace.test"),
+    ]);
+    let db = sqlx::postgres::PgPoolOptions::new()
+        .connect_lazy("postgresql://test:test@localhost/solace_test_unused")
+        .unwrap();
+    let worker = Worker::new(db, settings);
+    let mailer = worker.mailer.as_ref().unwrap();
+    assert_eq!(
+        mailer
+            .gate
+            .key_for("http://stalwart.railway.internal:8081/jmap/"),
+        Some("solace-test-private-gate")
+    );
+}
+
 /// A worker with neither mailer nor APNs, so every job ends skipped without leaving the machine.
 async fn offline_worker() -> (ScratchDatabase, Worker) {
     let scratch = ScratchDatabase::create().await;

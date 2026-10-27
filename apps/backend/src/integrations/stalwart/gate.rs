@@ -1,4 +1,4 @@
-//! `withStalwartGate`: the backend-gate key goes only to https calls on the configured Stalwart origin.
+//! The backend-gate key goes only to the configured HTTPS or Railway-private Stalwart origin.
 
 use reqwest::RequestBuilder;
 
@@ -27,7 +27,7 @@ impl StalwartGate {
         let origin = self
             .origin
             .as_deref()
-            .filter(|origin| origin.starts_with("https://"))?;
+            .filter(|origin| origin.starts_with("https://") || is_private_origin(origin))?;
         (origin_of(url).as_deref() == Some(origin)).then_some(key)
     }
 
@@ -44,6 +44,17 @@ impl StalwartGate {
         headers.insert(GATE_HEADER, value);
         request.headers(headers)
     }
+}
+
+fn is_private_origin(origin: &str) -> bool {
+    let Ok(url) = url::Url::parse(origin) else {
+        return false;
+    };
+    // Railway encrypts this environment-isolated network with WireGuard.
+    url.scheme() == "http"
+        && url
+            .domain()
+            .is_some_and(|host| host.ends_with(".railway.internal"))
 }
 
 fn origin_of(url: &str) -> Option<String> {
@@ -101,6 +112,41 @@ mod tests {
     fn never_sends_the_key_over_http() {
         let gate = StalwartGate::new("http://stalwart.test", Some("solace-test-gate"));
         assert!(header(&gate, "http://stalwart.test/jmap/session", None).is_empty());
+    }
+
+    #[test]
+    fn sends_the_key_only_to_the_configured_private_origin() {
+        let gate = StalwartGate::new(
+            "http://stalwart.railway.internal:8081",
+            Some("solace-test-gate"),
+        );
+        assert_eq!(
+            header(
+                &gate,
+                "http://stalwart.railway.internal:8081/jmap/session",
+                None
+            ),
+            ["solace-test-gate"]
+        );
+        for url in [
+            "http://other.railway.internal:8081/jmap/session",
+            "http://stalwart.railway.internal:8080/jmap/session",
+            "http://stalwart.railway.internal.attacker.test:8081/jmap/session",
+        ] {
+            assert!(header(&gate, url, None).is_empty(), "{url}");
+        }
+        let spoofed = StalwartGate::new(
+            "http://stalwart.railway.internal.attacker.test:8081",
+            Some("solace-test-gate"),
+        );
+        assert!(
+            header(
+                &spoofed,
+                "http://stalwart.railway.internal.attacker.test:8081/jmap",
+                None
+            )
+            .is_empty()
+        );
     }
 
     #[test]

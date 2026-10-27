@@ -77,13 +77,14 @@ pub fn utc_now() -> PrimitiveDateTime {
 
 impl Worker {
     pub fn new(db: PgPool, settings: Settings) -> Self {
+        let gate_key = settings.get("STALWART_GATE_KEY");
         let mailer = settings.mailer().map(|config| Mailer {
-            gate: StalwartGate::new(&config.base_url, None),
+            gate: StalwartGate::new(&config.base_url, gate_key.as_deref()),
             config,
         });
         match &mailer {
-            Some(mailer) => {
-                tracing::info!(from = %mailer.config.from, "Stalwart JMAP mailer initialized")
+            Some(_) => {
+                tracing::info!("Stalwart JMAP mailer initialized")
             }
             None => tracing::warn!(
                 "Stalwart JMAP mailer is not fully configured; email sending is disabled"
@@ -491,7 +492,8 @@ impl Worker {
 /// `--test`: a sample reminder email (an event 90 minutes out, 30 minutes' notice) to `recipient`; it needs no database.
 pub async fn send_test_email(settings: &Settings, recipient: &str) -> Result<(), String> {
     let config = settings.mailer().ok_or("email service not configured")?;
-    let gate = StalwartGate::new(&config.base_url, None);
+    let gate_key = settings.get("STALWART_GATE_KEY");
+    let gate = StalwartGate::new(&config.base_url, gate_key.as_deref());
     let start = Timestamp::now() + jiff::SignedDuration::from_mins(90);
     let sample = jobs::Reminder {
         encrypted_title: String::new(),

@@ -460,3 +460,64 @@ async fn the_mail_server_reachability_probe_reports_ok() {
     assert_eq!(response.status.as_u16(), 200, "{}", response.text());
     assert_eq!(ok(response.value()), json!({"status": "ok"}));
 }
+
+#[tokio::test]
+async fn the_mail_health_route_uses_the_private_gate_without_the_public_edge() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let upstream = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = upstream.local_addr().unwrap();
+    let base = format!("http://stalwart.railway.internal:{}", address.port());
+    let gate_key = "solace-test-private-gate";
+    let upstream_task = tokio::spawn(async move {
+        let (mut stream, _) = upstream.accept().await.unwrap();
+        let mut request = Vec::new();
+        while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+            let mut buffer = [0; 1024];
+            let size = stream.read(&mut buffer).await.unwrap();
+            assert!(size > 0 && request.len() < 8192);
+            request.extend_from_slice(&buffer[..size]);
+        }
+        let request = String::from_utf8(request).unwrap().to_ascii_lowercase();
+        let allowed = request.starts_with("get /jmap/session ")
+            && request.contains(&format!("\r\nx-solace-gate: {gate_key}\r\n"));
+        let status = if allowed { "200 OK" } else { "404 Not Found" };
+        stream
+            .write_all(
+                format!("HTTP/1.1 {status}\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}")
+                    .as_bytes(),
+            )
+            .await
+            .unwrap();
+    });
+    let config = solace_server::config::Config::from_lookup(|name| match name {
+        "DATABASE_URL" => Some("postgresql://test:test@localhost/solace_test_unused".into()),
+        "STALWART_BASE_URL" => Some(base.clone()),
+        "STALWART_GATE_KEY" => Some(gate_key.into()),
+        _ => None,
+    })
+    .unwrap();
+    let mut state = solace_server::state::AppState::new(config, Default::default()).unwrap();
+    state.http_no_redirect = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .resolve("stalwart.railway.internal", address)
+        .build()
+        .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let api = listener.local_addr().unwrap();
+    let server = tokio::spawn(solace_server::serve(
+        listener,
+        state,
+        std::future::pending(),
+    ));
+    let response = reqwest::get(format!("http://{api}/api/health/mail-jmap"))
+        .await
+        .unwrap();
+    let status = response.status();
+    let body: Value = response.json().await.unwrap();
+    server.abort();
+    upstream_task.await.unwrap();
+    assert_eq!(status.as_u16(), 200, "{body}");
+    assert_eq!(body, json!({"status": "ok"}));
+}

@@ -3,12 +3,12 @@
 Stalwart mail server runs on [Railway](https://railway.app). A public VPS
 (`mail.solace.onl` / `193.180.211.139`) owns the MX, TLS certificates, and
 inbound ports. Railway containers connect **outbound** to the VPS over frp, and
-client mail traffic enters through the VPS. The Solace API (the Railway service
-"Solace API"), the notifications worker and third-party clients all use
-`https://mail.solace.onl` through the VPS. The key-gated backend gate (HAProxy
-`:8081`, [`backend-gate.cfg`](backend-gate.cfg)) still starts with the container,
-and the Railway service domain still points at it; plan 001 step 7 moves the
-API to Railway's private network instead.
+third-party mail traffic enters through the VPS. The Solace API and notifications
+worker use `http://stalwart.railway.internal:8081` through Railway's encrypted private
+network and the key-gated backend gate ([`backend-gate.cfg`](backend-gate.cfg)).
+Web and native mail use the API's JMAP proxy, so a VPS tunnel outage does not interrupt
+mailbox access. Public SMTP and third-party clients still depend on the VPS; queued
+outbound mail waits for its relay tunnel to recover.
 
 Desired state for Stalwart objects lives in [`stalwart/plan/`](stalwart/plan/).
 WebUI edits are overwritten on the next Railway boot. This tree lives in the Solace
@@ -71,7 +71,7 @@ flowchart TB
     end
 
     MTA --> HAP
-    API -->|"HTTPS<br/>mail.solace.onl"| HAP
+    API -->|"Private network<br/>X-Solace-Gate"| GATE
     FRPS <-->|"TCP load-balancing groups<br/>HAProxy PROXY v2 passthrough"| FRPC
     FRPS <-->|"STCP tunnel"| REL
     REL -->|"SMTP + SASL"| FREL
@@ -94,7 +94,7 @@ scripts/stalwart-plan.sh dns-publish
 `railway-entrypoint.sh` runs `stalwart-cli apply` after JMAP is up and **before** the relay IP patch.
 Failing apply fails the boot.
 
-**In git:** Domain `solace.onl`, DNS/ACME/DKIM *policy*, NetworkListeners, HTTP security, Cache/JMAP/SystemSettings, MTA-STS, SenderAuth, ReportSettings, BlobStore (S3 via `EnvironmentVariable`), MetricsStore/TracingStore, Alerts, WebHooks.
+**In git:** Domain `solace.onl`, DNS/ACME/DKIM _policy_, NetworkListeners, HTTP security, Cache/JMAP/SystemSettings, MTA-STS, SenderAuth, ReportSettings, BlobStore (S3 via `EnvironmentVariable`), MetricsStore/TracingStore, Alerts, WebHooks.
 
 **Not in git:** user accounts, mailbox data, Certificates, DkimSignature private keys, `MtaRoute.host` (container IP), Tasks/queues/logs.
 
@@ -191,8 +191,8 @@ do not make Redis, PostgreSQL or the VPS highly available.
 
 Railway probes `GET /healthz/ready` on `PORT` (8090). Healthcheck, overlap, and drain live in the repo-root [`.railway/railway.ts`](../../.railway/railway.ts).
 Readiness needs a ready boot state, live Stalwart and frpc processes, and open
-:25/:8080/:8081/relay ports. It deliberately does not probe the VPS, so a tunnel blip
-never marks the container (and with it the VPS-independent API gate) unhealthy.
+:25/:8080/:8081 ports. The relay listener is required at startup only: FRP closes it
+while reconnecting, which must not mark the private API gate unhealthy.
 
 ### Tunnel mutual TLS (one-time rollout)
 
@@ -236,7 +236,7 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 | `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
 | `FRPC_VERSION` | build | Pins the frpc version used by the Docker build; production currently uses `0.71.1` |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
-| `STALWART_GATE_KEY` | yes | Backend gate key (32+ chars); only its SHA-256 reaches HAProxy; missing key fails boot. The API would send it as `X-Solace-Gate` only if its own `STALWART_GATE_KEY` were set (it is not) |
+| `STALWART_GATE_KEY`             | yes      | Backend gate key (32+ chars); only its SHA-256 reaches HAProxy; missing key fails boot. API and notifications reference the same key and send `X-Solace-Gate` only to their configured HTTPS or Railway-private origin |
 | `STALWART_REDIS_URL` | yes | Private Redis connection for shared transient state and coordination during overlapping mail deployments |
 | `STALWART_WEBHOOK_SECRET` | yes | HMAC key the plan's mail-ingest webhook signs with; missing key fails boot |
 | `PORT` | yes | Set to `8090` — Railway healthcheck port |

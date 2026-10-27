@@ -19,6 +19,9 @@ defaults, so the config uses a space and CSS hides them.
 | `PORT` | auto | Public listen port (proxy + Gatus) |
 | `prometheus_user`, `prometheus_password` | yes | Stalwart `/metrics/prometheus` Basic auth |
 | `DISCORD_WEBHOOK_URL` | yes | Discord webhook for Gatus downtime and scrape failures |
+| `VPS_MONITOR_SSH_USERNAME`               | VPS monitor | Dedicated forced-command account                        |
+| `VPS_MONITOR_SSH_PRIVATE_KEY_B64`        | VPS monitor | Base64 private key, stored only in Railway              |
+| `VPS_MONITOR_SSH_KNOWN_HOSTS`            | VPS monitor | Operator-verified OpenSSH known-hosts entry for the VPS |
 
 ## Alerting (two layers)
 
@@ -56,6 +59,7 @@ Both monitors scrape Stalwart's own `mail.solace.onl/metrics/prometheus` once ea
 These verify that metric families are being exported. Counter **values** and threshold
 expressions are handled by **Stalwart Enterprise Alerts** (email). Gatus Discord-alerts if
 those error counters appear on the scrape (`stalwart-error-counters`).
+Discord alert condition details are capped at 1024 characters; the status page retains the full results.
 Grafana ([dashboard #23498](https://grafana.com/grafana/dashboards/23498-service-stalwart/))
 remains useful for rate graphs.
 
@@ -74,5 +78,6 @@ docker run --rm -p 8080:8080 \
 ## Optional
 
 - **Status page auth:** `GATUS_ADMIN_USERNAME` / `GATUS_ADMIN_PASSWORD`
-- **VPS SSH monitor:** set `VPS_MONITOR_SSH_USERNAME` and `VPS_MONITOR_SSH_PRIVATE_KEY` (or `_B64`);
-  install `apps/stalwart/vps/gatus-monitor.sh` on the VPS and restrict the SSH user with `authorized_keys command=`
+- **VPS SSH monitor:** install `apps/stalwart/vps/gatus-monitor.sh` as root-owned mode 755, then run `sudo bash apps/stalwart/vps/setup-gatus-monitor.sh --check /path/to/monitor.pub` and `--apply` after review. Set the three `VPS_MONITOR_SSH_*` variables above; the account has no sudo, forwarding or arbitrary command access.
+- `vps-health` checks HAProxy, FRP server, STCP relay, Postfix, both tunnel group memberships and local JMAP readiness every minute, with the existing two-failure/two-recovery alerts.
+- `ssh-known-hosts.patch` adds `GATUS_SSH_KNOWN_HOSTS` to the pinned Gatus source; the entrypoint requires a host-key pin for VPS monitoring and writes credential files with mode 600. The image build tests matching, changed, unknown and missing host keys, plus deadlines for stalled handshakes and commands.
