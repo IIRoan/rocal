@@ -7,8 +7,6 @@ on:
     paths:
       - apps/backend/Dockerfile
       - apps/notifications/Dockerfile
-      - scripts/verify_chainguard_images.py
-      - scripts/verify_chainguard_images_test.py
       - .github/workflows/verify-chainguard-images.yml
   workflow_dispatch:
 
@@ -30,16 +28,41 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Test verification policy
-        run: python3 -B -m unittest discover -s scripts -p 'verify_chainguard_images_test.py' -v
-
       - name: Install Cosign
         uses: chainguard-actions/sigstore-cosign-installer@b87981cc3b0232e11827d1a8c6bcfa63d6cbd97a # v4.1.2
         with:
           cosign-release: v3.1.4
 
       - name: Verify pinned runtime images and signed metadata
-        run: python3 -B scripts/verify_chainguard_images.py --output "$RUNNER_TEMP/chainguard-verification"
+        env:
+          CERTIFICATE_IDENTITY: https://github.com/chainguard-images/images/.github/workflows/release.yaml@refs/heads/main
+          CERTIFICATE_OIDC_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          set -euo pipefail
+          for service in backend notifications; do
+            image="$(awk 'toupper($1) == "FROM" { image = $2 } END { print image }' "apps/$service/Dockerfile")"
+            [[ "$image" =~ ^cgr\.dev/chainguard/[a-z0-9._-]+(:[a-zA-Z0-9._-]+)?@sha256:[a-f0-9]{64}$ ]]
+            repository="${image%@*}"
+            image="${repository%%:*}@${image##*@}"
+            runtime_digest="$(docker manifest inspect "$image" | jq -er '
+              [.manifests[] | select(.platform.os == "linux" and .platform.architecture == "amd64")]
+              | if length == 1 then .[0].digest else error("Expected one linux/amd64 manifest") end')"
+            [[ "$runtime_digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+            for reference in "$image" "${image%@*}@$runtime_digest"; do
+              output="$RUNNER_TEMP/chainguard-verification/$service/${reference##*@sha256:}"
+              mkdir -p "$output"
+              printf '%s\n' "$reference" > "$output/image.txt"
+              cosign verify "$reference" \
+                --certificate-identity "$CERTIFICATE_IDENTITY" \
+                --certificate-oidc-issuer "$CERTIFICATE_OIDC_ISSUER" > "$output/signature.json"
+              cosign verify-attestation "$reference" --type https://spdx.dev/Document \
+                --certificate-identity "$CERTIFICATE_IDENTITY" \
+                --certificate-oidc-issuer "$CERTIFICATE_OIDC_ISSUER" > "$output/sbom.jsonl"
+              cosign verify-attestation "$reference" --type https://slsa.dev/provenance/v1 \
+                --certificate-identity "$CERTIFICATE_IDENTITY" \
+                --certificate-oidc-issuer "$CERTIFICATE_OIDC_ISSUER" > "$output/provenance.jsonl"
+            done
+          done
 
       - name: Save verified signatures, SBOMs and provenance
         uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
