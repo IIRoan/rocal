@@ -2,6 +2,7 @@
 """Collect bounded infrastructure counters without emitting journal messages or client addresses."""
 
 import datetime
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -72,7 +73,7 @@ def tcp_counters(raw):
     return result
 
 
-def ban_history(start, end, path=Path("/var/log/fail2ban.log")):
+def ban_history(start, end, path=Path("/var/log/fail2ban.log"), peers=None):
     start_time, end_time = [datetime.datetime.fromisoformat(value.replace("Z", "+00:00")) for value in (start, end)]
     try:
         with path.open("rb") as handle:
@@ -83,7 +84,7 @@ def ban_history(start, end, path=Path("/var/log/fail2ban.log")):
                 handle.readline()
             lines = handle.read(4_000_000).decode("utf-8", "replace").splitlines()
     except OSError:
-        return journal_summary(None)
+        return journal_summary(None), {"parsedBans": 0, "sshBans": 0, "otherBans": 0, "observedTunnelPeers": len(peers or ()), "bannedTunnelPeers": 0}
     selected, first = [], None
     for line in lines:
         try:
@@ -95,7 +96,31 @@ def ban_history(start, end, path=Path("/var/log/fail2ban.log")):
             selected.append(json.dumps({"MESSAGE": line}))
     result = journal_summary("\n".join(selected))
     result["truncated"] = first is None or first > start_time
-    return result
+    bans, ssh_bans = set(), 0
+    for raw in selected:
+        match = re.search(r"\[([a-zA-Z0-9_-]+)\]\s+Ban\s+(\S+)", json.loads(raw)["MESSAGE"])
+        if match:
+            try:
+                bans.add(str(ipaddress.ip_address(match[2])))
+            except ValueError:
+                continue
+            ssh_bans += match[1] == "sshd"
+    count = result["categories"]["address_banned"]
+    return result, {"parsedBans": len(bans), "sshBans": ssh_bans, "otherBans": count - ssh_bans, "observedTunnelPeers": len(peers or ()), "bannedTunnelPeers": len(bans & (peers or set()))}
+
+
+def tunnel_peers(journal, sockets):
+    endpoints = re.findall(r"client login info: ip \[(.*?)\] version", journal or "")
+    endpoints.extend(parts[4] for line in (sockets or "").splitlines() if len(parts := line.split()) >= 5)
+    peers = set()
+    for endpoint in endpoints:
+        try:
+            address = ipaddress.ip_address(endpoint.rsplit(":", 1)[0].strip("[]"))
+        except ValueError:
+            continue
+        if not address.is_loopback:
+            peers.add(str(address))
+    return peers
 
 
 def collect(start, end):
@@ -113,8 +138,11 @@ def collect(start, end):
         }
     dates = [datetime.datetime.fromisoformat(value.replace("Z", "+00:00")).strftime("%Y-%m-%d %H:%M:%S UTC") for value in (start, end)]
     args = ["journalctl", "--since", dates[0], "--until", dates[1], "--no-pager", "--output=json", "--output-fields=MESSAGE", "--lines=2000", "--quiet"]
-    tunnel = journal_summary(command([*args, "-u", "frps", "-u", "frpc-relay", "-u", "haproxy"]))
+    tunnel_raw = command([*args, "-u", "frps", "-u", "frpc-relay", "-u", "haproxy"])
+    tunnel = journal_summary(tunnel_raw)
     kernel = journal_summary(command([*args, "--kernel"]))
+    peers = tunnel_peers(tunnel_raw, command(["ss", "-Hnt", "sport = :7000"]))
+    bans, correlation = ban_history(start, end, peers=peers)
     return {
         "window": {"start": start, "end": end},
         "observedAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -122,13 +150,14 @@ def collect(start, end):
         "services": services,
         "tunnel": tunnel,
         "kernel": kernel,
-        "bans": ban_history(start, end),
+        "bans": bans,
+        "banCorrelation": correlation,
         "cumulativeTcpCounters": tcp_counters(Path("/proc/net/netstat").read_text()),
     }
 
 
 def validate_report(report, start, end):
-    if not isinstance(report, dict) or set(report) != {"window", "observedAt", "uptimeSeconds", "services", "tunnel", "kernel", "bans", "cumulativeTcpCounters"}:
+    if not isinstance(report, dict) or set(report) != {"window", "observedAt", "uptimeSeconds", "services", "tunnel", "kernel", "bans", "banCorrelation", "cumulativeTcpCounters"}:
         raise ValueError("invalid_report")
     if report["window"] != {"start": start, "end": end} or type(report["uptimeSeconds"]) is not int:
         raise ValueError("invalid_report")
@@ -149,6 +178,9 @@ def validate_report(report, start, end):
         if any(type(value) is not int for value in data["categories"].values()):
             raise ValueError("invalid_report")
     if not isinstance(report["cumulativeTcpCounters"], dict) or set(report["cumulativeTcpCounters"]) - set(COUNTERS) or any(type(value) is not int for value in report["cumulativeTcpCounters"].values()):
+        raise ValueError("invalid_report")
+    correlation = report["banCorrelation"]
+    if not isinstance(correlation, dict) or set(correlation) != {"parsedBans", "sshBans", "otherBans", "observedTunnelPeers", "bannedTunnelPeers"} or any(type(value) is not int or value < 0 for value in correlation.values()):
         raise ValueError("invalid_report")
     return report
 
