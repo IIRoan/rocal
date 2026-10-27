@@ -77,7 +77,9 @@ class BackendGateTests(unittest.TestCase):
     def setUpClass(cls):
         cls.upstream = ProxyV2Upstream()
         cls.gate_port = free_port()
+        cls.public_port = free_port()
         env = {**os.environ, "STALWART_GATE_PORT": str(cls.gate_port),
+               "STALWART_PUBLIC_PORT": str(cls.public_port),
                "STALWART_HTTP_PORT": str(cls.upstream.port),
                "STALWART_GATE_KEY_SHA256": hashlib.sha256(KEY.encode()).hexdigest()}
         cls.gate = subprocess.Popen([os.environ["HAPROXY_TEST_BINARY"], "-db", "-f",
@@ -95,11 +97,12 @@ class BackendGateTests(unittest.TestCase):
         cls.gate.terminate()
         cls.gate.wait(timeout=5)
 
-    def request(self, path, method="GET", key=KEY, headers=None):
+    def request(self, path, method="GET", key=KEY, headers=None, public=False):
         all_headers = dict(headers or {})
         if key is not None:
             all_headers["X-Solace-Gate"] = key
-        req = urllib.request.Request(f"http://127.0.0.1:{self.gate_port}{path}", method=method,
+        port = self.public_port if public else self.gate_port
+        req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", method=method,
                                      headers=all_headers, data=b"" if method == "POST" else None)
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:
@@ -126,6 +129,32 @@ class BackendGateTests(unittest.TestCase):
         self.assertEqual(forwarded["path"], "/jmap/session")
         self.assertEqual(forwarded["source"], "203.0.113.7")
         self.assertNotIn("x-solace-gate", forwarded["headers"])
+
+    def test_public_jmap_works_without_private_key_or_vps(self):
+        for path in ("/jmap/session", "/jmap/", "/jmap/download/a/b/name.txt", "/jmap/upload/a/",
+                     "/jmap/eventsource", "/.well-known/jmap", "/.well-known/mta-sts.txt",
+                     "/auth/code", "/auth/token", "/api/auth", "/api/discover", "/metrics/prometheus",
+                     "/mail/config-v1.1.xml", "/autodiscover/autodiscover.xml", "/autodiscover/autodiscover.json"):
+            self.assertEqual(self.request(path, key=None, public=True), 200, path)
+
+    def test_public_gateway_blocks_management_and_normalization_bypasses(self):
+        for path in ("/", "/admin", "/admin/oauth/callback", "/login", "/account", "/oauth/authorize",
+                     "/api/principal", "/logo", "/healthz/ready", "/jmap/../admin",
+                     "/jmap/%2e%2e/admin", "/jmap/%2e%2e%2fadmin", "/auth/../../admin",
+                     "//admin", "/api/auth/../principal", "/metrics/prometheus/../admin"):
+            before = len(self.upstream.requests)
+            self.assertEqual(self.request(path, public=True), 404, path)
+            self.assertEqual(len(self.upstream.requests), before, path)
+
+    def test_public_gateway_forwards_auth_and_client_ip_without_gate_key(self):
+        before = len(self.upstream.requests)
+        headers = {"X-Real-IP": "203.0.113.9", "Authorization": "Bearer mailbox-test-token"}
+        self.assertEqual(self.request("/jmap/", method="POST", headers=headers, public=True), 200)
+        forwarded = self.upstream.requests[before]
+        self.assertEqual(forwarded["source"], "203.0.113.9")
+        self.assertEqual(forwarded["headers"]["authorization"], "Bearer mailbox-test-token")
+        self.assertNotIn("x-solace-gate", forwarded["headers"])
+        self.assertEqual(self.request("/jmap/session", key=None), 404)
 
 
 if __name__ == "__main__":

@@ -173,6 +173,23 @@ class EntrypointTests(unittest.TestCase):
                                                         "FRPC_DRAIN_SECONDS": "0.2"}, check=True, timeout=10)
             self.assertEqual(order.read_text().split(), ["frpc", "stalwart"])
 
+    def test_unreachable_vps_does_not_prevent_jmap_startup(self):
+        with tempfile.TemporaryDirectory(prefix="solace-frpc-start-") as tmp:
+            binary = Path(tmp, "frpc")
+            binary.write_text('#!/bin/sh\n[ "$1" = verify ] && exit 0\nexec sleep 30\n')
+            binary.chmod(0o755)
+            script = ('write_frpc_tls() { :; }\nwrite_frpc_config() { :; }\n'
+                      'frpc_proxies_running() { return 1; }\nport_listening() { return 1; }\n'
+                      'log() { echo "$2"; }\ndie() { exit 1; }\nsleep() { :; }\n' +
+                      shell_functions("start_frpc").replace('/usr/local/bin/frpc', '"$FRPC_TEST_BINARY"') +
+                      'start_frpc\nkill "$FRPC_PID"\nwait "$FRPC_PID" 2>/dev/null || true\n')
+            result = subprocess.run(["sh", "-euc", script], env={"PATH": os.environ["PATH"],
+                                    "FRPC_TEST_BINARY": str(binary), "FRPC_CONFIG": str(Path(tmp, "frpc.toml")),
+                                    "FRPC_READY_TIMEOUT_SECONDS": "1", "FRPC_RELAY_LOCAL_PORT": "2525"},
+                                    capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("JMAP remains ready", result.stdout)
+
     def test_health_requires_ready_state_and_live_stalwart_and_frpc(self):
         code = "def ready():" + ENTRYPOINT.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]
         state = {"ready": True, "stalwart_pid": 1, "frpc_pid": 2}
@@ -189,13 +206,31 @@ class EntrypointTests(unittest.TestCase):
     def test_health_stays_ready_while_the_relay_listener_reconnects(self):
         code = "def ready():" + ENTRYPOINT.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]
         state = {"ready": True, "stalwart_pid": 1, "frpc_pid": 2}
-        listening = {25, 8080, 8081}
+        listening = {25, 8080, 8081, 8082}
         namespace = {"load_state": lambda: state, "pid_alive": lambda _: True,
                      "port_open": lambda port: port in listening}
         exec(code, namespace)
         self.assertTrue(namespace["ready"](), "a closed relay must not take the private JMAP gate offline")
         listening.remove(8081)
         self.assertFalse(namespace["ready"](), "the private JMAP gate must still be reachable")
+
+    def test_health_requires_the_public_gateway(self):
+        code = "def ready():" + ENTRYPOINT.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]
+        state = {"ready": True, "stalwart_pid": 1, "frpc_pid": 2}
+        listening = {25, 8080, 8081}
+        namespace = {"load_state": lambda: state, "pid_alive": lambda _: True,
+                     "port_open": lambda port: port in listening}
+        exec(code, namespace)
+        self.assertFalse(namespace["ready"]())
+        listening.add(8082)
+        self.assertTrue(namespace["ready"]())
+
+    def test_mail_exchange_and_jmap_advertise_separate_hosts(self):
+        entries = [json.loads(line) for line in (ROOT / "stalwart/plan/30-mta.ndjson").read_text().splitlines()]
+        settings = next(entry["value"] for entry in entries if entry["object"] == "SystemSettings")
+        self.assertEqual(settings["defaultHostname"], "mx.solace.onl")
+        self.assertEqual(settings["mailExchangers"]["0"]["hostname"], "mx.solace.onl")
+        self.assertEqual(settings["services"]["jmap"]["hostname"], "mail.solace.onl")
 
 
 if __name__ == "__main__":

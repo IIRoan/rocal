@@ -73,7 +73,7 @@ jobs:
             fi
           done <<<"$ADMIN_ALLOW_IP"
 
-          HOST="${VPS_SSH_HOST:-mail.solace.onl}"
+          HOST="${VPS_SSH_HOST:-mx.solace.onl}"
           USER="${VPS_SSH_USER:-Roan}"
           PORT="${VPS_SSH_PORT:-22}"
 

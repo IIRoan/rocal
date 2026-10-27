@@ -1,14 +1,22 @@
 # Stalwart on Railway (Solace mail)
 
-Stalwart mail server runs on [Railway](https://railway.app). A public VPS
-(`mail.solace.onl` / `193.180.211.139`) owns the MX, TLS certificates, and
-inbound ports. Railway containers connect **outbound** to the VPS over frp, and
-third-party mail traffic enters through the VPS. The Solace API and notifications
-worker use `http://stalwart.railway.internal:8081` through Railway's encrypted private
-network and the key-gated backend gate ([`backend-gate.cfg`](backend-gate.cfg)).
-Web and native mail use the API's JMAP proxy, so a VPS tunnel outage does not interrupt
-mailbox access. Public SMTP and third-party clients still depend on the VPS; queued
-outbound mail waits for its relay tunnel to recover.
+Stalwart runs on [Railway](https://railway.app). Public JMAP and mailbox OAuth at
+`https://mail.solace.onl` go directly through Railway HTTPS to the restricted public
+gateway on `:8082`. The key-gated API entry on `:8081` stays separate; Solace's API
+and notifications use it over Railway's encrypted private network. Both gateways
+forward locally to Stalwart with PROXY v2 and never log request paths.
+
+The VPS (`mx.solace.onl` / `193.180.211.139`) owns public SMTP and the outbound relay.
+Railway containers connect outbound over frp for those routes. A tunnel outage can
+delay SMTP delivery while public and private JMAP remain available, including on
+startup: after a bounded tunnel wait, frpc reconnects in the background. Management is
+available through the VPS's loopback admin tunnel; public management pages are blocked.
+
+The Stalwart plan declares `mx.solace.onl` as the default hostname and MX, with
+`mail.solace.onl` explicitly advertised for JMAP. Its automatic DNS publisher must
+keep that split. Before an HTTPS cutover, create the unproxied MX address, issue a
+certificate covering it, align the VPS PTR and Postfix hostname, and verify SMTP.
+Retain the original VPS HTTPS route and DNS snapshot for rollback until validation finishes.
 
 Desired state for Stalwart objects lives in [`stalwart/plan/`](stalwart/plan/).
 WebUI edits are overwritten on the next Railway boot. This tree lives in the Solace
@@ -102,7 +110,7 @@ Failing apply fails the boot.
 
 DKIM keys rotate through a scheduled `Task/DkimManagement` (`dkimManagement: Automatic`, every 90 days), and `dnsManagement: Automatic` publishes records through the `DnsServer` Cloudflare token. Check `stalwart-cli query Task` shows a pending `DkimManagement`; if none is pending (the 1.0 migration carried none over), create one for domain `b`. Stalwart adds and updates records but never deletes ones it stops advertising. `scripts/stalwart-plan.sh dns-publish` republishes on demand. `SystemSettings.services` advertises only JMAP, the one protocol the edge exposes. Do not flip MTA-STS to `enforce` until TLS-RPT reports arrive.
 
-Admin UI is allowlisted on public HTTPS via VPS file `/etc/haproxy/admin-allow.lst` (from GitHub Environment secret `ADMIN_ALLOW_IP` on `mail-vps`; never committed). Tunnel fallback: `ssh -N -L 8080:127.0.0.1:8080 USER@mail.solace.onl` then `http://127.0.0.1:8080/admin/`.
+Admin UI is blocked on Railway public HTTPS. Use the pinned SSH tunnel: `ssh -N -L 8080:127.0.0.1:8080 USER@mx.solace.onl` then `http://127.0.0.1:8080/admin/`.
 
 ## Inbound mail (Internet → Stalwart)
 
