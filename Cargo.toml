@@ -85,7 +85,7 @@ sha2 = "0.11"
 solace-api-tests = { path = "crates/solace-api-tests" }
 solace-server = { path = "apps/backend" }
 solace-api-types = { path = "crates/solace-api-types" }
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-aws-lc-rs", "postgres", "macros"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-rustls-aws-lc-rs", "postgres", "macros"] }
 thiserror = "2"
 time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "process", "signal", "net"] }
