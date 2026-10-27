@@ -41,6 +41,7 @@ pub struct MailCache {
     tokens: Mutex<HashMap<String, Arc<tokio::sync::Mutex<Option<CachedToken>>>>>,
     bridge_passwords: Mutex<HashSet<String>>,
     limits: tokio::sync::Mutex<Option<(Instant, Option<MailServerLimits>)>>,
+    oauth_redirect: tokio::sync::OnceCell<()>,
 }
 
 #[derive(Clone)]
@@ -171,12 +172,10 @@ async fn issue_access_token(
     .map_err(AppError::internal)?;
     let redirect_uri = bridge::redirect_uri(&state.config);
     let admin = Admin::new(state);
-    admin
-        .ensure_oauth_client(
-            bridge::CLIENT_ID,
-            &redirect_uri,
-            Some("Solace mail backend bridge"),
-        )
+    state
+        .mail_cache
+        .oauth_redirect
+        .get_or_try_init(|| admin.ensure_oauth_redirect(bridge::CLIENT_ID, &redirect_uri))
         .await
         .map_err(upstream)?;
     // Resetting the password on every mint would revoke the bearers other processes still hold.
@@ -1294,9 +1293,7 @@ pub mod tests {
     pub fn provisioning(plan: Plan) -> impl Fn(&Recorded) -> Reply {
         move |request| {
             match request.path.as_str() {
-                "/api/auth" => {
-                    return Reply::json(json!({"type": "authenticated", "clientCode": "code-1"}));
-                }
+                "/api/auth" => return Reply::authenticated(request, "code-1"),
                 "/auth/token" => {
                     return Reply::json(
                         json!({"access_token": "stalwart-access-token", "expires_in": 1800, "expires_at": 1_779_149_999u64}),
@@ -1330,10 +1327,9 @@ pub mod tests {
                 "x:Account/set" => json!({"updated": {"acct-1": null}}),
                 "x:PublicKey/set" => json!({"created": {"pk1": {"id": "pk-1"}}}),
                 "x:AccountSettings/set" => json!({"updated": {"singleton": null}}),
-                "x:OAuthClient/query" => json!({"ids": []}),
-                "x:OAuthClient/set" => json!({"created": {"client1": {"id": "client-1"}}}),
+                "x:OAuthClient/query" => json!({"ids": ["client-1"]}),
                 "x:OAuthClient/get" => {
-                    json!({"list": [{"id": "client-1", "clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}, "description": "Solace mail backend bridge"}]})
+                    json!({"list": [{"id": "client-1", "clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}}]})
                 }
                 _ => return Reply::status(500),
             };
@@ -1436,18 +1432,23 @@ pub mod tests {
         assert_eq!(logins[0].json()["accountName"], json!("alice@solace.test"));
         assert_eq!(logins[0].json()["accountSecret"], json!(secret));
         assert_ne!(
-            logins[0].json()["codeChallenge"],
-            logins[1].json()["codeChallenge"],
+            logins[0].json()["query"],
+            logins[1].json()["query"],
             "every mint uses a fresh PKCE pair"
         );
         assert_eq!(
             requests
                 .iter()
-                .find(|r| r.first_method() == "x:OAuthClient/set")
-                .map(|r| r.json()["methodCalls"][0][1]["create"]["client1"].clone()),
-            Some(
-                json!({"clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}, "description": "Solace mail backend bridge"})
-            )
+                .filter(|r| r.first_method() == "x:OAuthClient/query")
+                .count(),
+            1,
+            "the callback is registered once per process, not on every mint"
+        );
+        assert!(
+            !requests
+                .iter()
+                .any(|r| r.first_method() == "x:OAuthClient/set"),
+            "a registered callback is left alone"
         );
     }
 

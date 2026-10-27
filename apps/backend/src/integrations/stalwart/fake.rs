@@ -81,6 +81,26 @@ impl Reply {
             body: None,
         }
     }
+
+    /// Stalwart 1.0's `/api/auth` success: the login's redirect URI carrying `code` and its `state`.
+    pub fn authenticated(login: &Recorded, code: &str) -> Self {
+        let query = login.json()["query"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        let param = |name: &str| {
+            url::form_urlencoded::parse(query.as_bytes())
+                .find(|(key, _)| key == name)
+                .map(|(_, value)| value.into_owned())
+                .unwrap_or_default()
+        };
+        let mut location = url::Url::parse(&param("redirect_uri")).unwrap();
+        location
+            .query_pairs_mut()
+            .append_pair("code", code)
+            .append_pair("state", &param("state"));
+        Self::json(serde_json::json!({"type": "authenticated", "location": location.as_str()}))
+    }
 }
 
 type Handler = dyn Fn(&Recorded) -> Reply + Send + Sync;

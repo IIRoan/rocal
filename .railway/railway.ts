@@ -151,6 +151,8 @@ export default defineRailway(() => {
       STALWART_ADMIN_TOKEN: preserve(),
       STALWART_GATE_KEY: preserve(),
       STALWART_REDIS_URL: ref(stalwartRedis, "REDIS_URL"),
+      // The mail plan signs the ingest webhook with it; the API verifies with the same value.
+      STALWART_WEBHOOK_SECRET: preserve(),
     },
   });
 
@@ -181,7 +183,6 @@ export default defineRailway(() => {
       drainingSeconds: 30,
       restartPolicyMaxRetries: 5,
     },
-    // Boot re-registers Stalwart's webhook with STALWART_WEBHOOK_SECRET.
     env: {
       NODE_ENV: "production",
       DATABASE_URL: ref(postgresApp, "DATABASE_URL"),
@@ -210,8 +211,7 @@ export default defineRailway(() => {
       STALWART_DEFAULT_DOMAIN: "solace.onl",
       STALWART_JMAP_PASSWORD: preserve(),
       STALWART_JMAP_USERNAME: preserve(),
-      STALWART_WEBHOOK_SECRET: preserve(),
-      STALWART_WEBHOOK_URL: preserve(),
+      STALWART_WEBHOOK_SECRET: ref(stalwartMail, "STALWART_WEBHOOK_SECRET"),
       TRUSTED_ORIGINS: "https://solace-web.vercel.app",
     },
   });

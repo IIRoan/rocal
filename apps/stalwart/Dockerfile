@@ -19,8 +19,8 @@ RUN apt-get update \
     && rm -rf /tmp/stalwart-cli-x86_64-unknown-linux-gnu \
     && chmod 755 /usr/local/bin/stalwart-cli \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /var/log/stalwart /etc/stalwart /var/stalwart/blobs /usr/local/share/stalwart \
-    && chown -R stalwart:stalwart /var/log/stalwart /etc/stalwart /var/stalwart/blobs /usr/local/share/stalwart
+    && mkdir -p /var/log/stalwart /etc/stalwart /usr/local/share/stalwart \
+    && chown -R stalwart:stalwart /var/log/stalwart /etc/stalwart /usr/local/share/stalwart
 
 COPY railway-entrypoint.sh /usr/local/bin/railway-entrypoint.sh
 COPY backend-gate.cfg /usr/local/share/stalwart/backend-gate.cfg

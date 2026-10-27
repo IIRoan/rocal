@@ -62,7 +62,7 @@ case "$cmd" in
 		concat_plan >"$tmp"
 		cli apply --file "$tmp"
 		rm -f "$tmp"
-		cli create Action/ReloadSettings >/dev/null 2>&1 || true
+		cli create Action/ReloadSettings --json '{}' >/dev/null
 		;;
 	dry-run)
 		tmp="$(mktemp)"

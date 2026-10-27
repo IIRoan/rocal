@@ -175,18 +175,19 @@ port_listening() {
 	ss -tln 2>/dev/null | grep -q ":$1 "
 }
 
-wait_for_stalwart_ports() {
+wait_for_stalwart_ready() {
 	i=0
 	max_wait="${STALWART_READY_TIMEOUT_SECONDS:-180}"
 	while [ "$i" -lt "$max_wait" ]; do
-		if port_listening 25 && port_listening "${STALWART_HTTP_PORT}"; then
-			log info "Stalwart listening on :25 and :${STALWART_HTTP_PORT}."
+		# Stalwart's own readiness covers its data store; loopback would need a PROXY header.
+		if port_listening 25 && curl -fsS --max-time 2 "$(stalwart_management_url)/healthz/ready" >/dev/null 2>&1; then
+			log info "Stalwart ready on :25 and :${STALWART_HTTP_PORT}."
 			return 0
 		fi
 		i=$((i + 1))
 		sleep 1
 	done
-	die "Stalwart did not open mail/http ports within ${max_wait}s."
+	die "Stalwart was not ready within ${max_wait}s."
 }
 
 write_health_state() {
@@ -311,25 +312,16 @@ PY
 	die "Health listener failed to respond on :${HEALTH_PORT}."
 }
 
-prepare_blob_volume() {
-	BLOB_FS_PATH="${BLOB_FS_PATH:-/var/stalwart/blobs}"
-	if [ -d "$BLOB_FS_PATH" ] || mkdir -p "$BLOB_FS_PATH" 2>/dev/null; then
-		chown -R stalwart:stalwart "$BLOB_FS_PATH" \
-			|| die "Could not chown ${BLOB_FS_PATH} for stalwart user (volume permissions)."
-	fi
-}
-
 run_as_stalwart() {
 	runuser -u stalwart -- "$@"
 }
 
 start_stalwart() {
 	log info "Starting Stalwart (db=${PGHOST}:${PGPORT}/${PGDATABASE})."
-	prepare_blob_volume
 	run_as_stalwart /usr/local/bin/stalwart --config /etc/stalwart/config.json 2>&1 &
 	STALWART_PID=$!
 	log info "Stalwart pid=${STALWART_PID}."
-	wait_for_stalwart_ports
+	wait_for_stalwart_ready
 }
 
 start_gate() {
@@ -362,19 +354,6 @@ stalwart_management_url() {
 	printf 'http://%s:%s\n' "$(detect_container_ip)" "${STALWART_HTTP_PORT}"
 }
 
-stalwart_api_ready() {
-	stalwart_url="$(stalwart_management_url)"
-
-	if curl -fsSL --max-time 2 \
-		-H "Authorization: Bearer ${STALWART_ADMIN_TOKEN}" \
-		"${stalwart_url}/jmap/session" >/dev/null 2>&1; then
-		return 0
-	fi
-
-	stalwart-cli --url "$stalwart_url" --api-key "$STALWART_ADMIN_TOKEN" \
-		get MtaRoute "$RELAY_ROUTE_ID" >/dev/null 2>&1
-}
-
 update_relay_route() {
 	[ -n "${STALWART_ADMIN_TOKEN:-}" ] || {
 		log warn "STALWART_ADMIN_TOKEN unset; skipping relay route update."
@@ -388,14 +367,12 @@ update_relay_route() {
 	max_attempts="${RELAY_ROUTE_UPDATE_ATTEMPTS:-90}"
 	err_log="/tmp/relay-route-update.err"
 	while [ "$i" -lt "$max_attempts" ]; do
-		if stalwart_api_ready \
-			&& stalwart-cli --url "$stalwart_url" --api-key "$STALWART_ADMIN_TOKEN" \
-				update MtaRoute "$RELAY_ROUTE_ID" \
-				--field "host=${relay_addr}" \
-				--field "port=${FRPC_RELAY_LOCAL_PORT}" \
-				2>"$err_log"; then
-			stalwart-cli --url "$stalwart_url" --api-key "$STALWART_ADMIN_TOKEN" \
-				create Action/ReloadSettings >/dev/null 2>&1 || true
+		if stalwart-cli --url "$stalwart_url" --api-key "$STALWART_ADMIN_TOKEN" \
+			update MtaRoute "$RELAY_ROUTE_ID" \
+			--field "host=${relay_addr}" \
+			--field "port=${FRPC_RELAY_LOCAL_PORT}" \
+			2>"$err_log"; then
+			reload_stalwart_settings
 			log info "Relay route -> ${relay_addr}:${FRPC_RELAY_LOCAL_PORT} (id=${RELAY_ROUTE_ID}; via ${stalwart_url})."
 			return 0
 		fi
@@ -425,11 +402,10 @@ seed_stalwart_cli_schema() {
 }
 
 reload_stalwart_settings() {
-	for reload_url in "$@"; do
-		[ -n "$reload_url" ] || continue
-		stalwart-cli --url "$reload_url" --api-key "$STALWART_ADMIN_TOKEN" \
-			create Action/ReloadSettings >/dev/null 2>&1 || true
-	done
+	# The coordinator fans a reload out to every node; stalwart-cli 1.0 refuses an action without a body.
+	stalwart-cli --url "$(stalwart_management_url)" --api-key "$STALWART_ADMIN_TOKEN" \
+		create Action/ReloadSettings --json '{}' >/dev/null 2>&1 \
+		|| log warn "Stalwart settings reload failed."
 }
 
 verify_stalwart_cluster() {
@@ -504,7 +480,7 @@ apply_stalwart_plan() {
 			fi
 		done
 		if [ -n "$applied" ]; then
-			reload_stalwart_settings "$private_url" "$ipv4_loopback_url"
+			reload_stalwart_settings
 			rm -f "$plan"
 			log info "Applied Stalwart config plan from ${plan_dir} via ${applied}."
 			return 0
@@ -586,6 +562,7 @@ cleanup() {
 STALWART_GATE_KEY="${STALWART_GATE_KEY:-}"
 [ "${#STALWART_GATE_KEY}" -ge 32 ] || die "STALWART_GATE_KEY (32+ characters) is required for the backend gate."
 [ -n "${STALWART_REDIS_URL:-}" ] || die "STALWART_REDIS_URL is required for coordinated deployment overlap."
+[ -n "${STALWART_WEBHOOK_SECRET:-}" ] || die "STALWART_WEBHOOK_SECRET is required to sign the mail-ingest webhook."
 STALWART_GATE_KEY_SHA256="$(printf '%s' "$STALWART_GATE_KEY" | sha256sum | cut -d' ' -f1)"
 unset STALWART_GATE_KEY
 export STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT
@@ -593,11 +570,9 @@ trap cleanup EXIT
 trap 'exit 0' TERM INT
 
 write_store_config
-prepare_blob_volume
 start_health_server
 start_stalwart
 start_gate
-sleep "${STALWART_BOOT_DELAY_SECONDS:-3}"
 verify_stalwart_cluster
 apply_stalwart_plan
 update_relay_route || die "Relay route update failed; refusing to open health gate."
