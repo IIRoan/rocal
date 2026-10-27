@@ -1,0 +1,74 @@
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            runner: ubuntu-latest
+            build-mode: none
+          - language: rust
+            runner: ubuntu-latest
+            build-mode: none
+          - language: python
+            runner: ubuntu-latest
+            build-mode: none
+          - language: actions
+            runner: ubuntu-latest
+            build-mode: none
+          - language: swift
+            runner: macos-15
+            build-mode: manual
+
+    steps:
+      - name: Checkout
+        uses: chainguard-actions/actions-checkout@40e53bf063d4f87f0a6e0a83231c09bcfb22bc19 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust
+        if: matrix.language == 'rust'
+        run: rustup toolchain install --profile minimal
+
+      - name: Initialize CodeQL
+        uses: chainguard-actions/github-codeql-action/init@fb4cd6516f031c131efd4b91cb7a4ab5975a11ae # v4.39.1
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+
+      - name: Compile the iOS notification extension
+        if: matrix.language == 'swift'
+        run: >-
+          xcrun swiftc -parse-as-library -emit-library
+          -module-name SolaceNotificationService
+          packages/native-core/plugins/notification-service-extension/NotificationService.swift
+          -o "$RUNNER_TEMP/libSolaceNotificationService.dylib"
+
+      - name: Analyze
+        uses: chainguard-actions/github-codeql-action/analyze@fb4cd6516f031c131efd4b91cb7a4ab5975a11ae # v4.39.1
+        with:
+          category: /codeql/${{ matrix.language }}
