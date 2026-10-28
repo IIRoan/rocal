@@ -59,7 +59,7 @@ jobs:
       eas_version: ${{ steps.meta.outputs.eas_version }}
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
-      - uses: oven-sh/setup-bun@v2
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
       - name: Resolve profile metadata
@@ -91,14 +91,14 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - uses: expo/expo-github-action@v8
+      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
         with:
           eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
@@ -177,7 +177,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
 
@@ -189,7 +189,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - uses: expo/expo-github-action@v8
+      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
         with:
           eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
@@ -243,7 +243,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
 

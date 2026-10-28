@@ -34,7 +34,7 @@ jobs:
       eas_version: ${{ steps.release.outputs.eas_version }}
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
-      - uses: oven-sh/setup-bun@v2
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
       - id: release
@@ -64,7 +64,7 @@ jobs:
       - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
         with:
           node-version-file: .node-version
-      - uses: oven-sh/setup-bun@v2
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
@@ -73,7 +73,7 @@ jobs:
         if: inputs.submit
         run: |
           bun -e 'const { readFileSync } = require("node:fs"); const config = JSON.parse(readFileSync("eas.json", "utf8")); if (!/^[0-9]+$/.test(config.submit?.production?.ios?.ascAppId ?? "")) throw new Error("Set submit.production.ios.ascAppId in this app before requesting TestFlight submission");'
-      - uses: expo/expo-github-action@v8
+      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
         with:
           eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
@@ -88,7 +88,7 @@ jobs:
             ARGS+=(--auto-submit-with-profile production)
           fi
           eas "${ARGS[@]}" > "$RUNNER_TEMP/eas-build.json"
-      - uses: actions/upload-artifact@v7
+      - uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
         if: always()
         with:
           name: ${{ matrix.app }}-ios-store-build

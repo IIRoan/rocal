@@ -15,7 +15,7 @@ jobs:
       - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
         with:
           node-version-file: .node-version
-      - uses: oven-sh/setup-bun@v2
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
