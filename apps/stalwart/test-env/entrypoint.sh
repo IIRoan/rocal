@@ -79,10 +79,6 @@ if [ -n "${STALWART_GATE_KEY:-}" ]; then
 	STALWART_GATE_KEY_SHA256="$(printf '%s' "$STALWART_GATE_KEY" | sha256sum | cut -d' ' -f1)"
 	unset STALWART_GATE_KEY
 	export STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT STALWART_PUBLIC_PORT
-	STALWART_ADMIN_ALLOW_FILE="$(mktemp /tmp/stalwart-admin-allow.XXXXXX)"
-	chown stalwart:stalwart "$STALWART_ADMIN_ALLOW_FILE"
-	runuser -u stalwart -- python3 /usr/local/share/stalwart/render-admin-allow.py "$STALWART_ADMIN_ALLOW_FILE"
-	export STALWART_ADMIN_ALLOW_FILE
 	runuser -u stalwart -- haproxy -db -f /usr/local/share/stalwart/backend-gate.cfg &
 	GATE_PID=$!
 	log info "Backend gate on :${STALWART_GATE_PORT}."

@@ -117,7 +117,7 @@ jobs:
           -v "${GITHUB_WORKSPACE}/apps/stalwart:/work:ro"
           --workdir /work --entrypoint python3
           localhost/solace-test-stalwart
-          -B -m unittest discover -s tests -p test_backend_gate.py -v
+          -B -m unittest discover -s tests -p 'test_*gate.py' -v
 
       # Memory budgets stay local: shared runners' RSS is too noisy for fixed MiB limits.
       - name: Run cargo xtask check

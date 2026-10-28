@@ -20,6 +20,7 @@ pub mod integrations;
 pub mod invitations;
 pub mod invites;
 pub mod mail;
+pub mod mail_admin;
 pub mod mail_settings;
 pub mod notifications;
 pub mod profiles;
@@ -76,6 +77,7 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(invitations::routes())
         .merge(recurring::routes())
         .merge(mail::routes())
+        .merge(mail_admin::routes())
         .merge(mail_settings::routes())
 }
 
@@ -95,6 +97,10 @@ fn router(state: AppState) -> Router {
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::pipeline::middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            mail_admin::guard,
         ))
         .layer(middleware::from_fn(http::response_cookies::middleware))
         .layer(middleware::from_fn_with_state(

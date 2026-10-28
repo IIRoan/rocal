@@ -26,6 +26,8 @@ TEST_DATABASE_URL=postgres://solace_test:solace-test-pg@127.0.0.1:55432/solace_t
 
 The test Stalwart image is pinned to 1.0.0. Its provisioning key cache uses `$XDG_DATA_HOME/solace-test-tools` when set, otherwise `$HOME/.local/share/solace-test-tools`; set `XDG_DATA_HOME` to a writable test directory in a restricted environment.
 
+Admin-gate configuration cases always use a single isolated Rust fixture through `TestApp::spawn_with_config`, including when the other cases target `API_BASE_URL`. They require the local template database described above.
+
 ## Writing tests
 
 - One module per domain in `tests/api/`, registered in `tests/api/main.rs`. Shared helpers live in `tests/api/helpers.rs`.

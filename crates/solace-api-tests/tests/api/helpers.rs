@@ -14,6 +14,7 @@ pub use solace_api_tests::seed::hex;
 use solace_api_tests::seed::insert_invite;
 use solace_api_tests::stalwart::{REGISTRY, admin_jmap};
 use solace_api_types::auth::AuthError;
+use solace_server::config::Config;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, Executor, PgPool};
 
@@ -84,7 +85,11 @@ fn mode() -> Mode {
 }
 
 /// Clones the template, then serves the Rust backend on it.
-async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDatabase) {
+async fn in_process(
+    env: &TestEnv,
+    mode: Mode,
+    configure: impl FnOnce(&mut Config),
+) -> (String, String, ScratchDatabase) {
     let name = format!("solace_test_run_{}", hex(8));
     let mut admin = sqlx::PgConnection::connect(&env.database_url)
         .await
@@ -94,7 +99,7 @@ async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDataba
         .await
         .expect("clone the template database (run `cargo xtask test-env template`)");
     let database_url = env.database_url_for(&name).expect("scratch database url");
-    let base_url = serve_rust(env, mode, &database_url).await;
+    let base_url = serve_rust(env, mode, &database_url, configure).await;
     let scratch = ScratchDatabase {
         admin_url: env.database_url.clone(),
         name,
@@ -103,7 +108,12 @@ async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDataba
 }
 
 /// Serves the Rust backend on a random port with the same settings the TypeScript backend gets.
-async fn serve_rust(env: &TestEnv, mode: Mode, database_url: &str) -> String {
+async fn serve_rust(
+    env: &TestEnv,
+    mode: Mode,
+    database_url: &str,
+    configure: impl FnOnce(&mut Config),
+) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind a port");
@@ -119,12 +129,13 @@ async fn serve_rust(env: &TestEnv, mode: Mode, database_url: &str) -> String {
         database_url,
         stalwart_provision_token: provision_key,
     });
-    let config = solace_server::config::Config::from_lookup(|wanted| {
+    let mut config = solace_server::config::Config::from_lookup(|wanted| {
         vars.iter()
             .find(|(name, _)| *name == wanted)
             .map(|(_, value)| value.clone())
     })
     .expect("server config");
+    configure(&mut config);
     let pool = solace_server::db::connect(database_url, solace_server::db::DEFAULT_POOL_SIZE)
         .await
         .expect("server pool");
@@ -146,6 +157,22 @@ pub struct TestUser {
 }
 
 impl TestApp {
+    /// Configuration cases need an isolated Rust server even when the suite targets another backend.
+    pub async fn spawn_with_config(configure: impl FnOnce(&mut Config)) -> Self {
+        let env = TestEnv::from_env().expect("test environment");
+        let mode = mode();
+        let (base_url, database_url, scratch) = in_process(&env, mode, configure).await;
+        Self::connect(
+            env,
+            mode,
+            base_url,
+            Backend::Rust,
+            &database_url,
+            Some(scratch),
+        )
+        .await
+    }
+
     /// The Rust server in-process on a random port with a fresh database, or `API_BASE_URL` (whose database is `TEST_DATABASE_URL`).
     pub async fn spawn() -> Self {
         let env = TestEnv::from_env().expect("test environment");
@@ -160,7 +187,7 @@ impl TestApp {
                 (base_url, backend, env.database_url.clone(), None)
             }
             Err(_) => {
-                let (base_url, database_url, scratch) = in_process(&env, mode).await;
+                let (base_url, database_url, scratch) = in_process(&env, mode, |_| {}).await;
                 (base_url, Backend::Rust, database_url, Some(scratch))
             }
         };
@@ -180,7 +207,7 @@ impl TestApp {
                 guard::check_service_url("INTEROP_RUST_URL", &url).expect("INTEROP_RUST_URL");
                 url
             }
-            Err(_) => serve_rust(&env, mode, &database_url).await,
+            Err(_) => serve_rust(&env, mode, &database_url, |_| {}).await,
         };
         let ts = Self::connect(
             env.clone(),
