@@ -1,0 +1,10 @@
+spec:
+  authorities:
+    # Trust keys directly so account and email mismatches do not reject valid signatures.
+    - key:
+        kms: https://raw.githubusercontent.com/IIRoan/rocal/master/.chainguard/keys/C96ADB44C14A9F1F12E23585F921B9F89C73F25C.asc
+    - key:
+        kms: https://raw.githubusercontent.com/IIRoan/rocal/master/.chainguard/keys/F59027700612C87E6026FB2924C2FCC930F72EAD.asc
+    # GitHub signs web merges and bot commits with its web-flow key.
+    - key:
+        kms: https://github.com/web-flow.gpg
