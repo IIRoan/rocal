@@ -172,44 +172,7 @@ export default function PrivacyPage() {
           </p>
         </div>
 
-        <section id="providers" aria-labelledby="privacy-providers">
-          <h2
-            id="privacy-providers"
-            className="text-base font-semibold text-foreground"
-          >
-            Providers and delivery
-          </h2>
-          <p className="mt-2">
-            Vercel serves the web app. Railway hosts the API, databases, mail
-            service, notification worker and stored profile pictures. A
-            separately hosted relay server sends and receives internet mail.
-            Expo provides native app builds and over-the-air software updates.
-            Apple delivers iPhone notifications through APNs. These providers
-            process the information needed to host or deliver the service,
-            including connection metadata.
-          </p>
-          <p className="mt-3">
-            Providers process data only on Solace&apos;s behalf under their data
-            processing terms and must protect it at least as well as this policy
-            describes. Some are based in or process data in the United States;
-            those transfers rely on the safeguards in their terms, such as
-            Standard Contractual Clauses or the EU–U.S. Data Privacy Framework.
-            Solace does not sell personal data or share it for advertising.
-          </p>
-          <p className="mt-3">
-            Notification payloads use opaque event or message references;
-            reminder titles and mail previews are resolved on your device when
-            possible. Solace apps do not send crash or error reports, and
-            there is no analytics or tracking. Hosting and delivery providers may
-            process IP addresses for routing and security; Solace sessions do
-            not store IP addresses or user agents.
-          </p>
-          <p className="mt-3">
-            Sending email, accepting invitations, sharing calendars or
-            subscribing to external feeds also communicates with the recipients,
-            organizers or feed providers you choose.
-          </p>
-        </section>
+        <PrivacySubprocessors />
         <section id="retention" aria-labelledby="privacy-retention">
           <h2
             id="privacy-retention"
@@ -344,7 +307,9 @@ function PrivacyOverview() {
       <p className="mt-2">Last updated 28 October 2026.</p>
       <p className="mt-3">
         This policy covers the Solace website and the Solace Calendar and
-        Solace Mail apps. Solace is free to use and has no in-app purchases,
+        Solace Mail apps. Solace is run by Roan van Westerop, the controller
+        responsible for your personal data, who you can reach through the
+        contact link below. Solace is free to use and has no in-app purchases,
         subscriptions or advertising. The apps require an existing Solace
         account; accounts are created by invitation.
       </p>
@@ -462,6 +427,100 @@ function PrivacyRights({ contact }: { contact: string | null }) {
         explains account recovery, notification permissions and account
         deletion. Public bug reports should contain no private account, mail or
         calendar content.
+      </p>
+    </section>
+  );
+}
+
+const SUBPROCESSORS: ReadonlyArray<readonly [string, string, string]> = [
+  [
+    "Railway Corporation",
+    "United States; your data is stored in the Netherlands",
+    "Hosts the API, databases, mail storage, notification worker and profile pictures",
+  ],
+  [
+    "Webdock.io ApS",
+    "Denmark",
+    "Runs the relay server that sends and receives internet mail",
+  ],
+  ["Vercel Inc.", "United States", "Serves the website"],
+  [
+    "650 Industries, Inc. (Expo)",
+    "United States",
+    "Builds the apps and delivers app updates",
+  ],
+  [
+    "Apple Inc.",
+    "United States",
+    "Delivers iPhone notifications through the Apple Push Notification service",
+  ],
+];
+
+function PrivacySubprocessors() {
+  return (
+    <section id="providers" aria-labelledby="privacy-providers">
+      <h2
+        id="privacy-providers"
+        className="text-base font-semibold text-foreground"
+      >
+        Subprocessors and sharing
+      </h2>
+      <p className="mt-2">
+        Solace uses these subprocessors to host and deliver the service. They
+        process personal data only on Solace&apos;s behalf, including the
+        connection metadata needed for routing and security.
+      </p>
+      <div className="mt-3 overflow-x-auto rounded-lg border border-border/50">
+        <table className="w-full text-xs">
+          <caption className="sr-only">Subprocessors</caption>
+          <thead>
+            <tr className="text-left text-foreground">
+              <th scope="col" className="px-3 py-2 font-medium">
+                Subprocessor
+              </th>
+              <th scope="col" className="px-3 py-2 font-medium">
+                Location
+              </th>
+              <th scope="col" className="px-3 py-2 font-medium">
+                Role
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/30">
+            {SUBPROCESSORS.map(([name, location, role]) => (
+              <tr key={name}>
+                <th
+                  scope="row"
+                  className="px-3 py-2 text-left font-medium text-foreground"
+                >
+                  {name}
+                </th>
+                <td className="px-3 py-2">{location}</td>
+                <td className="px-3 py-2">{role}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3">
+        Each subprocessor works under data processing terms and must protect
+        your data at least as well as this policy describes. Transfers to the
+        United States rely on the safeguards in those terms, such as Standard
+        Contractual Clauses or the EU–U.S. Data Privacy Framework. Solace does
+        not sell personal data or share it for advertising.
+      </p>
+      <p className="mt-3">
+        Notification payloads use opaque event or message references; reminder
+        titles and mail previews are resolved on your device when possible.
+        Solace apps do not send crash or error reports, and there is no
+        analytics or tracking. Solace sessions do not store IP addresses or
+        user agents.
+      </p>
+      <p className="mt-3">
+        Sending email, accepting invitations, sharing calendars or subscribing
+        to external feeds also communicates with the recipients, organizers or
+        feed providers you choose. Public bug reports you file are posted on
+        GitHub; Solace does not send it any account data.
       </p>
     </section>
   );
