@@ -1,0 +1,32 @@
+{
+  "owner": "astralgrove",
+  "version": "1.0.0",
+  "easCliVersion": "24.6.0",
+  "initialBuildNumber": 1,
+  "iosDeploymentTarget": "16.4",
+  "notificationExtensionTargetName": "SolaceNotificationService",
+  "notificationExtensionBundleSuffix": "NotificationService",
+  "notificationKeychainService": "onl.solace.notification-extension",
+  "developmentApiUrl": "http://localhost:4001",
+  "developmentTunnelUrl": "https://cloudflared.roan.dev",
+  "apps": {
+    "calendar": {
+      "name": "Solace Calendar",
+      "developmentName": "Calendar Dev",
+      "slug": "solace-calendar",
+      "projectId": "4262422c-3b37-44aa-9074-efe6d194eb12",
+      "bundleIdentifier": "onl.solace.calendar",
+      "scheme": "solace",
+      "legacyDevelopmentScheme": "exp+solace"
+    },
+    "mail": {
+      "name": "Solace Mail",
+      "developmentName": "Mail Dev",
+      "slug": "solace-mail",
+      "projectId": "abe3e4a0-5b68-47b4-9390-654d95f093bd",
+      "bundleIdentifier": "onl.solace.mail",
+      "scheme": "solace-mail",
+      "reactCompiler": true
+    }
+  }
+}

@@ -6,7 +6,7 @@ import { PROFILES, getArg, isProfile, releaseKeys } from "./install-artifacts";
 import { createClient, pruneReleaseArtifacts } from "./r2";
 
 const USAGE =
-  "Usage: publish-android --profile <development|preview> --apk <path> [--out-dir <dir>]";
+  "Usage: publish-android --profile <development|preview|testing> --apk <path> [--out-dir <dir>]";
 
 function parseArgs(argv: string[]) {
   const profile = getArg(argv, "--profile");

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { getErrexReportingOptions, parseErrexDsn } from "./errex-dsn";
 
 jest.mock("expo-constants", () => ({
   __esModule: true,
@@ -9,17 +10,15 @@ jest.mock("expo-constants", () => ({
   },
 }));
 
-import { getErrexReportingOptions, parseErrexDsn } from "./errex-dsn";
-
 describe("parseErrexDsn", () => {
   it("parses key, host, and string project name", () => {
     expect(
       parseErrexDsn(
-        "https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace",
+        "https://fixture-public-key@reports.example.test/solace",
       ),
     ).toEqual({
-      key: "65f1ae513c4a4865bc3b3384ce746653",
-      host: "errors.solace.onl",
+      key: "fixture-public-key",
+      host: "reports.example.test",
       project: "solace",
     });
   });
@@ -27,7 +26,7 @@ describe("parseErrexDsn", () => {
   it("returns null for empty or invalid input", () => {
     expect(parseErrexDsn("")).toBeNull();
     expect(parseErrexDsn("not-a-url")).toBeNull();
-    expect(parseErrexDsn("https://errors.solace.onl/solace")).toBeNull();
+    expect(parseErrexDsn("https://reports.example.test/solace")).toBeNull();
   });
 });
 
@@ -39,11 +38,11 @@ describe("getErrexReportingOptions", () => {
   it("builds the errex tunnel URL and environment", () => {
     expect(
       getErrexReportingOptions(
-        "https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace",
+        "https://fixture-public-key@reports.example.test/solace",
       ),
     ).toEqual({
       tunnel:
-        "https://errors.solace.onl/api/solace/envelope/?sentry_key=65f1ae513c4a4865bc3b3384ce746653",
+        "https://reports.example.test/api/solace/envelope/?sentry_key=fixture-public-key",
       environment: "preview",
     });
   });
