@@ -27,10 +27,12 @@ This app targets **Expo SDK 57** (React Native 0.86, React 19.2). EAS iOS builds
 | EAS profile   | `APP_VARIANT` | Channel       | Notes                                 |
 | ------------- | ------------- | ------------- | ------------------------------------- |
 | `development` | `development` | `development` | Dev client, internal, Dev icon        |
-| `preview`     | `preview`     | `preview`     | Internal store build, production icon |
+| `preview`     | `preview`     | `preview`     | Internal ad-hoc build, production icon |
+| `testing`     | `preview`     | `testing`     | Internal ad-hoc testing build         |
+| `testflight`  | `preview`     | `testing`     | App Store signing for TestFlight      |
 | `production`  | `production`  | `master`      | App Store / Play, production icon     |
 
-Runtime version uses the Expo **`appVersion`** policy (`1.0.0` today) so OTAs keep matching installed binaries until you intentionally bump `version` and ship a new native build.
+Runtime version uses the Expo **`appVersion`** policy (the shared version in `packages/native-core/expo-apps.json`) so OTAs keep matching installed binaries until you intentionally bump `version` and ship a new native build.
 
 **Always publish updates via the profile helper** so `eas.json` build-profile `env` is applied and updates use the app config's runtime version:
 
@@ -45,6 +47,18 @@ Those scripts run `scripts/publish-update.ts`, which:
 2. Uses the app config's `appVersion` runtime policy, or the explicit `EAS_UPDATE_RUNTIME_VERSION` override when targeting an older binary
 
 Changing app icons, native modules, Expo plugins, or app `version` requires a **new native build**, not only an OTA.
+
+## Build upload contents
+
+Both apps use the repository-root `.easignore`. It excludes local agent worktrees, caches, credentials and unrelated service/web source while retaining the shared native packages, patches, every Bun workspace manifest and the retired backend’s Prisma schema for its install hook. EAS uses this file instead of all `.gitignore` files, so keep secret and generated-file exclusions here too.
+
+Run EAS commands from this app directory, using the CLI version in `packages/native-core/expo-apps.json` as CI does. Inspect the upload without starting a build:
+
+```bash
+eas build:inspect --platform ios --profile testflight --stage archive --output /tmp/solace-eas-archive
+```
+
+Choose a new output directory each time. A metadata-upload warning is separate from source upload/build status; inspect the actual build result before retrying a completed build. [Expo upload filtering](https://docs.expo.dev/build-reference/easignore/)
 
 ## Shared Expo configuration
 

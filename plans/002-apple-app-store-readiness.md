@@ -32,7 +32,7 @@ The old project is still `@astralgrove/solace`, UUID `1047b680-b99f-4671-9824-23
 
 ### Complete the Calendar migration before deleting the old project
 
-- [ ] Choose and build the replacement Calendar binary for the new project.
+- [x] Build a replacement Calendar store binary for the new project: TestFlight build `4110cc4a-b317-4fb9-9f32-6c06211fee36` finished successfully. Installation/migration acceptance remains pending below.
 - [ ] Verify its archive uses the new project/update URL and the existing bundle/application identifier, signing identity, App Groups and keychain access.
 - [ ] Install it over an existing current Calendar installation and verify login, encrypted data access, notifications, canonical deep links, legacy development links and update checks.
 - [x] Confirm repository/CI configuration on the default branch points to the new project (PR #108 merged).
@@ -46,13 +46,14 @@ The old project is still `@astralgrove/solace`, UUID `1047b680-b99f-4671-9824-23
 - [ ] Verify the intended Apple developer team and publisher identity.
 - [ ] Create or verify separate App Store Connect app records for `onl.solace.calendar` and `onl.solace.mail`.
 - [ ] Set each app's `submit.production.ios.ascAppId` in its `eas.json` once its App Store Connect app ID is known.
-- [ ] Configure EAS-managed submission credentials and production distribution profiles.
+- [x] Provision App Store distribution profiles/certificates for both main apps and their notification extensions; verified through EAS after the owner’s interactive setup.
+- [ ] Configure EAS-managed submission credentials/API keys and link the App Store Connect app records.
 - [ ] Verify signing for both main apps and their `.NotificationService` extensions, App Groups, push notifications and associated domains.
 - [ ] Complete required Apple agreements, age ratings, launch territories and EU trader declarations.
 
 Existing production build and submission scripts are in both apps' `package.json`; both `submit.production` profiles currently contain `{}`. EAS can manage signing and uploads from Linux. [EAS Submit](https://docs.expo.dev/submit/ios/)
 
-Live EAS inspection on 2026-10-28 found stored credentials for the current main-app and extension identifiers under team `HXJACWP87H`. The current Calendar references were copied to the new project; those four identifiers currently have ad-hoc profiles, so App Store distribution profiles still need setup. Neither new Calendar nor Mail has an App Store Connect app connection or a submission API key assigned to its iOS credentials. This does not establish whether app records already exist in Apple's dashboard or whether stored signing credentials are still valid. The old Calendar project also has legacy `onl.solace.mobile` credential records; these were retained there. Its latest cloud build records use that older identifier; the new Calendar project and Mail had no cloud build records at migration preparation, which does not establish the state of CI-local builds.
+Live EAS inspection on 2026-10-28 found stored credentials for the current main-app and extension identifiers under team `HXJACWP87H`. The current Calendar references were copied to the new project; the initial snapshot had only ad-hoc profiles. After the owner’s interactive setup, both apps and their notification extensions also have App Store profiles. Neither new Calendar nor Mail has an App Store Connect app connection or a submission API key assigned to its iOS credentials. This does not establish whether app records already exist in Apple's dashboard or whether stored signing credentials are still valid. The old Calendar project also has legacy `onl.solace.mobile` credential records; these were retained there. Its latest cloud build records use that older identifier; the new Calendar project and Mail had no cloud build records at migration preparation, which does not establish the state of CI-local builds.
 
 ## 3. Privacy and support
 
@@ -239,3 +240,11 @@ Draft reviewer explanation: “Solace currently uses invitation-only account cre
 - Final live EAS configuration and the Bun store preflight pass for both apps on both store profiles at version/runtime `1.0.2`, after compatibility-variable cleanup. Production uses channel `master`; TestFlight uses `testing`. No store build, upload or metadata push was initiated.
 
 - The linked Vercel project disables preview deployments. The PR push therefore does not produce a preview, and production support/passkey-route verification remains pending deployment after review. The CLI deployment ignore rules explicitly include the shared identity JSON used by the association route.
+
+### Upload filtering and first Calendar store build
+
+- The owner’s first Calendar TestFlight build `4110cc4a-b317-4fb9-9f32-6c06211fee36` finished successfully on source `6b308afea21d96cd85b07f66b7c64d2540f3fafc`, version/runtime `1.0.2`, build number `2`. EAS metadata confirms store distribution, the intended Calendar project/bundle/profile and channel `testing`. This is build evidence; Apple processing, TestFlight upload and installed-device acceptance remain separate.
+- The metadata-upload HTTP 400 was a warning for that successful build. Local archive inspection found unexcluded agent worktrees and unrelated service/web sources. Root `.easignore` now retains both native apps/shared packages, workspace manifests, patches and the retired Prisma install-hook input while excluding local state, credentials, generated projects and unrelated source.
+- Both inspected upload copies contain 1002 files and compress to approximately 11.12 MiB, versus the owner’s reported 996 MB archive. A frozen Bun 1.4.4 install from the filtered copy succeeds, generates the retired Prisma client, and preserves the lockfile. Direct metadata-upload probes with the new file list succeed on both the installed EAS CLI 22.0.0 and the repository-pinned 24.6.0; these probes do not establish the exact cause of the earlier HTTP 400.
+
+- Both iOS JavaScript bundles export successfully from the filtered upload copy after its frozen install, including Mail’s React Compiler transform. This validates bundling inputs; it is not a new signed native build or installed-device test.
