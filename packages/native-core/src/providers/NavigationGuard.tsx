@@ -14,7 +14,6 @@ import {
 } from "../lib/auth-routing";
 import { API_BASE_URL } from "../lib/constants";
 import { hideLaunchSplash } from "../lib/launch-splash";
-import { captureException } from "../lib/reporting";
 import { resetPreSessionQueries } from "../lib/session-query-reset";
 import { restoreWithTimeout } from "../lib/session-restore";
 import {
@@ -167,11 +166,7 @@ export function NavigationGuard({
         })
         .catch(() => undefined);
     })()
-      .catch((error) => {
-        captureException(error, {
-          tags: { area: "startup-crypto" },
-        });
-      })
+      .catch(() => undefined)
       .finally(() => {
         if (!cancelled) {
           setIsPreparingStartupCrypto(false);

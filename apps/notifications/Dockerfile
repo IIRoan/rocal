@@ -10,7 +10,6 @@ COPY apps/backend apps/backend
 COPY apps/notifications apps/notifications
 COPY crates crates
 COPY xtask xtask
-COPY packages/calendar-core/src/redaction-policy.js packages/calendar-core/src/redaction-policy.js
 COPY packages/calendar-ics/src/windows-zones.json packages/calendar-ics/src/windows-zones.json
 ENV RUSTFLAGS="-C target-cpu=x86-64-v3"
 RUN OPENSSL_STATIC=1 \

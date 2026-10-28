@@ -7,7 +7,7 @@ Chainguard Guardener maintains the hardened Actions and container migrations in 
 | CodeQL | Rust API and notifications, JavaScript/TypeScript web and Expo apps and shared packages, Python helpers, Actions workflows, and the Swift notification extension |
 | Bun audit | Every JavaScript workspace in `bun.lock`, including transitive and development dependencies |
 | Trivy repository | Cargo dependencies including development dependencies, and Dockerfile misconfigurations |
-| Trivy containers | Images built from the backend, notifications, Stalwart, Gatus, and Errex Dockerfiles |
+| Trivy containers | Images built from the backend, notifications, Stalwart, and Gatus Dockerfiles |
 | Trivy Rust build stages | Debian build-stage packages, including the OpenSSL library statically linked into the Rust executables |
 | GitHub secret protection | Repository secret scanning and push protection, enabled in repository settings |
 | Dependabot | Dependency alerts and security updates, plus weekly Bun, Cargo, and Actions update PRs |

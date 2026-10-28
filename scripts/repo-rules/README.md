@@ -27,7 +27,7 @@ Add it to the matching module (`repository`, `comments`, `backend`, `client`, `t
 | Rule | Checks |
 | --- | --- |
 | `native-deployment-config` | Native service URLs derive from shared runtime configuration; EAS profiles and mobile workflows do not repeat deployment variables. |
-| `forbidden-dependencies` | Workspace manifests must not depend on banned mail, analytics, state, validation, HTTP, date, motion, or CSS-in-JS libraries. |
+| `forbidden-dependencies` | Workspace manifests must not depend on banned mail, analytics, error-reporting, state, validation, HTTP, date, motion, or CSS-in-JS libraries. |
 | `no-pii-tracking-config` | Error reporting never sends default PII, never enables IP tracking, and the query cache is never persisted. |
 | `no-committed-secrets` | Only `.env*.example` files (and the public web production env) and no private keys may be committed. |
 | `no-alternate-mail-transport` | Mail runs over JMAP only: no SMTP/IMAP/POP3 URLs or Resend, and the provisioning token stays in the admin client. |

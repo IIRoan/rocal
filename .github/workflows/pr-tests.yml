@@ -47,6 +47,10 @@ jobs:
           python3 -B -m unittest discover -s apps/stalwart/tests -v
           python3 -B apps/stalwart/vps/gatus-monitor_test.py
           python3 -B -m unittest discover -s apps/gatus/tests -v
+      - name: Check iOS notification extension configuration
+        run: node scripts/tests/notification-extension.cjs
+      - name: Check iOS native code has no camera or microphone access
+        run: node scripts/tests/ios-no-camera.cjs
 
       - name: Upload backend coverage
         if: always()

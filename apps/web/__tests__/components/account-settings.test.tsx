@@ -28,6 +28,9 @@ jest.mock("lucide-react", () => {
     Pencil: Icon,
     Plus: Icon,
     Upload: Icon,
+    HelpCircle: Icon,
+    Shield: Icon,
+    Users: Icon,
   };
 });
 

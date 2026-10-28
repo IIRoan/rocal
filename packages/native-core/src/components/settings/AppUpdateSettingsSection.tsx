@@ -9,7 +9,6 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -17,6 +16,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { useMailSkin, type MailSkin } from "../mail/mail-ui";
 import { SheetGroup, SheetItem } from "../sheet/SheetSections";
 import { useAppUpdate } from "../../providers/AppUpdateProvider";
+import { SHOW_DEBUG_TOOLS } from "../../lib/constants";
 import {
   actionLabel,
   checkStatusDetail,
@@ -62,10 +62,9 @@ export function AppUpdateSettingsSection() {
     ? formatUpdateStamp(Updates.createdAt)
     : jsSourceLabel(runtime);
   const isDevBuild = runtime.appVariant === "development";
-  const expoUpdatesUrl = getExpoUpdatesUrl(
-    Constants.expoConfig?.owner,
-    Constants.expoConfig?.slug,
-  );
+  const expoUpdatesUrl = SHOW_DEBUG_TOOLS
+    ? getExpoUpdatesUrl(Constants.expoConfig?.owner, Constants.expoConfig?.slug)
+    : null;
 
   const showDiagnostics = () => {
     Alert.alert(updateDiagnosticsTitle(runtime), updateDiagnosticsBody(runtime));
@@ -140,13 +139,7 @@ export function AppUpdateSettingsSection() {
             ? `Looks for a newer bundle on ${channel}.`
             : "Updates are off in this session.")
         }
-        trailing={
-          <Feather
-            name={updateAccessoryIcon(enabled, action, checkStatus)}
-            size={16}
-            color={skin.textSecondary}
-          />
-        }
+        accessory={updateAccessoryIcon(enabled, action, checkStatus)}
         pending={checking}
         disabled={busy}
         onPress={onAction}
@@ -155,13 +148,7 @@ export function AppUpdateSettingsSection() {
       {expoUpdatesUrl ? (
         <SheetItem
           label="Browse Expo updates"
-          trailing={
-            <Feather
-              name="external-link"
-              size={16}
-              color={skin.textSecondary}
-            />
-          }
+          accessory="external-link"
           onPress={() => {
             void Linking.openURL(expoUpdatesUrl).catch(() =>
               Alert.alert(

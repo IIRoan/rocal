@@ -27,10 +27,12 @@ This app targets **Expo SDK 57** (React Native 0.86, React 19.2). EAS iOS builds
 | EAS profile   | `APP_VARIANT` | Channel       | Notes                                 |
 | ------------- | ------------- | ------------- | ------------------------------------- |
 | `development` | `development` | `development` | Dev client, internal, Dev icon        |
-| `preview`     | `preview`     | `preview`     | Internal store build, production icon |
+| `preview`     | `preview`     | `preview`     | Internal ad-hoc build, production icon |
+| `testing`     | `preview`     | `testing`     | Internal ad-hoc testing build         |
+| `testflight`  | `preview`     | `testing`     | App Store signing for TestFlight      |
 | `production`  | `production`  | `master`      | App Store / Play, production icon     |
 
-Runtime version uses the Expo **`appVersion`** policy (`1.0.0` today) so OTAs keep matching installed binaries until you intentionally bump `version` and ship a new native build.
+Runtime version uses the Expo **`appVersion`** policy (the shared version in `packages/native-core/expo-apps.json`) so OTAs keep matching installed binaries until you intentionally bump `version` and ship a new native build.
 
 **Always publish updates via the profile helper** so `eas.json` build-profile `env` is applied and updates use the app config's runtime version:
 
@@ -46,6 +48,18 @@ Those scripts run `scripts/publish-update.ts`, which:
 
 Changing app icons, native modules, Expo plugins, or app `version` requires a **new native build**, not only an OTA.
 
+## Build upload contents
+
+Both apps use the repository-root `.easignore`. It excludes local agent worktrees, caches, credentials and unrelated service/web source while retaining the shared native packages, patches, every Bun workspace manifest and the retired backend’s Prisma schema for its install hook. EAS uses this file instead of all `.gitignore` files, so keep secret and generated-file exclusions here too.
+
+Run EAS commands from this app directory, using the CLI version in `packages/native-core/expo-apps.json` as CI does. Inspect the upload without starting a build:
+
+```bash
+eas build:inspect --platform ios --profile testflight --stage archive --output /tmp/solace-eas-archive
+```
+
+Choose a new output directory each time. A metadata-upload warning is separate from source upload/build status; inspect the actual build result before retrying a completed build. [Expo upload filtering](https://docs.expo.dev/build-reference/easignore/)
+
 ## Shared Expo configuration
 
 Native identities and stable defaults are defined once in [`packages/native-core/expo-apps.json`](../../packages/native-core/expo-apps.json). Both `app.config.ts` files delegate to the shared builder in `packages/native-core/expo-config.cjs`; update URLs, development IDs, App Groups and extension IDs are derived from that configuration.
@@ -56,12 +70,13 @@ Deployment values live in the `astralgrove` account's shared EAS environments:
 | --- | --- | --- |
 | `SOLACE_API_URL` | development, preview, production | Backend origin |
 | `SOLACE_APP_URL` | preview, production | Web and passkey origin |
-| `SOLACE_SENTRY_DSN` | development, preview, production | Optional self-hosted error reporting |
 | `SOLACE_ENABLE_IOS_ASSOCIATED_DOMAINS` | preview, production | Passkey associated-domain capability |
 
 These are public app configuration values, never secrets. `eas.json` selects the variant and EAS environment through `APP_VARIANT` and `SOLACE_ENV_SOURCE=eas`. Builds and updates resolve the same values into `Constants.expoConfig.extra.runtimeEnvironment`, which native-core consumes. Local `.env` overrides are ignored for EAS deployment values. The pre-install build hook and OTA publisher reject missing required service values before building or publishing.
 
-For local development, `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_APP_URL`, optional `PASSKEY_ORIGIN`, and `EXPO_PUBLIC_SENTRY_DSN` remain supported overrides. `EXPO_OWNER`, `EXPO_PROJECT_ID` and `EXPO_PROJECT_SLUG` can override the linked project for a fork; the repository's defaults need no overrides.
+If Apple issues an encryption compliance code, set `SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE` on this app’s EAS project for each relevant build environment. It is embedded by the shared builder; keep app-specific approval codes out of the account-wide shared variables. Complete the export questionnaire and territory/filing requirements before review.
+
+For local development, `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_APP_URL`, and optional `PASSKEY_ORIGIN` remain supported overrides. `EXPO_OWNER`, `EXPO_PROJECT_ID` and `EXPO_PROJECT_SLUG` can override the linked project for a fork; the repository's defaults need no overrides.
 
 ## Local env
 
@@ -216,7 +231,7 @@ The production channel keeps its existing `master` name for installed-binary com
 
 `scripts/native-release-config.ts` selects the profile once for both build and update workflows; metadata reads app names, the EAS CLI version and each app's channel/environment from shared configuration. All workflows run native checks before builds or publishing. Internal artifact slots include `development`, `preview` and `testing`.
 
-The **iOS App Store build** workflow is dispatched from the default branch, selects `testflight` or `production`, and optionally uploads the completed build to TestFlight. Uploading requires the app's `submit.production.ios.ascAppId` and EAS App Store signing/submission credentials. `production` OTA updates also require an explicit default-branch dispatch. The app-version runtime policy still requires a version bump and new binary for native changes.
+The **iOS App Store build** workflow runs from the default branch after native checks and selects `testflight` or `production`. EAS manages signing, builds and upload; a small Bun check confirms the completed build’s project, identifier, profile, channel, version and source commit before optional submission with that exact build ID. Artifacts contain a sanitized build reference and EAS Metadata draft. Apple archive processing, privacy/export declarations and installed-device checks remain release requirements; see [the readiness checklist](../../plans/002-apple-app-store-readiness.md). Uploads require `submit.production.ios.ascAppId` and EAS App Store credentials/API key. Both apps and notification extensions are iPhone-only. Production OTA updates require an explicit default-branch dispatch; native changes require a version bump and new binary under the app-version runtime policy.
 
 Required GitHub secret:
 
@@ -227,3 +242,5 @@ The workflow publishes through the app's `scripts/publish-update.ts`. The shared
 Deployment values are managed only in the shared EAS environment; neither GitHub Actions nor `eas.json` repeats the service URLs or reporting DSN. Publish through the profile helpers so variant selection, environment loading and validation stay consistent.
 
 Note: PR-triggered publishes are skipped for forked repositories because GitHub does not expose secrets to untrusted PRs.
+
+Native changes (SDK/RN, native dependencies, plugins, permissions, entitlements, extensions or embedded configuration) require updating the shared `version` in `packages/native-core/expo-apps.json` and building a new binary before OTA for that runtime. This release uses runtime `1.0.2` for the iPhone/encryption native settings; earlier PR development binaries already used `1.0.1`. Pure JS/assets can update compatible binaries on their configured channel. Do not override the runtime to send incompatible native changes to older installations.

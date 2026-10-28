@@ -1,7 +1,6 @@
 import { AUTH_STORAGE_PREFIX, API_BASE_URL } from "./constants";
 import { AUTH_SESSION_LIFETIME_SECONDS } from "@workspace/calendar-core";
 import { getSetCookie } from "@better-auth/expo/client";
-import { captureException } from "./reporting";
 import {
   getChunkedSecureValueSync,
   readChunkedSecureValue,
@@ -236,9 +235,7 @@ export async function persistRenewedSessionCookie(
     const renewed = getSetCookie(updates, latestRaw);
     if (getSessionTokenCookieValue(renewed) !== current) return;
     setChunkedSecureValueSync(COOKIE_STORE_KEY, renewed);
-  } catch (error) {
-    captureException(error, {
-      tags: { area: "auth", reason: "session-renewal-cookie" },
-    });
+  } catch {
+    // Keep the stored cookie; the next authenticated response retries the renewal.
   }
 }

@@ -4,6 +4,31 @@ import {
 } from "../../expo-config.cjs";
 
 describe("shared native Expo configuration", () => {
+  it.each(["calendar", "mail"] as const)(
+    "uses the shared iPhone and encryption declarations in %s",
+    (app) => {
+      const config = createNativeExpoConfig(app, {});
+      expect(config.ios?.supportsTablet).toBe(false);
+      expect(config.ios?.infoPlist?.ITSAppUsesNonExemptEncryption).toBe(true);
+      expect(
+        config.ios?.infoPlist?.ITSEncryptionExportComplianceCode,
+      ).toBeUndefined();
+      expect(
+        createNativeExpoConfig(app, {
+          SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE: " issued-code ",
+        }).ios?.infoPlist?.ITSEncryptionExportComplianceCode,
+      ).toBe("issued-code");
+    },
+  );
+  it.each(["calendar", "mail"] as const)(
+    "declares no tracking in the %s app manifest",
+    (app) => {
+      expect(createNativeExpoConfig(app, {}).ios?.privacyManifests).toEqual({
+        NSPrivacyTracking: false,
+        NSPrivacyTrackingDomains: [],
+      });
+    },
+  );
   it.each([
     {
       app: "calendar" as const,
@@ -39,34 +64,29 @@ describe("shared native Expo configuration", () => {
     const config = createNativeExpoConfig("calendar", {
       SOLACE_API_URL: "https://api.example.test",
       SOLACE_APP_URL: "https://app.example.test",
-      SOLACE_SENTRY_DSN: "https://key@errors.example.test/solace",
       SOLACE_ENABLE_IOS_ASSOCIATED_DOMAINS: "true",
     });
     expect(config.extra?.runtimeEnvironment).toEqual({
       apiUrl: "https://api.example.test",
       appUrl: "https://app.example.test",
-      sentryDsn: "https://key@errors.example.test/solace",
     });
     expect(config.ios?.associatedDomains).toEqual([
       "webcredentials:app.example.test",
     ]);
   });
 
-  it("lets local overrides replace shared values and disable error reporting", () => {
+  it("lets local overrides replace shared values", () => {
     const config = createNativeExpoConfig("mail", {
       SOLACE_API_URL: "https://shared.example.test",
       SOLACE_APP_URL: "https://shared.example.test",
-      SOLACE_SENTRY_DSN: "https://key@errors.example.test/solace",
       SOLACE_ENABLE_IOS_ASSOCIATED_DOMAINS: "true",
       EXPO_PUBLIC_API_URL: "https://local-api.example.test",
       EXPO_PUBLIC_APP_URL: "https://local.example.test",
-      EXPO_PUBLIC_SENTRY_DSN: "",
       EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS: "false",
     });
     expect(config.extra?.runtimeEnvironment).toEqual({
       apiUrl: "https://local-api.example.test",
       appUrl: "https://local.example.test",
-      sentryDsn: "",
     });
     expect(config.ios?.associatedDomains).toBeUndefined();
   });

@@ -1,4 +1,4 @@
-/** Single source of truth for log/report redaction keys; plain ESM so ESLint can load it. */
+/** Single source of truth for log redaction keys; plain ESM so ESLint can load it. */
 
 /** @type {readonly string[]} */
 export const LOG_OMIT_FIELD_KEYS = Object.freeze([

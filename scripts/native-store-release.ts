@@ -1,0 +1,104 @@
+import settings from "../packages/native-core/expo-apps.json";
+import listings from "../packages/native-core/store-listings.json";
+import product from "../packages/calendar-core/src/product-info.json";
+import { nativeReleaseProfileMetadata } from "./native-release-config";
+
+function object(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Expected EAS release metadata");
+  }
+  return value as Record<string, unknown>;
+}
+
+export function prepareStoreRelease(
+  value: unknown,
+  app: string,
+  profile: string,
+  eas: unknown,
+) {
+  if (app !== "calendar" && app !== "mail")
+    throw new Error("Choose calendar or mail");
+  if (profile !== "testflight" && profile !== "production")
+    throw new Error("Choose a store profile");
+  const { channel } = nativeReleaseProfileMetadata(eas, profile);
+  const config = object(value);
+  const appConfig = object(config.appConfig);
+  const extra = object(appConfig.extra);
+  const identity = settings.apps[app];
+  if (
+    object(extra.eas).projectId !== identity.projectId ||
+    object(appConfig.ios).bundleIdentifier !== identity.bundleIdentifier ||
+    appConfig.version !== settings.version ||
+    object(config.buildProfile).channel !== channel ||
+    object(config.buildProfile).distribution !== "store"
+  ) {
+    throw new Error(
+      "Store configuration does not match the selected app/profile",
+    );
+  }
+  const appUrl = object(extra.runtimeEnvironment).appUrl;
+  if (typeof appUrl !== "string")
+    throw new Error("A public support/privacy website is required");
+  const website = new URL(appUrl);
+  if (website.protocol !== "https:" || website.username || website.password) {
+    throw new Error("The public website must use HTTPS without credentials");
+  }
+  return {
+    release: {
+      app,
+      projectId: identity.projectId,
+      appIdentifier: identity.bundleIdentifier,
+      appVersion: settings.version,
+      buildProfile: profile,
+      channel,
+    },
+    draft: {
+      configVersion: 0,
+      apple: {
+        version: settings.version,
+        info: {
+          "en-US": {
+            title: identity.name,
+            ...listings[app],
+            marketingUrl: website.origin,
+            supportUrl: website.origin + product.supportPath,
+            privacyPolicyUrl: website.origin + product.privacyPath,
+          },
+        },
+      },
+    },
+  };
+}
+
+export function selectStoreBuild(
+  value: unknown,
+  expected: unknown,
+  commit: string,
+) {
+  const builds = Array.isArray(value) ? value : [value];
+  if (builds.length !== 1) throw new Error("Expected exactly one EAS build");
+  const build = object(builds[0]);
+  const release = object(expected);
+  if (
+    build.status !== "FINISHED" ||
+    build.platform !== "IOS" ||
+    build.distribution !== "STORE" ||
+    build.isForIosSimulator !== false ||
+    object(build.app).id !== release.projectId ||
+    object(build.updateChannel).name !== release.channel ||
+    build.buildProfile !== release.buildProfile ||
+    build.appIdentifier !== release.appIdentifier ||
+    build.appVersion !== release.appVersion ||
+    !/^[a-f0-9]{40}$/.test(commit) ||
+    build.gitCommitHash !== commit
+  ) {
+    throw new Error("EAS build does not match the requested store release");
+  }
+  if (
+    typeof build.id !== "string" ||
+    !/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(build.id)
+  ) {
+    throw new Error("Invalid EAS build ID");
+  }
+  return { ...release, id: build.id, gitCommitHash: commit };
+}

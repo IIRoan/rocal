@@ -1,0 +1,28 @@
+{
+  "calendar": {
+    "subtitle": "Private calendars, clear plans",
+    "keywords": [
+      "calendar",
+      "schedule",
+      "events",
+      "reminders",
+      "privacy",
+      "encrypted",
+      "invitations"
+    ],
+    "description": "Plan your days with Solace Calendar. Create events, recurring plans and reminders, organize calendars, and respond to invitations.\n\nEvent titles, descriptions and locations are encrypted on your device before they are saved. Scheduling and sharing metadata remain readable to operate the service. Public and subscribed calendars and email invitations have different privacy limits; see the privacy policy for details.\n\nUse the same account on the web and in Solace Mail. Each app works on its own. Solace currently requires an invitation to create an account."
+  },
+  "mail": {
+    "subtitle": "A quiet inbox for your day",
+    "keywords": [
+      "mail",
+      "email",
+      "inbox",
+      "attachments",
+      "privacy",
+      "encrypted",
+      "calendar"
+    ],
+    "description": "Manage your inbox with Solace Mail. Read and send messages, work with attachments, organize conversations and labels, and search your mailbox on your device.\n\nSolace supports encrypted mailbox storage and OpenPGP messages. Ordinary email can be readable to mail servers during delivery; storage encryption and end-to-end encryption are different. See the privacy policy for the details and current limitations.\n\nOpen calendar events in Solace Calendar when it is installed, and use the same account on the web. Each app works on its own. Solace currently requires an invitation to create an account."
+  }
+}

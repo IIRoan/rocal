@@ -271,8 +271,6 @@ retired/backend/__tests__/lib/security-headers.test.ts	security headers › adds
 retired/backend/__tests__/lib/security-headers.test.ts	security headers › allows inline styles only on the Better Auth error page
 retired/backend/__tests__/lib/security-headers.test.ts	security headers › lets the avatar proxy load cross-origin as an <img>
 retired/backend/__tests__/lib/security-headers.test.ts	security headers › omits HSTS outside production
-retired/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing › installs beforeSend/beforeBreadcrumb scrubbers
-retired/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing › sanitizes extras before attaching them to the scope
 retired/backend/__tests__/lib/session-client-metadata.test.ts	stripSessionClientMetadata › nulls IP address and user agent before a session is stored
 retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › allows 2606:4700:4700::1111
 retired/backend/__tests__/lib/ssrf-host-policy.test.ts	isPrivateNetworkHost ranges › allows 8.8.8.8

@@ -135,10 +135,6 @@ jobs:
             context: apps/gatus
             dockerfile: apps/gatus/Dockerfile
             builder: false
-          - image: errex
-            context: apps/errex
-            dockerfile: apps/errex/Dockerfile
-            builder: false
 
     steps:
       - name: Checkout
