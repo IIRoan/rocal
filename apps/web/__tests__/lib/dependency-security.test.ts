@@ -20,6 +20,32 @@ function runDependencyCheck(source: string) {
 }
 
 describe("dependency compatibility", () => {
+  it("keeps native dependency declarations compatible with the installed Expo SDK matrix", () => {
+    runDependencyCheck(`
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const { createRequire } = require("node:module");
+      for (const app of ["native-calendar", "native-mail"]) {
+        const manifestPath = path.resolve("apps", app, "package.json");
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+        const appRequire = createRequire(manifestPath);
+        const expoManifest = appRequire.resolve("expo/package.json");
+        const expoRequire = createRequire(expoManifest);
+        const { intersects, satisfies } = expoRequire("semver");
+        const bundled = expoRequire("./bundledNativeModules.json");
+        for (const name of ["react", "react-native"]) {
+          const installed = appRequire(name + "/package.json").version;
+          assert.ok(satisfies(installed, bundled[name]), app + ": installed " + name + " " + installed + " must satisfy " + bundled[name]);
+        }
+        for (const [name, declared] of Object.entries(manifest.dependencies)) {
+          if (bundled[name]) {
+            assert.ok(intersects(declared, bundled[name]), app + ": " + name + " " + declared + " must satisfy " + bundled[name]);
+          }
+        }
+      }
+    `);
+  });
+
   it("decodes Expo Router query strings through the patched CommonJS adapter", () => {
     runDependencyCheck(`
       const queryString = require("query-string");
