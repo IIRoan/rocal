@@ -3,6 +3,7 @@ import {
   EMAIL_REMINDER_SETTING,
 } from "@workspace/calendar-core";
 import type { AccountSheetSearchEntry } from "./account-sheet-model";
+import { SHOW_DEBUG_TOOLS } from "./constants";
 import { THEME_OPTIONS, TIME_FORMAT_OPTIONS } from "./settings-options";
 
 /** Settings inside the shared pages that both apps render in the account drawer. */
@@ -109,22 +110,26 @@ export const SHARED_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
     location: "App · Updates",
     keywords: "expo version",
   },
-  {
-    pageId: "app",
-    label: "Copy diagnostics",
-    location: "App · Debugging",
-    keywords: "debug logs",
-  },
-  {
-    pageId: "app",
-    label: "Clear session cookies",
-    location: "App · Debugging",
-    keywords: "debug",
-  },
-  {
-    pageId: "app",
-    label: "Send test error",
-    location: "App · Debugging",
-    keywords: "debug crash report",
-  },
+  ...(SHOW_DEBUG_TOOLS
+    ? [
+        {
+          pageId: "app",
+          label: "Copy diagnostics",
+          location: "App · Debugging",
+          keywords: "debug logs",
+        },
+        {
+          pageId: "app",
+          label: "Clear session cookies",
+          location: "App · Debugging",
+          keywords: "debug",
+        },
+        {
+          pageId: "app",
+          label: "Send test error",
+          location: "App · Debugging",
+          keywords: "debug crash report",
+        },
+      ]
+    : []),
 ];

@@ -19,7 +19,7 @@ Started 2026-10-28 on `chore/apple-app-store-readiness`, based on `origin/master
 - [x] Configure namespaced shared EAS service variables and remove repeated deployment URLs/DSNs from both build profiles and the OTA workflow.
 - [x] Resolve runtime API/web/reporting values from the processed Expo config and derive publishing channels/environments from `eas.json`, including inherited testing settings.
 - [x] Add an offline repository rule rejecting repeated native deployment env values and fixed Solace service URLs.
-- [ ] Verify the corrected updates link in installed Calendar and Mail builds when testing the release candidate.
+- [ ] Verify the corrected updates link in installed Calendar and Mail development builds; store builds hide it with the other debugging tools.
 
 | App      | Expo dashboard display name | Immutable project slug | Existing project UUID                  | Native production ID  |
 | -------- | --------------------------- | ---------------------- | -------------------------------------- | --------------------- |
@@ -67,6 +67,8 @@ Live EAS inspection on 2026-10-28 found stored credentials for the current main-
 - [ ] Confirm App Privacy classifications against the release archives, deployed providers and Apple’s definitions, and complete both app records.
 - [x] Add explicit no-tracking manifests for both main apps and the shared notification extension, retain Expo/React Native SDK reason aggregation, and test the extension plugin against a generated Xcode project.
 - [ ] Inspect the real signed archives and required API reasons, including SDK coverage and whether each declared reason matches actual use.
+- [x] Remove camera and microphone access code from the iOS binaries: `patches/expo-image-picker@57.0.20.patch` strips the unused camera APIs, and `scripts/tests/ios-no-camera.cjs` fails CI if any native dependency references them (Apple rejects such code without a purpose string).
+- [x] Show the Debugging settings, their search entries and the Expo updates link only in development builds (`SHOW_DEBUG_TOOLS` in native-core `lib/constants.ts`), so TestFlight and App Store builds carry no developer tools.
 - [ ] Determine export-compliance requirements for the actual E2EE libraries and launch territories; document the basis for any exemption and supply required documents.
 
 Both apps conservatively declare non-exempt encryption (`ITSAppUsesNonExemptEncryption: true`) pending the owner’s Apple questionnaire and territory/filing determination. This setting does not establish that export compliance is complete. Account deletion already exists in shared native settings and the Rust API; validate it rather than introducing a second deletion flow. [Apple review guidelines](https://developer.apple.com/app-store/review/guidelines/), [App Privacy](https://developer.apple.com/app-store/app-privacy-details/), [Expo privacy manifests](https://docs.expo.dev/guides/apple-privacy/), [Apple encryption declarations](https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance/)

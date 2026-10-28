@@ -25,6 +25,10 @@ export const APP_SCHEME =
   firstScheme(Constants.expoConfig?.scheme) ?? CALENDAR_SCHEME;
 export const AUTH_STORAGE_PREFIX = "solace";
 
+/** Debugging tools ship only in development builds; App Review treats them as unfinished features. */
+export const SHOW_DEBUG_TOOLS =
+  Constants.expoConfig?.extra?.appVariant === "development";
+
 const runtimeEnvironment = getNativeRuntimeEnvironment();
 export const API_BASE_URL = runtimeEnvironment.apiUrl;
 export const APP_BASE_URL = runtimeEnvironment.appUrl;
