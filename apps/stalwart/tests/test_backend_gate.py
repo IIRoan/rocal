@@ -40,6 +40,7 @@ class ProxyV2Upstream:
 
     def __init__(self):
         self.requests = []
+        self.response_headers = []
         self.sock = socket.create_server(("127.0.0.1", 0))
         self.port = self.sock.getsockname()[1]
         threading.Thread(target=self.serve, daemon=True).start()
@@ -55,6 +56,8 @@ class ProxyV2Upstream:
             if header[:12] != PROXY_V2_SIGNATURE:
                 return
             family, length = header[13], struct.unpack("!H", header[14:16])[0]
+            if family not in (0x11, 0x21):
+                return
             addresses = read_exact(conn, length)
             source = (ipaddress.IPv4Address(addresses[:4]) if family == 0x11
                       else ipaddress.IPv6Address(addresses[:16]))
@@ -69,7 +72,9 @@ class ProxyV2Upstream:
                        for k, v in (line.split(":", 1) for line in lines[1:])}
             self.requests.append({"source": str(source), "path": lines[0].split(" ")[1],
                                   "headers": headers})
-            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+            extra_headers = "".join(f"{name}: {value}\r\n" for name, value in self.response_headers)
+            conn.sendall(("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n"
+                          + extra_headers + "\r\nok").encode())
 
 
 @unittest.skipUnless(os.environ.get("HAPROXY_TEST_BINARY"), "set HAPROXY_TEST_BINARY for the gate test")
@@ -83,7 +88,8 @@ class BackendGateTests(unittest.TestCase):
         cls.allow_file = os.path.join(cls.allow_dir.name, "operators")
         with open(cls.allow_file, "w") as handle:
             handle.write("203.0.113.11/32\n2001:db8:1::/64\n")
-        env = {**os.environ, "STALWART_GATE_PORT": str(cls.gate_port),
+        env = {**os.environ, "SOLACE_ADMIN_AUTH_URL": "", "STALWART_GATE_PORT": str(cls.gate_port),
+               "STALWART_GATE_LUA_PATH": str(ROOT / "admin-gate.lua"),
                "STALWART_PUBLIC_PORT": str(cls.public_port),
                "STALWART_ADMIN_ALLOW_FILE": cls.allow_file,
                "STALWART_HTTP_PORT": str(cls.upstream.port),
@@ -181,7 +187,8 @@ class BackendGateTests(unittest.TestCase):
         with open(self.allow_file, "w") as handle:
             handle.write("")
         # HAProxy keeps its parsed rules in memory; a new process must load the empty list.
-        env = {**os.environ, "STALWART_GATE_PORT": str(free_port()),
+        env = {**os.environ, "SOLACE_ADMIN_AUTH_URL": "", "STALWART_GATE_PORT": str(free_port()),
+               "STALWART_GATE_LUA_PATH": str(ROOT / "admin-gate.lua"),
                "STALWART_PUBLIC_PORT": str(free_port()), "STALWART_HTTP_PORT": str(self.upstream.port),
                "STALWART_ADMIN_ALLOW_FILE": self.allow_file,
                "STALWART_GATE_KEY_SHA256": hashlib.sha256(KEY.encode()).hexdigest()}

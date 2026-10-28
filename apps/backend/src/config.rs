@@ -78,6 +78,7 @@ pub struct Config {
     pub stalwart_webhook_secret: Option<String>,
     /// The backend-gate key the Railway Stalwart domain requires (`apps/stalwart/backend-gate.cfg`).
     pub stalwart_gate_key: Option<String>,
+    pub stalwart_admin_user_ids: Vec<String>,
     /// `main.ts` polled every linked mailbox only outside Vercel, so production never did; it stays off unless set, since it widens server-side invite ingestion.
     pub mail_receipt_polling: bool,
     /// `CALENDAR_SYNC=false` keeps a deployment that doesn't serve the API yet from syncing feeds beside the one that does.
@@ -159,6 +160,7 @@ impl Config {
             noreply_email,
             stalwart_webhook_secret: trimmed(&var, "STALWART_WEBHOOK_SECRET"),
             stalwart_gate_key: trimmed(&var, "STALWART_GATE_KEY"),
+            stalwart_admin_user_ids: csv(var("STALWART_ADMIN_USER_IDS").as_deref()),
             mail_receipt_polling: matches!(
                 var("MAIL_RECEIPT_POLLING").as_deref(),
                 Some("1" | "true")

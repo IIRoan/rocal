@@ -15,6 +15,8 @@ RUN apt-get update \
     && chown -R stalwart:stalwart /etc/stalwart /var/lib/stalwart /usr/local/share/stalwart
 
 COPY --chown=stalwart:stalwart backend-gate.cfg /usr/local/share/stalwart/backend-gate.cfg
+COPY --chown=stalwart:stalwart admin-gate.lua /usr/local/share/stalwart/admin-gate.lua
+ENV STALWART_GATE_LUA_PATH=/usr/local/share/stalwart/admin-gate.lua
 COPY --chown=stalwart:stalwart render-admin-allow.py /usr/local/share/stalwart/render-admin-allow.py
 COPY stalwart/plan/16-provisioner-role.ndjson /usr/local/share/stalwart/16-provisioner-role.ndjson
 COPY test-env/plan.ndjson /usr/local/share/stalwart/test-plan.ndjson

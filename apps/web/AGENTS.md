@@ -1,7 +1,7 @@
 Auth uses rolling 14-day app and passkey sessions; Better Auth checks hourly and on focus/reconnect, with renewal cookies forwarded by the API.
 
 Mail uses the API's JMAP proxy; the API and notifications reach Stalwart through its key-gated Railway private endpoint, independently of the VPS mail tunnel.
-Public JMAP at `mail.solace.onl` use Railway HTTPS through the restricted `:8082` gateway; SMTP uses the VPS at `mx.solace.onl`. Users sign in only through Solace; direct Stalwart login and management require the operator IP allowlist.
+Public JMAP at `mail.solace.onl` uses Railway HTTPS through the restricted `:8082` gateway; SMTP uses the VPS at `mx.solace.onl`. Users sign in only through Solace. The operator-only `/admin` entry opens Stalwart on its separate mail origin. With `SOLACE_ADMIN_AUTH_URL` configured, the gateway requires a live Solace session, its existing passkey step-up and an explicit `STALWART_ADMIN_USER_IDS` allowlist before Stalwart's own administrator login; otherwise the legacy operator IP gate applies. Public JMAP keeps its independent Stalwart authentication. This operator tooling has no native screen.
 
 Every backend change ships with a case in the API suite (`crates/solace-api-tests`, root AGENTS §5). The API is Rust (`apps/backend`, plan 001; root AGENTS §3 "Rust backend"): wire types come from `@workspace/api-contracts`, and the known privacy gaps of root AGENTS §2 stay until plan 001 step 7.
 

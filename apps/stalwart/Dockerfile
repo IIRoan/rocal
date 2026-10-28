@@ -24,6 +24,8 @@ RUN apt-get update \
 
 COPY railway-entrypoint.sh /usr/local/bin/railway-entrypoint.sh
 COPY backend-gate.cfg /usr/local/share/stalwart/backend-gate.cfg
+COPY admin-gate.lua /usr/local/share/stalwart/admin-gate.lua
+ENV STALWART_GATE_LUA_PATH=/usr/local/share/stalwart/admin-gate.lua
 COPY render-admin-allow.py /usr/local/share/stalwart/render-admin-allow.py
 COPY stalwart/plan /usr/local/share/stalwart/plan
 COPY stalwart/cli-schema.json /usr/local/share/stalwart/cli-schema.json

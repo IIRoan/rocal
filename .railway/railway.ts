@@ -155,6 +155,7 @@ export default defineRailway(() => {
       PORT: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
       STALWART_ADMIN_ALLOW_IPS: preserve(),
+      SOLACE_ADMIN_AUTH_URL: `http://\${{"Solace API".RAILWAY_PRIVATE_DOMAIN}}:8080/api/internal/stalwart/admin-access`,
       STALWART_GATE_KEY: preserve(),
       STALWART_REDIS_URL: ref(stalwartRedis, "REDIS_URL"),
       // The mail plan signs the ingest webhook with it; the API verifies with the same value.
@@ -213,6 +214,7 @@ export default defineRailway(() => {
         "https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace",
       // The same Stalwart admin token the server itself is configured with.
       STALWART_ADMIN_TOKEN: ref(stalwartMail, "STALWART_ADMIN_TOKEN"),
+      STALWART_ADMIN_USER_IDS: preserve(),
       STALWART_BASE_URL: `http://${ref(stalwartMail, "RAILWAY_PRIVATE_DOMAIN")}:8081`,
       STALWART_GATE_KEY: ref(stalwartMail, "STALWART_GATE_KEY"),
       STALWART_DEFAULT_DOMAIN: "solace.onl",

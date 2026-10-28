@@ -9,9 +9,10 @@ forward locally to Stalwart with PROXY v2 and never log request paths.
 The VPS (`mx.solace.onl` / `193.180.211.139`) owns public SMTP and the outbound relay.
 Railway containers connect outbound over frp for those routes. A tunnel outage can
 delay SMTP delivery while public and private JMAP remain available, including on
-startup: after a bounded tunnel wait, frpc reconnects in the background. Direct Stalwart login and management remain restricted to the operator IP allowlist;
-users sign in through Solace, whose private OAuth bridge stays key-gated. The VPS's
-loopback admin tunnel remains available for recovery.
+startup: after a bounded tunnel wait, frpc reconnects in the background. Users sign
+in through Solace, whose private OAuth bridge stays key-gated. Operators can open
+`https://solace.onl/admin`, which redirects to Stalwart on its separate
+`mail.solace.onl` origin. Its optional Solace session gate is described below.
 
 The Stalwart plan declares `mx.solace.onl` as the default hostname and MX, with
 `mail.solace.onl` explicitly advertised for JMAP. Its automatic DNS publisher must
@@ -115,7 +116,39 @@ Failing apply fails the boot.
 
 DKIM keys rotate through a scheduled `Task/DkimManagement` (`dkimManagement: Automatic`, every 90 days), and `dnsManagement: Automatic` publishes records through the `DnsServer` Cloudflare token. Check `stalwart-cli query Task` shows a pending `DkimManagement`; if none is pending (the 1.0 migration carried none over), create one for domain `b`. Stalwart adds and updates records but never deletes ones it stops advertising. `scripts/stalwart-plan.sh dns-publish` republishes on demand. `SystemSettings.services` advertises only JMAP, the one protocol the edge exposes. Do not flip MTA-STS to `enforce` until TLS-RPT reports arrive.
 
-Admin UI and Stalwart authentication on Railway HTTPS require the same operator networks as the VPS: set `STALWART_ADMIN_ALLOW_IPS` in Railway to match the `mail-vps` Environment's `ADMIN_ALLOW_IP`. Missing or invalid allowlists fail closed. The gateway never logs them. Recovery uses the pinned SSH tunnel: `ssh -N -L 8080:127.0.0.1:8080 USER@mx.solace.onl` then `http://127.0.0.1:8080/admin/`.
+## Operator access
+
+`https://solace.onl/admin` opens `https://mail.solace.onl/admin/`. Set
+`SOLACE_ADMIN_AUTH_URL` on the mail service to the API's private
+`http://solace-api.railway.internal:8080/api/internal/stalwart/admin-access`
+endpoint to require a Solace session before serving the UI or direct Stalwart
+sign-in routes. The API checks the live session, its existing passkey step-up and
+`STALWART_ADMIN_USER_IDS`, a comma-separated allowlist of opaque Solace user IDs.
+An empty allowlist grants nobody access. Ordinary signed-in users cannot open the
+UI. Stalwart still requires its own administrator credentials afterward.
+
+Deploy the API and set its approved IDs before enabling the mail service's auth
+URL. Then deploy the gateway and web entry. The gateway accepts only an exact 204
+authorization response, refuses duplicate session cookies and denies access when
+the authorizer fails; it never falls back to the IP gate when a URL is configured.
+Signed-out entry visits return to Solace login with `/admin` as the return target.
+The gateway sends only the session, persistence preference and passkey cookies to
+the API, forwards renewal cookies to the browser and strips application cookies
+before contacting Stalwart.
+It does not log cookies, credentials or administrator addresses.
+
+Public JMAP, discovery and monitoring do not call this authorizer. JMAP continues
+to validate Stalwart credentials and permissions itself; an existing Stalwart
+administrator bearer remains valid until Stalwart revokes or expires it, even
+after Solace sign-out. This gate protects browser entry and sign-in, and does not
+replace Stalwart's authorization. It is operator tooling with no native screen.
+
+With `SOLACE_ADMIN_AUTH_URL` unset, direct UI and sign-in access retain the legacy
+IP gate: set `STALWART_ADMIN_ALLOW_IPS` to match the VPS `mail-vps` Environment's
+`ADMIN_ALLOW_IP`. Missing or invalid allowlists fail closed. The VPS HTTPS rollback
+route retains its separate operator IP restriction; the new Solace session gate
+applies to Railway HTTPS. For recovery while the Solace API is unavailable, use
+the existing pinned VPS SSH access and Stalwart CLI.
 
 ## Inbound mail (Internet → Stalwart)
 
@@ -249,6 +282,9 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 | `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
 | `FRPC_VERSION` | build | Pins the frpc version used by the Docker build; production currently uses `0.71.1` |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
+| `STALWART_ADMIN_ALLOW_IPS` | legacy | Operator networks permitted when `SOLACE_ADMIN_AUTH_URL` is unset; never used as fallback when it is configured |
+| `SOLACE_ADMIN_AUTH_URL` | no | Private API `/api/internal/stalwart/admin-access` URL; enables the fail-closed Solace session gate for UI and direct sign-in |
+| `STALWART_ADMIN_USER_IDS` | API only | Explicit opaque Solace user IDs allowed through the UI gate; empty grants nobody access |
 | `STALWART_GATE_KEY`             | yes      | Backend gate key (32+ chars); only its SHA-256 reaches HAProxy; missing key fails boot. API and notifications reference the same key and send `X-Solace-Gate` only to their configured HTTPS or Railway-private origin |
 | `STALWART_REDIS_URL` | yes | Private Redis connection for shared transient state and coordination during overlapping mail deployments |
 | `STALWART_WEBHOOK_SECRET` | yes | HMAC key the plan's mail-ingest webhook signs with; missing key fails boot |
