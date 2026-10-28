@@ -36,10 +36,6 @@ local function valid_login_url()
 end
 
 core.register_action("solace_admin_authorize", {"http-req"}, function(txn)
-    if auth_url == "" then
-        txn:set_var("txn.solace_admin_status", "legacy")
-        return
-    end
     txn:set_var("txn.solace_admin_status", "denied")
     if not valid_auth_url() or #gate_key < 32 or not valid_login_url() then return end
     txn:set_var("txn.solace_admin_login_url", login_url .. "?next=%2Fadmin")

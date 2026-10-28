@@ -27,7 +27,8 @@ async fn run(config: Config) -> anyhow::Result<()> {
         .context("connect to the database")?;
     let port = config.port;
     let state = AppState::new(config, db)?;
-    let listener = tokio::net::TcpListener::bind(("0.0.0.0", port)).await?;
+    // Dual-stack: the production Railway environment's private DNS resolves to IPv6 only.
+    let listener = tokio::net::TcpListener::bind(("::", port)).await?;
     tracing::info!(port, "Server is running");
     let calendar_sync = state
         .config

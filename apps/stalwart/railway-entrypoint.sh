@@ -326,10 +326,6 @@ start_stalwart() {
 }
 
 start_gate() {
-	STALWART_ADMIN_ALLOW_FILE="$(mktemp /tmp/stalwart-admin-allow.XXXXXX)"
-	chown stalwart:stalwart "$STALWART_ADMIN_ALLOW_FILE"
-	run_as_stalwart python3 /usr/local/share/stalwart/render-admin-allow.py "$STALWART_ADMIN_ALLOW_FILE" || die "Invalid administrator network allowlist."
-	export STALWART_ADMIN_ALLOW_FILE
 	run_as_stalwart haproxy -db -f /usr/local/share/stalwart/backend-gate.cfg &
 	GATE_PID=$!
 	log info "JMAP gateway pid=${GATE_PID} (private :${STALWART_GATE_PORT}, public :${STALWART_PUBLIC_PORT})."
@@ -556,7 +552,6 @@ cleanup() {
 	for child in "${GATE_PID:-}" "${STALWART_PID:-}" "${HEALTH_PID:-}"; do
 		[ -z "$child" ] || kill "$child" 2>/dev/null || true
 	done
-	[ -z "${STALWART_ADMIN_ALLOW_FILE:-}" ] || rm -f "$STALWART_ADMIN_ALLOW_FILE"
 }
 
 # --- main ---

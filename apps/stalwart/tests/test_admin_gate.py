@@ -21,8 +21,13 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class IPv6HTTPServer(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+
 class LoopbackDns:
-    def __init__(self):
+    def __init__(self, families=(1, 28)):
+        self.families = families
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(("127.0.0.1", 0))
         self.port = self.sock.getsockname()[1]
@@ -42,8 +47,10 @@ class LoopbackDns:
             question = packet[12:end + 4]
             kind = struct.unpack("!H", packet[end:end + 2])[0]
             self.queries.append(kind)
-            address_bytes = socket.inet_aton("127.0.0.1") if kind == 1 else socket.inet_pton(socket.AF_INET6, "::1")
-            answer = b"\xc0\x0c" + struct.pack("!HHIH", kind, 1, 10, len(address_bytes)) + address_bytes
+            answer = b""
+            if kind in self.families:
+                address_bytes = socket.inet_aton("127.0.0.1") if kind == 1 else socket.inet_pton(socket.AF_INET6, "::1")
+                answer = b"\xc0\x0c" + struct.pack("!HHIH", kind, 1, 10, len(address_bytes)) + address_bytes
             response = packet[:2] + struct.pack("!HHHHH", 0x8180, 1, bool(answer), 0, 0)
             self.sock.sendto(response + question + answer, address)
 
@@ -90,13 +97,9 @@ class SolaceAdminGateTests(unittest.TestCase):
         cls.authorizer = ThreadingHTTPServer(("127.0.0.1", 0), Authorizer)
         threading.Thread(target=cls.authorizer.serve_forever, daemon=True).start()
         cls.directory = tempfile.TemporaryDirectory(prefix="solace-admin-session-")
-        cls.allow_file = os.path.join(cls.directory.name, "operators")
-        with open(cls.allow_file, "w") as handle:
-            handle.write("203.0.113.11/32\n2001:db8:1::/64\n")
         cls.env = {**os.environ, "STALWART_GATE_PORT": str(gate_tools.free_port()),
                    "STALWART_PUBLIC_PORT": str(gate_tools.free_port()),
                    "STALWART_GATE_LUA_PATH": str(gate_tools.ROOT / "admin-gate.lua"),
-                   "STALWART_ADMIN_ALLOW_FILE": cls.allow_file,
                    "STALWART_HTTP_PORT": str(cls.upstream.port),
                    "STALWART_GATE_KEY_SHA256": hashlib.sha256(gate_tools.KEY.encode()).hexdigest(),
                    "STALWART_ADMIN_GATE_KEY": gate_tools.KEY,
@@ -204,38 +207,46 @@ class SolaceAdminGateTests(unittest.TestCase):
         cookie = "__Secure-better-auth.session_token=owner; __Secure-better-auth.session_token=other"
         self.assertEqual(self.request("/login", cookie)[0], 404)
 
-    def test_session_mode_still_requires_an_operator_address(self):
+    def test_admin_ui_requires_a_valid_client_address_but_no_operator_network(self):
         before = len(Authorizer.requests)
-        for value in (None, "", "invalid", "198.51.100.1"):
+        for value in (None, "", "invalid"):
             with self.subTest(value=value):
                 self.assertEqual(self.request("/login", "__Secure-better-auth.session_token=owner",
                                               {"X-Real-IP": value})[0], 404)
         self.assertEqual(len(Authorizer.requests), before)
-        for value in ("203.0.113.11", "2001:db8:1::7"):
+        for value in ("198.51.100.1", "203.0.113.11", "2001:db8:1::7"):
             self.assertEqual(self.request("/login", "__Secure-better-auth.session_token=owner",
                                           {"X-Real-IP": value})[0], 200)
             self.assertEqual(self.upstream.requests[-1]["source"], value)
             self.assertEqual(Authorizer.requests[-1]["client_ip"], value)
 
     def test_private_authorizer_hostname_uses_the_configured_dns_resolver(self):
-        dns = LoopbackDns()
-        config = os.path.join(self.directory.name, "dns-gate.cfg")
-        contents = (gate_tools.ROOT / "backend-gate.cfg").read_text()
-        with open(config, "w") as handle:
-            handle.write(contents.replace("parse-resolv-conf", f"nameserver test_dns 127.0.0.1:{dns.port}"))
-        env = {**self.env,
-               "SOLACE_ADMIN_AUTH_URL": f"http://solace-api.railway.internal:{self.authorizer.server_port}/api/internal/stalwart/admin-access",
-               "STALWART_GATE_PORT": str(gate_tools.free_port()),
-               "STALWART_PUBLIC_PORT": str(gate_tools.free_port())}
-        process = self.start_gate(env, config)
-        try:
-            self.assertEqual(self.request("/admin/", "__Secure-better-auth.session_token=owner",
-                                          port=env["STALWART_PUBLIC_PORT"])[0], 200)
-            self.assertIn(1, dns.queries)
-        finally:
-            process.terminate()
-            process.wait(timeout=5)
-            dns.sock.close()
+        ipv6_authorizer = IPv6HTTPServer(("::1", 0), Authorizer)
+        threading.Thread(target=ipv6_authorizer.serve_forever, daemon=True).start()
+        # Railway environments created before 2025-10-16, like production, resolve private names to IPv6 only.
+        for families, port, query in (((1, 28), self.authorizer.server_port, 1),
+                                      ((28,), ipv6_authorizer.server_port, 28)):
+            with self.subTest(families=families):
+                dns = LoopbackDns(families)
+                config = os.path.join(self.directory.name, "dns-gate.cfg")
+                contents = (gate_tools.ROOT / "backend-gate.cfg").read_text()
+                with open(config, "w") as handle:
+                    handle.write(contents.replace("parse-resolv-conf", f"nameserver test_dns 127.0.0.1:{dns.port}"))
+                env = {**self.env,
+                       "SOLACE_ADMIN_AUTH_URL": f"http://solace-api.railway.internal:{port}/api/internal/stalwart/admin-access",
+                       "STALWART_GATE_PORT": str(gate_tools.free_port()),
+                       "STALWART_PUBLIC_PORT": str(gate_tools.free_port())}
+                process = self.start_gate(env, config)
+                try:
+                    self.assertEqual(self.request("/admin/", "__Secure-better-auth.session_token=owner",
+                                                  port=env["STALWART_PUBLIC_PORT"])[0], 200)
+                    self.assertIn(query, dns.queries)
+                finally:
+                    process.terminate()
+                    process.wait(timeout=5)
+                    dns.sock.close()
+        ipv6_authorizer.shutdown()
+        ipv6_authorizer.server_close()
 
     def test_step_up_returns_to_solace_passkey_login(self):
         status, headers = self.request("/admin/", "__Secure-better-auth.session_token=stepup")
@@ -284,7 +295,7 @@ class SolaceAdminGateTests(unittest.TestCase):
         finally:
             self.upstream.response_headers = []
 
-    def test_invalid_auth_origin_fails_closed_even_from_operator_network(self):
+    def test_invalid_auth_origin_fails_closed(self):
         env = {**self.env, "SOLACE_ADMIN_AUTH_URL": "http://attacker.invalid/admin-access",
                "STALWART_GATE_PORT": str(gate_tools.free_port()), "STALWART_PUBLIC_PORT": str(gate_tools.free_port())}
         process = self.start_gate(env)

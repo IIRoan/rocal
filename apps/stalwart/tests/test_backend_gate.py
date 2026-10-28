@@ -84,14 +84,9 @@ class BackendGateTests(unittest.TestCase):
         cls.upstream = ProxyV2Upstream()
         cls.gate_port = free_port()
         cls.public_port = free_port()
-        cls.allow_dir = tempfile.TemporaryDirectory(prefix="solace-admin-allow-")
-        cls.allow_file = os.path.join(cls.allow_dir.name, "operators")
-        with open(cls.allow_file, "w") as handle:
-            handle.write("203.0.113.11/32\n2001:db8:1::/64\n")
         env = {**os.environ, "SOLACE_ADMIN_AUTH_URL": "", "STALWART_GATE_PORT": str(cls.gate_port),
                "STALWART_GATE_LUA_PATH": str(ROOT / "admin-gate.lua"),
                "STALWART_PUBLIC_PORT": str(cls.public_port),
-               "STALWART_ADMIN_ALLOW_FILE": cls.allow_file,
                "STALWART_HTTP_PORT": str(cls.upstream.port),
                "STALWART_GATE_KEY_SHA256": hashlib.sha256(KEY.encode()).hexdigest()}
         cls.gate = subprocess.Popen([os.environ["HAPROXY_TEST_BINARY"], "-db", "-f",
@@ -108,7 +103,6 @@ class BackendGateTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.gate.terminate()
         cls.gate.wait(timeout=5)
-        cls.allow_dir.cleanup()
 
     def request(self, path, method="GET", key=KEY, headers=None, public=False):
         all_headers = dict(headers or {})
@@ -175,42 +169,13 @@ class BackendGateTests(unittest.TestCase):
         self.assertEqual(self.request("/jmap/session", headers={"X-Real-IP": "2001:db8::9"}, public=True), 200)
         self.assertEqual(self.upstream.requests[before]["source"], "2001:db8::9")
 
-    def test_direct_stalwart_login_requires_the_operator_network(self):
-        for source in ("203.0.113.11", "2001:db8:1::9"):
+    def test_unconfigured_session_gate_denies_direct_stalwart_login(self):
+        for headers in ({}, {"X-Real-IP": "203.0.113.11"}, {"X-Real-IP": "2001:db8:1::9"},
+                        {"X-Real-IP": "invalid"}, {"X-Forwarded-For": "203.0.113.11"}):
             for path in ("/login", "/admin", "/account", "/api/auth", "/auth/token"):
-                self.assertEqual(self.request(path, headers={"X-Real-IP": source}, key=None, public=True), 200)
-        for headers in ({}, {"X-Real-IP": "203.0.113.12"}, {"X-Real-IP": "invalid"},
-                        {"X-Forwarded-For": "203.0.113.11"}):
-            self.assertEqual(self.request("/login", headers=headers, public=True), 404)
-
-    def test_empty_operator_allowlist_denies_direct_login(self):
-        with open(self.allow_file, "w") as handle:
-            handle.write("")
-        # HAProxy keeps its parsed rules in memory; a new process must load the empty list.
-        env = {**os.environ, "SOLACE_ADMIN_AUTH_URL": "", "STALWART_GATE_PORT": str(free_port()),
-               "STALWART_GATE_LUA_PATH": str(ROOT / "admin-gate.lua"),
-               "STALWART_PUBLIC_PORT": str(free_port()), "STALWART_HTTP_PORT": str(self.upstream.port),
-               "STALWART_ADMIN_ALLOW_FILE": self.allow_file,
-               "STALWART_GATE_KEY_SHA256": hashlib.sha256(KEY.encode()).hexdigest()}
-        gate = subprocess.Popen([os.environ["HAPROXY_TEST_BINARY"], "-db", "-f", str(ROOT / "backend-gate.cfg")], env=env)
-        try:
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline:
-                try:
-                    req = urllib.request.Request(f'http://127.0.0.1:{env["STALWART_PUBLIC_PORT"]}/login',
-                                                 headers={"X-Real-IP": "203.0.113.11"})
-                    urllib.request.urlopen(req, timeout=1)
-                    self.fail("empty allowlist granted administrator access")
-                except urllib.error.HTTPError as error:
-                    self.assertEqual(error.code, 404)
-                    break
-                except urllib.error.URLError:
-                    time.sleep(0.05)
-            else:
-                self.fail("gateway did not start")
-        finally:
-            gate.terminate()
-            gate.wait(timeout=5)
+                before = len(self.upstream.requests)
+                self.assertEqual(self.request(path, headers=headers, key=None, public=True), 404, path)
+                self.assertEqual(len(self.upstream.requests), before, path)
 
     def test_vps_rollback_route_also_blocks_direct_user_authentication(self):
         with tempfile.TemporaryDirectory(prefix="solace-vps-auth-") as tmp:

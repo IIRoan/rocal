@@ -157,7 +157,6 @@ export default defineRailway(() => {
       PGUSER: ref(postgresStalwart, "PGUSER"),
       PORT: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
-      STALWART_ADMIN_ALLOW_IPS: preserve(),
       SOLACE_ADMIN_AUTH_URL: preserve(),
       SOLACE_ADMIN_LOGIN_URL: `${fromApi("FRONTEND_URL")}/login`,
       STALWART_ADMIN_GATE_KEY: preserve(),
