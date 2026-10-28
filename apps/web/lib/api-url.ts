@@ -80,7 +80,16 @@ const toSafeRelativePath = (path?: string | null) => {
     return AUTH_REDIRECT_FALLBACK_PATH;
   }
 
-  return path;
+  // `//host`, `/\host` and tab-split variants start with "/" yet resolve to another origin.
+  try {
+    const appOrigin = new URL(getAppBaseUrl()).origin;
+    const target = new URL(path, appOrigin);
+    return target.origin === appOrigin
+      ? `${target.pathname}${target.search}${target.hash}`
+      : AUTH_REDIRECT_FALLBACK_PATH;
+  } catch {
+    return AUTH_REDIRECT_FALLBACK_PATH;
+  }
 };
 
 const toOrigin = (value?: string | null) => {

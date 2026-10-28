@@ -210,7 +210,9 @@ function withExtensionTarget(config, props) {
       buildSettings.CURRENT_PROJECT_VERSION =
         mod.ios?.buildNumber ?? String(settings.initialBuildNumber);
       buildSettings.SWIFT_VERSION = "5.0";
-      buildSettings.TARGETED_DEVICE_FAMILY = `"1,2"`;
+      buildSettings.TARGETED_DEVICE_FAMILY = mod.ios?.supportsTablet
+        ? `"1,2"`
+        : `"1"`;
       buildSettings.GENERATE_INFOPLIST_FILE = "NO";
       if (mod.ios?.appleTeamId) {
         buildSettings.DEVELOPMENT_TEAM = mod.ios.appleTeamId;

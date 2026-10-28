@@ -180,9 +180,9 @@ export default function PrivacyPage() {
             Vercel serves the web app. Railway hosts the API, databases, mail
             service, notification worker and stored profile pictures. Expo
             provides native app builds and over-the-air software updates. Apple
-            delivers iPhone and iPad notifications through APNs. These providers
-            process the information needed to host or deliver the service,
-            including connection metadata.
+            delivers iPhone notifications through APNs. These providers process
+            the information needed to host or deliver the service, including
+            connection metadata.
           </p>
           <p className="mt-3">
             Notification payloads use opaque event or message references;

@@ -32,7 +32,7 @@ const answers = [
   {
     question: "How do I change notification permissions?",
     answer:
-      "Change reminder preferences in Notifications in the account drawer. On iPhone or iPad, also check the app’s notification permissions in system Settings. Calendar reminders belong to Calendar; new-mail alerts belong to Mail. Both apps remain usable when notifications are denied.",
+      "Change reminder preferences in Notifications in the account drawer. On iPhone, also check the app’s notification permissions in system Settings. Calendar reminders belong to Calendar; new-mail alerts belong to Mail. Both apps remain usable when notifications are denied.",
   },
   {
     question: "How do I delete my account?",

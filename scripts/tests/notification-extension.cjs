@@ -68,8 +68,17 @@ async function main() {
       "utf8",
     );
     assert.match(manifest, /NSPrivacyTracking<\/key>\s*<false\/>/);
+    const extensionConfigurations = () =>
+      Object.values(project.pbxXCBuildConfigurationSection()).filter(
+        (value) =>
+          value.buildSettings?.PRODUCT_NAME === '"' + plugin.TARGET_NAME + '"',
+      );
+    for (const { buildSettings } of extensionConfigurations()) {
+      assert.equal(buildSettings.TARGETED_DEVICE_FAMILY, '"1"');
+    }
     config.version = "1.0.2";
     config.ios.buildNumber = "28";
+    config.ios.supportsTablet = true;
     await config.mods.ios.dangerous({ ...config, modRequest: request });
     await config.mods.ios.xcodeproj({
       ...config,
@@ -87,6 +96,7 @@ async function main() {
     for (const { buildSettings } of configurations) {
       assert.equal(buildSettings.MARKETING_VERSION, "1.0.2");
       assert.equal(buildSettings.CURRENT_PROJECT_VERSION, "28");
+      assert.equal(buildSettings.TARGETED_DEVICE_FAMILY, '"1,2"');
     }
     const info = await fs.readFile(
       path.join(

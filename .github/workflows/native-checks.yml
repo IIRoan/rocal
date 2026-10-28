@@ -28,7 +28,7 @@ jobs:
           cd apps/native-calendar && bunx expo install --check
           cd ../native-mail && bunx expo install --check
       - run: bun run check:rules
-      - run: python3 -B -m unittest discover -s scripts/tests -p 'test_ios_release.py' -v
+      - run: node scripts/tests/notification-extension.cjs
       - run: bun run --cwd packages/native-core lint && bun run --cwd apps/native-calendar lint && bun run --cwd apps/native-mail lint
       - run: bun run typecheck:native
       - run: bun run test:native

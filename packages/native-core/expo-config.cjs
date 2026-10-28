@@ -77,10 +77,18 @@ function createNativeExpoConfig(app, environment = process.env) {
       url: `https://u.expo.dev/${projectId}`,
     },
     ios: {
-      supportsTablet: true,
+      supportsTablet: settings.iosSupportsTablet,
       bundleIdentifier,
       buildNumber: String(settings.initialBuildNumber),
-      infoPlist: { ITSAppUsesNonExemptEncryption: false },
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: settings.iosUsesNonExemptEncryption,
+        ...(environment.SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE?.trim()
+          ? {
+              ITSEncryptionExportComplianceCode:
+                environment.SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE.trim(),
+            }
+          : {}),
+      },
       privacyManifests: {
         NSPrivacyTracking: false,
         NSPrivacyTrackingDomains: [],

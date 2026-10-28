@@ -1,14 +1,11 @@
 {
   "owner": "astralgrove",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "easCliVersion": "24.6.0",
   "initialBuildNumber": 1,
   "iosDeploymentTarget": "16.4",
-  "iosStoreRequirements": {
-    "minimumXcodeMajor": 26,
-    "minimumSdkMajor": 26,
-    "verifiedOn": "2026-10-28"
-  },
+  "iosSupportsTablet": false,
+  "iosUsesNonExemptEncryption": true,
   "notificationExtensionTargetName": "SolaceNotificationService",
   "notificationExtensionBundleSuffix": "NotificationService",
   "notificationKeychainService": "onl.solace.notification-extension",

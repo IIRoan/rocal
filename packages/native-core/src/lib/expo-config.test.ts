@@ -5,6 +5,22 @@ import {
 
 describe("shared native Expo configuration", () => {
   it.each(["calendar", "mail"] as const)(
+    "uses the shared iPhone and encryption declarations in %s",
+    (app) => {
+      const config = createNativeExpoConfig(app, {});
+      expect(config.ios?.supportsTablet).toBe(false);
+      expect(config.ios?.infoPlist?.ITSAppUsesNonExemptEncryption).toBe(true);
+      expect(
+        config.ios?.infoPlist?.ITSEncryptionExportComplianceCode,
+      ).toBeUndefined();
+      expect(
+        createNativeExpoConfig(app, {
+          SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE: " issued-code ",
+        }).ios?.infoPlist?.ITSEncryptionExportComplianceCode,
+      ).toBe("issued-code");
+    },
+  );
+  it.each(["calendar", "mail"] as const)(
     "declares no tracking in the %s app manifest",
     (app) => {
       expect(createNativeExpoConfig(app, {}).ios?.privacyManifests).toEqual({
