@@ -118,37 +118,71 @@ DKIM keys rotate through a scheduled `Task/DkimManagement` (`dkimManagement: Aut
 
 ## Operator access
 
-`https://solace.onl/admin` opens `https://mail.solace.onl/admin/`. Set
-`SOLACE_ADMIN_AUTH_URL` on the mail service to the API's private
-`http://solace-api.railway.internal:8080/api/internal/stalwart/admin-access`
-endpoint to require a Solace session before serving the UI or direct Stalwart
-sign-in routes. The API checks the live session, its existing passkey step-up and
-`STALWART_ADMIN_USER_IDS`, a comma-separated allowlist of opaque Solace user IDs.
-An empty allowlist grants nobody access. Ordinary signed-in users cannot open the
-UI. Stalwart still requires its own administrator credentials afterward.
+Set the web server's `STALWART_ADMIN_URL` to that environment's Stalwart
+`https://<mail-host>/admin/` URL. `/admin` redirects only to this configured target;
+an unset value returns 404. HTTPS is required except for local loopback HTTP.
+Credentials, query strings and fragments are refused. Configure
+`SOLACE_ADMIN_LOGIN_URL` on the mail service to the same environment's Solace
+`https://<app-host>/login` URL. Local and preview instances have no implicit
+production redirect. Use hosts that share the Solace session cookie domain; for
+local HTTP, use `localhost` consistently and set `SOLACE_ADMIN_SESSION_COOKIE` to
+`better-auth.session_token`. Configure `SOLACE_ADMIN_STEP_UP_COOKIE` too if the API
+uses a custom cookie prefix.
 
-Deploy the API and set its approved IDs before enabling the mail service's auth
-URL. Then deploy the gateway and web entry. The gateway accepts only an exact 204
-authorization response, refuses duplicate session cookies and denies access when
-the authorizer fails; it never falls back to the IP gate when a URL is configured.
-Signed-out entry visits return to Solace login with `/admin` as the return target.
-The gateway sends only the session, persistence preference and passkey cookies to
-the API, forwards renewal cookies to the browser and strips application cookies
-before contacting Stalwart.
-It does not log cookies, credentials or administrator addresses.
+The Railway gateway always requires a valid edge-supplied `X-Real-IP` in
+`STALWART_ADMIN_ALLOW_IPS` for UI and direct Stalwart sign-in. Enabling Solace
+sessions adds an authorization check and never replaces that network restriction.
+Stalwart still requires its own administrator credentials. The existing account
+passkey checks apply; this feature does not change password recovery or passkey
+enrollment privileges.
 
-Public JMAP, discovery and monitoring do not call this authorizer. JMAP continues
-to validate Stalwart credentials and permissions itself; an existing Stalwart
-administrator bearer remains valid until Stalwart revokes or expires it, even
-after Solace sign-out. This gate protects browser entry and sign-in, and does not
-replace Stalwart's authorization. It is operator tooling with no native screen.
+Session mode is opt-in. IaC preserves `SOLACE_ADMIN_AUTH_URL` without assigning a
+value, so applying the file does not enable it. Before enabling it:
 
-With `SOLACE_ADMIN_AUTH_URL` unset, direct UI and sign-in access retain the legacy
-IP gate: set `STALWART_ADMIN_ALLOW_IPS` to match the VPS `mail-vps` Environment's
-`ADMIN_ALLOW_IP`. Missing or invalid allowlists fail closed. The VPS HTTPS rollback
-route retains its separate operator IP restriction; the new Solace session gate
-applies to Railway HTTPS. For recovery while the Solace API is unavailable, use
-the existing pinned VPS SSH access and Stalwart CLI.
+1. Select the operator's opaque Solace user IDs and set `STALWART_ADMIN_USER_IDS`
+   on the API. An empty list grants nobody access.
+2. Set a random `STALWART_ADMIN_GATE_KEY` of at least 32 bytes on the mail service
+   and reference the same secret from the API. The key is server-only and never
+   belongs in the web environment or a `NEXT_PUBLIC_*` variable.
+3. Deploy the API endpoint and gateway with session mode still disabled. Verify
+   the operator networks and both environment-specific redirect targets.
+4. Check the API's actual listening `PORT` and private hostname. If necessary,
+   explicitly set `PORT` to the value its Railway domain already targets. Use
+   `http://<API_PRIVATE_HOST>:<API_PORT>/api/internal/stalwart/admin-access` for
+   the authorizer; there is no assumed port 8080. A Railway reference may use
+   `${{"Solace API".RAILWAY_PRIVATE_DOMAIN}}` and `${{"Solace API".PORT}}` once
+   `PORT` is explicitly configured.
+5. Verify that the keyed authorizer returns 204 for the approved live session,
+   refuses other accounts and missing credentials, then set
+   `SOLACE_ADMIN_AUTH_URL` to that verified private URL. Validate the full browser
+   login from an approved network.
+
+The API verifies the gateway key in constant time and rate-limits each forwarded
+client address to 240 checks per minute before looking up a session. Public
+callers without the key receive 404 regardless of their account. The gateway
+accepts only an exact 204, refuses duplicate authentication cookies and fails
+closed for unavailable or malformed configuration. Missing or invalid operator
+addresses are denied before any authorizer call. The client address reaches both
+the authorizer's limiter and Stalwart's own login protections.
+
+The HTTP client prefers IPv4 to match the API listener, disables retries and uses
+a one-second server timeout with a 500 ms connection timeout. Lua has a one-second
+execution budget and one state per HAProxy thread. Public requests without cookies
+and responses without cookies skip cookie-processing actions. Authorization is
+checked on every protected request so session revocation takes effect immediately;
+there is no allow-cache that can outlive sign-out.
+
+Only the session, persistence preference and passkey cookies go to the API. Renewal
+cookies return to the browser; application cookies and gateway credentials never
+reach Stalwart. No cookie, credential, upstream body or administrator address is
+logged by these actions.
+
+Public JMAP, discovery and monitoring remain independent of this authorizer and
+retain Stalwart's own authentication and permissions. Existing administrator
+bearers remain valid until Stalwart revokes or expires them; Solace sign-out does
+not revoke those tokens. The VPS HTTPS rollback route keeps its separate operator
+IP restriction. Pinned VPS SSH access and the Stalwart CLI remain the recovery path
+while the Solace API is unavailable. This is operator tooling with no native screen.
 
 ## Inbound mail (Internet → Stalwart)
 
@@ -282,8 +316,11 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 | `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
 | `FRPC_VERSION` | build | Pins the frpc version used by the Docker build; production currently uses `0.71.1` |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
-| `STALWART_ADMIN_ALLOW_IPS` | legacy | Operator networks permitted when `SOLACE_ADMIN_AUTH_URL` is unset; never used as fallback when it is configured |
-| `SOLACE_ADMIN_AUTH_URL` | no | Private API `/api/internal/stalwart/admin-access` URL; enables the fail-closed Solace session gate for UI and direct sign-in |
+| `STALWART_ADMIN_ALLOW_IPS` | yes | Operator networks required in both legacy and session modes; missing or invalid addresses fail closed |
+| `SOLACE_ADMIN_AUTH_URL` | opt-in | Verified private API URL including its actual port; kept unset until the key, operator IDs and targets are configured |
+| `SOLACE_ADMIN_LOGIN_URL` | session mode | Environment-specific Solace `/login` URL; HTTPS except loopback HTTP |
+| `STALWART_ADMIN_GATE_KEY` | session mode | Shared server-only random key of at least 32 bytes; the API references the mail service value |
+| `STALWART_ADMIN_URL` | web only | Environment-specific Stalwart `/admin/` target; unset disables the web entry |
 | `STALWART_ADMIN_USER_IDS` | API only | Explicit opaque Solace user IDs allowed through the UI gate; empty grants nobody access |
 | `STALWART_GATE_KEY`             | yes      | Backend gate key (32+ chars); only its SHA-256 reaches HAProxy; missing key fails boot. API and notifications reference the same key and send `X-Solace-Gate` only to their configured HTTPS or Railway-private origin |
 | `STALWART_REDIS_URL` | yes | Private Redis connection for shared transient state and coordination during overlapping mail deployments |

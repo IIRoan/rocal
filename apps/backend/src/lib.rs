@@ -98,6 +98,10 @@ fn router(state: AppState) -> Router {
             state.clone(),
             auth::pipeline::middleware,
         ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            mail_admin::guard,
+        ))
         .layer(middleware::from_fn(http::response_cookies::middleware))
         .layer(middleware::from_fn_with_state(
             state.clone(),

@@ -1,4 +1,6 @@
 local auth_url = os.getenv("SOLACE_ADMIN_AUTH_URL") or ""
+local gate_key = os.getenv("STALWART_ADMIN_GATE_KEY") or ""
+local login_url = os.getenv("SOLACE_ADMIN_LOGIN_URL") or ""
 local session_name = os.getenv("SOLACE_ADMIN_SESSION_COOKIE") or "__Secure-better-auth.session_token"
 local step_up_name = os.getenv("SOLACE_ADMIN_STEP_UP_COOKIE") or "solace-passkey-step-up"
 local session_prefix = session_name:match("^(.+%.)[^.]+$") or session_name
@@ -28,13 +30,19 @@ local function valid_auth_url()
     return host and (host == "127.0.0.1" or host:match("^[%w.-]+%.railway%.internal$"))
 end
 
+local function valid_login_url()
+    local scheme, host, port = login_url:match("^(https?)://([%w.-]+):?(%d*)/login$")
+    return scheme == "https" or (scheme == "http" and port ~= "" and (host == "127.0.0.1" or host == "localhost"))
+end
+
 core.register_action("solace_admin_authorize", {"http-req"}, function(txn)
     if auth_url == "" then
         txn:set_var("txn.solace_admin_status", "legacy")
         return
     end
     txn:set_var("txn.solace_admin_status", "denied")
-    if not valid_auth_url() then return end
+    if not valid_auth_url() or #gate_key < 32 or not valid_login_url() then return end
+    txn:set_var("txn.solace_admin_login_url", login_url .. "?next=%2Fadmin")
     local selected, seen = {}, {}
     for _, cookie in ipairs(cookies(txn)) do
         if cookie[1] == session_name or cookie[1] == step_up_name or cookie[1] == remember_name then
@@ -50,12 +58,18 @@ core.register_action("solace_admin_authorize", {"http-req"}, function(txn)
     local ok, response = pcall(function()
         return core.httpclient():get({
             url = auth_url,
-            headers = {cookie = {table.concat(selected, "; ")}},
+            headers = {
+                cookie = {table.concat(selected, "; ")},
+                ["x-solace-admin-gate"] = {gate_key},
+                ["x-real-ip"] = {txn.f:req_hdr("x-real-ip")},
+            },
             timeout = 1000,
         })
     end)
     if not ok or not response then return end
-    txn:set_priv({auth_cookies = (response.headers or {})["set-cookie"] or {}})
+    local auth_cookies = (response.headers or {})["set-cookie"] or {}
+    txn:set_priv({auth_cookies = auth_cookies})
+    txn:set_var("txn.solace_auth_cookies", next(auth_cookies) ~= nil)
     local status = ({[204] = "allowed", [401] = "login", [403] = "step_up"})[response.status]
     txn:set_var("txn.solace_admin_status", status or "denied")
 end)

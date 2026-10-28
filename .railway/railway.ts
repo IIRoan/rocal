@@ -114,6 +114,9 @@ export default defineRailway(() => {
     },
   });
 
+  // The reference as Railway stores it: `ref()` writes the service name quoted, then reads that back as a change on every plan.
+  const fromApi = (name: string) => `\${{"Solace API".${name}}}`;
+
   const stalwartMail = service("stalwart-mail", {
     source: stalwartRepo,
     build: {
@@ -155,7 +158,9 @@ export default defineRailway(() => {
       PORT: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
       STALWART_ADMIN_ALLOW_IPS: preserve(),
-      SOLACE_ADMIN_AUTH_URL: `http://\${{"Solace API".RAILWAY_PRIVATE_DOMAIN}}:8080/api/internal/stalwart/admin-access`,
+      SOLACE_ADMIN_AUTH_URL: preserve(),
+      SOLACE_ADMIN_LOGIN_URL: `${fromApi("FRONTEND_URL")}/login`,
+      STALWART_ADMIN_GATE_KEY: preserve(),
       STALWART_GATE_KEY: preserve(),
       STALWART_REDIS_URL: ref(stalwartRedis, "REDIS_URL"),
       // The mail plan signs the ingest webhook with it; the API verifies with the same value.
@@ -163,8 +168,6 @@ export default defineRailway(() => {
     },
   });
 
-  // The reference as Railway stores it: `ref()` writes the service name quoted, then reads that back as a change on every plan.
-  const fromApi = (name: string) => `\${{"Solace API".${name}}}`;
   const api = service("Solace API", {
     source: solaceRepo,
     build: {
@@ -215,6 +218,7 @@ export default defineRailway(() => {
       // The same Stalwart admin token the server itself is configured with.
       STALWART_ADMIN_TOKEN: ref(stalwartMail, "STALWART_ADMIN_TOKEN"),
       STALWART_ADMIN_USER_IDS: preserve(),
+      STALWART_ADMIN_GATE_KEY: preserve(),
       STALWART_BASE_URL: `http://${ref(stalwartMail, "RAILWAY_PRIVATE_DOMAIN")}:8081`,
       STALWART_GATE_KEY: ref(stalwartMail, "STALWART_GATE_KEY"),
       STALWART_DEFAULT_DOMAIN: "solace.onl",

@@ -42,26 +42,32 @@ class LoopbackDns:
             question = packet[12:end + 4]
             kind = struct.unpack("!H", packet[end:end + 2])[0]
             self.queries.append(kind)
-            answer = (b"\xc0\x0c" + struct.pack("!HHIH", 1, 1, 10, 4)
-                      + socket.inet_aton("127.0.0.1")) if kind == 1 else b""
+            address_bytes = socket.inet_aton("127.0.0.1") if kind == 1 else socket.inet_pton(socket.AF_INET6, "::1")
+            answer = b"\xc0\x0c" + struct.pack("!HHIH", kind, 1, 10, len(address_bytes)) + address_bytes
             response = packet[:2] + struct.pack("!HHHHH", 0x8180, 1, bool(answer), 0, 0)
             self.sock.sendto(response + question + answer, address)
 
 
 class Authorizer(BaseHTTPRequestHandler):
     requests = []
+    slow_started = threading.Event()
 
     def do_GET(self):
         cookie = self.headers.get("Cookie", "")
         self.requests.append({"path": self.path, "cookie": cookie,
-                              "authorization": self.headers.get("Authorization")})
-        if "session_token=timeout" in cookie:
+                              "authorization": self.headers.get("Authorization"),
+                              "gate": self.headers.get("X-Solace-Admin-Gate"),
+                              "client_ip": self.headers.get("X-Real-IP")})
+        if "session_token=timeout" in cookie or "session_token=slow-owner" in cookie:
+            self.slow_started.set()
             time.sleep(3)
-        code = 204 if "session_token=owner" in cookie else 404
+        code = 204 if "session_token=owner" in cookie or "session_token=slow-owner" in cookie else 404
         for value, status in [("expired", 401), ("stepup", 403), ("unavailable", 503),
                               ("redirect", 302), ("ok200", 200)]:
             if f"session_token={value}" in cookie:
                 code = status
+        if self.headers.get("X-Solace-Admin-Gate") != gate_tools.KEY:
+            code = 404
         self.send_response(code)
         if code == 204:
             self.send_header("Set-Cookie", "__Secure-better-auth.session_token=renewed; HttpOnly; Secure")
@@ -86,13 +92,15 @@ class SolaceAdminGateTests(unittest.TestCase):
         cls.directory = tempfile.TemporaryDirectory(prefix="solace-admin-session-")
         cls.allow_file = os.path.join(cls.directory.name, "operators")
         with open(cls.allow_file, "w") as handle:
-            handle.write("203.0.113.11/32\n")
+            handle.write("203.0.113.11/32\n2001:db8:1::/64\n")
         cls.env = {**os.environ, "STALWART_GATE_PORT": str(gate_tools.free_port()),
                    "STALWART_PUBLIC_PORT": str(gate_tools.free_port()),
                    "STALWART_GATE_LUA_PATH": str(gate_tools.ROOT / "admin-gate.lua"),
                    "STALWART_ADMIN_ALLOW_FILE": cls.allow_file,
                    "STALWART_HTTP_PORT": str(cls.upstream.port),
                    "STALWART_GATE_KEY_SHA256": hashlib.sha256(gate_tools.KEY.encode()).hexdigest(),
+                   "STALWART_ADMIN_GATE_KEY": gate_tools.KEY,
+                   "SOLACE_ADMIN_LOGIN_URL": "https://app.solace.test/login",
                    "SOLACE_ADMIN_AUTH_URL": f"http://127.0.0.1:{cls.authorizer.server_port}/api/internal/stalwart/admin-access"}
         cls.gate = cls.start_gate(cls.env)
 
@@ -121,7 +129,8 @@ class SolaceAdminGateTests(unittest.TestCase):
         cls.directory.cleanup()
 
     def request(self, path, cookie=None, headers=None, port=None):
-        headers = dict(headers or {})
+        headers = {"X-Real-IP": "203.0.113.11", **(headers or {})}
+        headers = {key: value for key, value in headers.items() if value is not None}
         if cookie:
             headers["Cookie"] = cookie
         url = f'http://127.0.0.1:{port or self.env["STALWART_PUBLIC_PORT"]}{path}'
@@ -137,7 +146,7 @@ class SolaceAdminGateTests(unittest.TestCase):
         before = len(self.upstream.requests)
         status, headers = self.request("/admin/")
         self.assertEqual(status, 302)
-        self.assertEqual(headers["Location"], "https://solace.onl/login?next=%2Fadmin")
+        self.assertEqual(headers["Location"], "https://app.solace.test/login?next=%2Fadmin")
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertEqual(len(self.upstream.requests), before)
 
@@ -147,6 +156,45 @@ class SolaceAdminGateTests(unittest.TestCase):
                 self.assertEqual(self.request("/login", f"__Secure-better-auth.session_token={value}")[0], 404)
         self.assertEqual(self.request("/login", "__Secure-better-auth.session_token=owner")[0], 200)
 
+    def test_authorization_deadline_refuses_a_late_success(self):
+        before = len(self.upstream.requests)
+        start = time.monotonic()
+        status, _ = self.request("/login", "__Secure-better-auth.session_token=slow-owner")
+        self.assertEqual(status, 404)
+        self.assertLess(time.monotonic() - start, 1.8)
+        self.assertEqual(len(self.upstream.requests), before)
+
+    def test_public_jmap_is_responsive_during_slow_admin_authorization(self):
+        Authorizer.slow_started.clear()
+        worker = threading.Thread(target=lambda: self.request("/login", "__Secure-better-auth.session_token=slow-owner"))
+        worker.start()
+        try:
+            self.assertTrue(Authorizer.slow_started.wait(timeout=2))
+            start = time.monotonic()
+            self.assertEqual(self.request("/jmap/session")[0], 200)
+            self.assertLess(time.monotonic() - start, 0.8)
+        finally:
+            worker.join(timeout=7)
+        self.assertFalse(worker.is_alive())
+
+    def test_http_timeout_does_not_depend_on_the_lua_execution_budget(self):
+        config = os.path.join(self.directory.name, "timeout-gate.cfg")
+        contents = (gate_tools.ROOT / "backend-gate.cfg").read_text()
+        with open(config, "w") as handle:
+            handle.write(contents.replace("tune.lua.session-timeout 1s", "tune.lua.session-timeout 10s"))
+        env = {**self.env, "STALWART_GATE_PORT": str(gate_tools.free_port()),
+               "STALWART_PUBLIC_PORT": str(gate_tools.free_port())}
+        process = self.start_gate(env, config)
+        try:
+            start = time.monotonic()
+            status, _ = self.request("/login", "__Secure-better-auth.session_token=slow-owner",
+                                     port=env["STALWART_PUBLIC_PORT"])
+            self.assertEqual(status, 404)
+            self.assertLess(time.monotonic() - start, 1.8)
+        finally:
+            process.terminate()
+            process.wait(timeout=5)
+
     def test_operator_ip_and_client_headers_do_not_bypass_solace_auth(self):
         for headers in ({"X-Real-IP": "203.0.113.11"}, {"X-Forwarded-For": "203.0.113.11"},
                         {"X-Solace-Admin": "allowed", "X-Solace-Gate": gate_tools.KEY}):
@@ -155,6 +203,19 @@ class SolaceAdminGateTests(unittest.TestCase):
     def test_duplicate_session_cookie_is_refused(self):
         cookie = "__Secure-better-auth.session_token=owner; __Secure-better-auth.session_token=other"
         self.assertEqual(self.request("/login", cookie)[0], 404)
+
+    def test_session_mode_still_requires_an_operator_address(self):
+        before = len(Authorizer.requests)
+        for value in (None, "", "invalid", "198.51.100.1"):
+            with self.subTest(value=value):
+                self.assertEqual(self.request("/login", "__Secure-better-auth.session_token=owner",
+                                              {"X-Real-IP": value})[0], 404)
+        self.assertEqual(len(Authorizer.requests), before)
+        for value in ("203.0.113.11", "2001:db8:1::7"):
+            self.assertEqual(self.request("/login", "__Secure-better-auth.session_token=owner",
+                                          {"X-Real-IP": value})[0], 200)
+            self.assertEqual(self.upstream.requests[-1]["source"], value)
+            self.assertEqual(Authorizer.requests[-1]["client_ip"], value)
 
     def test_private_authorizer_hostname_uses_the_configured_dns_resolver(self):
         dns = LoopbackDns()
@@ -179,7 +240,7 @@ class SolaceAdminGateTests(unittest.TestCase):
     def test_step_up_returns_to_solace_passkey_login(self):
         status, headers = self.request("/admin/", "__Secure-better-auth.session_token=stepup")
         self.assertEqual(status, 302)
-        self.assertEqual(headers["Location"], "https://solace.onl/login?next=%2Fadmin&stepUp=1")
+        self.assertEqual(headers["Location"], "https://app.solace.test/login?next=%2Fadmin&stepUp=1")
 
     def test_application_cookies_and_stalwart_credentials_stay_separate(self):
         before = len(self.upstream.requests)
@@ -191,6 +252,7 @@ class SolaceAdminGateTests(unittest.TestCase):
         self.assertEqual(authorized["path"], "/api/internal/stalwart/admin-access")
         self.assertEqual(authorized["cookie"], "__Secure-better-auth.session_token=owner; solace-passkey-step-up=verified")
         self.assertIsNone(authorized["authorization"])
+        self.assertEqual(authorized["gate"], gate_tools.KEY)
         forwarded = self.upstream.requests[before]["headers"]
         self.assertEqual(forwarded["cookie"], "stalwart-login=preserved")
         self.assertEqual(forwarded["authorization"], "Bearer stalwart-token")
@@ -232,3 +294,19 @@ class SolaceAdminGateTests(unittest.TestCase):
         finally:
             process.terminate()
             process.wait(timeout=5)
+
+    def test_missing_gateway_key_or_unsafe_login_target_never_calls_the_api(self):
+        for overrides in ({"STALWART_ADMIN_GATE_KEY": ""},
+                          {"SOLACE_ADMIN_LOGIN_URL": "javascript:alert(1)"},
+                          {"SOLACE_ADMIN_LOGIN_URL": "https://user:secret@app.solace.test/login"}):
+            env = {**self.env, **overrides, "STALWART_GATE_PORT": str(gate_tools.free_port()),
+                   "STALWART_PUBLIC_PORT": str(gate_tools.free_port())}
+            process = self.start_gate(env)
+            before = len(Authorizer.requests)
+            try:
+                self.assertEqual(self.request("/admin/", "__Secure-better-auth.session_token=owner",
+                                              port=env["STALWART_PUBLIC_PORT"])[0], 404)
+                self.assertEqual(len(Authorizer.requests), before)
+            finally:
+                process.terminate()
+                process.wait(timeout=5)
