@@ -2,36 +2,41 @@ name: Expo Update
 
 on:
   push:
-    branches:
-      - master
-      - main
-      - testing
+    branches: [master, main, testing]
     paths:
-      - "apps/native-calendar/**"
-      - "apps/native-mail/**"
+      - "apps/native-*/**"
       - "packages/**"
       - "package.json"
       - "bun.lock"
       - "babel.config.cts"
-      - "scripts/native-publish-update.ts"
+      - "scripts/native-*.ts"
       - "scripts/eas-build-profile.ts"
       - ".github/workflows/expo-update.yml"
+      - ".github/workflows/native-checks.yml"
   pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+    types: [opened, synchronize, reopened]
     paths:
-      - "apps/native-calendar/**"
-      - "apps/native-mail/**"
+      - "apps/native-*/**"
       - "packages/**"
       - "package.json"
       - "bun.lock"
       - "babel.config.cts"
-      - "scripts/native-publish-update.ts"
+      - "scripts/native-*.ts"
       - "scripts/eas-build-profile.ts"
       - ".github/workflows/expo-update.yml"
+      - ".github/workflows/native-checks.yml"
   workflow_dispatch:
+    inputs:
+      profile:
+        description: Matching EAS build/update profile (production requires the default branch)
+        type: choice
+        options: [development, testing, preview, production]
+        default: preview
+      app:
+        description: App to update
+        type: choice
+        options: [all, calendar, mail]
+        default: all
 
 permissions:
   contents: read
@@ -40,214 +45,58 @@ concurrency:
   group: expo-update-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Must mirror eas.json build profile `env` so fingerprint runtimeVersion
-  # matches the binary (eas update only loads EAS Environment vars, not profile env).
-  EXPO_PUBLIC_API_URL: https://api.solace.onl
-  EXPO_PUBLIC_APP_URL: https://solace.onl
-  PASSKEY_ORIGIN: https://solace.onl
-  EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS: "true"
-  EXPO_PUBLIC_SENTRY_DSN: https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace
-
 jobs:
-  publish-preview-update:
-    name: Publish Preview EAS Update
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+  meta:
+    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name != 'push' || github.ref_name == github.event.repository.default_branch || github.ref_name == 'testing')
+    runs-on: ubuntu-latest
+    outputs:
+      profile: ${{ steps.release.outputs.profile }}
+      matrix: ${{ steps.release.outputs.matrix }}
+      eas_version: ${{ steps.release.outputs.eas_version }}
+    steps:
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - id: release
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          INPUT_PROFILE: ${{ inputs.profile }}
+          INPUT_APP: ${{ inputs.app }}
+          ALLOW_PRODUCTION: "true"
+        run: bun ./scripts/native-release-metadata.ts
+
+  checks:
+    needs: meta
+    uses: ./.github/workflows/native-checks.yml
+
+  publish:
+    name: Publish ${{ needs.meta.outputs.profile }} update
+    needs: [meta, checks]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      matrix:
-        app: [native-calendar, native-mail]
+      matrix: ${{ fromJSON(needs.meta.outputs.matrix) }}
     defaults:
       run:
-        working-directory: apps/${{ matrix.app }}
-
+        working-directory: ${{ matrix.dir }}
     steps:
-      - name: Check for EXPO_TOKEN
-        working-directory: .
-        run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "You must provide an EXPO_TOKEN secret linked to the astralgrove Expo account."
-            exit 1
-          fi
-
-      - name: Checkout
-        uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
-
-      - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
         with:
           node-version-file: .node-version
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
-
-      - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
+      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
         with:
-          eas-version: latest
+          eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install dependencies
+      - run: bun install --frozen-lockfile
         working-directory: .
-        run: bun install --frozen-lockfile
-
-      - name: Publish update to preview
+      - name: Publish to the build profile's channel
         env:
-          EAS_UPDATE_MESSAGE: preview-${{ github.ref_name }}-${{ github.sha }}
-        run: bun run ./scripts/publish-update.ts preview --message "$EAS_UPDATE_MESSAGE" --non-interactive
-
-  publish-development-update:
-    name: Publish Development EAS Update
-    if: github.event_name == 'push' && github.ref == 'refs/heads/testing'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [native-calendar, native-mail]
-    defaults:
-      run:
-        working-directory: apps/${{ matrix.app }}
-
-    steps:
-      - name: Check for EXPO_TOKEN
-        working-directory: .
-        run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "You must provide an EXPO_TOKEN secret linked to the astralgrove Expo account."
-            exit 1
-          fi
-
-      - name: Checkout
-        uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
-
-      - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
-        with:
-          node-version-file: .node-version
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-
-      - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install dependencies
-        working-directory: .
-        run: bun install --frozen-lockfile
-
-      - name: Publish update to development
-        env:
-          EAS_UPDATE_MESSAGE: development-${{ github.sha }}
-        run: bun run ./scripts/publish-update.ts development --message "$EAS_UPDATE_MESSAGE" --non-interactive
-
-  publish-testing-update:
-    name: Publish Testing EAS Update
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [native-calendar, native-mail]
-    defaults:
-      run:
-        working-directory: apps/${{ matrix.app }}
-
-    steps:
-      - name: Check for EXPO_TOKEN
-        working-directory: .
-        run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "You must provide an EXPO_TOKEN secret linked to the astralgrove Expo account."
-            exit 1
-          fi
-
-      - name: Checkout
-        uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
-        with:
-          node-version-file: .node-version
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-
-      - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install dependencies
-        working-directory: .
-        run: bun install --frozen-lockfile
-
-      - name: Publish update to testing
-        env:
-          EAS_UPDATE_MESSAGE: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-        run: bun run ./scripts/publish-update.ts testing --message "$EAS_UPDATE_MESSAGE" --non-interactive
-
-  publish-master-update:
-    name: Publish Master EAS Update
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [native-calendar, native-mail]
-    defaults:
-      run:
-        working-directory: apps/${{ matrix.app }}
-
-    steps:
-      - name: Check for EXPO_TOKEN
-        working-directory: .
-        run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "You must provide an EXPO_TOKEN secret linked to the astralgrove Expo account."
-            exit 1
-          fi
-
-      - name: Checkout
-        uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
-
-      - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
-        with:
-          node-version-file: .node-version
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-
-      - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install dependencies
-        working-directory: .
-        run: bun install --frozen-lockfile
-
-      - name: Publish update to master
-        env:
-          EAS_UPDATE_MESSAGE: master-${{ github.sha }}
-        run: bun run ./scripts/publish-update.ts production --message "$EAS_UPDATE_MESSAGE" --non-interactive
+          PROFILE: ${{ needs.meta.outputs.profile }}
+          UPDATE_MESSAGE: ${{ needs.meta.outputs.profile }}-${{ github.sha }}
+        run: bun run ./scripts/publish-update.ts "$PROFILE" --message "$UPDATE_MESSAGE" --non-interactive
