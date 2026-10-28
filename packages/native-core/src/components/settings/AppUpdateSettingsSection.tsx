@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -22,15 +23,13 @@ import {
   formatChannelLabel,
   formatUpdateId,
   formatUpdateStamp,
+  getExpoUpdatesUrl,
   jsSourceLabel,
   presentUpdateCheckAlert,
   updateAccessoryIcon,
   updateDiagnosticsBody,
   updateDiagnosticsTitle,
 } from "../../lib/app-update";
-
-const EXPO_UPDATES_URL =
-  "https://expo.dev/accounts/astralgrove/projects/solace/updates";
 
 export function AppUpdateSettingsSection() {
   const { theme } = useTheme();
@@ -63,6 +62,10 @@ export function AppUpdateSettingsSection() {
     ? formatUpdateStamp(Updates.createdAt)
     : jsSourceLabel(runtime);
   const isDevBuild = runtime.appVariant === "development";
+  const expoUpdatesUrl = getExpoUpdatesUrl(
+    Constants.expoConfig?.owner,
+    Constants.expoConfig?.slug,
+  );
 
   const showDiagnostics = () => {
     Alert.alert(updateDiagnosticsTitle(runtime), updateDiagnosticsBody(runtime));
@@ -149,19 +152,28 @@ export function AppUpdateSettingsSection() {
         onPress={onAction}
       />
 
-      <SheetItem
-        label="Browse Expo updates"
-        trailing={
-          <Feather name="external-link" size={16} color={skin.textSecondary} />
-        }
-        onPress={() => {
-          void Linking.openURL(EXPO_UPDATES_URL).catch(() =>
-            Alert.alert("Could not open", "Open the Expo updates page in a browser."),
-          );
-        }}
-        accessibilityRole="link"
-        accessibilityLabel="Browse Expo updates"
-      />
+      {expoUpdatesUrl ? (
+        <SheetItem
+          label="Browse Expo updates"
+          trailing={
+            <Feather
+              name="external-link"
+              size={16}
+              color={skin.textSecondary}
+            />
+          }
+          onPress={() => {
+            void Linking.openURL(expoUpdatesUrl).catch(() =>
+              Alert.alert(
+                "Could not open",
+                "Open the Expo updates page in a browser.",
+              ),
+            );
+          }}
+          accessibilityRole="link"
+          accessibilityLabel="Browse Expo updates"
+        />
+      ) : null}
     </SheetGroup>
   );
 }

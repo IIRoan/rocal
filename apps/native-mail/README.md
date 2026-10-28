@@ -1,6 +1,6 @@
 # Solace Mail (native)
 
-This app is configured for Expo/EAS under the `astralgrove` org, project slug `solace-mail`. It shares auth, E2EE, settings, push and UI primitives with `apps/native-calendar` (Solace Calendar) through `packages/native-core`.
+This app is configured for Expo/EAS under the `astralgrove` org with dashboard display name and project slug `solace-mail`. It shares auth, E2EE, settings, push and UI primitives with `apps/native-calendar` (Solace Calendar) through `packages/native-core`.
 
 ## Current app identifiers
 
@@ -12,7 +12,9 @@ This app is configured for Expo/EAS under the `astralgrove` org, project slug `s
 | iOS bundle identifier  | `onl.solace.mail` | `onl.solace.mail.dev` |
 | Android application ID | `onl.solace.mail` | `onl.solace.mail.dev` |
 
-EAS project: `@astralgrove/solace-mail` (`abe3e4a0-5b68-47b4-9390-654d95f093bd`, set in `app.config.ts`; `EXPO_PROJECT_ID` overrides it). Register `onl.solace.mail` / `onl.solace.mail.dev` (plus their `group.*` App Groups and NSE bundle IDs) in the Apple Developer account and add them to the site's `apple-app-site-association` `webcredentials` for passkeys.
+EAS project: `@astralgrove/solace-mail` (`abe3e4a0-5b68-47b4-9390-654d95f093bd`, defined in `packages/native-core/expo-apps.json`; `EXPO_PROJECT_ID` overrides it). Register `onl.solace.mail` / `onl.solace.mail.dev` (plus their `group.*` App Groups and NSE bundle IDs) in the Apple Developer account and add them to the site's `apple-app-site-association` `webcredentials` for passkeys.
+
+Keep the existing Expo slug and UUID when changing the dashboard display name. The device display name remains `Solace Mail`, and its deep-link schemes, bundle IDs and update channels stay unchanged. See [Expo's project-ID documentation](https://github.com/expo/fyi/blob/main/eas-project-id.md).
 
 Opening an event from a mail invitation deep-links into Solace Calendar (`solace://event/<id>`); if Calendar is not installed, the app shows a toast.
 
@@ -30,7 +32,7 @@ This app targets **Expo SDK 57** (React Native 0.86, React 19.2). EAS iOS builds
 
 Runtime version uses the Expo **`appVersion`** policy (`1.0.0` today) so OTAs keep matching installed binaries until you intentionally bump `version` and ship a new native build.
 
-**Always publish updates via the profile helper** so `eas.json` build-profile `env` is applied and the update is pinned to the latest finished build’s runtime:
+**Always publish updates via the profile helper** so `eas.json` build-profile `env` is applied and updates use the app config's runtime version:
 
 ```bash
 bun run update:preview      # apps/native-mail
@@ -39,10 +41,27 @@ bun run update:master
 ```
 
 Those scripts run `scripts/publish-update.ts`, which:
-1. Mirrors the matching build profile’s `env` (`APP_VARIANT`, associated-domains flags, public URLs, Sentry DSN, …)
-2. Looks up the latest finished EAS build for that profile and pins `runtimeVersion` to it (so fingerprint drift from local `node_modules` cannot orphan OTAs)
+1. Reads the target channel/environment and inherited profile env from `eas.json`, then loads the shared EAS environment before validating and publishing
+2. Uses the app config's `appVersion` runtime policy, or the explicit `EAS_UPDATE_RUNTIME_VERSION` override when targeting an older binary
 
 Changing app icons, native modules, Expo plugins, or app `version` requires a **new native build**, not only an OTA.
+
+## Shared Expo configuration
+
+Native identities and stable defaults are defined once in [`packages/native-core/expo-apps.json`](../../packages/native-core/expo-apps.json). Both `app.config.ts` files delegate to the shared builder in `packages/native-core/expo-config.cjs`; update URLs, development IDs, App Groups and extension IDs are derived from that configuration.
+
+Deployment values live in the `astralgrove` account's shared EAS environments:
+
+| Variable | Environments | Purpose |
+| --- | --- | --- |
+| `SOLACE_API_URL` | development, preview, production | Backend origin |
+| `SOLACE_APP_URL` | preview, production | Web and passkey origin |
+| `SOLACE_SENTRY_DSN` | development, preview, production | Optional self-hosted error reporting |
+| `SOLACE_ENABLE_IOS_ASSOCIATED_DOMAINS` | preview, production | Passkey associated-domain capability |
+
+These are public app configuration values, never secrets. `eas.json` selects the variant and EAS environment through `APP_VARIANT` and `SOLACE_ENV_SOURCE=eas`. Builds and updates resolve the same values into `Constants.expoConfig.extra.runtimeEnvironment`, which native-core consumes. Local `.env` overrides are ignored for EAS deployment values. The pre-install build hook and OTA publisher reject missing required service values before building or publishing.
+
+For local development, `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_APP_URL`, optional `PASSKEY_ORIGIN`, and `EXPO_PUBLIC_SENTRY_DSN` remain supported overrides. `EXPO_OWNER`, `EXPO_PROJECT_ID` and `EXPO_PROJECT_SLUG` can override the linked project for a fork; the repository's defaults need no overrides.
 
 ## Local env
 
@@ -51,9 +70,6 @@ Create `apps/native-mail/.env` or `apps/native-mail/.env.local` with:
 ```env
 EXPO_PUBLIC_API_URL=https://api.example.com
 EXPO_PUBLIC_APP_URL=https://app.example.com
-PASSKEY_ORIGIN=https://app.example.com
-EXPO_OWNER=your-expo-account-or-org
-EXPO_PROJECT_ID=your-eas-project-id
 APP_VARIANT=development
 ```
 
@@ -85,15 +101,15 @@ bun run dev:expo
 
 1. Sign in to `https://expo.dev`.
 2. Create or choose the Expo account or organization that should own the app.
-3. Create a new EAS project named `solace-mail`.
-4. Copy the project ID from the project settings page.
-5. Set `EXPO_OWNER` to your Expo account/org name.
-6. Set `EXPO_PROJECT_ID` to that EAS project ID.
+3. Select the existing project displayed as `solace-mail`; do not create a replacement project.
+4. Confirm its UUID matches the shared `expo-apps.json` identity.
+5. For a fork, set `EXPO_OWNER` to the owning account.
+6. For a fork, set both `EXPO_PROJECT_ID` and `EXPO_PROJECT_SLUG` to the linked project.
 7. In the Expo dashboard, configure credentials:
    - Android: let Expo manage the keystore unless you already have one.
    - iOS: connect the Apple Developer account/team and let Expo manage certificates/profiles.
-8. Add `EXPO_PUBLIC_API_URL` in EAS environment variables if your build should target staging or production automatically.
-9. If you want native passkeys, also add `PASSKEY_ORIGIN` (or reuse `NEXT_PUBLIC_APP_URL`) with the HTTPS app origin that Better Auth uses for passkeys.
+8. Configure the shared EAS service variables listed above.
+9. Set `SOLACE_APP_URL` to the HTTPS web origin used for passkeys; the associated domain is derived from it.
 10. Create or confirm EAS Update branches named `development`, `preview`, `testing`, and `master`.
 11. Link each channel to the matching branch in Expo (`development`, `preview`, `testing`, `master`).
 
@@ -128,10 +144,10 @@ http://192.168.88.246:4001/api/auth/callback/github
 ## Native passkeys
 
 - Native uses a browser-based Better Auth passkey bridge, so passkey actions work without native-only modules.
-- `app.config.ts` automatically adds the iOS `associatedDomains` entry when `PASSKEY_ORIGIN`, `NEXT_PUBLIC_APP_URL`, or `EXPO_PUBLIC_APP_URL` points at a non-local HTTPS origin.
+- EAS builds derive iOS `associatedDomains` from `SOLACE_APP_URL` when `SOLACE_ENABLE_IOS_ASSOCIATED_DOMAINS=true`; local builds use `EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS=true` with the configured passkey/web origin.
 - iOS still needs `https://<domain>/.well-known/apple-app-site-association`.
 - Android still needs `https://<domain>/.well-known/assetlinks.json` with `delegate_permission/common.get_login_creds`.
-- `EXPO_PUBLIC_APP_URL` should point at a reachable web deployment for the browser bridge.
+- `SOLACE_APP_URL` (or the local `EXPO_PUBLIC_APP_URL` override) should point at a reachable HTTPS web deployment for the browser bridge.
 
 ## E2EE crypto
 
@@ -150,10 +166,12 @@ bun run build:preview:android
 bun run build:android
 bun run build:dev:ios
 bun run build:preview:ios
+bun run build:testing:ios
+bun run build:testflight:ios
 bun run build:ios
 ```
 
-`build:android` and `build:ios` use the `production` profile.
+`build:android` and `build:ios` use the `production` profile. `build:testflight:ios` produces a store-signed beta on the `testing` channel; `build:testing:*` produces ad-hoc/APK builds on the same channel with the same preview environment.
 `build:dev:*` produces a development client with the Mail Dev icon and `.dev` bundle ID.
 
 ## OTA updates
@@ -163,7 +181,7 @@ When a newer bundle is on the channel, the app shows a full-screen prompt (Insta
 To publish an update manually to the branch used by the production channel:
 
 ```bash
-bun run update:master -- --message "master update"
+bun run update:production -- --message "production update"
 ```
 
 To publish an update manually to the preview channel:
@@ -178,7 +196,7 @@ To publish an update to the development-client channel:
 bun run update:development -- --message "dev update"
 ```
 
-To publish an update manually to the PR/testing branch:
+To publish an update manually to testing and TestFlight builds:
 
 ```bash
 bun run update:testing -- --message "testing update"
@@ -186,31 +204,26 @@ bun run update:testing -- --message "testing update"
 
 ## GitHub automation
 
-| Git event | EAS update branch |
-| --- | --- |
-| Push to `main` or `master` (and `workflow_dispatch`) | `preview` |
-| Push to `testing` | `development` |
-| Push to `master` | `master` (production) |
-| Pull request | `testing` |
+| Source | Build profile | Distribution | Update channel | EAS environment |
+| --- | --- | --- | --- | --- |
+| Trusted pull request | `development` | Dev client, ad-hoc/APK | `development` | `development` |
+| Push to `testing` | `testing` | Ad-hoc/APK | `testing` | `preview` |
+| Push to the repository's default branch | `preview` | Ad-hoc/APK | `preview` | `preview` |
+| Manual TestFlight build | `testflight` | App Store | `testing` | `preview` |
+| Manual production release | `production` | App Store | `master` | `production` |
+
+The production channel keeps its existing `master` name for installed-binary compatibility. `update:production` and the older `update:master` alias both resolve it from `eas.json`. A default-branch push publishes only preview updates.
+
+`scripts/native-release-config.ts` selects the profile once for both build and update workflows; metadata reads app names, the EAS CLI version and each app's channel/environment from shared configuration. All workflows run native checks before builds or publishing. Internal artifact slots include `development`, `preview` and `testing`.
+
+The **iOS App Store build** workflow is dispatched from the default branch, selects `testflight` or `production`, and optionally uploads the completed build to TestFlight. Uploading requires the app's `submit.production.ios.ascAppId` and EAS App Store signing/submission credentials. `production` OTA updates also require an explicit default-branch dispatch. The app-version runtime policy still requires a version bump and new binary for native changes.
 
 Required GitHub secret:
 
 - `EXPO_TOKEN`
 
-The workflow publishes through `apps/native-mail/scripts/publish-update.ts`, which applies the matching `eas.json` build-profile `env` so the fingerprint runtimeVersion matches installed binaries. It also bakes production API origins into published bundles:
+The workflow publishes through the app's `scripts/publish-update.ts`. The shared publisher reads its channel and environment from `eas.json`, loads the EAS environment with `eas env:exec`, validates required service values and uses the app config's runtime version. The `testing` profile inherits `preview` while selecting its own channel. Native dependency or plugin changes require a version bump and a new binary before publishing an update for that runtime.
 
-- `EXPO_PUBLIC_API_URL=https://api.solace.onl`
-- `EXPO_PUBLIC_APP_URL=https://solace.onl`
-- `PASSKEY_ORIGIN=https://solace.onl`
-- `EXPO_ENABLE_IOS_ASSOCIATED_DOMAINS=true` (preview / production profiles)
-- `EXPO_PUBLIC_SENTRY_DSN` (Errex project `solace`; native reports via `reporting.ts`)
-
-Required Expo EAS environment values for the `production` / `preview` environments (used by `eas update --environment`):
-
-- `EXPO_PUBLIC_API_URL`
-- `EXPO_PUBLIC_SENTRY_DSN`
-- `PASSKEY_ORIGIN` when native passkeys are enabled
-
-Keep those aligned with `eas.json` `build.*.env`. Do not publish with a bare `eas update` that omits profile env — the OTA will not attach to existing binaries.
+Deployment values are managed only in the shared EAS environment; neither GitHub Actions nor `eas.json` repeats the service URLs or reporting DSN. Publish through the profile helpers so variant selection, environment loading and validation stay consistent.
 
 Note: PR-triggered publishes are skipped for forked repositories because GitHub does not expose secrets to untrusted PRs.

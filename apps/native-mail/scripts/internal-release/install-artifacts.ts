@@ -1,4 +1,6 @@
-export const PROFILES = ["development", "preview"] as const;
+import { INTERNAL_BUILD_PROFILES } from "../../../../scripts/native-release-config";
+
+export const PROFILES = INTERNAL_BUILD_PROFILES;
 export type Profile = (typeof PROFILES)[number];
 
 /** App-scoped so the calendar and mail apps (or anything else in a shared bucket) never prune each other's artifacts. */

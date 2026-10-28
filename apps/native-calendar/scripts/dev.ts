@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { createLogger } from "@workspace/logger";
+import settings from "../../../packages/native-core/expo-apps.json";
 
 type SpawnedProcess = {
   exited: Promise<number>;
@@ -20,7 +21,6 @@ declare const Bun: {
   ): SpawnedProcess;
 };
 
-const DEFAULT_CLOUDFLARED_PUBLIC_URL = "https://cloudflared.roan.dev";
 const log = createLogger("native:dev");
 
 function normalizeUrl(value: string): string {
@@ -28,7 +28,7 @@ function normalizeUrl(value: string): string {
 }
 
 const publicUrl = normalizeUrl(
-  process.env.CLOUDFLARED_PUBLIC_URL || DEFAULT_CLOUDFLARED_PUBLIC_URL,
+  process.env.CLOUDFLARED_PUBLIC_URL || settings.developmentTunnelUrl,
 );
 const expoArgs = process.argv.slice(2);
 const hasClientFlag =
