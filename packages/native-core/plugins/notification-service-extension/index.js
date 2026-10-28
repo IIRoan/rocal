@@ -1,20 +1,21 @@
 /** Adds the iOS Notification Service Extension; the App Group id doubles as its keychain access group. */
 const fs = require("fs");
 const path = require("path");
+const settings = require("../../expo-apps.json");
 const {
   withDangerousMod,
   withEntitlementsPlist,
   withXcodeProject,
 } = require("expo/config-plugins");
 
-const TARGET_NAME = "SolaceNotificationService";
+const TARGET_NAME = settings.notificationExtensionTargetName;
 const SWIFT_FILE = "NotificationService.swift";
 const INFO_PLIST_FILE = `${TARGET_NAME}-Info.plist`;
 const ENTITLEMENTS_FILE = `${TARGET_NAME}.entitlements`;
 const APP_GROUPS_ENTITLEMENT = "com.apple.security.application-groups";
 
 function extensionBundleIdentifier(appBundleIdentifier) {
-  return `${appBundleIdentifier}.NotificationService`;
+  return `${appBundleIdentifier}.${settings.notificationExtensionBundleSuffix}`;
 }
 
 function escapeXml(value) {
@@ -99,8 +100,8 @@ function withExtensionFiles(config, props) {
       await fs.promises.writeFile(
         path.join(targetDir, INFO_PLIST_FILE),
         infoPlist({
-          version: mod.version ?? "1.0.0",
-          buildNumber: mod.ios?.buildNumber ?? "1",
+          version: mod.version ?? settings.version,
+          buildNumber: mod.ios?.buildNumber ?? String(settings.initialBuildNumber),
           appGroup: props.appGroup,
           keychainService: props.keychainService,
         }),
@@ -163,8 +164,9 @@ function withExtensionTarget(config, props) {
       buildSettings.CODE_SIGN_STYLE = "Automatic";
       buildSettings.INFOPLIST_FILE = `${TARGET_NAME}/${INFO_PLIST_FILE}`;
       buildSettings.IPHONEOS_DEPLOYMENT_TARGET = props.deploymentTarget;
-      buildSettings.MARKETING_VERSION = mod.version ?? "1.0.0";
-      buildSettings.CURRENT_PROJECT_VERSION = mod.ios?.buildNumber ?? "1";
+      buildSettings.MARKETING_VERSION = mod.version ?? settings.version;
+      buildSettings.CURRENT_PROJECT_VERSION =
+        mod.ios?.buildNumber ?? String(settings.initialBuildNumber);
       buildSettings.SWIFT_VERSION = "5.0";
       buildSettings.TARGETED_DEVICE_FAMILY = `"1,2"`;
       buildSettings.GENERATE_INFOPLIST_FILE = "NO";

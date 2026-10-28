@@ -15,9 +15,10 @@ import {
   EVENT_REMINDER_MAIL_MIN_FILL_RATIO,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import { APP_BASE_URL } from "@workspace/native-core/lib/constants";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 
-const LOGO_URL = "https://solace.onl/favicon-192x192.png";
+const appUrl = APP_BASE_URL?.replace(/\/+$/, "");
 
 type EventReminderMessageBodyProps = {
   reminder: EventReminderMailView;
@@ -34,14 +35,15 @@ export function EventReminderMessageBody({
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const styles = createStyles(theme, windowWidth, windowHeight);
 
-  const openFooterLink = (url: string) => {
+  const openFooterLink = (path: string) => {
+    if (!appUrl) return;
     // A device without a handler for the URL just no-ops the tap.
-    void Linking.openURL(url).catch(() => undefined);
+    void Linking.openURL(`${appUrl}${path}`).catch(() => undefined);
   };
 
-  const openSettings = () => openFooterLink("https://solace.onl/settings");
+  const openSettings = () => openFooterLink("/settings");
 
-  const openPrivacy = () => openFooterLink("https://solace.onl/privacy");
+  const openPrivacy = () => openFooterLink("/privacy");
 
   return (
     <View
@@ -50,11 +52,13 @@ export function EventReminderMessageBody({
         attachedBelowBanner && styles.containerAttached,
       ]}
     >
-      <Image
-        source={{ uri: LOGO_URL }}
-        style={styles.logo}
-        accessibilityLabel="Solace"
-      />
+      {appUrl ? (
+        <Image
+          source={{ uri: `${appUrl}/favicon-192x192.png` }}
+          style={styles.logo}
+          accessibilityLabel="Solace"
+        />
+      ) : null}
 
       <Text style={styles.title}>{reminder.title}</Text>
       <Text style={styles.subtitle}>{reminder.timeUntilEvent}</Text>
@@ -107,15 +111,17 @@ export function EventReminderMessageBody({
         This reminder was sent because email notifications are enabled for your
         account.
       </Text>
-      <View style={styles.footerLinks}>
-        <Pressable onPress={openSettings} hitSlop={8}>
-          <Text style={styles.footerLink}>Settings</Text>
-        </Pressable>
-        <Text style={styles.footerSeparator}>·</Text>
-        <Pressable onPress={openPrivacy} hitSlop={8}>
-          <Text style={styles.footerLink}>Privacy</Text>
-        </Pressable>
-      </View>
+      {appUrl ? (
+        <View style={styles.footerLinks}>
+          <Pressable onPress={openSettings} hitSlop={8}>
+            <Text style={styles.footerLink}>Settings</Text>
+          </Pressable>
+          <Text style={styles.footerSeparator}>·</Text>
+          <Pressable onPress={openPrivacy} hitSlop={8}>
+            <Text style={styles.footerLink}>Privacy</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
