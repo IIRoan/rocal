@@ -58,7 +58,7 @@ export type MailVaultBackup = {
   encryptedVaultB64: string;
   kdf: string;
   kdfParams: MailVaultKdfParams;
-  /** Vault passphrase sealed to the user's E2EE account key; null while legacy. */
+  /** Vault passphrase sealed to the user's E2EE account key; the server always returns it, and a vault without it cannot be opened. */
   wrappedSecret?: string | null;
   wrapAlgorithm?: string | null;
 };

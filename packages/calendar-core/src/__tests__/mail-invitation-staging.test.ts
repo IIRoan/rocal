@@ -19,7 +19,6 @@ function calendarFixture(overrides: Partial<Calendar> = {}): Calendar {
     isDefault: true,
     isSyncOnly: false,
     icsShareEnabled: false,
-    forceFullEncryption: false,
     userId: "user-1",
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),

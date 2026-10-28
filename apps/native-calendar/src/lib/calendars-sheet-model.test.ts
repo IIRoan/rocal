@@ -91,31 +91,17 @@ describe("validateCalendarName", () => {
 });
 
 describe("row details", () => {
-  it("flags default, encryption requirements, and hidden owned calendars", () => {
+  it("flags default, name encryption, and hidden owned calendars", () => {
     expect(ownedCalendarDetail(calendar({}))).toBeUndefined();
     expect(
       ownedCalendarDetail(
         calendar({
           isDefault: true,
-          forceFullEncryption: true,
+          encryptionState: "encrypted",
           isVisible: false,
         }),
       ),
-    ).toBe("Default · Event encryption required · Hidden");
-  });
-
-  it("uses the actual name encryption state without requiring the event policy flag", () => {
-    expect(
-      ownedCalendarDetail(calendar({ encryptionState: "encrypted" })),
-    ).toBe("Name encrypted");
-    expect(
-      ownedCalendarDetail(
-        calendar({
-          encryptionState: "shadow_write",
-          forceFullEncryption: true,
-        }),
-      ),
-    ).toBe("Encryption pending");
+    ).toBe("Default · Name encrypted · Hidden");
   });
 
   it("shows last sync only for feeds, after the hidden flag", () => {

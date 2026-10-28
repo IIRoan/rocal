@@ -130,10 +130,27 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The caller's calendars, default first, then by name; the first call creates the defaults. */
+        /** The caller's calendars, default first, then by name. */
         get: operations["listCalendars"];
         put?: never;
         post: operations["createCalendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendars/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stores the client-encrypted starting calendars when the caller owns none yet; answers the caller's calendars either way. */
+        post: operations["seedDefaultCalendars"];
         delete?: never;
         options?: never;
         head?: never;
@@ -424,23 +441,6 @@ export interface paths {
         put: operations["updateEvent"];
         post?: never;
         delete: operations["deleteEvent"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/events/{id}/ics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** A plaintext event, or one occurrence of a series, as an `.ics` download. */
-        get: operations["exportEventIcs"];
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -993,7 +993,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Imports client-encrypted events into an owned calendar; the legacy raw ICS body stays for shipped clients. */
+        /** Imports client-encrypted events into an owned calendar. */
         post: operations["importSubscriptionIcs"];
         delete?: never;
         options?: never;
@@ -1137,7 +1137,6 @@ export interface components {
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
-            forceFullEncryption: boolean;
             icsShareEnabled: boolean;
             icsShareToken: string | null;
             id: components["schemas"]["CalendarId"];
@@ -1225,24 +1224,17 @@ export interface components {
         CreateCalendarRequest: {
             blindIndexTokens?: string[];
             color: string;
-            encryptedName?: string;
+            encryptedName: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
-            /** @description Accepted from older clients and ignored; ciphertext presence decides. */
-            encryptionState?: string;
-            forceFullEncryption?: boolean;
             isDefault?: boolean;
-            name?: string;
         };
         CreateCategoryRequest: {
             blindIndexTokens?: string[];
             color: string;
-            encryptedName?: string;
+            encryptedName: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
-            /** @description Accepted from older clients and ignored; ciphertext presence decides. */
-            encryptionState?: string;
-            name?: string;
         };
         CreateEventRequest: {
             allDay?: boolean;
@@ -1250,14 +1242,12 @@ export interface components {
             calendarId: components["schemas"]["CalendarId"];
             categoryId?: components["schemas"]["CategoryId"];
             color?: string;
-            description?: string;
-            encryptedContent?: string;
+            encryptedContent: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
             end: string;
             /** @description Transient plaintext for invitation mail; never stored. */
             invitationContent?: components["schemas"]["InvitationContent"];
-            location?: string;
             participants?: components["schemas"]["ParticipantInput"][];
             recurrence?: string;
             /**
@@ -1267,8 +1257,6 @@ export interface components {
             reminder?: number | null;
             start: string;
             timezone?: string;
-            /** @description Plaintext content is only accepted without `encryptedContent`. */
-            title?: string;
         };
         CreateInviteRequest: {
             email: string;
@@ -1333,9 +1321,9 @@ export interface components {
             algorithms: components["schemas"]["E2eeAlgorithms"];
             calendars: components["schemas"]["EncryptionCalendar"][];
             devices: components["schemas"]["EncryptionDevice"][];
+            /** @description Always true; shipped native binaries reject a bootstrap without it. */
             enabled: boolean;
             passwordEnvelope: components["schemas"]["PasswordEnvelope"] | null;
-            rolloutStage: string;
         };
         EditRecurringRequest: {
             /** @description `this_only`, `this_and_future` or `all`. */
@@ -1382,6 +1370,7 @@ export interface components {
             start: components["schemas"]["Timestamp"];
             timezone: string;
         };
+        /** @description `POST /api/subscriptions/import-ics`: events the client parsed and encrypted. */
         EncryptedIcsImportRequest: {
             calendarId: components["schemas"]["CalendarId"];
             encryptedEvents: components["schemas"]["EncryptedIcsEvent"][];
@@ -1526,7 +1515,6 @@ export interface components {
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
-            forceFullEncryption: boolean;
             icsShareEnabled: boolean;
             icsShareToken: string | null;
             id: components["schemas"]["CalendarId"];
@@ -1647,29 +1635,13 @@ export interface components {
         HealthStatus: {
             status: string;
         };
-        /** @description `POST /api/subscriptions/import-ics`; `fileName` and `calendarName` only answer legacy plaintext imports. */
-        IcsImportResult: {
-            calendarName?: string | null;
-            errors?: string[] | null;
-            /** Format: int64 */
-            eventsCreated: number;
-            /** Format: int64 */
-            eventsTotal: number;
-            fileName?: string | null;
-            success: boolean;
-        };
-        /** @description `POST /api/subscriptions/import-ics`: client-encrypted events, or the legacy raw ICS kept for shipped clients. */
-        ImportIcsRequest: components["schemas"]["EncryptedIcsImportRequest"] | components["schemas"]["LegacyIcsImportRequest"];
         ImportIcsResponse: {
-            calendarName?: string;
             /** @description Per-event problems; absent when there were none. */
             errors?: string[];
             /** Format: int64 */
             eventsCreated: number;
             /** Format: int64 */
             eventsTotal: number;
-            /** @description Legacy imports only. */
-            fileName?: string;
             success: boolean;
         };
         /** @description A decrypted mailed invitation the client imports. */
@@ -1764,11 +1736,6 @@ export interface components {
         };
         /** @description `GET /api/account/invite/validate`: whether a token can still be used to sign up. */
         InviteValidation: components["schemas"]["InviteValid"] | components["schemas"]["InviteInvalid"];
-        LegacyIcsImportRequest: {
-            calendarId: components["schemas"]["CalendarId"];
-            fileName?: string;
-            icsContent: string;
-        };
         ListedCategory: components["schemas"]["Category"] & {
             /**
              * Format: int64
@@ -1808,8 +1775,7 @@ export interface components {
             /** Format: int32 */
             vaultVersion: number;
             wrapAlgorithm?: string | null;
-            /** @description Optional on the wire, but the service rejects a bootstrap without it. */
-            wrappedSecret?: string | null;
+            wrappedSecret: string;
         };
         /** @description What invitation auto-filing did with the ICS parts it found; also the answer of `POST /api/events/invitations/import-ics`. */
         MailCalendarImportSummary: {
@@ -1942,8 +1908,7 @@ export interface components {
             /** Format: int32 */
             vaultVersion: number;
             wrapAlgorithm: string | null;
-            /** @description Null for legacy vaults sealed before the account-key seal existed. */
-            wrappedSecret: string | null;
+            wrappedSecret: string;
         };
         /** @description `PUT /api/mail/account/vault-backup`; an omitted or null seal keeps the stored one. */
         MailVaultBackupRequest: {
@@ -1953,7 +1918,8 @@ export interface components {
             /** Format: int32 */
             vaultVersion: number;
             wrapAlgorithm?: string | null;
-            wrappedSecret?: string | null;
+            /** @description Absent keeps the stored seal; a vault is never left unsealed. */
+            wrappedSecret?: string;
         };
         /** @description Argon2id parameters of the encrypted private-key vault. */
         MailVaultKdfParams: {
@@ -2206,13 +2172,11 @@ export interface components {
             /** @description An empty id clears the category. */
             categoryId?: string;
             color?: string;
-            description?: string;
             encryptedContent?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
             end?: string;
             invitationContent?: components["schemas"]["InvitationContent"];
-            location?: string;
             participants?: components["schemas"]["ParticipantInput"][];
             recurrence?: string;
             /**
@@ -2222,7 +2186,6 @@ export interface components {
             reminder?: number;
             start?: string;
             timezone?: string;
-            title?: string;
         };
         RegisterDeviceRequest: {
             deviceId: string;
@@ -2299,6 +2262,10 @@ export interface components {
             id: string;
             name: string;
         };
+        /** @description `POST /api/calendars/defaults`: the client-encrypted starting calendars of an account that owns none yet. */
+        SeedDefaultCalendarsRequest: {
+            calendars: components["schemas"]["CreateCalendarRequest"][];
+        };
         SessionId: string;
         SessionWithUser: {
             session: components["schemas"]["AuthSession"];
@@ -2356,7 +2323,6 @@ export interface components {
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
-            forceFullEncryption: boolean;
             icsShareEnabled: boolean;
             icsShareToken: string | null;
             id: components["schemas"]["CalendarId"];
@@ -2412,11 +2378,8 @@ export interface components {
             encryptedName?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
-            encryptionState?: string;
-            forceFullEncryption?: boolean;
             isDefault?: boolean;
             isVisible?: boolean;
-            name?: string;
         };
         UpdateCategoryRequest: {
             blindIndexTokens?: string[];
@@ -2424,12 +2387,8 @@ export interface components {
             encryptedName?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
-            encryptionState?: string;
-            name?: string;
         };
         UpdateEventNotificationsRequest: {
-            /** @description Sent by shipped binaries; accepted and dropped, never stored. */
-            displayTitle?: string | null;
             /** @description `v1.<iv>.<ciphertext>` under the notification key; omitted keeps the stored one, `null` clears it. */
             encryptedDisplayTitle?: string | null;
             notifications: components["schemas"]["NotificationSetting"][];
@@ -2441,13 +2400,11 @@ export interface components {
             /** @description An empty id clears the category. */
             categoryId?: string;
             color?: string;
-            description?: string;
             encryptedContent?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
             end?: string;
             invitationContent?: components["schemas"]["InvitationContent"];
-            location?: string;
             participants?: components["schemas"]["ParticipantInput"][];
             /** @description `null` turns a series into a single event. */
             recurrence?: string | null;
@@ -2455,7 +2412,6 @@ export interface components {
             reminder?: number | null;
             start?: string;
             timezone?: string;
-            title?: string;
         };
         UpdateSettingsRequest: {
             browserNotifications?: boolean;
@@ -2466,8 +2422,6 @@ export interface components {
             /** @description `month`, `week`, `3day`, `day` or `agenda`. */
             defaultView?: string;
             emailNotifications?: boolean;
-            /** @description `hybrid` or `full`. */
-            eventEncryptionMode?: string;
             pushNotifications?: boolean;
             reminderSound?: boolean;
             showDeclinedEvents?: boolean;
@@ -2514,7 +2468,6 @@ export interface components {
             defaultEventDuration: number;
             defaultView: string;
             emailNotifications: boolean;
-            eventEncryptionMode: string;
             id: string;
             pushNotifications: boolean;
             reminderSound: boolean;
@@ -2725,6 +2678,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Calendar"];
+                };
+            };
+        };
+    };
+    seedDefaultCalendars: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeedDefaultCalendarsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarList"];
                 };
             };
         };
@@ -3286,27 +3262,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventDeleted"];
-                };
-            };
-        };
-    };
-    exportEventIcs: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/calendar": string;
                 };
             };
         };
@@ -4318,7 +4273,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ImportIcsRequest"];
+                "application/json": components["schemas"]["EncryptedIcsImportRequest"];
             };
         };
         responses: {

@@ -6,21 +6,14 @@ import { API_BASE_URL } from "@workspace/native-core/lib/constants";
 import {
   createEncryptedMailVault,
   unlockEncryptedMailVault,
-  unlockEncryptedMailVaultWithDerivedKey,
   type UserKeyVault,
 } from "./native-vault-crypto";
 import {
-  loadDerivedVaultKey,
   saveDerivedVaultKey,
   loadCachedPrivateKey,
   saveCachedPrivateKey,
 } from "./mail-password-cache";
-import {
-  generateVaultSecret,
-  unwrapVaultSecret,
-  VAULT_WRAP_ALGORITHM,
-  wrapVaultSecret,
-} from "./vault-secret";
+import { unwrapVaultSecret } from "./vault-secret";
 import { extractPgpMimeCiphertextBlobId } from "./message-security";
 import { parseMimeBody } from "./mail-mime-parser";
 import type {
@@ -144,73 +137,6 @@ async function fetchVaultBackup(): Promise<MailVaultBackup> {
   return record;
 }
 
-async function rekeyVault(input: {
-  unlockedVault: UserKeyVault;
-  oldPassphrase: string;
-  newPassphrase: string;
-  vaultVersion: number;
-  wrappedSecret: string;
-}): Promise<void> {
-  try {
-    const decryptedPrivateKey = await openpgp.decryptKey({
-      privateKey: await openpgp.readPrivateKey({
-        armoredKey: input.unlockedVault.encryptedPrivateKeyArmored,
-      }),
-      passphrase: input.oldPassphrase,
-    });
-    const reEncrypted = await openpgp.encryptKey({
-      privateKey: decryptedPrivateKey,
-      passphrase: input.newPassphrase,
-    });
-    const migratedVault: UserKeyVault = {
-      ...input.unlockedVault,
-      encryptedPrivateKeyArmored: reEncrypted.armor(),
-    };
-    const encrypted = await createEncryptedMailVault(
-      migratedVault,
-      input.newPassphrase,
-      KEY_MATERIAL_KDF,
-    );
-
-    await upsertAccountVaultBackup({
-      vaultVersion: input.vaultVersion,
-      encryptedVaultB64: encrypted.encryptedVaultB64,
-      kdf: encrypted.kdf,
-      kdfParams: encrypted.kdfParams,
-      wrappedSecret: input.wrappedSecret,
-      wrapAlgorithm: VAULT_WRAP_ALGORITHM,
-    });
-  } catch (error) {
-    log.warn("Vault re-key failed", { error });
-  }
-}
-
-/** Moves a legacy vault off the server-derived passphrase onto a random secret sealed to the E2EE key. */
-async function sealVaultToAccountKey(input: {
-  unlockedVault: UserKeyVault;
-  currentPassphrase: string;
-  vaultVersion: number;
-}): Promise<void> {
-  try {
-    const secret = generateVaultSecret();
-    const wrappedSecret = await wrapVaultSecret(secret);
-    if (!wrappedSecret) {
-      // No E2EE session on this device yet; the next open retries.
-      return;
-    }
-
-    await rekeyVault({
-      unlockedVault: input.unlockedVault,
-      oldPassphrase: input.currentPassphrase,
-      newPassphrase: secret,
-      vaultVersion: input.vaultVersion,
-      wrappedSecret,
-    });
-  } catch (error) {
-    log.warn("Sealing the mail vault to the account key failed", { error });
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Vault unlock helpers
 // ---------------------------------------------------------------------------
@@ -294,7 +220,6 @@ async function loadCachedPrivateKeyForVault(
 /** Loads and caches the vault for the session; the passphrase is sealed to the E2EE key, so it only works signed in. */
 export async function ensureVaultLoaded(
   runtime: MailRuntime,
-  fallbackPassword?: string | null,
 ): Promise<UnlockedVault> {
   if (cachedVault) {
     log.debug("[mail-crypto] ensureVaultLoaded: vault already loaded, returning cached");
@@ -311,7 +236,7 @@ export async function ensureVaultLoaded(
     return vaultLoadingPromise;
   }
 
-  vaultLoadingPromise = doLoadVault(runtime, fallbackPassword);
+  vaultLoadingPromise = doLoadVault(runtime);
 
   try {
     cachedVault = await vaultLoadingPromise;
@@ -324,10 +249,7 @@ export async function ensureVaultLoaded(
   }
 }
 
-async function doLoadVault(
-  runtime: MailRuntime,
-  fallbackPassword?: string | null,
-): Promise<UnlockedVault> {
+async function doLoadVault(runtime: MailRuntime): Promise<UnlockedVault> {
   log.debug(
     "[mail-crypto] doLoadVault: starting vault load, backendBaseUrl=%s",
     API_BASE_URL,
@@ -357,38 +279,40 @@ async function doLoadVault(
     backup.kdfParams.parallelism,
   );
 
-  // Preferred path: the passphrase is sealed to this user's E2EE key, so only a signed-in device can open the vault.
-  if (backup.wrappedSecret) {
-    const sealedSecret = await unwrapVaultSecret(backup.wrappedSecret);
-    if (sealedSecret) {
-      try {
-        const unlockedVault = await unlockEncryptedMailVault(
-          backup.encryptedVaultB64,
-          sealedSecret,
-          backup.kdfParams,
-          (keyB64) => {
-            void saveDerivedVaultKey(keyB64).catch(() => undefined);
-          },
-        );
-        const privateKey =
-          (await loadCachedPrivateKeyForVault(unlockedVault)) ??
-          (await decryptVaultPrivateKey(unlockedVault, sealedSecret));
-
-        log.debug("[mail-crypto] doLoadVault: SUCCESS via sealed vault secret");
-        return { vault: unlockedVault, passphrase: sealedSecret, privateKey };
-      } catch (err) {
-        log.warn(
-          "[mail-crypto] doLoadVault: sealed-secret unlock failed: %s",
-          err instanceof Error ? err.message : String(err),
-        );
-        throw err;
-      }
-    }
+  if (!backup.wrappedSecret) {
+    throw new Error(
+      "This mail vault is not sealed to your encryption key and cannot be opened.",
+    );
+  }
+  const sealedSecret = await unwrapVaultSecret(backup.wrappedSecret);
+  if (!sealedSecret) {
+    throw new Error(
+      "Mail vault could not be unlocked on this device. Make sure you are signed in so your encryption keys are available, then try again.",
+    );
   }
 
-  throw new Error(
-    "Mail vault could not be unlocked on this device. Make sure you are signed in so your encryption keys are available, then try again.",
-  );
+  try {
+    const unlockedVault = await unlockEncryptedMailVault(
+      backup.encryptedVaultB64,
+      sealedSecret,
+      backup.kdfParams,
+      (keyB64) => {
+        void saveDerivedVaultKey(keyB64).catch(() => undefined);
+      },
+    );
+    const privateKey =
+      (await loadCachedPrivateKeyForVault(unlockedVault)) ??
+      (await decryptVaultPrivateKey(unlockedVault, sealedSecret));
+
+    log.debug("[mail-crypto] doLoadVault: SUCCESS via sealed vault secret");
+    return { vault: unlockedVault, passphrase: sealedSecret, privateKey };
+  } catch (err) {
+    log.warn(
+      "[mail-crypto] doLoadVault: sealed-secret unlock failed: %s",
+      err instanceof Error ? err.message : String(err),
+    );
+    throw err;
+  }
 }
 
 /** Decrypts an armored PGP mail body with the vault key; throws when no passphrase can unlock the vault. */

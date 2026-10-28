@@ -18,35 +18,20 @@ type E2eeBootstrapDialogProps = {
   onConfirmPasswordChange: (confirmPassword: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onSignOut: () => void;
-  onRetryBootstrap: () => void;
 };
 
 function getGateCopy(mode: GateMode) {
   const isUnlock = mode === "unlock";
-  const isLegacy = mode === "legacy";
-
-  const title = isUnlock
-    ? "Unlock encrypted data"
-    : isLegacy
-      ? "Finish encryption migration"
-      : "Protect your encryption keys";
-
-  const description = isUnlock
-    ? "Your email sign-in password did not unlock encrypted data on this device. If you recently changed it, enter the previous password."
-    : isLegacy
-      ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and save an encryption password once."
-      : "Solace reuses your email sign-in password to protect your encryption keys. Re-enter it below only if automatic setup did not finish.";
-
-  const primaryLabel = isUnlock ? "Unlock" : isLegacy ? "Retry" : "Save password";
 
   return {
-    title,
-    description,
+    title: isUnlock ? "Unlock encrypted data" : "Protect your encryption keys",
+    description: isUnlock
+      ? "Your email sign-in password did not unlock encrypted data on this device. If you recently changed it, enter the previous password."
+      : "Solace reuses your email sign-in password to protect your encryption keys. Re-enter it below only if automatic setup did not finish.",
     passwordLabel: "Email sign-in password",
-    primaryLabel,
+    primaryLabel: isUnlock ? "Unlock" : "Save password",
     Icon: isUnlock ? KeyRound : Shield,
     isUnlock,
-    isLegacy,
   };
 }
 
@@ -56,10 +41,9 @@ export function E2eeBootstrapDialog({
   onConfirmPasswordChange,
   onSubmit,
   onSignOut,
-  onRetryBootstrap,
 }: E2eeBootstrapDialogProps) {
   const { mode, password, confirmPassword, error, isSubmitting } = gate;
-  const { title, description, passwordLabel, primaryLabel, Icon, isUnlock, isLegacy } =
+  const { title, description, passwordLabel, primaryLabel, Icon, isUnlock } =
     getGateCopy(mode);
 
   return (
@@ -94,51 +78,49 @@ export function E2eeBootstrapDialog({
               {description}
             </p>
 
-            {!isLegacy ? (
-              <div className="space-y-3">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="e2ee-password"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  {passwordLabel}
+                </Label>
+                <Input
+                  id="e2ee-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => onPasswordChange(event.target.value)}
+                  autoComplete={
+                    isUnlock ? "current-password" : "new-password"
+                  }
+                  disabled={isSubmitting}
+                  className="h-9"
+                />
+              </div>
+
+              {mode === "setup" ? (
                 <div className="space-y-1.5">
                   <Label
-                    htmlFor="e2ee-password"
+                    htmlFor="e2ee-password-confirm"
                     className="text-xs font-medium text-muted-foreground"
                   >
-                    {passwordLabel}
+                    Confirm password
                   </Label>
                   <Input
-                    id="e2ee-password"
+                    id="e2ee-password-confirm"
                     type="password"
-                    value={password}
-                    onChange={(event) => onPasswordChange(event.target.value)}
-                    autoComplete={
-                      isUnlock ? "current-password" : "new-password"
+                    value={confirmPassword}
+                    onChange={(event) =>
+                      onConfirmPasswordChange(event.target.value)
                     }
+                    autoComplete="new-password"
                     disabled={isSubmitting}
                     className="h-9"
                   />
                 </div>
-
-                {mode === "setup" ? (
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="e2ee-password-confirm"
-                      className="text-xs font-medium text-muted-foreground"
-                    >
-                      Confirm password
-                    </Label>
-                    <Input
-                      id="e2ee-password-confirm"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(event) =>
-                        onConfirmPasswordChange(event.target.value)
-                      }
-                      autoComplete="new-password"
-                      disabled={isSubmitting}
-                      className="h-9"
-                    />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+              ) : null}
+            </div>
 
             {error ? (
               <p
@@ -152,16 +134,10 @@ export function E2eeBootstrapDialog({
 
           <div className="px-3 py-2 border-t border-border/50 flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground hidden sm:flex items-center gap-1.5">
-              {isLegacy ? (
-                <>End-to-end encrypted</>
-              ) : (
-                <>
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                    Enter
-                  </kbd>
-                  to {isUnlock ? "unlock" : "save"}
-                </>
-              )}
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                Enter
+              </kbd>
+              to {isUnlock ? "unlock" : "save"}
             </span>
             <div className="flex items-center gap-2 ml-auto">
               <Button
@@ -175,26 +151,14 @@ export function E2eeBootstrapDialog({
                 <LogOut className="mr-1.5 size-3.5" />
                 Sign out
               </Button>
-              {isLegacy ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={onRetryBootstrap}
-                  disabled={isSubmitting}
-                  className="h-8"
-                >
-                  {isSubmitting ? "Working..." : primaryLabel}
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={isSubmitting}
-                  className="h-8"
-                >
-                  {isSubmitting ? "Working..." : primaryLabel}
-                </Button>
-              )}
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSubmitting}
+                className="h-8"
+              >
+                {isSubmitting ? "Working..." : primaryLabel}
+              </Button>
             </div>
           </div>
         </form>

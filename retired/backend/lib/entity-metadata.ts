@@ -1,12 +1,14 @@
 import {
   ENCRYPTED_CALENDAR_EXTERNAL_LABEL,
-  PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE,
   hasEncryptedPayloadValue,
   CALENDAR_COLORS,
   isValidCalendarColor,
 } from "@workspace/calendar-core";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import { ValidationError } from "./errors";
+
+export const PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE =
+  "Plaintext names must not be sent alongside an encrypted name.";
 
 type NormalizeEntityNameOptions = {
   entityLabel: string;

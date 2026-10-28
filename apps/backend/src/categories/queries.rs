@@ -67,22 +67,6 @@ pub async fn find<C: ConnectionTrait>(
         .await
 }
 
-/// Another of the user's categories with this plaintext name.
-pub async fn named<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-    name: &str,
-    except: Option<&str>,
-) -> Result<Option<event_category::Model>, sea_orm::DbErr> {
-    let mut query = event_category::Entity::find()
-        .filter(event_category::Column::UserId.eq(user_id))
-        .filter(event_category::Column::Name.eq(name));
-    if let Some(except) = except {
-        query = query.filter(event_category::Column::Id.ne(except));
-    }
-    query.one(db).await
-}
-
 pub async fn insert<C: ConnectionTrait>(
     db: &C,
     row: event_category::ActiveModel,

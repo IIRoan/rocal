@@ -1,15 +1,12 @@
-//! Calendar and category names and colors (`lib/entity-metadata.ts`): ciphertext blanks the plaintext name, and plaintext beside ciphertext is refused.
+//! Calendar and category names and colors: owned names are stored only as client ciphertext.
 
 use std::sync::LazyLock;
 
 use regex_lite::Regex;
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serde_json::Value;
 
-use crate::db::entities::user_encryption_device;
 use crate::error::AppError;
-use crate::http::schemas::PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE;
-use crate::http::zod::{js_length, js_trim};
+use crate::http::zod::js_trim;
 
 pub const CALENDAR_COLORS: [&str; 12] = [
     "blue", "orange", "violet", "rose", "emerald", "red", "cyan", "lime", "amber", "indigo",
@@ -19,7 +16,6 @@ pub const CALENDAR_COLORS: [&str; 12] = [
 /// The label a calendar name leaves the device with (ICS, CalDAV) when it is encrypted or blank.
 pub const ENCRYPTED_CALENDAR_EXTERNAL_LABEL: &str = "Solace calendar";
 pub const MAIL_INVITATION_STAGING_CALENDAR_NAME: &str = "Invitations";
-const MAX_NAME_LENGTH: usize = 100;
 
 static HEX_COLOR: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
@@ -54,7 +50,6 @@ pub fn assert_valid_entity_color(color: &str) -> Result<(), AppError> {
 pub enum NamePersistence {
     /// The request left the name alone.
     None,
-    Plaintext(String),
     Encrypted {
         encrypted_name: String,
         blind_index_tokens: String,
@@ -64,81 +59,32 @@ pub enum NamePersistence {
 
 pub struct NameInput<'a> {
     pub entity_label: &'static str,
-    pub name: Option<&'a str>,
     pub encrypted_name: Option<&'a str>,
     pub blind_index_tokens: Option<&'a [String]>,
     pub encryption_key_version: Option<i32>,
-    pub require_name: bool,
 }
 
-/// `resolveEntityNamePersistence`.
+/// An omitted name is left alone; a given one must be non-blank ciphertext.
 pub fn resolve_name_persistence(input: NameInput<'_>) -> Result<NamePersistence, AppError> {
-    if let Some(encrypted_name) = input.encrypted_name {
-        if js_trim(encrypted_name).is_empty() {
-            return Err(AppError::field(
-                format!(
-                    "Encrypted {} name cannot be empty",
-                    input.entity_label.to_lowercase()
-                ),
-                "encryptedName",
-            ));
-        }
-        if input.name.is_some_and(|name| !js_trim(name).is_empty()) {
-            return Err(AppError::field(
-                PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE,
-                "name",
-            ));
-        }
-        let tokens = serde_json::to_string(input.blind_index_tokens.unwrap_or_default())
-            .map_err(AppError::internal)?;
-        return Ok(NamePersistence::Encrypted {
-            encrypted_name: encrypted_name.to_owned(),
-            blind_index_tokens: tokens,
-            encryption_key_version: input.encryption_key_version.unwrap_or(1),
-        });
-    }
-    if input.name.is_none() && !input.require_name {
+    let Some(encrypted_name) = input.encrypted_name else {
         return Ok(NamePersistence::None);
-    }
-    let name = js_trim(input.name.unwrap_or_default());
-    if name.is_empty() {
+    };
+    if js_trim(encrypted_name).is_empty() {
         return Err(AppError::field(
             format!(
-                "{} name is required and cannot be empty",
-                input.entity_label
+                "Encrypted {} name cannot be empty",
+                input.entity_label.to_lowercase()
             ),
-            "name",
-        ));
-    }
-    if js_length(name) > MAX_NAME_LENGTH {
-        return Err(AppError::field(
-            format!(
-                "{} name cannot exceed {MAX_NAME_LENGTH} characters",
-                input.entity_label
-            ),
-            "name",
-        ));
-    }
-    Ok(NamePersistence::Plaintext(name.to_owned()))
-}
-
-/// Accounts with an E2EE device must send encrypted names.
-pub async fn assert_plaintext_name_allowed<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-    entity_label: &str,
-) -> Result<(), AppError> {
-    let devices = user_encryption_device::Entity::find()
-        .filter(user_encryption_device::Column::UserId.eq(user_id))
-        .count(db)
-        .await?;
-    if devices > 0 {
-        return Err(AppError::field(
-            format!("{entity_label} name encryption requires an active encryption session."),
             "encryptedName",
         ));
     }
-    Ok(())
+    let tokens = serde_json::to_string(input.blind_index_tokens.unwrap_or_default())
+        .map_err(AppError::internal)?;
+    Ok(NamePersistence::Encrypted {
+        encrypted_name: encrypted_name.to_owned(),
+        blind_index_tokens: tokens,
+        encryption_key_version: input.encryption_key_version.unwrap_or(1),
+    })
 }
 
 /// The calendar label sent to Stalwart and ICS; encrypted names never leave the device.
@@ -176,23 +122,23 @@ mod tests {
     }
 
     #[test]
-    fn names_are_trimmed_and_counted_in_utf16_units() {
-        fn input(name: &str) -> NameInput<'_> {
+    fn names_are_ciphertext_or_left_alone() {
+        fn input(encrypted_name: Option<&str>) -> NameInput<'_> {
             NameInput {
                 entity_label: "Calendar",
-                name: Some(name),
-                encrypted_name: None,
+                encrypted_name,
                 blind_index_tokens: None,
                 encryption_key_version: None,
-                require_name: true,
             }
         }
         assert!(matches!(
-            resolve_name_persistence(input("  Work  ")),
-            Ok(NamePersistence::Plaintext(name)) if name == "Work"
+            resolve_name_persistence(input(Some("ct"))),
+            Ok(NamePersistence::Encrypted { encrypted_name, encryption_key_version: 1, .. }) if encrypted_name == "ct"
         ));
-        assert!(resolve_name_persistence(input(&"😀".repeat(50))).is_ok());
-        assert!(resolve_name_persistence(input(&"😀".repeat(51))).is_err());
-        assert!(resolve_name_persistence(input("   ")).is_err());
+        assert!(matches!(
+            resolve_name_persistence(input(None)),
+            Ok(NamePersistence::None)
+        ));
+        assert!(resolve_name_persistence(input(Some("   "))).is_err());
     }
 }

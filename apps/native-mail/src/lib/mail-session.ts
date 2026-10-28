@@ -1,9 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AuthLifecycle } from "@workspace/native-core/providers/AuthProvider";
-import {
-  enforceFullEventEncryption,
-  type AuthenticatedSessionInput,
-} from "@workspace/native-core/lib/startup-crypto";
+import type { AuthenticatedSessionInput } from "@workspace/native-core/lib/startup-crypto";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { bootstrapMailboxForAccount } from "./mail/account-bootstrap";
 import {
@@ -67,7 +64,6 @@ async function finishRestoredMailSession(
     QUERY_KEYS.mailRuntime(),
   );
   await Promise.all([
-    enforceFullEventEncryption(input),
     queryClient.fetchQuery({
       queryKey: QUERY_KEYS.mailRuntime(),
       queryFn: buildMailRuntime,
@@ -93,9 +89,6 @@ export async function prepareMailSession(
     await finishRestoredMailSession(input);
     return;
   }
-
-  await enforceFullEventEncryption(input);
-  if (input.isCancelled()) return;
 
   setPhase("Checking encrypted mail…");
 

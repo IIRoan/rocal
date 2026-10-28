@@ -41,7 +41,7 @@ pub struct Vault {
     pub kdf_memory_kib: i32,
     pub kdf_iterations: i32,
     pub kdf_parallelism: i32,
-    pub wrapped_secret: Option<String>,
+    pub wrapped_secret: String,
     pub wrap_algorithm: Option<String>,
 }
 
@@ -124,16 +124,17 @@ pub async fn vault<C: ConnectionTrait>(
         .await
 }
 
-/// Inserts or replaces the entry's vault; with `keep_seal`, a missing seal keeps the stored one.
+/// Inserts or replaces the entry's vault.
 pub async fn upsert_vault<C: ConnectionTrait>(
     db: &C,
     entry_id: &str,
     vault: Vault,
-    keep_seal: bool,
 ) -> Result<mail_vault_backup::Model, DbErr> {
     use mail_vault_backup::Column;
     let now = instant::now();
-    let mut columns = vec![
+    let columns = [
+        Column::WrappedSecret,
+        Column::WrapAlgorithm,
         Column::VaultVersion,
         Column::EncryptedVaultB64,
         Column::Kdf,
@@ -143,12 +144,6 @@ pub async fn upsert_vault<C: ConnectionTrait>(
         Column::KdfParallelism,
         Column::UpdatedAt,
     ];
-    if !keep_seal || vault.wrapped_secret.is_some() {
-        columns.push(Column::WrappedSecret);
-    }
-    if !keep_seal || vault.wrap_algorithm.is_some() {
-        columns.push(Column::WrapAlgorithm);
-    }
     let row = mail_vault_backup::ActiveModel {
         id: Set(cuid()),
         directory_entry_id: Set(entry_id.to_owned()),
@@ -159,7 +154,7 @@ pub async fn upsert_vault<C: ConnectionTrait>(
         kdf_memory_kib: Set(vault.kdf_memory_kib),
         kdf_iterations: Set(vault.kdf_iterations),
         kdf_parallelism: Set(vault.kdf_parallelism),
-        wrapped_secret: Set(vault.wrapped_secret),
+        wrapped_secret: Set(Some(vault.wrapped_secret)),
         wrap_algorithm: Set(vault.wrap_algorithm),
         created_at: Set(now),
         updated_at: Set(now),
@@ -186,7 +181,7 @@ pub async fn insert_entry<C: ConnectionTrait>(
     }
     .insert(db)
     .await?;
-    upsert_vault(db, &entry.id, vault, false).await?;
+    upsert_vault(db, &entry.id, vault).await?;
     Ok(())
 }
 
@@ -205,7 +200,7 @@ pub async fn update_entry<C: ConnectionTrait>(
     }
     .update(db)
     .await?;
-    upsert_vault(db, entry_id, vault, false).await?;
+    upsert_vault(db, entry_id, vault).await?;
     Ok(())
 }
 

@@ -74,11 +74,7 @@ export function toCalendarSearchResult(
   index: number,
 ): UnifiedSearchResult<JmapEmailMessage> {
   const encryptionStatus: UnifiedSearchEncryptionStatus =
-    event.encryptionState === "encrypted"
-      ? "encrypted-indexed"
-      : event.encryptionState === "shadow_write"
-        ? "metadata-only"
-        : "plaintext";
+    event.encryptionState === "encrypted" ? "encrypted-indexed" : "plaintext";
 
   return {
     id: `calendar:${event.id}`,

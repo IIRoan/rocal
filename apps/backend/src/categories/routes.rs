@@ -13,28 +13,23 @@ use super::service;
 use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
-use crate::http::schemas::{
-    calendar_color_schema, encryption_shadow_fields, refine_encrypted_name_body,
-};
+use crate::http::schemas::{calendar_color_schema, encrypted_name_fields};
 use crate::http::zod;
 use crate::request_schema;
 use crate::state::AppState;
 
 request_schema!(CreateCategoryRequest => zod::object([
-    ("name", zod::string().optional()),
     ("color", calendar_color_schema()),
 ])
-.extend(encryption_shadow_fields())
-.strict()
-.super_refine(refine_encrypted_name_body("Category", true)));
+.extend(encrypted_name_fields())
+.extend([("encryptedName", zod::string())])
+.strict());
 
 request_schema!(UpdateCategoryRequest => zod::object([
-    ("name", zod::string().optional()),
     ("color", calendar_color_schema().optional()),
 ])
-.extend(encryption_shadow_fields())
-.strict()
-.super_refine(refine_encrypted_name_body("Category", false)));
+.extend(encrypted_name_fields())
+.strict());
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()

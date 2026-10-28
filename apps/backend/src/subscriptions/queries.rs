@@ -486,24 +486,6 @@ pub async fn replace_exceptions<C: ConnectionTrait>(
     Ok(())
 }
 
-/// External ids among `external_ids` that already name a non-feed event in the calendar.
-pub async fn taken_external_ids<C: ConnectionTrait>(
-    db: &C,
-    calendar_id: &str,
-    external_ids: Vec<String>,
-) -> Result<Vec<String>, sea_orm::DbErr> {
-    let taken: Vec<Option<String>> = calendar_event::Entity::find()
-        .select_only()
-        .column(calendar_event::Column::ExternalId)
-        .filter(calendar_event::Column::CalendarId.eq(calendar_id))
-        .filter(calendar_event::Column::ExternalId.is_in(external_ids))
-        .filter(calendar_event::Column::IsSynced.eq(false))
-        .into_tuple()
-        .all(db)
-        .await?;
-    Ok(taken.into_iter().flatten().collect())
-}
-
 /// A non-feed event of the owner's calendar with this external id; `series` also requires a recurrence.
 pub async fn imported_event<C: ConnectionTrait>(
     db: &C,

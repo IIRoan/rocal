@@ -20,8 +20,7 @@ use crate::http::extract::{ValidJson, ValidQuery};
 use crate::http::schemas::{
     bulk_event_action_schema, calendar_color_schema, event_content_encryption_fields,
     event_invitation_content_schema, event_participant_input_schema,
-    refine_encrypted_event_content_body, reminder_field_schema, rsvp_status_schema,
-    timezone_schema,
+    refine_invitation_content_body, reminder_field_schema, rsvp_status_schema, timezone_schema,
 };
 use crate::http::zod::{self, optional_query_boolean, optional_query_int};
 use crate::request_schema;
@@ -53,12 +52,9 @@ request_schema!(InvitationByExternalIdQuery => zod::object([
 .strict());
 
 request_schema!(CreateEventRequest => zod::object([
-    ("title", zod::string().max(255).optional()),
-    ("description", zod::string().max(1000).optional()),
     ("start", zod::string()),
     ("end", zod::string()),
     ("allDay", zod::boolean().optional()),
-    ("location", zod::string().max(255).optional()),
     ("color", calendar_color_schema().optional()),
     ("calendarId", zod::string()),
     ("categoryId", zod::string().optional()),
@@ -68,20 +64,18 @@ request_schema!(CreateEventRequest => zod::object([
 ])
 .extend(event_content_encryption_fields())
 .extend([
+    ("encryptedContent", zod::string()),
     ("participants", zod::array(event_participant_input_schema()).optional()),
     ("invitationContent", event_invitation_content_schema().optional()),
 ])
 .strict()
-.super_refine(refine_encrypted_event_content_body(true)));
+.super_refine(refine_invitation_content_body));
 
 request_schema!(UpdateEventRequest => zod::object([
-    ("title", zod::string().max(255).optional()),
-    ("description", zod::string().max(1000).optional()),
     ("start", zod::string().optional()),
     ("end", zod::string().optional()),
     ("timezone", timezone_schema().optional()),
     ("allDay", zod::boolean().optional()),
-    ("location", zod::string().max(255).optional()),
     ("color", calendar_color_schema().optional()),
     ("calendarId", zod::string().optional()),
     ("categoryId", zod::string().optional()),
@@ -94,7 +88,7 @@ request_schema!(UpdateEventRequest => zod::object([
     ("invitationContent", event_invitation_content_schema().optional()),
 ])
 .strict()
-.super_refine(refine_encrypted_event_content_body(false)));
+.super_refine(refine_invitation_content_body));
 
 request_schema!(RsvpRequest => zod::object([("status", rsvp_status_schema())]).strict());
 
@@ -117,7 +111,6 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(search))
         .routes(routes!(search_corpus))
         .routes(routes!(list, create))
-        .routes(routes!(export_ics))
         .routes(routes!(invitation_by_external_id))
         .routes(routes!(rsvp))
         .routes(routes!(seal))
@@ -168,18 +161,6 @@ pub async fn create(
     ValidJson(body): ValidJson<CreateEventRequest>,
 ) -> Result<Json<Event>, AppError> {
     Ok(Json(service::create(&state, &user, body).await?))
-}
-
-/// A plaintext event, or one occurrence of a series, as an `.ics` download.
-#[utoipa::path(get, path = "/api/events/{id}/ics", operation_id = "exportEventIcs", tag = "Events", params(("id" = String, Path)), responses((status = 200, content_type = "text/calendar", body = String)))]
-#[tracing::instrument(skip_all)]
-pub async fn export_ics(
-    State(state): State<AppState>,
-    user: RouteUser,
-    Path(id): Path<String>,
-) -> Result<Response, AppError> {
-    let (ics, filename) = service::export_ics(&state, &user, &id).await?;
-    Ok(ics_response(ics, "attachment", &filename, "no-store"))
 }
 
 /// An `.ics` body served `attachment` or `inline` under `filename`.

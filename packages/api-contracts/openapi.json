@@ -192,7 +192,7 @@
         "tags": [
           "Calendars"
         ],
-        "summary": "The caller's calendars, default first, then by name; the first call creates the defaults.",
+        "summary": "The caller's calendars, default first, then by name.",
         "operationId": "listCalendars",
         "responses": {
           "200": {
@@ -227,6 +227,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Calendar"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/defaults": {
+      "post": {
+        "tags": [
+          "Calendars"
+        ],
+        "summary": "Stores the client-encrypted starting calendars when the caller owns none yet; answers the caller's calendars either way.",
+        "operationId": "seedDefaultCalendars",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeedDefaultCalendarsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarList"
                 }
               }
             }
@@ -1055,36 +1085,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventDeleted"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/events/{id}/ics": {
-      "get": {
-        "tags": [
-          "Events"
-        ],
-        "summary": "A plaintext event, or one occurrence of a series, as an `.ics` download.",
-        "operationId": "exportEventIcs",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "text/calendar": {
-                "schema": {
-                  "type": "string"
                 }
               }
             }
@@ -2354,13 +2354,13 @@
         "tags": [
           "Calendar Subscriptions"
         ],
-        "summary": "Imports client-encrypted events into an owned calendar; the legacy raw ICS body stays for shipped clients.",
+        "summary": "Imports client-encrypted events into an owned calendar.",
         "operationId": "importSubscriptionIcs",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ImportIcsRequest"
+                "$ref": "#/components/schemas/EncryptedIcsImportRequest"
               }
             }
           },
@@ -2749,7 +2749,6 @@
           "blindIndexTokens",
           "encryptionState",
           "encryptionKeyVersion",
-          "forceFullEncryption",
           "color",
           "kind",
           "isPublic",
@@ -2791,9 +2790,6 @@
           },
           "encryptionState": {
             "type": "string"
-          },
-          "forceFullEncryption": {
-            "type": "boolean"
           },
           "icsShareEnabled": {
             "type": "boolean"
@@ -3128,7 +3124,8 @@
       "CreateCalendarRequest": {
         "type": "object",
         "required": [
-          "color"
+          "color",
+          "encryptedName"
         ],
         "properties": {
           "blindIndexTokens": {
@@ -3147,18 +3144,8 @@
             "type": "integer",
             "format": "int32"
           },
-          "encryptionState": {
-            "type": "string",
-            "description": "Accepted from older clients and ignored; ciphertext presence decides."
-          },
-          "forceFullEncryption": {
-            "type": "boolean"
-          },
           "isDefault": {
             "type": "boolean"
-          },
-          "name": {
-            "type": "string"
           }
         },
         "additionalProperties": false
@@ -3166,7 +3153,8 @@
       "CreateCategoryRequest": {
         "type": "object",
         "required": [
-          "color"
+          "color",
+          "encryptedName"
         ],
         "properties": {
           "blindIndexTokens": {
@@ -3184,13 +3172,6 @@
           "encryptionKeyVersion": {
             "type": "integer",
             "format": "int32"
-          },
-          "encryptionState": {
-            "type": "string",
-            "description": "Accepted from older clients and ignored; ciphertext presence decides."
-          },
-          "name": {
-            "type": "string"
           }
         },
         "additionalProperties": false
@@ -3200,7 +3181,8 @@
         "required": [
           "start",
           "end",
-          "calendarId"
+          "calendarId",
+          "encryptedContent"
         ],
         "properties": {
           "allDay": {
@@ -3221,9 +3203,6 @@
           "color": {
             "type": "string"
           },
-          "description": {
-            "type": "string"
-          },
           "encryptedContent": {
             "type": "string"
           },
@@ -3237,9 +3216,6 @@
           "invitationContent": {
             "$ref": "#/components/schemas/InvitationContent",
             "description": "Transient plaintext for invitation mail; never stored."
-          },
-          "location": {
-            "type": "string"
           },
           "participants": {
             "type": "array",
@@ -3263,10 +3239,6 @@
           },
           "timezone": {
             "type": "string"
-          },
-          "title": {
-            "type": "string",
-            "description": "Plaintext content is only accepted without `encryptedContent`."
           }
         },
         "additionalProperties": false
@@ -3486,7 +3458,6 @@
         "type": "object",
         "required": [
           "enabled",
-          "rolloutStage",
           "algorithms",
           "devices",
           "passwordEnvelope",
@@ -3509,7 +3480,8 @@
             }
           },
           "enabled": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Always true; shipped native binaries reject a bootstrap without it."
           },
           "passwordEnvelope": {
             "oneOf": [
@@ -3520,9 +3492,6 @@
                 "type": "null"
               }
             ]
-          },
-          "rolloutStage": {
-            "type": "string"
           }
         }
       },
@@ -3694,6 +3663,7 @@
       },
       "EncryptedIcsImportRequest": {
         "type": "object",
+        "description": "`POST /api/subscriptions/import-ics`: events the client parsed and encrypted.",
         "required": [
           "calendarId",
           "encryptedEvents"
@@ -4315,7 +4285,6 @@
           "blindIndexTokens",
           "encryptionState",
           "encryptionKeyVersion",
-          "forceFullEncryption",
           "color",
           "kind",
           "isPublic",
@@ -4356,9 +4325,6 @@
           },
           "encryptionState": {
             "type": "string"
-          },
-          "forceFullEncryption": {
-            "type": "boolean"
           },
           "icsShareEnabled": {
             "type": "boolean"
@@ -4829,60 +4795,6 @@
           }
         }
       },
-      "IcsImportResult": {
-        "type": "object",
-        "description": "`POST /api/subscriptions/import-ics`; `fileName` and `calendarName` only answer legacy plaintext imports.",
-        "required": [
-          "success",
-          "eventsCreated",
-          "eventsTotal"
-        ],
-        "properties": {
-          "calendarName": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "errors": {
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "type": "string"
-            }
-          },
-          "eventsCreated": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "eventsTotal": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "fileName": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "success": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ImportIcsRequest": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/EncryptedIcsImportRequest"
-          },
-          {
-            "$ref": "#/components/schemas/LegacyIcsImportRequest"
-          }
-        ],
-        "description": "`POST /api/subscriptions/import-ics`: client-encrypted events, or the legacy raw ICS kept for shipped clients."
-      },
       "ImportIcsResponse": {
         "type": "object",
         "required": [
@@ -4891,9 +4803,6 @@
           "eventsTotal"
         ],
         "properties": {
-          "calendarName": {
-            "type": "string"
-          },
           "errors": {
             "type": "array",
             "items": {
@@ -4908,10 +4817,6 @@
           "eventsTotal": {
             "type": "integer",
             "format": "int64"
-          },
-          "fileName": {
-            "type": "string",
-            "description": "Legacy imports only."
           },
           "success": {
             "type": "boolean"
@@ -5261,25 +5166,6 @@
         ],
         "description": "`GET /api/account/invite/validate`: whether a token can still be used to sign up."
       },
-      "LegacyIcsImportRequest": {
-        "type": "object",
-        "required": [
-          "calendarId",
-          "icsContent"
-        ],
-        "properties": {
-          "calendarId": {
-            "$ref": "#/components/schemas/CalendarId"
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "icsContent": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
       "ListedCategory": {
         "allOf": [
           {
@@ -5367,7 +5253,8 @@
           "vaultVersion",
           "encryptedVaultB64",
           "kdf",
-          "kdfParams"
+          "kdfParams",
+          "wrappedSecret"
         ],
         "properties": {
           "algorithm": {
@@ -5403,11 +5290,7 @@
             ]
           },
           "wrappedSecret": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Optional on the wire, but the service rejects a bootstrap without it."
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -5923,11 +5806,7 @@
             ]
           },
           "wrappedSecret": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Null for legacy vaults sealed before the account-key seal existed."
+            "type": "string"
           }
         }
       },
@@ -5962,10 +5841,8 @@
             ]
           },
           "wrappedSecret": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "description": "Absent keeps the stored seal; a vault is never left unsealed."
           }
         },
         "additionalProperties": false
@@ -6851,9 +6728,6 @@
           "color": {
             "type": "string"
           },
-          "description": {
-            "type": "string"
-          },
           "encryptedContent": {
             "type": "string"
           },
@@ -6866,9 +6740,6 @@
           },
           "invitationContent": {
             "$ref": "#/components/schemas/InvitationContent"
-          },
-          "location": {
-            "type": "string"
           },
           "participants": {
             "type": "array",
@@ -6888,9 +6759,6 @@
             "type": "string"
           },
           "timezone": {
-            "type": "string"
-          },
-          "title": {
             "type": "string"
           }
         },
@@ -7218,6 +7086,22 @@
           }
         }
       },
+      "SeedDefaultCalendarsRequest": {
+        "type": "object",
+        "description": "`POST /api/calendars/defaults`: the client-encrypted starting calendars of an account that owns none yet.",
+        "required": [
+          "calendars"
+        ],
+        "properties": {
+          "calendars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateCalendarRequest"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "SessionId": {
         "type": "string"
       },
@@ -7385,7 +7269,6 @@
           "blindIndexTokens",
           "encryptionState",
           "encryptionKeyVersion",
-          "forceFullEncryption",
           "color",
           "kind",
           "isPublic",
@@ -7427,9 +7310,6 @@
           },
           "encryptionState": {
             "type": "string"
-          },
-          "forceFullEncryption": {
-            "type": "boolean"
           },
           "icsShareEnabled": {
             "type": "boolean"
@@ -7600,20 +7480,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "encryptionState": {
-            "type": "string"
-          },
-          "forceFullEncryption": {
-            "type": "boolean"
-          },
           "isDefault": {
             "type": "boolean"
           },
           "isVisible": {
             "type": "boolean"
-          },
-          "name": {
-            "type": "string"
           }
         },
         "additionalProperties": false
@@ -7636,12 +7507,6 @@
           "encryptionKeyVersion": {
             "type": "integer",
             "format": "int32"
-          },
-          "encryptionState": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
           }
         },
         "additionalProperties": false
@@ -7652,13 +7517,6 @@
           "notifications"
         ],
         "properties": {
-          "displayTitle": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Sent by shipped binaries; accepted and dropped, never stored."
-          },
           "encryptedDisplayTitle": {
             "type": [
               "string",
@@ -7697,9 +7555,6 @@
           "color": {
             "type": "string"
           },
-          "description": {
-            "type": "string"
-          },
           "encryptedContent": {
             "type": "string"
           },
@@ -7712,9 +7567,6 @@
           },
           "invitationContent": {
             "$ref": "#/components/schemas/InvitationContent"
-          },
-          "location": {
-            "type": "string"
           },
           "participants": {
             "type": "array",
@@ -7740,9 +7592,6 @@
             "type": "string"
           },
           "timezone": {
-            "type": "string"
-          },
-          "title": {
             "type": "string"
           }
         },
@@ -7778,10 +7627,6 @@
           },
           "emailNotifications": {
             "type": "boolean"
-          },
-          "eventEncryptionMode": {
-            "type": "string",
-            "description": "`hybrid` or `full`."
           },
           "pushNotifications": {
             "type": "boolean"
@@ -7880,7 +7725,6 @@
           "pushNotifications",
           "browserNotifications",
           "reminderSound",
-          "eventEncryptionMode",
           "defaultEventDuration",
           "defaultCalendarId",
           "compactView",
@@ -7918,9 +7762,6 @@
           },
           "emailNotifications": {
             "type": "boolean"
-          },
-          "eventEncryptionMode": {
-            "type": "string"
           },
           "id": {
             "type": "string"

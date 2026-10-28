@@ -104,7 +104,6 @@ pub fn calendar_dto(model: &calendar::Model) -> EventCalendar {
         blind_index_tokens: model.blind_index_tokens.clone(),
         encryption_state: model.encryption_state.clone(),
         encryption_key_version: model.encryption_key_version,
-        force_full_encryption: model.force_full_encryption,
         color: model.color.clone(),
         kind: model.kind.clone(),
         is_public: model.is_public,

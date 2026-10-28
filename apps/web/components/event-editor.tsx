@@ -229,9 +229,13 @@ export function EventEditor({
       }}
       handleEventDelete={handleEventDelete}
       handleEventDownloadIcs={() => {
-        if (selectedEvent?.id) {
-          // downloadEventIcs toasts every failure path itself.
-          void downloadEventIcs(selectedEvent.id).catch(() => undefined);
+        if (selectedEvent) {
+          downloadEventIcs(selectedEvent, {
+            calendarName: calendars.find(
+              (calendar) => calendar.id === selectedEvent.calendarId,
+            )?.name,
+            timezone: localSettings.timezone,
+          });
         }
       }}
       handleEventSave={handleEventSave}

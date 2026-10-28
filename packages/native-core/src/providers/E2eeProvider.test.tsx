@@ -56,7 +56,8 @@ jest.mock("@workspace/e2ee", () => {
     encryptEventContentRequest: actual.encryptEventContentRequest,
     encryptNameRequest: actual.encryptNameRequest,
     hydrateEncryptedName: actual.hydrateEncryptedName,
-    shouldEncryptEventContent: actual.shouldEncryptEventContent,
+    withoutPlaintextEventContent: actual.withoutPlaintextEventContent,
+    withoutPlaintextName: actual.withoutPlaintextName,
   };
 });
 
@@ -99,8 +100,6 @@ function createBootstrapResponse(
   overrides?: Partial<E2eeBootstrapResponse>,
 ): E2eeBootstrapResponse {
   return {
-    enabled: true,
-    rolloutStage: "encrypted",
     algorithms: {
       content: "AES-GCM-256",
       blindIndex: "HMAC-SHA-256",
@@ -644,6 +643,59 @@ describe("E2eeProvider", () => {
         updatedAt: new Date(0),
       }),
     ).resolves.toMatchObject({ name: "Therapy" });
+  });
+
+  it("does not mint new keys when other devices hold them without a password envelope", async () => {
+    peekPendingAuthPassword.mockReturnValue("secret-password");
+    mockUseAuth.mockReturnValue(
+      createMockAuthContext({
+        clearPendingAuthPassword,
+        consumePendingAuthPassword,
+        peekPendingAuthPassword,
+        lastAuthMethod: "email-password",
+      }),
+    );
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(
+          createBootstrapResponse({
+            devices: [
+              {
+                id: "device-row",
+                userId: "user-1",
+                deviceId: "other-device",
+                deviceLabel: null,
+                publicKey: "public-key",
+                publicKeyAlgorithm: "RSA-OAEP-4096",
+                wrappedAccountKey: "wrapped-account-key",
+                wrappedSearchKey: "wrapped-search-key",
+                wrapAlgorithm: "RSA-OAEP-4096",
+                keyVersion: 1,
+                lastSeenAt: new Date(0),
+                createdAt: new Date(0),
+                updatedAt: new Date(0),
+              },
+            ],
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+    await flushBootstrap();
+
+    expect(getE2ee().isReady).toBe(true);
+    expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
+    await expect(getE2ee().provider.hasActiveSession()).resolves.toBe(false);
+    await expect(
+      getE2ee().provider.attachCalendarEncryptionShadow({ name: "Therapy", color: "blue" }),
+    ).rejects.toThrow("Encryption is not ready");
   });
 
   it("starts a fresh E2EE session for passkey users when a password envelope exists", async () => {

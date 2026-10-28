@@ -4,6 +4,7 @@ import { webcrypto } from "node:crypto";
 import type { CryptoProvider } from "../crypto-provider";
 import { createE2eeModule } from "../e2ee-module";
 import {
+  ENCRYPTION_NOT_READY_MESSAGE,
   decryptEntityName,
   encryptEventContentRequest,
   encryptNameRequest,
@@ -12,6 +13,7 @@ import {
   shouldEncryptEventContent,
   type E2eeSessionKeys,
 } from "../payloads";
+import { NoopE2eeProvider } from "../provider";
 
 const e2ee = createE2eeModule(webcrypto as unknown as CryptoProvider);
 let keys: E2eeSessionKeys;
@@ -101,9 +103,43 @@ describe("encryptEventContentRequest", () => {
 
     expect(shouldEncryptEventContent(request)).toBe(false);
     expect(shouldEncryptEventContent({ title: "  " })).toBe(false);
-    await expect(encryptEventContentRequest(e2ee, keys, request)).resolves.toBe(
+    await expect(encryptEventContentRequest(e2ee, keys, request)).resolves.toEqual(
       request,
     );
+  });
+
+  it("drops empty content keys and refuses plaintext it cannot encrypt", async () => {
+    await expect(
+      encryptEventContentRequest(e2ee, keys, { title: " ", location: "", end: "x" }),
+    ).resolves.toEqual({ end: "x" });
+    await expect(
+      encryptEventContentRequest(e2ee, keys, { description: "Session notes" }),
+    ).rejects.toThrow(ENCRYPTION_NOT_READY_MESSAGE);
+  });
+});
+
+describe("NoopE2eeProvider", () => {
+  const provider = new NoopE2eeProvider();
+
+  it("throws instead of sending plaintext content without a session", async () => {
+    await expect(
+      provider.attachEventEncryptionShadow({ title: "Therapy", start: "s", end: "e", calendarId: "c" }),
+    ).rejects.toThrow(ENCRYPTION_NOT_READY_MESSAGE);
+    await expect(
+      provider.attachCalendarEncryptionShadow({ name: "Health", color: "blue" }),
+    ).rejects.toThrow(ENCRYPTION_NOT_READY_MESSAGE);
+    await expect(
+      provider.attachCategoryEncryptionShadow({ name: "Health" }),
+    ).rejects.toThrow(ENCRYPTION_NOT_READY_MESSAGE);
+  });
+
+  it("passes content-free writes through", async () => {
+    await expect(
+      provider.attachEventEncryptionShadow({ start: "s", end: "e" }),
+    ).resolves.toEqual({ start: "s", end: "e" });
+    await expect(
+      provider.attachCalendarEncryptionShadow({ isVisible: false, name: "" }),
+    ).resolves.toEqual({ isVisible: false });
   });
 });
 
@@ -112,11 +148,9 @@ describe("encrypted names", () => {
     const wire = await encryptNameRequest(e2ee, keys, "calendar", {
       name: " Therapy ",
       color: "blue",
-      encryptionState: "shadow_write",
     });
 
     expect(wire).not.toHaveProperty("name");
-    expect(wire).not.toHaveProperty("encryptionState");
     expect(JSON.stringify(wire)).not.toContain("Therapy");
     expect(wire.color).toBe("blue");
 
@@ -138,7 +172,7 @@ describe("encrypted names", () => {
     const request = { isVisible: false };
     await expect(
       encryptNameRequest(e2ee, keys, "calendar", request),
-    ).resolves.toBe(request);
+    ).resolves.toEqual(request);
   });
 
   it("hydrates encrypted names or falls back to a placeholder", async () => {

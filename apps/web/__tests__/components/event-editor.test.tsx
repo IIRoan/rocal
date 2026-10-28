@@ -41,7 +41,6 @@ jest.mock("../../components/event-editor/event-editor-popover", () => ({
 jest.mock("../../lib/calendar-api-service", () => ({
   calendarApiService: {
     deleteRecurringEvent: jest.fn(),
-    downloadEventICS: jest.fn(),
     getCategories: jest.fn(async () => []),
     getEventNotifications: jest.fn(),
     updateEventNotifications: jest.fn(),
@@ -190,7 +189,6 @@ const localSettings = {
   defaultView: "month",
   emailNotifications: true,
   pushNotifications: true,
-  eventEncryptionMode: "hybrid",
   id: "settings-1",
   reminderSound: true,
   showDeclinedEvents: false,

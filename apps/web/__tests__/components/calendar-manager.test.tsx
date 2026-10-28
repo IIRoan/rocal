@@ -131,7 +131,6 @@ describe("CalendarManager", () => {
       calendars: [
         {
           color: "blue",
-          forceFullEncryption: true,
           id: "cal-1",
           isDefault: true,
           isSyncOnly: false,

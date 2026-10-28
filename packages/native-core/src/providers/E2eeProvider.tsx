@@ -147,14 +147,6 @@ export function E2eeProvider({
           return;
         }
 
-        if (!bootstrapData.enabled) {
-          log.info("E2EE is not enabled for this user");
-          if (!isStale()) {
-            setIsReady(true);
-          }
-          return;
-        }
-
         if (isStale()) {
           return;
         }
@@ -230,6 +222,14 @@ export function E2eeProvider({
         }
 
         if (isStale()) {
+          return;
+        }
+
+        // Without an envelope the keys live only on other devices; fresh keys here would orphan their content.
+        if (!bootstrapData.passwordEnvelope && bootstrapData.devices.length > 0) {
+          log.warn("E2EE devices exist without a password envelope; this device cannot unlock", {
+            userId,
+          });
           return;
         }
 

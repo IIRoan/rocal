@@ -2,8 +2,8 @@
 
 use sea_orm::sea_query::{Condition, Expr};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
-    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, ModelTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
 
 use crate::db::entities::{calendar, calendar_event};
@@ -34,16 +34,6 @@ pub async fn owned_by<C: ConnectionTrait>(
         .await
 }
 
-pub async fn count_owned_by<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-) -> Result<u64, sea_orm::DbErr> {
-    calendar::Entity::find()
-        .filter(calendar::Column::UserId.eq(user_id))
-        .count(db)
-        .await
-}
-
 pub async fn find<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
@@ -56,22 +46,6 @@ pub async fn find<C: ConnectionTrait>(
         .await
 }
 
-/// Another of the user's calendars with this plaintext name.
-pub async fn named<C: ConnectionTrait>(
-    db: &C,
-    user_id: &str,
-    name: &str,
-    except: Option<&str>,
-) -> Result<Option<calendar::Model>, sea_orm::DbErr> {
-    let mut query = calendar::Entity::find()
-        .filter(calendar::Column::UserId.eq(user_id))
-        .filter(calendar::Column::Name.eq(name));
-    if let Some(except) = except {
-        query = query.filter(calendar::Column::Id.ne(except));
-    }
-    query.one(db).await
-}
-
 pub async fn insert<C: ConnectionTrait>(
     db: &C,
     row: calendar::ActiveModel,
@@ -79,7 +53,7 @@ pub async fn insert<C: ConnectionTrait>(
     row.insert(db).await
 }
 
-/// An owned, private calendar row that does not force full encryption.
+/// An owned, private calendar row.
 pub fn new_calendar(
     user_id: &str,
     name: &str,
@@ -94,7 +68,6 @@ pub fn new_calendar(
         is_public: Set(false),
         is_visible: Set(visible),
         is_default: Set(default),
-        force_full_encryption: Set(false),
         user_id: Set(user_id.to_owned()),
         ..Default::default()
     }
@@ -122,38 +95,6 @@ pub async fn clear_default<C: ConnectionTrait>(
         query = query.filter(calendar::Column::Id.ne(except));
     }
     query.exec(db).await.map(|_| ())
-}
-
-/// Events that already carry ciphertext drop their plaintext shadows.
-pub async fn drop_plaintext_shadows(
-    db: &DatabaseTransaction,
-    user_id: &str,
-    calendar_id: &str,
-) -> Result<(), sea_orm::DbErr> {
-    calendar_event::Entity::update_many()
-        .col_expr(calendar_event::Column::Title, Expr::value(""))
-        .col_expr(
-            calendar_event::Column::Description,
-            Expr::value(Option::<String>::None),
-        )
-        .col_expr(
-            calendar_event::Column::Location,
-            Expr::value(Option::<String>::None),
-        )
-        .col_expr(
-            calendar_event::Column::EncryptionState,
-            Expr::value("encrypted"),
-        )
-        .col_expr(
-            calendar_event::Column::UpdatedAt,
-            Expr::value(instant::now()),
-        )
-        .filter(calendar_event::Column::CalendarId.eq(calendar_id))
-        .filter(calendar_event::Column::UserId.eq(user_id))
-        .filter(calendar_event::Column::EncryptedContent.is_not_null())
-        .exec(db)
-        .await
-        .map(|_| ())
 }
 
 /// The user's owned calendars, the staging calendar aside.

@@ -3,6 +3,10 @@ import {
   getCurrentUserInvitationStatus,
   invitationByExternalIdQueryKey,
 } from "@workspace/calendar-core";
+import {
+  buildEventIcsExport,
+  EventIcsExportError,
+} from "@workspace/calendar-core/event-ics-export";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { toast } from "sonner";
 
@@ -26,15 +30,29 @@ export function getInvitationResponseStatus(
     : null;
 }
 
-export async function downloadEventIcs(eventId: string): Promise<void> {
+/** Builds the .ics from the decrypted event in the browser, so the server never sees its content. */
+export function downloadEventIcs(
+  event: CalendarEvent,
+  options: { calendarName?: string | null; timezone?: string | null },
+): void {
   try {
-    await calendarApiService.downloadEventICS(eventId);
+    const { icsContent, filename } = buildEventIcsExport(event, options);
+    const objectUrl = URL.createObjectURL(
+      new Blob([icsContent], { type: "text/calendar" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
   } catch (error: unknown) {
-    const message =
-      error && typeof error === "object" && "message" in error
-        ? String(error.message)
-        : "Failed to download event as ICS file";
-    toast.error(message);
+    toast.error(
+      error instanceof EventIcsExportError
+        ? error.message
+        : "Failed to download event as ICS file",
+    );
   }
 }
 

@@ -1,22 +1,15 @@
 import type { Schema } from "@workspace/api-contracts";
 import { z } from "zod";
 import type {
-  Calendar,
   CreateCalendarRequest,
   CreateCategoryRequest,
   CreateEventRequest,
-  EventCategory,
   EventContentEncryptionShadowRequest,
   NameEncryptionShadowRequest,
   UpdateCalendarRequest,
   UpdateCategoryRequest,
   UpdateEventRequest,
 } from "./types";
-import { isMailInvitationStagingCalendar } from "./mail-invitation-staging";
-
-/** `"shadow_write"` is kept only to read responses from servers predating encrypted-only storage. */
-export const E2EE_ROLLOUT_STAGE = "encrypted" as const;
-export type E2eeRolloutStage = typeof E2EE_ROLLOUT_STAGE | "shadow_write";
 
 export const CONTENT_ENCRYPTION_KEY_VERSION = 1;
 
@@ -47,11 +40,6 @@ export function eventContentAad(
   return `event-content:v${keyVersion}`;
 }
 
-export const PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE =
-  "Plaintext names must not be sent alongside an encrypted name.";
-export const PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE =
-  "Plaintext event content must not be sent alongside encrypted content.";
-
 const EVENT_CONTENT_FIELDS = ["title", "description", "location"] as const;
 export type EventContentField = (typeof EVENT_CONTENT_FIELDS)[number];
 
@@ -81,37 +69,18 @@ export const eventInvitationContentSchema = z
 export type EventInvitationContent = z.infer<typeof eventInvitationContentSchema> &
   Schema<"InvitationContent">;
 
-/** Event create/update body after client-side encryption. */
+/** Event create/update body after client-side encryption; plaintext content never leaves the device. */
 export type EventWireRequest<T extends CreateEventRequest | UpdateEventRequest> =
   Omit<T, EventContentField> &
-    Partial<Pick<CreateEventRequest, EventContentField>> &
     EventContentEncryptionShadowRequest & {
       invitationContent?: EventInvitationContent;
     };
 
-/** Calendar/category create/update body after client-side encryption. */
+/** Calendar/category create/update body after client-side encryption; the plaintext name never leaves the device. */
 export type NameWireRequest<
   T extends
     | CreateCalendarRequest
     | UpdateCalendarRequest
     | CreateCategoryRequest
     | UpdateCategoryRequest,
-> = Omit<T, "name"> & { name?: string } & NameEncryptionShadowRequest;
-
-/** Subscription feed names and the invitation staging calendar stay plaintext by design. */
-export function isCalendarNameBackfillCandidate(
-  calendar: Pick<Calendar, "name" | "kind" | "isVisible" | "isSyncOnly">,
-): boolean {
-  return (
-    calendar.kind === "owned" &&
-    !calendar.isSyncOnly &&
-    hasText(calendar.name) &&
-    !isMailInvitationStagingCalendar(calendar)
-  );
-}
-
-export function isCategoryNameBackfillCandidate(
-  category: Pick<EventCategory, "name" | "isActive">,
-): boolean {
-  return category.isActive !== false && hasText(category.name);
-}
+> = Omit<T, "name"> & NameEncryptionShadowRequest;

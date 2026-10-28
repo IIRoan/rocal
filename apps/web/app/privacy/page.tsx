@@ -86,10 +86,10 @@ export default function PrivacyPage() {
                 </table>
               </div>
               <p className="mt-3">
-                Owned calendar and category names are encrypted separately.
+                The names of your own calendars and categories, and the content
+                of the events you create, are always encrypted on your device.
                 Colors, settings, ownership and sharing information remain
-                readable. Legacy names and events may remain readable until a
-                signed-in device finishes migrating them.
+                readable.
               </p>
               <p className="mt-3">
                 Reminder emails contain a generic notice; Solace resolves event
@@ -144,12 +144,11 @@ export default function PrivacyPage() {
                 before delivery. Signature verification is a separate check.
               </p>
               <p className="mt-3">
-                New mail vaults use a random secret sealed to your account
-                encryption key. The server stores encrypted vault backups.
-                Legacy vaults without that seal may use a server-derived secret
-                and need migration. The backend can still authenticate to the
-                mailbox, and invitation processing
-                reads readable mail content when available.
+                Your mail vault uses a random secret sealed to your account
+                encryption key. The server stores only encrypted vault backups.
+                The backend can still authenticate to the mailbox, and
+                invitation processing reads readable mail content when
+                available.
               </p>
             </div>
 

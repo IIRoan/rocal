@@ -139,7 +139,6 @@ function createDefaultSettings(
     pushNotifications: true,
     browserNotifications: true,
     reminderSound: true,
-    eventEncryptionMode: "hybrid",
     defaultEventDuration: 60,
     defaultCalendarId: null,
     compactView: false,

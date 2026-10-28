@@ -9,23 +9,23 @@ jest.mock("react-native", () => ({
 jest.mock("@expo/vector-icons", () => ({ Feather: "Feather" }));
 
 describe("native event encryption notice", () => {
-  it("warns about legacy readable copies when the badge is pressed", () => {
+  it("explains encrypted fields when the badge is pressed", () => {
     const badge = EncryptionStatusIcon({
-      item: { encryptionState: "shadow_write" },
+      item: { encryptionState: "encrypted" },
       color: "muted",
     });
-    expect(badge.props.accessibilityLabel).toBe("Encryption pending");
-    expect(badge.props.children.props.name).toBe("alert-triangle");
+    expect(badge.props.accessibilityLabel).toBe("End-to-end encrypted");
+    expect(badge.props.children.props.name).toBe("shield");
     badge.props.onPress();
     expect(Alert.alert).toHaveBeenCalledWith(
-      "Encryption pending",
-      expect.stringContaining("readable copy may remain"),
+      "End-to-end encrypted",
+      expect.stringContaining("encrypted on your device"),
     );
   });
 
-  it("does not claim plaintext is encrypted because its calendar requires encryption", () => {
+  it("marks plaintext feed events as not encrypted", () => {
     const badge = EncryptionStatusIcon({
-      item: { encryptionState: "plaintext", forceFullEncryption: true },
+      item: { encryptionState: "plaintext" },
       color: "muted",
     });
     expect(badge.props.accessibilityLabel).toBe("Not encrypted");

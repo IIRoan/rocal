@@ -93,11 +93,7 @@ function parseUserKeyVault(raw: string): UserKeyVault {
 // ---------------------------------------------------------------------------
 
 function base64ToBytes(value: string): Uint8Array {
-  // Accept both standard base64 and base64url encodings
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded =
-    base64.length % 4 === 0 ? base64 : base64 + "=".repeat(4 - (base64.length % 4));
-  const binary = atob(padded);
+  const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);

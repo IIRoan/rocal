@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   defaultViewSchema,
-  eventEncryptionModeSchema,
   themeSchema,
   timeFormatSchema,
   timezoneSchema,
@@ -9,6 +8,9 @@ import {
 import type { UserSettings as PrismaUserSettings } from "../generated/prisma/index.js";
 import { strictZodObject } from "../lib/validation";
 import { userIdField } from "./_zod";
+
+// The retired API keeps the mode calendar-core dropped with the encrypted-only change.
+const eventEncryptionModeSchema = z.enum(["hybrid", "full"]);
 
 export const updateSettingsBodySchema = strictZodObject({
   theme: themeSchema.optional(),

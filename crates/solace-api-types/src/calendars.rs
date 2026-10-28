@@ -18,7 +18,6 @@ pub struct Calendar {
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
-    pub force_full_encryption: bool,
     pub color: String,
     pub kind: String,
     pub is_public: bool,
@@ -48,37 +47,29 @@ pub struct CalendarList {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateCalendarRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub name: Option<String>,
     pub color: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub is_default: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub encrypted_name: Option<String>,
+    pub encrypted_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
-    /// Accepted from older clients and ignored; ciphertext presence decides.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub encryption_state: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub force_full_encryption: Option<bool>,
+}
+
+/// `POST /api/calendars/defaults`: the client-encrypted starting calendars of an account that owns none yet.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SeedDefaultCalendarsRequest {
+    pub calendars: Vec<CreateCalendarRequest>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateCalendarRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub color: Option<String>,
@@ -96,13 +87,7 @@ pub struct UpdateCalendarRequest {
     pub blind_index_tokens: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
-    pub encryption_state: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub force_full_encryption: Option<bool>,
 }
 
 /// Query of `DELETE /api/calendars/:id`; `action` is `delete_events` (default) or `move_events`.

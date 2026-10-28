@@ -25,7 +25,6 @@ export function toUpdateSettingsRequest(
     pushNotifications: settings.pushNotifications,
     browserNotifications: settings.browserNotifications,
     reminderSound: settings.reminderSound,
-    eventEncryptionMode: settings.eventEncryptionMode,
     defaultEventDuration: settings.defaultEventDuration,
     defaultCalendarId: settings.defaultCalendarId,
     compactView: settings.compactView,

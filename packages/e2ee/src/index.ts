@@ -37,6 +37,7 @@ export {
 
 export {
   decryptEntityName,
+  ENCRYPTION_NOT_READY_MESSAGE,
   encryptEventContentRequest,
   encryptNameRequest,
   hydrateEncryptedName,
@@ -44,6 +45,8 @@ export {
   isEncryptedJsonPayload,
   parseEncryptedJsonPayload,
   shouldEncryptEventContent,
+  withoutPlaintextEventContent,
+  withoutPlaintextName,
 } from "./payloads";
 export type {
   ContentDecrypter,

@@ -156,9 +156,6 @@ const MOCK_SAFE_VAULT_BACKUP = {
   },
 };
 
-const MOCK_KEY_MATERIAL = "server-derived-key-material-xyz";
-const MOCK_DERIVED_KEY_B64 = "ZGVyaXZlZGtleWJ5dGVzYmFzZTY0dXJsZW5jb2RlZA==";
-
 const MOCK_VAULT = {
   userId: "user-1",
   email: "alice@example.com",
@@ -286,7 +283,7 @@ describe("mail-crypto", () => {
       expect(mockMailFetch).toHaveBeenCalledTimes(1);
     });
 
-    it("refuses a vault the server could still open", async () => {
+    it("refuses a vault without the account-key seal", async () => {
       mockMailFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => MOCK_VAULT_BACKUP,
@@ -294,7 +291,7 @@ describe("mail-crypto", () => {
 
       const runtime = buildRuntime();
       await expect(ensureVaultLoaded(runtime)).rejects.toThrow(
-        "could not be unlocked",
+        "not sealed to your encryption key",
       );
       expect(mockUnlockVault).not.toHaveBeenCalled();
     });

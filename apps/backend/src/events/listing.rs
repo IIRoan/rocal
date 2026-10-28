@@ -13,7 +13,6 @@ use super::recurrence::{self, Exception, ExceptionType};
 use super::view::{self, Relations};
 use crate::addresses::is_reserved_system_email;
 use crate::auth::guard::RouteUser;
-use crate::calendars::service::ensure_user_calendars;
 use crate::db::entities::calendar_event;
 use crate::error::AppError;
 use crate::http::zod::js_trim;
@@ -46,7 +45,6 @@ pub async fn list(
     start: &str,
     end: &str,
 ) -> Result<EventList, AppError> {
-    ensure_user_calendars(state, &user.id).await;
     if start.is_empty() || end.is_empty() {
         return Err(AppError::validation(
             "Start and end date parameters are required",

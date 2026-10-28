@@ -11,8 +11,6 @@ const ALLOWED: [&str; 7] = [
     "accountId",
     "emailFallback",
 ];
-/// Legacy plaintext keys: rows that still carry them are delivered, but the values are never read.
-const LEGACY_IGNORED: [&str; 3] = ["subject", "title", "fromName"];
 const MAX_OPAQUE_ID_LENGTH: usize = 128;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -35,10 +33,7 @@ pub fn parse(raw: &str) -> Option<Payload> {
         Ok(Value::Null) => Map::new(),
         _ => return None,
     };
-    if map
-        .keys()
-        .any(|key| !ALLOWED.contains(&key.as_str()) && !LEGACY_IGNORED.contains(&key.as_str()))
-    {
+    if map.keys().any(|key| !ALLOWED.contains(&key.as_str())) {
         return None;
     }
     let payload = Payload {
@@ -133,13 +128,11 @@ mod tests {
     }
 
     #[test]
-    fn legacy_plaintext_keys_are_tolerated_but_never_read() {
-        let payload = parse(
-            r#"{"kind":"new_mail","emailId":"m1","subject":"Secret","fromName":"Ann","title":"T"}"#,
-        )
-        .unwrap();
-        assert_eq!(payload.email_id, "m1");
-        assert!(!format!("{payload:?}").contains("Secret"));
+    fn plaintext_keys_are_refused() {
+        for key in ["subject", "title", "fromName"] {
+            let raw = format!(r#"{{"kind":"new_mail","emailId":"m1","{key}":"Secret"}}"#);
+            assert_eq!(parse(&raw), None, "{key}");
+        }
     }
 
     #[test]

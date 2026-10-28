@@ -1,5 +1,12 @@
-import type { Calendar } from "./types";
+import type { Calendar, CreateCalendarRequest } from "./types";
 import { isMailInvitationStagingCalendar } from "./mail-invitation-staging";
+
+/** Seeded by the client so their names are encrypted before they reach the server. */
+export const DEFAULT_CALENDARS: readonly CreateCalendarRequest[] = [
+  { name: "Personal", color: "#10b981", isDefault: true },
+  { name: "Work", color: "#3b82f6" },
+  { name: "Family", color: "#f43f5e" },
+];
 
 export type PartitionedCalendars = {
   ownedCalendars: Calendar[];

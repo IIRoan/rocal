@@ -8,17 +8,9 @@ import {
   type OutgoingMimeAttachment,
 } from "@workspace/calendar-core";
 import { type Attachment as ParsedMailAttachment } from "postal-mime";
-import { createLogger } from "@workspace/logger";
 import { mailDemoApiService } from "@/lib/mail/api-service";
-import {
-  generateVaultSecret,
-  VAULT_WRAP_ALGORITHM,
-  wrapVaultSecret,
-} from "@/lib/mail/vault-secret";
 import { StalwartJmapClient, type JmapAttachmentInput } from "@/lib/mail/jmap-client";
 import { mergeMailMessage, mergeMailMessagePreservingKeywords } from "@/lib/mail/mail-message-body";
-import { createEncryptedMailVault } from "@/lib/mail/vault-crypto";
-import { putStoredMailVault } from "@/lib/mail/vault-storage";
 import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
 import type {
   JmapEmailMessage,
@@ -29,18 +21,8 @@ import type {
   MailDecryptResult,
   MailSignatureVerificationState,
   MailSyncResponse,
-  MailVaultKdfParams,
   UserKeyVault,
 } from "@/lib/mail/types";
-
-const log = createLogger("mail-app");
-
-/** Reduced argon2id work factor: the passphrase is server-derived key material with 256 bits of entropy. */
-const KEY_MATERIAL_KDF: Partial<MailVaultKdfParams> = {
-  memoryKiB: 8192,
-  iterations: 1,
-  parallelism: 1,
-};
 
 export type ActiveMailboxState = {
   client: StalwartJmapClient;
@@ -352,83 +334,6 @@ export async function resolveOutgoingMessageBody(input: {
     textBody: armoredMessage,
     encrypted: true,
   };
-}
-
-/** Re-encrypt the vault (AES-GCM wrapper and inner PGP private key) under a new passphrase, sealing it to the user's E2EE key when one is supplied. */
-async function rekeyVault(input: {
-  unlockedVault: UserKeyVault;
-  oldPassphrase: string;
-  newPassphrase: string;
-  email: string;
-  vaultVersion: number;
-  wrappedSecret?: string | null;
-}): Promise<void> {
-  try {
-    const { privateKeyArmored } =
-      await mailCryptoWorkerClient.reEncryptPrivateKey({
-        privateKeyArmored: input.unlockedVault.encryptedPrivateKeyArmored,
-        oldPassphrase: input.oldPassphrase,
-        newPassphrase: input.newPassphrase,
-      });
-    const migratedVault: UserKeyVault = {
-      ...input.unlockedVault,
-      encryptedPrivateKeyArmored: privateKeyArmored,
-    };
-    const encrypted = await createEncryptedMailVault(
-      migratedVault,
-      input.newPassphrase,
-      KEY_MATERIAL_KDF,
-    );
-    await putStoredMailVault({
-      email: input.email,
-      vaultVersion: input.vaultVersion,
-      encryptedVaultB64: encrypted.encryptedVaultB64,
-      kdf: encrypted.kdf,
-      kdfParams: encrypted.kdfParams,
-    });
-    await mailDemoApiService.upsertAccountVaultBackup({
-      vaultVersion: input.vaultVersion,
-      encryptedVaultB64: encrypted.encryptedVaultB64,
-      kdf: encrypted.kdf,
-      kdfParams: encrypted.kdfParams,
-      ...(input.wrappedSecret
-        ? {
-            wrappedSecret: input.wrappedSecret,
-            wrapAlgorithm: VAULT_WRAP_ALGORITHM,
-          }
-        : {}),
-    });
-  } catch (err) {
-    log.error("Vault re-key failed.", err);
-  }
-}
-
-/** Move a legacy vault off the server-derived passphrase onto a random secret sealed to the user's E2EE key, so the server can no longer open it. */
-export async function sealVaultToAccountKey(input: {
-  unlockedVault: UserKeyVault;
-  currentPassphrase: string;
-  email: string;
-  vaultVersion: number;
-}): Promise<void> {
-  try {
-    const secret = generateVaultSecret();
-    const wrappedSecret = await wrapVaultSecret(secret);
-    if (!wrappedSecret) {
-      // No E2EE session on this device yet; the next open retries.
-      return;
-    }
-
-    await rekeyVault({
-      unlockedVault: input.unlockedVault,
-      oldPassphrase: input.currentPassphrase,
-      newPassphrase: secret,
-      email: input.email,
-      vaultVersion: input.vaultVersion,
-      wrappedSecret,
-    });
-  } catch (error) {
-    log.warn("Sealing the mail vault to the account key failed", { error });
-  }
 }
 
 export function mergeMailboxes(

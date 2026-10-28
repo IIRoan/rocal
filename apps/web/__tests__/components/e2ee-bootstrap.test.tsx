@@ -143,8 +143,6 @@ function createBootstrap(
   overrides?: Partial<E2eeBootstrapResponse>,
 ): E2eeBootstrapResponse {
   return {
-    enabled: true,
-    rolloutStage: "shadow_write",
     algorithms: {
       content: "AES-GCM-256",
       blindIndex: "HMAC-SHA-256",

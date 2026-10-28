@@ -3,6 +3,7 @@ import {
   encryptedNameAad,
   encryptedNamePlaceholder,
   eventContentAad,
+  findPlaintextEventContentFields,
   type CreateCalendarRequest,
   type CreateCategoryRequest,
   type CreateEventRequest,
@@ -48,6 +49,31 @@ function hasOwn(value: object, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
+export const ENCRYPTION_NOT_READY_MESSAGE =
+  "Encryption is not ready on this device. Sign in again to unlock your encrypted data, then retry.";
+
+/** Without a session only content-free writes (visibility, color, time moves) may leave the device. */
+export function withoutPlaintextEventContent<
+  T extends CreateEventRequest | UpdateEventRequest,
+>(request: T): EventWireRequest<T> {
+  if (findPlaintextEventContentFields(request).length > 0) {
+    throw new Error(ENCRYPTION_NOT_READY_MESSAGE);
+  }
+  const { title: _title, description: _description, location: _location, ...wire } = request;
+  return wire;
+}
+
+/** Without a session only requests that do not rename may leave the device. */
+export function withoutPlaintextName<T extends NameRequest>(
+  request: T,
+): NameWireRequest<T> {
+  if (trimToNull(request.name)) {
+    throw new Error(ENCRYPTION_NOT_READY_MESSAGE);
+  }
+  const { name: _name, ...wire } = request;
+  return wire;
+}
+
 /** Ciphertext covers all three fields, so a request without a title must keep the stored one. */
 export function shouldEncryptEventContent(request: object): boolean {
   if (!hasOwn(request, "title")) {
@@ -67,7 +93,7 @@ export async function encryptEventContentRequest<
   keyVersion: number = CONTENT_ENCRYPTION_KEY_VERSION,
 ): Promise<EventWireRequest<T>> {
   if (!shouldEncryptEventContent(request)) {
-    return request;
+    return withoutPlaintextEventContent(request);
   }
 
   const title = trimToNull(request.title) ?? "";
@@ -86,10 +112,7 @@ export async function encryptEventContentRequest<
     [title, description, location].filter(Boolean).join(" "),
   );
 
-  const wire: EventWireRequest<T> = { ...request };
-  delete wire.title;
-  delete wire.description;
-  delete wire.location;
+  const { title: _title, description: _description, location: _location, ...wire } = request;
 
   const invitesAttendees = (request.participants ?? []).some(
     (participant) => participant.role !== "organizer",
@@ -112,7 +135,7 @@ export async function encryptEventContentRequest<
   };
 }
 
-/** Requests that do not rename (visibility, color) are returned unchanged. */
+/** Requests that do not rename (visibility, color) carry no name on the wire. */
 export async function encryptNameRequest<T extends NameRequest>(
   e2ee: ContentEncrypter,
   keys: E2eeSessionKeys,
@@ -123,7 +146,7 @@ export async function encryptNameRequest<T extends NameRequest>(
   const name = hasOwn(request, "name") ? trimToNull(request.name) : null;
 
   if (!name) {
-    return request;
+    return withoutPlaintextName(request);
   }
 
   const encryptedName = JSON.stringify(
@@ -138,9 +161,7 @@ export async function encryptNameRequest<T extends NameRequest>(
     name,
   );
 
-  const wire: NameWireRequest<T> = { ...request };
-  delete wire.name;
-  delete wire.encryptionState;
+  const { name: _name, ...wire } = request;
 
   return {
     ...wire,

@@ -98,7 +98,6 @@ pub struct EventCalendar {
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
-    pub force_full_encryption: bool,
     pub color: String,
     pub kind: String,
     pub is_public: bool,
@@ -306,21 +305,6 @@ pub struct RsvpDeleted {
     pub deleted: bool,
 }
 
-/// `POST /api/subscriptions/import-ics`; `fileName` and `calendarName` only answer legacy plaintext imports.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct IcsImportResult {
-    pub success: bool,
-    pub events_created: i64,
-    pub events_total: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub file_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub calendar_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub errors: Option<Vec<String>>,
-}
-
 /// `GET /api/events`: an instant range, both required.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -373,16 +357,6 @@ pub struct CreateEventRequest {
     pub start: String,
     pub end: String,
     pub calendar_id: CalendarId,
-    /// Plaintext content is only accepted without `encryptedContent`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub title: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub description: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub location: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub all_day: Option<bool>,
@@ -405,9 +379,7 @@ pub struct CreateEventRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub recurrence: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub encrypted_content: Option<String>,
+    pub encrypted_content: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub blind_index_tokens: Option<Vec<String>>,
@@ -428,12 +400,6 @@ pub struct CreateEventRequest {
 pub struct UpdateEventRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
-    pub title: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub description: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
     pub start: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
@@ -444,9 +410,6 @@ pub struct UpdateEventRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub all_day: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub location: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub color: Option<String>,

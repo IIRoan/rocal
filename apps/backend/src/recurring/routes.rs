@@ -17,7 +17,7 @@ use crate::http::extract::{ValidJson, ValidQuery};
 use crate::http::schemas::{
     calendar_color_schema, event_content_encryption_fields, event_invitation_content_schema,
     event_participant_input_schema, recurrence_rule_schema, recurrence_scope_schema,
-    refine_encrypted_event_content_body, timezone_schema,
+    refine_invitation_content_body, timezone_schema,
 };
 use crate::http::zod;
 use crate::request_schema;
@@ -37,12 +37,9 @@ request_schema!(EditRecurringRequest => zod::object([
     ("editScope", recurrence_scope_schema()),
     ("occurrenceDate", zod::string().optional()),
     ("updates", zod::object([
-        ("title", zod::string().optional()),
-        ("description", zod::string().optional()),
         ("start", zod::string().optional()),
         ("end", zod::string().optional()),
         ("allDay", zod::boolean().optional()),
-        ("location", zod::string().optional()),
         ("color", calendar_color_schema().optional()),
         ("reminder", zod::number().optional()),
         ("recurrence", zod::string().optional()),
@@ -54,7 +51,7 @@ request_schema!(EditRecurringRequest => zod::object([
     ])
     .extend(event_content_encryption_fields())
     .strict()
-    .super_refine(refine_encrypted_event_content_body(false))),
+    .super_refine(refine_invitation_content_body)),
 ])
 .strict());
 

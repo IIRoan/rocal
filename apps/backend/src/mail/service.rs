@@ -308,7 +308,7 @@ pub async fn bootstrap(
             "This account is not approved for a mailbox yet.".into(),
         ));
     }
-    if optional_text(request.wrapped_secret.as_ref().and_then(|s| s.as_deref())).is_none() {
+    if optional_text(Some(&request.wrapped_secret)).is_none() {
         return Err(AppError::field(
             "A vault secret sealed to your account key is required.",
             "wrappedSecret",
@@ -400,7 +400,7 @@ fn provisioning(
             encrypted_vault_b64,
             &request.kdf,
             &request.kdf_params,
-            optional_text(request.wrapped_secret.flatten().as_deref()),
+            js_trim(&request.wrapped_secret).to_owned(),
             optional_text(request.wrap_algorithm.flatten().as_deref()),
         )?,
         public_key_armored,
@@ -415,7 +415,7 @@ fn stored_vault(
     encrypted_vault_b64: String,
     kdf: &str,
     params: &MailVaultKdfParams,
-    wrapped_secret: Option<String>,
+    wrapped_secret: String,
     wrap_algorithm: Option<String>,
 ) -> Result<Vault, AppError> {
     let kdf = js_trim(kdf).to_lowercase();
@@ -994,10 +994,10 @@ pub async fn vault_backup(state: &AppState, user: &RouteUser) -> Result<MailVaul
     let vault = queries::vault(&state.db, &mailbox.id)
         .await?
         .ok_or_else(missing)?;
-    Ok(vault_record(mailbox.email, vault))
+    vault_record(mailbox.email, vault)
 }
 
-/// Replaces the vault; an omitted or null seal keeps the stored one, so a write never makes a vault server-openable again.
+/// Replaces the vault; an omitted seal keeps the stored one, and a vault without a seal is never written.
 pub async fn put_vault_backup(
     state: &AppState,
     user: &RouteUser,
@@ -1016,21 +1016,43 @@ pub async fn put_vault_backup(
             "encryptedVaultB64",
         ));
     }
+    let current = queries::vault(&state.db, &mailbox.id).await?;
+    let Some(wrapped_secret) = optional_text(request.wrapped_secret.as_deref()).or_else(|| {
+        current
+            .as_ref()
+            .and_then(|vault| vault.wrapped_secret.clone())
+    }) else {
+        return Err(AppError::field(
+            "A vault secret sealed to your account key is required.",
+            "wrappedSecret",
+        ));
+    };
+    let wrap_algorithm = request
+        .wrap_algorithm
+        .flatten()
+        .or_else(|| current.and_then(|vault| vault.wrap_algorithm));
     let vault = stored_vault(
         request.vault_version,
         encrypted_vault_b64,
         &request.kdf,
         &request.kdf_params,
-        request.wrapped_secret.flatten(),
-        request.wrap_algorithm.flatten(),
+        wrapped_secret,
+        wrap_algorithm,
     )?;
-    let stored = queries::upsert_vault(&state.db, &mailbox.id, vault, true).await?;
-    Ok(vault_record(mailbox.email, stored))
+    let stored = queries::upsert_vault(&state.db, &mailbox.id, vault).await?;
+    vault_record(mailbox.email, stored)
 }
 
-fn vault_record(email: String, vault: mail_vault_backup::Model) -> MailVaultBackup {
+/// Every write stores a seal, so a row without one is corrupt.
+fn vault_record(
+    email: String,
+    vault: mail_vault_backup::Model,
+) -> Result<MailVaultBackup, AppError> {
     let count = |value: i32| u32::try_from(value).unwrap_or_default();
-    MailVaultBackup {
+    let wrapped_secret = vault
+        .wrapped_secret
+        .ok_or_else(|| AppError::internal("mail vault backup without a seal"))?;
+    Ok(MailVaultBackup {
         email,
         vault_version: count(vault.vault_version),
         encrypted_vault_b64: vault.encrypted_vault_b64,
@@ -1041,9 +1063,9 @@ fn vault_record(email: String, vault: mail_vault_backup::Model) -> MailVaultBack
             iterations: count(vault.kdf_iterations),
             parallelism: count(vault.kdf_parallelism),
         },
-        wrapped_secret: vault.wrapped_secret,
+        wrapped_secret,
         wrap_algorithm: vault.wrap_algorithm,
-    }
+    })
 }
 
 /// `deleteMailboxForUser`: the linked Stalwart account, then any account still holding the mailbox name, then the entry.
@@ -1275,7 +1297,7 @@ pub mod tests {
                 iterations: 3,
                 parallelism: 4,
             },
-            wrapped_secret: Some(Some("wrapped:sealed-secret".into())),
+            wrapped_secret: "wrapped:sealed-secret".into(),
             wrap_algorithm: Some(Some("e2ee-account-key-v1".into())),
         }
     }

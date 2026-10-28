@@ -70,7 +70,7 @@ describe("settings toggle rows", () => {
   it("renders security encryption as informational text without a toggle", () => {
     const html = renderToStaticMarkup(
       <SecuritySettings
-        localSettings={{ eventEncryptionMode: "hybrid" } as any}
+        localSettings={{} as any}
         updateSetting={jest.fn()}
         goBack={() => {}}
         goForward={() => {}}
@@ -91,7 +91,6 @@ describe("settings toggle rows", () => {
           {
             emailNotifications: true,
             pushNotifications: true,
-            eventEncryptionMode: "hybrid",
           } as any
         }
         updateSetting={jest.fn()}
@@ -132,7 +131,6 @@ describe("settings toggle rows", () => {
           {
             emailNotifications: true,
             pushNotifications: false,
-            eventEncryptionMode: "hybrid",
           } as any
         }
         updateSetting={jest.fn()}

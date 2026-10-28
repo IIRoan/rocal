@@ -128,7 +128,6 @@ import {
   resolveAttachmentBlob,
   buildTextAttachmentPreview,
   resolveOutgoingMessageBody,
-  sealVaultToAccountKey,
   resolveSignatureVerificationState,
   getPrimaryMailboxId,
   messageBelongsToMailbox,
@@ -153,9 +152,6 @@ export type { ActiveMailboxState } from "@/lib/mail/mail-app-helpers";
 
 const log = createLogger("mail-app");
 
-const MAILBOX_REAUTH_REQUIRED_MESSAGE =
-  "This mailbox still needs a one-time password migration. Sign out and sign back in with your email password once to finish automatic unlocking.";
-
 /** The account's vault backup, preferring the server copy and caching it on this device. */
 async function loadMailVaultBackup(
   email: string,
@@ -179,11 +175,16 @@ async function unlockMailVaultBackup(
   backup: MailVaultBackupRecord,
   accountUserId: string | null | undefined,
 ): Promise<{ unlockedVault: UserKeyVault; effectivePassphrase: string }> {
-  const sealedSecret = backup.wrappedSecret
-    ? await unwrapVaultSecret(backup.wrappedSecret)
-    : null;
+  if (!backup.wrappedSecret) {
+    throw new Error(
+      "This mail vault is not sealed to your encryption key and cannot be opened.",
+    );
+  }
+  const sealedSecret = await unwrapVaultSecret(backup.wrappedSecret);
   if (!sealedSecret) {
-    throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
+    throw new Error(
+      "Your encryption keys are not unlocked on this device. Sign in with your email password, then try again.",
+    );
   }
 
   const cachedDerivedKey = accountUserId
@@ -1345,16 +1346,6 @@ export function useMailApp() {
       void client.ensureEncryptOnAppendDisabled(jmapSession).catch((error) => {
         log.warn("Failed to disable Stalwart encryptOnAppend on sign-in", error);
       });
-
-      // Seal a legacy vault to the account key; the server keeps no copy.
-      if (!backup.wrappedSecret) {
-        void sealVaultToAccountKey({
-          unlockedVault,
-          currentPassphrase: effectivePassphrase,
-          email,
-          vaultVersion: backup.vaultVersion,
-        }).catch(() => undefined);
-      }
 
       const mailServerPolicy = resolveMailServerPolicy({
         session: jmapSession,

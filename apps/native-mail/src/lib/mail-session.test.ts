@@ -9,9 +9,6 @@ const mockLoadSnapshot = jest.fn<
   [string]
 >();
 
-jest.mock("@workspace/native-core/lib/startup-crypto", () => ({
-  enforceFullEventEncryption: jest.fn(),
-}));
 jest.mock("./mail/account-bootstrap", () => ({
   bootstrapMailboxForAccount: jest.fn(),
 }));

@@ -39,24 +39,6 @@ async function handleGenerateKeyPair(payload: {
   };
 }
 
-async function handleReEncryptPrivateKey(payload: {
-  privateKeyArmored: string;
-  oldPassphrase: string;
-  newPassphrase: string;
-}): Promise<{ privateKeyArmored: string }> {
-  const decrypted = await openpgp.decryptKey({
-    privateKey: await openpgp.readPrivateKey({
-      armoredKey: payload.privateKeyArmored,
-    }),
-    passphrase: payload.oldPassphrase,
-  });
-  const reEncrypted = await openpgp.encryptKey({
-    privateKey: decrypted,
-    passphrase: payload.newPassphrase,
-  });
-  return { privateKeyArmored: reEncrypted.armor() };
-}
-
 async function handleLoadActiveVault(payload: {
   privateKeyArmored: string;
   privateKeyPassphrase: string;
@@ -182,11 +164,6 @@ type MailCryptoWorkerRequest =
     }
   | {
       requestId: number;
-      type: "REENCRYPT_PRIVATE_KEY";
-      payload: Parameters<typeof handleReEncryptPrivateKey>[0];
-    }
-  | {
-      requestId: number;
       type: "LOAD_ACTIVE_VAULT";
       payload: Parameters<typeof handleLoadActiveVault>[0];
     }
@@ -217,9 +194,6 @@ self.onmessage = async (event: MessageEvent<MailCryptoWorkerRequest>) => {
     switch (request.type) {
       case "GENERATE_PGP_KEYPAIR":
         result = await handleGenerateKeyPair(request.payload);
-        break;
-      case "REENCRYPT_PRIVATE_KEY":
-        result = await handleReEncryptPrivateKey(request.payload);
         break;
       case "LOAD_ACTIVE_VAULT":
         result = await handleLoadActiveVault(request.payload);

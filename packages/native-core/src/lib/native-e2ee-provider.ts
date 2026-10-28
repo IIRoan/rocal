@@ -4,7 +4,8 @@ import {
   encryptNameRequest,
   hydrateEncryptedEventWithoutSession,
   hydrateEncryptedName,
-  shouldEncryptEventContent,
+  withoutPlaintextEventContent,
+  withoutPlaintextName,
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
@@ -49,7 +50,7 @@ function isE2eeBootstrapResponse(value: unknown): value is E2eeBootstrapResponse
     return false;
   }
   const record = value as Record<string, unknown>;
-  if (typeof record.enabled !== "boolean" || !Array.isArray(record.devices)) {
+  if (!Array.isArray(record.devices)) {
     return false;
   }
   return record.devices.every(
@@ -242,68 +243,51 @@ export function createNativeE2eeProvider({
     }
     return getSession();
   };
-  const getRequiredSession = (): E2eeSession => {
-    const session = getSession();
-    if (!session) {
-      throw new Error("Encryption setup has not completed on this device.");
+
+  const encryptWith = async <T>(
+    kind: string,
+    encrypt: (e2ee: E2eeModule, session: E2eeSession) => Promise<T>,
+    withoutSession: () => T,
+  ): Promise<T> => {
+    try {
+      const session = await waitForSession();
+      const e2ee = session ? await getModule() : null;
+      return session && e2ee ? await encrypt(e2ee, session) : withoutSession();
+    } catch (error) {
+      log.error(`Failed to encrypt ${kind}:`, error);
+      throw error;
     }
-    return session;
   };
 
   const provider: IE2eeProvider = {
     async attachEventEncryptionShadow<
       T extends CreateEventRequest | UpdateEventRequest,
     >(request: T): Promise<EventWireRequest<T>> {
-      const session = getSession();
-      if (!session || !shouldEncryptEventContent(request)) {
-        return request;
-      }
-
-      try {
-        const e2ee = await getModule();
-        if (!e2ee) {
-          return request;
-        }
-
-        return await encryptEventContentRequest(e2ee, session, request);
-      } catch (error) {
-        log.error("Failed to encrypt event:", error);
-        throw error;
-      }
+      return encryptWith(
+        "event",
+        (e2ee, session) => encryptEventContentRequest(e2ee, session, request),
+        () => withoutPlaintextEventContent(request),
+      );
     },
 
     async attachCalendarEncryptionShadow<
       T extends CreateCalendarRequest | UpdateCalendarRequest,
     >(request: T): Promise<NameWireRequest<T>> {
-      try {
-        const session = getRequiredSession();
-        const e2ee = await getModule();
-        if (!e2ee) {
-          throw new Error("Native encryption runtime is unavailable.");
-        }
-
-        return await encryptNameRequest(e2ee, session, "calendar", request);
-      } catch (error) {
-        log.error("Failed to encrypt calendar:", error);
-        throw error;
-      }
+      return encryptWith(
+        "calendar",
+        (e2ee, session) => encryptNameRequest(e2ee, session, "calendar", request),
+        () => withoutPlaintextName(request),
+      );
     },
 
     async attachCategoryEncryptionShadow<
       T extends CreateCategoryRequest | UpdateCategoryRequest,
     >(request: T): Promise<NameWireRequest<T>> {
-      try {
-        const session = getRequiredSession();
-        const e2ee = await getModule();
-        if (!e2ee) {
-          throw new Error("Native encryption runtime is unavailable.");
-        }
-
-        return await encryptNameRequest(e2ee, session, "category", request);
-      } catch (error) {
-        log.error("Failed to encrypt category:", error);
-        throw error;
-      }
+      return encryptWith(
+        "category",
+        (e2ee, session) => encryptNameRequest(e2ee, session, "category", request),
+        () => withoutPlaintextName(request),
+      );
     },
 
     async hydrateEncryptedCalendar(calendar: Calendar): Promise<Calendar> {

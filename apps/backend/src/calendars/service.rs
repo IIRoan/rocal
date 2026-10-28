@@ -1,28 +1,21 @@
-//! `CalendarService`: listing with the default set, create and update with name and color rules, and delete with its event handling.
+//! `CalendarService`: listing, the client-encrypted starting set, create and update with name and color rules, and delete with its event handling.
 
-use sea_orm::{IntoActiveModel, Set, TransactionTrait};
+use sea_orm::{EntityTrait, IntoActiveModel, QuerySelect, Set, TransactionTrait};
 use solace_api_types::calendars::{
     Calendar, CalendarDeleteResult, CalendarList, CreateCalendarRequest, DeleteCalendarQuery,
-    UpdateCalendarRequest,
+    SeedDefaultCalendarsRequest, UpdateCalendarRequest,
 };
 
 use super::queries;
 use crate::auth::guard::RouteUser;
-use crate::db::entities::calendar;
+use crate::db::entities::{calendar, user};
 use crate::entity_metadata::{
-    NameInput, NamePersistence, assert_plaintext_name_allowed, assert_valid_entity_color,
-    is_mail_invitation_staging_calendar, resolve_name_persistence,
+    NameInput, NamePersistence, assert_valid_entity_color, is_mail_invitation_staging_calendar,
+    resolve_name_persistence,
 };
 use crate::error::AppError;
 use crate::instant;
 use crate::state::AppState;
-
-/// The three calendars a new account starts with: name, color, default.
-const DEFAULT_CALENDARS: [(&str, &str, bool); 3] = [
-    ("Personal", "#10b981", true),
-    ("Work", "#3b82f6", false),
-    ("Family", "#f43f5e", false),
-];
 
 pub fn dto(model: calendar::Model) -> Calendar {
     Calendar {
@@ -32,7 +25,6 @@ pub fn dto(model: calendar::Model) -> Calendar {
         blind_index_tokens: model.blind_index_tokens,
         encryption_state: model.encryption_state,
         encryption_key_version: model.encryption_key_version,
-        force_full_encryption: model.force_full_encryption,
         color: model.color,
         kind: model.kind,
         is_public: model.is_public,
@@ -50,43 +42,47 @@ pub fn dto(model: calendar::Model) -> Calendar {
     }
 }
 
-/// `ensureUserCalendars`: an account without calendars gets the defaults; a failure is logged, never raised.
-pub async fn ensure_user_calendars(state: &AppState, user_id: &str) {
-    let created: Result<(), sea_orm::DbErr> = async {
-        if queries::count_owned_by(&state.db, user_id).await? > 0 {
-            return Ok(());
-        }
-        for (name, color, is_default) in DEFAULT_CALENDARS {
-            let row = queries::new_calendar(user_id, name, color, true, is_default);
-            queries::insert(&state.db, row).await?;
-        }
-        tracing::info!("Created default calendars");
-        Ok(())
-    }
-    .await;
-    if let Err(error) = created {
-        tracing::error!(error = %crate::telemetry::redact_pii(&error.to_string()), "Failed to ensure default calendars");
-    }
-}
-
 pub async fn list(state: &AppState, user: &RouteUser) -> Result<CalendarList, AppError> {
-    ensure_user_calendars(state, &user.id).await;
     let calendars = queries::owned_by(&state.db, &user.id).await?;
     Ok(CalendarList {
         calendars: calendars.into_iter().map(dto).collect(),
     })
 }
 
-/// Writes the name columns; plaintext leaves the key version alone, as Prisma did.
+/// Stores the client-encrypted starting calendars once; any owned calendar besides staging means the account already has its set.
+pub async fn seed_defaults(
+    state: &AppState,
+    user: &RouteUser,
+    request: SeedDefaultCalendarsRequest,
+) -> Result<CalendarList, AppError> {
+    let mut rows = Vec::with_capacity(request.calendars.len());
+    let mut has_default = false;
+    for calendar in request.calendars {
+        let is_default = !has_default && calendar.is_default == Some(true);
+        has_default |= is_default;
+        let mut row = new_row(user, calendar)?;
+        row.is_default = Set(is_default);
+        rows.push(row);
+    }
+    let transaction = state.db.begin().await?;
+    // Concurrent first launches serialize on the user row, so only one set is stored.
+    user::Entity::find_by_id(user.id.clone())
+        .lock_exclusive()
+        .one(&transaction)
+        .await?;
+    if queries::count_editable(&transaction, &user.id).await? == 0 {
+        for row in rows {
+            queries::insert(&transaction, row).await?;
+        }
+    }
+    transaction.commit().await?;
+    list(state, user).await
+}
+
+/// Writes the encrypted name columns.
 fn apply_name(row: &mut calendar::ActiveModel, persistence: NamePersistence) {
     match persistence {
         NamePersistence::None => {}
-        NamePersistence::Plaintext(name) => {
-            row.name = Set(name);
-            row.encrypted_name = Set(None);
-            row.blind_index_tokens = Set(None);
-            row.encryption_state = Set("plaintext".into());
-        }
         NamePersistence::Encrypted {
             encrypted_name,
             blind_index_tokens,
@@ -101,23 +97,29 @@ fn apply_name(row: &mut calendar::ActiveModel, persistence: NamePersistence) {
     }
 }
 
-async fn assert_unique_name(
-    state: &AppState,
-    user_id: &str,
-    name: &str,
-    except: Option<&str>,
-) -> Result<(), AppError> {
-    assert_plaintext_name_allowed(&state.db, user_id, "Calendar").await?;
-    if queries::named(&state.db, user_id, name, except)
-        .await?
-        .is_some()
-    {
-        return Err(AppError::field(
-            "A calendar with this name already exists",
-            "name",
-        ));
-    }
-    Ok(())
+/// A new owned calendar with a validated encrypted name and color.
+fn new_row(
+    user: &RouteUser,
+    request: CreateCalendarRequest,
+) -> Result<calendar::ActiveModel, AppError> {
+    let persistence = resolve_name_persistence(NameInput {
+        entity_label: "Calendar",
+        encrypted_name: Some(&request.encrypted_name),
+        blind_index_tokens: request.blind_index_tokens.as_deref(),
+        encryption_key_version: request.encryption_key_version,
+    })?;
+    assert_valid_entity_color(&request.color)?;
+    let mut row = calendar::ActiveModel {
+        color: Set(request.color),
+        kind: Set("owned".into()),
+        is_public: Set(false),
+        is_visible: Set(true),
+        is_default: Set(request.is_default.unwrap_or(false)),
+        user_id: Set(user.id.clone()),
+        ..Default::default()
+    };
+    apply_name(&mut row, persistence);
+    Ok(row)
 }
 
 pub async fn create(
@@ -125,30 +127,8 @@ pub async fn create(
     user: &RouteUser,
     request: CreateCalendarRequest,
 ) -> Result<Calendar, AppError> {
-    let persistence = resolve_name_persistence(NameInput {
-        entity_label: "Calendar",
-        name: request.name.as_deref(),
-        encrypted_name: request.encrypted_name.as_deref(),
-        blind_index_tokens: request.blind_index_tokens.as_deref(),
-        encryption_key_version: request.encryption_key_version,
-        require_name: true,
-    })?;
-    assert_valid_entity_color(&request.color)?;
-    if let NamePersistence::Plaintext(name) = &persistence {
-        assert_unique_name(state, &user.id, name, None).await?;
-    }
     let is_default = request.is_default.unwrap_or(false);
-    let mut row = calendar::ActiveModel {
-        force_full_encryption: Set(request.force_full_encryption.unwrap_or(true)),
-        color: Set(request.color),
-        kind: Set("owned".into()),
-        is_public: Set(false),
-        is_visible: Set(true),
-        is_default: Set(is_default),
-        user_id: Set(user.id.clone()),
-        ..Default::default()
-    };
-    apply_name(&mut row, persistence);
+    let row = new_row(user, request)?;
     let transaction = state.db.begin().await?;
     if is_default {
         queries::clear_default(&transaction, &user.id, None).await?;
@@ -166,11 +146,9 @@ pub async fn update(
 ) -> Result<Calendar, AppError> {
     let persistence = resolve_name_persistence(NameInput {
         entity_label: "Calendar",
-        name: request.name.as_deref(),
         encrypted_name: request.encrypted_name.as_deref(),
         blind_index_tokens: request.blind_index_tokens.as_deref(),
         encryption_key_version: request.encryption_key_version,
-        require_name: false,
     })?;
     let Some(existing) = queries::find(&state.db, &user.id, id).await? else {
         return Err(AppError::validation("Calendar not found or access denied"));
@@ -178,8 +156,7 @@ pub async fn update(
     let visibility_only = request.is_visible.is_some()
         && matches!(persistence, NamePersistence::None)
         && request.color.is_none()
-        && request.is_default.is_none()
-        && request.force_full_encryption.is_none();
+        && request.is_default.is_none();
     if existing.kind != "owned" && !visibility_only {
         return Err(AppError::validation(
             "Only owned calendars can be updated here. Manage subscribed or public calendars from subscriptions instead.",
@@ -199,14 +176,9 @@ pub async fn update(
             "isDefault",
         ));
     }
-    if let NamePersistence::Plaintext(name) = &persistence {
-        assert_unique_name(state, &user.id, name, Some(id)).await?;
-    }
     if let Some(color) = &request.color {
         assert_valid_entity_color(color)?;
     }
-    let enabling_full_encryption =
-        request.force_full_encryption == Some(true) && !existing.force_full_encryption;
     let mut row = existing.into_active_model();
     apply_name(&mut row, persistence);
     if let Some(color) = request.color {
@@ -218,18 +190,11 @@ pub async fn update(
     if let Some(is_default) = request.is_default {
         row.is_default = Set(is_default);
     }
-    if let Some(force) = request.force_full_encryption {
-        row.force_full_encryption = Set(force);
-    }
     let transaction = state.db.begin().await?;
     if is_default {
         queries::clear_default(&transaction, &user.id, Some(id)).await?;
     }
     let updated = queries::update(&transaction, row).await?;
-    if enabling_full_encryption {
-        // Legacy plaintext events without ciphertext need a client-side re-encryption pass instead.
-        queries::drop_plaintext_shadows(&transaction, &user.id, id).await?;
-    }
     transaction.commit().await?;
     Ok(dto(updated))
 }

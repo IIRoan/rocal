@@ -6,15 +6,8 @@ import { isReservedSystemEmail } from "./mail-addresses";
 const PARTICIPANT_EMAIL_REGEX =
   /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
-export const encryptionStateSchema = z.enum([
-  "plaintext",
-  "shadow_write",
-  "encrypted",
-]);
+export const encryptionStateSchema = z.enum(["plaintext", "encrypted"]);
 export type EncryptionState = z.infer<typeof encryptionStateSchema>;
-
-export const eventEncryptionModeSchema = z.enum(["hybrid", "full"]);
-export type EventEncryptionMode = z.infer<typeof eventEncryptionModeSchema>;
 
 export const eventParticipantRoleSchema = z.enum(["organizer", "attendee"]);
 export type EventParticipantRole = z.infer<typeof eventParticipantRoleSchema>;

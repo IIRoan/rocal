@@ -107,7 +107,7 @@ async function buildNameUpdate(
     keyVersion,
   );
 
-  if (request.name !== undefined || !request.encryptedName) {
+  if (!request.encryptedName) {
     throw new Error(`${kind} ${record.id} could not be encrypted.`);
   }
 

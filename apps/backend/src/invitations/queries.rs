@@ -6,14 +6,13 @@ use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter,
 use crate::db::entities::{calendar, calendar_event, event_participant, mail_directory_entry};
 use crate::entity_metadata::MAIL_INVITATION_STAGING_CALENDAR_NAME;
 
-/// `writableOwnedCalendarWhere`: owned, writable, not fully encrypted, and not the hidden staging calendar.
+/// `writableOwnedCalendarWhere`: owned, writable, and not the hidden staging calendar.
 fn writable_owned(user_id: &str) -> Condition {
     use calendar::Column;
     Condition::all()
         .add(Column::UserId.eq(user_id))
         .add(Column::Kind.eq("owned"))
         .add(Column::IsSyncOnly.eq(false))
-        .add(Column::ForceFullEncryption.eq(false))
         .add(
             Condition::all()
                 .add(Column::Name.eq(MAIL_INVITATION_STAGING_CALENDAR_NAME))

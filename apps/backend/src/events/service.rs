@@ -10,10 +10,7 @@ use solace_api_types::events::{
     ParticipantInput, SealEncryptionRequest, UpdateEventRequest,
 };
 
-use super::encryption::{
-    InvitationContentSource, assert_no_plaintext_with_ciphertext, resolve_invitation_content,
-    resolve_persistence_policy,
-};
+use super::encryption::{InvitationContentSource, clear_plaintext, resolve_invitation_content};
 use super::view::{self, Relations};
 use super::{constraints, queries, recurrence};
 use super::{participants, rsvp};
@@ -24,11 +21,11 @@ use crate::db::entities::{
     calendar, calendar_event, event_notification, recurrence_exception, user_settings,
 };
 use crate::email;
-use crate::entity_metadata::{CALENDAR_COLORS, external_calendar_name, is_valid_calendar_color};
+use crate::entity_metadata::{CALENDAR_COLORS, is_valid_calendar_color};
 use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
-use crate::integrations::ics::{build, export, trimmed_text};
+use crate::integrations::ics::{build, export};
 use crate::invitations::request;
 use crate::invitations::rsvp_reply::RsvpStatus;
 use crate::notifications::calculator;
@@ -36,18 +33,10 @@ use crate::notifications::job_payload::should_schedule_event_reminder;
 use crate::state::AppState;
 use crate::telemetry::redact_pii;
 
-const MS_PER_DAY: i64 = 86_400_000;
-const MS_PER_MINUTE: i64 = 60_000;
-
 /// A recurring instance id, `<seriesId>_<ISO instant>`; edits and deletes go to the series.
 static INSTANCE_ID: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
         .unwrap_or_else(|error| panic!("instance id pattern: {error}"))
-});
-
-static EXPORT_INSTANCE_ID: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(.+?)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)$")
-        .unwrap_or_else(|error| panic!("export instance id pattern: {error}"))
 });
 
 pub fn series_id(id: &str) -> &str {
@@ -296,21 +285,6 @@ pub async fn create(
     user: &RouteUser,
     request: CreateEventRequest,
 ) -> Result<Event, AppError> {
-    let has_encrypted = has_text(request.encrypted_content.as_deref());
-    assert_no_plaintext_with_ciphertext(
-        request.encrypted_content.as_deref(),
-        [
-            ("title", request.title.as_deref()),
-            ("description", request.description.as_deref()),
-            ("location", request.location.as_deref()),
-        ],
-    )?;
-    if !has_encrypted && !has_text(request.title.as_deref()) {
-        return Err(AppError::field(
-            "Title is required and cannot be empty",
-            "title",
-        ));
-    }
     if request.start.is_empty() {
         return Err(AppError::field("Start date is required", "start"));
     }
@@ -339,11 +313,6 @@ pub async fn create(
     if let Some(category_id) = &category_id {
         assert_active_category(state, user, category_id).await?;
     }
-    if has_text(request.title.as_deref()) {
-        constraints::validate_title_length(request.title.as_deref())?;
-    }
-    constraints::validate_description_length(request.description.as_deref())?;
-    constraints::validate_location_length(request.location.as_deref())?;
     if request.calendar_id.0.is_empty() {
         return Err(AppError::field("Calendar ID is required", "calendarId"));
     }
@@ -360,28 +329,19 @@ pub async fn create(
             .as_deref()
             .or(settings.as_ref().map(|s| s.timezone.as_str())),
     );
-    if is_writable(&calendar) && !has_encrypted {
+    if !has_text(Some(&request.encrypted_content)) {
         return Err(AppError::field(
             "Event encryption requires an active encryption session.",
             "encryptedContent",
         ));
     }
-    let policy = resolve_persistence_policy(
-        has_encrypted,
-        request.title.as_deref().unwrap_or_default(),
-        request.description.as_deref(),
-        request.location.as_deref(),
-    );
     let uid = format!("{}@solace-calendar.local", uuid::Uuid::new_v4());
     let mut row = calendar_event::ActiveModel {
-        title: Set(policy.title),
-        description: Set(policy.description),
-        encryption_state: Set(policy.encryption_state.into()),
         start: Set(start),
         end: Set(end),
         timezone: Set(timezone.clone()),
         all_day: Set(request.all_day.unwrap_or(false)),
-        location: Set(policy.location),
+        encrypted_content: Set(Some(request.encrypted_content.clone())),
         color: Set(request.color.clone().filter(|c| !c.is_empty())),
         calendar_id: Set(request.calendar_id.0.clone()),
         category_id: Set(category_id),
@@ -394,9 +354,7 @@ pub async fn create(
         stalwart_synced_at: Set(None),
         ..Default::default()
     };
-    if let Some(content) = &request.encrypted_content {
-        row.encrypted_content = Set(Some(content.clone()));
-    }
+    clear_plaintext(&mut row);
     if let Some(tokens) = &request.blind_index_tokens {
         row.blind_index_tokens = Set(Some(tokens_json(tokens)?));
     }
@@ -411,13 +369,7 @@ pub async fn create(
         Some(&user.id),
     )
     .await?;
-    let content = resolve_invitation_content(
-        has_encrypted,
-        request.invitation_content.as_ref(),
-        request.title.as_deref(),
-        request.description.as_deref(),
-        request.location.as_deref(),
-    );
+    let content = resolve_invitation_content(request.invitation_content.as_ref());
     let mut warnings = invite(state, &event, &synced, &calendar.name, content).await?;
     if let Some(minutes) = reminder.filter(|m| *m > 0)
         && schedules_reminders(settings.as_ref())
@@ -438,7 +390,7 @@ pub async fn create(
     Ok(created)
 }
 
-/// Mails the REQUEST to new invitees once their rows exist; without plaintext to put in it, nobody is mailed.
+/// Mails the REQUEST to new invitees once their rows exist; without the transient copy, nobody is mailed.
 async fn invite(
     state: &AppState,
     event: &calendar_event::Model,
@@ -506,32 +458,6 @@ pub async fn update(
     if final_start >= final_end {
         return Err(AppError::field("End time must be after start time", "end"));
     }
-    assert_no_plaintext_with_ciphertext(
-        request.encrypted_content.as_deref(),
-        [
-            ("title", request.title.as_deref()),
-            ("description", request.description.as_deref()),
-            ("location", request.location.as_deref()),
-        ],
-    )?;
-    if !has_text(request.encrypted_content.as_deref())
-        && request.title.is_some()
-        && !has_text(request.title.as_deref())
-    {
-        return Err(AppError::field(
-            "Title is required and cannot be empty",
-            "title",
-        ));
-    }
-    if request.title.is_some() {
-        constraints::validate_title_length(request.title.as_deref())?;
-    }
-    if request.description.is_some() {
-        constraints::validate_description_length(request.description.as_deref())?;
-    }
-    if request.location.is_some() {
-        constraints::validate_location_length(request.location.as_deref())?;
-    }
     let reminder_value = checked_reminder(request.reminder.flatten())?;
     if let Some(color) = request.color.as_deref().filter(|c| !c.is_empty())
         && !is_valid_calendar_color(color)
@@ -560,52 +486,27 @@ pub async fn update(
         ),
         None => existing.timezone.clone(),
     };
-    let existing_has_encrypted = has_text(existing.encrypted_content.as_deref());
-    let final_encrypted = match &request.encrypted_content {
-        Some(content) => Some(content.clone()),
-        None => existing.encrypted_content.clone(),
-    };
-    let has_encrypted = has_text(final_encrypted.as_deref());
-    let sensitive =
-        request.title.is_some() || request.description.is_some() || request.location.is_some();
-    let writable = is_writable(&final_calendar);
-    if sensitive && request.encrypted_content.is_none() && (existing_has_encrypted || writable) {
-        return Err(AppError::field(
-            "Encrypted content payload is required when updating protected event fields.",
-            "encryptedContent",
-        ));
-    }
-    if writable && !has_encrypted && !existing.is_synced {
+    let has_encrypted = has_text(
+        request
+            .encrypted_content
+            .as_deref()
+            .or(existing.encrypted_content.as_deref()),
+    );
+    if is_writable(&final_calendar) && !has_encrypted && !existing.is_synced {
         return Err(AppError::field(
             "Event encryption requires an active encryption session.",
             "encryptedContent",
         ));
     }
-    let next_title = match &request.title {
-        Some(title) => js_trim(title).to_owned(),
-        None => existing.title.clone(),
-    };
-    let optional = |given: &Option<String>, current: &Option<String>| match given {
-        Some(value) => trimmed_text(Some(value)),
-        None => current.clone(),
-    };
-    let next_description = optional(&request.description, &existing.description);
-    let next_location = optional(&request.location, &existing.location);
     let final_reminder = match request.reminder {
         Some(_) => reminder_value,
         None => existing.reminder,
     };
-    let policy = resolve_persistence_policy(
-        has_encrypted,
-        &next_title,
-        next_description.as_deref(),
-        next_location.as_deref(),
-    );
     let seen = existing.updated_at;
     let mut row = existing.into_active_model();
-    row.title = Set(policy.title);
-    row.description = Set(policy.description);
-    row.location = Set(policy.location);
+    if has_encrypted {
+        clear_plaintext(&mut row);
+    }
     if let Some(start) = start {
         row.start = Set(start);
     }
@@ -643,7 +544,6 @@ pub async fn update(
     if let Some(tokens) = &request.blind_index_tokens {
         row.blind_index_tokens = Set(Some(tokens_json(tokens)?));
     }
-    row.encryption_state = Set(policy.encryption_state.into());
     if let Some(version) = request.encryption_key_version {
         row.encryption_key_version = Set(version);
     }
@@ -658,13 +558,7 @@ pub async fn update(
     let mut warnings = Vec::new();
     if let Some(given) = &request.participants {
         let synced = participants::sync(&state.db, &updated.id, given, Some(&user.id)).await?;
-        let content = resolve_invitation_content(
-            has_encrypted,
-            request.invitation_content.as_ref(),
-            Some(&next_title),
-            next_description.as_deref(),
-            next_location.as_deref(),
-        );
+        let content = resolve_invitation_content(request.invitation_content.as_ref());
         warnings = invite(state, &updated, &synced, &final_calendar.name, content).await?;
     }
     if (start.is_some() || end.is_some() || request.reminder.is_some())
@@ -1018,21 +912,12 @@ pub async fn seal(
     if existing.encryption_state == "encrypted" {
         return view::one(&state.db, &existing).await;
     }
-    let policy = resolve_persistence_policy(
-        true,
-        &existing.title,
-        existing.description.as_deref(),
-        existing.location.as_deref(),
-    );
     let mut row = existing.into_active_model();
-    row.title = Set(policy.title);
-    row.description = Set(policy.description);
-    row.location = Set(policy.location);
+    clear_plaintext(&mut row);
     row.encrypted_content = Set(Some(request.encrypted_content));
     if let Some(tokens) = &request.blind_index_tokens {
         row.blind_index_tokens = Set(Some(tokens_json(tokens)?));
     }
-    row.encryption_state = Set(policy.encryption_state.into());
     row.encryption_key_version = Set(request.encryption_key_version.unwrap_or(1));
     let updated = queries::update(&state.db, row).await?;
     view::one(&state.db, &updated).await
@@ -1092,108 +977,4 @@ pub fn attach_exceptions(
             None => built[series].excluded_dates.push(exception.exception_date),
         }
     }
-}
-
-/// `exportIcs`: a plaintext event (or one occurrence of a series) as an `.ics` file.
-pub async fn export_ics(
-    state: &AppState,
-    user: &RouteUser,
-    requested: &str,
-) -> Result<(String, String), AppError> {
-    let mut id = requested;
-    let mut occurrence: Option<time::PrimitiveDateTime> = None;
-    if let Some(captures) = EXPORT_INSTANCE_ID.captures(requested)
-        && let (Some(series), Some(at)) = (captures.get(1), captures.get(2))
-    {
-        id = series.as_str();
-        occurrence = instant::parse_js_date(at.as_str()).and_then(instant::from_unix_millis);
-    }
-    let event = queries::find(&state.db, &user.id, id)
-        .await?
-        .ok_or_else(not_found)?;
-    if event.encryption_state == "encrypted" {
-        return Err(AppError::validation(
-            "Encrypted event details cannot be exported as ICS by the server.",
-        ));
-    }
-    let relations = Relations::load(&state.db, &[&event], false).await?;
-    let calendar = relations
-        .calendars
-        .get(&event.calendar_id)
-        .ok_or_else(|| AppError::internal("event without its calendar"))?;
-    let rows = relations.participants_of(&event.id);
-    let export_participants: Vec<export::ExportParticipant<'_>> = rows
-        .iter()
-        .map(|(row, owner)| export::ExportParticipant {
-            id: &row.id,
-            email: &row.email,
-            display_name: row.display_name.as_deref(),
-            role: &row.role,
-            status: &row.status,
-            user_email: owner.as_ref().map(|u| u.email.as_str()),
-            user_name: owner.as_ref().map(|u| u.name.as_str()),
-        })
-        .collect();
-    let invalid_until = |_| AppError::internal("recurrence until is not a valid instant");
-    let mut built = export::to_build_event(&export_event(&event, &export_participants))
-        .map_err(invalid_until)?;
-    if let Some(at) = occurrence {
-        let duration = (instant::unix_millis(event.end) - instant::unix_millis(event.start)).max(
-            if event.all_day {
-                MS_PER_DAY
-            } else {
-                MS_PER_MINUTE
-            },
-        );
-        let end = instant::from_unix_millis(instant::unix_millis(at) + duration)
-            .ok_or_else(|| AppError::internal("occurrence end out of range"))?;
-        built.uid = Some(format!(
-            "{}-{}@solace-calendar.local",
-            event
-                .external_id
-                .as_deref()
-                .filter(|id| !id.is_empty())
-                .unwrap_or(&event.id),
-            instant::iso(at).0
-        ));
-        built.start = at;
-        built.end = end;
-        built.recurrence = None;
-    }
-    let mut events = vec![built];
-    if occurrence.is_none() && event.recurrence.is_some() {
-        // The series' exceptions travel along; a detached row the server cannot export is skipped like a deleted one.
-        let exceptions = queries::exceptions(&state.db, vec![event.id.clone()]).await?;
-        let detached_ids: Vec<String> = exceptions
-            .iter()
-            .filter_map(|exception| exception.modified_event_id.clone())
-            .collect();
-        let detached: Vec<calendar_event::Model> = if detached_ids.is_empty() {
-            Vec::new()
-        } else {
-            queries::find_many(&state.db, &user.id, detached_ids)
-                .await?
-                .into_iter()
-                .filter(|row| row.encryption_state != "encrypted")
-                .collect()
-        };
-        let rows: Vec<&calendar_event::Model> = std::iter::once(&event).chain(&detached).collect();
-        for row in &detached {
-            events.push(export::to_build_event(&export_event(row, &[])).map_err(invalid_until)?);
-        }
-        attach_exceptions(&rows, &mut events, &exceptions);
-    }
-    let ics = build::build_calendar(
-        &build::Calendar {
-            name: Some(external_calendar_name(&calendar.name)),
-            timezone: Some(instant::resolve_timezone(Some(&event.timezone))),
-            ..Default::default()
-        },
-        &events,
-    );
-    let base = match occurrence {
-        Some(at) => format!("{}-{}", event.title, &instant::iso(at).0[..10]),
-        None => event.title.clone(),
-    };
-    Ok((ics, export::safe_filename(&base)))
 }

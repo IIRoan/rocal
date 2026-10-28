@@ -125,11 +125,11 @@ describe("EncryptionStatusBadge", () => {
     expect(badge?.querySelector("[data-icon='shield-check']")).not.toBeNull();
   });
 
-  it("describes readable calendar names even when event encryption is required", () => {
+  it("describes the readable name of a plaintext feed calendar", () => {
     act(() => {
       root.render(
         <EncryptionStatusBadge
-          item={{ forceFullEncryption: true, encryptionState: "plaintext" }}
+          item={{ encryptionState: "plaintext" }}
           kind="calendar"
           hidePlaintext={false}
         />,
@@ -146,29 +146,6 @@ describe("EncryptionStatusBadge", () => {
       "The calendar name is readable to the server.",
     );
     expect(popover?.textContent).toContain("Calendar name");
-    expect(popover?.textContent).toContain(
-      "older plaintext events still need migration",
-    );
     expect(popover?.textContent).not.toContain("Title");
-  });
-
-  it("renders legacy pending items with the expected server-visible fields", () => {
-    act(() => {
-      root.render(
-        <EncryptionStatusBadge item={{ encryptionState: "shadow_write" }} />,
-      );
-    });
-
-    const button = container.querySelector(
-      "button[aria-label='Encryption pending']",
-    );
-    const popover = container.querySelector("[data-testid='popover']");
-
-    expect(button).not.toBeNull();
-    expect(popover?.textContent).toContain(
-      "An encrypted copy exists, but a readable copy may remain on the server.",
-    );
-    expect(popover?.textContent).toContain("Title");
-    expect(popover?.querySelector("[data-icon='shield-check']")).toBeNull();
   });
 });

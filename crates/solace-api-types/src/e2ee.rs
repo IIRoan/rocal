@@ -8,8 +8,8 @@ use crate::common::{CalendarId, CategoryId, EventId, Timestamp, UserId};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct E2eeBootstrap {
+    /// Always true; shipped native binaries reject a bootstrap without it.
     pub enabled: bool,
-    pub rollout_stage: String,
     pub algorithms: E2eeAlgorithms,
     pub devices: Vec<EncryptionDevice>,
     #[schema(required = true)]

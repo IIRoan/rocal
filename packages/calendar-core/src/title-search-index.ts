@@ -75,9 +75,7 @@ function toIsoTimestamp(value: Date | string | undefined): string | undefined {
 function calendarEncryptionStatus(
   event: CalendarEvent,
 ): UnifiedSearchEncryptionStatus {
-  if (event.encryptionState === "encrypted") return "encrypted-indexed";
-  if (event.encryptionState === "shadow_write") return "metadata-only";
-  return "plaintext";
+  return event.encryptionState === "encrypted" ? "encrypted-indexed" : "plaintext";
 }
 
 function tokenMatches(normalizedValue: string, token: string): boolean {
@@ -240,11 +238,7 @@ function stubCalendarEvent(document: TitleIndexDocument): CalendarEvent {
     createdAt: start,
     updatedAt: start,
     encryptionState:
-      document.encryptionStatus === "encrypted-indexed"
-        ? "encrypted"
-        : document.encryptionStatus === "metadata-only"
-          ? "shadow_write"
-          : "plaintext",
+      document.encryptionStatus === "encrypted-indexed" ? "encrypted" : "plaintext",
   };
 }
 

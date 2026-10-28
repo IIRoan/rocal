@@ -13,8 +13,8 @@ use super::queries;
 use super::rsvp_reply::{self, Reply, RsvpStatus};
 use crate::calendars::queries as calendars;
 use crate::db::entities::{calendar, calendar_event, event_participant};
+use crate::entity_metadata::is_mail_invitation_staging_calendar;
 use crate::error::AppError;
-use crate::events::encryption::resolve_persistence_policy;
 use crate::events::{participants, queries as events};
 use crate::http::zod::js_trim;
 use crate::instant;
@@ -35,7 +35,7 @@ const CALENDAR_MIME_TYPES: [&str; 5] = [
     "application/x-ical",
 ];
 
-/// `resolveAcceptedInvitationTargetCalendar`: the requested, then the default, then the first writable calendar; a user without calendars gets Personal.
+/// `resolveAcceptedInvitationTargetCalendar`: the requested, then the default, then the first writable calendar.
 pub async fn resolve_accepted_invitation_target_calendar<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
@@ -55,14 +55,7 @@ pub async fn resolve_accepted_invitation_target_calendar<C: ConnectionTrait>(
     {
         return Ok(Some(default));
     }
-    if let Some(existing) = queries::first_writable_calendar(db, user_id).await? {
-        return Ok(Some(existing));
-    }
-    if calendars::count_owned_by(db, user_id).await? > 0 {
-        return Ok(None);
-    }
-    let personal = calendars::new_calendar(user_id, "Personal", "#10b981", true, true);
-    calendars::insert(db, personal).await.map(Some)
+    queries::first_writable_calendar(db, user_id).await
 }
 
 /// `resolveInvitationStagingCalendar`: the hidden Invitations calendar, created on first use.
@@ -302,10 +295,13 @@ async fn ingest(
             .push("No writable calendar is available for ICS mail imports.".into());
         return Ok(summary);
     };
-    if target.force_full_encryption {
-        summary.errors.push("This calendar requires encrypted event details; automatic server-side mail import is unavailable.".into());
-        return Ok(summary);
-    }
+    // Only the hidden staging calendar holds server-readable copies; other calendars take client-sealed ones.
+    let needs_seal = !is_mail_invitation_staging_calendar(
+        &target.kind,
+        target.is_sync_only,
+        target.is_visible,
+        &target.name,
+    );
     let account_id = queries::stalwart_account_id(&state.db, user_id).await?;
     let place = Target {
         calendar: &target,
@@ -337,6 +333,19 @@ async fn ingest(
                 "{}: ICS file contains {} events which exceeds the limit of {MAX_ICS_EVENTS_PER_FILE}; skipped.",
                 source.id,
                 parsed.events.len()
+            ));
+            continue;
+        }
+        if needs_seal
+            && parsed.method != "CANCEL"
+            && parsed
+                .events
+                .iter()
+                .any(|event| !options.encryption.contains_key(&event.uid))
+        {
+            summary.errors.push(format!(
+                "{}: This calendar requires encrypted event details; automatic server-side mail import is unavailable.",
+                source.id
             ));
             continue;
         }
@@ -397,7 +406,7 @@ struct Sealed {
     encryption_key_version: i32,
 }
 
-/// `buildInvitationLocalEventData`: scheduling fields, plus either the parsed plaintext or the client's ciphertext.
+/// `buildInvitationLocalEventData`: scheduling fields, plus the parsed plaintext for staging or the client's ciphertext.
 struct LocalData {
     start: time::PrimitiveDateTime,
     end: time::PrimitiveDateTime,
@@ -436,13 +445,7 @@ fn local_data(
     let Some(entry) = encryption.filter(|e| !js_trim(&e.encrypted_content).is_empty()) else {
         return data;
     };
-    let policy = resolve_persistence_policy(
-        true,
-        &parsed.title,
-        parsed.description.as_deref(),
-        parsed.location.as_deref(),
-    );
-    data.content = Some((policy.title, policy.description, policy.location));
+    data.content = Some((String::new(), None, None));
     data.sealed = Some(Sealed {
         encrypted_content: entry.encrypted_content.clone(),
         blind_index_tokens: entry

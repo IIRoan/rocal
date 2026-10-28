@@ -13,8 +13,8 @@ use solace_api_types::Timestamp;
 use solace_api_types::events::ParticipantInput;
 use solace_api_types::subscriptions::{
     CalendarSubscription, CreateSubscriptionRequest, DeleteSubscriptionResponse,
-    EncryptedIcsImportRequest, ImportIcsRequest, ImportIcsResponse, LegacyIcsImportRequest,
-    SubscribedCalendar, SubscriptionSyncResult, SyncLogCount, UpdateSubscriptionRequest,
+    EncryptedIcsImportRequest, ImportIcsResponse, SubscribedCalendar, SubscriptionSyncResult,
+    SyncLogCount, UpdateSubscriptionRequest,
 };
 
 use super::holidays;
@@ -134,7 +134,6 @@ fn calendar_dto(model: calendar::Model) -> SubscribedCalendar {
         blind_index_tokens: model.blind_index_tokens,
         encryption_state: model.encryption_state,
         encryption_key_version: model.encryption_key_version,
-        force_full_encryption: model.force_full_encryption,
         color: model.color,
         kind: model.kind,
         is_public: model.is_public,
@@ -645,18 +644,6 @@ pub(crate) async fn link_series<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Imports client-encrypted events, or a legacy plaintext ICS file from shipped clients.
-pub async fn import_ics(
-    state: &AppState,
-    user: &RouteUser,
-    request: ImportIcsRequest,
-) -> Result<ImportIcsResponse, AppError> {
-    match request {
-        ImportIcsRequest::Encrypted(request) => import_encrypted(state, user, request).await,
-        ImportIcsRequest::Legacy(request) => import_legacy(state, user, request).await,
-    }
-}
-
 /// The caller's calendar an import writes into: it must be their own and not managed by a feed.
 async fn import_target(
     state: &AppState,
@@ -676,72 +663,6 @@ async fn import_target(
     Ok(calendar)
 }
 
-async fn import_legacy(
-    state: &AppState,
-    user: &RouteUser,
-    request: LegacyIcsImportRequest,
-) -> Result<ImportIcsResponse, AppError> {
-    let calendar_id = request.calendar_id.0.as_str();
-    import_target(state, user, calendar_id).await?;
-    let timezone = queries::user_timezone(&state.db, &user.id).await?;
-    let parsed = parse::parse(&request.ics_content, &timezone);
-    if parsed.events.is_empty() {
-        return Err(AppError::validation("No valid events found in ICS file"));
-    }
-    let uids = parsed
-        .events
-        .iter()
-        .map(|event| event.uid.clone())
-        .collect();
-    let taken: HashSet<String> = queries::taken_external_ids(&state.db, calendar_id, uids)
-        .await?
-        .into_iter()
-        .collect();
-    let mut errors = parsed.errors.clone();
-    let mut created = 0;
-    let mut rows = Vec::new();
-    for event in &parsed.events {
-        // Messages never carry titles or UIDs: those are the file's content.
-        if taken.contains(&event.uid) {
-            errors.push("An event already exists in this calendar.".to_owned());
-            continue;
-        }
-        let row = parse::to_new_event(event, &user.id, calendar_id, None);
-        let imported: Result<calendar_event::Model, AppError> = async {
-            let inserted = queries::insert_event(&state.db, row).await?;
-            let inputs = participant_inputs(event.participants.as_deref());
-            participants::sync(&state.db, &inserted.id, &inputs, None).await?;
-            Ok(inserted)
-        }
-        .await;
-        match imported {
-            Ok(inserted) => {
-                created += 1;
-                rows.push(inserted);
-            }
-            Err(error) => errors.push(format!(
-                "An event could not be created: {}",
-                error.client_message()
-            )),
-        }
-    }
-    // Only rows this file created are linked, so a calendar's own exceptions are never rewritten.
-    link_series(&state.db, &rows_by_uid(rows), &parsed.events).await?;
-    Ok(ImportIcsResponse {
-        success: true,
-        events_created: created,
-        events_total: parsed.events.len() as i64,
-        file_name: Some(
-            request
-                .file_name
-                .filter(|name| !name.is_empty())
-                .unwrap_or_else(|| "unknown.ics".into()),
-        ),
-        calendar_name: parsed.calendar_name,
-        errors: (!errors.is_empty()).then_some(errors),
-    })
-}
-
 /// `new Date(iso)` of an instant the schema already checked.
 fn stored_instant(value: &Timestamp) -> Result<time::PrimitiveDateTime, AppError> {
     instant::parse_js_date(&value.0)
@@ -750,7 +671,7 @@ fn stored_instant(value: &Timestamp) -> Result<time::PrimitiveDateTime, AppError
 }
 
 /// Series import before their overrides, in one transaction; only ciphertext and keyed ids are stored.
-async fn import_encrypted(
+pub async fn import_ics(
     state: &AppState,
     user: &RouteUser,
     request: EncryptedIcsImportRequest,
@@ -836,8 +757,6 @@ async fn import_encrypted(
         success: true,
         events_created: created,
         events_total: request.encrypted_events.len() as i64,
-        file_name: None,
-        calendar_name: None,
         errors: (!errors.is_empty()).then_some(errors),
     })
 }

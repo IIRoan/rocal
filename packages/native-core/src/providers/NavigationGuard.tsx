@@ -32,8 +32,8 @@ export interface NavigationGuardProps {
   children: ReactNode;
   /** The app's signed-in landing route. */
   homeRoute: string;
-  /** App-specific startup after the E2EE session is ready (encryption checks, mailbox unlock). */
-  prepareSession: (input: AuthenticatedSessionInput) => Promise<void>;
+  /** App-specific startup after the E2EE session is ready (mailbox unlock). */
+  prepareSession?: (input: AuthenticatedSessionInput) => Promise<void>;
   /** Seeds the cache from an encrypted on-device copy; resolving true skips the loading screen while startup runs behind the app. */
   restoreSession?: (
     input: Pick<
@@ -131,7 +131,7 @@ export function NavigationGuard({
       await bootstrap(user.id, API_BASE_URL);
       if (cancelled) return;
 
-      await prepareSession({
+      await prepareSession?.({
         queryClient,
         userId: user.id,
         email: user.email,
@@ -149,19 +149,13 @@ export function NavigationGuard({
       // repo-rules-allow async-promise-handling: resetPreSessionQueries is Promise.all of resetQueries, which never rejects.
       void resetPreSessionQueries(queryClient);
 
-      // Silent on failure; the next launch retries the remaining rows.
+      // Silent on failure; the next launch retries the seed.
       void calendarApiService
-        .backfillEncryptedNames()
-        .then((result) => {
-          if (cancelled) return;
-          if (result.calendars > 0) {
-            void queryClient.invalidateQueries({
+        .ensureDefaultCalendars()
+        .then(async (seeded) => {
+          if (seeded && !cancelled) {
+            await queryClient.invalidateQueries({
               queryKey: QUERY_KEYS.calendars(),
-            });
-          }
-          if (result.categories > 0) {
-            void queryClient.invalidateQueries({
-              queryKey: QUERY_KEYS.categories(),
             });
           }
         })

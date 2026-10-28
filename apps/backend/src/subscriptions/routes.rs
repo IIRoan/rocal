@@ -4,8 +4,8 @@ use axum::Json;
 use axum::extract::{Path, State};
 use solace_api_types::subscriptions::{
     CalendarSubscription, CreateSubscriptionRequest, DeleteSubscriptionQuery,
-    DeleteSubscriptionResponse, ImportIcsRequest, ImportIcsResponse, SubscriptionSyncResult,
-    UpdateSubscriptionRequest,
+    DeleteSubscriptionResponse, EncryptedIcsImportRequest, ImportIcsResponse,
+    SubscriptionSyncResult, UpdateSubscriptionRequest,
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -39,15 +39,7 @@ request_schema!(DeleteSubscriptionQuery => zod::object([
 ])
 .strict());
 
-request_schema!(ImportIcsRequest => zod::union(vec![
-    encrypted_ics_import_body_schema(),
-    zod::object([
-        ("calendarId", zod::string().min(1)),
-        ("icsContent", zod::string().min(1)),
-        ("fileName", zod::string().optional()),
-    ])
-    .strict(),
-]));
+request_schema!(EncryptedIcsImportRequest => encrypted_ics_import_body_schema());
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -116,13 +108,13 @@ pub async fn sync(
     Ok(Json(service::sync(&state, &user, &id).await?))
 }
 
-/// Imports client-encrypted events into an owned calendar; the legacy raw ICS body stays for shipped clients.
-#[utoipa::path(post, path = "/api/subscriptions/import-ics", operation_id = "importSubscriptionIcs", tag = "Calendar Subscriptions", request_body = ImportIcsRequest, responses((status = 200, body = ImportIcsResponse)))]
+/// Imports client-encrypted events into an owned calendar.
+#[utoipa::path(post, path = "/api/subscriptions/import-ics", operation_id = "importSubscriptionIcs", tag = "Calendar Subscriptions", request_body = EncryptedIcsImportRequest, responses((status = 200, body = ImportIcsResponse)))]
 #[tracing::instrument(skip_all)]
 pub async fn import_ics(
     State(state): State<AppState>,
     user: RouteUser,
-    ValidJson(body): ValidJson<ImportIcsRequest>,
+    ValidJson(body): ValidJson<EncryptedIcsImportRequest>,
 ) -> Result<Json<ImportIcsResponse>, AppError> {
     Ok(Json(service::import_ics(&state, &user, body).await?))
 }

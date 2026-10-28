@@ -1,16 +1,12 @@
-//! Settings rows, plus the calendar and event writes that full encryption triggers.
+//! Settings rows.
 
 use sea_orm::prelude::TimeDateTime;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect, Set,
-    TransactionTrait,
-};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use solace_api_types::settings::UpdateSettingsRequest;
 
 use crate::db::cuid;
 use crate::db::entities::{calendar, user_settings};
-use crate::events::encryption::backfill_ciphertext_only;
 
 pub async fn find<C: ConnectionTrait>(
     db: &C,
@@ -96,7 +92,6 @@ pub async fn upsert<C: ConnectionTrait>(
         push_notifications => PushNotifications,
         browser_notifications => BrowserNotifications,
         reminder_sound => ReminderSound,
-        event_encryption_mode => EventEncryptionMode,
         default_event_duration => DefaultEventDuration,
         compact_view => CompactView,
         show_week_numbers => ShowWeekNumbers,
@@ -114,40 +109,6 @@ pub async fn upsert<C: ConnectionTrait>(
         )
         .exec_with_returning(db)
         .await
-}
-
-/// Upserts and, in the same transaction, disables every share link and drops plaintext kept beside ciphertext in those calendars.
-pub async fn upsert_closing_share_links(
-    db: &DatabaseConnection,
-    user_id: &str,
-    changes: UpdateSettingsRequest,
-    now: TimeDateTime,
-) -> Result<user_settings::Model, sea_orm::DbErr> {
-    let transaction = db.begin().await?;
-    let shared: Vec<String> = calendar::Entity::find()
-        .select_only()
-        .column(calendar::Column::Id)
-        .filter(calendar::Column::UserId.eq(user_id))
-        .filter(calendar::Column::IcsShareEnabled.eq(true))
-        .into_tuple()
-        .all(&transaction)
-        .await?;
-    let settings = upsert(&transaction, user_id, changes, now).await?;
-    calendar::Entity::update_many()
-        .col_expr(calendar::Column::IcsShareEnabled, false.into())
-        .col_expr(
-            calendar::Column::IcsShareToken,
-            Option::<String>::None.into(),
-        )
-        .col_expr(calendar::Column::UpdatedAt, now.into())
-        .filter(calendar::Column::UserId.eq(user_id))
-        .filter(calendar::Column::IcsShareEnabled.eq(true))
-        .exec(&transaction)
-        .await?;
-    let shared: Vec<&str> = shared.iter().map(String::as_str).collect();
-    backfill_ciphertext_only(&transaction, user_id, &shared, now).await?;
-    transaction.commit().await?;
-    Ok(settings)
 }
 
 pub async fn delete<C: ConnectionTrait>(db: &C, user_id: &str) -> Result<(), sea_orm::DbErr> {

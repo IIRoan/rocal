@@ -10,7 +10,6 @@ use crate::calendars::queries as calendars;
 use crate::db::entities::calendar;
 use crate::entity_metadata::external_calendar_name;
 use crate::error::AppError;
-use crate::events::encryption::backfill_ciphertext_only;
 use crate::events::queries as events;
 use crate::events::service::{attach_exceptions, export_event};
 use crate::instant;
@@ -102,7 +101,7 @@ pub async fn create(
     Ok(link(state, &updated))
 }
 
-/// Revokes the link; plaintext left beside ciphertext is dropped now that nothing exports it.
+/// Revokes the link.
 pub async fn disable(
     state: &AppState,
     user: &RouteUser,
@@ -116,10 +115,7 @@ pub async fn disable(
             "Cannot modify sharing for a synced calendar.",
         ));
     }
-    let calendar_id = calendar.id.clone();
-    let now = instant::now();
     queries::set_share(&state.db, calendar, false, None).await?;
-    backfill_ciphertext_only(&state.db, &user.id, &[&calendar_id], now).await?;
     Ok(DisableShareLinkResponse { success: true })
 }
 

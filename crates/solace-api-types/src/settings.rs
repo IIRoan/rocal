@@ -23,7 +23,6 @@ pub struct UserSettings {
     pub push_notifications: bool,
     pub browser_notifications: bool,
     pub reminder_sound: bool,
-    pub event_encryption_mode: String,
     pub default_event_duration: i32,
     #[schema(required = true)]
     pub default_calendar_id: Option<CalendarId>,
@@ -79,10 +78,6 @@ pub struct UpdateSettingsRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub reminder_sound: Option<bool>,
-    /// `hybrid` or `full`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub event_encryption_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub default_event_duration: Option<i32>,
