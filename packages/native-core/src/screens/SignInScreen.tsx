@@ -25,6 +25,7 @@ import { resolvePasskeyAutoPromptAction } from "@workspace/native-core/lib/passk
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import { ThemeToggle } from "@workspace/native-core/components/ThemeToggle";
+import { AppInformationLinks } from "@workspace/native-core/components/AppInformationLinks";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
 const log = createLogger("auth:sign-in");
@@ -408,6 +409,7 @@ export function SignInScreen() {
                 </>
               )}
             </View>
+            <AppInformationLinks />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

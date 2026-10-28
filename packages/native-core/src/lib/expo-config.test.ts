@@ -4,6 +4,15 @@ import {
 } from "../../expo-config.cjs";
 
 describe("shared native Expo configuration", () => {
+  it.each(["calendar", "mail"] as const)(
+    "declares no tracking in the %s app manifest",
+    (app) => {
+      expect(createNativeExpoConfig(app, {}).ios?.privacyManifests).toEqual({
+        NSPrivacyTracking: false,
+        NSPrivacyTrackingDomains: [],
+      });
+    },
+  );
   it.each([
     {
       app: "calendar" as const,

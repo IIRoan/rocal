@@ -216,7 +216,7 @@ The production channel keeps its existing `master` name for installed-binary com
 
 `scripts/native-release-config.ts` selects the profile once for both build and update workflows; metadata reads app names, the EAS CLI version and each app's channel/environment from shared configuration. All workflows run native checks before builds or publishing. Internal artifact slots include `development`, `preview` and `testing`.
 
-The **iOS App Store build** workflow is dispatched from the default branch, selects `testflight` or `production`, and optionally uploads the completed build to TestFlight. Uploading requires the app's `submit.production.ios.ascAppId` and EAS App Store signing/submission credentials. `production` OTA updates also require an explicit default-branch dispatch. The app-version runtime policy still requires a version bump and new binary for native changes.
+The **iOS App Store build** workflow is dispatched from the default branch, selects `testflight` or `production`, validates the exact completed archive on macOS, and optionally uploads that same EAS build ID to TestFlight. Validation checks identities, matching extension versions, runtime/channel, manifests, signatures and provisioning before submission. Its artifacts include sanitized build references, a validation report and an EAS Metadata draft; raw environment/provisioning/download credentials are not uploaded. See [the readiness checklist](../../plans/002-apple-app-store-readiness.md) for the archive tool, reviewer walkthrough and remaining owner/device checks. Uploading requires the app's `submit.production.ios.ascAppId` and EAS App Store signing/submission credentials. `production` OTA updates also require an explicit default-branch dispatch. The app-version runtime policy still requires a version bump and new binary for native changes.
 
 Required GitHub secret:
 
@@ -227,3 +227,5 @@ The workflow publishes through the app's `scripts/publish-update.ts`. The shared
 Deployment values are managed only in the shared EAS environment; neither GitHub Actions nor `eas.json` repeats the service URLs or reporting DSN. Publish through the profile helpers so variant selection, environment loading and validation stay consistent.
 
 Note: PR-triggered publishes are skipped for forked repositories because GitHub does not expose secrets to untrusted PRs.
+
+Native changes (SDK/RN, native dependencies, plugins, permissions, entitlements, extensions or embedded configuration) require updating the shared `version` in `packages/native-core/expo-apps.json` and building a new binary before OTA for that runtime. This release uses runtime `1.0.1` for the privacy-manifest changes. Pure JS/assets can update compatible binaries on their configured channel. Do not override the runtime to send incompatible native changes to older installations.

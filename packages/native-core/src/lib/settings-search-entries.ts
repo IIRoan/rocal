@@ -93,6 +93,18 @@ export const SHARED_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
   },
   {
     pageId: "app",
+    label: "Privacy policy",
+    location: "App · Help and privacy",
+    keywords: "data retention deletion personal privacy",
+  },
+  {
+    pageId: "app",
+    label: "Support",
+    location: "App · Help and privacy",
+    keywords: "help contact email problem feedback",
+  },
+  {
+    pageId: "app",
     label: "Updates",
     location: "App · Updates",
     keywords: "expo version",

@@ -81,6 +81,10 @@ function createNativeExpoConfig(app, environment = process.env) {
       bundleIdentifier,
       buildNumber: String(settings.initialBuildNumber),
       infoPlist: { ITSAppUsesNonExemptEncryption: false },
+      privacyManifests: {
+        NSPrivacyTracking: false,
+        NSPrivacyTrackingDomains: [],
+      },
       ...(associatedDomain
         ? { associatedDomains: [`webcredentials:${associatedDomain}`] }
         : {}),

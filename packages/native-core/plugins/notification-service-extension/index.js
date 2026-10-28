@@ -12,6 +12,7 @@ const TARGET_NAME = settings.notificationExtensionTargetName;
 const SWIFT_FILE = "NotificationService.swift";
 const INFO_PLIST_FILE = `${TARGET_NAME}-Info.plist`;
 const ENTITLEMENTS_FILE = `${TARGET_NAME}.entitlements`;
+const PRIVACY_FILE = "PrivacyInfo.xcprivacy";
 const APP_GROUPS_ENTITLEMENT = "com.apple.security.application-groups";
 
 function extensionBundleIdentifier(appBundleIdentifier) {
@@ -91,17 +92,25 @@ function withExtensionFiles(config, props) {
   return withDangerousMod(config, [
     "ios",
     async (mod) => {
-      const targetDir = path.join(mod.modRequest.platformProjectRoot, TARGET_NAME);
+      const targetDir = path.join(
+        mod.modRequest.platformProjectRoot,
+        TARGET_NAME,
+      );
       await fs.promises.mkdir(targetDir, { recursive: true });
       await fs.promises.copyFile(
         require.resolve(`./${SWIFT_FILE}`),
         path.join(targetDir, SWIFT_FILE),
       );
+      await fs.promises.copyFile(
+        require.resolve(`./${PRIVACY_FILE}`),
+        path.join(targetDir, PRIVACY_FILE),
+      );
       await fs.promises.writeFile(
         path.join(targetDir, INFO_PLIST_FILE),
         infoPlist({
           version: mod.version ?? settings.version,
-          buildNumber: mod.ios?.buildNumber ?? String(settings.initialBuildNumber),
+          buildNumber:
+            mod.ios?.buildNumber ?? String(settings.initialBuildNumber),
           appGroup: props.appGroup,
           keychainService: props.keychainService,
         }),
@@ -118,17 +127,11 @@ function withExtensionFiles(config, props) {
 function withExtensionTarget(config, props) {
   return withXcodeProject(config, (mod) => {
     const project = mod.modResults;
-    // `xcode` stores target names quoted, so match both spellings.
-    if (
-      project.pbxTargetByName(TARGET_NAME) ||
-      project.pbxTargetByName(`"${TARGET_NAME}"`)
-    ) {
-      return mod;
-    }
-
     const bundleIdentifier = mod.ios?.bundleIdentifier;
     if (!bundleIdentifier) {
-      throw new Error("notification-service-extension: ios.bundleIdentifier is required");
+      throw new Error(
+        "notification-service-extension: ios.bundleIdentifier is required",
+      );
     }
 
     // `xcode` assumes these sections exist when adding target dependencies.
@@ -136,23 +139,62 @@ function withExtensionTarget(config, props) {
     objects.PBXTargetDependency = objects.PBXTargetDependency ?? {};
     objects.PBXContainerItemProxy = objects.PBXContainerItemProxy ?? {};
 
-    const group = project.addPbxGroup(
-      [SWIFT_FILE, INFO_PLIST_FILE, ENTITLEMENTS_FILE],
-      TARGET_NAME,
-      TARGET_NAME,
-    );
+    let targetId =
+      project.findTargetKey(TARGET_NAME) ||
+      project.findTargetKey(`"${TARGET_NAME}"`);
     const mainGroupId = project.getFirstProject().firstProject.mainGroup;
-    project.addToPbxGroup(group.uuid, mainGroupId);
+    if (!targetId) {
+      const group = project.addPbxGroup(
+        [SWIFT_FILE, INFO_PLIST_FILE, ENTITLEMENTS_FILE],
+        TARGET_NAME,
+        TARGET_NAME,
+      );
+      project.addToPbxGroup(group.uuid, mainGroupId);
 
-    const target = project.addTarget(
-      TARGET_NAME,
-      "app_extension",
-      TARGET_NAME,
-      extensionBundleIdentifier(bundleIdentifier),
+      const target = project.addTarget(
+        TARGET_NAME,
+        "app_extension",
+        TARGET_NAME,
+        extensionBundleIdentifier(bundleIdentifier),
+      );
+      project.addBuildPhase(
+        [SWIFT_FILE],
+        "PBXSourcesBuildPhase",
+        "Sources",
+        target.uuid,
+      );
+      project.addBuildPhase(
+        [],
+        "PBXResourcesBuildPhase",
+        "Resources",
+        target.uuid,
+      );
+      project.addBuildPhase(
+        [],
+        "PBXFrameworksBuildPhase",
+        "Frameworks",
+        target.uuid,
+      );
+      targetId = target.uuid;
+      if (mod.ios?.appleTeamId) {
+        project.addTargetAttribute(
+          "DevelopmentTeam",
+          mod.ios.appleTeamId,
+          target,
+        );
+      }
+    }
+    const privacyFile = project.addFile(
+      `${TARGET_NAME}/${PRIVACY_FILE}`,
+      mainGroupId,
+      { lastKnownFileType: "text.xml" },
     );
-    project.addBuildPhase([SWIFT_FILE], "PBXSourcesBuildPhase", "Sources", target.uuid);
-    project.addBuildPhase([], "PBXResourcesBuildPhase", "Resources", target.uuid);
-    project.addBuildPhase([], "PBXFrameworksBuildPhase", "Frameworks", target.uuid);
+    if (privacyFile) {
+      privacyFile.uuid = project.generateUuid();
+      privacyFile.target = targetId;
+      project.addToPbxBuildFileSection(privacyFile);
+      project.addToPbxResourcesBuildPhase(privacyFile);
+    }
 
     const configurations = project.pbxXCBuildConfigurationSection();
     for (const key of Object.keys(configurations)) {
@@ -173,9 +215,6 @@ function withExtensionTarget(config, props) {
       if (mod.ios?.appleTeamId) {
         buildSettings.DEVELOPMENT_TEAM = mod.ios.appleTeamId;
       }
-    }
-    if (mod.ios?.appleTeamId) {
-      project.addTargetAttribute("DevelopmentTeam", mod.ios.appleTeamId, target);
     }
     return mod;
   });

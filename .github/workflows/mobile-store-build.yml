@@ -80,17 +80,69 @@ jobs:
       - name: Build signed App Store binary
         env:
           PROFILE: ${{ needs.meta.outputs.profile }}
-          SUBMIT: ${{ inputs.submit }}
+          APP: ${{ matrix.app }}
         run: |
           set -euo pipefail
-          ARGS=(build --platform ios --profile "$PROFILE" --non-interactive --json)
-          if [ "$SUBMIT" = "true" ]; then
-            ARGS+=(--auto-submit-with-profile production)
-          fi
-          eas "${ARGS[@]}" > "$RUNNER_TEMP/eas-build.json"
+          umask 077
+          eas config --platform ios --profile "$PROFILE" --json > "$RUNNER_TEMP/eas-config.json"
+          python3 ../../scripts/ios-release.py prepare --app "$APP" --eas-config "$RUNNER_TEMP/eas-config.json" --out-dir "$RUNNER_TEMP/release"
+          eas build --platform ios --profile "$PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
+          python3 ../../scripts/ios-release.py reference --build-json "$RUNNER_TEMP/eas-build.json" --output "$RUNNER_TEMP/release/build-reference.json"
       - uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
-        if: always()
         with:
           name: ${{ matrix.app }}-ios-store-build
-          path: ${{ runner.temp }}/eas-build.json
-          if-no-files-found: ignore
+          path: ${{ runner.temp }}/release/*.json
+          if-no-files-found: error
+
+  validate:
+    name: Validate and optionally upload ${{ matrix.app }}
+    needs: [meta, build]
+    runs-on: macos-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.meta.outputs.matrix) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        with:
+          node-version-file: .node-version
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+        working-directory: .
+      - uses: chainguard-actions/actions-download-artifact@77c15e0347b866c3c041206ac4c052b52c381ac7 # v8.0.2
+        with:
+          name: ${{ matrix.app }}-ios-store-build
+          path: ${{ runner.temp }}/release
+      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
+        with:
+          eas-version: ${{ needs.meta.outputs.eas_version }}
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Verify the exact signed archive
+        id: archive
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+          BUILD_ID=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"] + "/release/build-reference.json"))["id"])')
+          eas build:view "$BUILD_ID" --json > "$RUNNER_TEMP/eas-build.json"
+          python3 ../../scripts/ios-release.py verify --expectations "$RUNNER_TEMP/release/archive-expectations.json" --build-json "$RUNNER_TEMP/eas-build.json" --build-id "$BUILD_ID" --commit "$SOURCE_COMMIT" --report "$RUNNER_TEMP/release/archive-validation.json" --require-signature
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+      - uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
+        with:
+          name: ${{ matrix.app }}-ios-archive-validation
+          path: |
+            ${{ runner.temp }}/release/archive-validation.json
+            ${{ runner.temp }}/release/build-reference.json
+          if-no-files-found: error
+      - name: Upload the verified build to TestFlight
+        if: inputs.submit
+        env:
+          BUILD_ID: ${{ steps.archive.outputs.build_id }}
+        run: eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --wait

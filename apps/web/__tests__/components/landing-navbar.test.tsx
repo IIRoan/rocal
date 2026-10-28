@@ -73,7 +73,7 @@ describe("LandingNavbar", () => {
       Array.from(navigation?.querySelectorAll("a") ?? []).map((link) =>
         link.getAttribute("href"),
       ),
-    ).toEqual(["#calendar", "#mail", "/privacy"]);
+    ).toEqual(["#calendar", "#mail", "/privacy", "/support"]);
 
     const calendarLink = navigation?.querySelector<HTMLAnchorElement>(
       'a[href="#calendar"]',

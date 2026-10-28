@@ -1,5 +1,7 @@
 Auth uses rolling 14-day app and passkey sessions; Better Auth checks hourly and on focus/reconnect, with renewal cookies forwarded by the API.
 
+Public `/privacy` and `/support` pages share their routes/contact configuration with native help settings and store metadata through `packages/calendar-core/src/product-info.json`.
+
 Mail uses the API's JMAP proxy; the API and notifications reach Stalwart through its key-gated Railway private endpoint, independently of the VPS mail tunnel.
 Public JMAP at `mail.solace.onl` use Railway HTTPS through the restricted `:8082` gateway; SMTP uses the VPS at `mx.solace.onl`. Users sign in only through Solace; direct Stalwart login and management require the operator IP allowlist.
 

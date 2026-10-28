@@ -1,0 +1,23 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Solace//Synthetic review examples//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+UID:solace-review-planning-20300107@example.test
+DTSTAMP:20261028T120000Z
+DTSTART:20300107T090000Z
+DTEND:20300107T093000Z
+SUMMARY:Sample planning session
+DESCRIPTION:Synthetic review event. Edit the title and move the time.
+LOCATION:Example room
+END:VEVENT
+BEGIN:VEVENT
+UID:solace-review-recurring-20300108@example.test
+DTSTAMP:20261028T120000Z
+DTSTART:20300108T140000Z
+DTEND:20300108T143000Z
+RRULE:FREQ=WEEKLY;COUNT=4
+SUMMARY:Sample weekly check-in
+DESCRIPTION:Synthetic recurring event for review.
+END:VEVENT
+END:VCALENDAR
