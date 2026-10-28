@@ -32,9 +32,9 @@ on:
           - preview
         default: development
 
-# Skipped fork and Dependabot runs use isolated groups so they cannot cancel a publish.
+# One group per profile (each publishes to one R2 slot, newest run wins); fork PRs, which the meta guard skips, get their own group so they can't cancel a real build.
 concurrency:
-  group: mobile-internal-${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.login == 'dependabot[bot]') && format('untrusted-{0}', github.run_id) || github.event_name == 'push' && 'preview' || inputs.profile || 'development' }}
+  group: mobile-internal-${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && format('fork-{0}', github.run_id) || github.event_name == 'push' && 'preview' || inputs.profile || 'development' }}
   cancel-in-progress: true
 
 permissions:
@@ -45,8 +45,8 @@ env:
 
 jobs:
   meta:
-    # Fork and Dependabot PRs have no access to EXPO_TOKEN / R2 secrets.
-    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]')
+    # Fork PRs have no access to EXPO_TOKEN / R2 secrets.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     outputs:
       profile: ${{ steps.meta.outputs.profile }}
