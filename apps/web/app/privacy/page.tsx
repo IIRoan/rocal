@@ -29,6 +29,9 @@ export default function PrivacyPage() {
       currentPath={PRODUCT_ROUTES.privacy}
     >
       <div className="flex flex-col gap-8 text-sm leading-7 text-muted-foreground">
+        <PrivacyOverview />
+        <PrivacyDataUse />
+
         <div id="calendar-encryption">
           <h2 className="text-base font-semibold text-foreground">
             Calendar encryption
@@ -143,7 +146,8 @@ export default function PrivacyPage() {
             vault secret. Email sign-in uses your email password. Passkey and
             social sign-in use a separate encryption password. Changing that
             password rewraps your existing keys rather than re-encrypting your
-            content.
+            content. Passwords are stored only as salted hashes, and connections
+            to Solace use TLS.
           </p>
           <p className="mt-3">
             Keep your encryption password safe. A login reset alone cannot
@@ -163,9 +167,8 @@ export default function PrivacyPage() {
           </p>
           <p className="mt-3">
             Solace does not use your data for advertising, resale or profiling.
-            There are no third-party analytics or session replay tools. Error
-            reports go to Solace&apos;s own error tracker with sensitive fields
-            scrubbed.
+            There are no analytics, session replay, advertising or
+            error-reporting tools, and the apps send no crash reports.
           </p>
         </div>
 
@@ -178,17 +181,26 @@ export default function PrivacyPage() {
           </h2>
           <p className="mt-2">
             Vercel serves the web app. Railway hosts the API, databases, mail
-            service, notification worker and stored profile pictures. Expo
-            provides native app builds and over-the-air software updates. Apple
-            delivers iPhone notifications through APNs. These providers process
-            the information needed to host or deliver the service, including
-            connection metadata.
+            service, notification worker and stored profile pictures. A
+            separately hosted relay server sends and receives internet mail.
+            Expo provides native app builds and over-the-air software updates.
+            Apple delivers iPhone notifications through APNs. These providers
+            process the information needed to host or deliver the service,
+            including connection metadata.
+          </p>
+          <p className="mt-3">
+            Providers process data only on Solace&apos;s behalf under their data
+            processing terms and must protect it at least as well as this policy
+            describes. Some are based in or process data in the United States;
+            those transfers rely on the safeguards in their terms, such as
+            Standard Contractual Clauses or the EU–U.S. Data Privacy Framework.
+            Solace does not sell personal data or share it for advertising.
           </p>
           <p className="mt-3">
             Notification payloads use opaque event or message references;
             reminder titles and mail previews are resolved on your device when
-            possible. Error reports go to Solace’s self-hosted Errex service
-            with sensitive fields scrubbed. Hosting and delivery providers may
+            possible. Solace apps do not send crash or error reports, and
+            there is no analytics or tracking. Hosting and delivery providers may
             process IP addresses for routing and security; Solace sessions do
             not store IP addresses or user agents.
           </p>
@@ -271,39 +283,186 @@ export default function PrivacyPage() {
             microphone access.
           </p>
         </section>
-        <section id="contact" aria-labelledby="privacy-contact">
-          <h2
-            id="privacy-contact"
-            className="text-base font-semibold text-foreground"
-          >
-            Help and privacy requests
-          </h2>
-          {contact ? (
-            <p className="mt-2">
-              <a
-                href={contact}
-                className="text-primary underline underline-offset-4 cursor-pointer"
-              >
-                Contact Solace privately
-              </a>{" "}
-              for questions about personal data, access, correction or deletion.
-              Never send a password, encryption key or session token.
-            </p>
-          ) : null}
-          <p className="mt-3">
-            The{" "}
-            <Link
-              href={PRODUCT_ROUTES.support}
-              className="text-primary underline underline-offset-4 cursor-pointer"
-            >
-              support page
-            </Link>{" "}
-            explains account recovery, notification permissions and account
-            deletion. Public bug reports should contain no private account, mail
-            or calendar content.
-          </p>
-        </section>
+        <PrivacyRights contact={contact} />
       </div>
     </PublicInformationPage>
+  );
+}
+
+const DATA_USES: ReadonlyArray<readonly [string, string, string]> = [
+  [
+    "Account: email address, display name, password hash, passkeys, wrapped encryption keys and invitation",
+    "Create your account, sign you in and protect your encrypted data",
+    "Our agreement with you",
+  ],
+  [
+    "Calendars: encrypted event content, times, recurrence, sharing, participants and subscribed feeds",
+    "Show, sync and share your calendars and send the reminders you set",
+    "Our agreement with you",
+  ],
+  [
+    "Mail: messages, attachments, addresses, labels and mailbox settings",
+    "Send, receive, store and search your mail",
+    "Our agreement with you",
+  ],
+  [
+    "Contacts and settings, encrypted on your device",
+    "Keep your contacts and preferences in sync",
+    "Our agreement with you",
+  ],
+  [
+    "Profile picture, if you add one",
+    "Show your picture in Solace to you and the people you correspond with",
+    "Our agreement with you",
+  ],
+  [
+    "Push notification token",
+    "Deliver the reminders and new-mail alerts you turn on",
+    "Your consent, which you can withdraw in Settings",
+  ],
+  [
+    "Keyed hash of your IP address and request IDs",
+    "Limit repeated sign-in attempts and keep the service secure",
+    "Legitimate interest in security",
+  ],
+  [
+    "Messages you send to support",
+    "Answer your request",
+    "Legitimate interest in helping you",
+  ],
+];
+
+function PrivacyOverview() {
+  return (
+    <section id="overview" aria-labelledby="privacy-overview">
+      <h2
+        id="privacy-overview"
+        className="text-base font-semibold text-foreground"
+      >
+        Overview
+      </h2>
+      <p className="mt-2">Last updated 28 October 2026.</p>
+      <p className="mt-3">
+        This policy covers the Solace website and the Solace Calendar and
+        Solace Mail apps. Solace is free to use and has no in-app purchases,
+        subscriptions or advertising. The apps require an existing Solace
+        account; accounts are created by invitation.
+      </p>
+    </section>
+  );
+}
+
+function PrivacyDataUse() {
+  return (
+    <section id="data-use" aria-labelledby="privacy-data-use">
+      <h2
+        id="privacy-data-use"
+        className="text-base font-semibold text-foreground"
+      >
+        What Solace processes and why
+      </h2>
+      <p className="mt-2">
+        Solace processes only what it needs to run your account, calendar
+        and mailbox. You provide most of it; incoming mail, invitations and
+        shared calendars come from the people and services you communicate
+        with.
+      </p>
+      <div className="mt-3 overflow-x-auto rounded-lg border border-border/50">
+        <table className="w-full text-xs">
+          <caption className="sr-only">
+            Personal data, purposes and legal bases
+          </caption>
+          <thead>
+            <tr className="text-left text-foreground">
+              <th scope="col" className="px-3 py-2 font-medium">
+                Data
+              </th>
+              <th scope="col" className="px-3 py-2 font-medium">
+                Purpose
+              </th>
+              <th scope="col" className="px-3 py-2 font-medium">
+                Legal basis
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/30">
+            {DATA_USES.map(([data, purpose, basis]) => (
+              <tr key={data}>
+                <th
+                  scope="row"
+                  className="px-3 py-2 text-left font-medium text-foreground"
+                >
+                  {data}
+                </th>
+                <td className="px-3 py-2">{purpose}</td>
+                <td className="px-3 py-2">{basis}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3">
+        Solace does not make automated decisions about you that have legal
+        or similarly significant effects. The website uses only cookies
+        needed for sign-in and security, with no tracking or advertising
+        cookies; the apps keep their session in the device&apos;s secure
+        storage.
+      </p>
+    </section>
+  );
+}
+
+function PrivacyRights({ contact }: { contact: string | null }) {
+  return (
+    <section id="contact" aria-labelledby="privacy-contact">
+      <h2
+        id="privacy-contact"
+        className="text-base font-semibold text-foreground"
+      >
+        Your rights and privacy requests
+      </h2>
+      <p className="mt-2">
+        You can access, correct, export or delete your personal data, restrict
+        or object to its processing, and withdraw consent at any time. The apps
+        let you edit your profile and settings, turn off notifications and
+        delete your account. For anything else,{" "}
+        {contact ? (
+          <a
+            href={contact}
+            className="text-primary underline underline-offset-4 cursor-pointer"
+          >
+            contact Solace privately
+          </a>
+        ) : (
+          "contact Solace through the support page"
+        )}
+        ; Solace answers within one month. Never send a password, encryption key
+        or session token.
+      </p>
+      <p className="mt-3">
+        If you believe your data is mishandled, you can also complain to the
+        data protection authority where you live or work.
+      </p>
+      <p className="mt-3">
+        Solace is not intended for children under 16, and accounts are created
+        only by invitation.
+      </p>
+      <p className="mt-3">
+        When this policy changes, the date at the top changes. Solace tells you
+        in the apps or by email before significant changes apply.
+      </p>
+      <p className="mt-3">
+        The{" "}
+        <Link
+          href={PRODUCT_ROUTES.support}
+          className="text-primary underline underline-offset-4 cursor-pointer"
+        >
+          support page
+        </Link>{" "}
+        explains account recovery, notification permissions and account
+        deletion. Public bug reports should contain no private account, mail or
+        calendar content.
+      </p>
+    </section>
   );
 }

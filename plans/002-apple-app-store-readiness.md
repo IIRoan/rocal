@@ -44,14 +44,14 @@ The old project is still `@astralgrove/solace`, UUID `1047b680-b99f-4671-9824-23
 ## 2. Apple app records and EAS credentials
 
 - [ ] Verify the intended Apple developer team and publisher identity.
-- [ ] Create or verify separate App Store Connect app records for `onl.solace.calendar` and `onl.solace.mail`.
-- [ ] Set each app's `submit.production.ios.ascAppId` in its `eas.json` once its App Store Connect app ID is known.
+- [x] Create or verify separate App Store Connect app records for `onl.solace.calendar` (Apple ID `6828036308`) and `onl.solace.mail` (`6828036995`).
+- [x] Set each app's `submit.production.ios.ascAppId` in its `eas.json`.
 - [x] Provision App Store distribution profiles/certificates for both main apps and their notification extensions; verified through EAS after the owner’s interactive setup.
 - [ ] Configure EAS-managed submission credentials/API keys and link the App Store Connect app records.
 - [ ] Verify signing for both main apps and their `.NotificationService` extensions, App Groups, push notifications and associated domains.
 - [ ] Complete required Apple agreements, age ratings, launch territories and EU trader declarations.
 
-Existing production build and submission scripts are in both apps' `package.json`; both `submit.production` profiles currently contain `{}`. EAS can manage signing and uploads from Linux. [EAS Submit](https://docs.expo.dev/submit/ios/)
+Existing production build and submission scripts are in both apps' `package.json`; both `submit.production` profiles name their App Store Connect app. EAS can manage signing and uploads from Linux. [EAS Submit](https://docs.expo.dev/submit/ios/)
 
 Live EAS inspection on 2026-10-28 found stored credentials for the current main-app and extension identifiers under team `HXJACWP87H`. The current Calendar references were copied to the new project; the initial snapshot had only ad-hoc profiles. After the owner’s interactive setup, both apps and their notification extensions also have App Store profiles. Neither new Calendar nor Mail has an App Store Connect app connection or a submission API key assigned to its iOS credentials. This does not establish whether app records already exist in Apple's dashboard or whether stored signing credentials are still valid. The old Calendar project also has legacy `onl.solace.mobile` credential records; these were retained there. Its latest cloud build records use that older identifier; the new Calendar project and Mail had no cloud build records at migration preparation, which does not establish the state of CI-local builds.
 
@@ -64,7 +64,7 @@ Live EAS inspection on 2026-10-28 found stored credentials for the current main-
 - [x] Provision the support address as an enabled alias on the owner’s existing mailbox. Verify admin readback and public SMTP recipient acceptance (250), resetting without sending a message; save private before/after metadata and a rollback patch outside Git.
 - [ ] Deploy the public pages and verify support/privacy links from signed-out web and installed apps.
 - [x] Prepare the source-based data-processing inventory below for both apps.
-- [ ] Confirm App Privacy classifications against the release archives, deployed providers and Apple’s definitions, and complete both app records.
+- [ ] Confirm App Privacy classifications against the release archives, deployed providers and Apple’s definitions, and publish both app records. Answers are entered but unpublished in both records: contact info, user ID, device ID (push token), photos (avatar), other user content and, for Mail, emails are linked to the user and used only for app functionality; nothing is used for tracking. Error reporting was removed, so neither app declares diagnostics.
 - [x] Add explicit no-tracking manifests for both main apps and the shared notification extension, retain Expo/React Native SDK reason aggregation, and test the extension plugin against a generated Xcode project.
 - [ ] Inspect the real signed archives and required API reasons, including SDK coverage and whether each declared reason matches actual use.
 - [x] Remove camera and microphone access code from the iOS binaries: `patches/expo-image-picker@57.0.20.patch` strips the unused camera APIs, and `scripts/tests/ios-no-camera.cjs` fails CI if any native dependency references them (Apple rejects such code without a purpose string).
@@ -81,7 +81,7 @@ Both apps conservatively declare non-exempt encryption (`ITSAppUsesNonExemptEncr
 - [x] Document native-dependency/plugin changes requiring an app-version bump and new binary under the existing `appVersion` policy (below and both native READMEs).
 - [x] Let EAS manage signing/build/upload; check the completed build’s project, identifier, profile, channel, version and source commit before submitting that exact build ID. Retain a sanitized reference and listing draft.
 - [ ] Test OTA installation, deferred installation and rollback on compatible release binaries.
-- [x] Confirm live EAS service values resolve the production API and website, error reporting and `webcredentials` origin for both store profiles. API health is 200.
+- [x] Confirm live EAS service values resolve the production API and website and `webcredentials` origin for both store profiles. API health is 200.
 - [x] Implement the public passkey-association route from shared bundle identifiers and an environment-specific `SOLACE_APPLE_TEAM_ID`; return 404 when the team is absent/invalid.
 - [ ] Deploy and verify the website’s passkey association file; its configured `/.well-known/apple-app-site-association` URL returned 404 during preparation. Verify associated-domain authorization using the actual Apple team and both app IDs before device testing.
 - [x] Retain internal development/preview builds, add testing, and provide a separate manually dispatched iOS App Store workflow with optional TestFlight submission and App Store Connect ID preflight.
@@ -134,7 +134,7 @@ Existing development/preview profiles use `distribution: internal`; their QR/ad-
 - [ ] Review the generated metadata and publish approved listing fields through EAS Metadata or App Store Connect; finish unsupported fields/screenshots in App Store Connect.
 - [ ] Select the exact tested builds, complete declarations and reviewer instructions, and submit both apps for App Review.
 - [ ] Resolve review feedback and choose the public release timing.
-- [ ] Verify public downloads, login, notifications, support access and error reporting after release.
+- [ ] Verify public downloads, login, notifications, and support access after release.
 
 EAS Submit uploads a binary; public App Review and release remain separate App Store Connect steps. EAS Metadata is optional and currently beta. [EAS Submit](https://docs.expo.dev/submit/ios/), [EAS Metadata](https://docs.expo.dev/eas/metadata/)
 
@@ -179,7 +179,7 @@ These are source findings and candidate disclosure areas, not finalized Apple qu
 | Calendar                   | Titles/descriptions/locations and calendar/category names are encrypted client-side; scheduling/sharing metadata and participant addresses remain readable. Subscription feeds and invitation delivery have separate readable-content limits.                                            | Calendar and shared account services; verify public/subscribed/shared/invitation flows and the privacy page's existing encryption exceptions.                                 |
 | Mail                       | Messages, attachments, addresses, contacts and mailbox metadata support send/receive, storage and search. Normal email is readable during ordinary delivery; encrypted storage/OpenPGP do not make every mail flow E2EE. Known backend token/ingestion gaps remain documented in AGENTS. | Mail; assess emails/text messages, contacts and other content. Confirm the deployed vault/delivery behavior and on-device search boundaries.                                  |
 | Push and extension         | APNs token, opaque bundle/device/event/mail identifiers, delivery preference/job metadata and encrypted reminder title. The extension decrypts/fetches previews on-device and currently holds the session cookie in shared keychain.                                                     | Calendar reminders / Mail new-mail alerts; inspect payloads and verify locked-device fallback, sign-out cleanup and the outstanding scoped-token gap.                         |
-| Diagnostics                | Self-hosted Errex receives scrubbed error events/breadcrumbs without default PII; no third-party analytics. API logs use categories and request IDs.                                                                                                                                     | Both apps; inspect crash/diagnostic fields from actual archives and the deployed retention/configuration rather than assuming scrubbing removes every disclosure requirement. |
+| Diagnostics                | None: error reporting (Errex) was removed from the web, native apps, API and worker, and repository rules ban crash/error-reporting SDKs. No third-party analytics. API logs use categories and request IDs and stay with the hosting provider. | Both apps; confirm the release archives contain no crash-reporting SDK. |
 | Hosting and delivery       | Railway operates API/database/mail/notification/avatar infrastructure; Vercel serves web and passkey bridge; Expo provides builds/OTA; Apple delivers APNs. Providers receive necessary connection metadata.                                                                             | Confirm provider contracts, regions, operational logs/backups and actual retention; account sessions themselves do not retain IP/user-agent metadata.                         |
 | Local device data          | Secure-store/keychain auth and keys, encrypted Mail snapshot and optional encrypted search index; no persistent query cache. Photo permission is used for a selected avatar; camera/microphone permission is disabled.                                                                   | Both apps; confirm sign-out/account-switch deletion and permission strings in the built archive. Local-only processing and server transfers need separate review.             |
 
