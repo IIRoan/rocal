@@ -193,7 +193,7 @@ async fn cors_reflects_only_trusted_origins() {
 async fn cross_site_writes_are_refused_from_untrusted_origins() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let body = || Some(json!({"name": "Planted", "color": "blue"}));
+    let body = || Some(json!({"encryptedName": "ciphertext", "color": "blue"}));
     let cross_site = ok(user
         .agent
         .send(
@@ -226,7 +226,10 @@ async fn cross_site_writes_are_refused_from_untrusted_origins() {
     }
     let trusted = ok(user
         .agent
-        .post("/api/calendars", json!({"name": "Mine", "color": "blue"}))
+        .post(
+            "/api/calendars",
+            json!({"encryptedName": "ciphertext", "color": "blue"}),
+        )
         .await);
     assert!(trusted.status.is_success(), "{}", trusted.text());
     let read = ok(user

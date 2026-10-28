@@ -9,8 +9,8 @@ use solace_api_types::mail::{
 };
 
 use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, json_body,
-    ok,
+    Backend, TestApp, TestUser, count, expect_invalid, expect_unauthorized, expect_unknown_field,
+    hex, json_body, ok,
 };
 use crate::mail_support::{
     access_token, bootstrap, bootstrap_request, bridge_secret, kdf_params, mailbox, pgp_key,
@@ -178,7 +178,7 @@ async fn bootstrap_provisions_an_encrypted_mailbox_linked_to_the_user() {
             "kdf_memory_kib": 65_536,
             "kdf_iterations": 3,
             "kdf_parallelism": 1,
-            "wrapped_secret": request.wrapped_secret.clone().flatten(),
+            "wrapped_secret": request.wrapped_secret,
             "wrap_algorithm": "RSA-OAEP-256",
         })
     );
@@ -233,26 +233,33 @@ async fn bootstrap_provisions_an_encrypted_mailbox_linked_to_the_user() {
 async fn bootstrap_requires_a_vault_secret_sealed_to_the_account_key() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    for wrapped_secret in [None, Some(None), Some(Some("   ".to_owned()))] {
-        let mut request = bootstrap_request(0);
-        request.wrapped_secret = wrapped_secret.clone();
-        let error = ok(user
-            .post("/api/mail/account/bootstrap", json_body(&request))
-            .await
-            .expect_error(
-                400,
-                "Validation Error",
-                "A vault secret sealed to your account key is required.",
-            ));
-        assert_eq!(
-            error["details"],
-            json!({"field": "wrappedSecret"}),
-            "{wrapped_secret:?}"
-        );
+    let mut missing = json_body(&bootstrap_request(0));
+    missing
+        .as_object_mut()
+        .expect("body")
+        .remove("wrappedSecret");
+    let mut null = json_body(&bootstrap_request(0));
+    null["wrappedSecret"] = Value::Null;
+    for (body, message) in [
+        (missing, "Required"),
+        (null, "Expected string, received null"),
+    ] {
+        let response = user.post("/api/mail/account/bootstrap", body).await;
+        expect_invalid(&response, message, "wrappedSecret");
     }
+    let mut blank = bootstrap_request(0);
+    blank.wrapped_secret = "   ".into();
+    let error = ok(user
+        .post("/api/mail/account/bootstrap", json_body(&blank))
+        .await
+        .expect_error(
+            400,
+            "Validation Error",
+            "A vault secret sealed to your account key is required.",
+        ));
+    assert_eq!(error["details"], json!({"field": "wrappedSecret"}));
     assert_eq!(count(&app.db, ENTRY_COUNT, &user.id).await, 0);
 }
-
 #[tokio::test]
 async fn unapproved_accounts_cannot_bootstrap() {
     let app = TestApp::spawn().await;
@@ -267,7 +274,7 @@ async fn unapproved_accounts_cannot_bootstrap() {
     assert!(!status.mailbox_approved && !status.provisioned);
 
     let mut request = bootstrap_request(0);
-    request.wrapped_secret = None;
+    request.wrapped_secret = "   ".into();
     let error = ok(user
         .post("/api/mail/account/bootstrap", json_body(&request))
         .await
@@ -564,7 +571,7 @@ async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
         .and_then(|r| r.dto()));
     assert_eq!(stored.email, owner.user.email);
     assert_eq!(stored.vault_version, 1);
-    let seal = stored.wrapped_secret.clone().expect("sealed at bootstrap");
+    let seal = stored.wrapped_secret.clone();
 
     let mut update = MailVaultBackupRequest {
         vault_version: 2,
@@ -592,37 +599,44 @@ async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
                 salt_b64: update.kdf_params.salt_b64.trim().to_owned(),
                 ..update.kdf_params.clone()
             },
-            wrapped_secret: Some(seal.clone()),
+            wrapped_secret: seal.clone(),
             wrap_algorithm: Some("RSA-OAEP-256".into()),
         },
         "an omitted seal is kept"
     );
 
-    update.wrapped_secret = Some(None);
+    let mut nulled = json_body(&update);
+    nulled["wrappedSecret"] = Value::Null;
+    expect_invalid(
+        &owner
+            .user
+            .put("/api/mail/account/vault-backup", nulled)
+            .await,
+        "Expected string, received null",
+        "wrappedSecret",
+    );
+    update.wrapped_secret = Some("   ".into());
     update.wrap_algorithm = Some(None);
-    let nulled: MailVaultBackup = ok(owner
+    let kept: MailVaultBackup = ok(owner
         .user
         .put("/api/mail/account/vault-backup", json_body(&update))
         .await
         .dto());
     assert_eq!(
-        (
-            nulled.wrapped_secret.as_deref(),
-            nulled.wrap_algorithm.as_deref()
-        ),
-        (Some(seal.as_str()), Some("RSA-OAEP-256")),
-        "null never unseals a vault"
+        (kept.wrapped_secret.as_str(), kept.wrap_algorithm.as_deref()),
+        (seal.as_str(), Some("RSA-OAEP-256")),
+        "a blank seal or null algorithm never unseals a vault"
     );
 
     let new_seal = fake_envelope();
-    update.wrapped_secret = Some(Some(new_seal.clone()));
+    update.wrapped_secret = Some(new_seal.clone());
     update.wrap_algorithm = Some(Some("AES-GCM-256".into()));
     let resealed: MailVaultBackup = ok(owner
         .user
         .put("/api/mail/account/vault-backup", json_body(&update))
         .await
         .dto());
-    assert_eq!(resealed.wrapped_secret, Some(new_seal.clone()));
+    assert_eq!(resealed.wrapped_secret, new_seal);
     let row: (i32, String, Option<String>, Option<String>) = sqlx::query_as(
         "SELECT v.vault_version, v.kdf, v.wrapped_secret, v.wrap_algorithm FROM mail_vault_backup v \
          JOIN mail_directory_entry e ON e.id = v.directory_entry_id WHERE e.user_id = $1",
@@ -671,6 +685,55 @@ async fn vault_backups_round_trip_and_keep_the_seal_unless_replaced() {
             .await,
         "email",
     );
+}
+
+#[tokio::test]
+async fn a_vault_backup_without_any_seal_is_never_written() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    // A mailbox whose vault row is gone has no stored seal to keep.
+    sqlx::query(
+        "DELETE FROM mail_vault_backup v USING mail_directory_entry e \
+         WHERE e.id = v.directory_entry_id AND e.user_id = $1",
+    )
+    .bind(&owner.user.id)
+    .execute(&app.db)
+    .await
+    .expect("drop vault");
+    let vaults = "SELECT count(*) FROM mail_vault_backup v JOIN mail_directory_entry e ON e.id = v.directory_entry_id WHERE e.user_id = $1";
+    let mut update = MailVaultBackupRequest {
+        vault_version: 1,
+        encrypted_vault_b64: "dmF1bHQ=".into(),
+        kdf: "argon2id".into(),
+        kdf_params: kdf_params(),
+        wrapped_secret: None,
+        wrap_algorithm: None,
+    };
+    for seal in [None, Some("   ".to_owned())] {
+        update.wrapped_secret = seal;
+        let error = ok(owner
+            .user
+            .put("/api/mail/account/vault-backup", json_body(&update))
+            .await
+            .expect_error(
+                400,
+                "Validation Error",
+                "A vault secret sealed to your account key is required.",
+            ));
+        assert_eq!(error["details"], json!({"field": "wrappedSecret"}));
+    }
+    assert_eq!(count(&app.db, vaults, &owner.user.id).await, 0);
+
+    let seal = fake_envelope();
+    update.wrapped_secret = Some(seal.clone());
+    let stored: MailVaultBackup = ok(owner
+        .user
+        .put("/api/mail/account/vault-backup", json_body(&update))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(stored.wrapped_secret, seal);
+    assert_eq!(count(&app.db, vaults, &owner.user.id).await, 1);
 }
 
 #[tokio::test]

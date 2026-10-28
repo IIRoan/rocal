@@ -13,9 +13,7 @@ use solace_api_types::account::{
     AuthStatus, DeleteAccountResponse, EmailAvailability, EmailAvailabilityCode, SignupConfig,
 };
 use solace_api_types::events::ParticipantInput;
-use solace_api_types::subscriptions::{
-    EncryptedIcsEvent, EncryptedIcsImportRequest, ImportIcsRequest,
-};
+use solace_api_types::subscriptions::{EncryptedIcsEvent, EncryptedIcsImportRequest};
 use sqlx::PgPool;
 
 use crate::helpers::{
@@ -142,9 +140,12 @@ fn session_token_only(agent: &Agent) -> Agent {
     stripped
 }
 
-async fn owned_calendar(user: &mut TestUser, name: &str) -> String {
+async fn owned_calendar(user: &mut TestUser) -> String {
     let created = ok(user
-        .post("/api/calendars", json!({"name": name, "color": "#3b82f6"}))
+        .post(
+            "/api/calendars",
+            json!({"encryptedName": fake_envelope(), "color": "#3b82f6"}),
+        )
         .await
         .expect_status(200)
         .and_then(|r| r.value()));
@@ -173,10 +174,10 @@ async fn import(user: &mut TestUser, calendar_id: &str, events: Vec<EncryptedIcs
     ok(user
         .post(
             "/api/subscriptions/import-ics",
-            json_body(&ImportIcsRequest::Encrypted(EncryptedIcsImportRequest {
+            json_body(&EncryptedIcsImportRequest {
                 calendar_id: calendar_id.to_owned().into(),
                 encrypted_events: events,
-            })),
+            }),
         )
         .await
         .expect_status(200));
@@ -209,7 +210,7 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
         )
         .await
         .expect_status(200));
-    let calendar = owned_calendar(user, "Work").await;
+    let calendar = owned_calendar(user).await;
     ok(user
         .post(
             "/api/categories",
@@ -451,7 +452,7 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         .await
         .expect("avatar id");
 
-    let bystander_calendar = owned_calendar(&mut bystander, "Home").await;
+    let bystander_calendar = owned_calendar(&mut bystander).await;
     import(
         &mut bystander,
         &bystander_calendar,
@@ -485,7 +486,7 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         .await
         .expect_status(200));
     let (victim_calendar,): (String,) =
-        sqlx::query_as("SELECT id FROM calendar WHERE user_id = $1 AND name = 'Work'")
+        sqlx::query_as("SELECT id FROM calendar WHERE user_id = $1 AND encrypted_name IS NOT NULL")
             .bind(&victim.id)
             .fetch_one(&app.db)
             .await

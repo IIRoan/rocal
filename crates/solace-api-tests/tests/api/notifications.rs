@@ -8,7 +8,7 @@ use solace_api_types::notifications::{
 
 use crate::event_fixtures::{
     FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event, insert_calendar,
-    insert_plaintext_event, iso_from_now, row_snapshot, to_json,
+    insert_plaintext_event, insert_staging_calendar, iso_from_now, row_snapshot, to_json,
 };
 use crate::events::overdue_schedule_shape;
 use crate::helpers::{
@@ -36,7 +36,6 @@ fn update(settings: Vec<NotificationSetting>) -> UpdateEventNotificationsRequest
     UpdateEventNotificationsRequest {
         notifications: settings,
         encrypted_display_title: None,
-        display_title: None,
     }
 }
 
@@ -352,26 +351,21 @@ async fn the_title_ciphertext_is_stored_kept_and_cleared() {
         "an omitted title keeps the stored ciphertext"
     );
 
-    let mut legacy = update(vec![setting("email", 25, true)]);
-    legacy.display_title = Some(Some("Lunch with Sam".into()));
-    put(&mut owner, &event, to_json(&legacy)).await;
+    for plaintext in [json!("Lunch with Sam"), Value::Null] {
+        let mut body = to_json(&update(vec![setting("email", 25, true)]));
+        body["displayTitle"] = plaintext;
+        expect_unknown_field(
+            &owner
+                .put(&format!("/api/notifications/event/{event}"), body)
+                .await,
+            "displayTitle",
+        );
+    }
     assert_eq!(
         schedules(&app, &event).await,
-        [("email".to_owned(), 25, Some(title.clone()))],
-        "a plaintext title from shipped binaries is accepted and dropped"
+        [("email".to_owned(), 20, Some(title.clone()))],
+        "a plaintext title is refused and changes nothing"
     );
-    assert_eq!(
-        count(
-            &app.db,
-            "SELECT count(*) FROM event_notification WHERE event_id = $1 AND encrypted_display_title LIKE '%Lunch%'",
-            &event
-        )
-        .await,
-        0
-    );
-    let mut legacy_null = update(vec![setting("email", 25, true)]);
-    legacy_null.display_title = Some(None);
-    put(&mut owner, &event, to_json(&legacy_null)).await;
 
     let mut cleared = update(vec![setting("email", 30, true)]);
     cleared.encrypted_display_title = Some(None);
@@ -382,11 +376,12 @@ async fn the_title_ciphertext_is_stored_kept_and_cleared() {
         "null clears it"
     );
 
-    let calendar = calendar_id(&mut owner, "Work").await;
+    // A staged invitation copy is plaintext, and its title still never reaches a schedule.
+    let staging = insert_staging_calendar(&app, &owner.id).await;
     let plain = insert_plaintext_event(
         &app,
         &owner.id,
-        &calendar,
+        &staging,
         "Lunch with Sam",
         FUTURE_START,
         FUTURE_END,
@@ -436,8 +431,8 @@ async fn title_ciphertext_and_settings_are_validated() {
         ),
         (
             json!({"notifications": one, "displayTitle": "x".repeat(256)}),
-            "String must contain at most 255 character(s)",
-            "displayTitle",
+            "Unrecognized key(s) in object: 'displayTitle'",
+            "root",
         ),
         (json!({}), "Required", "notifications"),
         (
@@ -781,33 +776,6 @@ async fn other_users_get_not_found() {
         row_snapshot(&app.db, "calendar_event", &event).await,
         before
     );
-}
-
-#[tokio::test]
-async fn calendars_forcing_full_encryption_still_take_reminders() {
-    let app = TestApp::spawn().await;
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    sqlx::query("UPDATE calendar SET force_full_encryption = true WHERE id = $1")
-        .bind(&calendar)
-        .execute(&app.db)
-        .await
-        .expect("force encryption");
-    let event = create_event(
-        &mut owner,
-        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
-    )
-    .await
-    .id
-    .0;
-    let result = put(
-        &mut owner,
-        &event,
-        to_json(&update(vec![setting("email", 15, true)])),
-    )
-    .await;
-    assert_eq!(result.data.map(|d| d.created), Some(1));
-    assert_eq!(reminder(&app, &event).await, Some(15));
 }
 
 #[tokio::test]

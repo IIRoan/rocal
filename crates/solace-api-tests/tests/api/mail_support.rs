@@ -68,7 +68,7 @@ pub fn bootstrap_request(index: usize) -> MailBootstrapRequest {
         encrypted_vault_b64: STANDARD.encode(rand::random::<[u8; 48]>()),
         kdf: "argon2id".into(),
         kdf_params: kdf_params(),
-        wrapped_secret: Some(Some(fake_envelope())),
+        wrapped_secret: fake_envelope(),
         wrap_algorithm: Some(Some("RSA-OAEP-256".into())),
     }
 }

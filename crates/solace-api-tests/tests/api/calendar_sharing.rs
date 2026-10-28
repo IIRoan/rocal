@@ -8,8 +8,8 @@ use solace_api_types::calendars::{
 };
 
 use crate::calendars::{
-    CalendarRow, EVENT_STAMP, EventRow, calendar_row, create_calendar, create_calendar_with,
-    event_row, insert_calendar, insert_event,
+    CalendarRow, EventRow, calendar_row, create_calendar, create_calendar_with, insert_calendar,
+    insert_event,
 };
 use crate::helpers::{
     Backend, TestApp, TestUser, expect_invalid, expect_plain_error, expect_unauthorized,
@@ -84,6 +84,20 @@ fn ics(lines: &[String]) -> String {
     format!("{}\r\n", folded.join("\r\n"))
 }
 
+/// A public feed calendar: plaintext by design, and shareable onward because it is not sync-only.
+async fn public_calendar(app: &TestApp, user: &TestUser, name: &str) -> String {
+    insert_calendar(
+        &app.db,
+        &user.id,
+        CalendarRow {
+            name,
+            kind: "subscribed",
+            ..Default::default()
+        },
+    )
+    .await
+}
+
 async fn share_state(app: &TestApp, calendar_id: &str) -> (bool, Option<String>) {
     sqlx::query_as("SELECT ics_share_enabled, ics_share_token FROM calendar WHERE id = $1")
         .bind(calendar_id)
@@ -106,7 +120,7 @@ async fn anonymous_callers_are_refused() {
 async fn a_new_calendar_is_not_shared() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Private", "blue").await;
+    let calendar = create_calendar(&mut user, "blue").await;
     let link: CalendarShareLink = ok(user
         .get(&share_link_path(&calendar.id.0))
         .await
@@ -116,7 +130,7 @@ async fn a_new_calendar_is_not_shared() {
         link,
         CalendarShareLink {
             calendar_id: calendar.id.clone(),
-            calendar_name: "Private".into(),
+            calendar_name: String::new(),
             enabled: false,
             share_url: None,
         }
@@ -128,7 +142,7 @@ async fn a_new_calendar_is_not_shared() {
 async fn enabling_issues_a_public_url_and_keeps_its_token() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Team", "blue").await;
+    let calendar = create_calendar(&mut user, "blue").await;
     let path = share_link_path(&calendar.id.0);
 
     let link = enable(&mut user, &calendar.id.0).await;
@@ -140,7 +154,7 @@ async fn enabling_issues_a_public_url_and_keeps_its_token() {
         link,
         CalendarShareLink {
             calendar_id: calendar.id.clone(),
-            calendar_name: "Team".into(),
+            calendar_name: String::new(),
             enabled: true,
             share_url: Some(format!(
                 "{}/api/calendars/shared/{token}",
@@ -174,7 +188,7 @@ async fn enabling_issues_a_public_url_and_keeps_its_token() {
         Some("PRODID:-//Solace Calendar//Calendar Export//EN".into()),
         Some("CALSCALE:GREGORIAN".into()),
         Some("METHOD:PUBLISH".into()),
-        Some("X-WR-CALNAME:Team".into()),
+        Some("X-WR-CALNAME:Solace calendar".into()),
         owner_description(&app, &user.name),
         Some("X-WR-TIMEZONE:Europe/Amsterdam".into()),
         Some(format!("URL:{}", link.share_url.clone().expect("url"))),
@@ -194,7 +208,7 @@ async fn enabling_issues_a_public_url_and_keeps_its_token() {
 async fn regenerating_rotates_the_token_and_revokes_the_old_feed() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Team", "blue").await;
+    let calendar = create_calendar(&mut user, "blue").await;
     let old = token_of(&enable(&mut user, &calendar.id.0).await);
 
     let rotated: CalendarShareLink = ok(user
@@ -221,7 +235,7 @@ async fn regenerating_rotates_the_token_and_revokes_the_old_feed() {
 async fn disabling_revokes_the_feed_until_a_new_link_is_issued() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Team", "blue").await;
+    let calendar = create_calendar(&mut user, "blue").await;
     let path = share_link_path(&calendar.id.0);
     let old = token_of(&enable(&mut user, &calendar.id.0).await);
     let before = calendar_row(&app.db, &calendar.id.0).await.expect("row");
@@ -259,9 +273,10 @@ async fn disabling_revokes_the_feed_until_a_new_link_is_issued() {
 async fn the_feed_serves_top_level_plaintext_events_as_ics() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Team, Feed; Ü", "blue").await;
-    let elsewhere = create_calendar(&mut user, "Elsewhere", "blue").await;
-    let id = &calendar.id.0;
+    // The feed escapes the public calendar's plaintext name.
+    let calendar = public_calendar(&app, &user, "Team, Feed; Ü").await;
+    let elsewhere = public_calendar(&app, &user, "Elsewhere").await;
+    let id = &calendar;
     let standup = insert_event(
         &app.db,
         &user.id,
@@ -339,7 +354,7 @@ async fn the_feed_serves_top_level_plaintext_events_as_ics() {
     insert_event(
         &app.db,
         &user.id,
-        &elsewhere.id.0,
+        &elsewhere,
         EventRow {
             title: "Not shared",
             ..Default::default()
@@ -462,8 +477,8 @@ async fn the_feed_serves_top_level_plaintext_events_as_ics() {
 async fn the_feed_carries_each_series_exceptions() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Rota", "blue").await;
-    let id = &calendar.id.0;
+    let calendar = public_calendar(&app, &user, "Rota").await;
+    let id = &calendar;
     let weekly = insert_event(
         &app.db,
         &user.id,
@@ -560,8 +575,8 @@ async fn the_feed_carries_each_series_exceptions() {
 async fn zoned_series_keep_wall_clock_time_across_dst() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Standup", "blue").await;
-    let id = &calendar.id.0;
+    let calendar = public_calendar(&app, &user, "Rota").await;
+    let id = &calendar;
     // 09:00 in Amsterdam every week, across the end of summer time on 25 October.
     let series = insert_event(
         &app.db,
@@ -612,7 +627,7 @@ async fn zoned_series_keep_wall_clock_time_across_dst() {
 async fn the_feed_token_may_carry_an_ics_suffix_and_spaces() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Team", "blue").await;
+    let calendar = create_calendar(&mut user, "blue").await;
     let token = token_of(&enable(&mut user, &calendar.id.0).await);
     for (requested, source) in [
         (format!("{token}.ics"), format!("{token}.ics")),
@@ -645,69 +660,21 @@ async fn unknown_or_blank_tokens_are_not_found() {
 async fn encrypted_events_block_sharing_and_the_feed() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let sealed = EventRow {
-        title: "",
-        encrypted_content: Some(r#"{"version":1}"#),
-        encryption_state: Some("encrypted"),
-        ..Default::default()
-    };
+    let blocked_message =
+        "ICS sharing is unavailable while this calendar contains encrypted events.";
 
-    let locked = create_calendar(&mut user, "Locked", "blue").await;
-    insert_event(&app.db, &user.id, &locked.id.0, sealed).await;
+    let locked = create_calendar(&mut user, "blue").await;
+    insert_event(&app.db, &user.id, &locked.id.0, EventRow::sealed()).await;
     expect_plain_error(
         &user.post(&share_link_path(&locked.id.0), json!({})).await,
-        "ICS sharing is unavailable while this calendar contains encrypted events.",
+        blocked_message,
     );
     assert_eq!(share_state(&app, &locked.id.0).await, (false, None));
 
-    let shared = create_calendar(&mut user, "Shared", "blue").await;
+    // A link issued while the calendar was empty stops serving once ciphertext lands in it.
+    let shared = create_calendar(&mut user, "blue").await;
     let token = token_of(&enable(&mut user, &shared.id.0).await);
-    let parent = insert_event(
-        &app.db,
-        &user.id,
-        &shared.id.0,
-        EventRow {
-            title: "Visible",
-            ..Default::default()
-        },
-    )
-    .await;
-    let child = EventRow {
-        title: "",
-        encrypted_content: Some(r#"{"version":1}"#),
-        encryption_state: Some("encrypted"),
-        parent_event_id: Some(&parent),
-        ..Default::default()
-    };
-    insert_event(&app.db, &user.id, &shared.id.0, child).await;
-    let response = feed(&app, &token).await;
-    match app.backend {
-        // TypeScript's feed ignores detached instances, so their ciphertext goes unnoticed.
-        Backend::TypeScript => {
-            assert_eq!(response.status.as_u16(), 200);
-            assert!(response.text().contains("SUMMARY:Visible"));
-        }
-        Backend::Rust => {
-            ok(response.expect_error(
-                400,
-                "Validation Error",
-                "This shared calendar contains encrypted event details and cannot be exported.",
-            ));
-        }
-    }
-    // Enabling again counts detached instances on both backends.
-    expect_plain_error(
-        &user.post(&share_link_path(&shared.id.0), json!({})).await,
-        "ICS sharing is unavailable while this calendar contains encrypted events.",
-    );
-
-    let top_level = EventRow {
-        title: "",
-        encrypted_content: Some(r#"{"version":1}"#),
-        encryption_state: Some("encrypted"),
-        ..Default::default()
-    };
-    insert_event(&app.db, &user.id, &shared.id.0, top_level).await;
+    insert_event(&app.db, &user.id, &shared.id.0, EventRow::sealed()).await;
     let blocked = feed(&app, &token).await;
     let body = ok(blocked.expect_error(
         400,
@@ -715,68 +682,10 @@ async fn encrypted_events_block_sharing_and_the_feed() {
         "This shared calendar contains encrypted event details and cannot be exported.",
     ));
     assert!(body.get("details").is_none(), "{body}");
-}
-
-#[tokio::test]
-async fn disabling_drops_plaintext_shadows_beside_ciphertext() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Shared", "blue").await;
-    let elsewhere = create_calendar(&mut user, "Elsewhere", "blue").await;
-    enable(&mut user, &calendar.id.0).await;
-    let shadow = |state| EventRow {
-        title: "Shadow title",
-        description: Some("Shadow body"),
-        location: Some("Shadow room"),
-        encrypted_content: Some(r#"{"version":1}"#),
-        encryption_state: Some(state),
-        ..Default::default()
-    };
-    let shadow_write =
-        insert_event(&app.db, &user.id, &calendar.id.0, shadow("shadow_write")).await;
-    let marked_plaintext =
-        insert_event(&app.db, &user.id, &calendar.id.0, shadow("plaintext")).await;
-    let sealed = insert_event(&app.db, &user.id, &calendar.id.0, shadow("encrypted")).await;
-    let plain = insert_event(
-        &app.db,
-        &user.id,
-        &calendar.id.0,
-        EventRow {
-            title: "Plain",
-            description: Some("Plain body"),
-            ..Default::default()
-        },
-    )
-    .await;
-    let other = insert_event(&app.db, &user.id, &elsewhere.id.0, shadow("shadow_write")).await;
-    let untouched = [
-        (sealed.clone(), event_row(&app.db, &sealed).await),
-        (plain.clone(), event_row(&app.db, &plain).await),
-        (other.clone(), event_row(&app.db, &other).await),
-    ];
-
-    ok(user
-        .delete(&share_link_path(&calendar.id.0))
-        .await
-        .expect_status(200));
-
-    for event in [shadow_write, marked_plaintext] {
-        let row = event_row(&app.db, &event).await.expect("event");
-        assert_eq!(
-            (
-                &row["title"],
-                &row["description"],
-                &row["location"],
-                &row["encryption_state"]
-            ),
-            (&json!(""), &json!(null), &json!(null), &json!("encrypted"))
-        );
-        assert_eq!(row["encrypted_content"], json!(r#"{"version":1}"#));
-        assert_ne!(row["updated_at"], json!(EVENT_STAMP), "updatedAt is bumped");
-    }
-    for (event, before) in untouched {
-        assert_eq!(event_row(&app.db, &event).await, before);
-    }
+    expect_plain_error(
+        &user.post(&share_link_path(&shared.id.0), json!({})).await,
+        blocked_message,
+    );
 }
 
 #[tokio::test]
@@ -810,7 +719,7 @@ async fn other_users_calendars_behave_as_not_found() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let mut other = app.user().await;
-    let calendar = create_calendar(&mut owner, "Team", "blue").await;
+    let calendar = create_calendar(&mut owner, "blue").await;
     let token = token_of(&enable(&mut owner, &calendar.id.0).await);
     let path = share_link_path(&calendar.id.0);
 
@@ -837,7 +746,7 @@ async fn the_share_link_body_is_validated() {
     let app = TestApp::spawn().await;
     let mut victim = app.user().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Team", "blue").await;
+    let calendar = create_calendar(&mut user, "blue").await;
     let path = share_link_path(&calendar.id.0);
 
     expect_invalid(
@@ -861,7 +770,7 @@ async fn the_share_link_body_is_validated() {
     );
     assert_eq!(share_state(&app, &calendar.id.0).await, (false, None));
 
-    let victims = create_calendar(&mut victim, "Victim", "blue").await;
+    let victims = create_calendar(&mut victim, "blue").await;
     assert_eq!(share_state(&app, &victims.id.0).await, (false, None));
 }
 
@@ -873,7 +782,7 @@ async fn encrypted_calendar_names_leave_as_a_neutral_label() {
         &mut user,
         &CreateCalendarRequest {
             color: "blue".into(),
-            encrypted_name: Some("ciphertext".into()),
+            encrypted_name: "ciphertext".into(),
             ..Default::default()
         },
     )

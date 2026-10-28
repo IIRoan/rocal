@@ -1,9 +1,12 @@
-//! Shared setup for the event modules: calendars, encrypted events, legacy plaintext rows and the noreply mail they send.
+//! Shared setup for the event modules: calendars, encrypted events, feed and staged plaintext rows and the noreply mail they send.
 
 use std::time::Duration;
 
 use serde_json::{Value, json};
 use solace_api_tests::seed::{fake_envelope, fake_token};
+use solace_api_types::calendars::{
+    CalendarList, CreateCalendarRequest, SeedDefaultCalendarsRequest,
+};
 use solace_api_types::events::{CreateEventRequest, Event, EventList};
 use sqlx::PgPool;
 
@@ -23,16 +26,13 @@ pub fn encrypted_event(calendar_id: &str, start: &str, end: &str) -> CreateEvent
         start: start.into(),
         end: end.into(),
         calendar_id: calendar_id.to_owned().into(),
-        title: None,
-        description: None,
-        location: None,
         all_day: None,
         color: None,
         category_id: None,
         timezone: None,
         reminder: None,
         recurrence: None,
-        encrypted_content: Some(fake_envelope()),
+        encrypted_content: fake_envelope(),
         blind_index_tokens: Some(vec![fake_token(), fake_token()]),
         encryption_key_version: Some(1),
         participants: None,
@@ -56,34 +56,79 @@ pub async fn list_events(user: &mut TestUser, start: &str, end: &str) -> EventLi
         .and_then(|r| r.dto()))
 }
 
-/// The user's calendar by name; the first event list creates Personal, Work and Family.
+/// The starting set a client seeds, told apart by color since the names are ciphertext; Personal is the default.
+pub const DEFAULT_CALENDARS: [(&str, &str); 3] = [
+    ("Personal", "#10b981"),
+    ("Work", "#3b82f6"),
+    ("Family", "#f43f5e"),
+];
+
+/// An owned calendar as clients create it: an encrypted name only.
+pub fn encrypted_calendar(color: &str, is_default: bool) -> CreateCalendarRequest {
+    CreateCalendarRequest {
+        color: color.into(),
+        is_default: Some(is_default),
+        encrypted_name: fake_envelope(),
+        blind_index_tokens: Some(vec![fake_token()]),
+        encryption_key_version: Some(1),
+    }
+}
+
+pub fn seed_defaults_request() -> SeedDefaultCalendarsRequest {
+    SeedDefaultCalendarsRequest {
+        calendars: DEFAULT_CALENDARS
+            .iter()
+            .enumerate()
+            .map(|(index, (_, color))| encrypted_calendar(color, index == 0))
+            .collect(),
+    }
+}
+
+/// `POST /api/calendars/defaults`, which stores the set only while the user owns no calendar yet.
+pub async fn seed_default_calendars(user: &mut TestUser) -> CalendarList {
+    ok(user
+        .post("/api/calendars/defaults", to_json(&seed_defaults_request()))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()))
+}
+
+/// The user's starting calendar by its old name, seeding the set first.
 pub async fn calendar_id(user: &mut TestUser, name: &str) -> String {
-    let list = list_events(user, FUTURE_START, FUTURE_END).await;
-    list.calendars
+    let color = DEFAULT_CALENDARS
+        .iter()
+        .find(|(label, _)| *label == name)
+        .map(|(_, color)| *color)
+        .unwrap_or_else(|| panic!("no default calendar {name}"));
+    seed_default_calendars(user)
+        .await
+        .calendars
         .into_iter()
-        .find(|calendar| calendar.name == name)
+        .find(|calendar| calendar.color == color && calendar.kind == "owned")
         .map(|calendar| calendar.id.0)
         .unwrap_or_else(|| panic!("no calendar {name}"))
 }
 
-/// A calendar row inserted directly, for kinds the API never creates (subscribed, sync-only, shared).
+/// A calendar row inserted directly, for kinds the API never creates (subscribed, sync-only, shared); owned rows get an encrypted name.
 pub async fn insert_calendar(app: &TestApp, user_id: &str, kind: &str, sync_only: bool) -> String {
     let id = format!("suitecal{}", hex(8));
+    let encrypted_name = (kind == "owned").then(fake_envelope);
     sqlx::query(
-        "INSERT INTO calendar (id, name, color, kind, is_sync_only, user_id, created_at, updated_at) \
-         VALUES ($1, 'Feed', '#64748b', $2, $3, $4, now(), now())",
+        "INSERT INTO calendar (id, name, encrypted_name, encryption_state, color, kind, is_sync_only, user_id, created_at, updated_at) \
+         VALUES ($1, CASE WHEN $5::text IS NULL THEN 'Feed' ELSE '' END, $5, CASE WHEN $5::text IS NULL THEN 'plaintext' ELSE 'encrypted' END, '#64748b', $2, $3, $4, now(), now())",
     )
     .bind(&id)
     .bind(kind)
     .bind(sync_only)
     .bind(user_id)
+    .bind(encrypted_name)
     .execute(&app.db)
     .await
     .expect("insert calendar");
     id
 }
 
-/// A plaintext row as legacy clients, subscriptions and invitation imports leave them.
+/// A plaintext row, as only feed sync and staged invitation imports write one.
 pub async fn insert_plaintext_event(
     app: &TestApp,
     user_id: &str,
@@ -107,6 +152,11 @@ pub async fn insert_plaintext_event(
     .await
     .expect("insert plaintext event");
     id
+}
+
+/// The hidden Invitations calendar, the one owned calendar whose staged copies stay plaintext.
+pub async fn insert_staging_calendar(app: &TestApp, user_id: &str) -> String {
+    crate::calendars::insert_calendar(&app.db, user_id, crate::calendars::STAGING).await
 }
 
 /// The content columns of a `calendar_event` row.
