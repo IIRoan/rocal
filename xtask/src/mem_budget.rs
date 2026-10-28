@@ -10,7 +10,7 @@ use anyhow::{Context, bail, ensure};
 use serde_json::json;
 use solace_api_tests::env::{BackendTarget, TEMPLATE_DATABASE, TestEnv};
 use solace_api_tests::seed::insert_invite;
-use sqlx::{Connection, Executor, PgConnection};
+use sqlx::{Connection, PgConnection};
 
 const IDLE_BUDGET_MIB: f64 = 30.0;
 const STEADY_BUDGET_MIB: f64 = 80.0;
@@ -98,9 +98,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let mut admin = PgConnection::connect(&env.database_url).await?;
     crate::test_env::recreate_database(&mut admin, &database, Some(TEMPLATE_DATABASE)).await?;
     let result = measure(&binary, &env, &database_url, &options).await;
-    admin
-        .execute(format!("DROP DATABASE IF EXISTS {database} WITH (FORCE)").as_str())
-        .await?;
+    crate::test_env::drop_database(&mut admin, &database).await?;
     result
 }
 

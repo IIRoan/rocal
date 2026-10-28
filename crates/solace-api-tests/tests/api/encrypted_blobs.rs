@@ -57,10 +57,11 @@ async fn put<B: Blob>(user: &mut TestUser, body: serde_json::Value) -> B {
 
 /// The stored row with `updated_at` in the wire format.
 async fn stored<B: Blob>(app: &TestApp, user_id: &str) -> Option<(String, i32, String)> {
-    sqlx::query_as(&format!(
+    // Blob table names are constants from the two local trait implementations.
+    sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT encrypted_content, encryption_key_version, to_char(updated_at, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') FROM {} WHERE user_id = $1",
         B::TABLE
-    ))
+    )))
     .bind(user_id)
     .fetch_optional(&app.db)
     .await
@@ -70,7 +71,10 @@ async fn stored<B: Blob>(app: &TestApp, user_id: &str) -> Option<(String, i32, S
 async fn rows<B: Blob>(app: &TestApp, user_id: &str) -> i64 {
     count(
         &app.db,
-        &format!("SELECT count(*) FROM {} WHERE user_id = $1", B::TABLE),
+        sqlx::AssertSqlSafe(format!(
+            "SELECT count(*) FROM {} WHERE user_id = $1",
+            B::TABLE
+        )),
         user_id,
     )
     .await

@@ -5,7 +5,7 @@ use std::process::Command;
 
 use anyhow::{Context, bail, ensure};
 use solace_api_tests::env::TestEnv;
-use sqlx::{Connection, Executor, PgConnection};
+use sqlx::{Connection, PgConnection};
 
 const DATABASE: &str = "solace_test_entities";
 
@@ -45,9 +45,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         ])
         .status()?;
     ensure!(status.success(), "sea-orm-cli failed");
-    admin
-        .execute(format!("DROP DATABASE IF EXISTS {DATABASE} WITH (FORCE)").as_str())
-        .await?;
+    crate::test_env::drop_database(&mut admin, DATABASE).await?;
     // The repo uses `name.rs` beside `name/`, never `mod.rs`.
     std::fs::rename(generated.join("mod.rs"), out.join("entities.rs"))?;
     format(&out)?;

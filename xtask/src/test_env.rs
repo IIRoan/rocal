@@ -10,7 +10,7 @@ use solace_api_tests::env::{
     LOCAL_STALWART_PORT, LOCAL_STALWART_PROVISIONER_PASSWORD, TEMPLATE_DATABASE, TestEnv,
 };
 use solace_api_tests::stalwart::{provision_key, url_host_port};
-use sqlx::{Connection, Executor, PgConnection};
+use sqlx::{Connection, PgConnection};
 
 const POSTGRES_CONTAINER: &str = "solace-test-pg";
 const POSTGRES_IMAGE: &str = "docker.io/library/postgres:18";
@@ -150,13 +150,38 @@ pub async fn recreate_database(
     name: &str,
     template: Option<&str>,
 ) -> anyhow::Result<()> {
-    admin
-        .execute(format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)").as_str())
-        .await?;
+    validate_database_name(name)?;
+    if let Some(template) = template {
+        validate_database_name(template)?;
+    }
+    drop_database(admin, name).await?;
     let from = template.map_or(String::new(), |template| format!(" TEMPLATE {template}"));
-    admin
-        .execute(format!("CREATE DATABASE {name}{from}").as_str())
+    // Identifiers pass the test-name whitelist above; SQL parameters cannot represent identifiers.
+    sqlx::raw_sql(sqlx::AssertSqlSafe(format!("CREATE DATABASE {name}{from}")))
+        .execute(&mut *admin)
         .await?;
+    Ok(())
+}
+
+pub async fn drop_database(admin: &mut PgConnection, name: &str) -> anyhow::Result<()> {
+    validate_database_name(name)?;
+    // The whitelist excludes SQL syntax and limits deletion to test databases.
+    sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+        "DROP DATABASE IF EXISTS {name} WITH (FORCE)"
+    )))
+    .execute(admin)
+    .await?;
+    Ok(())
+}
+
+fn validate_database_name(name: &str) -> anyhow::Result<()> {
+    ensure!(
+        name.starts_with("solace_test")
+            && name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+        "database names must start with solace_test and contain lowercase letters, digits or underscores"
+    );
     Ok(())
 }
 
@@ -208,7 +233,8 @@ pub async fn apply_migrations(db: &mut PgConnection) -> anyhow::Result<usize> {
     migrations.sort();
     for path in &migrations {
         let sql = std::fs::read_to_string(path)?;
-        sqlx::raw_sql(&sql)
+        // Migration files are trusted repository SQL, not externally supplied content.
+        sqlx::raw_sql(sqlx::AssertSqlSafe(sql))
             .execute(&mut *db)
             .await
             .with_context(|| format!("migration {}", path.display()))?;
@@ -276,4 +302,27 @@ fn podman(args: &[&str]) -> anyhow::Result<()> {
         args.first().copied().unwrap_or_default()
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_database_name;
+
+    #[test]
+    fn database_identifiers_must_be_safe_test_names() {
+        for name in ["solace_test", "solace_test_template", "solace_test_mem_123"] {
+            assert!(validate_database_name(name).is_ok());
+        }
+        for name in [
+            "",
+            "production",
+            "solace_test; DROP DATABASE solace_test",
+            "solace_test\"",
+            "solace_test--",
+            "solace_test café",
+            "SOLACE_TEST",
+        ] {
+            assert!(validate_database_name(name).is_err(), "{name}");
+        }
+    }
 }

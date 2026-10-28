@@ -30,7 +30,8 @@ fn create_error(reason: &str) -> String {
 }
 
 /// `toISOString()` of a `TIMESTAMP(3)` column, for comparing database values with the wire.
-fn iso(column: &str) -> String {
+// Only static column names are composed into SQL; values are bound by callers.
+fn iso(column: &'static str) -> String {
     format!("to_char({column}, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')")
 }
 
@@ -477,15 +478,16 @@ async fn list_returns_own_feeds_newest_first_with_calendar_and_sync_log_count() 
         ("subscribed", true, "#6366f1")
     );
     assert_eq!(calendar.blind_index_tokens, None);
-    let (last_sync_at, created_at): (String, String) = sqlx::query_as(&format!(
-        "SELECT {}, {} FROM calendar_subscription WHERE id = $1",
-        iso("last_sync_at"),
-        iso("created_at")
-    ))
-    .bind(&older.subscription_id)
-    .fetch_one(&app.db)
-    .await
-    .expect("subscription times");
+    let (last_sync_at, created_at): (String, String) =
+        sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT {}, {} FROM calendar_subscription WHERE id = $1",
+            iso("last_sync_at"),
+            iso("created_at")
+        )))
+        .bind(&older.subscription_id)
+        .fetch_one(&app.db)
+        .await
+        .expect("subscription times");
     assert_eq!(first.last_sync_at, Some(Timestamp(last_sync_at)));
     assert_eq!(first.created_at, Timestamp(created_at));
 
@@ -807,7 +809,7 @@ async fn delete_keeps_events_and_turns_the_calendar_into_an_owned_one() {
             assert_eq!(
                 count(
                     &app.db,
-                    &format!("SELECT count(*) FROM {table} = $1"),
+                    sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table} = $1")),
                     &feed.subscription_id
                 )
                 .await,
@@ -899,10 +901,10 @@ async fn sync_refuses_a_stored_private_url_and_records_the_failure() {
     let mut user = app.user().await;
     let feed = insert_feed(&app, &user, "http://169.254.169.254/latest/meta-data", 0).await;
     let event_id = insert_synced_event(&app, &user, &feed).await;
-    let (before,): (String,) = sqlx::query_as(&format!(
+    let (before,): (String,) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {} FROM calendar_subscription WHERE id = $1",
         iso("last_sync_at")
-    ))
+    )))
     .bind(&feed.subscription_id)
     .fetch_one(&app.db)
     .await
@@ -942,10 +944,10 @@ async fn sync_refuses_a_stored_private_url_and_records_the_failure() {
         (state.3.as_str(), state.4.as_deref()),
         ("error", Some(PRIVATE_NETWORK))
     );
-    let (after,): (String,) = sqlx::query_as(&format!(
+    let (after,): (String,) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {} FROM calendar_subscription WHERE id = $1",
         iso("last_sync_at")
-    ))
+    )))
     .bind(&feed.subscription_id)
     .fetch_one(&app.db)
     .await
@@ -1110,12 +1112,12 @@ async fn legacy_ics_import_stores_the_parsed_events_and_attendees() {
     );
 
     // The legacy contract stores plaintext; shipped clients still send it.
-    let rows: Vec<LegacyRow> = sqlx::query_as(&format!(
+    let rows: Vec<LegacyRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT title, description, location, encryption_state, external_id, is_synced, all_day, recurrence, timezone, {}, {} \
          FROM calendar_event WHERE calendar_id = $1 ORDER BY external_id",
         iso("start"),
         iso("\"end\"")
-    ))
+    )))
     .bind(&calendar_id)
     .fetch_all(&app.db)
     .await
@@ -1280,10 +1282,10 @@ async fn an_unreadable_rule_fails_only_its_event() {
         )
         .await;
     let stored = || async {
-        let rows: Vec<(String, Option<String>, String, String)> = sqlx::query_as(&format!(
+        let rows: Vec<(String, Option<String>, String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "SELECT external_id, recurrence, timezone, {} FROM calendar_event WHERE calendar_id = $1 ORDER BY external_id",
             iso("start")
-        ))
+        )))
         .bind(&calendar_id)
         .fetch_all(&app.db)
         .await
@@ -1366,10 +1368,10 @@ async fn floating_times_are_read_in_the_users_zone() {
         )
         .await
         .expect_status(200));
-    let stored: (String, String) = sqlx::query_as(&format!(
+    let stored: (String, String) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {}, timezone FROM calendar_event WHERE calendar_id = $1",
         iso("start")
-    ))
+    )))
     .bind(&calendar_id)
     .fetch_one(&app.db)
     .await
@@ -1412,10 +1414,10 @@ async fn imported_zones_are_tz_database_zones_never_labels() {
         )
         .await
         .expect_status(200));
-    let stored: Vec<(String, String)> = sqlx::query_as(&format!(
+    let stored: Vec<(String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT timezone, {} FROM calendar_event WHERE calendar_id = $1 ORDER BY external_id",
         iso("start")
-    ))
+    )))
     .bind(&calendar_id)
     .fetch_all(&app.db)
     .await
@@ -1478,10 +1480,10 @@ async fn custom_tzids_are_read_by_their_vtimezone() {
         )
         .await
         .expect_status(200));
-    let stored: (String, String) = sqlx::query_as(&format!(
+    let stored: (String, String) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT timezone, {} FROM calendar_event WHERE calendar_id = $1",
         iso("start")
-    ))
+    )))
     .bind(&calendar_id)
     .fetch_one(&app.db)
     .await
@@ -1534,11 +1536,11 @@ async fn skipped_wall_times_keep_the_offset_before_the_jump() {
         )
         .await
         .expect_status(200));
-    let stored: (String, String) = sqlx::query_as(&format!(
+    let stored: (String, String) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {}, {} FROM calendar_event WHERE calendar_id = $1",
         iso("start"),
         iso("\"end\"")
-    ))
+    )))
     .bind(&calendar_id)
     .fetch_one(&app.db)
     .await
@@ -1775,11 +1777,11 @@ async fn encrypted_import_reads_fraction_digits_like_javascript() {
         .expect_status(200)
         .and_then(|r| r.dto()));
     assert_eq!((imported.events_created, imported.errors), (2, None));
-    let mut stored: Vec<(String, String, String)> = sqlx::query_as(&format!(
+    let mut stored: Vec<(String, String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT external_id, {}, {} FROM calendar_event WHERE calendar_id = $1",
         iso("start"),
         iso("\"end\"")
-    ))
+    )))
     .bind(&calendar_id)
     .fetch_all(&app.db)
     .await
@@ -1907,10 +1909,10 @@ async fn encrypted_import_stores_ciphertext_as_sent_and_links_overrides() {
             ),
         ]
     );
-    let exceptions: Vec<(String, String, Option<String>)> = sqlx::query_as(&format!(
+    let exceptions: Vec<(String, String, Option<String>)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT type, {}, modified_event_id FROM recurrence_exception WHERE parent_event_id = $1 ORDER BY exception_date",
         iso("exception_date")
-    ))
+    )))
     .bind(&series_id)
     .fetch_all(&app.db)
     .await

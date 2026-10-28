@@ -133,11 +133,12 @@ async fn auth_status_reports_the_session_and_is_never_cached() {
 
 async fn invite_with_status(app: &TestApp, status: &str, expires: &str) -> String {
     let token = app.invite_token().await;
-    sqlx::query(&format!(
-        "UPDATE invite SET status = $1, expires_at = now() + interval '{expires}' WHERE token = $2"
-    ))
+    sqlx::query(
+        "UPDATE invite SET status = $1, expires_at = now() + $3::text::interval WHERE token = $2",
+    )
     .bind(status)
     .bind(&token)
+    .bind(expires)
     .execute(&app.db)
     .await
     .expect("update invite");

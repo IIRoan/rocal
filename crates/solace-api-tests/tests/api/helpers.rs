@@ -15,7 +15,7 @@ use solace_api_tests::seed::insert_invite;
 use solace_api_tests::stalwart::{REGISTRY, admin_jmap};
 use solace_api_types::auth::AuthError;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Connection, Executor, PgPool};
+use sqlx::{Connection, PgPool};
 
 /// `NODE_ENV` of the backend under test (`TEST_BACKEND_MODE`); production changes cookie names and attributes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,11 +63,12 @@ impl Drop for ScratchDatabase {
             if let Ok(runtime) = runtime {
                 runtime.block_on(async {
                     if let Ok(mut admin) = sqlx::PgConnection::connect(&admin_url).await {
-                        let _ = admin
-                            .execute(
-                                format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)").as_str(),
-                            )
-                            .await;
+                        // The scratch database name contains only a fixed prefix and random hex.
+                        let _ = sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+                            "DROP DATABASE IF EXISTS {name} WITH (FORCE)"
+                        )))
+                        .execute(&mut admin)
+                        .await;
                     }
                 });
             }
@@ -89,10 +90,13 @@ async fn in_process(env: &TestEnv, mode: Mode) -> (String, String, ScratchDataba
     let mut admin = sqlx::PgConnection::connect(&env.database_url)
         .await
         .expect("connect to the test Postgres");
-    admin
-        .execute(format!("CREATE DATABASE {name} TEMPLATE {TEMPLATE_DATABASE}").as_str())
-        .await
-        .expect("clone the template database (run `cargo xtask test-env template`)");
+    // Both identifiers are generated test names, never request data.
+    sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+        "CREATE DATABASE {name} TEMPLATE {TEMPLATE_DATABASE}"
+    )))
+    .execute(&mut admin)
+    .await
+    .expect("clone the template database (run `cargo xtask test-env template`)");
     let database_url = env.database_url_for(&name).expect("scratch database url");
     let base_url = serve_rust(env, mode, &database_url).await;
     let scratch = ScratchDatabase {
@@ -482,7 +486,7 @@ pub fn signed_cookie_token(secret: &str, cookie_value: &str) -> Option<String> {
     (STANDARD.encode(mac.finalize().into_bytes()) == signature).then(|| value.to_owned())
 }
 
-pub async fn count(db: &PgPool, sql: &str, bind: &str) -> i64 {
+pub async fn count(db: &PgPool, sql: impl sqlx::SqlSafeStr, bind: &str) -> i64 {
     sqlx::query_scalar(sql)
         .bind(bind)
         .fetch_one(db)

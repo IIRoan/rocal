@@ -44,10 +44,12 @@ async fn rows_mentioning(db: &PgPool, needles: &BTreeSet<String>) -> BTreeMap<Ro
     let needles: Vec<&String> = needles.iter().collect();
     let mut rows = BTreeMap::new();
     for table in tables(db).await {
-        let found: Vec<(Option<String>, String)> = sqlx::query_as(&format!(
-            "SELECT to_jsonb(x)->>'id', x::text FROM \"{table}\" x \
+        // Quote catalog identifiers; user content remains in the bound needle list.
+        let quoted_table = table.replace('"', "\"\"");
+        let found: Vec<(Option<String>, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT to_jsonb(x)->>'id', x::text FROM \"{quoted_table}\" x \
              WHERE EXISTS (SELECT 1 FROM unnest($1::text[]) n WHERE strpos(x::text, n) > 0)"
-        ))
+        )))
         .bind(&needles)
         .fetch_all(db)
         .await
@@ -191,7 +193,7 @@ async fn event_id(db: &PgPool, calendar_id: &str, external_id: &str) -> String {
         .expect("event id")
 }
 
-async fn exec(db: &PgPool, sql: &str, binds: &[&str]) {
+async fn exec(db: &PgPool, sql: &'static str, binds: &[&str]) {
     let mut query = sqlx::query(sql);
     for bind in binds {
         query = query.bind(*bind);

@@ -133,12 +133,15 @@ pub async fn stored_content(db: &PgPool, event_id: &str) -> StoredContent {
 }
 
 /// Every column of a row as JSON, to prove a refused request changed nothing.
-pub async fn row_snapshot(db: &PgPool, table: &str, id: &str) -> Option<Value> {
-    sqlx::query_scalar(&format!("SELECT to_jsonb(t) FROM {table} t WHERE id = $1"))
-        .bind(id)
-        .fetch_optional(db)
-        .await
-        .expect("snapshot")
+pub async fn row_snapshot(db: &PgPool, table: &'static str, id: &str) -> Option<Value> {
+    // Table names come from static test literals; row ids stay bound.
+    sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT to_jsonb(t) FROM {table} t WHERE id = $1"
+    )))
+    .bind(id)
+    .fetch_optional(db)
+    .await
+    .expect("snapshot")
 }
 
 /// `now()` plus an offset, as JavaScript's `toISOString()` writes it.

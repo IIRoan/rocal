@@ -25,7 +25,7 @@ const ONLY_OWNED_DELETE: &str = "Only owned calendars can be deleted here. Manag
 pub const EVENT_STAMP: &str = "2026-10-01T08:00:00";
 
 /// One row as `row_to_json`, with snake_case column names.
-pub async fn db_json(db: &PgPool, sql: &str, bind: &str) -> Option<Value> {
+pub async fn db_json(db: &PgPool, sql: &'static str, bind: &str) -> Option<Value> {
     let text: Option<String> = sqlx::query_scalar(sql)
         .bind(bind)
         .fetch_optional(db)
@@ -35,11 +35,12 @@ pub async fn db_json(db: &PgPool, sql: &str, bind: &str) -> Option<Value> {
 }
 
 /// `created_at` and `updated_at` of a row as `toISOString()` writes them.
-pub async fn wire_timestamps(db: &PgPool, table: &str, id: &str) -> (String, String) {
+pub async fn wire_timestamps(db: &PgPool, table: &'static str, id: &str) -> (String, String) {
     let format = r#"'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'"#;
-    sqlx::query_as(&format!(
+    // Table names come from static test literals; row ids stay bound.
+    sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT to_char(created_at, {format}), to_char(updated_at, {format}) FROM {table} WHERE id = $1"
-    ))
+    )))
     .bind(id)
     .fetch_one(db)
     .await

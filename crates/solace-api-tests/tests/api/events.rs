@@ -1587,7 +1587,7 @@ async fn deleting_an_event_removes_its_reminders_and_logs() {
         assert_eq!(
             count(
                 &app.db,
-                &format!("SELECT count(*) FROM {table} WHERE event_id = $1"),
+                sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table} WHERE event_id = $1")),
                 &event.id.0
             )
             .await,
@@ -2059,15 +2059,15 @@ async fn bulk_move_checks_the_target_calendar() {
         }
     );
     assert_eq!(
-        count(
-            &app.db,
-            &format!(
-                "SELECT count(*) FROM calendar_event WHERE calendar_id = $1 AND id IN ('{}', '{}')",
-                first.id, second.id
-            ),
-            &family
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM calendar_event WHERE calendar_id = $1 AND id IN ($2, $3)",
         )
-        .await,
+        .bind(&family)
+        .bind(&first.id.0)
+        .bind(&second.id.0)
+        .fetch_one(&app.db)
+        .await
+        .expect("moved events"),
         2
     );
 }

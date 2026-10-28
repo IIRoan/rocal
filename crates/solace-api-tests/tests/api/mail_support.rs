@@ -395,12 +395,17 @@ pub async fn post_signed(app: &TestApp, payload: &Value) -> ApiResponse {
 }
 
 /// One row as JSON, from a query whose single column is `to_jsonb(...)`.
-pub async fn row_json(db: &sqlx::PgPool, sql: &str, bind: &str) -> Value {
-    let text: String = sqlx::query_scalar(&format!("SELECT row::text FROM ({sql}) AS q(row)"))
-        .bind(bind)
-        .fetch_one(db)
-        .await
-        .unwrap_or_else(|e| panic!("{sql}: {e}"));
+pub async fn row_json(db: &sqlx::PgPool, sql: impl sqlx::SqlSafeStr, bind: &str) -> Value {
+    let sql = sql.into_sql_str();
+    let sql = sql.as_str();
+    // Callers supply SQLx-safe queries; the wrapper adds only static SQL.
+    let text: String = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT row::text FROM ({sql}) AS q(row)"
+    )))
+    .bind(bind)
+    .fetch_one(db)
+    .await
+    .unwrap_or_else(|e| panic!("{sql}: {e}"));
     serde_json::from_str(&text).expect("row JSON")
 }
 

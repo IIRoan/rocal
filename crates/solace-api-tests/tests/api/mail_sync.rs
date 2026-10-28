@@ -86,7 +86,7 @@ async fn wait_for_event(
     let account = owner.account_id().to_owned();
     for _ in 0..40 {
         sync(&mut owner.user, &account).await;
-        let rows: Vec<String> = sqlx::query_scalar(&event_sql())
+        let rows: Vec<String> = sqlx::query_scalar(event_sql())
             .bind(uid)
             .fetch_all(&app.db)
             .await
@@ -103,7 +103,7 @@ async fn wait_for_event(
     panic!("invitation {uid} was not filed as expected");
 }
 
-fn event_sql() -> String {
+fn event_sql() -> &'static str {
     "SELECT jsonb_build_object(\
         'title', e.title, 'description', e.description, 'location', e.location, \
         'start', e.start, 'end', e.\"end\", 'allDay', e.all_day, 'timezone', e.timezone, \
@@ -113,7 +113,6 @@ fn event_sql() -> String {
         'participants', (SELECT jsonb_agg(jsonb_build_object('email', p.email, 'displayName', p.display_name, 'role', p.role, 'status', p.status, 'userId', p.user_id) ORDER BY p.role DESC, p.email) \
                          FROM event_participant p WHERE p.event_id = e.id))::text \
      FROM calendar_event e JOIN calendar c ON c.id = e.calendar_id WHERE e.external_id = $1"
-        .to_owned()
 }
 
 #[tokio::test]
@@ -519,7 +518,12 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
             errors: vec![],
         }
     );
-    let event = row_json(&app.db, &event_sql().replace("::text", ""), &uid).await;
+    let event = row_json(
+        &app.db,
+        sqlx::AssertSqlSafe(event_sql().replace("::text", "")),
+        &uid,
+    )
+    .await;
     assert_eq!(event["title"], json!("Decrypted invite"));
     assert_eq!(event["calendar"]["name"], json!("Work"));
     assert_eq!(
@@ -557,7 +561,12 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
         .expect_status(200)
         .and_then(|r| r.dto()));
     assert_eq!(chosen.events_created, 1);
-    let event = row_json(&app.db, &event_sql().replace("::text", ""), &chosen_uid).await;
+    let event = row_json(
+        &app.db,
+        sqlx::AssertSqlSafe(event_sql().replace("::text", "")),
+        &chosen_uid,
+    )
+    .await;
     assert_eq!(
         event["calendar"]["name"],
         json!("Side"),
@@ -587,7 +596,12 @@ async fn client_encrypted_invitation_imports_store_only_ciphertext() {
         .expect_status(200)
         .and_then(|r| r.dto()));
     assert_eq!(summary.events_created, 1);
-    let event = row_json(&app.db, &event_sql().replace("::text", ""), &uid).await;
+    let event = row_json(
+        &app.db,
+        sqlx::AssertSqlSafe(event_sql().replace("::text", "")),
+        &uid,
+    )
+    .await;
     assert_eq!(
         (
             event["title"].clone(),
@@ -630,7 +644,12 @@ async fn a_declined_invitation_is_kept_as_a_hidden_tombstone_that_mail_does_not_
         .expect_status(200)
         .and_then(|r| r.value()));
     assert_eq!(declined, json!({"declined": true}));
-    let tombstone = row_json(&app.db, &event_sql().replace("::text", ""), &uid).await;
+    let tombstone = row_json(
+        &app.db,
+        sqlx::AssertSqlSafe(event_sql().replace("::text", "")),
+        &uid,
+    )
+    .await;
     assert_eq!(tombstone["calendar"]["name"], json!("Invitations"));
     assert_eq!(tombstone["calendar"]["isVisible"], json!(false));
     let me = |event: &Value| {
@@ -659,7 +678,12 @@ async fn a_declined_invitation_is_kept_as_a_hidden_tombstone_that_mail_does_not_
         assert_eq!(changes.calendar_import.ics_parts_found, 1, "{changes:?}");
         assert_eq!(changes.calendar_import.events_updated, 0);
     }
-    let after = row_json(&app.db, &event_sql().replace("::text", ""), &uid).await;
+    let after = row_json(
+        &app.db,
+        sqlx::AssertSqlSafe(event_sql().replace("::text", "")),
+        &uid,
+    )
+    .await;
     assert_eq!(
         after["title"],
         json!("Unwanted sync"),
