@@ -1,41 +1,8 @@
 /** Publish an EAS Update with the matching eas.json build profile's env under app.config's runtimeVersion, the one every installed binary embeds. */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readEasBuildProfile } from "./eas-build-profile";
-
-type Target = {
-  profile: string;
-  branch: string;
-  environment: string;
-};
-
-const TARGETS: Record<string, Target> = {
-  development: {
-    profile: "development",
-    branch: "development",
-    environment: "development",
-  },
-  preview: {
-    profile: "preview",
-    branch: "preview",
-    environment: "preview",
-  },
-  testing: {
-    profile: "preview",
-    branch: "testing",
-    environment: "preview",
-  },
-  production: {
-    profile: "production",
-    branch: "master",
-    environment: "production",
-  },
-  master: {
-    profile: "production",
-    branch: "master",
-    environment: "production",
-  },
-};
+import { readEasUpdateTarget } from "./eas-build-profile";
+import { validateNativeBuildEnvironment } from "../packages/native-core/expo-config.cjs";
 
 function usage(): never {
   console.error(
@@ -45,12 +12,20 @@ function usage(): never {
 }
 
 export async function publishNativeUpdate(appDirectory: string) {
-  const targetName = process.argv[2];
+  const targetName = process.env.SOLACE_UPDATE_TARGET ?? process.argv[2];
   if (!targetName) usage();
-  const candidate = Object.hasOwn(TARGETS, targetName) ? TARGETS[targetName] : undefined;
-  if (!candidate) usage();
-  const target: Target = candidate;
-  const passthrough = process.argv.slice(3);
+  const suppliedArgs: unknown = process.env.SOLACE_UPDATE_ARGUMENTS
+    ? JSON.parse(process.env.SOLACE_UPDATE_ARGUMENTS)
+    : process.argv.slice(3);
+  if (
+    !Array.isArray(suppliedArgs) ||
+    !suppliedArgs.every((arg): arg is string => typeof arg === "string")
+  )
+    usage();
+  const passthrough: string[] = suppliedArgs;
+  if (passthrough.some((arg) => ["--channel", "--branch", "--environment", "--auto"].some((flag) => arg === flag || arg.startsWith(`${flag}=`)))) {
+    throw new Error("Update routing comes from eas.json; channel, branch and environment flags cannot override it");
+  }
   const hasMessage = passthrough.some(
     (arg) => arg === "--message" || arg.startsWith("--message="),
   );
@@ -58,25 +33,51 @@ export async function publishNativeUpdate(appDirectory: string) {
 
   const easPath = resolve(appDirectory, "eas.json");
   const eas: unknown = JSON.parse(readFileSync(easPath, "utf8"));
-  const profile = readEasBuildProfile(eas, target.profile);
-  if (!profile) {
-    console.error(`eas.json has a missing or invalid build profile "${target.profile}"`);
+  const target = readEasUpdateTarget(eas, targetName);
+  if (!target) {
+    console.error(
+      `eas.json has a missing or invalid update target "${targetName}"`,
+    );
     process.exit(1);
   }
 
-  const profileEnv = profile.env ?? {};
+  const profileEnv = target.env;
 
   const baseEnv: NodeJS.ProcessEnv = {
     ...process.env,
     ...profileEnv,
   };
 
-  for (const [key, value] of Object.entries(profileEnv)) {
-    baseEnv[key] = value;
+  if (process.env.SOLACE_UPDATE_ENVIRONMENT !== target.environment) {
+    const loader = Bun.spawn(
+      [
+        "eas",
+        "env:exec",
+        target.environment,
+        "--non-interactive",
+        "bun ./scripts/publish-update.ts",
+      ],
+      {
+        cwd: appDirectory,
+        env: {
+          ...baseEnv,
+          SOLACE_UPDATE_ENVIRONMENT: target.environment,
+          SOLACE_UPDATE_TARGET: targetName,
+          SOLACE_UPDATE_ARGUMENTS: JSON.stringify(passthrough),
+        },
+        stdin: "inherit",
+        stdout: "inherit",
+        stderr: "inherit",
+      },
+    );
+    const exitCode = await loader.exited;
+    if (exitCode !== 0) process.exit(exitCode);
+    return;
   }
+  validateNativeBuildEnvironment(baseEnv);
 
   console.log(
-    `[publish-update] profile=${target.profile} branch=${target.branch} environment=${target.environment}`,
+    `[publish-update] profile=${target.profile} channel=${target.channel} environment=${target.environment}`,
   );
   console.log(
     `[publish-update] applying eas.json env: ${Object.keys(profileEnv).sort().join(", ") || "(none)"}`,
@@ -84,14 +85,14 @@ export async function publishNativeUpdate(appDirectory: string) {
 
   const args = [
     "update",
-    "--branch",
-    target.branch,
+    "--channel",
+    target.channel,
     "--environment",
     target.environment,
     ...passthrough,
   ];
   if (!hasMessage) {
-    args.push("--message", `${target.branch}-update`);
+    args.push("--message", `${target.channel}-update`);
   }
   if (!hasNonInteractive && !process.stdout.isTTY) {
     args.push("--non-interactive");

@@ -1,4 +1,6 @@
 import Constants from "expo-constants";
+import settings from "../../expo-apps.json";
+import { getNativeRuntimeEnvironment } from "./native-environment";
 
 function firstScheme(scheme: unknown): string | null {
   if (typeof scheme === "string" && scheme.length > 0) {
@@ -16,16 +18,16 @@ function firstScheme(scheme: unknown): string | null {
   return null;
 }
 
-/** Deep-link scheme for this binary (`solace` or `solace-dev`). */
-export const APP_SCHEME = firstScheme(Constants.expoConfig?.scheme) ?? "solace";
+export const CALENDAR_SCHEME = settings.apps.calendar.scheme;
+
+/** Canonical deep-link scheme from this binary's Expo config. */
+export const APP_SCHEME =
+  firstScheme(Constants.expoConfig?.scheme) ?? CALENDAR_SCHEME;
 export const AUTH_STORAGE_PREFIX = "solace";
 
-/** Backend API base URL; dev defaults to localhost, production comes from EXPO_PUBLIC_API_URL. */
-export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4001";
-
-export const APP_BASE_URL =
-  process.env.EXPO_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? null;
+const runtimeEnvironment = getNativeRuntimeEnvironment();
+export const API_BASE_URL = runtimeEnvironment.apiUrl;
+export const APP_BASE_URL = runtimeEnvironment.appUrl;
 
 /** Secure-store keys used throughout the app. */
 export const SECURE_STORE_KEYS = {

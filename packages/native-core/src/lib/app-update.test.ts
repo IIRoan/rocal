@@ -9,6 +9,7 @@ import {
   formatDownloadPercent,
   formatUpdateId,
   formatUpdateStamp,
+  getExpoUpdatesUrl,
   isDevelopmentModeCheckError,
   jsSourceLabel,
   resolveAppUpdateAction,
@@ -30,6 +31,35 @@ const base: AppUpdateSnapshot = {
   downloadError: false,
   dismissed: false,
 };
+
+describe("getExpoUpdatesUrl", () => {
+  it.each([
+    { app: "Solace Calendar", slug: "solace-calendar" },
+    { app: "Solace Mail", slug: "solace-mail" },
+  ])(
+    "opens the configured project for $app",
+    ({ slug }) => {
+      expect(getExpoUpdatesUrl("astralgrove", slug)).toBe(
+        `https://expo.dev/accounts/astralgrove/projects/${slug}/updates`,
+      );
+    },
+  );
+
+  it("uses the configured Expo owner", () => {
+    expect(getExpoUpdatesUrl("another-owner", "solace-calendar")).toBe(
+      "https://expo.dev/accounts/another-owner/projects/solace-calendar/updates",
+    );
+  });
+
+  it.each([
+    [undefined, "solace-calendar"],
+    ["astralgrove", undefined],
+    ["", "solace-calendar"],
+    ["astralgrove", ""],
+  ])("omits the link when config is missing", (owner, slug) => {
+    expect(getExpoUpdatesUrl(owner, slug)).toBeNull();
+  });
+});
 
 describe("resolveAppUpdatePhase", () => {
   it("stays idle when updates are disabled", () => {

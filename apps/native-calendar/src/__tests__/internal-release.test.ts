@@ -41,11 +41,13 @@ describe("release keys", () => {
       qr: "solace/releases/calendar/development-qr.png",
     });
     expect(releaseKeys("preview").apk).toBe("solace/releases/calendar/preview.apk");
+    expect(releaseKeys("testing").apk).toBe("solace/releases/calendar/testing.apk");
   });
 
   it("only accepts internal profiles", () => {
     expect(isProfile("development")).toBe(true);
     expect(isProfile("preview")).toBe(true);
+    expect(isProfile("testing")).toBe(true);
     expect(isProfile("production")).toBe(false);
     expect(isProfile(undefined)).toBe(false);
   });
