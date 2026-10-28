@@ -9,7 +9,7 @@ describe("shared native Expo configuration", () => {
     (app) => {
       const config = createNativeExpoConfig(app, {});
       expect(config.ios?.supportsTablet).toBe(false);
-      expect(config.ios?.infoPlist?.ITSAppUsesNonExemptEncryption).toBe(true);
+      expect(config.ios?.infoPlist?.ITSAppUsesNonExemptEncryption).toBe(false);
       expect(
         config.ios?.infoPlist?.ITSEncryptionExportComplianceCode,
       ).toBeUndefined();

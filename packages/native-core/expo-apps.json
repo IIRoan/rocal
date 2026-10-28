@@ -5,7 +5,7 @@
   "initialBuildNumber": 1,
   "iosDeploymentTarget": "16.4",
   "iosSupportsTablet": false,
-  "iosUsesNonExemptEncryption": true,
+  "iosUsesNonExemptEncryption": false,
   "notificationExtensionTargetName": "SolaceNotificationService",
   "notificationExtensionBundleSuffix": "NotificationService",
   "notificationKeychainService": "onl.solace.notification-extension",
