@@ -16,7 +16,5 @@ export function getNativeRuntimeEnvironment() {
       typeof environment.appUrl === "string" && environment.appUrl
         ? environment.appUrl
         : null,
-    sentryDsn:
-      typeof environment.sentryDsn === "string" ? environment.sentryDsn : null,
   };
 }

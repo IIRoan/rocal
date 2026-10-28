@@ -124,12 +124,6 @@ export const SHARED_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
           location: "App · Debugging",
           keywords: "debug",
         },
-        {
-          pageId: "app",
-          label: "Send test error",
-          location: "App · Debugging",
-          keywords: "debug crash report",
-        },
       ]
     : []),
 ];

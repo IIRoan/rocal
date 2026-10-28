@@ -70,14 +70,13 @@ Deployment values live in the `astralgrove` account's shared EAS environments:
 | --- | --- | --- |
 | `SOLACE_API_URL` | development, preview, production | Backend origin |
 | `SOLACE_APP_URL` | preview, production | Web and passkey origin |
-| `SOLACE_SENTRY_DSN` | development, preview, production | Optional self-hosted error reporting |
 | `SOLACE_ENABLE_IOS_ASSOCIATED_DOMAINS` | preview, production | Passkey associated-domain capability |
 
 These are public app configuration values, never secrets. `eas.json` selects the variant and EAS environment through `APP_VARIANT` and `SOLACE_ENV_SOURCE=eas`. Builds and updates resolve the same values into `Constants.expoConfig.extra.runtimeEnvironment`, which native-core consumes. Local `.env` overrides are ignored for EAS deployment values. The pre-install build hook and OTA publisher reject missing required service values before building or publishing.
 
 If Apple issues an encryption compliance code, set `SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE` on this app’s EAS project for each relevant build environment. It is embedded by the shared builder; keep app-specific approval codes out of the account-wide shared variables. Complete the export questionnaire and territory/filing requirements before review.
 
-For local development, `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_APP_URL`, optional `PASSKEY_ORIGIN`, and `EXPO_PUBLIC_SENTRY_DSN` remain supported overrides. `EXPO_OWNER`, `EXPO_PROJECT_ID` and `EXPO_PROJECT_SLUG` can override the linked project for a fork; the repository's defaults need no overrides.
+For local development, `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_APP_URL`, and optional `PASSKEY_ORIGIN` remain supported overrides. `EXPO_OWNER`, `EXPO_PROJECT_ID` and `EXPO_PROJECT_SLUG` can override the linked project for a fork; the repository's defaults need no overrides.
 
 ## Local env
 

@@ -46,7 +46,7 @@ describe("settings search entries", () => {
         development.SHARED_SETTINGS_SEARCH_ENTRIES,
         "debug",
       ).map((entry) => entry.label),
-    ).toEqual(["Copy diagnostics", "Clear session cookies", "Send test error"]);
+    ).toEqual(["Copy diagnostics", "Clear session cookies"]);
   });
 
   it.each(["privacy", "support"])(

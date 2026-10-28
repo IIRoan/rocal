@@ -20,7 +20,6 @@ describe("native runtime environment", () => {
     mockEnvironment = {
       apiUrl: "https://api.example.test",
       appUrl: "https://app.example.test",
-      sentryDsn: "https://key@errors.example.test/solace",
     };
     expect(getNativeRuntimeEnvironment()).toEqual(mockEnvironment);
   });
@@ -29,13 +28,12 @@ describe("native runtime environment", () => {
     null,
     undefined,
     "invalid",
-    { apiUrl: false, appUrl: 1, sentryDsn: {} },
+    { apiUrl: false, appUrl: 1 },
   ])("handles older or malformed runtime configuration: %p", (value) => {
     mockEnvironment = value;
     expect(getNativeRuntimeEnvironment()).toEqual({
       apiUrl: "http://localhost:4001",
       appUrl: null,
-      sentryDsn: null,
     });
   });
 });

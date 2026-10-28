@@ -86,7 +86,6 @@ pub struct Config {
     pub calendar_sync: bool,
     /// Base64 HMAC key for the per-user Stalwart bridge passwords; mail tokens fail without it.
     pub mail_bridge_hmac_key: Option<String>,
-    pub sentry_dsn: Option<String>,
     /// The private profile-picture bucket; uploads are unavailable without it.
     pub avatar_bucket: Option<AvatarBucketConfig>,
 }
@@ -169,7 +168,6 @@ impl Config {
             ),
             calendar_sync: !matches!(var("CALENDAR_SYNC").as_deref(), Some("0" | "false")),
             mail_bridge_hmac_key: trimmed(&var, "MAIL_BRIDGE_HMAC_KEY"),
-            sentry_dsn: var("SENTRY_DSN").map(|dsn| dsn.trim().to_owned()),
             avatar_bucket: avatar_bucket(&var),
             backend_url,
         })

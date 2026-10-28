@@ -27,11 +27,6 @@ import {
   readChunkedSecureValue,
 } from "../../lib/secure-store-chunked";
 import { hasSessionTokenCookie } from "../../lib/session-cookie";
-import {
-  captureException,
-  flushReporting,
-  getErrexReportingOptions,
-} from "../../lib/reporting";
 
 const COOKIE_STORE_KEY = `${AUTH_STORAGE_PREFIX}_cookie`;
 
@@ -143,24 +138,6 @@ export function AppDebugSettingsSection() {
     );
   };
 
-  const onSendTestError = () => {
-    if (!getErrexReportingOptions()) {
-      Alert.alert(
-        "Error reporting off",
-        "EXPO_PUBLIC_SENTRY_DSN is not set in this build.",
-      );
-      return;
-    }
-    void (async () => {
-      captureException(
-        new Error(`solace native settings test ${new Date().toISOString()}`),
-      );
-      await flushReporting(2_000);
-      Alert.alert("Sent", "Test event queued for Errex.");
-      // flushReporting races allSettled with a timer, so this promise never rejects.
-    })().catch(() => undefined);
-  };
-
   const healthLabel =
     health === "checking"
       ? "Checking…"
@@ -230,16 +207,6 @@ export function AppDebugSettingsSection() {
         tone="destructive"
         trailing={trailingIcon("trash-2", theme.colors.destructive)}
         onPress={onClearSessionCookies}
-      />
-      <SheetItem
-        label="Send test error"
-        detail={
-          getErrexReportingOptions()
-            ? "Errex · errors.solace.onl/solace"
-            : "DSN not configured"
-        }
-        trailing={trailingIcon("upload")}
-        onPress={onSendTestError}
       />
     </SheetGroup>
   );

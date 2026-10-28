@@ -19,7 +19,6 @@ import { triggerSessionClear } from "./session-clear";
 import { triggerPasskeyStepUpRequired } from "./passkey-step-up-required";
 import { getFallbackSessionToken } from "./session-token-fallback";
 import { authClient } from "./auth-client";
-import { captureException, captureMessage } from "./reporting";
 
 export function getNativeExpoOrigin() {
   return Linking.createURL("", { scheme: APP_SCHEME });
@@ -78,29 +77,15 @@ async function confirmExpiredSessionThenClear() {
         sessionConfirmed = true;
       }
       if (result?.error) getSessionErrored = true;
-    } catch (error) {
+    } catch {
       getSessionErrored = true;
-      captureException(error, {
-        tags: { area: "auth", reason: "post-401-get-session" },
-      });
     }
 
-    if (sessionConfirmed) {
+    // An unreachable session check keeps the local session; only a confirmed 401 signs out.
+    if (sessionConfirmed || getSessionErrored) {
       return;
     }
 
-    if (getSessionErrored) {
-      captureMessage(
-        "Session validation unavailable after 401; retaining local session",
-        { level: "warning", tags: { area: "auth" } },
-      );
-      return;
-    }
-
-    captureMessage("Clearing session after 401", {
-      level: "warning",
-      tags: { area: "auth" },
-    });
     triggerSessionClear();
   } finally {
     confirmingAuthError = false;
@@ -115,11 +100,7 @@ export const httpClient = new HttpClient({
   credentials: "omit",
   getHeaders: getAuthHeadersAsync,
   onAuthError: () => {
-    void confirmExpiredSessionThenClear().catch((error) => {
-      captureException(error, {
-        tags: { area: "auth", reason: "confirm-session-clear" },
-      });
-    });
+    void confirmExpiredSessionThenClear().catch(() => undefined);
   },
   onPasskeyStepUpRequired: triggerPasskeyStepUpRequired,
   onResponseHeaders: persistRenewedSessionCookie,

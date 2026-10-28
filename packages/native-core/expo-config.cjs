@@ -186,11 +186,6 @@ function createNativeExpoConfig(app, environment = process.env) {
       runtimeEnvironment: {
         apiUrl: apiUrl || settings.developmentApiUrl,
         appUrl,
-        sentryDsn: fromEas
-          ? (environment.SOLACE_SENTRY_DSN ?? null)
-          : (environment.EXPO_PUBLIC_SENTRY_DSN ??
-            environment.SOLACE_SENTRY_DSN ??
-            null),
       },
     },
   };

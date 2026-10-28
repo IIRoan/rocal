@@ -179,7 +179,6 @@ export default defineRailway(() => {
         "Cargo.toml",
         "Cargo.lock",
         "rust-toolchain.toml",
-        "packages/calendar-core/src/redaction-policy.js",
         "packages/calendar-ics/src/windows-zones.json",
       ],
     },
@@ -212,8 +211,6 @@ export default defineRailway(() => {
       FRONTEND_URL: "https://solace.onl",
       MAIL_BRIDGE_HMAC_KEY: preserve(),
       MOBILE_AUTH_CALLBACK_URL: preserve(),
-      SENTRY_DSN:
-        "https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace",
       // The same Stalwart admin token the server itself is configured with.
       STALWART_ADMIN_TOKEN: ref(stalwartMail, "STALWART_ADMIN_TOKEN"),
       STALWART_ADMIN_USER_IDS: preserve(),
@@ -243,7 +240,6 @@ export default defineRailway(() => {
         "Cargo.toml",
         "Cargo.lock",
         "rust-toolchain.toml",
-        "packages/calendar-core/src/redaction-policy.js",
         "packages/calendar-ics/src/windows-zones.json",
       ],
     },
