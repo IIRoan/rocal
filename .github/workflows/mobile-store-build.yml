@@ -1,0 +1,96 @@
+name: iOS App Store build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: TestFlight beta channel or App Store production channel
+        type: choice
+        options: [testflight, production]
+        default: testflight
+      app:
+        description: App to build
+        type: choice
+        options: [all, calendar, mail]
+        default: all
+      submit:
+        description: Upload the completed builds to TestFlight (requires configured App Store Connect credentials)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-store-${{ inputs.app }}
+  cancel-in-progress: false
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      profile: ${{ steps.release.outputs.profile }}
+      matrix: ${{ steps.release.outputs.matrix }}
+      eas_version: ${{ steps.release.outputs.eas_version }}
+    steps:
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - id: release
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          INPUT_PROFILE: ${{ inputs.profile }}
+          INPUT_APP: ${{ inputs.app }}
+          ALLOW_PRODUCTION: "true"
+        run: bun ./scripts/native-release-metadata.ts
+
+  checks:
+    needs: meta
+    uses: ./.github/workflows/native-checks.yml
+
+  build:
+    needs: [meta, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.meta.outputs.matrix) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        with:
+          node-version-file: .node-version
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+        working-directory: .
+      - name: Check TestFlight app configuration
+        if: inputs.submit
+        run: |
+          bun -e 'const { readFileSync } = require("node:fs"); const config = JSON.parse(readFileSync("eas.json", "utf8")); if (!/^[0-9]+$/.test(config.submit?.production?.ios?.ascAppId ?? "")) throw new Error("Set submit.production.ios.ascAppId in this app before requesting TestFlight submission");'
+      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
+        with:
+          eas-version: ${{ needs.meta.outputs.eas_version }}
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Build signed App Store binary
+        env:
+          PROFILE: ${{ needs.meta.outputs.profile }}
+          SUBMIT: ${{ inputs.submit }}
+        run: |
+          set -euo pipefail
+          ARGS=(build --platform ios --profile "$PROFILE" --non-interactive --json)
+          if [ "$SUBMIT" = "true" ]; then
+            ARGS+=(--auto-submit-with-profile production)
+          fi
+          eas "${ARGS[@]}" > "$RUNNER_TEMP/eas-build.json"
+      - uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
+        if: always()
+        with:
+          name: ${{ matrix.app }}-ios-store-build
+          path: ${{ runner.temp }}/eas-build.json
+          if-no-files-found: ignore

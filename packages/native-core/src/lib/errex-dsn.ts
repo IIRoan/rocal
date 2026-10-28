@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { getNativeRuntimeEnvironment } from "./native-environment";
 
 /** Official Sentry SDKs need a numeric project id; errex uses a string name + tunnel. */
 export function parseErrexDsn(raw: string): {
@@ -40,7 +41,7 @@ function resolveEnvironment(): string {
 }
 
 export function getErrexReportingOptions(
-  rawDsn = process.env.EXPO_PUBLIC_SENTRY_DSN?.trim() ?? "",
+  rawDsn = getNativeRuntimeEnvironment().sentryDsn?.trim() ?? "",
 ): ErrexReportingOptions | null {
   if (!rawDsn) {
     return null;

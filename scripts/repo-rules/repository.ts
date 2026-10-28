@@ -1,6 +1,6 @@
 import * as path from "path";
 
-import { type Finding, type Rule, CLIENT_SOURCE, matchLines, sourceUnder } from "./engine";
+import { type Finding, type Rule, CLIENT_SOURCE, appSourceUnder, matchLines, sourceUnder } from "./engine";
 
 const FORBIDDEN_DEPENDENCIES: Array<[RegExp, string]> = [
   [/^(nodemailer|imapflow|node-imap|imap|imap-simple|emailjs|smtp-.*|poplib|resend)$/, "mail is JMAP-only"],
@@ -20,6 +20,34 @@ const FORBIDDEN_DEPENDENCIES: Array<[RegExp, string]> = [
 const ALLOWED_ENV_FILES = new Set(["apps/web/.env.production"]);
 
 export const repositoryRules: Rule[] = [
+  {
+    id: "native-deployment-config",
+    summary: "Native deployment values come from shared EAS variables, never repeated build/workflow env or fixed Solace service URLs.",
+    files: (file) =>
+      /^apps\/native-(calendar|mail)\/eas\.json$/.test(file) ||
+      /^\.github\/workflows\/(expo-update|mobile-internal-build|mobile-store-build)\.ya?ml$/.test(file) ||
+      appSourceUnder(["apps/native-calendar/", "apps/native-mail/", "packages/native-core/src/"])(file),
+    check(file) {
+      const findings = matchLines(
+        file,
+        /https?:\/\/(?:[\w-]+\.)*solace\.onl\b/,
+        () => "derive native service URLs from the shared runtime environment",
+      );
+      if (/\.(json|ya?ml)$/.test(file.path)) {
+        findings.push(...matchLines(
+          file,
+          /\b(?:(?:EXPO_PUBLIC_|SOLACE_)(?:API_URL|APP_URL|SENTRY_DSN)|PASSKEY_ORIGIN|(?:EXPO|SOLACE)_ENABLE_IOS_ASSOCIATED_DOMAINS)["']?\s*:/,
+          () => "manage deployment values in shared EAS variables; profiles select only the variant and environment source",
+        ));
+      }
+      return findings;
+    },
+    examples: {
+      path: "apps/native-mail/eas.json",
+      bad: ['{"env":{"SOLACE_API_URL":"https://api.example.test"}}', '{"env":{"EXPO_PUBLIC_SENTRY_DSN":"https://key@errors.example.test/solace"}}', '{"url":"https://solace.onl/privacy"}'],
+      good: ['{"env":{"APP_VARIANT":"preview","SOLACE_ENV_SOURCE":"eas"}}'],
+    },
+  },
   {
     id: "forbidden-dependencies",
     summary: "Workspace manifests must not depend on banned mail, analytics, state, validation, HTTP, date, or UI libraries.",

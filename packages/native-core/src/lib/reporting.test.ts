@@ -2,28 +2,37 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.unmock("./reporting");
 
+let mockDsn: string | null = null;
+
 jest.mock("expo-constants", () => ({
   __esModule: true,
   default: {
     expoConfig: {
-      extra: { appVariant: "preview" },
+      extra: {
+        appVariant: "preview",
+        runtimeEnvironment: {
+          get sentryDsn() {
+            return mockDsn;
+          },
+        },
+      },
     },
   },
 }));
 
 const DSN =
-  "https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace";
+  "https://fixture-public-key@reports.example.test/solace";
 
 describe("reporting", () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
-    process.env.EXPO_PUBLIC_SENTRY_DSN = DSN;
+    mockDsn = DSN;
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    delete process.env.EXPO_PUBLIC_SENTRY_DSN;
+    mockDsn = null;
     jest.resetModules();
   });
 
@@ -71,7 +80,7 @@ describe("reporting", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(url).toBe(
-      "https://errors.solace.onl/api/solace/envelope/?sentry_key=65f1ae513c4a4865bc3b3384ce746653",
+      "https://reports.example.test/api/solace/envelope/?sentry_key=fixture-public-key",
     );
     expect(init?.headers).toMatchObject({
       "Content-Type": "application/x-sentry-envelope",
@@ -118,7 +127,7 @@ describe("reporting", () => {
   });
 
   it("no-ops when the DSN is unset", async () => {
-    delete process.env.EXPO_PUBLIC_SENTRY_DSN;
+    mockDsn = null;
     const fetchMock = jest.fn(async () => new Response("", { status: 200 }));
     globalThis.fetch = fetchMock as typeof fetch;
 
