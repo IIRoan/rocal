@@ -237,3 +237,5 @@ Draft reviewer explanation: “Solace currently uses invitation-only account cre
 - Earlier PR CI successfully built and published both iOS development artifacts on runtime `1.0.1`. The final iPhone/encryption changes therefore bump the shared native version to `1.0.2`, keeping old binaries on their compatible OTA runtime. These internal build results do not establish App Store signing, TestFlight upload or device acceptance.
 
 - Final live EAS configuration and the Bun store preflight pass for both apps on both store profiles at version/runtime `1.0.2`, after compatibility-variable cleanup. Production uses channel `master`; TestFlight uses `testing`. No store build, upload or metadata push was initiated.
+
+- The linked Vercel project disables preview deployments. The PR push therefore does not produce a preview, and production support/passkey-route verification remains pending deployment after review. The CLI deployment ignore rules explicitly include the shared identity JSON used by the association route.
