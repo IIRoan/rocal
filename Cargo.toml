@@ -62,7 +62,7 @@ icu_collator = "2"
 p256 = { version = "0.14", features = ["ecdsa"] }
 percent-encoding = "2"
 # Mailbox key fingerprints: `readKey` from openpgp.js, which `lib/mail-key-utils.ts` used.
-pgp = { version = "0.20", default-features = false }
+pgp = { version = "0.21", default-features = false }
 rand = "0.10"
 regex-lite = "0.1"
 # Decompression matches Bun's fetch, and safe fetch caps bodies after decoding.
