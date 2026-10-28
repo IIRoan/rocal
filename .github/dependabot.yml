@@ -5,9 +5,17 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    ignore:
+      # SDK 58 modules require a coordinated native binary upgrade.
+      - dependency-name: expo-network
+        versions: [">=58.0.0"]
+      - dependency-name: expo-image-manipulator
+        versions: [">=58.0.0"]
     groups:
       javascript:
         update-types: [minor, patch]
+        # Native runtime changes need a coordinated Expo upgrade.
+        exclude-patterns: ["expo", "expo-*", "@expo/*", "react", "react-dom", "react-native", "react-native-*", "@types/react", "@types/react-dom"]
   - package-ecosystem: cargo
     directory: /
     schedule:

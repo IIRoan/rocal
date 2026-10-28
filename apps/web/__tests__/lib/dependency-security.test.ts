@@ -20,6 +20,32 @@ function runDependencyCheck(source: string) {
 }
 
 describe("dependency compatibility", () => {
+  it("keeps native dependency declarations compatible with the installed Expo SDK matrix", () => {
+    runDependencyCheck(`
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const { createRequire } = require("node:module");
+      for (const app of ["native-calendar", "native-mail"]) {
+        const manifestPath = path.resolve("apps", app, "package.json");
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+        const appRequire = createRequire(manifestPath);
+        const expoManifest = appRequire.resolve("expo/package.json");
+        const expoRequire = createRequire(expoManifest);
+        const { intersects, satisfies } = expoRequire("semver");
+        const bundled = expoRequire("./bundledNativeModules.json");
+        for (const name of ["react", "react-native"]) {
+          const installed = appRequire(name + "/package.json").version;
+          assert.ok(satisfies(installed, bundled[name]), app + ": installed " + name + " " + installed + " must satisfy " + bundled[name]);
+        }
+        for (const [name, declared] of Object.entries(manifest.dependencies)) {
+          if (bundled[name]) {
+            assert.ok(intersects(declared, bundled[name]), app + ": " + name + " " + declared + " must satisfy " + bundled[name]);
+          }
+        }
+      }
+    `);
+  });
+
   it("decodes Expo Router query strings through the patched CommonJS adapter", () => {
     runDependencyCheck(`
       const queryString = require("query-string");
@@ -70,15 +96,15 @@ describe("dependency compatibility", () => {
     `);
   });
 
-  it("loads Prisma's config merger and React Doctor's TOML parser", () => {
+  it("loads Prisma's config merger and React Doctor's config parser", () => {
     runDependencyCheck(`
       const { createRequire } = require("node:module");
       const prismaRequire = createRequire(require.resolve("@prisma/config"));
       const { deepmerge } = prismaRequire("deepmerge-ts");
       assert.deepEqual(deepmerge({ db: { host: "localhost" } }, { db: { port: 5432 } }), { db: { host: "localhost", port: 5432 } });
       const doctorRequire = createRequire(require.resolve("react-doctor"));
-      const effectRequire = createRequire(doctorRequire.resolve("effect"));
-      assert.equal(effectRequire("toml").parse('[scan]\\nenabled = true').scan.enabled, true);
+      const { parseJSON5 } = doctorRequire("confbox");
+      assert.equal(parseJSON5('{scan: {enabled: true}}').scan.enabled, true);
     `);
   });
 
