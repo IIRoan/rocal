@@ -23,6 +23,10 @@ jest.mock("react-native", () => ({
 }));
 
 const mockClearNativeTitleIndex = jest.fn(async () => undefined);
+const mockClearStoredDevice = jest.fn(async () => undefined);
+jest.mock("../lib/native-e2ee-provider", () => ({
+  clearStoredDevice: () => mockClearStoredDevice(),
+}));
 jest.mock("../lib/search/title-index-store", () => ({
   clearNativeTitleIndex: () => mockClearNativeTitleIndex(),
 }));
@@ -425,6 +429,7 @@ describe("AuthProvider", () => {
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockOnSignedOut).toHaveBeenCalled();
     expect(mockClearNativeTitleIndex).toHaveBeenCalled();
+    expect(mockClearStoredDevice).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });

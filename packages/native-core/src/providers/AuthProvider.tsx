@@ -1,7 +1,7 @@
 import React, {
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -41,6 +41,7 @@ import { registerClearSession } from "../lib/session-clear";
 import { registerPasskeyStepUpRequired } from "../lib/passkey-step-up-required";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
 import { clearNotificationExtensionSecrets } from "../lib/notification-extension-store";
+import { clearStoredDevice } from "../lib/native-e2ee-provider";
 import { clearNativeTitleIndex } from "../lib/search/title-index-store";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
@@ -91,9 +92,10 @@ export interface AuthLifecycle {
 }
 type SignInResult = { requiresPasskeyStepUp: boolean };
 
-/** The search index holds decrypted titles and mail excerpts, so it goes with the session in both apps. */
+/** The device key opens the account key and the search index holds decrypted text, so both go with the session in both apps. */
 async function wipeSessionData(lifecycle: AuthLifecycle | undefined): Promise<void> {
   await Promise.all([
+    clearStoredDevice().catch(() => undefined),
     clearNativeTitleIndex().catch(() => undefined),
     lifecycle?.onSignedOut?.(),
   ]);
@@ -801,7 +803,7 @@ export function AuthProvider({
 // ---------------------------------------------------------------------------
 
 export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
+  const ctx = use(AuthContext);
   if (!ctx) {
     throw new Error("useAuth must be used within an AuthProvider");
   }

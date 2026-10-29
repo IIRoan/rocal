@@ -30,6 +30,7 @@ import { SECURE_STORE_KEYS } from "./constants";
 import { getE2eeApiUrl } from "./e2ee-api-url";
 import { getAuthHeaders } from "./api";
 import {
+  deleteChunkedSecureValue,
   readChunkedSecureValue,
   writeChunkedSecureValue,
 } from "./secure-store-chunked";
@@ -163,6 +164,14 @@ export async function registerDeviceForSession({
     userId,
     apiBaseUrl,
   };
+}
+
+/** Forgets this device's key pair; the next session unwraps the account key from the password envelope again. */
+export async function clearStoredDevice(): Promise<void> {
+  await Promise.all([
+    SecureStore.deleteItemAsync(SECURE_STORE_KEYS.E2EE_DEVICE_ID),
+    deleteChunkedSecureValue(SECURE_STORE_KEYS.E2EE_PRIVATE_KEY),
+  ]);
 }
 
 export async function unwrapStoredDeviceKeys(
