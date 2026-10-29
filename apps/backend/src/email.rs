@@ -72,8 +72,7 @@ pub fn password_updated(name: &str, sign_in_url: &str) -> Message {
         String::new(),
         "This is a confirmation that your Solace password was changed.".into(),
         "If you made this change, no further action is needed.".into(),
-        "After you sign in with email and password, Solace will also use this password to protect your encryption keys.".into(),
-        "GitHub and passkey sign-in keep using a separate encryption password.".into(),
+        "Solace also uses this password to protect your encryption keys on every device.".into(),
         format!("If you did not make this change, email {SUPPORT_EMAIL} from another address right away."),
     ]
     .join("\n");

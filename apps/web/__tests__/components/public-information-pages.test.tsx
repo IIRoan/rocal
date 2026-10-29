@@ -60,7 +60,7 @@ it("explains actual retention windows and the limits of account deletion", () =>
 it("provides recovery and deletion help and keeps private data out of public reports", () => {
   const page = render(<SupportPage />);
   expect(page.textContent).toContain(
-    "A login reset cannot recover your encryption keys",
+    "Solace does not reset passwords from the sign-in screen",
   );
   expect(page.textContent).toContain("Delete account");
   expect(page.textContent).toContain("Reports are public");
