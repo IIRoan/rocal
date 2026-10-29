@@ -36,9 +36,9 @@ export default function PrivacyPage() {
             Calendar encryption
           </h2>
           <p className="mt-2">
-            Solace encrypts event titles, descriptions and locations on your
-            device before saving them. Enabling reminders does not make these
-            fields readable to the server.
+            Solace encrypts event titles, descriptions, locations, colors and
+            categories on your device before saving them. Enabling reminders
+            does not make these fields readable to the server.
           </p>
           <div className="mt-3 overflow-hidden rounded-lg border border-border/50">
             <table className="w-full text-xs">
@@ -73,14 +73,18 @@ export default function PrivacyPage() {
           </div>
           <p className="mt-3">
             The names of your calendars and categories are encrypted the same way,
-            including the calendars a new account starts with. Colors, settings
-            and which calendar an event belongs to remain readable.
+            including the calendars a new account starts with. Calendar colors
+            and which calendar an event belongs to remain readable. Events saved
+            by older app versions keep a readable color and category until they
+            are next saved. Calendar search runs on your device, so your search
+            words are not sent to Solace.
           </p>
           <p className="mt-3">
-            Reminder emails show only the event&apos;s date and time; Solace
-            resolves event details on your device when you open the message.
-            iPhone alerts show the start time and, when the device&apos;s keys
-            are available, a title decrypted on the device.
+            Reminder emails show only the event&apos;s date and time, and their
+            subject names neither; Solace resolves event details on your device
+            when you open the message. iPhone alerts carry the event title and
+            the reminder&apos;s lead time encrypted, so Apple sees neither; your
+            iPhone decrypts them to show the event and when it starts.
           </p>
         </div>
 
@@ -96,8 +100,8 @@ export default function PrivacyPage() {
           </p>
           <p className="mt-3">
             Invitations that arrive by email are read by the server and stay
-            readable until you open them in Solace Mail, which encrypts your
-            copy; invitations you answer only from the calendar stay readable.
+            readable until one of your devices opens Solace, which encrypts your
+            copy; a declined invitation keeps no readable text.
             Subscribed and public calendars are fetched by the server, so their
             feed names, URLs and event details are readable.
           </p>
@@ -114,9 +118,13 @@ export default function PrivacyPage() {
             servers is separate from end-to-end encryption.
           </p>
           <p className="mt-3">
-            {MAIL_READABLE_METADATA} Folder names, read and flag status, labels,
-            message sizes and the words you search for in Mail are also readable
-            to the mail server. Remote images stay blocked until you allow them;
+            {MAIL_READABLE_METADATA} Names of folders you create, and your label
+            names, are encrypted on your device. Built-in folder names, read and
+            flag status, which labels a message has, and message sizes are
+            readable to the mail server. With the on-device search index switched
+            on, Mail searches on your device and does not send your search words
+            to the server; with it off, the words you search for are sent to the
+            mail server. Remote images stay blocked until you allow them;
             loading them lets the sender&apos;s servers see your IP address and
             when you opened the message.
           </p>
@@ -172,9 +180,12 @@ export default function PrivacyPage() {
             Other data
           </h2>
           <p className="mt-2">
-            Contacts and mail settings are encrypted on your device before
-            syncing. Account details needed for sign-in and delivery, and
-            uploaded profile pictures, are not end-to-end encrypted.
+            Contacts, mail settings and app preferences such as theme and working
+            hours are encrypted on your device before syncing. Your time zone,
+            time format, notification switches and default calendar stay
+            readable so reminders and invitations work. Account details needed
+            for sign-in and delivery, and uploaded profile pictures, are not
+            end-to-end encrypted.
           </p>
           <p className="mt-3">
             Solace does not use your data for advertising, resale or profiling.
@@ -284,7 +295,7 @@ const DATA_USES: ReadonlyArray<readonly [string, string, string]> = [
     "Our agreement with you",
   ],
   [
-    "Contacts and mail settings, encrypted on your device, and app preferences such as time zone and working hours",
+    "Contacts, mail settings and app preferences such as theme and working hours, encrypted on your device; time zone, time format, notification switches and default calendar",
     "Keep your contacts and preferences in sync",
     "Our agreement with you",
   ],
