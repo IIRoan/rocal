@@ -173,4 +173,33 @@ describe("CalendarManager", () => {
       container.querySelector('[data-testid="badge-cal-1"]'),
     ).not.toBeNull();
   });
+
+  it.each(["calendars", "calendar-create"] as const)(
+    "names the %s back button and focuses it visibly",
+    async (currentView) => {
+      const onBack = jest.fn();
+      await act(async () => {
+        root.render(
+          <QueryClientProvider client={queryClient}>
+            <CalendarManager
+              currentView={currentView}
+              onBack={onBack}
+              onGoToSubscriptions={() => {}}
+              onNavigateTo={() => {}}
+            />
+          </QueryClientProvider>,
+        );
+
+        await Promise.resolve();
+      });
+
+      const back = container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Back"]',
+      );
+
+      expect(back?.className).toContain("focus-visible:");
+      act(() => back?.click());
+      expect(onBack).toHaveBeenCalledTimes(1);
+    },
+  );
 });

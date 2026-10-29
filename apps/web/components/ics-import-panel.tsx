@@ -84,14 +84,15 @@ export function IcsImportPanel({ calendars, onBack }: IcsImportPanelProps) {
   return (
     <>
       <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={onBack}
           aria-label="Back"
-          className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
         >
           <ArrowLeft className="size-4 text-muted-foreground" />
-        </button>
+        </Button>
         <FileText className="size-4 text-muted-foreground shrink-0" />
         <span className="text-sm font-medium">Import .ics File</span>
       </div>
