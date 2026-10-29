@@ -26,9 +26,9 @@ function getGateCopy(mode: GateMode) {
   return {
     title: isUnlock ? "Unlock encrypted data" : "Protect your encryption keys",
     description: isUnlock
-      ? "Your email sign-in password did not unlock encrypted data on this device. If you recently changed it, enter the previous password."
+      ? "This device needs your password to open your encrypted data. If you changed it recently, enter the previous one."
       : "Solace reuses your email sign-in password to protect your encryption keys. Re-enter it below only if automatic setup did not finish.",
-    passwordLabel: "Email sign-in password",
+    passwordLabel: isUnlock ? "Password" : "Email sign-in password",
     primaryLabel: isUnlock ? "Unlock" : "Save password",
     Icon: isUnlock ? KeyRound : Shield,
     isUnlock,
