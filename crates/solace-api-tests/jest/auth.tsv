@@ -1,5 +1,5 @@
-retired/backend/__tests__/contracts/query-coercion.test.ts	optionalShareLinkBodySchema › accepts a missing body	suite:calendar_sharing::enabling_issues_a_public_url_and_keeps_its_token
-retired/backend/__tests__/contracts/query-coercion.test.ts	optionalShareLinkBodySchema › accepts an empty object body	suite:calendar_sharing::enabling_issues_a_public_url_and_keeps_its_token
+retired/backend/__tests__/contracts/query-coercion.test.ts	optionalShareLinkBodySchema › accepts a missing body	n/a: ICS share links removed; owned calendars only hold encrypted events
+retired/backend/__tests__/contracts/query-coercion.test.ts	optionalShareLinkBodySchema › accepts an empty object body	n/a: ICS share links removed; owned calendars only hold encrypted events
 retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › coerces deleteEvents=true from subscription delete queries	suite:subscriptions::delete_with_delete_events_removes_events_and_the_calendar
 retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › coerces string query integers for event search pagination	suite:events_list::search_paging_coerces_query_strings_like_zod
 retired/backend/__tests__/contracts/query-coercion.test.ts	query coercion helpers › coerces string query integers for search corpus pagination	suite:events_list::the_search_corpus_pages_by_update_time
@@ -102,7 +102,7 @@ retired/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing �
 retired/backend/__tests__/lib/sentry.test.ts	backend error reporting scrubbing › sanitizes extras before attaching them to the scope	unit:solace-server::telemetry::report::tests::report_extras_are_sanitized
 retired/backend/__tests__/lib/session-client-metadata.test.ts	stripSessionClientMetadata › nulls IP address and user agent before a session is stored	suite:auth_sessions::sign_up_creates_the_user_credential_session_and_accepts_the_invite
 retired/backend/__tests__/lib/time-constants.test.ts	time-constants › matches expected millisecond values	n/a: JavaScript millisecond constants; Rust uses std::time::Duration
-retired/backend/__tests__/lib/validation.test.ts	validation helpers › rejects unknown keys in strict zod objects	suite:calendar_sharing::the_share_link_body_is_validated
+retired/backend/__tests__/lib/validation.test.ts	validation helpers › rejects unknown keys in strict zod objects	suite:calendars::plaintext_names_are_refused_as_unknown_keys
 retired/backend/__tests__/routes/account-auth-status.test.ts	auth-status cookie propagation › forwards cookie clears from an unauthenticated status check	suite:account_public::auth_status_forwards_session_cookie_changes
 retired/backend/__tests__/routes/account-auth-status.test.ts	auth-status cookie propagation › forwards every renewed cookie while checking passkey state	suite:account_public::auth_status_forwards_session_cookie_changes
 retired/backend/__tests__/services/invite.service.test.ts	InviteService › approves nobody when there is no invite to accept	suite:auth_sessions::sign_up_needs_a_claimed_invite

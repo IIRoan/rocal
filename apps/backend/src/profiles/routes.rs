@@ -8,8 +8,8 @@ use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use regex_lite::Regex;
 use solace_api_types::profiles::{
-    AvatarIdParams, AvatarResponse, AvatarSizeQuery, EmailAvatarQuery, ProfileLookupRequest,
-    ProfileLookupResponse, UploadAvatarRequest,
+    AvatarIdParams, AvatarResponse, AvatarSizeQuery, ProfileLookupRequest, ProfileLookupResponse,
+    UploadAvatarRequest,
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -27,7 +27,6 @@ use crate::state::AppState;
 const AVATAR_WRITE_LIMIT: Limit = Limit::per_minute(10);
 /// Base64 of `SOLACE_AVATAR_UPLOAD_MAX_BYTES` (512 KiB).
 const MAX_AVATAR_BASE64_LENGTH: usize = (512 * 1024usize).div_ceil(3) * 4;
-const PROXY_CACHE: &str = "private, max-age=300";
 /// Ids change on every upload, so a served variant never changes.
 const UPLOADED_CACHE: &str = "private, max-age=86400, immutable";
 
@@ -45,11 +44,6 @@ request_schema!(ProfileLookupRequest => zod::object([(
     zod::array(zod::string().trim().min(1).max(254)).max(LOOKUP_MAX_EMAILS),
 )]).strict());
 
-request_schema!(EmailAvatarQuery => zod::object([
-    ("email", zod::string().trim().min(1).max(254)),
-    ("size", avatar_size_query()),
-]).strict());
-
 request_schema!(AvatarSizeQuery => zod::object([("size", avatar_size_query())]).strict());
 
 request_schema!(UploadAvatarRequest => zod::object([(
@@ -62,7 +56,6 @@ request_schema!(AvatarIdParams => zod::object([("avatarId", zod::string().regex(
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(lookup))
-        .routes(routes!(email_avatar))
         .routes(routes!(uploaded_avatar))
         .routes(routes!(upload_avatar, remove_avatar))
 }
@@ -76,18 +69,6 @@ pub async fn lookup(
     ValidJson(body): ValidJson<ProfileLookupRequest>,
 ) -> Result<Json<ProfileLookupResponse>, AppError> {
     Ok(Json(service::lookup(&state, &body.emails).await?))
-}
-
-/// Streams a user's picture by email, fetching external ones through safe fetch; a bare 404 without one.
-#[utoipa::path(get, path = "/api/profiles/avatar", tag = "Profiles", operation_id = "getProfileAvatarByEmail", params(("email" = String, Query), ("size" = Option<u32>, Query)), responses((status = 200, description = "The picture", content_type = "image/*", body = String), (status = 404, description = "No picture")))]
-#[tracing::instrument(skip_all)]
-pub async fn email_avatar(
-    State(state): State<AppState>,
-    _: RouteUser,
-    ValidQuery(query): ValidQuery<EmailAvatarQuery>,
-) -> Result<Response, AppError> {
-    let picture = avatars::stream_by_email(&state, &query.email, query.size).await?;
-    Ok(served(picture, PROXY_CACHE))
 }
 
 /// Streams the smallest stored WebP variant covering `size` pixels (default 512) while the id is attached to an account.

@@ -81,7 +81,6 @@ pub async fn create_user<C: ConnectionTrait>(
     db: &C,
     email: &str,
     name: &str,
-    image: Option<String>,
 ) -> Result<user::Model, sea_orm::DbErr> {
     let now = instant::now();
     user::ActiveModel {
@@ -89,7 +88,6 @@ pub async fn create_user<C: ConnectionTrait>(
         name: Set(name.to_owned()),
         email: Set(email.to_owned()),
         email_verified: Set(false),
-        image: Set(image),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()

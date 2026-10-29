@@ -145,7 +145,7 @@ pub fn dto(row: &event_participant::Model, user: Option<&user::Model>) -> EventP
         id: row.id.clone().into(),
         event_id: row.event_id.clone().into(),
         user_id: row.user_id.clone().map(Into::into),
-        image: participant_image(user.and_then(|user| user.image.as_deref()), &email),
+        image: participant_image(user.and_then(|user| user.image.as_deref())),
         display_name,
         role: role.into(),
         status: normalize_status(Some(&row.status), role),
@@ -390,30 +390,6 @@ mod tests {
             (resolved[1].role, resolved[1].status.as_str()),
             ("organizer", "accepted")
         );
-    }
-
-    #[test]
-    fn remote_pictures_become_solace_paths() {
-        assert_eq!(
-            participant_image(Some("https://images.example/a.png"), "Ann@Example.com").as_deref(),
-            Some("/api/profiles/avatar?email=ann%40example.com")
-        );
-        assert_eq!(
-            participant_image(Some("/api/profiles/avatars/abc"), "ann@example.com").as_deref(),
-            Some("/api/profiles/avatars/abc")
-        );
-        for blocked in [
-            "http://images.example/a.png",
-            "https://127.0.0.1/a.png",
-            "https://u:p@x.example/a",
-            "https://printer.local/a",
-        ] {
-            assert_eq!(
-                participant_image(Some(blocked), "ann@example.com"),
-                None,
-                "{blocked}"
-            );
-        }
     }
 
     #[test]

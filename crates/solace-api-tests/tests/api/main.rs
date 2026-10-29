@@ -7,7 +7,6 @@ mod account_public;
 mod auth_limits;
 mod auth_passwords;
 mod auth_sessions;
-mod calendar_sharing;
 mod calendars;
 mod categories;
 mod e2e_security;

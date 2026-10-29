@@ -52,9 +52,6 @@ import type {
   SyncSubscriptionResponse,
   ImportICSRequest,
   ImportICSResponse,
-  CalendarShareLink,
-  CreateCalendarShareLinkRequestPayload,
-  DisableCalendarShareLinkResponsePayload,
   EventSearchResult,
   EventSearchParams,
   EventSearchCorpusResult,
@@ -1071,44 +1068,6 @@ export class CalendarApiService {
       )) as SyncSubscriptionResponse;
     } catch (error) {
       throw this.transformError(error, "Failed to sync subscription");
-    }
-  }
-
-  // ─── Calendar Sharing ────────────────────────────────────────────────────────
-
-  async getCalendarShareLink(calendarId: string): Promise<CalendarShareLink> {
-    try {
-      return await this.client.get<Schema<"CalendarShareLink">>(
-        `/api/calendars/${encodeURIComponent(calendarId)}/share-link`,
-      );
-    } catch (error) {
-      throw this.transformError(error, "Failed to get calendar share link");
-    }
-  }
-
-  async enableCalendarShareLink(
-    calendarId: string,
-    request?: CreateCalendarShareLinkRequestPayload,
-  ): Promise<CalendarShareLink> {
-    try {
-      return await this.client.post<Schema<"CalendarShareLink">>(
-        `/api/calendars/${encodeURIComponent(calendarId)}/share-link`,
-        (request || {}) satisfies Schema<"CreateShareLinkRequest">,
-      );
-    } catch (error) {
-      throw this.transformError(error, "Failed to enable calendar share link");
-    }
-  }
-
-  async disableCalendarShareLink(
-    calendarId: string,
-  ): Promise<DisableCalendarShareLinkResponsePayload> {
-    try {
-      return await this.client.delete<Schema<"DisableShareLinkResponse">>(
-        `/api/calendars/${encodeURIComponent(calendarId)}/share-link`,
-      );
-    } catch (error) {
-      throw this.transformError(error, "Failed to disable calendar share link");
     }
   }
 

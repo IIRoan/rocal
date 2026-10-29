@@ -1,4 +1,4 @@
-//! `/api/calendars`: calendars, delete actions and ICS share links.
+//! `/api/calendars`: calendars and delete actions.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -24,9 +24,6 @@ pub struct Calendar {
     pub is_visible: bool,
     pub is_default: bool,
     pub is_sync_only: bool,
-    #[schema(required = true)]
-    pub ics_share_token: Option<String>,
-    pub ics_share_enabled: bool,
     #[schema(required = true)]
     pub stalwart_account_id: Option<String>,
     #[schema(required = true)]
@@ -108,30 +105,4 @@ pub struct CalendarDeleteResult {
     pub deleted_calendar_id: CalendarId,
     pub events_affected: i64,
     pub action: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct CalendarShareLink {
-    pub calendar_id: CalendarId,
-    /// The stored name, so empty for encrypted names.
-    pub calendar_name: String,
-    pub enabled: bool,
-    #[schema(required = true)]
-    pub share_url: Option<String>,
-}
-
-/// The whole body may be omitted or `null`.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct CreateShareLinkRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub regenerate: Option<bool>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct DisableShareLinkResponse {
-    pub success: bool,
 }

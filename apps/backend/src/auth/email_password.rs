@@ -27,7 +27,6 @@ struct SignUpBody {
     name: String,
     email: String,
     password: String,
-    image: Option<String>,
     remember_me: Option<bool>,
 }
 
@@ -47,7 +46,6 @@ static SIGN_UP: LazyLock<Schema> = LazyLock::new(|| {
         ("name", zod::string()),
         ("email", zod::string().email()),
         ("password", zod::string().min(1)),
-        ("image", zod::string().optional()),
         ("callbackURL", zod::string().optional()),
         ("rememberMe", zod::boolean().optional()),
     ])
@@ -119,7 +117,7 @@ async fn create_account(
         .await
         .map_err(|_| ApiError::internal())?;
     let transaction = state.db.begin().await?;
-    let user = store::create_user(&transaction, &email, &body.name, body.image).await?;
+    let user = store::create_user(&transaction, &email, &body.name).await?;
     store::link_credential(&transaction, &user.id, &hash).await?;
     transaction.commit().await?;
     let dont_remember = body.remember_me == Some(false);

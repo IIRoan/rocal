@@ -140,8 +140,6 @@ fn calendar_dto(model: calendar::Model) -> SubscribedCalendar {
         is_visible: model.is_visible,
         is_default: model.is_default,
         is_sync_only: model.is_sync_only,
-        ics_share_token: model.ics_share_token,
-        ics_share_enabled: model.ics_share_enabled,
         stalwart_account_id: model.stalwart_account_id,
         stalwart_calendar_id: model.stalwart_calendar_id,
         stalwart_synced_at: model.stalwart_synced_at.map(instant::iso),

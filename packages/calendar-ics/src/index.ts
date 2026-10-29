@@ -210,21 +210,6 @@ export interface DeleteCalendarSubscriptionResponse {
   success: boolean;
 }
 
-export interface CalendarShareLinkResponse {
-  calendarId: string;
-  calendarName: string;
-  enabled: boolean;
-  shareUrl: string | null;
-}
-
-export interface CreateCalendarShareLinkRequest {
-  regenerate?: boolean;
-}
-
-export interface DisableCalendarShareLinkResponse {
-  success: boolean;
-}
-
 export interface IcsCalendarMetadata {
   name?: string;
   description?: string;

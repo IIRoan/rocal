@@ -350,7 +350,7 @@ pub async fn verify_password(
 
 static UPDATE_USER: LazyLock<Schema> = LazyLock::new(zod::record);
 
-/// Renames the user (or changes the image) and re-issues the session cookie, as Better Auth does.
+/// Renames the user and re-issues the session cookie; pictures change only through `/api/profiles/me/avatar`.
 pub async fn update_user(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -369,35 +369,23 @@ pub async fn update_user(
                 "Email can not be updated",
             ));
         }
-        let name = body.get("name").cloned();
-        let image = body.get("image").cloned();
-        if name.is_none() && image.is_none() {
+        if body.contains_key("image") {
+            return Err(ApiError::message(
+                StatusCode::BAD_REQUEST,
+                "Profile pictures are changed through /api/profiles/me/avatar",
+            ));
+        }
+        let Some(name) = body.get("name") else {
             return Err(ApiError::message(
                 StatusCode::BAD_REQUEST,
                 "No fields to update",
             ));
-        }
+        };
         let name = name
-            .map(|name| {
-                name.as_str()
-                    .map(str::to_owned)
-                    .ok_or_else(ApiError::internal)
-            })
-            .transpose()?;
-        match image.map(|image| image.as_str().map(str::to_owned)) {
-            // Older clients still change pictures here, so an uploaded one is retired like a removal.
-            Some(image) => {
-                crate::profiles::avatars::update_user_image(&state, &active.user.id, name, image)
-                    .await
-                    .map_err(|error| {
-                        tracing::error!(error = %crate::telemetry::redact_pii(&error.to_string()), "Profile image update failed");
-                        ApiError::internal()
-                    })?
-            }
-            None => {
-                store::update_user(&state.db, active.user, name).await?;
-            }
-        }
+            .as_str()
+            .map(str::to_owned)
+            .ok_or_else(ApiError::internal)?;
+        store::update_user(&state.db, active.user, Some(name)).await?;
         let dont_remember = hooks::dont_remember(&state, &headers);
         Ok(Reply::new(
             json(&StatusFlag { status: true }),

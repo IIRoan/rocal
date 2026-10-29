@@ -21,8 +21,8 @@ pub struct Model {
     pub kdf_parallelism: i32,
     pub created_at: TimeDateTime,
     pub updated_at: TimeDateTime,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub wrapped_secret: Option<String>,
+    #[sea_orm(column_type = "Text")]
+    pub wrapped_secret: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub wrap_algorithm: Option<String>,
 }

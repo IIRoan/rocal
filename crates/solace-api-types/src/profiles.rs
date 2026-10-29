@@ -23,15 +23,6 @@ pub struct SolaceProfile {
     pub image: String,
 }
 
-/// Query of `GET /api/profiles/avatar`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct EmailAvatarQuery {
-    pub email: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub size: Option<u32>,
-}
-
 /// Query of `GET /api/profiles/avatars/:avatarId`; `size` is rounded up to a stored variant.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

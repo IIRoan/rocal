@@ -20,8 +20,6 @@ export const EVENT_READABLE_METADATA = [
 ];
 export const EVENT_INVITATION_ENCRYPTION_HINT =
   "Invitations share readable event details with the server and recipients.";
-export const CALENDAR_ICS_SHARING_HINT =
-  "Anyone with the ICS link can read its contents. Sharing is unavailable while the calendar contains encrypted events.";
 export const MAIL_READABLE_METADATA =
   "Sender, recipients, subject, date and routing headers remain readable.";
 

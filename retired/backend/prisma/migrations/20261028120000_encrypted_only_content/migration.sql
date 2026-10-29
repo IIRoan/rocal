@@ -21,3 +21,7 @@ WHERE c."kind" = 'owned'
 UPDATE "user_settings" s SET "default_calendar_id" = NULL
 WHERE s."default_calendar_id" IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM "calendar" c WHERE c."id" = s."default_calendar_id");
+
+-- Profile pictures are uploads only; nothing points at another host.
+UPDATE "user" SET "image" = NULL
+WHERE "image" IS NOT NULL AND "image" NOT LIKE '/api/profiles/avatars/%';

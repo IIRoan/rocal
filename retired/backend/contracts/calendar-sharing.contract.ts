@@ -1,7 +1,3 @@
-import type {
-  CalendarShareLinkResponse,
-  DisableCalendarShareLinkResponse,
-} from "@workspace/calendar-ics";
 import {
   createShareLinkInputSchema,
   shareLinkInputSchema,
@@ -10,6 +6,18 @@ import {
 } from "./calendar.contract";
 
 export { createShareLinkInputSchema, shareLinkInputSchema };
+
+// The retired API keeps the share-link shapes the shared packages dropped.
+export interface CalendarShareLinkResponse {
+  calendarId: string;
+  calendarName: string;
+  enabled: boolean;
+  shareUrl: string | null;
+}
+
+export interface DisableCalendarShareLinkResponse {
+  success: boolean;
+}
 export type { CreateShareLinkInput, ShareLinkInput };
 
 export interface ICalendarSharingService {

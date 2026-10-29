@@ -154,7 +154,7 @@ pub async fn upsert_vault<C: ConnectionTrait>(
         kdf_memory_kib: Set(vault.kdf_memory_kib),
         kdf_iterations: Set(vault.kdf_iterations),
         kdf_parallelism: Set(vault.kdf_parallelism),
-        wrapped_secret: Set(Some(vault.wrapped_secret)),
+        wrapped_secret: Set(vault.wrapped_secret),
         wrap_algorithm: Set(vault.wrap_algorithm),
         created_at: Set(now),
         updated_at: Set(now),

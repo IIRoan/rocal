@@ -22,10 +22,6 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::oauth_access_token::Entity")]
-    OauthAccessToken,
-    #[sea_orm(has_many = "super::oauth_refresh_token::Entity")]
-    OauthRefreshToken,
     #[sea_orm(
         belongs_to = "super::user::Entity",
         from = "Column::UserId",
@@ -34,18 +30,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     User,
-}
-
-impl Related<super::oauth_access_token::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::OauthAccessToken.def()
-    }
-}
-
-impl Related<super::oauth_refresh_token::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::OauthRefreshToken.def()
-    }
 }
 
 impl Related<super::user::Entity> for Entity {

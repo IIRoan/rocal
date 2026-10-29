@@ -4,12 +4,11 @@ import {
   type EventParticipantInput,
   type EventParticipantRole,
   type EventParticipantStatus,
-  buildSolaceProfileAvatarPath,
   isReservedSystemEmail,
   isSolaceUploadedAvatarPath,
   normalizeParticipantEmail,
-  sanitizePublicImageUrl,
 } from "@workspace/calendar-core";
+import { buildSolaceProfileAvatarPath, sanitizePublicImageUrl } from "./profile-images";
 export { normalizeParticipantEmail } from "@workspace/calendar-core";
 
 export const EVENT_PARTICIPANT_USER_SELECT = {

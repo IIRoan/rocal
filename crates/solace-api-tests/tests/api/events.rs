@@ -1729,28 +1729,6 @@ async fn bulk_move_checks_the_target_calendar() {
             "Target calendar not found or access denied",
         ));
     assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
-    sqlx::query("UPDATE calendar SET ics_share_enabled = true WHERE id = $1")
-        .bind(&family)
-        .execute(&app.db)
-        .await
-        .expect("share family");
-    let error = ok(owner
-        .post(
-            "/api/events/bulk",
-            json!({"action": "move", "eventIds": ids, "targetCalendarId": family}),
-        )
-        .await
-        .expect_error(
-            400,
-            "Validation Error",
-            "Events with encrypted details cannot be moved into a calendar with ICS sharing enabled.",
-        ));
-    assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
-    sqlx::query("UPDATE calendar SET ics_share_enabled = false WHERE id = $1")
-        .bind(&family)
-        .execute(&app.db)
-        .await
-        .expect("unshare family");
 
     let moved: BulkEventResult = ok(owner
         .post(

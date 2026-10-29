@@ -17,9 +17,7 @@ use super::{participants, rsvp};
 use crate::addresses::is_reserved_system_email;
 use crate::auth::guard::RouteUser;
 use crate::calendars::queries as calendars;
-use crate::db::entities::{
-    calendar, calendar_event, event_notification, recurrence_exception, user_settings,
-};
+use crate::db::entities::{calendar, calendar_event, event_notification, user_settings};
 use crate::email;
 use crate::entity_metadata::{CALENDAR_COLORS, is_valid_calendar_color};
 use crate::error::AppError;
@@ -731,13 +729,6 @@ pub async fn bulk(
                 "Cannot move events to a read-only calendar.",
             )
             .await?;
-            if target.ics_share_enabled && events.iter().any(|e| e.encryption_state == "encrypted")
-            {
-                return Err(AppError::field(
-                    "Events with encrypted details cannot be moved into a calendar with ICS sharing enabled.",
-                    "targetCalendarId",
-                ));
-            }
             let moved =
                 queries::move_to_calendar(&state.db, &user.id, ids, &target.id, instant::now())
                     .await?;
@@ -942,39 +933,5 @@ pub fn export_event<'a>(
         created_at: event.created_at,
         updated_at: event.updated_at,
         participants,
-    }
-}
-
-/// Carries series' exceptions onto exported rows (`built[i]` is `rows[i]`): a detached row among them overrides its instance under the series UID, and any other exception of a series among them becomes EXDATE.
-pub fn attach_exceptions(
-    rows: &[&calendar_event::Model],
-    built: &mut [build::Event],
-    exceptions: &[recurrence_exception::Model],
-) {
-    let index: std::collections::HashMap<&str, usize> = rows
-        .iter()
-        .enumerate()
-        .map(|(at, row)| (row.id.as_str(), at))
-        .collect();
-    for exception in exceptions {
-        let Some(&series) = index.get(exception.parent_event_id.as_str()) else {
-            continue;
-        };
-        let detached = exception
-            .modified_event_id
-            .as_deref()
-            .and_then(|id| index.get(id).copied())
-            .filter(|&at| rows[at].recurrence.is_none());
-        match detached {
-            Some(at) => {
-                built[at].uid = built[series].uid.clone();
-                built[at].recurrence_id = Some(exception.exception_date);
-                built[at].recurrence_zone = built[series]
-                    .recurrence
-                    .as_ref()
-                    .and_then(|rule| rule.timezone.clone());
-            }
-            None => built[series].excluded_dates.push(exception.exception_date),
-        }
     }
 }

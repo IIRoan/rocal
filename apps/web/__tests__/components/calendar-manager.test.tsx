@@ -31,9 +31,6 @@ jest.mock("../../components/command-palette/index", () => ({
 
 jest.mock("../../lib/calendar-api-service", () => ({
   calendarApiService: {
-    disableCalendarShareLink: jest.fn(),
-    enableCalendarShareLink: jest.fn(),
-    getCalendarShareLink: jest.fn(),
     getSubscriptions: jest.fn(async () => []),
   },
 }));

@@ -349,7 +349,6 @@ async fn guarded_routes_authenticate_before_they_validate() {
             ok(agent.put("/api/settings", json!({"theme": 1})).await),
             ok(agent.post("/api/events", json!({})).await),
             ok(agent.get("/api/events/search").await),
-            ok(agent.get("/api/profiles/avatar").await),
             ok(agent.get("/api/profiles/avatars/bad.id").await),
         ];
         for response in &malformed {

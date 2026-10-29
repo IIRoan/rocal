@@ -264,36 +264,6 @@
         }
       }
     },
-    "/api/calendars/shared/{token}": {
-      "get": {
-        "tags": [
-          "ICS Sharing"
-        ],
-        "summary": "The token-protected, read-only ICS feed that outside calendar apps subscribe to; no session needed.",
-        "operationId": "getSharedCalendarFeed",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "text/calendar": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/calendars/{id}": {
       "put": {
         "tags": [
@@ -370,100 +340,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CalendarDeleteResult"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/calendars/{id}/share-link": {
-      "get": {
-        "tags": [
-          "ICS Sharing"
-        ],
-        "operationId": "getCalendarShareLink",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CalendarShareLink"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "ICS Sharing"
-        ],
-        "summary": "Enables the public ICS link, or rotates its token with `regenerate`.",
-        "operationId": "createCalendarShareLink",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateShareLinkRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CalendarShareLink"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "ICS Sharing"
-        ],
-        "operationId": "disableCalendarShareLink",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DisableShareLinkResponse"
                 }
               }
             }
@@ -1731,50 +1607,6 @@
         }
       }
     },
-    "/api/profiles/avatar": {
-      "get": {
-        "tags": [
-          "Profiles"
-        ],
-        "summary": "Streams a user's picture by email, fetching external ones through safe fetch; a bare 404 without one.",
-        "operationId": "getProfileAvatarByEmail",
-        "parameters": [
-          {
-            "name": "email",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The picture",
-            "content": {
-              "image/*": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No picture"
-          }
-        }
-      }
-    },
     "/api/profiles/avatars/{avatarId}": {
       "get": {
         "tags": [
@@ -2755,8 +2587,6 @@
           "isVisible",
           "isDefault",
           "isSyncOnly",
-          "icsShareToken",
-          "icsShareEnabled",
           "stalwartAccountId",
           "stalwartCalendarId",
           "stalwartSyncedAt",
@@ -2790,15 +2620,6 @@
           },
           "encryptionState": {
             "type": "string"
-          },
-          "icsShareEnabled": {
-            "type": "boolean"
-          },
-          "icsShareToken": {
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "id": {
             "$ref": "#/components/schemas/CalendarId"
@@ -2894,33 +2715,6 @@
             "items": {
               "$ref": "#/components/schemas/Calendar"
             }
-          }
-        }
-      },
-      "CalendarShareLink": {
-        "type": "object",
-        "required": [
-          "calendarId",
-          "calendarName",
-          "enabled",
-          "shareUrl"
-        ],
-        "properties": {
-          "calendarId": {
-            "$ref": "#/components/schemas/CalendarId"
-          },
-          "calendarName": {
-            "type": "string",
-            "description": "The stored name, so empty for encrypted names."
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "shareUrl": {
-            "type": [
-              "string",
-              "null"
-            ]
           }
         }
       },
@@ -3255,16 +3049,6 @@
         },
         "additionalProperties": false
       },
-      "CreateShareLinkRequest": {
-        "type": "object",
-        "description": "The whole body may be omitted or `null`.",
-        "properties": {
-          "regenerate": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
       "CreateSubscriptionRequest": {
         "type": "object",
         "required": [
@@ -3420,17 +3204,6 @@
           }
         }
       },
-      "DisableShareLinkResponse": {
-        "type": "object",
-        "required": [
-          "success"
-        ],
-        "properties": {
-          "success": {
-            "type": "boolean"
-          }
-        }
-      },
       "E2eeAlgorithms": {
         "type": "object",
         "required": [
@@ -3571,27 +3344,6 @@
         "properties": {
           "email": {
             "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "EmailAvatarQuery": {
-        "type": "object",
-        "description": "Query of `GET /api/profiles/avatar`.",
-        "required": [
-          "email"
-        ],
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "size": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int32",
-            "minimum": 0
           }
         },
         "additionalProperties": false
@@ -4291,8 +4043,6 @@
           "isVisible",
           "isDefault",
           "isSyncOnly",
-          "icsShareToken",
-          "icsShareEnabled",
           "stalwartAccountId",
           "stalwartCalendarId",
           "stalwartSyncedAt",
@@ -4325,15 +4075,6 @@
           },
           "encryptionState": {
             "type": "string"
-          },
-          "icsShareEnabled": {
-            "type": "boolean"
-          },
-          "icsShareToken": {
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "id": {
             "$ref": "#/components/schemas/CalendarId"
@@ -7275,8 +7016,6 @@
           "isVisible",
           "isDefault",
           "isSyncOnly",
-          "icsShareToken",
-          "icsShareEnabled",
           "stalwartAccountId",
           "stalwartCalendarId",
           "stalwartSyncedAt",
@@ -7310,15 +7049,6 @@
           },
           "encryptionState": {
             "type": "string"
-          },
-          "icsShareEnabled": {
-            "type": "boolean"
-          },
-          "icsShareToken": {
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "id": {
             "$ref": "#/components/schemas/CalendarId"

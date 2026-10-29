@@ -696,12 +696,8 @@ async fn participant_pictures_never_expose_remote_urls() {
     let mut owner = app.user().await;
     let attendee = app.user().await;
     let event = invite(&mut owner, &attendee.email).await;
-    let encoded = attendee.email.replace('@', "%40");
     for (image, expected) in [
-        (
-            Some("https://cdn.example.com/bee.png"),
-            Some(format!("/api/profiles/avatar?email={encoded}")),
-        ),
+        (Some("https://cdn.example.com/bee.png"), None),
         (Some("http://127.0.0.1/tracker.png"), None),
         (Some("javascript:alert(1)"), None),
         (

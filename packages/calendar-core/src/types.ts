@@ -1,11 +1,8 @@
 import type {
-  CalendarShareLinkResponse,
   CalendarKind,
-  CreateCalendarShareLinkRequest,
   CalendarSubscriptionSummary,
   CalendarSubscriptionSyncResponse,
   CreateCalendarSubscriptionRequest,
-  DisableCalendarShareLinkResponse,
   DeleteCalendarSubscriptionResponse,
   ImportIcsRequest,
   ImportIcsResponse,
@@ -513,11 +510,6 @@ export type DeleteSubscriptionResponse = DeleteCalendarSubscriptionResponse;
 export type SyncSubscriptionResponse = CalendarSubscriptionSyncResponse;
 export type ImportICSRequest = ImportIcsRequest;
 export type ImportICSResponse = ImportIcsResponse;
-export type CalendarShareLink = CalendarShareLinkResponse;
-export type CreateCalendarShareLinkRequestPayload =
-  CreateCalendarShareLinkRequest;
-export type DisableCalendarShareLinkResponsePayload =
-  DisableCalendarShareLinkResponse;
 
 export interface E2eeDeviceRecord {
   id: string;

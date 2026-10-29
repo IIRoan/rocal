@@ -123,7 +123,6 @@ fn expect_no_picture(response: &ApiResponse) {
 }
 
 const UPLOADED_CACHE: &str = "private, max-age=86400, immutable";
-const PROXY_CACHE: &str = "private, max-age=300";
 
 async fn insert_person(app: &TestApp, email: &str, image: Option<&str>) -> String {
     let id = format!("suiteperson{}", hex(8));
@@ -161,9 +160,6 @@ async fn anonymous_callers_are_refused() {
     let mut anon = app.anonymous();
     expect_unauthorized(&ok(anon
         .post("/api/profiles/lookup", json!({"emails": [owner.email]}))
-        .await));
-    expect_unauthorized(&ok(anon
-        .get(&format!("/api/profiles/avatar?email={}", owner.email))
         .await));
     expect_unauthorized(&ok(anon.get(&format!("{UPLOAD_PREFIX}{avatar_id}")).await));
     expect_unauthorized(&ok(anon
@@ -266,17 +262,14 @@ async fn any_signed_in_user_can_see_an_uploaded_avatar() {
             }]
         }
     );
-    let proxied = viewer
-        .get(&format!(
-            "/api/profiles/avatar?email={}&size=64",
-            owner.email.to_uppercase()
-        ))
-        .await;
-    assert_eq!(expect_webp(&proxied, PROXY_CACHE), 64);
-    let default = viewer
+    let by_email = viewer
         .get(&format!("/api/profiles/avatar?email={}", owner.email))
         .await;
-    assert_eq!(expect_webp(&default, PROXY_CACHE), 512);
+    assert_eq!(
+        by_email.status.as_u16(),
+        404,
+        "no route serves pictures by email"
+    );
 }
 
 #[tokio::test]
@@ -460,7 +453,7 @@ async fn concurrent_uploads_leave_exactly_one_picture() {
 }
 
 #[tokio::test]
-async fn lookup_returns_paths_only_for_people_with_a_usable_picture() {
+async fn lookup_returns_paths_only_for_people_with_an_uploaded_picture() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let mut viewer = app.user().await;
@@ -474,12 +467,15 @@ async fn lookup_returns_paths_only_for_people_with_a_usable_picture() {
     insert_person(&app, &plain_http, Some("http://192.0.2.10/me.png")).await;
     insert_person(&app, &reserved, Some("https://192.0.2.10/root.png")).await;
     insert_person(&app, &no_picture, None).await;
-    let real = insert_person(
-        &app,
-        &format!("real-{tag}@example.com"),
-        Some("https://192.0.2.10/alias.png"),
-    )
-    .await;
+    let real = insert_person(&app, &format!("real-{tag}@example.com"), None).await;
+    let alias_avatar = format!("{}{}", hex(8), "_-alias1");
+    sqlx::query("UPDATE \"user\" SET avatar_id = $1, image = $2 WHERE id = $3")
+        .bind(&alias_avatar)
+        .bind(format!("{UPLOAD_PREFIX}{alias_avatar}"))
+        .bind(&real)
+        .execute(&app.db)
+        .await
+        .expect("attach alias picture");
     let alias = format!("alias-{tag}@solace.test");
     sqlx::query(
         "INSERT INTO mail_directory_entry (id, user_id, email, local_part, domain, stalwart_account_id, stalwart_domain_id, \
@@ -518,15 +514,8 @@ async fn lookup_returns_paths_only_for_people_with_a_usable_picture() {
                 image: format!("{UPLOAD_PREFIX}{avatar_id}"),
             },
             SolaceProfile {
-                email: external.clone(),
-                image: format!(
-                    "/api/profiles/avatar?email={}",
-                    external.replace('@', "%40")
-                ),
-            },
-            SolaceProfile {
                 email: alias.clone(),
-                image: format!("/api/profiles/avatar?email={}", alias.replace('@', "%40")),
+                image: format!("{UPLOAD_PREFIX}{alias_avatar}"),
             },
         ]
     );
@@ -586,100 +575,10 @@ async fn lookup_validates_the_batch() {
 }
 
 #[tokio::test]
-async fn the_email_proxy_refuses_private_hosts_and_unknown_people() {
-    let app = TestApp::spawn().await;
-    let mut viewer = app.user().await;
-    let tag = hex(6);
-    let cases = [
-        (
-            format!("doc-{tag}@example.com"),
-            Some("https://192.0.2.10/me.png"),
-        ),
-        (
-            format!("mapped-{tag}@example.com"),
-            Some("https://[::ffff:7f00:1]/me.png"),
-        ),
-        (
-            format!("plain-{tag}@example.com"),
-            Some("http://192.0.2.10/me.png"),
-        ),
-        (
-            format!("loop-{tag}@example.com"),
-            Some("https://127.0.0.1/me.png"),
-        ),
-        (
-            format!("admin+{tag}@example.com"),
-            Some("https://192.0.2.10/me.png"),
-        ),
-        (format!("nopic-{tag}@example.com"), None),
-    ];
-    for (email, image) in &cases {
-        insert_person(&app, email, *image).await;
-        expect_no_picture(
-            &viewer
-                .get(&format!("/api/profiles/avatar?email={email}"))
-                .await,
-        );
-    }
-    expect_no_picture(
-        &viewer
-            .get(&format!(
-                "/api/profiles/avatar?email=nobody-{tag}@example.com"
-            ))
-            .await,
-    );
-}
-
-#[tokio::test]
 async fn avatar_queries_are_validated() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let avatar_id = upload_fixture(&mut user, "avatar.png").await;
-    let email_cases = [
-        ("/api/profiles/avatar", "Required", "email"),
-        (
-            "/api/profiles/avatar?email=%20",
-            "String must contain at least 1 character(s)",
-            "email",
-        ),
-        (
-            "/api/profiles/avatar?email=a@example.com&size=0",
-            "Number must be greater than or equal to 1",
-            "size",
-        ),
-        (
-            "/api/profiles/avatar?email=a@example.com&size=4097",
-            "Number must be less than or equal to 4096",
-            "size",
-        ),
-        (
-            "/api/profiles/avatar?email=a@example.com&size=abc",
-            "Expected number, received nan",
-            "size",
-        ),
-        (
-            "/api/profiles/avatar?email=a@example.com&size=1.5",
-            "Expected integer, received float",
-            "size",
-        ),
-    ];
-    for (path, message, field) in email_cases {
-        expect_invalid(&user.get(path).await, message, field);
-    }
-    let long = format!("{}@example.com", "a".repeat(243));
-    expect_invalid(
-        &user
-            .get(&format!("/api/profiles/avatar?email={long}"))
-            .await,
-        "String must contain at most 254 character(s)",
-        "email",
-    );
-    expect_unknown_field(
-        &user
-            .get("/api/profiles/avatar?email=a@example.com&userId=x")
-            .await,
-        "userId",
-    );
     for (query, message) in [
         ("?size=0", "Number must be greater than or equal to 1"),
         ("?size=4097", "Number must be less than or equal to 4096"),
@@ -729,46 +628,23 @@ async fn update_user(user: &mut TestUser, body: Value) {
 }
 
 #[tokio::test]
-async fn a_legacy_image_change_retires_the_uploaded_picture() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    let avatar_id = upload_fixture(&mut user, "avatar.png").await;
-    update_user(&mut user, json!({"image": "https://192.0.2.10/me.png"})).await;
-    assert_eq!(
-        avatar_state(&app, &user.id).await,
-        (None, None, Some("https://192.0.2.10/me.png".into()))
-    );
-    assert!(!stored_objects_exist(&app, &mut user, &avatar_id).await);
-    let email = user.email.clone();
-    assert_eq!(
-        lookup(&mut user, &[&email]).await.profiles[0].image,
-        format!("/api/profiles/avatar?email={}", email.replace('@', "%40"))
-    );
-}
-
-#[tokio::test]
-async fn legacy_updates_that_keep_the_image_keep_the_upload() {
+async fn update_user_renames_but_never_changes_the_picture() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let avatar_id = upload_fixture(&mut user, "avatar.png").await;
     let path = format!("{UPLOAD_PREFIX}{avatar_id}");
     update_user(&mut user, json!({"name": "Renamed"})).await;
-    update_user(&mut user, json!({"image": path})).await;
+    for image in [json!("https://192.0.2.10/me.png"), json!(path), json!(null)] {
+        let refused = user
+            .post("/api/auth/update-user", json!({"image": image}))
+            .await;
+        assert_eq!(refused.status.as_u16(), 400, "{}", refused.text());
+    }
     assert_eq!(
         avatar_state(&app, &user.id).await,
         (Some(avatar_id.clone()), None, Some(path.clone()))
     );
     expect_webp(&user.get(&path).await, UPLOADED_CACHE);
-}
-
-#[tokio::test]
-async fn a_legacy_image_removal_clears_the_uploaded_reference() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    let avatar_id = upload_fixture(&mut user, "avatar.png").await;
-    update_user(&mut user, json!({"image": null})).await;
-    assert_eq!(avatar_state(&app, &user.id).await, (None, None, None));
-    assert!(!stored_objects_exist(&app, &mut user, &avatar_id).await);
 }
 
 #[tokio::test]

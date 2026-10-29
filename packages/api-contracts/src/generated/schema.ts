@@ -157,23 +157,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/calendars/shared/{token}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The token-protected, read-only ICS feed that outside calendar apps subscribe to; no session needed. */
-        get: operations["getSharedCalendarFeed"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/calendars/{id}": {
         parameters: {
             query?: never;
@@ -186,23 +169,6 @@ export interface paths {
         post?: never;
         /** Deletes an owned calendar, deleting its events (default) or moving them to another calendar. */
         delete: operations["deleteCalendar"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/calendars/{id}/share-link": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getCalendarShareLink"];
-        put?: never;
-        /** Enables the public ICS link, or rotates its token with `regenerate`. */
-        post: operations["createCalendarShareLink"];
-        delete: operations["disableCalendarShareLink"];
         options?: never;
         head?: never;
         patch?: never;
@@ -738,23 +704,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/profiles/avatar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Streams a user's picture by email, fetching external ones through safe fetch; a bare 404 without one. */
-        get: operations["getProfileAvatarByEmail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/profiles/avatars/{avatarId}": {
         parameters: {
             query?: never;
@@ -1137,8 +1086,6 @@ export interface components {
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
-            icsShareEnabled: boolean;
-            icsShareToken: string | null;
             id: components["schemas"]["CalendarId"];
             isDefault: boolean;
             isPublic: boolean;
@@ -1164,13 +1111,6 @@ export interface components {
         CalendarId: string;
         CalendarList: {
             calendars: components["schemas"]["Calendar"][];
-        };
-        CalendarShareLink: {
-            calendarId: components["schemas"]["CalendarId"];
-            /** @description The stored name, so empty for encrypted names. */
-            calendarName: string;
-            enabled: boolean;
-            shareUrl: string | null;
         };
         /** @description A feed subscription with its mirrored calendar; only the list carries `_count`. */
         CalendarSubscription: {
@@ -1261,10 +1201,6 @@ export interface components {
         CreateInviteRequest: {
             email: string;
         };
-        /** @description The whole body may be omitted or `null`. */
-        CreateShareLinkRequest: {
-            regenerate?: boolean;
-        };
         CreateSubscriptionRequest: {
             color?: string;
             name: string;
@@ -1308,9 +1244,6 @@ export interface components {
         DeleteSubscriptionResponse: {
             success: boolean;
         };
-        DisableShareLinkResponse: {
-            success: boolean;
-        };
         E2eeAlgorithms: {
             blindIndex: string;
             content: string;
@@ -1345,12 +1278,6 @@ export interface components {
         EmailAvailabilityCode: "available" | "invalid_email" | "already_in_use" | "reserved";
         EmailAvailabilityQuery: {
             email: string;
-        };
-        /** @description Query of `GET /api/profiles/avatar`. */
-        EmailAvatarQuery: {
-            email: string;
-            /** Format: int32 */
-            size?: number | null;
         };
         EncryptedIcsEvent: {
             allDay: boolean;
@@ -1515,8 +1442,6 @@ export interface components {
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
-            icsShareEnabled: boolean;
-            icsShareToken: string | null;
             id: components["schemas"]["CalendarId"];
             isDefault: boolean;
             isPublic: boolean;
@@ -2323,8 +2248,6 @@ export interface components {
             /** Format: int32 */
             encryptionKeyVersion: number;
             encryptionState: string;
-            icsShareEnabled: boolean;
-            icsShareToken: string | null;
             id: components["schemas"]["CalendarId"];
             isDefault: boolean;
             isPublic: boolean;
@@ -2705,27 +2628,6 @@ export interface operations {
             };
         };
     };
-    getSharedCalendarFeed: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/calendar": string;
-                };
-            };
-        };
-    };
     updateCalendar: {
         parameters: {
             query?: never;
@@ -2771,73 +2673,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalendarDeleteResult"];
-                };
-            };
-        };
-    };
-    getCalendarShareLink: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarShareLink"];
-                };
-            };
-        };
-    };
-    createCalendarShareLink: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateShareLinkRequest"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarShareLink"];
-                };
-            };
-        };
-    };
-    disableCalendarShareLink: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DisableShareLinkResponse"];
                 };
             };
         };
@@ -3773,36 +3608,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NotificationDeleteResult"];
                 };
-            };
-        };
-    };
-    getProfileAvatarByEmail: {
-        parameters: {
-            query: {
-                email: string;
-                size?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The picture */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "image/*": string;
-                };
-            };
-            /** @description No picture */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };

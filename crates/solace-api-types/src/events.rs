@@ -105,9 +105,6 @@ pub struct EventCalendar {
     pub is_default: bool,
     pub is_sync_only: bool,
     #[schema(required = true)]
-    pub ics_share_token: Option<String>,
-    pub ics_share_enabled: bool,
-    #[schema(required = true)]
     pub stalwart_account_id: Option<String>,
     #[schema(required = true)]
     pub stalwart_calendar_id: Option<String>,

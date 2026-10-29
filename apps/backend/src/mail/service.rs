@@ -994,7 +994,7 @@ pub async fn vault_backup(state: &AppState, user: &RouteUser) -> Result<MailVaul
     let vault = queries::vault(&state.db, &mailbox.id)
         .await?
         .ok_or_else(missing)?;
-    vault_record(mailbox.email, vault)
+    Ok(vault_record(mailbox.email, vault))
 }
 
 /// Replaces the vault; an omitted seal keeps the stored one, and a vault without a seal is never written.
@@ -1017,11 +1017,9 @@ pub async fn put_vault_backup(
         ));
     }
     let current = queries::vault(&state.db, &mailbox.id).await?;
-    let Some(wrapped_secret) = optional_text(request.wrapped_secret.as_deref()).or_else(|| {
-        current
-            .as_ref()
-            .and_then(|vault| vault.wrapped_secret.clone())
-    }) else {
+    let Some(wrapped_secret) = optional_text(request.wrapped_secret.as_deref())
+        .or_else(|| current.as_ref().map(|vault| vault.wrapped_secret.clone()))
+    else {
         return Err(AppError::field(
             "A vault secret sealed to your account key is required.",
             "wrappedSecret",
@@ -1040,19 +1038,12 @@ pub async fn put_vault_backup(
         wrap_algorithm,
     )?;
     let stored = queries::upsert_vault(&state.db, &mailbox.id, vault).await?;
-    vault_record(mailbox.email, stored)
+    Ok(vault_record(mailbox.email, stored))
 }
 
-/// Every write stores a seal, so a row without one is corrupt.
-fn vault_record(
-    email: String,
-    vault: mail_vault_backup::Model,
-) -> Result<MailVaultBackup, AppError> {
+fn vault_record(email: String, vault: mail_vault_backup::Model) -> MailVaultBackup {
     let count = |value: i32| u32::try_from(value).unwrap_or_default();
-    let wrapped_secret = vault
-        .wrapped_secret
-        .ok_or_else(|| AppError::internal("mail vault backup without a seal"))?;
-    Ok(MailVaultBackup {
+    MailVaultBackup {
         email,
         vault_version: count(vault.vault_version),
         encrypted_vault_b64: vault.encrypted_vault_b64,
@@ -1063,9 +1054,9 @@ fn vault_record(
             iterations: count(vault.kdf_iterations),
             parallelism: count(vault.kdf_parallelism),
         },
-        wrapped_secret,
+        wrapped_secret: vault.wrapped_secret,
         wrap_algorithm: vault.wrap_algorithm,
-    })
+    }
 }
 
 /// `deleteMailboxForUser`: the linked Stalwart account, then any account still holding the mailbox name, then the entry.
@@ -1571,10 +1562,7 @@ pub mod tests {
         assert_eq!(entry.public_key_fingerprint, FINGERPRINT);
         assert_eq!(entry.stalwart_public_key_id.as_deref(), Some("pk-1"));
         let vault = queries::vault(&state.db, "entry-1").await.unwrap().unwrap();
-        assert_eq!(
-            vault.wrapped_secret.as_deref(),
-            Some("wrapped:sealed-secret")
-        );
+        assert_eq!(vault.wrapped_secret, "wrapped:sealed-secret");
         assert_eq!(count(&state, "mail_directory_entry").await, 1);
         assert!(!destroyed(&fake));
     }
