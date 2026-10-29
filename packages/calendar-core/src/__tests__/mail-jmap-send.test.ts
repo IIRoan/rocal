@@ -1,9 +1,11 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import {
   buildDraftMethodCalls,
   buildSendMessageMethodCalls,
-  buildUnsentMessageCleanupMethodCall,
+  sendJmapMessage,
+  type OutgoingJmapMessage,
 } from "../mail-jmap-email-set";
+import type { JmapMethodCallLike } from "../mail-server-policy";
 
 const base = {
   draftsMailboxId: "drafts",
@@ -124,7 +126,7 @@ describe("buildSendMessageMethodCalls", () => {
       previousDraftId: "draft-old",
     });
 
-    expect(calls[0][1].destroy).toEqual(["draft-old"]);
+    expect(calls[0][1]).not.toHaveProperty("destroy");
     expect(createdEmails(calls)).toEqual({
       draft1: expect.objectContaining({
         inReplyTo: ["msg-1@example.com"],
@@ -230,63 +232,115 @@ describe("buildDraftMethodCalls", () => {
   });
 });
 
-describe("buildUnsentMessageCleanupMethodCall", () => {
-  const sentEmails = [
-    "Email/set",
-    { created: { draft1: { id: "plain-1" }, sent1: { id: "copy-1" } } },
-    "c1",
-  ] as [string, unknown, string];
+describe("sendJmapMessage", () => {
+  type Envelope = { methodResponses?: JmapMethodCallLike[] };
+  const queued: JmapMethodCallLike = ["EmailSubmission/set", { created: { s1: { id: "sub-1" } } }, "c2"];
+  const refused: JmapMethodCallLike = [
+    "EmailSubmission/set",
+    { notCreated: { s1: { type: "forbiddenToSend", description: "Quota" } } },
+    "c2",
+  ];
+  const external = {
+    ...base,
+    sentMailboxId: "sent",
+    sentCopyCiphertext: { blobId: "sealed-copy", size: 900 },
+    previousDraftId: "draft-old",
+  };
 
-  it("does nothing once the submission was created", () => {
-    expect(
-      buildUnsentMessageCleanupMethodCall({
-        accountId: "acc",
-        draftsMailboxId: "drafts",
+  function send(responses: Envelope[], message: OutgoingJmapMessage = external) {
+    const request = jest.fn(async (_using: string[], _calls: JmapMethodCallLike[]) => {
+      const next = responses.shift();
+      if (!next) throw new Error("unexpected request");
+      return next;
+    });
+    const onCleanupError = jest.fn();
+    const result = sendJmapMessage(message, {
+      mailAccountId: "acc",
+      submissionAccountId: "acc",
+      policy: null,
+      request,
+      onCleanupError,
+    });
+    return { result, request, onCleanupError };
+  }
+
+  it("reports a queued message as sent when its Sent copy could not be stored", async () => {
+    const { result, request, onCleanupError } = send([
+      {
         methodResponses: [
-          sentEmails,
-          ["EmailSubmission/set", { created: { s1: { id: "sub-1" } } }, "c2"],
+          [
+            "Email/set",
+            { created: { draft1: { id: "plain-1", threadId: "t-1" } }, notCreated: { sent1: { type: "tooLarge" } } },
+            "c1",
+          ],
+          queued,
+          ["Email/set", { destroyed: ["plain-1"] }, "c2"],
         ],
-      }),
-    ).toBeNull();
+      },
+      { methodResponses: [["Email/set", { destroyed: ["draft-old"] }, "c1"]] },
+    ]);
+
+    await expect(result).resolves.toEqual({ emailId: "plain-1", threadId: "t-1", submissionId: "sub-1" });
+    expect(onCleanupError).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining("tooLarge") }));
+    expect(request).toHaveBeenCalledTimes(2);
   });
 
-  it("drops the plaintext email and keeps the encrypted copy as the draft when the server refuses the submission", () => {
-    expect(
-      buildUnsentMessageCleanupMethodCall({
-        accountId: "acc",
-        draftsMailboxId: "drafts",
-        methodResponses: [
-          sentEmails,
-          [
-            "EmailSubmission/set",
-            { created: null, notCreated: { s1: { type: "forbiddenFrom" } } },
-            "c2",
-          ],
-        ],
-      }),
-    ).toEqual([
-      "Email/set",
+  it("destroys the draft it replaces only once the submission is queued, and a failed cleanup never fails the send", async () => {
+    const { result, request, onCleanupError } = send([
       {
-        accountId: "acc",
-        destroy: ["plain-1"],
-        update: {
-          "copy-1": {
-            mailboxIds: { drafts: true },
-            keywords: { $draft: true, $seen: true },
-          },
-        },
+        methodResponses: [
+          ["Email/set", { created: { draft1: { id: "plain-1" }, sent1: { id: "copy-1", threadId: "t-2" } } }, "c1"],
+          queued,
+          ["Email/set", { destroyed: ["plain-1"] }, "c2"],
+        ],
       },
-      "c1",
+      { methodResponses: [["Email/set", { notDestroyed: { "draft-old": { type: "notFound" } } }, "c1"]] },
+    ]);
+
+    await expect(result).resolves.toEqual({ emailId: "copy-1", threadId: "t-2", submissionId: "sub-1" });
+    const [[, sendCalls], [, cleanupCalls]] = request.mock.calls;
+    expect(sendCalls[0]?.[1]).not.toHaveProperty("destroy");
+    expect(cleanupCalls).toEqual([["Email/set", { accountId: "acc", destroy: ["draft-old"] }, "c1"]]);
+    expect(onCleanupError).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the previous draft and removes everything a refused send created", async () => {
+    const { result, request } = send([
+      {
+        methodResponses: [
+          ["Email/set", { created: { draft1: { id: "plain-1" }, sent1: { id: "copy-1" } } }, "c1"],
+          refused,
+        ],
+      },
+      { methodResponses: [["Email/set", { destroyed: ["plain-1", "copy-1"] }, "c1"]] },
+    ]);
+
+    await expect(result).rejects.toThrow("Quota");
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]?.[1]).toEqual([
+      ["Email/set", { accountId: "acc", destroy: ["plain-1", "copy-1"] }, "c1"],
     ]);
   });
 
-  it("does nothing when no email was created", () => {
-    expect(
-      buildUnsentMessageCleanupMethodCall({
-        accountId: "acc",
-        draftsMailboxId: "drafts",
-        methodResponses: [["error", { type: "serverFail" }, "c1"]],
-      }),
-    ).toBeNull();
+  it("removes the encrypted message of a refused internal send", async () => {
+    const { result, request } = send(
+      [
+        { methodResponses: [["Email/set", { created: { draft1: { id: "sealed-1" } } }, "c1"], refused] },
+        { methodResponses: [["Email/set", { destroyed: ["sealed-1"] }, "c1"]] },
+      ],
+      { ...base, to: ["bob@solace.onl"], pgpMimeCiphertext: { blobId: "blob-abc", size: 4096 }, sentCopyCiphertext: null },
+    );
+
+    await expect(result).rejects.toThrow("Quota");
+    expect(request.mock.calls[1]?.[1]).toEqual([["Email/set", { accountId: "acc", destroy: ["sealed-1"] }, "c1"]]);
+  });
+
+  it("fails when the server returns no submission without saying why", async () => {
+    const { result } = send(
+      [{ methodResponses: [["Email/set", {}, "c1"], ["EmailSubmission/set", { created: {} }, "c2"]] }],
+      base,
+    );
+
+    await expect(result).rejects.toThrow("not submitted for delivery");
   });
 });

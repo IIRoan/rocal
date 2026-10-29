@@ -1221,7 +1221,7 @@ describe("StalwartJmapClient", () => {
       expect(submission.onSuccessUpdateEmail).toBeUndefined();
     });
 
-    it("drops the plaintext and keeps the encrypted copy as the draft when the submission is refused", async () => {
+    it("removes the plaintext and its encrypted copy when the submission is refused", async () => {
       const fetcher = jest.fn<(input: string, init?: RequestInit) => Promise<Response>>(
         async () =>
           new Response(
@@ -1240,7 +1240,7 @@ describe("StalwartJmapClient", () => {
                         "c2",
                       ],
                     ]
-                  : [["Email/set", { destroyed: ["plain-1"], updated: { "copy-1": null } }, "c1"]],
+                  : [["Email/set", { destroyed: ["plain-1", "copy-1"] }, "c1"]],
             }),
           ),
       );
@@ -1251,25 +1251,50 @@ describe("StalwartJmapClient", () => {
       });
       client.setMailServerPolicy(resolveMailServerPolicy({}));
 
-      await expect(client.sendMessage(session, external)).rejects.toThrow("Quota");
+      await expect(
+        client.sendMessage(session, { ...external, previousDraftId: "draft-1" }),
+      ).rejects.toThrow("Quota");
 
       const [, cleanup] = requestBodies(fetcher);
+      expect(fetcher).toHaveBeenCalledTimes(2);
       expect(cleanup.methodCalls).toEqual([
-        [
-          "Email/set",
-          {
-            accountId: "account",
-            destroy: ["plain-1"],
-            update: {
-              "copy-1": {
-                mailboxIds: { "drafts-1": true },
-                keywords: { $draft: true, $seen: true },
-              },
-            },
-          },
-          "c1",
-        ],
+        ["Email/set", { accountId: "account", destroy: ["plain-1", "copy-1"] }, "c1"],
       ]);
+    });
+
+    it("reports a delivered message as sent even when its Sent copy was refused", async () => {
+      const fetcher = jest.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+        async () =>
+          new Response(
+            JSON.stringify({
+              methodResponses: [
+                [
+                  "Email/set",
+                  {
+                    created: { draft1: { id: "plain-1", threadId: "t-1" } },
+                    notCreated: { sent1: { type: "tooLarge" } },
+                  },
+                  "c1",
+                ],
+                ["EmailSubmission/set", { created: { s1: { id: "sub-1" } } }, "c2"],
+                ["Email/set", { destroyed: ["plain-1"] }, "c2"],
+              ],
+            }),
+          ),
+      );
+      const client = new StalwartJmapClient({
+        baseUrl: "http://localhost:4001/api/mail/jmap",
+        accessToken: "mail-access-token",
+        fetcher,
+      });
+      client.setMailServerPolicy(resolveMailServerPolicy({}));
+
+      await expect(client.sendMessage(session, external)).resolves.toEqual({
+        emailId: "plain-1",
+        threadId: "t-1",
+        submissionId: "sub-1",
+      });
+      expect(fetcher).toHaveBeenCalledTimes(1);
     });
   });
 

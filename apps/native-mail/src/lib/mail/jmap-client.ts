@@ -8,12 +8,13 @@ import type {
   JmapSession,
 } from "./types";
 import {
-  buildDraftMethodCalls,
-  buildSendMessageMethodCalls,
-  buildUnsentMessageCleanupMethodCall,
+  assertSuccessfulJmapResponses,
+  saveJmapDraft,
+  sendJmapMessage,
   type JmapAttachmentInput,
-  type JmapPgpMimeCiphertext,
-  parseSendMessageResults,
+  type JmapDraft,
+  type OutgoingJmapMessage,
+  type SentJmapMessage,
   chunkArray,
   resolveMailServerPolicy,
   resolveMailboxMessagesPageSize,
@@ -22,10 +23,7 @@ import {
   STALWART_JMAP_POLICY_PROPERTIES,
   DEFAULT_JMAP_MAX_METHOD_CALLS,
   chunkJmapMethodCalls,
-  estimateOutgoingJmapMessageBytes,
   jmapMethodCallsHaveDependencies,
-  validateOutgoingMessageSize,
-  validateJmapRequestSize,
   isStalwartEncryptOnAppendEnabled,
   sortMailMessagesBySearchRelevance,
   extractTextQueryFromJmapFilter,
@@ -79,12 +77,6 @@ function errorMessageFromBody(value: unknown): string | null {
   return typeof message === "string" ? message : null;
 }
 
-type JmapMethodError = {
-  type?: string;
-  description?: string;
-  properties?: string[];
-};
-
 function getSubmissionAccountId(
   session: JmapSession,
   mailAccountId: string,
@@ -92,46 +84,6 @@ function getSubmissionAccountId(
   return (
     session.primaryAccounts["urn:ietf:params:jmap:submission"] ?? mailAccountId
   );
-}
-
-function formatJmapMethodError(
-  methodName: string,
-  error: JmapMethodError,
-): string {
-  const propsHint = error.properties?.length
-    ? ` (properties: ${error.properties.join(", ")})`
-    : "";
-  const typeHint = error.type ? ` [${error.type}]` : "";
-  return `${error.description || error.type || `Failed during ${methodName}`}${typeHint}${propsHint}`;
-}
-
-function assertSuccessfulJmapResponses(
-  envelope: JmapEnvelope,
-  context: string,
-): void {
-  for (const [methodName, result] of envelope.methodResponses ?? []) {
-    if (methodName === "error" || methodName.endsWith("/error")) {
-      const error = result as JmapMethodError;
-      throw new Error(formatJmapMethodError(methodName === "error" ? context : methodName, error));
-    }
-
-    const failedPatch = (patch?: Record<string, JmapMethodError>) => {
-      if (!patch || Object.keys(patch).length === 0) return null;
-      return Object.values(patch)[0] ?? null;
-    };
-
-    const patchError =
-      failedPatch(result.notCreated as Record<string, JmapMethodError> | undefined) ??
-      failedPatch(result.notDestroyed as Record<string, JmapMethodError> | undefined) ??
-      failedPatch(result.notUpdated as Record<string, JmapMethodError> | undefined);
-    if (patchError) {
-      throw new Error(formatJmapMethodError(methodName, patchError));
-    }
-  }
-
-  if (!envelope.methodResponses?.length) {
-    throw new Error(`${context}: JMAP response did not include method results.`);
-  }
 }
 
 type JmapClientBearerAuthInput = {
@@ -348,34 +300,6 @@ export class StalwartJmapClient {
 
   private getMaxMethodCalls(): number {
     return this.mailServerPolicy?.maxMethodCalls ?? DEFAULT_JMAP_MAX_METHOD_CALLS;
-  }
-
-  private validateOutgoingMessagePolicy(input: {
-    subject: string;
-    textBody: string;
-    htmlBody?: string;
-    attachments?: JmapAttachmentInput[];
-    pgpMimeCiphertext?: JmapPgpMimeCiphertext;
-    enforceRequestLimit?: boolean;
-  }): string | null {
-    const estimatedBytes = estimateOutgoingJmapMessageBytes({
-      subject: input.subject,
-      textBody: input.textBody,
-      htmlBody: input.htmlBody,
-      attachments: input.attachments,
-      pgpMimeCiphertext: input.pgpMimeCiphertext,
-    });
-    const messageError = validateOutgoingMessageSize(
-      estimatedBytes,
-      this.mailServerPolicy?.limits.maxMessageSizeBytes,
-    );
-    if (messageError) {
-      return messageError;
-    }
-    if (input.enforceRequestLimit !== false && this.mailServerPolicy) {
-      return validateJmapRequestSize(estimatedBytes, this.mailServerPolicy);
-    }
-    return null;
   }
 
   private async getAuthorizationHeader(): Promise<string> {
@@ -1126,145 +1050,30 @@ export class StalwartJmapClient {
 
   async sendMessage(
     session: JmapSession,
-    input: {
-      draftsMailboxId: string;
-      sentMailboxId: string | null;
-      fromEmail: string;
-      fromName?: string | null;
-      to: string[];
-      cc?: string[];
-      bcc?: string[];
-      subject: string;
-      textBody: string;
-      htmlBody?: string;
-      identityId: string;
-      attachments?: JmapAttachmentInput[];
-      pgpMimeCiphertext?: JmapPgpMimeCiphertext;
-      sentCopyCiphertext: JmapPgpMimeCiphertext | null;
-      inReplyTo?: string[];
-      references?: string[];
-      previousDraftId?: string;
-    },
-  ): Promise<{
-    emailId: string;
-    threadId: string | null;
-    submissionId: string;
-  }> {
+    input: OutgoingJmapMessage,
+  ): Promise<SentJmapMessage> {
     await this.syncMailServerPolicy(session);
 
-    const sizeError =
-      this.validateOutgoingMessagePolicy(input) ??
-      (input.sentCopyCiphertext
-        ? this.validateOutgoingMessagePolicy({
-            subject: input.subject,
-            textBody: "",
-            pgpMimeCiphertext: input.sentCopyCiphertext,
-            enforceRequestLimit: false,
-          })
-        : null);
-    if (sizeError) {
-      throw new Error(sizeError);
-    }
-
     const mailAccountId = this.requirePrimaryAccountId(session);
-    const submissionAccountId = getSubmissionAccountId(session, mailAccountId);
-    const calls = buildSendMessageMethodCalls(input).map(
-      ([method, params, id]) =>
-        [
-          method,
-          {
-            ...params,
-            accountId:
-              method === "EmailSubmission/set"
-                ? submissionAccountId
-                : mailAccountId,
-          },
-          id,
-        ] as JmapMethodCall,
-    );
-    const envelope = await this.call(
-      session,
-      [
-        "urn:ietf:params:jmap:core",
-        "urn:ietf:params:jmap:mail",
-        "urn:ietf:params:jmap:submission",
-      ],
-      calls,
-    );
-    const cleanup = input.sentCopyCiphertext
-      ? buildUnsentMessageCleanupMethodCall({
-          accountId: mailAccountId,
-          draftsMailboxId: input.draftsMailboxId,
-          methodResponses: envelope.methodResponses,
-        })
-      : null;
-    if (cleanup) {
-      await this.call(
-        session,
-        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-        [cleanup],
-      ).catch((error: unknown) => {
-        log.warn("Failed to clean up an unsent message", sanitizeContext({ error }));
-      });
-    }
-    assertSuccessfulJmapResponses(envelope, "Send message");
-    return parseSendMessageResults({
-      emailSet: this.getMethodResult(envelope, "Email/set"),
-      emailSubmissionSet: this.getMethodResult(envelope, "EmailSubmission/set"),
+    return sendJmapMessage(input, {
+      mailAccountId,
+      submissionAccountId: getSubmissionAccountId(session, mailAccountId),
+      policy: this.mailServerPolicy,
+      request: (using, calls) => this.call(session, using, calls),
+      onCleanupError: (error) => {
+        log.warn("Sent mail cleanup failed", sanitizeContext({ error }));
+      },
     });
   }
 
-  async saveDraft(
-    session: JmapSession,
-    input: {
-      draftsMailboxId: string;
-      fromEmail: string;
-      fromName?: string | null;
-      to: string[];
-      cc?: string[];
-      bcc?: string[];
-      subject: string;
-      ciphertext: JmapPgpMimeCiphertext;
-      previousDraftId?: string;
-    },
-  ): Promise<string> {
+  async saveDraft(session: JmapSession, input: JmapDraft): Promise<string> {
     await this.syncMailServerPolicy(session);
 
-    const sizeError = this.validateOutgoingMessagePolicy({
-      subject: input.subject,
-      textBody: "",
-      pgpMimeCiphertext: input.ciphertext,
+    return saveJmapDraft(input, {
+      accountId: this.requirePrimaryAccountId(session),
+      policy: this.mailServerPolicy,
+      request: (using, calls) => this.call(session, using, calls),
     });
-    if (sizeError) {
-      throw new Error(sizeError);
-    }
-
-    const accountId = this.requirePrimaryAccountId(session);
-    const calls = buildDraftMethodCalls(input).map(([method, params, id]) => [
-      method,
-      { ...params, accountId },
-      id,
-    ]) as JmapMethodCall[];
-    const envelope = await this.call(
-      session,
-      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-      calls,
-    );
-    const setResult = this.getMethodResult<{
-      created?: Record<string, { id?: string } | null>;
-      notCreated?: Record<string, { description?: string }>;
-    }>(envelope, "Email/set");
-    const notCreated = setResult.notCreated
-      ? Object.values(setResult.notCreated)[0]
-      : null;
-    if (notCreated) {
-      throw new Error(notCreated.description ?? "Failed to save draft.");
-    }
-    const created = setResult.created?.draft1;
-    if (!created?.id) {
-      throw new Error("Failed to save draft.");
-    }
-    return created.id;
   }
 
   async moveToTrash(
