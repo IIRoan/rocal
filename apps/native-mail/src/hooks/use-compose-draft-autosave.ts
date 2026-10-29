@@ -4,6 +4,7 @@ import {
   composeTextToHtml,
   hasComposeFormatting,
   sealMailForSelf,
+  splitRecipientList,
 } from "@workspace/calendar-core";
 import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
 import { createLogger } from "@workspace/logger";
@@ -36,20 +37,13 @@ type ComposeDraftAutosaveInput = {
   setDraftSaveStatus: (status: DraftSaveStatus) => void;
 };
 
-function parseAddressList(raw: string): string[] {
-  return raw
-    .split(/[,;]+/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
 /** Whether the text fields hold anything a draft can store; drafts never keep attachments. */
 export function hasDraftContent(
   fields: Pick<ComposeDraftAutosaveInput, "to" | "cc" | "bcc" | "subject" | "body">,
 ): boolean {
   return (
     [fields.to, fields.cc, fields.bcc].some(
-      (raw) => parseAddressList(raw).length > 0,
+      (raw) => splitRecipientList(raw).length > 0,
     ) ||
     Boolean(fields.subject.trim()) ||
     Boolean(fields.body.trim())
@@ -69,9 +63,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     if (!draftHasContent) return { status: "empty" };
     if (!input.runtime) return { status: "failed" };
 
-    const toAddresses = parseAddressList(input.to);
-    const ccAddresses = parseAddressList(input.cc);
-    const bccAddresses = parseAddressList(input.bcc);
+    const toAddresses = splitRecipientList(input.to);
+    const ccAddresses = splitRecipientList(input.cc);
+    const bccAddresses = splitRecipientList(input.bcc);
     const plainBody = input.body.trim();
     // A save queued behind an autosave runs with its render's draftId, which that autosave already replaced.
     const previousDraftId = lastSavedDraftIdRef.current ?? input.draftId;

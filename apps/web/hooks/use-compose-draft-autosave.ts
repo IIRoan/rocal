@@ -13,10 +13,9 @@ import {
   useMailComposeChrome,
 } from "@/components/mail/mail-compose-context";
 import {
-  validateJmapRequestSize,
-  estimateOutgoingJmapMessageBytes,
   sealMailForSelf,
-  validateOutgoingMessageSize,
+  splitRecipientList,
+  validateOutgoingJmapMessage,
 } from "@workspace/calendar-core";
 import type { MailServerPolicy } from "@workspace/calendar-core";
 import { resolveOutgoingComposeBodies } from "@/lib/mail/signature-utils";
@@ -94,12 +93,9 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     if (!bridge || !client || !session || !unlockedVault) return null;
 
     const draft = bridge.getDraft();
-    const parseList = (raw: string) =>
-      raw.split(/[,;]+/).flatMap((entry) => entry.trim() || []);
-
-    const toAddresses = parseList(draft.to);
-    const ccAddresses = parseList(draft.cc);
-    const bccAddresses = parseList(draft.bcc);
+    const toAddresses = splitRecipientList(draft.to);
+    const ccAddresses = splitRecipientList(draft.cc);
+    const bccAddresses = splitRecipientList(draft.bcc);
     const composeSettings = readMailComposeSettings();
     const { textBody: plainBody, htmlBody } = resolveOutgoingComposeBodies({
       body: draft.body,
@@ -131,28 +127,17 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const draftsMailboxId = getPrimaryMailboxId(mailboxes, "drafts");
     if (!draftsMailboxId) return null;
 
-    if (mailServerPolicy) {
-      const estimatedBytes = estimateOutgoingJmapMessageBytes({
+    const sizeError = validateOutgoingJmapMessage(
+      {
         subject: draft.subject.trim() || "(No subject)",
         textBody: plainBody,
         htmlBody: htmlForDraft,
-      });
-      const messageSizeError = validateOutgoingMessageSize(
-        estimatedBytes,
-        mailServerPolicy.limits.maxMessageSizeBytes,
-      );
-      if (messageSizeError) {
-        bridge.setDraftSaveStatus("error");
-        return null;
-      }
-      const requestSizeError = validateJmapRequestSize(
-        estimatedBytes,
-        mailServerPolicy,
-      );
-      if (requestSizeError) {
-        bridge.setDraftSaveStatus("error");
-        return null;
-      }
+      },
+      mailServerPolicy ?? null,
+    );
+    if (sizeError) {
+      bridge.setDraftSaveStatus("error");
+      return null;
     }
 
     const identity =
