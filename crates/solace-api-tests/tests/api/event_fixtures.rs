@@ -202,7 +202,7 @@ pub async fn iso_from_now(db: &PgPool, seconds: i64) -> String {
     .expect("now")
 }
 
-/// One message the noreply identity sent, with its calendar attachment.
+/// One message the noreply identity sent, as the test Stalwart's catch-all sink received it.
 #[derive(Debug)]
 pub struct SentMail {
     pub subject: String,
@@ -232,39 +232,19 @@ pub async fn assert_no_mail(app: &TestApp, to: &str) {
 }
 
 async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
-    let base = app.env.stalwart_url.trim_end_matches('/');
-    let session: Value = serde_json::from_str(
-        &noreply_jmap(
-            app,
-            reqwest::Method::GET,
-            &format!("{base}/jmap/session"),
-            None,
+    let Some(account) = app.stalwart_account_id("sink").await else {
+        return Vec::new();
+    };
+    let response = app
+        .stalwart_admin(
+            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+            json!([
+                ["Email/query", {"accountId": account, "filter": {"to": to}, "sort": [{"property": "receivedAt", "isAscending": true}]}, "q"],
+                ["Email/get", {"accountId": account, "#ids": {"resultOf": "q", "name": "Email/query", "path": "/ids"},
+                    "properties": ["subject", "attachments", "textBody", "bodyValues"], "fetchTextBodyValues": true}, "g"],
+            ]),
         )
-        .await,
-    )
-    .expect("JMAP session");
-    let account = session["primaryAccounts"]["urn:ietf:params:jmap:mail"]
-        .as_str()
-        .expect("mail account")
-        .to_owned();
-    let calls = json!({
-        "using": ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-        "methodCalls": [
-            ["Email/query", {"accountId": account, "filter": {"to": to}, "sort": [{"property": "receivedAt", "isAscending": true}]}, "q"],
-            ["Email/get", {"accountId": account, "#ids": {"resultOf": "q", "name": "Email/query", "path": "/ids"},
-                "properties": ["subject", "attachments", "textBody", "bodyValues"], "fetchTextBodyValues": true}, "g"],
-        ],
-    });
-    let response: Value = serde_json::from_str(
-        &noreply_jmap(
-            app,
-            reqwest::Method::POST,
-            &format!("{base}/jmap/"),
-            Some(&calls),
-        )
-        .await,
-    )
-    .expect("JMAP body");
+        .await;
     let list = response["methodResponses"][1][1]["list"]
         .as_array()
         .cloned()
@@ -272,17 +252,9 @@ async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
     let mut mail = Vec::new();
     for email in list {
         let text_part = email["textBody"][0]["partId"].as_str().unwrap_or_default();
-        let attachment = email["attachments"].get(0).cloned();
-        let ics = match attachment.as_ref().and_then(|a| a["blobId"].as_str()) {
-            Some(blob) => Some(
-                noreply_jmap(
-                    app,
-                    reqwest::Method::GET,
-                    &format!("{base}/jmap/download/{account}/{blob}/invite.ics"),
-                    None,
-                )
-                .await,
-            ),
+        let attachment = email["attachments"].get(0);
+        let ics = match attachment.and_then(|a| a["blobId"].as_str()) {
+            Some(blob) => Some(download(app, &account, blob).await),
             None => None,
         };
         mail.push(SentMail {
@@ -298,40 +270,22 @@ async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
     mail
 }
 
-/// The backends send as noreply too, so the suite reads one request at a time under Stalwart's per-account concurrency limit.
-static NOREPLY_READS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
-
-async fn noreply_jmap(
-    app: &TestApp,
-    method: reqwest::Method,
-    url: &str,
-    body: Option<&Value>,
-) -> String {
-    let _permit = NOREPLY_READS.acquire().await.expect("semaphore");
-    let user = format!("noreply@{}", app.env.mail_domain);
-    for _ in 0..50 {
-        let mut request = reqwest::Client::new()
-            .request(method.clone(), url)
-            .basic_auth(&user, Some(&app.env.stalwart_noreply_password));
-        if let Some(key) = &app.env.stalwart_gate_key {
-            request = request.header("X-Solace-Gate", key);
-        }
-        if let Some(body) = body {
-            request = request.json(body);
-        }
-        let text = request
-            .send()
-            .await
-            .expect("JMAP request")
-            .text()
-            .await
-            .expect("JMAP text");
-        if !text.contains("urn:ietf:params:jmap:error:limit") {
-            return text;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+/// The raw blob, since JMAP body values normalize the CRLF line endings ICS requires.
+async fn download(app: &TestApp, account: &str, blob: &str) -> String {
+    let base = app.env.stalwart_url.trim_end_matches('/');
+    let mut request = reqwest::Client::new()
+        .get(format!("{base}/jmap/download/{account}/{blob}/invite.ics"))
+        .basic_auth("admin", Some(&app.env.stalwart_admin_password));
+    if let Some(key) = &app.env.stalwart_gate_key {
+        request = request.header("X-Solace-Gate", key);
     }
-    panic!("Stalwart kept refusing noreply reads at its concurrency limit");
+    request
+        .send()
+        .await
+        .expect("JMAP download")
+        .text()
+        .await
+        .expect("JMAP download text")
 }
 
 /// Unfolds RFC 5545 continuation lines so assertions can match whole properties.

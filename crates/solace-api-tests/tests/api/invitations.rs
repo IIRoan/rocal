@@ -394,6 +394,22 @@ async fn new_invitees_get_a_noreply_invitation_with_an_ics_request() {
         }
     }
     assert_no_mail(&app, &owner.email).await;
+
+    let noreply = app
+        .stalwart_account_id("noreply")
+        .await
+        .expect("noreply account");
+    let kept = app
+        .stalwart_admin(
+            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+            json!([["Email/query", {"accountId": noreply, "filter": {"to": outsider}}, "q"]]),
+        )
+        .await;
+    assert_eq!(
+        kept["methodResponses"][0][1]["ids"],
+        json!([]),
+        "the noreply mailbox keeps no plaintext copy of the invitation"
+    );
 }
 
 #[tokio::test]
