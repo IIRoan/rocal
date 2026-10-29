@@ -5,13 +5,28 @@ use solace_api_tests::client::ResponseResult;
 use solace_api_types::auth::{SessionWithUser, StatusFlag};
 
 use crate::helpers::{
-    TestApp, TestUser, auth_error, auth_key, count, ok, set_cookies_named, signed_cookie_token,
+    TestApp, TestUser, auth_error, auth_key, count, hex, ok, set_cookies_named, signed_cookie_token,
 };
 
 const UPDATED_SUBJECT: &str = "Your Solace password was updated";
-/// Written by the TypeScript backend at sign-up for `LEGACY_PASSWORD`, before clients derived auth keys.
-const LEGACY_HASH: &str = "dd9606626dae5b0a239158deba3bd517:f7ceb36210bb220f924c0085423c00d4fd9cfc3bc6c0bdf8d0907357c7610cbd52744f7c0016cade759d4a39954470e3c7ee2aad0761b3103637fdae72e4d86a";
-const LEGACY_PASSWORD: &str = "solace-test-pw-123";
+
+/// A password and the hash the TypeScript backend wrote for it at sign-up, before clients derived auth keys.
+fn legacy_credential() -> (String, String) {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../apps/backend/tests/fixtures/passwords.json"
+    );
+    let vectors: Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("password vectors"))
+            .expect("password vectors json");
+    let field = |name: &str| {
+        vectors["legacyHash"][name]
+            .as_str()
+            .expect("legacy hash vector")
+            .to_owned()
+    };
+    (field("password"), field("hash"))
+}
 
 async fn password_hash(app: &TestApp, user: &TestUser) -> String {
     sqlx::query_scalar(
@@ -169,15 +184,16 @@ async fn change_password_can_revoke_the_other_sessions() {
 async fn a_legacy_hash_takes_the_raw_password_once_then_the_auth_key() {
     let app = TestApp::spawn().await;
     let user = app.user().await;
+    let (legacy_password, legacy_hash) = legacy_credential();
     sqlx::query(
         "UPDATE account SET password = $1 WHERE user_id = $2 AND provider_id = 'credential'",
     )
-    .bind(LEGACY_HASH)
+    .bind(&legacy_hash)
     .bind(&user.id)
     .execute(&app.db)
     .await
     .expect("legacy hash");
-    let key = auth_key(LEGACY_PASSWORD, &user.email);
+    let key = auth_key(&legacy_password, &user.email);
     let mut agent = app.anonymous();
     let refused = ok(agent
         .post(
@@ -191,19 +207,19 @@ async fn a_legacy_hash_takes_the_raw_password_once_then_the_auth_key() {
         "PASSWORD_UPGRADE_REQUIRED",
         "Send the password once more to finish upgrading its protection",
     );
-    assert_eq!(password_hash(&app, &user).await, LEGACY_HASH);
+    assert_eq!(password_hash(&app, &user).await, legacy_hash);
     assert_eq!(
-        sign_in_status(&app, &user.email, LEGACY_PASSWORD).await,
+        sign_in_status(&app, &user.email, &legacy_password).await,
         200
     );
     assert!(password_hash(&app, &user).await.starts_with("ak1:"));
     assert_eq!(sign_in_status(&app, &user.email, &key).await, 200);
     assert_eq!(
-        sign_in_status(&app, &user.email, LEGACY_PASSWORD).await,
+        sign_in_status(&app, &user.email, &legacy_password).await,
         200,
         "shipped binaries still send the raw password"
     );
-    let wrong = auth_key("solace-test-wrong", &user.email);
+    let wrong = auth_key(&format!("solace-test-{}", hex(8)), &user.email);
     assert_eq!(sign_in_status(&app, &user.email, &wrong).await, 401);
 }
 
@@ -212,7 +228,8 @@ async fn change_password_takes_auth_keys_salted_with_the_account_email() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let current = auth_key(&user.password, &user.email);
-    let new = auth_key("solace-test-changed-password", &user.email);
+    let changed = format!("solace-test-{}", hex(8));
+    let new = auth_key(&changed, &user.email);
     let before = password_hash(&app, &user).await;
     let elsewhere = user
         .post(
@@ -236,7 +253,7 @@ async fn change_password_takes_auth_keys_salted_with_the_account_email() {
         .expect_status(200));
     assert_eq!(sign_in_status(&app, &user.email, &new).await, 200);
     assert_eq!(
-        sign_in_status(&app, &user.email, "solace-test-changed-password").await,
+        sign_in_status(&app, &user.email, &changed).await,
         200,
         "the API derives the same key from a raw password"
     );

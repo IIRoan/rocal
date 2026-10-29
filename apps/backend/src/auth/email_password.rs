@@ -177,7 +177,12 @@ async fn password_sign_in(
         Verdict::Match { rehash: None } => {}
         Verdict::Match {
             rehash: Some(rehash),
-        } => store::set_password(&state.db, account, rehash).await?,
+        } => {
+            // The password is proven either way, and the next raw sign-in retries the upgrade.
+            if let Err(error) = store::set_password(&state.db, account, rehash).await {
+                tracing::warn!(error = %crate::telemetry::redact_pii(&error.to_string()), "Could not upgrade a legacy password hash");
+            }
+        }
         Verdict::Mismatch => return Err(codes::invalid_email_or_password()),
         Verdict::UpgradeRequired => return Err(codes::password_upgrade_required()),
     }

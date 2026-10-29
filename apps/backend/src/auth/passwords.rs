@@ -61,6 +61,15 @@ fn greeting(user: &user::Model) -> String {
     }
 }
 
+/// The current password must match; a legacy hash can only be checked once the client resends it raw.
+fn require_match(verdict: Verdict) -> Result<(), ApiError> {
+    match verdict {
+        Verdict::Match { .. } => Ok(()),
+        Verdict::Mismatch => Err(codes::invalid_password()),
+        Verdict::UpgradeRequired => Err(codes::password_upgrade_required()),
+    }
+}
+
 async fn notify_password_updated(state: &AppState, user: &user::Model) {
     let message = email::password_updated(&greeting(user), &sign_in_url(state));
     let _ = email::send(
@@ -100,14 +109,11 @@ pub async fn change_password(
         let new_hash = password::hash(&body.new_password, &active.user.email)
             .await
             .map_err(|_| ApiError::internal())?;
-        match password::verify(&stored, &body.current_password, &active.user.email)
-            .await
-            .map_err(|_| ApiError::internal())?
-        {
-            Verdict::Match { .. } => {}
-            Verdict::Mismatch => return Err(codes::invalid_password()),
-            Verdict::UpgradeRequired => return Err(codes::password_upgrade_required()),
-        }
+        require_match(
+            password::verify(&stored, &body.current_password, &active.user.email)
+                .await
+                .map_err(|_| ApiError::internal())?,
+        )?;
         store::set_password(&state.db, credential, new_hash).await?;
         let mut token = None;
         if body.revoke_other_sessions == Some(true) {
@@ -140,17 +146,12 @@ pub async fn verify_password(
         let stored = store::credential_account(&state.db, &active.user.id)
             .await?
             .and_then(|a| a.password);
-        let verdict = match stored {
+        require_match(match stored {
             Some(stored) => password::verify(&stored, &body.password, &active.user.email)
                 .await
                 .map_err(|_| ApiError::internal())?,
             None => Verdict::Mismatch,
-        };
-        match verdict {
-            Verdict::Match { .. } => {}
-            Verdict::Mismatch => return Err(codes::invalid_password()),
-            Verdict::UpgradeRequired => return Err(codes::password_upgrade_required()),
-        }
+        })?;
         Ok(json(&StatusFlag { status: true }))
     }
     .await;

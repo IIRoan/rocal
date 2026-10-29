@@ -46,7 +46,8 @@ impl<'a> Presented<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+/// No `Debug` outside tests, so `rehash` can never reach a log.
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub enum Verdict {
     /// `rehash` replaces a legacy hash, which a raw password just proved.
     Match {
@@ -149,55 +150,80 @@ mod tests {
 
     const EMAIL: &str = "person@solace.test";
 
+    /// Fixed inputs shared with `@workspace/e2ee`'s auth-key test and the API suite.
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Vectors {
+        auth_key: AuthKeyVector,
+        legacy_hash: LegacyHashVector,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct AuthKeyVector {
+        password: String,
+        email: String,
+        key: String,
+    }
+
+    /// Written by the TypeScript backend at sign-up, before clients derived auth keys.
+    #[derive(serde::Deserialize)]
+    struct LegacyHashVector {
+        password: String,
+        hash: String,
+    }
+
+    fn vectors() -> Vectors {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/passwords.json");
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    fn random_password() -> String {
+        hex::encode(rand::rng().random::<[u8; 12]>())
+    }
+
     #[test]
     fn derives_the_same_auth_key_as_the_clients() {
-        // The same vector is asserted in `@workspace/e2ee`'s auth-key test.
-        assert_eq!(
-            derive_auth_key("solace-test-pw-123", " Person@Solace.test "),
-            "solace-ak1:RVi5JAJdWxgw6aLgvytG2Lm2kedP4CA38RkCO9mReJw"
-        );
+        let vector = vectors().auth_key;
+        assert_eq!(derive_auth_key(&vector.password, &vector.email), vector.key);
     }
 
     #[tokio::test]
     async fn auth_key_hashes_accept_the_key_and_the_raw_password() {
-        let key = derive_auth_key("solace-test-password", EMAIL);
+        let (password, wrong) = (random_password(), random_password());
+        let key = derive_auth_key(&password, EMAIL);
         let stored = hash(&key, EMAIL).await.unwrap();
         assert!(stored.starts_with(STORED_AUTH_KEY_PREFIX));
         let matched = Verdict::Match { rehash: None };
         assert_eq!(verify(&stored, &key, EMAIL).await.unwrap(), matched);
-        assert_eq!(
-            verify(&stored, "solace-test-password", EMAIL)
-                .await
-                .unwrap(),
-            matched
-        );
-        let other = derive_auth_key("solace-test-wrong", EMAIL);
+        assert_eq!(verify(&stored, &password, EMAIL).await.unwrap(), matched);
+        let other = derive_auth_key(&wrong, EMAIL);
         assert_eq!(
             verify(&stored, &other, EMAIL).await.unwrap(),
             Verdict::Mismatch
         );
         assert_eq!(
-            verify(&stored, "solace-test-wrong", EMAIL).await.unwrap(),
+            verify(&stored, &wrong, EMAIL).await.unwrap(),
             Verdict::Mismatch
         );
     }
 
     #[tokio::test]
     async fn legacy_hashes_need_the_raw_password_once() {
-        // Written by the TypeScript backend at sign-up for "solace-test-pw-123".
-        let stored = "dd9606626dae5b0a239158deba3bd517:f7ceb36210bb220f924c0085423c00d4fd9cfc3bc6c0bdf8d0907357c7610cbd52744f7c0016cade759d4a39954470e3c7ee2aad0761b3103637fdae72e4d86a";
-        let key = derive_auth_key("solace-test-pw-123", EMAIL);
+        let legacy = vectors().legacy_hash;
+        let key = derive_auth_key(&legacy.password, EMAIL);
         assert_eq!(
-            verify(stored, &key, EMAIL).await.unwrap(),
+            verify(&legacy.hash, &key, EMAIL).await.unwrap(),
             Verdict::UpgradeRequired
         );
         assert_eq!(
-            verify(stored, "solace-test-pw-124", EMAIL).await.unwrap(),
+            verify(&legacy.hash, &random_password(), EMAIL)
+                .await
+                .unwrap(),
             Verdict::Mismatch
         );
         let Verdict::Match {
             rehash: Some(rehash),
-        } = verify(stored, "solace-test-pw-123", EMAIL).await.unwrap()
+        } = verify(&legacy.hash, &legacy.password, EMAIL).await.unwrap()
         else {
             panic!("a raw match rehashes");
         };
@@ -206,14 +232,14 @@ mod tests {
             Verdict::Match { rehash: None }
         );
         assert_eq!(
-            verify("garbage", "x", EMAIL).await.unwrap(),
+            verify("garbage", &random_password(), EMAIL).await.unwrap(),
             Verdict::Mismatch
         );
     }
 
     #[test]
     fn only_well_formed_keys_count_as_auth_keys() {
-        let key = derive_auth_key("x", EMAIL);
+        let key = derive_auth_key(&random_password(), EMAIL);
         assert!(matches!(Presented::of(&key), Presented::AuthKey(_)));
         assert!(matches!(
             Presented::of("solace-ak1:short"),
@@ -221,6 +247,10 @@ mod tests {
         ));
         assert!(matches!(
             Presented::of(&format!("{key}=")),
+            Presented::Raw(_)
+        ));
+        assert!(matches!(
+            Presented::of(&key.replace("solace-ak1:", "solace-ak2:")),
             Presented::Raw(_)
         ));
     }

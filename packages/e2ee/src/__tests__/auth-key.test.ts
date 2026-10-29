@@ -1,17 +1,20 @@
 import { describe, expect, it } from "@jest/globals";
 import { webcrypto } from "node:crypto";
+// Shared with the API's unit tests, which derive the same key in Rust.
+import vectors from "../../../../apps/backend/tests/fixtures/passwords.json";
 import type { CryptoProvider } from "../crypto-provider";
 import { createE2eeModule } from "../e2ee-module";
+
+const vector = vectors.authKey;
 
 // Node's WebCrypto matches the provider at runtime; only the DOM-shaped declarations differ.
 const e2eeModule = createE2eeModule(webcrypto as unknown as CryptoProvider);
 
 describe("deriveAuthKey", () => {
   it("matches the key the API derives from a raw password", async () => {
-    // The same vector is asserted in `apps/backend/src/auth/password.rs`.
     await expect(
-      e2eeModule.deriveAuthKey("solace-test-pw-123", " Person@Solace.test "),
-    ).resolves.toBe("solace-ak1:RVi5JAJdWxgw6aLgvytG2Lm2kedP4CA38RkCO9mReJw");
+      e2eeModule.deriveAuthKey(vector.password, vector.email),
+    ).resolves.toBe(vector.key);
   });
 
   it("salts with the email so the same password differs per account", async () => {
