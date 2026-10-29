@@ -1,4 +1,4 @@
-import type { JmapAttachmentInput } from "./jmap-client";
+import type { JmapAttachmentInput } from "@workspace/calendar-core";
 
 export type PendingComposeAttachment = {
   id: string;

@@ -6,7 +6,6 @@ import {
 } from "./compose-attachments";
 import {
   buildBearerAuthHeader,
-  buildSendMessageMethodCalls,
   getPrimaryMailAccountId,
   normalizeJmapSession,
   StalwartJmapClient,
@@ -78,147 +77,6 @@ describe("getPrimaryMailAccountId", () => {
     expect(
       getPrimaryMailAccountId({ accounts: {}, primaryAccounts: {} }),
     ).toBeNull();
-  });
-});
-
-describe("buildSendMessageMethodCalls", () => {
-  const base = {
-    draftsMailboxId: "drafts",
-    fromEmail: "me@example.com",
-    to: ["you@example.com"],
-    subject: "Hi",
-    textBody: "Hello",
-    identityId: "identity-1",
-  };
-
-  it("creates an Email/set draft and an EmailSubmission/set call", () => {
-    const calls = buildSendMessageMethodCalls(base);
-    expect(calls).toHaveLength(2);
-
-    const [emailSet, submissionSet] = calls;
-    expect(emailSet[0]).toBe("Email/set");
-    expect(submissionSet[0]).toBe("EmailSubmission/set");
-
-    const draft = (emailSet[1].create as Record<string, any>).draft1;
-    expect(draft.mailboxIds).toEqual({ drafts: true });
-    expect(draft.from).toEqual([{ email: "me@example.com" }]);
-    expect(draft.to).toEqual([{ email: "you@example.com" }]);
-    expect(draft.subject).toBe("Hi");
-    expect(draft.bodyStructure).toBeUndefined();
-    expect(draft.textBody).toEqual([{ partId: "text", type: "text/plain" }]);
-    expect(draft.bodyValues.text.value).toBe("Hello");
-  });
-
-  it("parses display-name recipients and sets an explicit submission envelope", () => {
-    const calls = buildSendMessageMethodCalls({
-      ...base,
-      to: ["User Two <user2@solace.onl>"],
-    });
-    const draft = (calls[0][1].create as Record<string, any>).draft1;
-    const submission = (calls[1][1].create as Record<string, any>).s1;
-
-    expect(draft.to).toEqual([
-      { name: "User Two", email: "user2@solace.onl" },
-    ]);
-    expect(submission.envelope).toEqual({
-      mailFrom: { email: "me@example.com" },
-      rcptTo: [{ email: "user2@solace.onl" }],
-    });
-  });
-
-  it("moves the message out of drafts into sent on success", () => {
-    const calls = buildSendMessageMethodCalls({
-      ...base,
-      sentMailboxId: "sent",
-    });
-    const submissionParams = calls[1][1] as Record<string, any>;
-    expect(submissionParams.onSuccessUpdateEmail["#s1"]).toEqual({
-      "mailboxIds/sent": true,
-      "mailboxIds/drafts": null,
-      "keywords/$draft": null,
-    });
-  });
-
-  it("omits cc/bcc and reply headers when not provided", () => {
-    const draft = (
-      buildSendMessageMethodCalls(base)[0][1].create as Record<string, any>
-    ).draft1;
-    expect(draft).not.toHaveProperty("cc");
-    expect(draft).not.toHaveProperty("bcc");
-    expect(draft).not.toHaveProperty("inReplyTo");
-    expect(draft).not.toHaveProperty("references");
-  });
-
-  it("includes cc, bcc, and threading headers when present", () => {
-    const draft = (
-      buildSendMessageMethodCalls({
-        ...base,
-        cc: ["cc@example.com"],
-        bcc: ["bcc@example.com"],
-        inReplyTo: ["<msg-1@example.com>"],
-        references: ["<root@example.com>"],
-      })[0][1].create as Record<string, any>
-    ).draft1;
-    expect(draft.cc).toEqual([{ email: "cc@example.com" }]);
-    expect(draft.bcc).toEqual([{ email: "bcc@example.com" }]);
-    expect(draft.inReplyTo).toEqual(["<msg-1@example.com>"]);
-    expect(draft.references).toEqual(["<root@example.com>"]);
-  });
-
-  it("uses top-level attachments when present", () => {
-    const draft = (
-      buildSendMessageMethodCalls({
-        ...base,
-        attachments: [
-          { blobId: "blob-1", name: "a.pdf", type: "application/pdf", size: 10 },
-        ],
-      })[0][1].create as Record<string, any>
-    ).draft1;
-    expect(draft.bodyStructure).toBeUndefined();
-    expect(draft.attachments).toEqual([
-      {
-        blobId: "blob-1",
-        name: "a.pdf",
-        type: "application/pdf",
-        disposition: "attachment",
-      },
-    ]);
-  });
-
-  it("adds an htmlBody part and html bodyValues when HTML is provided", () => {
-    const draft = (
-      buildSendMessageMethodCalls({
-        ...base,
-        htmlBody: "<p>Hello <strong>world</strong></p>",
-      })[0][1].create as Record<string, any>
-    ).draft1;
-    expect(draft.htmlBody).toEqual([{ partId: "html", type: "text/html" }]);
-    expect(draft.bodyValues.html.value).toBe(
-      "<p>Hello <strong>world</strong></p>",
-    );
-    expect(draft.textBody).toEqual([{ partId: "text", type: "text/plain" }]);
-    expect(draft.bodyValues.text.value).toBe("Hello");
-  });
-
-  it("keeps htmlBody and top-level attachments on the same draft", () => {
-    const draft = (
-      buildSendMessageMethodCalls({
-        ...base,
-        htmlBody: "<p>Hi</p>",
-        attachments: [
-          { blobId: "blob-2", name: "note.txt", type: "text/plain", size: 4 },
-        ],
-      })[0][1].create as Record<string, any>
-    ).draft1;
-    expect(draft.htmlBody).toEqual([{ partId: "html", type: "text/html" }]);
-    expect(draft.attachments).toEqual([
-      {
-        blobId: "blob-2",
-        name: "note.txt",
-        type: "text/plain",
-        disposition: "attachment",
-      },
-    ]);
   });
 });
 
@@ -437,6 +295,7 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
             {
               created: {
                 draft1: { id: "email-1", threadId: "thread-1" },
+                sent1: { id: "copy-1", threadId: "thread-1" },
               },
             },
             "c1",
@@ -481,9 +340,10 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
       htmlBody: "<p>Hello <strong>world</strong></p>",
       identityId: "identity-1",
       attachments: [toJmapAttachmentInput(pending, uploaded.blobId)],
+      sentCopyCiphertext: { blobId: "sealed-copy", size: 900 },
     });
     expect(sent).toEqual({
-      emailId: "email-1",
+      emailId: "copy-1",
       threadId: "thread-1",
       submissionId: "sub-1",
     });
@@ -506,6 +366,95 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
         disposition: "attachment",
       },
     ]);
+    // The external send keeps only the self-encrypted copy: no plaintext body or attachment blob in Sent.
+    const copy = sendRequest.methodCalls[0][1].create.sent1;
+    expect(copy.mailboxIds).toEqual({ sent: true });
+    expect(copy.bodyStructure.subParts[1].blobId).toBe("sealed-copy");
+    expect(JSON.stringify(copy)).not.toContain("Hello world");
+    expect(JSON.stringify(copy)).not.toContain("blob-uploaded");
+    expect(sendRequest.methodCalls[1][1].onSuccessDestroyEmail).toEqual(["#s1"]);
+  });
+
+  it("restores the encrypted copy as the draft and drops the plaintext when the submission is refused", async () => {
+    let requests = 0;
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({
+        methodResponses:
+          ++requests === 1
+            ? [
+                [
+                  "Email/set",
+                  { created: { draft1: { id: "plain-1" }, sent1: { id: "copy-1" } } },
+                  "c1",
+                ],
+                [
+                  "EmailSubmission/set",
+                  { notCreated: { s1: { type: "forbiddenToSend", description: "Quota" } } },
+                  "c2",
+                ],
+              ]
+            : [["Email/set", { destroyed: ["plain-1"] }, "c1"]],
+      }),
+    );
+    const client = createClient(fetcher);
+    client.setMailServerPolicy(resolveMailServerPolicy());
+
+    await expect(
+      client.sendMessage(session, {
+        draftsMailboxId: "drafts",
+        sentMailboxId: "sent",
+        fromEmail: "me@example.com",
+        to: ["you@example.com"],
+        subject: "Notes",
+        textBody: "Hello world",
+        identityId: "identity-1",
+        sentCopyCiphertext: { blobId: "sealed-copy", size: 900 },
+      }),
+    ).rejects.toThrow("Quota");
+
+    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls).toEqual([
+      [
+        "Email/set",
+        {
+          accountId: "acc1",
+          destroy: ["plain-1"],
+          update: {
+            "copy-1": {
+              mailboxIds: { drafts: true },
+              keywords: { $draft: true, $seen: true },
+            },
+          },
+        },
+        "c1",
+      ],
+    ]);
+  });
+
+  it("saves drafts only as PGP/MIME ciphertext", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({
+        methodResponses: [["Email/set", { created: { draft1: { id: "draft-2" } } }, "c1"]],
+      }),
+    );
+    const client = createClient(fetcher);
+    client.setMailServerPolicy(resolveMailServerPolicy());
+
+    await expect(
+      client.saveDraft(session, {
+        draftsMailboxId: "drafts",
+        fromEmail: "me@example.com",
+        to: ["you@example.com"],
+        subject: "Plans",
+        ciphertext: { blobId: "sealed-draft", size: 512 },
+      }),
+    ).resolves.toBe("draft-2");
+
+    const draft = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1].create.draft1;
+    expect(draft.subject).toBe("Plans");
+    expect(draft.bodyStructure.type).toBe("multipart/encrypted");
+    expect(draft).not.toHaveProperty("textBody");
+    expect(draft).not.toHaveProperty("htmlBody");
+    expect(draft).not.toHaveProperty("attachments");
   });
 });
 

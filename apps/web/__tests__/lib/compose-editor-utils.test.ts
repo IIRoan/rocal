@@ -61,4 +61,29 @@ describe("compose-editor-utils", () => {
       }),
     ]);
   });
+
+  it("keeps an inserted image's bytes local until a plaintext send uploads it", () => {
+    resetComposeInlineImages();
+    registerComposeInlineImage({
+      cid: "img-2@solace",
+      blobId: null,
+      type: "image/png",
+      name: "pasted.png",
+      size: 3,
+      dataUrl: "data:image/png;base64,abc",
+      content: new Uint8Array([7, 8, 9]),
+    });
+
+    const rewritten = rewriteComposeInlineImages(
+      '<img src="data:image/png;base64,abc" data-cid="img-2@solace">',
+    );
+
+    expect(rewritten.attachments).toEqual([
+      expect.objectContaining({
+        blobId: null,
+        cid: "img-2@solace",
+        content: new Uint8Array([7, 8, 9]),
+      }),
+    ]);
+  });
 });

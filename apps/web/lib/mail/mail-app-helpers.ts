@@ -1,15 +1,15 @@
 import {
-  getEmailDomain,
   normalizeEmailAddress,
-  buildOutgoingMimeMessage,
-  resolveEncryptionInternalDomain,
-  shouldEncryptOutgoingMail,
+  sealOutgoingMessageBody,
+  type JmapAttachmentInput,
+  type MailSealer,
   type MailServerPolicy,
+  type OutgoingMessageBody,
   type OutgoingMimeAttachment,
 } from "@workspace/calendar-core";
 import { type Attachment as ParsedMailAttachment } from "postal-mime";
 import { mailDemoApiService } from "@/lib/mail/api-service";
-import { StalwartJmapClient, type JmapAttachmentInput } from "@/lib/mail/jmap-client";
+import { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import { mergeMailMessage, mergeMailMessagePreservingKeywords } from "@/lib/mail/mail-message-body";
 import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
 import type {
@@ -258,82 +258,39 @@ export async function buildTextAttachmentPreview(
   };
 }
 
-export async function resolveOutgoingMessageBody(input: {
+/** Seals mail with the vault unlocked on this device. */
+export function createMailSealer(
+  mailbox: Pick<ActiveMailboxState, "client" | "session" | "unlockedVault">,
+): MailSealer {
+  return {
+    selfPublicKeyArmored: mailbox.unlockedVault.publicKeyArmored,
+    encrypt: (input) => mailCryptoWorkerClient.encryptForRecipients(input),
+    upload: (armoredMessage) =>
+      mailbox.client.uploadTextBlob(mailbox.session, armoredMessage, "text/plain"),
+  };
+}
+
+export function resolveOutgoingMessageBody(input: {
   activeMailbox: ActiveMailboxState;
   recipients: string[];
   plaintext: string;
   html?: string;
   internalDomain: string | null;
   mimeAttachments?: OutgoingMimeAttachment[];
-}): Promise<{
-  textBody: string;
-  encrypted: boolean;
-  pgpMimeCiphertext?: { blobId: string; size: number };
-}> {
-  const internalDomain = resolveEncryptionInternalDomain(input.internalDomain);
-  if (!shouldEncryptOutgoingMail(input.recipients, internalDomain)) {
-    return {
-      textBody: input.plaintext,
-      encrypted: false,
-    };
-  }
-
-  const internalRecipients = input.recipients.filter(
-    (recipient) => getEmailDomain(recipient) === internalDomain,
-  );
-
-  const senderEmail = normalizeEmailAddress(input.activeMailbox.email);
-  const recipientPublicKeysArmored = new Set<string>([
-    input.activeMailbox.unlockedVault.publicKeyArmored,
-  ]);
-
-  for (const recipient of internalRecipients) {
-    if (recipient === senderEmail) {
-      recipientPublicKeysArmored.add(
-        input.activeMailbox.unlockedVault.publicKeyArmored,
-      );
-      continue;
-    }
-
-    const recipientKey = await mailDemoApiService.getRecipientKey(recipient);
-    recipientPublicKeysArmored.add(recipientKey.publicKeyArmored);
-  }
-
-  const shouldUseMime =
-    Boolean(input.html?.trim()) || (input.mimeAttachments?.length ?? 0) > 0;
-  const encryptPayload = shouldUseMime
-    ? buildOutgoingMimeMessage({
+}): Promise<OutgoingMessageBody> {
+  return sealOutgoingMessageBody({
+    recipients: input.recipients,
+    senderEmail: input.activeMailbox.email,
+    internalDomain: input.internalDomain,
+    content: {
       text: input.plaintext,
       html: input.html,
       attachments: input.mimeAttachments,
-    })
-    : input.plaintext;
-
-  const { armoredMessage } = await mailCryptoWorkerClient.encryptForRecipients({
-    plaintext: encryptPayload,
-    recipientPublicKeysArmored: [...recipientPublicKeysArmored],
+    },
+    sealer: createMailSealer(input.activeMailbox),
+    getRecipientPublicKey: async (email) =>
+      (await mailDemoApiService.getRecipientKey(email)).publicKeyArmored,
   });
-
-  if ((input.mimeAttachments?.length ?? 0) > 0) {
-    const uploaded = await input.activeMailbox.client.uploadTextBlob(
-      input.activeMailbox.session,
-      armoredMessage,
-      "text/plain",
-    );
-    return {
-      textBody: "",
-      encrypted: true,
-      pgpMimeCiphertext: {
-        blobId: uploaded.blobId,
-        size: uploaded.size,
-      },
-    };
-  }
-
-  return {
-    textBody: armoredMessage,
-    encrypted: true,
-  };
 }
 
 export function mergeMailboxes(

@@ -39,6 +39,7 @@ import {
   shouldWarnAboutMissingAttachment,
   validateComposeRecipients,
   resolveComposeSendBodies,
+  runTasksWithConcurrencyLimit,
   type ComposeTextFields,
   type SimpleLoginComposeNotice,
 } from "@workspace/calendar-core";
@@ -236,28 +237,37 @@ function ComposeSession({
     ];
 
     const send = async () => {
-      const { textBody, encrypted } = runtime
-        ? await resolveOutgoingMessageBody({
-            runtime,
-            recipients: allRecipients,
-            plaintext,
-          })
-        : { textBody: plaintext, encrypted: false };
+      if (!runtime) {
+        throw new Error("Your mailbox is not ready to send messages yet.");
+      }
+      const { textBody, encrypted, pgpMimeCiphertext, sentCopyCiphertext } =
+        await resolveOutgoingMessageBody({
+          runtime,
+          recipients: allRecipients,
+          plaintext,
+          html: unencryptedHtml,
+          mimeAttachments: attachments.map((pending) => ({
+            filename: pending.name,
+            contentType: pending.type,
+            content: pending.bytes,
+          })),
+        });
       const htmlBody = encrypted ? undefined : unencryptedHtml;
 
-      const uploadedAttachments = [];
-      if (runtime && attachments.length > 0) {
-        for (const pending of attachments) {
-          const uploaded = await runtime.client.uploadBlob(
-            runtime.session,
-            pending.bytes,
-            pending.type,
+      // Encrypted mail carries its attachments inside the ciphertext, so only plaintext sends upload them.
+      const uploadedAttachments = encrypted
+        ? []
+        : await runTasksWithConcurrencyLimit(
+            attachments.map((pending) => async () => {
+              const uploaded = await runtime.client.uploadBlob(
+                runtime.session,
+                pending.bytes,
+                pending.type,
+              );
+              return toJmapAttachmentInput(pending, uploaded.blobId);
+            }),
+            runtime.mailServerPolicy.maxConcurrentUploads,
           );
-          uploadedAttachments.push(
-            toJmapAttachmentInput(pending, uploaded.blobId),
-          );
-        }
-      }
 
       const savedDraft = await saveDraft();
 
@@ -274,6 +284,8 @@ function ComposeSession({
             savedDraft.status === "saved" ? savedDraft.draftId : draftId,
           attachments:
             uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+          pgpMimeCiphertext,
+          sentCopyCiphertext,
         },
         {
           onSuccess: () => {

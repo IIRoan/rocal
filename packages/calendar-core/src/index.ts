@@ -69,5 +69,6 @@ export * from "./event-categories";
 export * from "./mail-list-settings";
 export * from "./mail-search-filter";
 export * from "./mail-jmap-email-set";
+export * from "./mail-outgoing-crypto";
 export * from "./calendar-view-days";
 export * from "./after-paint";

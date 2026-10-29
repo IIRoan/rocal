@@ -3,7 +3,7 @@
 import { useEffect, useEffectEvent, useRef, type RefObject } from "react";
 import { createLogger } from "@workspace/logger";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
-import type { JmapEmailMessage, JmapSession } from "@/lib/mail/types";
+import type { JmapEmailMessage, JmapSession, UserKeyVault } from "@/lib/mail/types";
 import {
   getMailComposeBridge,
   registerComposeDraftSaver,
@@ -15,11 +15,13 @@ import {
 import {
   validateJmapRequestSize,
   estimateOutgoingJmapMessageBytes,
+  sealMailForSelf,
   validateOutgoingMessageSize,
 } from "@workspace/calendar-core";
 import type { MailServerPolicy } from "@workspace/calendar-core";
 import { resolveOutgoingComposeBodies } from "@/lib/mail/signature-utils";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
+import { createMailSealer } from "@/lib/mail/mail-app-helpers";
 
 const log = createLogger("compose-draft-autosave");
 const AUTOSAVE_DEBOUNCE_MS = 2000;
@@ -43,6 +45,7 @@ function getPrimaryMailboxId(
 type ComposeDraftAutosaveInput = {
   client: StalwartJmapClient | null;
   session: JmapSession | null;
+  unlockedVault: UserKeyVault | null;
   mailboxes: Array<{ id: string; role?: string | null }>;
   identities: Array<{
     id: string;
@@ -63,6 +66,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
   const {
     client,
     session,
+    unlockedVault,
     mailboxes,
     identities,
     fallbackFromEmail,
@@ -87,14 +91,11 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
   const saveDraftOnce = async (): Promise<string | null> => {
     const bridge = getMailComposeBridge();
-    if (!bridge || !client || !session) return null;
+    if (!bridge || !client || !session || !unlockedVault) return null;
 
     const draft = bridge.getDraft();
     const parseList = (raw: string) =>
-      raw
-        .split(/[,;]+/)
-        .map((entry) => entry.trim())
-        .filter(Boolean);
+      raw.split(/[,;]+/).flatMap((entry) => entry.trim() || []);
 
     const toAddresses = parseList(draft.to);
     const ccAddresses = parseList(draft.cc);
@@ -163,6 +164,10 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     bridge.setDraftSaveStatus("saving");
 
     const persistDraft = async () => {
+      const ciphertext = await sealMailForSelf(
+        { text: plainBody, html: htmlForDraft },
+        createMailSealer({ client, session, unlockedVault }),
+      );
       const savedDraftId = await client.saveDraft(session, {
         draftsMailboxId,
         fromEmail,
@@ -171,8 +176,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
         cc: ccAddresses.length ? ccAddresses : undefined,
         bcc: bccAddresses.length ? bccAddresses : undefined,
         subject: draft.subject.trim() || "(No subject)",
-        textBody: plainBody,
-        htmlBody: htmlForDraft,
+        ciphertext,
         previousDraftId: previousDraftId ?? undefined,
       });
 

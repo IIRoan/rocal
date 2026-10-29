@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
@@ -6,10 +7,15 @@ import {
   EVENT_ENCRYPTED_FIELDS,
   EVENT_READABLE_METADATA,
   EVENT_INVITATION_ENCRYPTION_HINT,
-  CALENDAR_ICS_SHARING_HINT,
   MAIL_READABLE_METADATA,
 } from "@workspace/calendar-core";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
+
+export const metadata: Metadata = {
+  title: "Privacy – Solace",
+  description:
+    "How Solace encrypts your calendar and mail, and what the server can read.",
+};
 
 export default function PrivacyPage() {
   return (
@@ -50,9 +56,10 @@ export default function PrivacyPage() {
                 Calendar encryption
               </h2>
               <p className="mt-2">
-                Solace encrypts event titles, descriptions and locations on your
-                device before saving them. Enabling reminders does not make
-                these fields readable to the server.
+                Every Solace account is end-to-end encrypted. Your device
+                encrypts event titles, descriptions and locations before saving
+                them, and the server cannot decrypt them without your password.
+                Enabling reminders does not make these fields readable.
               </p>
               <div className="mt-3 overflow-hidden rounded-lg border border-border/50">
                 <table className="w-full text-xs">
@@ -86,9 +93,9 @@ export default function PrivacyPage() {
                 </table>
               </div>
               <p className="mt-3">
-                The names of your own calendars and categories, and the content
-                of the events you create, are always encrypted on your device.
-                Colors, settings, ownership and sharing information remain
+                The names of your calendars and categories are encrypted the
+                same way, including the calendars a new account starts with.
+                Colors, settings and which calendar an event belongs to remain
                 readable.
               </p>
               <p className="mt-3">
@@ -101,7 +108,7 @@ export default function PrivacyPage() {
 
             <div>
               <h2 className="text-base font-semibold text-foreground">
-                Invitations, subscriptions and sharing
+                Invitations and subscriptions
               </h2>
               <p className="mt-2">
                 {EVENT_INVITATION_ENCRYPTION_HINT} Invitation content is handled
@@ -110,13 +117,11 @@ export default function PrivacyPage() {
                 remain readable.
               </p>
               <p className="mt-3">
-                Imported invitations can be read by the server before your
-                device encrypts the calendar copy. The original email is
-                separate. Subscribed and public calendars are fetched by the
-                server, so their feed names, URLs and event details are
-                readable.
+                Invitations that arrive by email are read by the server to stage
+                them until your device encrypts your copy. Subscribed and public
+                calendars are fetched by the server, so their feed names, URLs
+                and event details are readable.
               </p>
-              <p className="mt-3">{CALENDAR_ICS_SHARING_HINT}</p>
             </div>
 
             <div id="mail-encryption">
@@ -124,31 +129,26 @@ export default function PrivacyPage() {
                 Mail encryption
               </h2>
               <p className="mt-2">
-                Mailbox storage encryption protects incoming message content
-                after the mail server receives it. Ordinary incoming mail is
-                readable to the server before encryption. Transport encryption
-                between mail servers is separate from end-to-end encryption.
+                Mail you receive is encrypted with your own OpenPGP key as soon
+                as it arrives and is stored only that way. Drafts and the copies
+                of mail you send are encrypted to the same key on your device
+                before they are saved. The private key never leaves your devices
+                unencrypted, so the server cannot read stored mail.
               </p>
               <p className="mt-3">{MAIL_READABLE_METADATA}</p>
               <p className="mt-3">
-                Storage encryption is an account setting, not proof that every
-                message is encrypted. Older mail, drafts and sent copies may be
-                readable. Solace disables automatic storage encryption for
-                messages appended by the client.
+                Mail between Solace users is end-to-end encrypted. Mail you send
+                to other providers has to leave readable so its recipients can
+                open it, and mail from them is readable to the server while it
+                arrives, unless the sender encrypted it with your public key.
+                Transport encryption between mail servers is separate.
               </p>
               <p className="mt-3">
-                When a sender encrypts with your OpenPGP public key before
-                sending, the content inside that payload is end-to-end
-                encrypted. Attachments outside the payload are not covered.
-                Detecting a PGP payload alone does not prove it was encrypted
-                before delivery. Signature verification is a separate check.
-              </p>
-              <p className="mt-3">
-                Your mail vault uses a random secret sealed to your account
-                encryption key. The server stores only encrypted vault backups.
-                The backend can still authenticate to the mailbox, and
-                invitation processing reads readable mail content when
-                available.
+                Your private key is kept in a vault locked with a random secret
+                that only your account key can open; the server stores only the
+                locked vault. The server can still sign in to your mailbox to
+                sync it and file invitations, which shows it the readable
+                headers but not the encrypted content.
               </p>
             </div>
 
@@ -164,9 +164,11 @@ export default function PrivacyPage() {
                 re-encrypting your content.
               </p>
               <p className="mt-3">
-                Keep your encryption password safe. A login reset alone cannot
-                recover encrypted content. An already unlocked device may let
-                you set a new encryption password while preserving your keys.
+                Keep your encryption password safe. Without it, or a device that
+                is already unlocked, nobody can decrypt your content, including
+                Solace. A login reset alone cannot recover it; an unlocked
+                device may let you set a new encryption password while keeping
+                your keys.
               </p>
             </div>
 
@@ -176,8 +178,10 @@ export default function PrivacyPage() {
               </h2>
               <p className="mt-2">
                 Contacts and mail settings are encrypted on your device before
-                syncing. Account details needed for sign-in and delivery, and
-                uploaded profile pictures, are not end-to-end encrypted.
+                syncing. Account details needed for sign-in and delivery are not
+                end-to-end encrypted. Profile pictures are re-encoded on your
+                device without location data and stored privately; Solace never
+                loads profile pictures from other sites.
               </p>
               <p className="mt-3">
                 Solace does not use your data for advertising, resale or

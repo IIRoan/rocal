@@ -6,8 +6,11 @@ import type {
   JmapSession,
 } from "./types";
 import {
-  parseRecipientString,
-  type ParsedMailAddress,
+  buildDraftMethodCalls,
+  buildSendMessageMethodCalls,
+  buildUnsentMessageCleanupMethodCall,
+  type JmapAttachmentInput,
+  type JmapPgpMimeCiphertext,
   parseJmapBlobUploadResponse,
   parseSendMessageResults,
   validateUploadedBlob,
@@ -89,10 +92,6 @@ function getSubmissionAccountId(
   return (
     session.primaryAccounts["urn:ietf:params:jmap:submission"] ?? mailAccountId
   );
-}
-
-function toJmapAddressList(addresses: string[]): ParsedMailAddress[] {
-  return addresses.map((address) => parseRecipientString(address));
 }
 
 function formatJmapMethodError(
@@ -250,15 +249,6 @@ export function getPrimaryMailAccountId(
   );
 }
 
-export type JmapAttachmentInput = {
-  blobId: string;
-  name: string;
-  type: string;
-  size: number;
-  disposition?: "attachment" | "inline";
-  cid?: string;
-};
-
 const EMAIL_LIST_GET_PROPERTIES = [
   "id",
   "threadId",
@@ -305,238 +295,6 @@ export type GetMessagesOptions = {
   /** When false, only list-preview metadata is fetched (no MIME/blob work). Default true. */
   includeBodies?: boolean;
 };
-
-export type JmapPgpMimeCiphertext = {
-  blobId: string;
-  size: number;
-};
-
-function buildPgpMimeBodyStructure(
-  ciphertext: JmapPgpMimeCiphertext,
-): Record<string, unknown> {
-  return {
-    type: "multipart/encrypted",
-    subParts: [
-      { type: "application/pgp-encrypted", partId: "pgp-version" },
-      {
-        type: "application/octet-stream",
-        blobId: ciphertext.blobId,
-        size: ciphertext.size,
-      },
-    ],
-  };
-}
-
-/** JMAP Email/set body fields — matches Bulwark/webmail sendEmail (convenience properties). */
-function buildEmailContentFields(input: {
-  textBody: string;
-  htmlBody?: string;
-  attachments?: JmapAttachmentInput[];
-  pgpMimeCiphertext?: JmapPgpMimeCiphertext;
-}): Record<string, unknown> {
-  if (input.pgpMimeCiphertext) {
-    return {
-      bodyStructure: buildPgpMimeBodyStructure(input.pgpMimeCiphertext),
-      bodyValues: buildMessageBodyValues(input),
-    };
-  }
-
-  const trimmedHtml = input.htmlBody?.trim();
-  const fields: Record<string, unknown> = {
-    bodyValues: trimmedHtml
-      ? {
-          text: { value: normalizeJmapBodyValue(input.textBody) },
-          html: { value: normalizeJmapBodyValue(trimmedHtml) },
-        }
-      : {
-          text: { value: normalizeJmapBodyValue(input.textBody) },
-        },
-    textBody: [{ partId: "text", type: "text/plain" }],
-  };
-
-  if (trimmedHtml) {
-    fields.htmlBody = [{ partId: "html", type: "text/html" }];
-  }
-
-  if (input.attachments?.length) {
-    fields.attachments = input.attachments.map((attachment) => ({
-      blobId: attachment.blobId,
-      type: attachment.type,
-      name: attachment.name,
-      disposition: attachment.disposition ?? "attachment",
-      ...(attachment.cid ? { cid: attachment.cid } : {}),
-    }));
-  }
-
-  return fields;
-}
-
-function normalizeJmapBodyValue(value: string): string {
-  return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, "\r\n");
-}
-
-function buildMessageBodyValues(input: {
-  textBody: string;
-  htmlBody?: string;
-  pgpMimeCiphertext?: JmapPgpMimeCiphertext;
-}): Record<string, { value: string }> {
-  if (input.pgpMimeCiphertext) {
-    return {
-      "pgp-version": { value: "Version: 1\r\n" },
-    };
-  }
-
-  if (input.htmlBody) {
-    return {
-      text: { value: normalizeJmapBodyValue(input.textBody) },
-      html: { value: normalizeJmapBodyValue(input.htmlBody) },
-    };
-  }
-  return { text: { value: normalizeJmapBodyValue(input.textBody) } };
-}
-
-function buildFromHeader(
-  fromEmail: string,
-  fromName?: string | null,
-): Array<{ email: string; name?: string }> {
-  const trimmedName = fromName?.trim();
-  return [
-    {
-      email: fromEmail,
-      ...(trimmedName ? { name: trimmedName } : {}),
-    },
-  ];
-}
-
-export function buildSendMessageMethodCalls(input: {
-  draftsMailboxId: string;
-  sentMailboxId?: string | null;
-  fromEmail: string;
-  fromName?: string | null;
-  to: string[];
-  cc?: string[];
-  bcc?: string[];
-  subject: string;
-  textBody: string;
-  htmlBody?: string;
-  identityId: string;
-  attachments?: JmapAttachmentInput[];
-  pgpMimeCiphertext?: JmapPgpMimeCiphertext;
-  inReplyTo?: string[];
-  references?: string[];
-  previousDraftId?: string;
-}): JmapMethodCall[] {
-  const toAddresses = toJmapAddressList(input.to);
-  const ccAddresses = input.cc?.length ? toJmapAddressList(input.cc) : undefined;
-  const bccAddresses = input.bcc?.length
-    ? toJmapAddressList(input.bcc)
-    : undefined;
-  const seenEnvelopeRecipients = new Set<string>();
-  const envelopeRecipients: Array<{ email: string }> = [];
-  for (const address of [
-    ...toAddresses,
-    ...(ccAddresses ?? []),
-    ...(bccAddresses ?? []),
-  ]) {
-    if (seenEnvelopeRecipients.has(address.email)) continue;
-    seenEnvelopeRecipients.add(address.email);
-    envelopeRecipients.push({ email: address.email });
-  }
-
-  const submissionParams: Record<string, unknown> = {
-    create: {
-      s1: {
-        emailId: "#draft1",
-        identityId: input.identityId,
-        envelope: {
-          mailFrom: { email: input.fromEmail.trim() },
-          rcptTo: envelopeRecipients,
-        },
-      },
-    },
-  };
-
-  if (input.sentMailboxId) {
-    submissionParams.onSuccessUpdateEmail = {
-      "#s1": {
-        [`mailboxIds/${input.sentMailboxId}`]: true,
-        [`mailboxIds/${input.draftsMailboxId}`]: null,
-        "keywords/$draft": null,
-      },
-    };
-  }
-
-  const emailSetArgs: Record<string, unknown> = {
-    create: {
-      draft1: {
-        mailboxIds: {
-          [input.draftsMailboxId]: true,
-        },
-        keywords: { $seen: true, $draft: true },
-        ...(input.inReplyTo?.length ? { inReplyTo: input.inReplyTo } : {}),
-        ...(input.references?.length ? { references: input.references } : {}),
-        from: buildFromHeader(input.fromEmail, input.fromName),
-        to: toAddresses,
-        ...(ccAddresses?.length ? { cc: ccAddresses } : {}),
-        ...(bccAddresses?.length ? { bcc: bccAddresses } : {}),
-        subject: input.subject,
-        ...buildEmailContentFields(input),
-      },
-    },
-  };
-
-  if (input.previousDraftId) {
-    emailSetArgs.destroy = [input.previousDraftId];
-  }
-
-  return [
-    ["Email/set", emailSetArgs, "c1"],
-    ["EmailSubmission/set", submissionParams, "c2"],
-  ];
-}
-
-export function buildDraftMethodCalls(input: {
-  draftsMailboxId: string;
-  fromEmail: string;
-  fromName?: string | null;
-  to: string[];
-  cc?: string[];
-  bcc?: string[];
-  subject: string;
-  textBody: string;
-  htmlBody?: string;
-  attachments?: JmapAttachmentInput[];
-  previousDraftId?: string;
-}): JmapMethodCall[] {
-  const toAddresses = toJmapAddressList(input.to);
-  const ccAddresses = input.cc?.length ? toJmapAddressList(input.cc) : undefined;
-  const bccAddresses = input.bcc?.length
-    ? toJmapAddressList(input.bcc)
-    : undefined;
-
-  const emailSetArgs: Record<string, unknown> = {
-    create: {
-      draft1: {
-        mailboxIds: {
-          [input.draftsMailboxId]: true,
-        },
-        keywords: { $draft: true },
-        from: buildFromHeader(input.fromEmail, input.fromName),
-        to: toAddresses,
-        ...(ccAddresses?.length ? { cc: ccAddresses } : {}),
-        ...(bccAddresses?.length ? { bcc: bccAddresses } : {}),
-        subject: input.subject,
-        ...buildEmailContentFields(input),
-      },
-    },
-  };
-
-  if (input.previousDraftId) {
-    emailSetArgs.destroy = [input.previousDraftId];
-  }
-
-  return [["Email/set", emailSetArgs, "c1"]];
-}
 
 export class StalwartJmapClient {
   private readonly baseUrl: string;
@@ -1762,6 +1520,7 @@ export class StalwartJmapClient {
       identityId: string;
       attachments?: JmapAttachmentInput[];
       pgpMimeCiphertext?: JmapPgpMimeCiphertext;
+      sentCopyCiphertext: JmapPgpMimeCiphertext | null;
       inReplyTo?: string[];
       references?: string[];
       previousDraftId?: string;
@@ -1775,7 +1534,16 @@ export class StalwartJmapClient {
 
     const refreshed = await this.refreshOutgoingBlobReferences(session, input);
     const outgoing = { ...input, ...refreshed };
-    const sizeError = this.validateOutgoingMessagePolicy(outgoing);
+    const sizeError =
+      this.validateOutgoingMessagePolicy(outgoing) ??
+      (input.sentCopyCiphertext
+        ? this.validateOutgoingMessagePolicy({
+            subject: input.subject,
+            textBody: "",
+            pgpMimeCiphertext: input.sentCopyCiphertext,
+            enforceRequestLimit: false,
+          })
+        : null);
     if (sizeError) {
       throw new Error(sizeError);
     }
@@ -1805,6 +1573,22 @@ export class StalwartJmapClient {
       ],
       calls,
     );
+    const cleanup = input.sentCopyCiphertext
+      ? buildUnsentMessageCleanupMethodCall({
+          accountId: mailAccountId,
+          draftsMailboxId: input.draftsMailboxId,
+          methodResponses: envelope.methodResponses,
+        })
+      : null;
+    if (cleanup) {
+      await this.call(
+        session,
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+        [cleanup],
+      ).catch((error: unknown) => {
+        log.warn("Failed to clean up an unsent message", error);
+      });
+    }
     assertSuccessfulJmapResponses(envelope, "Send message");
     return parseSendMessageResults({
       emailSet: this.getMethodResult(envelope, "Email/set"),
@@ -1822,23 +1606,23 @@ export class StalwartJmapClient {
       cc?: string[];
       bcc?: string[];
       subject: string;
-      textBody: string;
-      htmlBody?: string;
-      attachments?: JmapAttachmentInput[];
+      ciphertext: JmapPgpMimeCiphertext;
       previousDraftId?: string;
     },
   ): Promise<string> {
     await this.syncMailServerPolicy(session);
 
-    const refreshed = await this.refreshOutgoingBlobReferences(session, input);
-    const outgoing = { ...input, ...refreshed };
-    const sizeError = this.validateOutgoingMessagePolicy(outgoing);
+    const sizeError = this.validateOutgoingMessagePolicy({
+      subject: input.subject,
+      textBody: "",
+      pgpMimeCiphertext: input.ciphertext,
+    });
     if (sizeError) {
       throw new Error(sizeError);
     }
 
     const accountId = this.requirePrimaryAccountId(session);
-    const calls = buildDraftMethodCalls(outgoing).map(([method, params, id]) => [
+    const calls = buildDraftMethodCalls(input).map(([method, params, id]) => [
       method,
       { ...params, accountId },
       id,

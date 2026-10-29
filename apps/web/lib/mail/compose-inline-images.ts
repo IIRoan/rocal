@@ -1,6 +1,7 @@
 export type ComposeInlineImage = {
   cid: string;
-  blobId: string;
+  /** Null for images inserted while composing: they are uploaded only if a plaintext send needs them. */
+  blobId: string | null;
   type: string;
   name: string;
   size: number;
