@@ -40,6 +40,8 @@ hex = "0.4"
 tikv-jemallocator = "0.7"
 # Better Auth passwords: scrypt over the NFKC-normalized password.
 scrypt = { version = "0.12", default-features = false }
+# Derives the auth key from raw passwords that shipped binaries still send; scrypt already depends on it.
+pbkdf2 = "0.13"
 unicode-normalization = "0.1"
 # Prisma `cuid()` ids.
 cuid = { version = "2", default-features = false, features = ["v1"] }

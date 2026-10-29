@@ -394,7 +394,7 @@ impl TestApp {
         token
     }
 
-    /// A fresh user signed up through the invite flow, with a browser agent holding its session.
+    /// A fresh user signed up through the invite flow as current clients do, with a browser agent holding its session.
     pub async fn user(&self) -> TestUser {
         let handle = format!("u{}", hex(6));
         let email = format!("{handle}@{}", self.env.mail_domain);
@@ -413,7 +413,7 @@ impl TestApp {
         let signed_up = agent
             .post(
                 "/api/auth/sign-up/email",
-                json!({"email": email, "password": password, "name": name}),
+                json!({"email": email, "password": auth_key(&password, &email), "name": name}),
             )
             .await
             .and_then(|r| r.expect_status(200))
@@ -565,4 +565,15 @@ pub fn auth_error(response: &ApiResponse, status: u16, code: &str, message: &str
 
 pub fn header<'a>(response: &'a ApiResponse, name: &str) -> Option<&'a str> {
     response.headers.get(name).and_then(|v| v.to_str().ok())
+}
+
+/// The key current clients send instead of the password, as `deriveAuthKey` in `@workspace/e2ee` derives it.
+pub fn auth_key(password: &str, email: &str) -> String {
+    let salt = format!("solace-auth-key-v1:{}", email.trim().to_lowercase());
+    let key = pbkdf2::pbkdf2_hmac_array::<sha2::Sha256, 32>(
+        password.as_bytes(),
+        salt.as_bytes(),
+        600_000,
+    );
+    format!("solace-ak1:{}", URL_SAFE_NO_PAD.encode(key))
 }

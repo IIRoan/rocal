@@ -3,7 +3,6 @@
 import { LOGIN_PATH } from "@/lib/app-routes";
 
 const PASSKEY_BRIDGE_PATH = "/passkey/native";
-const RESET_PASSWORD_PATH = "/reset-password";
 
 let pendingNavigation: { completed: boolean } | null = null;
 
@@ -49,9 +48,7 @@ export function isPasskeyStepUpExemptPath(
     pathname === LOGIN_PATH ||
     pathname.startsWith(`${LOGIN_PATH}/`) ||
     pathname === PASSKEY_BRIDGE_PATH ||
-    pathname.startsWith(`${PASSKEY_BRIDGE_PATH}/`) ||
-    pathname === RESET_PASSWORD_PATH ||
-    pathname.startsWith(`${RESET_PASSWORD_PATH}/`)
+    pathname.startsWith(`${PASSKEY_BRIDGE_PATH}/`)
   );
 }
 

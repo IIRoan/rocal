@@ -162,18 +162,6 @@ async fn account_recovery_endpoints_have_strict_budgets() {
     let cases = [
         (
             Method::POST,
-            "/api/auth/request-password-reset",
-            Some(json!({"email": email, "redirectTo": format!("{}/reset-password", app.origin)})),
-            3,
-        ),
-        (
-            Method::POST,
-            "/api/auth/reset-password",
-            Some(json!({"newPassword": "solace-test-password", "token": "missing"})),
-            5,
-        ),
-        (
-            Method::POST,
             "/api/auth/send-verification-email",
             Some(json!({"email": email})),
             3,

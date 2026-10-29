@@ -83,6 +83,7 @@ export function useMailCommandPaletteController({
 
   const { data: session, isPending: sessionLoading } = useSession();
   const sessionUserId = session?.user?.id ?? null;
+  const sessionEmail = session?.user?.email ?? null;
   const { settings, updateSettings } = useSettings();
   const queryClient = useQueryClient();
   const accountsQuery = useLinkedAuthAccounts();
@@ -185,6 +186,7 @@ export function useMailCommandPaletteController({
     runMailPasswordChange({
       ...input,
       sessionUserId,
+      sessionEmail,
       setBusy: (value) =>
         dispatchBusy({ type: "setChangingPassword", value }),
     });

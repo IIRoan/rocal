@@ -91,6 +91,7 @@ export async function persistAccountDeletion(input: {
 
 export async function persistPasswordChange(input: {
   sessionUserId: string;
+  email: string;
   currentPassword: string;
   newPassword: string;
 }): Promise<{ ok: true } | { ok: false; error: unknown }> {
@@ -98,6 +99,7 @@ export async function persistPasswordChange(input: {
     const result = await authClient.changePassword({
       currentPassword: input.currentPassword,
       newPassword: input.newPassword,
+      email: input.email,
     });
 
     if (result?.error) {

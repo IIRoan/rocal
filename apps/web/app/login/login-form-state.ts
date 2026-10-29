@@ -1,4 +1,4 @@
-export type AuthMode = "sign-in" | "sign-up" | "forgot-password";
+export type AuthMode = "sign-in" | "sign-up";
 
 export type LoginFormFieldsState = {
   authMode: AuthMode;
@@ -96,10 +96,6 @@ export function loginFormFieldsReducer(
       if (action.mode !== "sign-up") {
         next.name = "";
         next.inviteToken = "";
-      }
-
-      if (action.mode === "forgot-password") {
-        next.password = "";
       }
 
       return next;

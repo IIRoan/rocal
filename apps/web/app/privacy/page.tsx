@@ -145,14 +145,17 @@ export default function PrivacyPage() {
             vault secret. Email sign-in uses your email password. Passkey and
             social sign-in use a separate encryption password. Changing that password rewraps your existing keys rather than
             re-encrypting your content. Changing your email password rewraps
-            them to the new one; after an email reset, the first sign-in asks
-            for your previous password once. Passwords are stored only as salted hashes, and connections
-            to Solace use TLS.
+            them to the new one. Up-to-date Solace apps never send your
+            password: they send a key derived from it on your device, and
+            Solace stores only a salted hash of that key. Connections to Solace
+            use TLS.
           </p>
           <p className="mt-3">
-            Keep your encryption password safe. A login reset alone cannot
-            recover encrypted content. An already unlocked device may let you
-            set a new encryption password while preserving your keys.
+            Keep your password safe. Solace does not reset passwords from the
+            sign-in screen; if you forget yours, email support from a different
+            address. Without your password, no one, including Solace, can open
+            your encrypted content. An already unlocked device may let you set a
+            new encryption password while preserving your keys.
           </p>
         </div>
 

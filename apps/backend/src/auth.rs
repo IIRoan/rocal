@@ -50,15 +50,6 @@ pub fn routes() -> OpenApiRouter<AppState> {
             post(passwords::change_password),
         )
         .route(
-            "/api/auth/request-password-reset",
-            post(passwords::request_password_reset),
-        )
-        .route(
-            "/api/auth/reset-password/{token}",
-            get(passwords::reset_password_callback),
-        )
-        .route("/api/auth/reset-password", post(passwords::reset_password))
-        .route(
             "/api/auth/verify-password",
             post(passwords::verify_password),
         )

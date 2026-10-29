@@ -12,10 +12,10 @@ import {
 } from "@/lib/auth-navigation";
 
 describe("passkey step-up login navigation", () => {
-  it("keeps login, passkey bridge, and reset-password routes on the auth screens", () => {
+  it("keeps login and passkey bridge routes on the auth screens", () => {
     expect(isPasskeyStepUpExemptPath("/login")).toBe(true);
     expect(isPasskeyStepUpExemptPath("/passkey/native")).toBe(true);
-    expect(isPasskeyStepUpExemptPath("/reset-password")).toBe(true);
+    expect(isPasskeyStepUpExemptPath("/reset-password")).toBe(false);
     expect(isPasskeyStepUpExemptPath("/calendar")).toBe(false);
     expect(isPasskeyStepUpExemptPath(null)).toBe(false);
     expect(isPasskeyStepUpExemptPath(undefined)).toBe(false);

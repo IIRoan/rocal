@@ -179,6 +179,7 @@ export function AccountSettingsContent() {
         const result = await authClient.changePassword({
           currentPassword: currentPasswordInput,
           newPassword: newPasswordInput,
+          email: user?.email ?? "",
         });
         if (result?.error) {
           throw new Error(
@@ -226,6 +227,7 @@ export function AccountSettingsContent() {
     resetChangePasswordForm,
     resetEncryptionPassword,
     toast,
+    user?.email,
   ]);
 
   const saveProfilePicture = useCallback(

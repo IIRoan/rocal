@@ -28,6 +28,7 @@ const e2eeModule = createE2eeModule(webCrypto);
 
 // Re-export all functions from the module for backward compatibility
 export const generateWrappingKeyPair = e2eeModule.generateWrappingKeyPair;
+export const deriveAuthKey = e2eeModule.deriveAuthKey;
 export const exportWrappingPublicKey = e2eeModule.exportWrappingPublicKey;
 export const generateAccountKey = e2eeModule.generateAccountKey;
 export const generateBlindIndexKey = e2eeModule.generateBlindIndexKey;
