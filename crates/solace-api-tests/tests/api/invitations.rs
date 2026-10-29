@@ -383,8 +383,8 @@ async fn new_invitees_get_a_noreply_invitation_with_an_ics_request() {
         assert_eq!(mail.len(), 1, "{email}");
         let mail = &mail[0];
         assert_eq!(
-            mail.subject,
-            format!("{} invited you to Planning", owner.name)
+            mail.subject, "Invitation: Planning @ Mon Mar 2, 2099 · 10:00 AM – 11:00 AM (CET)",
+            "times show on the event's wall clock, like its invite.ics"
         );
         let lines: Vec<&str> = mail.text.lines().collect();
         assert_eq!(lines[0], format!("Hi {name},"));
@@ -392,7 +392,10 @@ async fn new_invitees_get_a_noreply_invitation_with_an_ics_request() {
             lines[2],
             format!("{} invited you to \"Planning\".", owner.name)
         );
-        assert!(lines[3].starts_with("When: Mar 2, 2099, "), "{}", lines[3]);
+        assert_eq!(
+            lines[3],
+            "When: Mon Mar 2, 2099 · 10:00 AM – 11:00 AM (CET)"
+        );
         assert_eq!(lines[4], "Location: Room 1");
         assert!(mail.text.contains("\n\nAgenda\nItems\n\n"), "{}", mail.text);
         assert!(
@@ -592,9 +595,12 @@ async fn updating_participants_invites_only_new_people_and_removes_the_rest() {
     );
     let added_mail = sent_mail(&app, &added, 1).await;
     assert_eq!(added_mail.len(), 1);
-    assert_eq!(
-        added_mail[0].subject,
-        format!("{} invited you to Planning v2", owner.name)
+    assert!(
+        added_mail[0]
+            .subject
+            .starts_with("Invitation: Planning v2 @ "),
+        "{}",
+        added_mail[0].subject
     );
     tokio::time::sleep(std::time::Duration::from_millis(750)).await;
     assert_eq!(

@@ -65,6 +65,7 @@ pub async fn send_pending(
         }],
     );
     let open_url = open_url(state, event_id);
+    let timezone = resolve_timezone(invitation.timezone.as_deref());
     let event = InvitedEvent {
         title: &invitation.title,
         description: invitation.description.as_deref(),
@@ -72,6 +73,7 @@ pub async fn send_pending(
         start: invitation.start,
         end: invitation.end,
         all_day: invitation.all_day,
+        timezone: Some(&timezone),
     };
     let mut warnings = Vec::new();
     for invitee in &synced.new_invitees {

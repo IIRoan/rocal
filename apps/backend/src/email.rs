@@ -1,7 +1,6 @@
 //! App mail from the noreply identity: the `auth-email.ts` templates, delivery modes, and the user-safe warnings for failed sends.
 
 use solace_api_types::common::OperationWarning;
-use time::macros::format_description;
 
 use crate::http::zod::js_trim;
 use crate::integrations::stalwart::mailer::{self, Attachment};
@@ -44,7 +43,8 @@ fn layout(template: &str, title: &str, preview: &str, fill: &[(&str, &str)]) -> 
         .map_or((template.to_owned(), String::new()), |(b, f)| {
             (b.to_owned(), f.to_owned())
         });
-    for (name, value) in fill {
+    let links = [("APP_URL", APP_URL), ("LOGO_URL", LOGO_URL)];
+    for (name, value) in links.iter().chain(fill) {
         let placeholder = format!("{{{{{name}}}}}");
         body = body.replace(&placeholder, value);
         footer = footer.replace(&placeholder, value);
@@ -52,8 +52,6 @@ fn layout(template: &str, title: &str, preview: &str, fill: &[(&str, &str)]) -> 
     SHELL
         .replace("{{TITLE}}", &escape_html(title))
         .replace("{{PREVIEW}}", &escape_html(preview))
-        .replace("{{APP_URL}}", &escape_html(APP_URL))
-        .replace("{{LOGO_URL}}", &escape_html(LOGO_URL))
         .replace("{{BODY}}", &body)
         .replace("{{FOOTER}}", &footer)
 }
@@ -131,36 +129,52 @@ pub struct InvitedEvent<'a> {
     pub start: time::PrimitiveDateTime,
     pub end: time::PrimitiveDateTime,
     pub all_day: bool,
+    /// The event's zone, which the mail shows its times in (UTC when unknown).
+    pub timezone: Option<&'a str>,
 }
 
-/// `formatEventEmailDateRange`: en-US medium dates and short times in the server's zone, UTC.
-fn event_when(
-    start: time::PrimitiveDateTime,
-    end: time::PrimitiveDateTime,
-    all_day: bool,
-) -> String {
-    let date = format_description!("[month repr:short] [day padding:none], [year]");
-    let time = format_description!("[hour repr:12 padding:none]:[minute] [period]");
-    let format = |at: time::PrimitiveDateTime| {
-        let date = at.format(&date).unwrap_or_default();
-        if all_day {
-            return date;
-        }
-        format!("{date}, {}", at.format(&time).unwrap_or_default())
-    };
+/// The stored UTC start and end on the event's wall clock; all-day dates stay as they are.
+fn wall_clock(event: &InvitedEvent<'_>) -> [jiff::Zoned; 2] {
+    let zone = event
+        .timezone
+        .filter(|_| !event.all_day)
+        .and_then(crate::instant::time_zone)
+        .unwrap_or(jiff::tz::TimeZone::UTC);
+    [event.start, event.end].map(|at| {
+        jiff::Timestamp::from_second(at.assume_utc().unix_timestamp())
+            .unwrap_or(jiff::Timestamp::UNIX_EPOCH)
+            .to_zoned(zone.clone())
+    })
+}
+
+/// Google Calendar's "Wed Oct 14, 2026 · 3:00 PM – 4:00 PM (CEST)", or the start date of an all-day event.
+fn event_when(start: &jiff::Zoned, end: &jiff::Zoned, all_day: bool) -> String {
+    let day = |at: &jiff::Zoned| at.strftime("%a %b %-d, %Y").to_string();
+    let clock = |at: &jiff::Zoned| at.strftime("%-I:%M %p").to_string();
     if all_day {
-        return format(start);
+        return format!("{} (all day)", day(start));
     }
-    format!("{} - {}", format(start), format(end))
+    let zone = start.strftime("%Z");
+    if start.date() == end.date() {
+        format!(
+            "{} · {} – {} ({zone})",
+            day(start),
+            clock(start),
+            clock(end)
+        )
+    } else {
+        format!(
+            "{} {} – {} {} ({zone})",
+            day(start),
+            clock(start),
+            day(end),
+            clock(end)
+        )
+    }
 }
 
-const DETAIL_LABEL: &str = r#"<p class="detail-label" style="margin:18px 0 4px;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:rgba(0,0,0,0.4)">"#;
-const DETAIL_VALUE: &str =
-    r#"<p class="detail-value" style="margin:0;font-size:15px;line-height:1.6;color:#1a1a1a">"#;
-
-fn detail(label: &str, value: &str) -> String {
-    format!("{DETAIL_LABEL}{label}</p>{DETAIL_VALUE}{value}</p>")
-}
+const LOCATION_LINE: &str = r#"<p class="email-muted" style="margin:2px 0 0;font-size:14px;line-height:20px;color:#6b6b6b">"#;
+const NOTES_BLOCK: &str = r#"<p class="email-text" style="margin:16px 0 0;font-size:14px;line-height:20px;color:#202020">"#;
 
 /// `buildEventInvitationEmail`.
 pub fn event_invitation(
@@ -172,19 +186,21 @@ pub fn event_invitation(
     let attendee = Some(js_trim(attendee))
         .filter(|name| !name.is_empty())
         .unwrap_or("there");
-    let when = event_when(event.start, event.end, event.all_day);
+    let [start, end] = wall_clock(event);
+    let when = event_when(&start, &end, event.all_day);
     let location = event.location.filter(|text| !js_trim(text).is_empty());
     let description = event.description.filter(|text| !js_trim(text).is_empty());
-    let mut details = detail("When", &escape_html(&when));
-    if let Some(location) = location {
-        details.push_str(&detail("Location", &escape_html(location)));
-    }
-    if let Some(description) = description {
-        details.push_str(&detail(
-            "Notes",
-            &escape_html(description).replace('\n', "<br />"),
-        ));
-    }
+    let location_line = location
+        .map(|location| format!("{LOCATION_LINE}{}</p>", escape_html(js_trim(location))))
+        .unwrap_or_default();
+    let notes = description
+        .map(|description| {
+            format!(
+                "{NOTES_BLOCK}{}</p>",
+                escape_html(description).replace('\n', "<br />")
+            )
+        })
+        .unwrap_or_default();
     let html = layout(
         EVENT_INVITATION,
         "Event invitation",
@@ -193,7 +209,9 @@ pub fn event_invitation(
             ("ATTENDEE", &escape_html(attendee)),
             ("INVITER", &escape_html(inviter)),
             ("TITLE", &escape_html(event.title)),
-            ("DETAILS", &details),
+            ("WHEN", &escape_html(&when)),
+            ("LOCATION", &location_line),
+            ("NOTES", &notes),
             ("OPEN_URL", &escape_html(open_url)),
         ],
     );
@@ -216,7 +234,7 @@ pub fn event_invitation(
         "An ICS calendar invite is attached.".into(),
     ]);
     Message {
-        subject: format!("{inviter} invited you to {}", event.title),
+        subject: format!("Invitation: {} @ {when}", event.title),
         text: text.join("\n"),
         html,
         attachments: Vec::new(),
@@ -419,6 +437,7 @@ mod tests {
             start: time::macros::datetime!(2026-10-14 15:00),
             end: time::macros::datetime!(2026-10-14 16:00),
             all_day: false,
+            timezone: None,
         };
         let message = event_invitation(
             " ",
@@ -426,32 +445,51 @@ mod tests {
             &event,
             "https://solace.test/calendar?eventId=e1",
         );
-        assert_eq!(message.subject, "Roan invited you to Planning <Q4>");
+        assert_eq!(
+            message.subject,
+            "Invitation: Planning <Q4> @ Wed Oct 14, 2026 · 3:00 PM – 4:00 PM (UTC)"
+        );
         assert_eq!(
             message.text,
-            "Hi there,\n\nRoan invited you to \"Planning <Q4>\".\nWhen: Oct 14, 2026, 3:00 PM - Oct 14, 2026, 4:00 PM\nLocation: Room 1\n\nAgenda\nItems\n\nOpen event: https://solace.test/calendar?eventId=e1\n\nAn ICS calendar invite is attached."
+            "Hi there,\n\nRoan invited you to \"Planning <Q4>\".\nWhen: Wed Oct 14, 2026 · 3:00 PM – 4:00 PM (UTC)\nLocation: Room 1\n\nAgenda\nItems\n\nOpen event: https://solace.test/calendar?eventId=e1\n\nAn ICS calendar invite is attached."
         );
+        assert!(message.html.contains(">Planning &lt;Q4&gt;</h1>"));
         assert!(
             message
                 .html
-                .contains("<strong>Planning &lt;Q4&gt;</strong>")
+                .contains(">Wed Oct 14, 2026 · 3:00 PM – 4:00 PM (UTC)</p>")
         );
+        assert!(message.html.contains(">Room 1</p>"));
         assert!(message.html.contains(" Agenda<br />Items "));
         assert!(!message.html.contains("{{"), "every placeholder is filled");
+        let amsterdam = InvitedEvent {
+            timezone: Some("Europe/Amsterdam"),
+            ..event
+        };
+        let message = event_invitation("Bee", "Roan", &amsterdam, "https://solace.test/x");
+        assert!(
+            message
+                .text
+                .contains("When: Wed Oct 14, 2026 · 5:00 PM – 6:00 PM (CEST)"),
+            "times follow the event's zone: {}",
+            message.text
+        );
         let all_day = InvitedEvent {
             all_day: true,
             start: time::macros::datetime!(2026-10-04 00:00),
             location: None,
             description: None,
-            ..event
+            ..amsterdam
         };
         let message = event_invitation("Bee", "Roan", &all_day, "https://solace.test/x");
         assert!(
-            message.text.contains("\nWhen: Oct 4, 2026\n\nOpen event"),
+            message
+                .text
+                .contains("\nWhen: Sun Oct 4, 2026 (all day)\n\nOpen event"),
             "{}",
             message.text
         );
-        assert!(!message.html.contains("Location"));
+        assert!(!message.html.contains("Room 1") && !message.html.contains("{{"));
     }
 
     #[test]
