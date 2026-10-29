@@ -3,7 +3,7 @@
 use serde_json::{Value, json};
 use solace_api_tests::seed::{fake_envelope, fake_token};
 use solace_api_types::Timestamp;
-use solace_api_types::events::ParticipantInput;
+use solace_api_types::events::{InvitationImportSummary, ParticipantInput};
 use solace_api_types::subscriptions::{
     CalendarSubscription, CreateSubscriptionRequest, DeleteSubscriptionResponse, EncryptedIcsEvent,
     EncryptedIcsImportRequest, ImportIcsResponse, UpdateSubscriptionRequest,
@@ -1076,6 +1076,314 @@ async fn non_ascii_rule_parts_and_property_names_still_import() {
     )
     .await;
     assert_eq!(events, 1);
+}
+
+/// Stages `lines` through the invitation import, which parses on the server like feed sync.
+async fn stage(user: &mut TestUser, lines: &[&str]) -> InvitationImportSummary {
+    ok(user
+        .post(
+            "/api/events/invitations/import-ics",
+            json!({"icsContent": lines.join("\r\n")}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()))
+}
+
+/// `(external id, timezone, start, end, all day, rule)` of the user's staged rows.
+async fn staged_rows(
+    app: &TestApp,
+    user: &TestUser,
+) -> Vec<(String, String, String, String, bool, Option<String>)> {
+    sqlx::query_as(&format!(
+        "SELECT external_id, timezone, {}, {}, all_day, recurrence FROM calendar_event WHERE user_id = $1 ORDER BY external_id",
+        iso("start"),
+        iso("\"end\"")
+    ))
+    .bind(&user.id)
+    .fetch_all(&app.db)
+    .await
+    .expect("staged rows")
+}
+
+async fn amsterdam_user(app: &TestApp) -> TestUser {
+    let mut user = app.user().await;
+    ok(user
+        .put("/api/settings", json!({"timezone": "Europe/Amsterdam"}))
+        .await
+        .expect_status(200));
+    user
+}
+
+#[tokio::test]
+async fn an_unreadable_rule_fails_only_its_event() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let summary = stage(
+        &mut user,
+        &[
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "BEGIN:VEVENT",
+            "UID:broken@example.com",
+            "DTSTART:20261101T090000Z",
+            "SUMMARY:Broken",
+            "RRULE:FREQ=FORTNIGHTLY",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "UID:yearly@example.com",
+            "DTSTART:20260715T090000Z",
+            "DTSTART:20260716T090000Z",
+            "SUMMARY:Yearly",
+            "RRULE:FREQ=YEARLY;BYMONTH=7;BYMONTHDAY=15",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "UID:offset@example.com",
+            "DTSTART;TZID=+0100:20261102T090000",
+            "SUMMARY:Offset",
+            "END:VEVENT",
+            "END:VCALENDAR",
+            "",
+        ],
+    )
+    .await;
+    assert_eq!(summary.events_created, 2);
+    assert_eq!(
+        summary.errors,
+        [
+            "Decrypted mail invitation: Failed to parse event broken@example.com: Invalid FREQ value: FORTNIGHTLY"
+        ]
+    );
+    let rows = staged_rows(&app, &user).await;
+    assert_eq!(
+        (
+            rows[0].0.as_str(),
+            rows[0].1.as_str(),
+            rows[0].2.as_str(),
+            &rows[0].5
+        ),
+        (
+            "offset@example.com",
+            "Etc/GMT-1",
+            "2026-11-02T08:00:00.000Z",
+            &None
+        ),
+        "an offset TZID is a fixed offset"
+    );
+    assert_eq!(
+        (rows[1].0.as_str(), rows[1].2.as_str()),
+        ("yearly@example.com", "2026-07-15T09:00:00.000Z"),
+        "the first DTSTART wins"
+    );
+    let rule: Value = serde_json::from_str(rows[1].5.as_deref().expect("rule")).expect("rule json");
+    assert_eq!(
+        (&rule["byMonth"], &rule["byMonthDay"]),
+        (&json!([7]), &json!([15]))
+    );
+}
+
+#[tokio::test]
+async fn floating_times_are_read_in_the_users_zone() {
+    let app = TestApp::spawn().await;
+    let mut user = amsterdam_user(&app).await;
+    stage(
+        &mut user,
+        &[
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "BEGIN:VEVENT",
+            "UID:floating@example.com",
+            "DTSTART:20260715T090000",
+            "DTEND:20260715T100000",
+            "SUMMARY:Floating",
+            "END:VEVENT",
+            "END:VCALENDAR",
+            "",
+        ],
+    )
+    .await;
+    let rows = staged_rows(&app, &user).await;
+    assert_eq!(
+        (rows[0].1.as_str(), rows[0].2.as_str(), rows[0].3.as_str()),
+        (
+            "Europe/Amsterdam",
+            "2026-07-15T07:00:00.000Z",
+            "2026-07-15T08:00:00.000Z"
+        ),
+        "09:00 in Amsterdam, as the on-device import reads it"
+    );
+}
+
+#[tokio::test]
+async fn imported_zones_are_tz_database_zones_never_labels() {
+    let app = TestApp::spawn().await;
+    let mut user = amsterdam_user(&app).await;
+    let event = |uid: &str, tzid: &str| {
+        format!(
+            "BEGIN:VEVENT\r\nUID:{uid}\r\nDTSTART;TZID={tzid}:20260715T090000\r\nSUMMARY:Zone\r\nEND:VEVENT"
+        )
+    };
+    let windows = event("a-windows", "Romance Standard Time");
+    let label = event("b-label", "\"(UTC+05:45) Somewhere new\"");
+    let unknown = event("c-unknown", "Mars/Olympus_Mons");
+    stage(
+        &mut user,
+        &[
+            "BEGIN:VCALENDAR\r\nVERSION:2.0",
+            &windows,
+            &label,
+            &unknown,
+            "END:VCALENDAR\r\n",
+        ],
+    )
+    .await;
+    let zones: Vec<(String, String)> = staged_rows(&app, &user)
+        .await
+        .into_iter()
+        .map(|row| (row.1, row.2))
+        .collect();
+    // A label CLDR cannot map files under the user's zone, which also reads an unknown zone's times.
+    assert_eq!(
+        zones,
+        [
+            ("Europe/Paris", "2026-07-15T07:00:00.000Z"),
+            ("Europe/Amsterdam", "2026-07-15T03:15:00.000Z"),
+            ("Europe/Amsterdam", "2026-07-15T07:00:00.000Z"),
+        ]
+        .map(|(zone, start)| (zone.to_owned(), start.to_owned()))
+    );
+}
+
+#[tokio::test]
+async fn custom_tzids_are_read_by_their_vtimezone() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    stage(
+        &mut user,
+        &[
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "BEGIN:VEVENT",
+            "UID:custom@example.com",
+            "DTSTART;TZID=Office time:20261102T090000",
+            "SUMMARY:After the change",
+            "END:VEVENT",
+            "BEGIN:VTIMEZONE",
+            "TZID:Office time",
+            "X-LIC-LOCATION:Europe/Amsterdam",
+            "BEGIN:STANDARD",
+            "DTSTART:19701025T030000",
+            "TZOFFSETFROM:+0200",
+            "TZOFFSETTO:+0100",
+            "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+            "END:STANDARD",
+            "BEGIN:DAYLIGHT",
+            "DTSTART:19700329T020000",
+            "TZOFFSETFROM:+0100",
+            "TZOFFSETTO:+0200",
+            "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+            "END:DAYLIGHT",
+            "END:VTIMEZONE",
+            "END:VCALENDAR",
+            "",
+        ],
+    )
+    .await;
+    let rows = staged_rows(&app, &user).await;
+    assert_eq!(
+        (rows[0].1.as_str(), rows[0].2.as_str()),
+        ("Europe/Amsterdam", "2026-11-02T08:00:00.000Z")
+    );
+}
+
+#[tokio::test]
+async fn skipped_wall_times_keep_the_offset_before_the_jump() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    stage(
+        &mut user,
+        &[
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "BEGIN:VTIMEZONE",
+            "TZID:W. Europe Standard Time",
+            "BEGIN:STANDARD",
+            "DTSTART:16011028T030000",
+            "TZOFFSETFROM:+0200",
+            "TZOFFSETTO:+0100",
+            "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10",
+            "END:STANDARD",
+            "BEGIN:DAYLIGHT",
+            "DTSTART:16010325T020000",
+            "TZOFFSETFROM:+0100",
+            "TZOFFSETTO:+0200",
+            "RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3",
+            "END:DAYLIGHT",
+            "END:VTIMEZONE",
+            "BEGIN:VEVENT",
+            "UID:gap@example.com",
+            "DTSTART;TZID=W. Europe Standard Time:20260329T023000",
+            "DTEND;TZID=W. Europe Standard Time:20260329T040000",
+            "SUMMARY:In the gap",
+            "END:VEVENT",
+            "END:VCALENDAR",
+            "",
+        ],
+    )
+    .await;
+    let rows = staged_rows(&app, &user).await;
+    // 02:30 does not exist that night, so it reads at +01:00 like the hour before it.
+    assert_eq!(
+        (rows[0].2.as_str(), rows[0].3.as_str()),
+        ("2026-03-29T01:30:00.000Z", "2026-03-29T02:00:00.000Z")
+    );
+}
+
+#[tokio::test]
+async fn all_day_ends_are_exclusive_and_a_single_day_stays_one_day() {
+    let app = TestApp::spawn().await;
+    let mut user = amsterdam_user(&app).await;
+    stage(
+        &mut user,
+        &[
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "BEGIN:VEVENT",
+            "UID:a-single-day",
+            "DTSTART;VALUE=DATE:20990302",
+            "DTEND;VALUE=DATE:20990303",
+            "SUMMARY:Single-day holiday",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "UID:b-three-days",
+            "DTSTART;VALUE=DATE:20990305",
+            "DTEND;VALUE=DATE:20990308",
+            "SUMMARY:Offsite",
+            "END:VEVENT",
+            "END:VCALENDAR",
+            "",
+        ],
+    )
+    .await;
+    let rows: Vec<(String, String, String, bool)> = staged_rows(&app, &user)
+        .await
+        .into_iter()
+        .map(|row| (row.1, row.2, row.3, row.4))
+        .collect();
+    // Dates are whole days in the user's zone, ending the millisecond before DTEND.
+    assert_eq!(
+        rows,
+        [
+            ("2099-03-01T23:00:00.000Z", "2099-03-02T22:59:59.999Z"),
+            ("2099-03-04T23:00:00.000Z", "2099-03-07T22:59:59.999Z"),
+        ]
+        .map(|(start, end)| (
+            "Europe/Amsterdam".to_owned(),
+            start.to_owned(),
+            end.to_owned(),
+            true
+        ))
+    );
 }
 
 fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEvent {
