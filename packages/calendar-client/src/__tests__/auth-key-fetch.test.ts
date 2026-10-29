@@ -28,10 +28,14 @@ function upgradeRequired() {
   );
 }
 
+const BEFORE_CUTOFF = Date.UTC(2026, 10, 1);
+const AFTER_CUTOFF = Date.UTC(2026, 11, 1);
+
 beforeEach(() => {
   sent = [];
   replies = [];
   fetchImpl.mockClear();
+  jest.spyOn(Date, "now").mockReturnValue(BEFORE_CUTOFF);
 });
 
 describe("createAuthKeyFetch", () => {
@@ -56,6 +60,25 @@ describe("createAuthKeyFetch", () => {
       "key(secret-pw|a@solace.test)",
       "secret-pw",
     ]);
+  });
+
+  it("stops sending raw passwords after the upgrade window closes", async () => {
+    jest.spyOn(Date, "now").mockReturnValue(AFTER_CUTOFF);
+    replies = [upgradeRequired()];
+
+    const response = await post("/sign-in/email", {
+      email: "a@solace.test",
+      password: "secret-pw",
+    });
+
+    expect(sent.map((body) => body.password)).toEqual([
+      "key(secret-pw|a@solace.test)",
+    ]);
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "PASSWORD_UPGRADE_CLOSED",
+      message: expect.stringContaining("support@solace.onl"),
+    });
   });
 
   it("refuses a short new password without sending anything", async () => {

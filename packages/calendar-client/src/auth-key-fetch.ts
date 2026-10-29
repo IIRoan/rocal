@@ -1,5 +1,7 @@
 /** Better Auth's fetch with every password swapped for its auth key, so the API never receives a password. */
 
+import { FORGOT_PASSWORD_NOTICE } from "@workspace/calendar-core/product-info";
+
 type DeriveAuthKey = (password: string, email: string) => Promise<string>;
 type Fetch = (
   input: string | URL | Request,
@@ -13,6 +15,9 @@ const PASSWORD_ROUTES: Record<string, PasswordRoute> = {
   "/sign-up/email": { next: "password" },
   "/change-password": { current: "currentPassword", next: "newPassword" },
 };
+
+/** After this, a server asking for the raw password is refused, so a compromised API cannot keep collecting them; hashes left by then go through support. */
+const RAW_PASSWORD_UPGRADE_ENDS = Date.UTC(2026, 11, 1);
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 128;
@@ -105,6 +110,9 @@ export function createAuthKeyFetch(
     const response = await send(keyed);
     if (!route.current || !(await isUpgradeRequired(response))) {
       return response;
+    }
+    if (Date.now() >= RAW_PASSWORD_UPGRADE_ENDS) {
+      return errorResponse("PASSWORD_UPGRADE_CLOSED", FORGOT_PASSWORD_NOTICE);
     }
     return send({ ...keyed, [route.current]: body[route.current] });
   };
