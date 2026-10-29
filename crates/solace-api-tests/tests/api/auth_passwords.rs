@@ -446,8 +446,8 @@ async fn a_new_envelope_needs_the_passkey_step_up() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     crate::passkeys::register(&app, &mut user, "Laptop").await;
-    let mut password_only = app.anonymous();
-    ok(password_only
+    let mut without_passkey = app.anonymous();
+    ok(without_passkey
         .post(
             "/api/auth/sign-in/email",
             json!({"email": user.email, "password": user.password}),
@@ -456,7 +456,7 @@ async fn a_new_envelope_needs_the_passkey_step_up() {
         .expect_status(200));
     let before = password_hash(&app, &user).await;
     let changed = format!("solace-test-{}", hex(8));
-    let planted = password_only
+    let planted = without_passkey
         .post(
             "/api/auth/change-password",
             json!({
@@ -475,7 +475,7 @@ async fn a_new_envelope_needs_the_passkey_step_up() {
     assert_eq!(password_hash(&app, &user).await, before);
     assert_eq!(envelope_salt(&app, &user).await, None);
 
-    let plain = ok(password_only
+    let plain = ok(without_passkey
         .post(
             "/api/auth/change-password",
             json!({"currentPassword": user.password, "newPassword": changed}),

@@ -103,20 +103,20 @@ impl TestEnv {
             },
         };
         guard::check_bucket("TEST_AVATAR_BUCKET", &env.avatar_bucket.name)?;
-        guard::check_secret("TEST_BETTER_AUTH_SECRET", &env.better_auth_secret)?;
-        guard::check_secret("TEST_MAIL_BRIDGE_HMAC_KEY", &env.mail_bridge_hmac_key)?;
-        guard::check_secret("TEST_STALWART_WEBHOOK_SECRET", &env.stalwart_webhook_secret)?;
+        guard::check_minted("TEST_BETTER_AUTH_SECRET", &env.better_auth_secret)?;
+        guard::check_minted("TEST_MAIL_BRIDGE_HMAC_KEY", &env.mail_bridge_hmac_key)?;
+        guard::check_minted("TEST_STALWART_WEBHOOK_SECRET", &env.stalwart_webhook_secret)?;
         if let Some(key) = &env.stalwart_gate_key {
-            guard::check_secret("TEST_STALWART_GATE_KEY", key)?;
+            guard::check_minted("TEST_STALWART_GATE_KEY", key)?;
         }
         guard::check_database_url("TEST_DATABASE_URL", &env.database_url)?;
         guard::check_service_url("TEST_STALWART_URL", &env.stalwart_url)?;
-        guard::check_secret("TEST_STALWART_ADMIN_PASSWORD", &env.stalwart_admin_password)?;
-        guard::check_secret(
+        guard::check_minted("TEST_STALWART_ADMIN_PASSWORD", &env.stalwart_admin_password)?;
+        guard::check_minted(
             "TEST_STALWART_PROVISIONER_PASSWORD",
             &env.stalwart_provisioner_password,
         )?;
-        guard::check_secret(
+        guard::check_minted(
             "TEST_STALWART_NOREPLY_PASSWORD",
             &env.stalwart_noreply_password,
         )?;

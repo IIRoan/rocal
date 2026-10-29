@@ -1018,19 +1018,15 @@ async fn passkey_step_up_gates_the_mail_token_and_the_proxy_session() {
     let mut owner = mailbox(&app).await;
     let mut passkey = register_passkey(&app, &mut owner.user).await;
 
-    let mut password_session = signed_in(&app, &owner.user).await;
-    expect_step_up_required(&password_session.get("/api/mail/oauth/access-token").await);
-    ok(password_session
+    let mut without_step_up = signed_in(&app, &owner.user).await;
+    expect_step_up_required(&without_step_up.get("/api/mail/oauth/access-token").await);
+    ok(without_step_up
         .get("/api/mail/account")
         .await
         .expect_status(403));
 
-    expect_step_up_required(
-        &password_session
-            .get("/api/mail/jmap/.well-known/jmap")
-            .await,
-    );
-    expect_step_up_required(&ok(password_session
+    expect_step_up_required(&without_step_up.get("/api/mail/jmap/.well-known/jmap").await);
+    expect_step_up_required(&ok(without_step_up
         .agent
         .send(
             reqwest::Method::GET,
@@ -1053,7 +1049,7 @@ async fn passkey_step_up_gates_the_mail_token_and_the_proxy_session() {
         .await
         .and_then(|r| r.expect_status(200)));
 
-    let relayed = ok(password_session
+    let relayed = ok(without_step_up
         .agent
         .send(
             reqwest::Method::GET,
