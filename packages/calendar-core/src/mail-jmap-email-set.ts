@@ -298,7 +298,6 @@ export async function sendJmapMessage(
             subject: message.subject,
             textBody: "",
             pgpMimeCiphertext: message.sentCopyCiphertext,
-            enforceRequestLimit: false,
           },
           context.policy,
         )

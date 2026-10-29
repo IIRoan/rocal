@@ -21,6 +21,7 @@ import {
   estimateOutgoingJmapMessageBytes,
   isBlobUploadExpired,
   jmapMethodCallsHaveDependencies,
+  validateOutgoingJmapMessage,
   validateOutgoingMessageSize,
 } from "../../src/mail-server-policy";
 
@@ -76,7 +77,7 @@ describe("resolveMailServerPolicy", () => {
         maxBlobUploadBytes: 100_000_000,
         maxAttachmentSizeBytes: 100_000_000,
         maxMessageSizeBytes: 150_000_000,
-        maxOutgoingAttachmentBytes: 50_000_000,
+        maxOutgoingAttachmentBytes: 53_333_333,
       },
       maxMailboxDepth: 8,
       maxMailboxNameLength: 120,
@@ -170,6 +171,40 @@ describe("validateJmapRequestSize", () => {
     });
     expect(validateJmapRequestSize(2_000_000, policy)).toMatch(/too large/);
     expect(validateJmapRequestSize(500_000, policy)).toBeNull();
+  });
+});
+
+describe("validateOutgoingJmapMessage", () => {
+  const policy = resolveMailServerPolicy({
+    emailSettings: { maxMessageSize: 75_000_000 },
+    jmapSettings: { maxRequestSize: 10_000_000 },
+  });
+
+  it("counts only inline bodies toward the request limit, since blobs travel by reference", () => {
+    expect(
+      validateOutgoingJmapMessage(
+        { subject: "Files", textBody: "Hi", attachments: [{ size: 30_000_000 }] },
+        policy,
+      ),
+    ).toBeNull();
+    expect(
+      validateOutgoingJmapMessage(
+        { subject: "Files", textBody: "", pgpMimeCiphertext: { size: 60_000_000 } },
+        policy,
+      ),
+    ).toBeNull();
+    expect(
+      validateOutgoingJmapMessage({ subject: "Long", textBody: "a".repeat(10_000_001) }, policy),
+    ).toMatch(/too large/);
+  });
+
+  it("still rejects a message over the server message limit", () => {
+    expect(
+      validateOutgoingJmapMessage(
+        { subject: "Files", textBody: "", pgpMimeCiphertext: { size: 80_000_000 } },
+        policy,
+      ),
+    ).toMatch(/server limit/);
   });
 });
 

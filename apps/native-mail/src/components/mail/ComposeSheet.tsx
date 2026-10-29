@@ -19,6 +19,7 @@ import type { ComposeRequest } from "../../lib/mail/compose-request";
 import {
   appendPlainTextSignature,
   getErrorMessage,
+  getOutgoingAttachmentSizeError,
   getPlainTextSignature,
   hasComposeUserContent,
   hasPlainTextSignatureBlock,
@@ -224,7 +225,9 @@ function ComposeSession({
   };
 
   const handleAttach = async () => {
-    await pickComposeAttachment()
+    await pickComposeAttachment(
+      runtime?.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
+    )
       .then((attachment) => {
         if (attachment) dispatch({ type: "attach", attachment });
       })
@@ -368,8 +371,10 @@ function ComposeSession({
   );
 }
 
-/** Picks one file; the picker's cache copy is plaintext, so it is deleted once read. */
-async function pickComposeAttachment(): Promise<PendingComposeAttachment | null> {
+/** Picks one file; the picker's cache copy is plaintext, so it is deleted once read or refused. */
+async function pickComposeAttachment(
+  maxBytes: number | undefined,
+): Promise<PendingComposeAttachment | null> {
   const result = await DocumentPicker.getDocumentAsync({
     type: "*/*",
     copyToCacheDirectory: true,
@@ -378,9 +383,18 @@ async function pickComposeAttachment(): Promise<PendingComposeAttachment | null>
   if (result.canceled) return null;
   const asset = result.assets[0];
   if (!asset?.uri) return null;
-  const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  }).finally(() =>
+  const readAsset = async () => {
+    const sizeError = getOutgoingAttachmentSizeError(
+      asset.name ?? "attachment",
+      asset.size ?? 0,
+      maxBytes,
+    );
+    if (sizeError) throw new Error(sizeError);
+    return FileSystem.readAsStringAsync(asset.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  };
+  const base64 = await readAsset().finally(() =>
     FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(() => undefined),
   );
   return createPendingComposeAttachment({

@@ -4,6 +4,7 @@ import {
   canSendCompose,
   composeTextToPlain,
   getErrorMessage,
+  getOutgoingAttachmentsTotalSizeError,
   hasPlainTextSignatureBlock,
   resolveComposeSendBodies,
   runTasksWithConcurrencyLimit,
@@ -75,6 +76,11 @@ export function useComposeSend({
       if (!runtime) {
         throw new Error("Your mailbox is not ready to send messages yet.");
       }
+      const sizeError = getOutgoingAttachmentsTotalSizeError(
+        attachments.map((pending) => pending.size),
+        runtime.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
+      );
+      if (sizeError) throw new Error(sizeError);
       // The send replaces the stored draft itself, so a pending autosave would only seal a throwaway copy.
       const previousDraftId = await settleDraftSave();
       const { textBody, encrypted, pgpMimeCiphertext, sentCopyCiphertext } =

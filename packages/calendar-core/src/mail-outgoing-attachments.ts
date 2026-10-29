@@ -7,7 +7,6 @@ import { nonEmptyTrimmedString, throwFirstZodIssue } from "./mail-zod-utils";
 
 export {
   DEFAULT_MAX_BLOB_UPLOAD_BYTES,
-  DEFAULT_MAX_OUTGOING_ATTACHMENT_BYTES,
   formatAttachmentByteLimit,
   parseStalwartSizeBytes,
   resolveMailServerLimits,
@@ -108,6 +107,17 @@ export function getOutgoingAttachmentSizeError(
   return `"${label}" exceeds the ${formatAttachmentByteLimit(maxBytes)} attachment limit.`;
 }
 
+/** The self-encrypted copy carries every attachment, so the limit also caps their total. */
+export function getOutgoingAttachmentsTotalSizeError(
+  sizes: readonly number[],
+  maxBytes: number,
+): string | null {
+  const total = sizes.reduce((sum, size) => sum + size, 0);
+  return total > maxBytes
+    ? `Attachments add up to ${formatAttachmentByteLimit(total)}, over the ${formatAttachmentByteLimit(maxBytes)} limit for one message.`
+    : null;
+}
+
 export function partitionOutgoingAttachmentFiles<
   T extends ReadableAttachmentFile,
 >(
@@ -176,6 +186,17 @@ export async function prepareOutgoingAttachments(
   }
 
   const maxBytes = options?.maxBytes ?? DEFAULT_MAX_BLOB_UPLOAD_BYTES;
+  const reportedSizeError =
+    files
+      .map((file) => getOutgoingAttachmentSizeError(file.name, file.size, maxBytes))
+      .find(Boolean) ??
+    getOutgoingAttachmentsTotalSizeError(
+      files.map((file) => file.size),
+      maxBytes,
+    );
+  if (reportedSizeError) {
+    throw new Error(reportedSizeError);
+  }
 
   return Promise.all(
     files.map(async (file) => {
@@ -184,15 +205,6 @@ export async function prepareOutgoingAttachments(
         throw new Error("Every attachment must have a filename.");
       }
       const filename = filenameResult.data;
-
-      const reportedSizeError = getOutgoingAttachmentSizeError(
-        filename,
-        file.size,
-        maxBytes,
-      );
-      if (reportedSizeError) {
-        throw new Error(reportedSizeError);
-      }
 
       const buffer = await file.arrayBuffer();
       if (buffer.byteLength === 0) {
