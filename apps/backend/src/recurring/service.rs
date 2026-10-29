@@ -14,14 +14,17 @@ use time::PrimitiveDateTime;
 use super::queries;
 use super::rules;
 use crate::auth::guard::RouteUser;
-use crate::db::entities::{calendar_event, event_participant, user};
+use crate::calendars::queries as calendars;
+use crate::db::entities::{calendar, calendar_event, event_participant, user};
 use crate::error::AppError;
 use crate::events::encryption::resolve_invitation_content;
 use crate::events::recurrence::{generate_instances, validate_rule};
-use crate::events::service::{invitation_event, is_writable};
+use crate::events::service::{
+    assert_editable, invitation_event, is_writable, refuse_plaintext, refuse_synced,
+};
 use crate::events::view::{Relations, event_dto};
 use crate::events::{participants, queries as events};
-use crate::http::zod::js_trim;
+use crate::http::zod::non_blank;
 use crate::instant;
 use crate::invitations::request;
 use crate::state::AppState;
@@ -188,27 +191,35 @@ fn clearable_category(id: &str) -> Option<String> {
     (!id.is_empty()).then(|| id.to_owned())
 }
 
+/// The calendar the edit leaves the series in, once a new calendar and category are checked to be the caller's.
 async fn assert_targets_owned(
     state: &AppState,
     user_id: &str,
+    series: &calendar_event::Model,
     updates: &RecurringUpdates,
-) -> Result<(), AppError> {
-    if let Some(id) = updates.calendar_id.as_ref().filter(|id| !id.0.is_empty()) {
-        let calendar = crate::calendars::queries::find(&state.db, user_id, &id.0)
-            .await?
-            .ok_or_else(|| {
-                AppError::field(
-                    "Invalid calendar or calendar does not belong to user",
+) -> Result<calendar::Model, AppError> {
+    let calendar = match updates.calendar_id.as_ref().filter(|id| !id.0.is_empty()) {
+        Some(id) => {
+            let calendar = calendars::find(&state.db, user_id, &id.0)
+                .await?
+                .ok_or_else(|| {
+                    AppError::field(
+                        "Invalid calendar or calendar does not belong to user",
+                        "calendarId",
+                    )
+                })?;
+            if !is_writable(&calendar) {
+                return Err(AppError::field(
+                    "Cannot move events to a read-only calendar.",
                     "calendarId",
-                )
-            })?;
-        if !is_writable(&calendar) {
-            return Err(AppError::field(
-                "Cannot move events to a read-only calendar.",
-                "calendarId",
-            ));
+                ));
+            }
+            calendar
         }
-    }
+        None => calendars::find(&state.db, user_id, &series.calendar_id)
+            .await?
+            .ok_or_else(|| AppError::validation(NOT_FOUND))?,
+    };
     if let Some(id) = updates.category_id.as_deref().filter(|id| !id.is_empty())
         && events::active_category(&state.db, user_id, id)
             .await?
@@ -219,15 +230,11 @@ async fn assert_targets_owned(
             "categoryId",
         ));
     }
-    Ok(())
+    Ok(calendar)
 }
 
-/// `hasEncryptedPayloadValue(updates.encryptedContent)`.
 fn new_ciphertext(updates: &RecurringUpdates) -> Option<&str> {
-    updates
-        .encrypted_content
-        .as_deref()
-        .filter(|text| !js_trim(text).is_empty())
+    non_blank(updates.encrypted_content.as_deref())
 }
 
 /// New ciphertext replaces the content; otherwise the series' own content (and ciphertext) is carried over.
@@ -346,8 +353,13 @@ pub async fn edit(
     request: &EditRecurringRequest,
 ) -> Result<Event, AppError> {
     let existing = series(state, &user.id, id).await?;
+    assert_editable(&user.id, &existing.row, &existing.participants)?;
     let updates = &request.updates;
-    assert_targets_owned(state, &user.id, updates).await?;
+    let calendar = assert_targets_owned(state, &user.id, &existing.row, updates).await?;
+    refuse_plaintext(
+        &calendar,
+        [new_ciphertext(updates).or(existing.row.encrypted_content.as_deref())],
+    )?;
     let occurrence = request.occurrence_date.as_deref();
     match request.edit_scope.as_str() {
         "this_only" => {
@@ -449,6 +461,7 @@ pub async fn delete(
 ) -> Result<RecurringDeleted, AppError> {
     tracing::info!(event_id = id, delete_scope = %query.delete_scope, "Delete recurring event request");
     let existing = series(state, &user.id, id).await?;
+    refuse_synced(&existing.row, "delete")?;
     let occurrence = query.occurrence_date.as_deref();
     let (message, action) = match query.delete_scope.as_str() {
         "this_only" => {

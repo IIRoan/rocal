@@ -21,7 +21,7 @@ use crate::db::entities::{calendar, calendar_event, event_notification, user_set
 use crate::email;
 use crate::entity_metadata::{CALENDAR_COLORS, is_valid_calendar_color};
 use crate::error::AppError;
-use crate::http::zod::js_trim;
+use crate::http::zod::{js_trim, non_blank};
 use crate::instant;
 use crate::integrations::ics::{build, export};
 use crate::invitations::request;
@@ -72,12 +72,12 @@ async fn writable_target(
     }
 }
 
-/// Writable calendars hold only ciphertext, so staged or legacy plaintext rows cannot be moved or copied into one.
-fn refuse_plaintext(events: &[calendar_event::Model]) -> Result<(), AppError> {
-    if events
-        .iter()
-        .any(|e| !e.is_synced && !has_text(e.encrypted_content.as_deref()))
-    {
+/// Writable calendars hold only ciphertext, so staged or legacy plaintext cannot be written, moved or copied into one.
+pub fn refuse_plaintext<'a>(
+    calendar: &calendar::Model,
+    ciphertexts: impl IntoIterator<Item = Option<&'a str>>,
+) -> Result<(), AppError> {
+    if is_writable(calendar) && ciphertexts.into_iter().any(|c| non_blank(c).is_none()) {
         return Err(AppError::field(
             "Event encryption requires an active encryption session.",
             "encryptedContent",
@@ -86,8 +86,31 @@ fn refuse_plaintext(events: &[calendar_event::Model]) -> Result<(), AppError> {
     Ok(())
 }
 
-fn has_text(value: Option<&str>) -> bool {
-    value.is_some_and(|value| !js_trim(value).is_empty())
+pub fn refuse_synced(event: &calendar_event::Model, action: &str) -> Result<(), AppError> {
+    if event.is_synced {
+        return Err(AppError::validation(format!(
+            "Cannot {action} synced events. Synced events are read-only."
+        )));
+    }
+    Ok(())
+}
+
+/// Feed events are read-only, and so is an attendee's copy of an invitation that still stands.
+pub fn assert_editable(
+    user_id: &str,
+    event: &calendar_event::Model,
+    participants: &[(
+        crate::db::entities::event_participant::Model,
+        Option<crate::db::entities::user::Model>,
+    )],
+) -> Result<(), AppError> {
+    refuse_synced(event, "edit")?;
+    if attendee_copy(user_id, participants) && !event.is_cancelled {
+        return Err(AppError::validation(
+            "Imported invitation events are read-only for attendees.",
+        ));
+    }
+    Ok(())
 }
 
 fn color_error() -> AppError {
@@ -341,7 +364,7 @@ pub async fn create(
             .as_deref()
             .or(settings.as_ref().map(|s| s.timezone.as_str())),
     );
-    if !has_text(Some(&request.encrypted_content)) {
+    if non_blank(Some(&request.encrypted_content)).is_none() {
         return Err(AppError::field(
             "Event encryption requires an active encryption session.",
             "encryptedContent",
@@ -443,16 +466,7 @@ pub async fn update(
         .ok_or_else(not_found)?;
     let existing_participants =
         queries::participants_with_users(&state.db, std::slice::from_ref(&existing.id)).await?;
-    if existing.is_synced {
-        return Err(AppError::validation(
-            "Cannot edit synced events. Synced events are read-only.",
-        ));
-    }
-    if attendee_copy(&user.id, &existing_participants) && !existing.is_cancelled {
-        return Err(AppError::validation(
-            "Imported invitation events are read-only for attendees.",
-        ));
-    }
+    assert_editable(&user.id, &existing, &existing_participants)?;
     let start = request
         .start
         .as_deref()
@@ -498,18 +512,12 @@ pub async fn update(
         ),
         None => existing.timezone.clone(),
     };
-    let has_encrypted = has_text(
-        request
-            .encrypted_content
-            .as_deref()
-            .or(existing.encrypted_content.as_deref()),
-    );
-    if is_writable(&final_calendar) && !has_encrypted && !existing.is_synced {
-        return Err(AppError::field(
-            "Event encryption requires an active encryption session.",
-            "encryptedContent",
-        ));
-    }
+    let ciphertext = request
+        .encrypted_content
+        .as_deref()
+        .or(existing.encrypted_content.as_deref());
+    refuse_plaintext(&final_calendar, [ciphertext])?;
+    let has_encrypted = non_blank(ciphertext).is_some();
     let final_reminder = match request.reminder {
         Some(_) => reminder_value,
         None => existing.reminder,
@@ -649,15 +657,11 @@ pub async fn delete(
     let existing = queries::find(&state.db, &user.id, &id)
         .await?
         .ok_or_else(not_found)?;
-    if existing.is_synced {
-        return Err(AppError::validation(
-            "Cannot delete synced events. Synced events are read-only.",
-        ));
-    }
+    refuse_synced(&existing, "delete")?;
     let participants =
         queries::participants_with_users(&state.db, std::slice::from_ref(&existing.id)).await?;
-    let attendee_invitation =
-        has_text(existing.external_id.as_deref()) && attendee_copy(&user.id, &participants);
+    let attendee_invitation = non_blank(existing.external_id.as_deref()).is_some()
+        && attendee_copy(&user.id, &participants);
     if attendee_invitation && !existing.is_cancelled {
         rsvp::respond(state, user, &id, RsvpStatus::Declined).await?;
         rsvp::purge(state, user, &id).await?;
@@ -743,7 +747,10 @@ pub async fn bulk(
                 "Cannot move events to a read-only calendar.",
             )
             .await?;
-            refuse_plaintext(&events)?;
+            refuse_plaintext(
+                &target,
+                events.iter().map(|e| e.encrypted_content.as_deref()),
+            )?;
             let moved =
                 queries::move_to_calendar(&state.db, &user.id, ids, &target.id, instant::now())
                     .await?;
@@ -756,8 +763,9 @@ pub async fn bulk(
             })
         }
         "delete" => {
-            let invitation =
-                |e: &calendar_event::Model| has_text(e.external_id.as_deref()) && attendee(e);
+            let invitation = |e: &calendar_event::Model| {
+                non_blank(e.external_id.as_deref()).is_some() && attendee(e)
+            };
             let mut declined: u64 = 0;
             for event in events.iter().filter(|e| invitation(e) && !e.is_cancelled) {
                 rsvp::respond(state, user, &event.id, RsvpStatus::Declined).await?;
@@ -792,14 +800,17 @@ pub async fn bulk(
                 .filter(|id| !id.is_empty());
             // Copies land only in the caller's own calendars; TypeScript wrote into any id and returned its share token.
             if let Some(id) = target {
-                writable_target(
+                let target = writable_target(
                     state,
                     user,
                     id,
                     "Cannot copy events to a read-only calendar.",
                 )
                 .await?;
-                refuse_plaintext(&events)?;
+                refuse_plaintext(
+                    &target,
+                    events.iter().map(|e| e.encrypted_content.as_deref()),
+                )?;
             }
             duplicate(state, user, &events, &relations, target).await
         }
@@ -902,7 +913,7 @@ pub async fn seal(
     id: &str,
     request: SealEncryptionRequest,
 ) -> Result<Event, AppError> {
-    if !has_text(Some(&request.encrypted_content)) {
+    if non_blank(Some(&request.encrypted_content)).is_none() {
         return Err(AppError::field(
             "Encrypted content payload is required.",
             "encryptedContent",
