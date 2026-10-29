@@ -77,4 +77,21 @@ describe("buildOutgoingMimeMessage", () => {
     expect(mime).toContain("See attached");
     expect(mime).toContain('filename="note.txt"');
   });
+
+  it("encodes a large attachment as 76-column base64 without Buffer, as on Hermes", () => {
+    const content = Uint8Array.from({ length: 200_003 }, (_, index) => (index * 31) % 256);
+    const expected = Buffer.from(content).toString("base64").match(/.{1,76}/g)?.join("\r\n");
+    const buffer = globalThis.Buffer;
+    Reflect.deleteProperty(globalThis, "Buffer");
+    try {
+      const mime = buildOutgoingMimeMessage({
+        text: "Large file",
+        attachments: [{ filename: "large.bin", contentType: "application/octet-stream", content }],
+      });
+      const encoded = mime.split("Content-Transfer-Encoding: base64\r\n\r\n")[1]?.split("\r\n\r\n--")[0];
+      expect(encoded).toBe(expected);
+    } finally {
+      globalThis.Buffer = buffer;
+    }
+  });
 });

@@ -66,13 +66,16 @@ pub async fn resolve_invitation_staging_calendar<C: ConnectionTrait>(
     if let Some(existing) = queries::staging_calendar(db, user_id).await? {
         return Ok(existing);
     }
-    let staging = calendars::new_calendar(
-        user_id,
-        crate::entity_metadata::MAIL_INVITATION_STAGING_CALENDAR_NAME,
-        "#78716c",
-        false,
-        false,
-    );
+    let staging = calendar::ActiveModel {
+        name: Set(crate::entity_metadata::MAIL_INVITATION_STAGING_CALENDAR_NAME.into()),
+        color: Set("#78716c".into()),
+        kind: Set("owned".into()),
+        is_public: Set(false),
+        is_visible: Set(false),
+        is_default: Set(false),
+        user_id: Set(user_id.to_owned()),
+        ..Default::default()
+    };
     calendars::insert(db, staging).await
 }
 

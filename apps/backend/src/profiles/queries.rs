@@ -100,25 +100,19 @@ pub async fn attach_upload<C: ConnectionTrait>(
         .map(|_| ())
 }
 
-/// The profile update itself; with `retired`, the uploaded picture is detached and queued for deletion.
-pub async fn update_profile<C: ConnectionTrait>(
+/// Detaches the uploaded picture and queues `retired` for deletion.
+pub async fn detach<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
-    name: Option<String>,
-    image: Option<String>,
-    retired: Option<Option<String>>,
+    retired: Option<String>,
 ) -> Result<(), sea_orm::DbErr> {
-    let mut update = user::Entity::update_many()
-        .col_expr(user::Column::Image, image.into())
+    user::Entity::update_many()
+        .col_expr(user::Column::Image, Option::<String>::None.into())
+        .col_expr(user::Column::AvatarId, Option::<String>::None.into())
+        .col_expr(user::Column::PendingAvatarId, retired.into())
         .col_expr(user::Column::UpdatedAt, instant::now().into())
-        .filter(user::Column::Id.eq(user_id));
-    if let Some(name) = name {
-        update = update.col_expr(user::Column::Name, name.into());
-    }
-    if let Some(retired) = retired {
-        update = update
-            .col_expr(user::Column::AvatarId, Option::<String>::None.into())
-            .col_expr(user::Column::PendingAvatarId, retired.into());
-    }
-    update.exec(db).await.map(|_| ())
+        .filter(user::Column::Id.eq(user_id))
+        .exec(db)
+        .await
+        .map(|_| ())
 }

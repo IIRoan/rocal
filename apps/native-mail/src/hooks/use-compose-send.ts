@@ -4,6 +4,7 @@ import {
   canSendCompose,
   composeTextToPlain,
   getErrorMessage,
+  getOutgoingAttachmentsTotalSizeError,
   hasPlainTextSignatureBlock,
   resolveComposeSendBodies,
   runTasksWithConcurrencyLimit,
@@ -21,7 +22,6 @@ import type { MailRuntime } from "../lib/mail/mail-runtime";
 import { resolveOutgoingMessageBody } from "../lib/mail/outgoing-message-crypto";
 import type { JmapIdentity } from "../lib/mail/types";
 import { useSendMessage, type resolveComposeContext } from "../lib/mail/use-mail";
-import type { DraftSaveResult } from "./use-compose-draft-autosave";
 
 type ComposeSendInput = {
   runtime: MailRuntime | undefined;
@@ -31,7 +31,7 @@ type ComposeSendInput = {
   composeContext: ReturnType<typeof resolveComposeContext>;
   settings: MailComposeSettings;
   signatureOptions: { separator: boolean };
-  saveDraft: () => Promise<DraftSaveResult>;
+  settleDraftSave: () => Promise<string | null>;
   setError: (message: string | null) => void;
   onSent: () => void;
 };
@@ -44,7 +44,7 @@ export function useComposeSend({
   composeContext,
   settings,
   signatureOptions,
-  saveDraft,
+  settleDraftSave,
   setError,
   onSent,
 }: ComposeSendInput) {
@@ -76,6 +76,13 @@ export function useComposeSend({
       if (!runtime) {
         throw new Error("Your mailbox is not ready to send messages yet.");
       }
+      const sizeError = getOutgoingAttachmentsTotalSizeError(
+        attachments.map((pending) => pending.size),
+        runtime.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
+      );
+      if (sizeError) throw new Error(sizeError);
+      // The send replaces the stored draft itself, so a pending autosave would only seal a throwaway copy.
+      const previousDraftId = await settleDraftSave();
       const { textBody, encrypted, pgpMimeCiphertext, sentCopyCiphertext } =
         await resolveOutgoingMessageBody({
           runtime,
@@ -105,8 +112,6 @@ export function useComposeSend({
             runtime.mailServerPolicy.maxConcurrentUploads,
           );
 
-      const savedDraft = await saveDraft();
-
       sendMessage.mutate(
         {
           to: validation.to,
@@ -116,8 +121,7 @@ export function useComposeSend({
           textBody,
           htmlBody,
           identityId,
-          previousDraftId:
-            savedDraft.status === "saved" ? savedDraft.draftId : form.draftId,
+          previousDraftId,
           attachments:
             uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           pgpMimeCiphertext,

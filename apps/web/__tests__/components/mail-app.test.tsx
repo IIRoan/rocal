@@ -519,17 +519,7 @@ const mockWorkerClient = jest.mocked(mailCryptoWorkerClient);
 const mockToastError = jest.mocked(toast.error);
 
 const mockMailOAuthConfig = {
-  issuer: "https://api.solace.test/api/auth",
-  discoveryUrl: "https://api.solace.test/api/.well-known/openid-configuration",
-  authorizationEndpoint: "https://api.solace.test/api/auth/oauth2/authorize",
-  tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
-  userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
-  jwksUri: "https://api.solace.test/api/auth/jwks",
   mailTokenEndpoint: "https://api.solace.test/api/mail/oauth/access-token",
-  clientId: "solace-mail-browser",
-  redirectUri: "https://app.solace.test/mail/oauth/callback",
-  scopes: ["openid", "email"],
-  audiences: ["https://mail.solace.onl"],
 };
 
 (

@@ -246,7 +246,7 @@ async fn calendar_plaintext_name_alongside_ciphertext_is_rejected() {
 }
 
 #[tokio::test]
-async fn plaintext_display_title_is_rejected_and_never_echoed() {
+async fn legacy_plaintext_display_title_is_accepted_but_never_stored() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let response = user
@@ -255,9 +255,11 @@ async fn plaintext_display_title_is_rejected_and_never_echoed() {
             json!({"notifications": [], "displayTitle": "plaintext title"}),
         )
         .await;
-    expect_rejected(
-        &response,
-        Some("Unrecognized key(s) in object: 'displayTitle'"),
+    assert_ne!(
+        response.status.as_u16(),
+        400,
+        "legacy client rejected: {}",
+        response.text()
     );
     assert!(
         !response.text().contains("plaintext title"),

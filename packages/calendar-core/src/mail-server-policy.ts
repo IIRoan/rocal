@@ -583,6 +583,28 @@ export function validateOutgoingMessageSize(
   return `Message exceeds the ${formatAttachmentByteLimit(maxMessageSizeBytes)} server limit.`;
 }
 
+/** First server size limit an outgoing email breaks, or null; blobs travel by reference, so only inline bodies count toward the request limit. */
+export function validateOutgoingJmapMessage(
+  input: OutgoingMessageSizeInput,
+  policy: MailServerPolicy | null,
+): string | null {
+  const messageError = validateOutgoingMessageSize(
+    estimateOutgoingJmapMessageBytes(input),
+    policy?.limits.maxMessageSizeBytes,
+  );
+  if (messageError || !policy) {
+    return messageError;
+  }
+  return validateJmapRequestSize(
+    estimateOutgoingJmapMessageBytes({
+      subject: input.subject,
+      textBody: input.textBody,
+      htmlBody: input.htmlBody,
+    }),
+    policy,
+  );
+}
+
 function paramsReferenceOtherCalls(
   params: Record<string, unknown>,
   callIds: Set<string>,

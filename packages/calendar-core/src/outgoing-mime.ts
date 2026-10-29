@@ -10,29 +10,17 @@ function encodeMimeFilename(value: string): string {
   return value.replace(/["\\]/g, "_");
 }
 
-function encodeBase64(bytes: Uint8Array): string {
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(bytes).toString("base64");
-  }
+/** 57 bytes encode to one 76-column line, so every chunk ends on a line break. */
+const BASE64_CHUNK_BYTES = 57 * 128;
 
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
+/** 76-column base64 in chunks, so a large attachment never also exists as one binary or unwrapped string (Hermes has no Buffer). */
+function encodeBase64Lines(bytes: Uint8Array): string[] {
+  const chunks: string[] = [];
+  for (let offset = 0; offset < bytes.length; offset += BASE64_CHUNK_BYTES) {
+    const chunk = bytes.subarray(offset, offset + BASE64_CHUNK_BYTES);
+    chunks.push(btoa(String.fromCharCode(...chunk)).replace(/.{76}(?=.)/g, "$&\r\n"));
   }
-
-  if (typeof btoa === "function") {
-    return btoa(binary);
-  }
-
-  throw new Error("Base64 encoding is not available in this environment.");
-}
-
-function wrapBase64(value: string): string {
-  const lines: string[] = [];
-  for (let offset = 0; offset < value.length; offset += 76) {
-    lines.push(value.slice(offset, offset + 76));
-  }
-  return lines.join("\r\n");
+  return chunks;
 }
 
 function normalizeMimeText(value: string): string {
@@ -129,7 +117,7 @@ export function buildOutgoingMimeMessage(input: {
         : []),
       "Content-Transfer-Encoding: base64",
       "",
-      wrapBase64(encodeBase64(attachment.content)),
+      ...encodeBase64Lines(attachment.content),
       "",
     );
   }

@@ -13,6 +13,8 @@ export interface StoredE2eeDeviceRecord {
   keyVersion: number;
   createdAt: string;
   updatedAt: string;
+  /** Salt of the password envelope known to hold this record's account key; without it sign-out keeps the record. */
+  envelopeSalt?: string;
 }
 
 function openDatabase(): Promise<IDBDatabase | null> {
@@ -89,4 +91,37 @@ export async function putStoredE2eeDevice(
 
 export async function deleteStoredE2eeDevice(userId: string): Promise<void> {
   await withStore("readwrite", (store) => store.delete(userId));
+}
+
+export async function rememberStoredDeviceEnvelopeSalt(
+  userId: string,
+  deviceId: string,
+  envelopeSalt: string | null,
+): Promise<void> {
+  const record = await getStoredE2eeDevice(userId);
+  if (
+    record?.deviceId === deviceId &&
+    (record.envelopeSalt ?? null) !== envelopeSalt
+  ) {
+    await putStoredE2eeDevice({
+      ...record,
+      envelopeSalt: envelopeSalt ?? undefined,
+    });
+  }
+}
+
+/** Sign-out keeps a device key no password envelope is known to hold, since it may be the only copy of the account key. */
+export async function listRecoverableE2eeDevices(): Promise<StoredE2eeDeviceRecord[]> {
+  const records = await withStore<StoredE2eeDeviceRecord[]>("readonly", (store) =>
+    store.getAll(),
+  );
+  return (records ?? []).filter((record) => record.envelopeSalt);
+}
+
+export async function deleteRecoverableE2eeDevices(): Promise<void> {
+  await Promise.all(
+    (await listRecoverableE2eeDevices()).map((record) =>
+      deleteStoredE2eeDevice(record.userId),
+    ),
+  );
 }

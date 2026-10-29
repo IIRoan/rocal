@@ -28,6 +28,17 @@ describe("mail address parsing", () => {
     });
   });
 
+  it("parses a long run of spaces in linear time", () => {
+    const hostile = `a${" ".repeat(200_000)}x`;
+    const started = Date.now();
+    expect(parseRecipientString(hostile)).toEqual({ email: hostile.toLowerCase() });
+    expect(Date.now() - started).toBeLessThan(200);
+    expect(parseRecipientString(`Name${" ".repeat(50)}<A@B.example>`)).toEqual({
+      name: "Name",
+      email: "a@b.example",
+    });
+  });
+
   it("deduplicates parsed address lists", () => {
     expect(
       parseAddressList("user2@solace.onl, User Two <user2@solace.onl>"),

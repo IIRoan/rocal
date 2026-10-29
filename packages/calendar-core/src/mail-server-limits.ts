@@ -8,6 +8,12 @@ export const DEFAULT_MAX_BLOB_UPLOAD_BYTES = 50_000_000;
 /** Stalwart default Email singleton `maxAttachmentSize`. */
 export const DEFAULT_MAX_ATTACHMENT_BYTES = 50_000_000;
 
+/** Stalwart default Email singleton `maxMessageSize`; the deployed plan keeps it. */
+export const DEFAULT_MAX_MESSAGE_BYTES = 75_000_000;
+
+/** A self-encrypted copy base64-encodes attachments in MIME and again in the armor (about 1.85x), plus room for the body. */
+const SEALED_COPY_EXPANSION = 1.875;
+
 const jmapCoreCapabilitySchema = z.object({
   maxSizeUpload: z.number().int().positive().optional(),
 });
@@ -149,8 +155,11 @@ export function resolveMailServerLimits(
   const maxAttachmentSizeBytes = resolveAttachmentSizeBytes(source);
   const maxMessageSizeBytes = resolveMessageSizeBytes(source);
 
-  // A send with attachments also uploads an encrypted copy (armored, about 1.8x their size), so they get half the upload limit.
-  const outgoingCandidates = [Math.floor(maxBlobUploadBytes / 2)];
+  // Every attachment also travels in a self-encrypted copy that must fit one upload and one message.
+  const outgoingCandidates = [
+    Math.floor(maxBlobUploadBytes / SEALED_COPY_EXPANSION),
+    Math.floor((maxMessageSizeBytes ?? DEFAULT_MAX_MESSAGE_BYTES) / SEALED_COPY_EXPANSION),
+  ];
   if (maxAttachmentSizeBytes) {
     outgoingCandidates.push(maxAttachmentSizeBytes);
   }
@@ -186,9 +195,6 @@ export function formatAttachmentByteLimit(bytes: number): string {
 
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
-
-/** @deprecated Use DEFAULT_MAX_BLOB_UPLOAD_BYTES */
-export const DEFAULT_MAX_OUTGOING_ATTACHMENT_BYTES = DEFAULT_MAX_BLOB_UPLOAD_BYTES;
 
 /** @deprecated Use JmapSessionLimitsSource */
 export type JmapSessionAttachmentLimitsSource = JmapSessionLimitsSource;

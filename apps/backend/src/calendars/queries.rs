@@ -53,26 +53,6 @@ pub async fn insert<C: ConnectionTrait>(
     row.insert(db).await
 }
 
-/// An owned, private calendar row.
-pub fn new_calendar(
-    user_id: &str,
-    name: &str,
-    color: &str,
-    visible: bool,
-    default: bool,
-) -> calendar::ActiveModel {
-    calendar::ActiveModel {
-        name: Set(name.to_owned()),
-        color: Set(color.to_owned()),
-        kind: Set("owned".into()),
-        is_public: Set(false),
-        is_visible: Set(visible),
-        is_default: Set(default),
-        user_id: Set(user_id.to_owned()),
-        ..Default::default()
-    }
-}
-
 pub async fn update<C: ConnectionTrait>(
     db: &C,
     row: calendar::ActiveModel,

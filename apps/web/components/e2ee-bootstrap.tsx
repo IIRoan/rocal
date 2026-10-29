@@ -154,11 +154,10 @@ async function resolveBootstrapGateState(input: {
       if (unlocked) {
         return { mode: "hidden", isSubmitting: false };
       }
-
-      return { mode: "unlock", isSubmitting: false };
     }
 
-    return { mode: "hidden", isSubmitting: false };
+    // Password sign-ins stash the password before the session exists, so only a passkey sign-in lands here without one.
+    return { mode: "unlock", isSubmitting: false };
   }
 
   return { mode: "hidden", isSubmitting: false };
@@ -186,9 +185,10 @@ async function runEncryptionPasswordSetup(input: {
   const stored = await resetEncryptionPasswordForActiveSession(userId, password);
 
   if (!stored) {
+    log.warn("Failed to refresh encrypted data for password setup", { userId });
     return {
       ok: false,
-      error: "Encryption session is not ready on this device.",
+      error: "Could not save your encryption password and refresh encrypted data.",
     };
   }
 
@@ -205,10 +205,7 @@ async function runEncryptionPasswordUnlock(input: {
   const { userId, password, queryClient } = input;
 
   if (!password) {
-    return {
-      ok: false,
-      error: "Enter your previous email sign-in password.",
-    };
+    return { ok: false, error: "Enter your password." };
   }
 
   // After a reset the sign-in password no longer opens the envelope; once the previous one does, the envelope follows it.
@@ -216,6 +213,7 @@ async function runEncryptionPasswordUnlock(input: {
   const unlocked = await unlockE2eeWithPassword(userId, password);
 
   if (!unlocked) {
+    log.warn("Failed to unlock E2EE password envelope", { userId });
     return {
       ok: false,
       error:
@@ -372,78 +370,43 @@ export function E2eeBootstrap() {
     };
   }, [isPending, queryClient, userId]);
 
-  async function handleSetup() {
+  async function handleGateSubmit() {
     if (!userId) {
       return;
     }
 
     dispatchGate({ type: "start-submit" });
-    const outcome = await runEncryptionPasswordSetup({
-      userId,
-      password: gate.password,
-      confirmPassword: gate.confirmPassword,
-      queryClient,
-    }).catch((error: unknown) => {
-      log.warn("Failed to set the E2EE password", { userId, error });
-      return {
-        ok: false as const,
-        error: "Could not set your encryption password. Please try again.",
-      };
-    });
-
-    if (outcome.ok === false) {
-      if (outcome.error === "Encryption session is not ready on this device.") {
-        log.warn("Failed to refresh encrypted data for password setup", {
+    const isUnlock = gate.mode === "unlock";
+    const run = isUnlock
+      ? runEncryptionPasswordUnlock({
           userId,
+          password: gate.password,
+          queryClient,
+        })
+      : runEncryptionPasswordSetup({
+          userId,
+          password: gate.password,
+          confirmPassword: gate.confirmPassword,
+          queryClient,
         });
-        dispatchGate({
-          type: "set-error",
-          error:
-            "Could not save your encryption password and refresh encrypted data.",
-        });
-      } else {
-        dispatchGate({ type: "set-error", error: outcome.error });
-      }
-    } else {
-      dispatchGate({ type: "success-hide" });
-    }
-    dispatchGate({ type: "end-submit" });
-  }
-
-  async function handleUnlock() {
-    if (!userId) {
-      return;
-    }
-
-    dispatchGate({ type: "start-submit" });
-    const outcome = await runEncryptionPasswordUnlock({
-      userId,
-      password: gate.password,
-      queryClient,
-    }).catch((error: unknown) => {
-      log.warn("Failed to unlock the E2EE password envelope", {
+    const outcome = await run.catch((error: unknown) => {
+      log.warn("Failed to finish the encryption password gate", {
         userId,
         error,
       });
       return {
         ok: false as const,
-        error: "Could not unlock encryption. Please try again.",
+        error: isUnlock
+          ? "Could not unlock encryption. Please try again."
+          : "Could not set your encryption password. Please try again.",
       };
     });
 
-    if (outcome.ok === false) {
-      if (
-        outcome.error.includes("did not unlock") ||
-        outcome.error.includes("didn't match")
-      ) {
-        log.warn("Failed to unlock E2EE password envelope", {
-          userId,
-        });
-      }
-      dispatchGate({ type: "set-error", error: outcome.error });
-    } else {
-      dispatchGate({ type: "success-hide" });
-    }
+    dispatchGate(
+      outcome.ok === false
+        ? { type: "set-error", error: outcome.error }
+        : { type: "success-hide" },
+    );
     dispatchGate({ type: "end-submit" });
   }
 
@@ -457,8 +420,7 @@ export function E2eeBootstrap() {
     if (gate.isSubmitting) {
       return;
     }
-    const submit = gate.mode === "unlock" ? handleUnlock : handleSetup;
-    void submit().catch((error) => {
+    void handleGateSubmit().catch((error) => {
       log.error("Encryption setup failed", error);
     });
   };

@@ -4,7 +4,15 @@ import {
   parseRecipientString,
   type ParsedMailAddress,
 } from "./mail-addresses";
-import type { JmapMethodCallLike } from "./mail-server-policy";
+import {
+  assertSuccessfulJmapResponses,
+  findJmapResponseError,
+} from "./mail-jmap-validation";
+import {
+  validateOutgoingJmapMessage,
+  type JmapMethodCallLike,
+  type MailServerPolicy,
+} from "./mail-server-policy";
 
 export type JmapEmailSetMethodCall = [
   "Email/set",
@@ -117,21 +125,44 @@ function createMessageId(fromEmail: string): string {
   return `${token}@${getEmailDomain(fromEmail) ?? "localhost"}`;
 }
 
+export type OutgoingJmapMessage = OutgoingEmailHeaders & {
+  draftsMailboxId: string;
+  sentMailboxId?: string | null;
+  textBody: string;
+  htmlBody?: string;
+  identityId: string;
+  attachments?: JmapAttachmentInput[];
+  pgpMimeCiphertext?: JmapPgpMimeCiphertext;
+  /** Self-encrypted copy stored in Sent when the submission itself is plaintext; null when it is already encrypted to the sender. */
+  sentCopyCiphertext: JmapPgpMimeCiphertext | null;
+  inReplyTo?: string[];
+  references?: string[];
+  /** Draft this message replaces; destroyed only once the submission is queued. */
+  previousDraftId?: string;
+};
+
+export type JmapDraft = OutgoingEmailHeaders & {
+  draftsMailboxId: string;
+  ciphertext: JmapPgpMimeCiphertext;
+  previousDraftId?: string;
+};
+
+/** One JMAP request through a mail client's transport. */
+export type JmapRequest = (
+  using: string[],
+  methodCalls: JmapMethodCallLike[],
+) => Promise<{ methodResponses?: JmapMethodCallLike[] }>;
+
+export type SentJmapMessage = {
+  emailId: string;
+  threadId: string | null;
+  submissionId: string;
+};
+
+const MAIL_CAPABILITIES = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"];
+
 export function buildSendMessageMethodCalls(
-  input: OutgoingEmailHeaders & {
-    draftsMailboxId: string;
-    sentMailboxId?: string | null;
-    textBody: string;
-    htmlBody?: string;
-    identityId: string;
-    attachments?: JmapAttachmentInput[];
-    pgpMimeCiphertext?: JmapPgpMimeCiphertext;
-    /** Self-encrypted copy stored in Sent when the submission itself is plaintext; null when it is already encrypted to the sender. */
-    sentCopyCiphertext: JmapPgpMimeCiphertext | null;
-    inReplyTo?: string[];
-    references?: string[];
-    previousDraftId?: string;
-  },
+  input: OutgoingJmapMessage,
 ): JmapMethodCallLike[] {
   const headers = buildEmailHeaders(input);
   const seenEnvelopeRecipients = new Set<string>();
@@ -196,25 +227,14 @@ export function buildSendMessageMethodCalls(
     };
   }
 
-  const emailSetArgs: Record<string, unknown> = { create };
-  if (input.previousDraftId) {
-    emailSetArgs.destroy = [input.previousDraftId];
-  }
-
   return [
-    ["Email/set", emailSetArgs, "c1"],
+    ["Email/set", { create }, "c1"],
     ["EmailSubmission/set", submissionParams, "c2"],
   ];
 }
 
 /** Drafts are stored only as PGP/MIME encrypted to the account's own key; the headers stay readable. */
-export function buildDraftMethodCalls(
-  input: OutgoingEmailHeaders & {
-    draftsMailboxId: string;
-    ciphertext: JmapPgpMimeCiphertext;
-    previousDraftId?: string;
-  },
-): JmapMethodCallLike[] {
+export function buildDraftMethodCalls(input: JmapDraft): JmapMethodCallLike[] {
   const emailSetArgs: Record<string, unknown> = {
     create: {
       draft1: {
@@ -233,55 +253,136 @@ export function buildDraftMethodCalls(
   return [["Email/set", emailSetArgs, "c1"]];
 }
 
-const createdIdSchema = z.object({ id: z.string().min(1) });
+const createdEmailSchema = z.object({
+  id: z.string().min(1),
+  threadId: z.string().nullish(),
+});
 const sendEmailSetResultSchema = z.object({
   created: z
     .object({
-      draft1: createdIdSchema.optional(),
-      [SENT_COPY_CREATION_ID]: createdIdSchema.optional(),
+      draft1: createdEmailSchema.optional(),
+      [SENT_COPY_CREATION_ID]: createdEmailSchema.optional(),
     })
     .nullish(),
 });
 const sendSubmissionResultSchema = z.object({
-  created: z.object({ s1: createdIdSchema }),
+  created: z.object({ s1: z.object({ id: z.string().min(1) }) }),
+});
+const draftSetResultSchema = z.object({
+  created: z.object({ draft1: createdEmailSchema }),
 });
 
-/** After a refused submission, drops the plaintext email and keeps its encrypted Sent copy as the draft; null when nothing needs fixing. */
-export function buildUnsentMessageCleanupMethodCall(input: {
-  accountId: string;
-  draftsMailboxId: string;
-  methodResponses: readonly [string, unknown, string][] | undefined;
-}): JmapEmailSetMethodCall | null {
-  const resultOf = (name: string) =>
-    input.methodResponses?.find(([method]) => method === name)?.[1];
-  if (sendSubmissionResultSchema.safeParse(resultOf("EmailSubmission/set")).success) {
-    return null;
-  }
-  const created = sendEmailSetResultSchema.safeParse(resultOf("Email/set"));
-  const plaintextId = created.success ? created.data.created?.draft1?.id : undefined;
-  const copyId = created.success
-    ? created.data.created?.[SENT_COPY_CREATION_ID]?.id
-    : undefined;
-  if (!plaintextId && !copyId) return null;
+function resultOf(
+  envelope: { methodResponses?: JmapMethodCallLike[] },
+  name: string,
+): unknown {
+  return envelope.methodResponses?.find(([method]) => method === name)?.[1];
+}
 
-  return [
-    "Email/set",
-    {
-      accountId: input.accountId,
-      ...(plaintextId ? { destroy: [plaintextId] } : {}),
-      ...(copyId
-        ? {
-            update: {
-              [copyId]: {
-                mailboxIds: { [input.draftsMailboxId]: true },
-                keywords: { $draft: true, $seen: true },
-              },
-            },
-          }
-        : {}),
-    },
-    "c1",
-  ];
+/** Once the submission is queued the mail is out, so later failures (a missing Sent copy, draft cleanup) only reach `onCleanupError`; a refused send removes what it created and keeps the previous draft. */
+export async function sendJmapMessage(
+  message: OutgoingJmapMessage,
+  context: {
+    mailAccountId: string;
+    submissionAccountId: string;
+    policy: MailServerPolicy | null;
+    request: JmapRequest;
+    onCleanupError: (error: unknown) => void;
+  },
+): Promise<SentJmapMessage> {
+  const sizeError =
+    validateOutgoingJmapMessage(message, context.policy) ??
+    (message.sentCopyCiphertext
+      ? validateOutgoingJmapMessage(
+          {
+            subject: message.subject,
+            textBody: "",
+            pgpMimeCiphertext: message.sentCopyCiphertext,
+          },
+          context.policy,
+        )
+      : null);
+  if (sizeError) {
+    throw new Error(sizeError);
+  }
+
+  const destroyEmails = (ids: string[]) =>
+    context
+      .request(MAIL_CAPABILITIES, [buildEmailDestroyMethodCall(context.mailAccountId, ids)])
+      .then((envelope) => assertSuccessfulJmapResponses(envelope, "Remove draft"))
+      .catch(context.onCleanupError);
+
+  const envelope = await context.request(
+    [...MAIL_CAPABILITIES, "urn:ietf:params:jmap:submission"],
+    buildSendMessageMethodCalls(message).map(([method, params, id]) => [
+      method,
+      {
+        ...params,
+        accountId:
+          method === "EmailSubmission/set"
+            ? context.submissionAccountId
+            : context.mailAccountId,
+      },
+      id,
+    ]),
+  );
+  const emails = sendEmailSetResultSchema.safeParse(resultOf(envelope, "Email/set"));
+  const created = emails.success ? emails.data.created : null;
+  const failure = findJmapResponseError(envelope, "Send message");
+  const submission = sendSubmissionResultSchema.safeParse(
+    resultOf(envelope, "EmailSubmission/set"),
+  );
+
+  if (!submission.success) {
+    const createdIds = [created?.draft1?.id, created?.[SENT_COPY_CREATION_ID]?.id].filter(
+      (id): id is string => Boolean(id),
+    );
+    if (createdIds.length > 0) {
+      await destroyEmails(createdIds);
+    }
+    throw failure ?? new Error("Send message was saved but not submitted for delivery.");
+  }
+
+  if (failure) {
+    context.onCleanupError(failure);
+  }
+  if (message.previousDraftId) {
+    await destroyEmails([message.previousDraftId]);
+  }
+  // A plaintext submission is destroyed once sent, so its self-encrypted Sent copy is the stored message.
+  const stored = created?.[SENT_COPY_CREATION_ID] ?? created?.draft1;
+  return {
+    emailId: stored?.id ?? "",
+    threadId: stored?.threadId ?? null,
+    submissionId: submission.data.created.s1.id,
+  };
+}
+
+export async function saveJmapDraft(
+  draft: JmapDraft,
+  context: { accountId: string; policy: MailServerPolicy | null; request: JmapRequest },
+): Promise<string> {
+  const sizeError = validateOutgoingJmapMessage(
+    { subject: draft.subject, textBody: "", pgpMimeCiphertext: draft.ciphertext },
+    context.policy,
+  );
+  if (sizeError) {
+    throw new Error(sizeError);
+  }
+
+  const envelope = await context.request(
+    MAIL_CAPABILITIES,
+    buildDraftMethodCalls(draft).map(([method, params, id]) => [
+      method,
+      { ...params, accountId: context.accountId },
+      id,
+    ]),
+  );
+  const saved = draftSetResultSchema.safeParse(resultOf(envelope, "Email/set"));
+  if (!saved.success) {
+    throw findJmapResponseError(envelope, "Save draft") ?? new Error("Failed to save draft.");
+  }
+  return saved.data.created.draft1.id;
 }
 
 export type MailMailboxRestore = {

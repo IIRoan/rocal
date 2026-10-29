@@ -22,15 +22,6 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   allowedDevOrigins: getAllowedNextDevOrigins(),
   reactCompiler: true,
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "raw.githubusercontent.com",
-        pathname: "/origin-space/origin-images/**",
-      },
-    ],
-  },
   // CSP hosts are derived from NEXT_PUBLIC_* env at build time.
   async headers() {
     return buildSecurityHeaderRoutes(process.env);

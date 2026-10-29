@@ -9,6 +9,7 @@ import {
 } from "./attachment-path";
 import type { JmapAttachment } from "./types";
 import type { MailRuntime } from "./mail-runtime";
+import { MAIL_OFFLINE_SNAPSHOT_FILE } from "./mail-offline-store";
 
 export { buildAttachmentCachePath, inferAttachmentMimeType } from "./attachment-path";
 
@@ -31,8 +32,29 @@ export type CachedAttachment = {
 /** Viewers and share sheets need decrypted files, so they live only here and the folder is wiped at launch and on sign-out. */
 const ATTACHMENT_CACHE_DIRECTORY = `${FileSystem.cacheDirectory ?? ""}mail-attachments/`;
 
+/** Earlier builds wrote decrypted attachments straight into the cache root, where the mailbox snapshot is the only other file this app keeps. */
+async function clearLegacyCachedAttachments(): Promise<void> {
+  const root = FileSystem.cacheDirectory;
+  if (!root) return;
+  const names = await FileSystem.readDirectoryAsync(root);
+  await Promise.all(
+    names
+      .filter((name) => name !== MAIL_OFFLINE_SNAPSHOT_FILE)
+      .map(async (name) => {
+        const info = await FileSystem.getInfoAsync(`${root}${name}`);
+        if (info.exists && !info.isDirectory) {
+          await FileSystem.deleteAsync(info.uri, { idempotent: true });
+        }
+      }),
+  );
+}
+
 export async function clearAttachmentCache(): Promise<void> {
-  await FileSystem.deleteAsync(ATTACHMENT_CACHE_DIRECTORY, { idempotent: true });
+  await Promise.all([
+    FileSystem.deleteAsync(ATTACHMENT_CACHE_DIRECTORY, { idempotent: true }),
+    // Sign-out must finish its other wipes; a leftover file is retried at the next launch.
+    clearLegacyCachedAttachments().catch(() => undefined),
+  ]);
 }
 
 export async function writeAttachmentToCache(input: {

@@ -4,6 +4,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { AppState } from "react-native";
 
+import { calendarApiService } from "../lib/api";
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
@@ -14,7 +15,6 @@ import {
   setFallbackSessionToken,
 } from "../lib/session-token-fallback";
 import { AuthProvider, useAuth } from "./AuthProvider";
-import { setAccountHasPasswordEnvelope } from "../lib/e2ee-session";
 
 jest.mock("react-native", () => ({
   AppState: { currentState: "active", addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
@@ -24,9 +24,11 @@ jest.mock("react-native", () => ({
 }));
 
 const mockClearNativeTitleIndex = jest.fn(async () => undefined);
-const mockClearStoredDevice = jest.fn(async () => undefined);
+const mockClearRecoverableStoredDevice = jest.fn(async () => undefined);
+const mockRecoverableStoredDeviceId = jest.fn(async (): Promise<string | null> => null);
 jest.mock("../lib/native-e2ee-provider", () => ({
-  clearStoredDevice: () => mockClearStoredDevice(),
+  clearRecoverableStoredDevice: () => mockClearRecoverableStoredDevice(),
+  recoverableStoredDeviceId: () => mockRecoverableStoredDeviceId(),
 }));
 jest.mock("../lib/search/title-index-store", () => ({
   clearNativeTitleIndex: () => mockClearNativeTitleIndex(),
@@ -209,6 +211,7 @@ describe("AuthProvider", () => {
     mockSignInWithBrowserPasskey.mockReset();
     mockUnregisterNativePushDevice.mockReset();
     mockOnSignedOut.mockClear();
+    mockClearRecoverableStoredDevice.mockClear();
 
     mockGetAuthCapabilities.mockReturnValue({
       supportsPassword: true,
@@ -414,20 +417,14 @@ describe("AuthProvider", () => {
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });
 
-  it("keeps the device key on sign-out when the account has no password envelope", async () => {
-    await renderProvider();
-    await act(async () => {
-      await getAuth().signIn("roan@example.com", "secret-password");
-    });
-    setAccountHasPasswordEnvelope(false);
+  it("drops a recoverable device key when the server ends the session before startup ran", async () => {
+    mockGetSession.mockResolvedValue({ data: null, error: null });
 
-    await act(async () => {
-      await getAuth().signOut();
-    });
+    await renderProvider();
     await flushPromises();
 
+    expect(mockClearRecoverableStoredDevice).toHaveBeenCalledTimes(1);
     expect(mockOnSignedOut).toHaveBeenCalled();
-    expect(mockClearStoredDevice).not.toHaveBeenCalled();
   });
 
   it("clears pending auth hints on sign-out", async () => {
@@ -436,7 +433,6 @@ describe("AuthProvider", () => {
     await act(async () => {
       await getAuth().signIn("roan@example.com", "secret-password");
     });
-    setAccountHasPasswordEnvelope(true);
 
     await act(async () => {
       await getAuth().signOut();
@@ -447,7 +443,7 @@ describe("AuthProvider", () => {
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockOnSignedOut).toHaveBeenCalled();
     expect(mockClearNativeTitleIndex).toHaveBeenCalled();
-    expect(mockClearStoredDevice).toHaveBeenCalled();
+    expect(mockClearRecoverableStoredDevice).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });
@@ -479,6 +475,40 @@ describe("AuthProvider", () => {
       fetchOptions: { headers: { cookie } },
     });
     expect(getFallbackSessionToken()).toBeNull();
+  });
+
+  it("deletes the server row of a device key sign-out removes, before the session ends", async () => {
+    mockRecoverableStoredDeviceId.mockResolvedValueOnce("native-device-1");
+    const deleteRow = jest
+      .spyOn(calendarApiService, "deleteE2eeDevice")
+      .mockResolvedValue({ success: true, message: "Encryption device removed" });
+    mockSignOut.mockImplementationOnce(async () => {
+      expect(deleteRow).toHaveBeenCalledWith(
+        "native-device-1",
+        expect.objectContaining({ cookie: expect.any(String) }),
+      );
+      return { data: { success: true }, error: null } as never;
+    });
+    await renderProvider();
+
+    await act(async () => {
+      await getAuth().signOut();
+    });
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockClearRecoverableStoredDevice).toHaveBeenCalled();
+    deleteRow.mockRestore();
+  });
+
+  it("keeps the same user object when a renewal returns the same user", async () => {
+    jest.useFakeTimers();
+    mockGetSession.mockImplementation(async () => createAuthResult());
+    await renderProvider();
+    const user = getAuth().user;
+    await act(async () => { await jest.advanceTimersByTimeAsync(60 * 60 * 1000); });
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+    expect(getAuth().user).toBe(user);
+    jest.useRealTimers();
   });
 
   it("renews hourly and on resume, retaining the session on network failure", async () => {

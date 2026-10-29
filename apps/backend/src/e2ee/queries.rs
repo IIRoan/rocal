@@ -167,6 +167,20 @@ pub async fn upsert_device<C: ConnectionTrait>(
     .await
 }
 
+/// The owner's device row; the count is 0 when the id is unknown or someone else's.
+pub async fn delete_device<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+    device_id: &str,
+) -> Result<u64, sea_orm::DbErr> {
+    Ok(user_encryption_device::Entity::delete_many()
+        .filter(user_encryption_device::Column::UserId.eq(user_id))
+        .filter(user_encryption_device::Column::DeviceId.eq(device_id))
+        .exec(db)
+        .await?
+        .rows_affected)
+}
+
 /// One envelope per user: a repeat store rotates it in place.
 pub async fn upsert_password_envelope<C: ConnectionTrait>(
     db: &C,

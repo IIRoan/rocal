@@ -144,7 +144,7 @@ pub struct EventParticipant {
     pub user_id: Option<UserId>,
     pub email: String,
     pub display_name: String,
-    /// A Solace avatar path (`/api/profiles/avatars/:id`, or `/api/profiles/avatar?email=` for remote pictures), never a remote URL.
+    /// A Solace avatar path (`/api/profiles/avatars/:id`), never a remote URL.
     #[schema(required = true)]
     pub image: Option<String>,
     pub role: String,

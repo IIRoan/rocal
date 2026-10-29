@@ -56,90 +56,55 @@ export function parseJmapBlobUploadResponse(
   };
 }
 
-const jmapCreatedEmailSchema = z
-  .object({
-    id: z.string().optional(),
-    threadId: z.string().nullable().optional(),
-  })
-  .optional();
-
-const jmapCreatedEmailResultSchema = z
-  .object({
-    created: z
-      .object({
-        draft1: jmapCreatedEmailSchema,
-        sent1: jmapCreatedEmailSchema,
-      })
-      .optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (!data.created?.draft1?.id?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Send message succeeded but no email id was returned.",
-        path: ["created", "draft1", "id"],
-      });
-    }
-  });
-
-const jmapCreatedSubmissionResultSchema = z
-  .object({
-    created: z
-      .object({
-        s1: z
-          .object({
-            id: z.string().optional(),
-          })
-          .optional(),
-      })
-      .optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (!data.created?.s1?.id?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Send message was saved but not submitted for delivery.",
-        path: ["created", "s1", "id"],
-      });
-    }
-  });
-
-export type SendMessageCreatedResults = {
-  emailId: string;
-  threadId: string | null;
-  submissionId: string;
+type JmapMethodError = {
+  type?: string;
+  description?: string;
+  properties?: string[];
 };
 
-export function parseSendMessageResults(input: {
-  emailSet: unknown;
-  emailSubmissionSet: unknown;
-}): SendMessageCreatedResults {
-  const email = jmapCreatedEmailResultSchema.safeParse(input.emailSet);
-  if (!email.success) {
-    throwFirstZodIssue(
-      email.error,
-      "Send message succeeded but no email id was returned.",
-    );
+function formatJmapMethodError(methodName: string, error: JmapMethodError): string {
+  const propsHint = error.properties?.length
+    ? ` (properties: ${error.properties.join(", ")})`
+    : "";
+  const typeHint = error.type ? ` [${error.type}]` : "";
+  return `${error.description || error.type || `Failed during ${methodName}`}${typeHint}${propsHint}`;
+}
+
+function firstPatchError(patch: unknown): JmapMethodError | null {
+  if (typeof patch !== "object" || patch === null) return null;
+  const [first] = Object.values(patch);
+  return typeof first === "object" && first !== null ? (first as JmapMethodError) : null;
+}
+
+/** The first method error or refused create/update/destroy in a JMAP response, or null when every call succeeded. */
+export function findJmapResponseError(
+  envelope: { methodResponses?: [string, Record<string, unknown>, string][] },
+  context: string,
+): Error | null {
+  for (const [methodName, result] of envelope.methodResponses ?? []) {
+    if (methodName === "error" || methodName.endsWith("/error")) {
+      return new Error(
+        formatJmapMethodError(methodName === "error" ? context : methodName, result as JmapMethodError),
+      );
+    }
+    const patchError =
+      firstPatchError(result.notCreated) ??
+      firstPatchError(result.notDestroyed) ??
+      firstPatchError(result.notUpdated);
+    if (patchError) {
+      return new Error(formatJmapMethodError(methodName, patchError));
+    }
   }
 
-  const submission = jmapCreatedSubmissionResultSchema.safeParse(
-    input.emailSubmissionSet,
-  );
-  if (!submission.success) {
-    throwFirstZodIssue(
-      submission.error,
-      "Send message was saved but not submitted for delivery.",
-    );
-  }
+  return envelope.methodResponses?.length
+    ? null
+    : new Error(`${context}: JMAP response did not include method results.`);
+}
 
-  // The superRefines reject created results without ids, so created/draft1/s1 all exist here.
-  const draft = email.data.created!.draft1!;
-  const copy = email.data.created?.sent1;
-  // A plaintext submission is destroyed once sent, so its self-encrypted Sent copy is the stored message.
-  const stored = copy?.id?.trim() ? copy : draft;
-  return {
-    emailId: (stored.id ?? "").trim(),
-    threadId: stored.threadId ?? null,
-    submissionId: submission.data.created!.s1!.id!.trim(), // Same superRefine guarantee as the emailId line above.
-  };
+export function assertSuccessfulJmapResponses(
+  envelope: { methodResponses?: [string, Record<string, unknown>, string][] },
+  context: string,
+): void {
+  const error = findJmapResponseError(envelope, context);
+  if (error) throw error;
 }

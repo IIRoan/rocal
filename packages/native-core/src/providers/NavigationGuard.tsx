@@ -2,6 +2,7 @@ import { useEffect, useReducer, type ReactNode } from "react";
 import { View } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { createLogger } from "@workspace/logger";
 import { useAuth } from "./AuthProvider";
 import { useE2ee } from "./E2eeProvider";
 import { PushNotificationNavigation } from "./PushNotificationNavigation";
@@ -27,6 +28,8 @@ import {
   type AuthenticatedSessionInput,
 } from "../lib/startup-crypto";
 import type { PushTapHandler } from "../lib/push-notifications";
+
+const log = createLogger("native:navigation-guard");
 
 export interface NavigationGuardProps {
   children: ReactNode;
@@ -205,7 +208,11 @@ export function NavigationGuard({
         })
         .catch(() => undefined);
     })()
-      .catch(() => undefined)
+      .catch((error: unknown) => {
+        log.warn("Session startup failed", {
+          errorName: error instanceof Error ? error.name : typeof error,
+        });
+      })
       .finally(() => {
         if (!cancelled) {
           dispatchStartup({ type: "finished" });

@@ -91,10 +91,21 @@ export async function readStoredDevice(bootstrapData: E2eeBootstrapResponse) {
   const privateKeyJwk = await readChunkedSecureValue(
     SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
   );
+  const envelopeSalt = await SecureStore.getItemAsync(
+    SECURE_STORE_KEYS.E2EE_ENVELOPE_SALT,
+  );
   const existingDevice = bootstrapData.devices.find(
     (device) => device.deviceId === deviceId,
   );
-  return { existingDevice, privateKeyJwk };
+  return { existingDevice, privateKeyJwk, envelopeSalt };
+}
+
+export async function rememberDeviceEnvelopeSalt(
+  salt: string | null,
+): Promise<void> {
+  await (salt
+    ? SecureStore.setItemAsync(SECURE_STORE_KEYS.E2EE_ENVELOPE_SALT, salt)
+    : SecureStore.deleteItemAsync(SECURE_STORE_KEYS.E2EE_ENVELOPE_SALT));
 }
 
 export async function registerDeviceForSession({
@@ -103,12 +114,15 @@ export async function registerDeviceForSession({
   apiBaseUrl,
   accountKey,
   blindIndexKey,
+  envelopeSalt,
 }: {
   e2ee: E2eeModule;
   userId: string;
   apiBaseUrl: string;
   accountKey: CryptoKey;
   blindIndexKey: CryptoKey;
+  /** The envelope these keys came from; null for freshly minted keys. */
+  envelopeSalt: string | null;
 }): Promise<E2eeSession> {
   const keyPair = await e2ee.generateWrappingKeyPair();
   const [publicKey, wrappedAccountKey, wrappedSearchKey] = await Promise.all([
@@ -151,11 +165,16 @@ export async function registerDeviceForSession({
     );
   }
 
+  // The old device's salt must never vouch for the new key, even if the app dies between writes.
+  await rememberDeviceEnvelopeSalt(null);
   await SecureStore.setItemAsync(SECURE_STORE_KEYS.E2EE_DEVICE_ID, deviceId);
   await writeChunkedSecureValue(
     SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
     exportedPrivateKeyJson,
   );
+  if (envelopeSalt) {
+    await rememberDeviceEnvelopeSalt(envelopeSalt);
+  }
 
   return {
     accountKey,
@@ -166,12 +185,24 @@ export async function registerDeviceForSession({
   };
 }
 
-/** Forgets this device's key pair; the next session unwraps the account key from the password envelope again. */
-export async function clearStoredDevice(): Promise<void> {
+/** This device's id when sign-out is about to forget its key pair, so its server row can go while the session lasts. */
+export async function recoverableStoredDeviceId(): Promise<string | null> {
+  if (!(await SecureStore.getItemAsync(SECURE_STORE_KEYS.E2EE_ENVELOPE_SALT))) {
+    return null;
+  }
+  return SecureStore.getItemAsync(SECURE_STORE_KEYS.E2EE_DEVICE_ID);
+}
+
+/** Forgets this device's key pair only when the password envelope is known to hold its account key; otherwise it may be the only copy. */
+export async function clearRecoverableStoredDevice(): Promise<void> {
+  if (!(await SecureStore.getItemAsync(SECURE_STORE_KEYS.E2EE_ENVELOPE_SALT))) {
+    return;
+  }
   await Promise.all([
     SecureStore.deleteItemAsync(SECURE_STORE_KEYS.E2EE_DEVICE_ID),
     deleteChunkedSecureValue(SECURE_STORE_KEYS.E2EE_PRIVATE_KEY),
   ]);
+  await rememberDeviceEnvelopeSalt(null);
 }
 
 export async function unwrapStoredDeviceKeys(
@@ -234,6 +265,7 @@ export async function putPasswordEnvelope({
   if (!response.ok) {
     throw new Error(`E2EE password registration returned ${response.status}.`);
   }
+  await rememberDeviceEnvelopeSalt(envelope.kdfSalt);
 }
 
 export function createNativeE2eeProvider({

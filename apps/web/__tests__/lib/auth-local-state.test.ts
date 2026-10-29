@@ -16,6 +16,10 @@ const mockClearOrphanedEncPasswordCookie = jest.fn();
 const mockResetE2eeBootstrap = jest.fn();
 const mockGetSession = jest.fn();
 const mockClearLocalSearchIndexDatabase = jest.fn<() => Promise<void>>();
+const mockDeleteRecoverableE2eeDevices = jest.fn<() => Promise<void>>();
+const mockListRecoverableE2eeDevices =
+  jest.fn<() => Promise<Array<{ userId: string; deviceId: string }>>>();
+const mockDeleteE2eeDevice = jest.fn<(deviceId: string) => Promise<unknown>>();
 
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
@@ -37,6 +41,17 @@ jest.mock("@/lib/enc-password-cookie", () => ({
 
 jest.mock("@/lib/e2ee-bootstrap", () => ({
   resetE2eeBootstrap: (...args: unknown[]) => mockResetE2eeBootstrap(...args),
+}));
+
+jest.mock("@/lib/e2ee-storage", () => ({
+  deleteRecoverableE2eeDevices: () => mockDeleteRecoverableE2eeDevices(),
+  listRecoverableE2eeDevices: () => mockListRecoverableE2eeDevices(),
+}));
+
+jest.mock("@/lib/calendar-api-service", () => ({
+  calendarApiService: {
+    deleteE2eeDevice: (deviceId: string) => mockDeleteE2eeDevice(deviceId),
+  },
 }));
 
 jest.mock("@/lib/search/local-index-store", () => ({
@@ -63,6 +78,9 @@ describe("auth-local-state", () => {
     jest.clearAllMocks();
     mockSignOut.mockResolvedValue(undefined as never);
     mockClearLocalSearchIndexDatabase.mockResolvedValue(undefined);
+    mockDeleteRecoverableE2eeDevices.mockResolvedValue(undefined);
+    mockListRecoverableE2eeDevices.mockResolvedValue([]);
+    mockDeleteE2eeDevice.mockResolvedValue({ success: true });
     mockGetSession.mockResolvedValue({
       data: { user: { id: "user-1" } },
       error: null,
@@ -82,7 +100,7 @@ describe("auth-local-state", () => {
     expect(mockResetE2eeBootstrap).toHaveBeenCalledTimes(1);
   });
 
-  it("deletes the device key, mail vault key and search index from disk", () => {
+  it("deletes recoverable device keys, the mail vault key and the search index from disk", () => {
     const deleteDatabase = jest.fn((_name: string) => ({}));
     Object.defineProperty(globalThis, "indexedDB", {
       value: { deleteDatabase },
@@ -91,10 +109,11 @@ describe("auth-local-state", () => {
 
     clearSolaceClientAuthArtifacts();
 
+    // The device-key database keeps keys no password envelope is known to hold.
     expect(deleteDatabase.mock.calls.map(([name]) => name)).toEqual([
-      "solace-e2ee",
       "solace-mail",
     ]);
+    expect(mockDeleteRecoverableE2eeDevices).toHaveBeenCalledTimes(1);
     expect(mockClearLocalSearchIndexDatabase).toHaveBeenCalledTimes(1);
     Reflect.deleteProperty(globalThis, "indexedDB");
   });
@@ -176,6 +195,31 @@ describe("auth-local-state", () => {
 
   it("signs out and clears local state even when server sign-out fails", async () => {
     mockSignOut.mockRejectedValueOnce(new Error("offline") as never);
+
+    await signOutAndClearLocalState();
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletes the server rows of recoverable device keys while the session still exists", async () => {
+    mockListRecoverableE2eeDevices.mockResolvedValue([
+      { userId: "user-1", deviceId: "web-device-1" },
+    ]);
+    mockSignOut.mockImplementation(async () => {
+      expect(mockDeleteE2eeDevice).toHaveBeenCalledWith("web-device-1");
+    });
+
+    await signOutAndClearLocalState();
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("still signs out when a device row cannot be deleted", async () => {
+    mockListRecoverableE2eeDevices.mockResolvedValue([
+      { userId: "user-1", deviceId: "web-device-1" },
+    ]);
+    mockDeleteE2eeDevice.mockRejectedValueOnce(new Error("offline"));
 
     await signOutAndClearLocalState();
 

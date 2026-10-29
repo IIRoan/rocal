@@ -870,6 +870,21 @@ export class CalendarApiService {
     }
   }
 
+  /** Removes this device's E2EE row once sign-out has deleted its private key. */
+  async deleteE2eeDevice(
+    deviceId: string,
+    headers?: Record<string, string>,
+  ): Promise<Schema<"SuccessMessage">> {
+    try {
+      return await this.client.delete<Schema<"SuccessMessage">>(
+        `/api/e2ee/devices/${encodeURIComponent(deviceId)}`,
+        headers ? { headers } : undefined,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to remove encryption device");
+    }
+  }
+
   // ─── Recurring Events ────────────────────────────────────────────────────────
 
   async validateRecurrence(
@@ -1044,16 +1059,11 @@ export class CalendarApiService {
     }
   }
 
-  async deleteSubscription(
-    id: string,
-    deleteEvents = false,
-  ): Promise<DeleteSubscriptionResponse> {
+  /** Both apps promise the feed's events go with it; kept events would turn the feed into a writable calendar of plaintext. */
+  async deleteSubscription(id: string): Promise<DeleteSubscriptionResponse> {
     try {
-      const params = new URLSearchParams();
-      if (deleteEvents) params.append("deleteEvents", "true");
-
       return await this.client.delete<Schema<"DeleteSubscriptionResponse">>(
-        `/api/subscriptions/${encodeURIComponent(id)}?${params}`,
+        `/api/subscriptions/${encodeURIComponent(id)}?deleteEvents=true`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete subscription");

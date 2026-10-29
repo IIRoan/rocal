@@ -28,6 +28,7 @@ export async function createMailSealer(runtime: MailRuntime): Promise<MailSealer
   };
 }
 
+// ponytail: sealing holds the MIME, its UTF-8 bytes and the armored ciphertext in Hermes memory at once (roughly 5-7x the attachments, 200-280 MB at the 40 MB cap); streaming OpenPGP encryption from the file is the upgrade path.
 export async function resolveOutgoingMessageBody(input: {
   runtime: MailRuntime;
   recipients: string[];

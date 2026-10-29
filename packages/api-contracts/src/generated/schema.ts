@@ -242,6 +242,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/e2ee/devices/{deviceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Removes one of the caller's devices by its client-chosen id, as signing out on it does; another user's id is not found. */
+        delete: operations["deleteE2eeDevice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/e2ee/password": {
         parameters: {
             query?: never;
@@ -1534,7 +1551,7 @@ export interface components {
             email: string;
             eventId: components["schemas"]["EventId"];
             id: components["schemas"]["EventParticipantId"];
-            /** @description A Solace avatar path (`/api/profiles/avatars/:id`, or `/api/profiles/avatar?email=` for remote pictures), never a remote URL. */
+            /** @description A Solace avatar path (`/api/profiles/avatars/:id`), never a remote URL. */
             image: string | null;
             role: string;
             status: string;
@@ -2328,6 +2345,11 @@ export interface components {
             encryptionKeyVersion?: number;
         };
         UpdateEventNotificationsRequest: {
+            /**
+             * @deprecated
+             * @description Binaries built before 2026-09-15 still send it; accepted and dropped, never stored.
+             */
+            displayTitle?: string | null;
             /** @description `v1.<iv>.<ciphertext>` under the notification key; omitted keeps the stored one, `null` clears it. */
             encryptedDisplayTitle?: string | null;
             notifications: components["schemas"]["NotificationSetting"][];
@@ -2820,6 +2842,34 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EncryptionDevice"];
                 };
+            };
+        };
+    };
+    deleteE2eeDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessMessage"];
+                };
+            };
+            /** @description No such device for the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

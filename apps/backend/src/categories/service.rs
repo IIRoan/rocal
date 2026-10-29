@@ -10,7 +10,7 @@ use super::queries;
 use crate::auth::guard::RouteUser;
 use crate::db::entities::event_category;
 use crate::entity_metadata::{
-    NameInput, NamePersistence, assert_valid_entity_color, resolve_name_persistence,
+    NameInput, apply_name, assert_valid_entity_color, resolve_name_persistence,
 };
 use crate::error::AppError;
 use crate::instant;
@@ -34,23 +34,6 @@ pub fn dto(model: event_category::Model) -> Category {
 
 fn not_found() -> AppError {
     AppError::field("Category not found or access denied", "categoryId")
-}
-
-fn apply_name(row: &mut event_category::ActiveModel, persistence: NamePersistence) {
-    match persistence {
-        NamePersistence::None => {}
-        NamePersistence::Encrypted {
-            encrypted_name,
-            blind_index_tokens,
-            encryption_key_version,
-        } => {
-            row.name = Set(String::new());
-            row.encrypted_name = Set(Some(encrypted_name));
-            row.blind_index_tokens = Set(Some(blind_index_tokens));
-            row.encryption_state = Set("encrypted".into());
-            row.encryption_key_version = Set(encryption_key_version);
-        }
-    }
 }
 
 pub async fn list(state: &AppState, user: &RouteUser) -> Result<CategoryList, AppError> {
@@ -85,7 +68,7 @@ pub async fn create(
         user_id: Set(user.id.clone()),
         ..Default::default()
     };
-    apply_name(&mut row, persistence);
+    apply_name!(row, persistence);
     Ok(dto(queries::insert(&state.db, row).await?))
 }
 
@@ -108,7 +91,7 @@ pub async fn update(
         assert_valid_entity_color(color)?;
     }
     let mut row = existing.into_active_model();
-    apply_name(&mut row, persistence);
+    apply_name!(row, persistence);
     if let Some(color) = request.color {
         row.color = Set(color);
     }

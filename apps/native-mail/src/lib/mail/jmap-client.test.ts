@@ -317,6 +317,8 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
       pending.type,
     );
     expect(uploaded.blobId).toBe("blob-uploaded");
+    // expo/fetch reads a typed array in place, so large attachments are not copied first.
+    expect(fetcher.mock.calls[0][1]?.body).toBe(pending.bytes);
     expect(fetcher.mock.calls[0][0]).toBe(
       "http://localhost:4001/api/mail/jmap/upload/acc1",
     );
@@ -375,7 +377,7 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     expect(sendRequest.methodCalls[1][1].onSuccessDestroyEmail).toEqual(["#s1"]);
   });
 
-  it("restores the encrypted copy as the draft and drops the plaintext when the submission is refused", async () => {
+  it("removes the plaintext and its encrypted copy when the submission is refused", async () => {
     let requests = 0;
     const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
       jsonOk({
@@ -393,7 +395,7 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
                   "c2",
                 ],
               ]
-            : [["Email/set", { destroyed: ["plain-1"] }, "c1"]],
+            : [["Email/set", { destroyed: ["plain-1", "copy-1"] }, "c1"]],
       }),
     );
     const client = createClient(fetcher);
@@ -409,24 +411,13 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
         textBody: "Hello world",
         identityId: "identity-1",
         sentCopyCiphertext: { blobId: "sealed-copy", size: 900 },
+        previousDraftId: "draft-1",
       }),
     ).rejects.toThrow("Quota");
 
+    expect(fetcher).toHaveBeenCalledTimes(2);
     expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls).toEqual([
-      [
-        "Email/set",
-        {
-          accountId: "acc1",
-          destroy: ["plain-1"],
-          update: {
-            "copy-1": {
-              mailboxIds: { drafts: true },
-              keywords: { $draft: true, $seen: true },
-            },
-          },
-        },
-        "c1",
-      ],
+      ["Email/set", { accountId: "acc1", destroy: ["plain-1", "copy-1"] }, "c1"],
     ]);
   });
 

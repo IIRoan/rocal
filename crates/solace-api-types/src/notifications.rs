@@ -16,6 +16,14 @@ pub struct UpdateEventNotificationsRequest {
         with = "::serde_with::rust::double_option"
     )]
     pub encrypted_display_title: Option<Option<String>>,
+    /// Binaries built before 2026-09-15 still send it; accepted and dropped, never stored.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "::serde_with::rust::double_option"
+    )]
+    #[schema(deprecated)]
+    pub display_title: Option<Option<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

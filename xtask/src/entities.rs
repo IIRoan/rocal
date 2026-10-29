@@ -1,4 +1,4 @@
-//! Regenerates `apps/backend/src/db/entities` with sea-orm-cli from a throwaway database built from the 53 migrations.
+//! Regenerates `apps/backend/src/db/entities` with sea-orm-cli from a throwaway database built from the 55 migrations.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;

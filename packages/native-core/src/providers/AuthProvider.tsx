@@ -16,7 +16,7 @@ import {
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { API_BASE_URL } from "../lib/constants";
-import { getAuthHeaders } from "../lib/api";
+import { calendarApiService, getAuthHeaders } from "../lib/api";
 import {
   deleteStoredPasskey,
   getDefaultPasskeyName,
@@ -43,10 +43,9 @@ import { registerPasskeyStepUpRequired } from "../lib/passkey-step-up-required";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
 import { clearNotificationExtensionSecrets } from "../lib/notification-extension-store";
 import {
-  getAccountHasPasswordEnvelope,
-  setAccountHasPasswordEnvelope,
-} from "../lib/e2ee-session";
-import { clearStoredDevice } from "../lib/native-e2ee-provider";
+  clearRecoverableStoredDevice,
+  recoverableStoredDeviceId,
+} from "../lib/native-e2ee-provider";
 import { clearNativeTitleIndex } from "../lib/search/title-index-store";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
@@ -107,10 +106,24 @@ const SIGNED_OUT: AuthState = {
   lastAuthMethod: "unknown",
 };
 
+/** Renewals return a new user object; keeping the old one stops effects keyed on it from restarting startup. */
+function isSameUser(current: User | null, next: User): current is User {
+  return (
+    current?.id === next.id &&
+    current.name === next.name &&
+    current.email === next.email &&
+    (current.image ?? null) === (next.image ?? null)
+  );
+}
+
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
     case "loaded":
-      return { ...state, user: action.user, session: action.session };
+      return {
+        ...state,
+        user: isSameUser(state.user, action.user) ? state.user : action.user,
+        session: action.session,
+      };
     case "cleared":
       return SIGNED_OUT;
     case "method":
@@ -129,13 +142,18 @@ export interface AuthLifecycle {
 }
 type SignInResult = { requiresPasskeyStepUp: boolean };
 
+/** A device row is useless once sign-out deletes its key, and deleting it needs the session sign-out ends. */
+async function deleteRecoverableDeviceRow(headers: Record<string, string>): Promise<void> {
+  const deviceId = await recoverableStoredDeviceId();
+  if (deviceId) {
+    await calendarApiService.deleteE2eeDevice(deviceId, headers);
+  }
+}
+
 /** The device key opens the account key and the search index holds decrypted text, so both go with the session in both apps. */
 async function wipeSessionData(lifecycle: AuthLifecycle | undefined): Promise<void> {
-  // Without a known password envelope the device key may be the only way back into the account, so it stays.
-  const keepDeviceKey = getAccountHasPasswordEnvelope() !== true;
-  setAccountHasPasswordEnvelope(null);
   await Promise.all([
-    keepDeviceKey ? Promise.resolve() : clearStoredDevice().catch(() => undefined),
+    clearRecoverableStoredDevice().catch(() => undefined),
     clearNativeTitleIndex().catch(() => undefined),
     lifecycle?.onSignedOut?.(),
   ]);
@@ -573,6 +591,7 @@ export function AuthProvider({
     setFallbackSessionToken(null);
     await Promise.all([
       unregisterNativePushDevice(logoutHeaders),
+      deleteRecoverableDeviceRow(logoutHeaders).catch(() => undefined),
       clearNotificationExtensionSecrets(),
     ]);
     try {

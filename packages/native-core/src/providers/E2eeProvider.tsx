@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import {
   createE2eeModule,
+  resolveDeviceEnvelopeSalt,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
 } from "@workspace/e2ee";
@@ -18,19 +19,16 @@ import {
   putPasswordEnvelope,
   readStoredDevice,
   registerDeviceForSession,
+  rememberDeviceEnvelopeSalt,
   unwrapStoredDeviceKeys,
   type E2eeSession,
 } from "../lib/native-e2ee-provider";
 import type { E2eeBootstrapResponse } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "./AuthProvider";
-import {
-  setAccountHasPasswordEnvelope,
-  setActiveE2eeSession,
-} from "../lib/e2ee-session";
+import { setActiveE2eeSession } from "../lib/e2ee-session";
 
 const log = createLogger("native:e2ee");
-
 
 export interface E2eeContextValue {
   isReady: boolean;
@@ -119,7 +117,6 @@ export function E2eeProvider({
       }
 
       await putPasswordEnvelope({ e2ee, session, apiBaseUrl, password });
-      setAccountHasPasswordEnvelope(true);
 
       clearPendingAuthPassword();
       log.info("Stored native E2EE password envelope for active session", {
@@ -170,9 +167,8 @@ export function E2eeProvider({
         }
 
         setIsEnabled(true);
-        setAccountHasPasswordEnvelope(Boolean(bootstrapData.passwordEnvelope));
 
-        const { existingDevice, privateKeyJwk } =
+        const { existingDevice, privateKeyJwk, envelopeSalt } =
           await readStoredDevice(bootstrapData);
 
         if (existingDevice && privateKeyJwk) {
@@ -194,8 +190,24 @@ export function E2eeProvider({
             apiBaseUrl,
           };
           setActiveE2eeSession(sessionRef.current);
-          // An account whose first envelope write failed gets another try whenever the sign-in password is at hand.
           const pendingPassword = peekPendingAuthPassword();
+          // Keys minted while another key's envelope existed must survive sign-out, so a changed envelope is checked again.
+          await resolveDeviceEnvelopeSalt(e2ee, {
+            storedSalt: envelopeSalt,
+            envelope: bootstrapData.passwordEnvelope,
+            password: pendingPassword,
+            accountKey,
+          })
+            .then((salt) =>
+              salt === envelopeSalt ? undefined : rememberDeviceEnvelopeSalt(salt),
+            )
+            .catch((error: unknown) => {
+              log.warn("Failed to check the device key against the envelope", {
+                userId,
+                error,
+              });
+            });
+          // An account whose first envelope write failed gets another try whenever the sign-in password is at hand.
           if (!bootstrapData.passwordEnvelope && pendingPassword) {
             await storePasswordEnvelopeForActiveSession({
               e2ee,
@@ -233,6 +245,7 @@ export function E2eeProvider({
               apiBaseUrl,
               accountKey,
               blindIndexKey,
+              envelopeSalt: bootstrapData.passwordEnvelope.kdfSalt,
             });
 
             if (isStale()) {
@@ -287,6 +300,7 @@ export function E2eeProvider({
           apiBaseUrl,
           accountKey,
           blindIndexKey,
+          envelopeSalt: null,
         });
 
         if (isStale()) {
@@ -294,6 +308,7 @@ export function E2eeProvider({
         }
 
         sessionRef.current = nextSession;
+        setActiveE2eeSession(nextSession);
 
         if (pendingPassword) {
           try {
@@ -395,6 +410,7 @@ export function E2eeProvider({
         userId: locked.userId,
         apiBaseUrl: locked.apiBaseUrl,
         ...keys,
+        envelopeSalt: locked.envelope.kdfSalt,
       });
       // A sign-out or new bootstrap during the unlock leaves the newer state alone.
       const current = lockedRef.current === locked;
@@ -493,7 +509,6 @@ export function E2eeProvider({
     </E2eeContext.Provider>
   );
 }
-
 
 export function useE2ee(): E2eeContextValue {
   const ctx = use(E2eeContext);

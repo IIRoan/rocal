@@ -79,6 +79,20 @@ describe("mail outgoing attachment validation", () => {
     ]);
   });
 
+  it("refuses attachments whose total exceeds the limit before reading any of them", async () => {
+    const file = (name: string) => ({
+      name,
+      type: "application/pdf",
+      size: 25_000_000,
+      arrayBuffer: async (): Promise<ArrayBuffer> => {
+        throw new Error("read before the size check");
+      },
+    });
+    await expect(
+      prepareOutgoingAttachments([file("a.pdf"), file("b.pdf")], { maxBytes: 40_000_000 }),
+    ).rejects.toThrow("Attachments add up to 50 MB, over the 40 MB limit for one message.");
+  });
+
   it("validates uploaded blob ids and sizes", () => {
     expect(
       validateUploadedBlob({

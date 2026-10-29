@@ -13,13 +13,29 @@ describe("shared native Expo configuration", () => {
       expect(
         config.ios?.infoPlist?.ITSEncryptionExportComplianceCode,
       ).toBeUndefined();
-      expect(
+      expect(() =>
         createNativeExpoConfig(app, {
           SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE: " issued-code ",
-        }).ios?.infoPlist?.ITSEncryptionExportComplianceCode,
-      ).toBe("issued-code");
+        }),
+      ).toThrow("requires iosUsesNonExemptEncryption: true");
     },
   );
+  it("embeds the compliance code once the apps declare non-exempt encryption", () => {
+    jest.isolateModules(() => {
+      jest.doMock("../../expo-apps.json", () => ({
+        ...jest.requireActual<object>("../../expo-apps.json"),
+        iosUsesNonExemptEncryption: true,
+      }));
+      const { createNativeExpoConfig: create } = jest.requireActual<{
+        createNativeExpoConfig: typeof createNativeExpoConfig;
+      }>("../../expo-config.cjs");
+      const infoPlist = create("mail", {
+        SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE: " issued-code ",
+      }).ios?.infoPlist;
+      expect(infoPlist?.ITSAppUsesNonExemptEncryption).toBe(true);
+      expect(infoPlist?.ITSEncryptionExportComplianceCode).toBe("issued-code");
+    });
+  });
   it.each(["calendar", "mail"] as const)(
     "declares no tracking in the %s app manifest",
     (app) => {

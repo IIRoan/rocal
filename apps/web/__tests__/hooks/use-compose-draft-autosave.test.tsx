@@ -10,6 +10,7 @@ import {
   jest,
 } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
+import { settleComposeDraftSave } from "@/components/mail/mail-compose-bridge";
 import {
   MailComposeProvider,
   useMailCompose,
@@ -180,5 +181,39 @@ describe("useComposeDraftAutosave", () => {
       "-----BEGIN PGP MESSAGE-----\nsealed\n-----END PGP MESSAGE-----",
       "text/plain",
     );
+  });
+
+  it("settles before a send without sealing a throwaway draft", async () => {
+    let compose: ReturnType<typeof useMailCompose> | null = null;
+    let chrome: ReturnType<typeof useMailComposeChrome> | null = null;
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider
+          identities={[
+            { id: "identity-1", email: "alice@solace.onl", name: "Alice" },
+          ]}
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
+          <ChromeProbe onReady={(value) => { chrome = value; }} />
+          <ComposeProbe onReady={(value) => { compose = value; }} />
+          <AutosaveProbe onReady={() => {}} />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      chrome!.setIsComposeOpen(true);
+      compose!.setComposeTo("bob@example.com");
+    });
+    await act(async () => {
+      await settleComposeDraftSave();
+      jest.advanceTimersByTime(5000);
+      await Promise.resolve();
+    });
+
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(mockEncryptForRecipients).not.toHaveBeenCalled();
   });
 });

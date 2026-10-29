@@ -75,6 +75,12 @@ export const getAppBaseUrl = () => {
   );
 };
 
+// Dot segments normalize `/.//host` to a `//host` pathname, which the browser reads as another origin.
+const toAppHref = (target: URL) => {
+  const href = `${target.pathname}${target.search}${target.hash}`;
+  return /^\/[/\\]/.test(href) ? null : href;
+};
+
 const toSafeRelativePath = (path?: string | null) => {
   if (!path || !path.startsWith("/")) {
     return AUTH_REDIRECT_FALLBACK_PATH;
@@ -84,9 +90,10 @@ const toSafeRelativePath = (path?: string | null) => {
   try {
     const appOrigin = new URL(getAppBaseUrl()).origin;
     const target = new URL(path, appOrigin);
-    return target.origin === appOrigin
-      ? `${target.pathname}${target.search}${target.hash}`
-      : AUTH_REDIRECT_FALLBACK_PATH;
+    return (
+      (target.origin === appOrigin && toAppHref(target)) ||
+      AUTH_REDIRECT_FALLBACK_PATH
+    );
   } catch {
     return AUTH_REDIRECT_FALLBACK_PATH;
   }
@@ -100,15 +107,6 @@ const toOrigin = (value?: string | null) => {
   } catch {
     return null;
   }
-};
-
-export const getAuthCallbackUrl = (nextPath?: string | null) => {
-  const safePath = toSafeRelativePath(nextPath);
-  return new URL(safePath, getAppBaseUrl()).toString();
-};
-
-export const getAuthErrorCallbackUrl = (nextPath?: string | null) => {
-  return getAuthCallbackUrl(nextPath);
 };
 
 export const getSafeAuthCallbackUrl = (callbackUrl?: string | null) => {
@@ -149,9 +147,9 @@ export const resolveAuthRedirectTarget = (
     const callbackOrigin = toOrigin(safeCallbackUrl);
 
     if (appOrigin && callbackOrigin && appOrigin === callbackOrigin) {
-      const callbackTarget = new URL(safeCallbackUrl);
       return {
-        href: `${callbackTarget.pathname}${callbackTarget.search}${callbackTarget.hash}`,
+        href:
+          toAppHref(new URL(safeCallbackUrl)) ?? toSafeRelativePath(nextPath),
         external: false,
       };
     }

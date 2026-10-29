@@ -10,8 +10,9 @@ use solace_api_types::recurring::{
 };
 
 use crate::event_fixtures::{
-    StoredContent, calendar_id, create_event, encrypted_event, insert_calendar, list_events,
-    row_snapshot, sent_mail, stored_content, to_json, unfold,
+    StoredContent, calendar_id, create_event, encrypted_event, insert_calendar,
+    insert_plaintext_event, insert_staging_calendar, list_events, row_snapshot, sent_mail,
+    stored_content, to_json, unfold,
 };
 use crate::helpers::{
     Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
@@ -1112,6 +1113,159 @@ async fn edits_cannot_target_other_users_or_read_only_calendars() {
     )
     .await;
     assert_eq!(moved.calendar.id.0, family);
+}
+
+/// A plaintext series row, as feed sync, staged invitations or a released feed leave one.
+async fn plaintext_series(app: &TestApp, user_id: &str, calendar: &str) -> String {
+    let id =
+        insert_plaintext_event(app, user_id, calendar, "Standup", SERIES_START, SERIES_END).await;
+    sqlx::query("UPDATE calendar_event SET recurrence = $2, description = 'Agenda' WHERE id = $1")
+        .bind(&id)
+        .bind(WEEKLY_FIVE)
+        .execute(&app.db)
+        .await
+        .expect("series rule");
+    id
+}
+
+#[tokio::test]
+async fn feed_series_and_invitation_copies_stay_read_only_and_plaintext_never_moves_in() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let work = calendar_id(&mut owner, "Work").await;
+    let feed = plaintext_series(
+        &app,
+        &owner.id,
+        &insert_calendar(&app, &owner.id, "subscribed", true).await,
+    )
+    .await;
+    sqlx::query("UPDATE calendar_event SET is_synced = true WHERE id = $1")
+        .bind(&feed)
+        .execute(&app.db)
+        .await
+        .expect("synced");
+    let copy = plaintext_series(
+        &app,
+        &owner.id,
+        &insert_staging_calendar(&app, &owner.id).await,
+    )
+    .await;
+    sqlx::query(
+        "INSERT INTO event_participant (id, event_id, user_id, email, status, role, updated_at) \
+         VALUES ($1, $2, $3, $4, 'pending', 'attendee', now())",
+    )
+    .bind(format!("suitepart{}", hex(8)))
+    .bind(&copy)
+    .bind(&owner.id)
+    .bind(&owner.email)
+    .execute(&app.db)
+    .await
+    .expect("attendee row");
+    // A deleted feed's calendar turns writable while its events stay plaintext.
+    let released = plaintext_series(
+        &app,
+        &owner.id,
+        &insert_calendar(&app, &owner.id, "owned", false).await,
+    )
+    .await;
+    let before = [
+        row_snapshot(&app.db, "calendar_event", &feed).await,
+        row_snapshot(&app.db, "calendar_event", &copy).await,
+        row_snapshot(&app.db, "calendar_event", &released).await,
+    ];
+    let cases = [
+        (
+            &feed,
+            "Cannot edit synced events. Synced events are read-only.",
+            None,
+        ),
+        (
+            &copy,
+            "Imported invitation events are read-only for attendees.",
+            None,
+        ),
+        (
+            &released,
+            "Event encryption requires an active encryption session.",
+            Some("encryptedContent"),
+        ),
+    ];
+    for (series, message, field) in cases {
+        for scope in ["all", "this_only", "this_and_future"] {
+            for updates in [
+                json!({"calendarId": work}),
+                json!({"start": "2099-03-09T08:00:00.000Z"}),
+            ] {
+                let error = ok(owner
+                    .put(
+                        &format!("/api/recurring/event/{series}"),
+                        json!({"editScope": scope, "occurrenceDate": "2099-03-09T09:00:00.000Z", "updates": updates}),
+                    )
+                    .await
+                    .expect_error(400, "Validation Error", message));
+                assert_eq!(
+                    error["details"].get("field").and_then(Value::as_str),
+                    field,
+                    "{scope} {updates}"
+                );
+            }
+        }
+    }
+    ok(owner
+        .delete(&format!("/api/recurring/event/{feed}?deleteScope=all"))
+        .await
+        .expect_error(
+            400,
+            "Validation Error",
+            "Cannot delete synced events. Synced events are read-only.",
+        ));
+    assert_eq!(
+        [
+            row_snapshot(&app.db, "calendar_event", &feed).await,
+            row_snapshot(&app.db, "calendar_event", &copy).await,
+            row_snapshot(&app.db, "calendar_event", &released).await,
+        ],
+        before
+    );
+    for series in [&feed, &copy, &released] {
+        assert_eq!(exceptions(&app, series).await, []);
+        assert_eq!(
+            count(
+                &app.db,
+                "SELECT count(*) FROM calendar_event WHERE parent_event_id = $1",
+                series
+            )
+            .await,
+            0
+        );
+    }
+
+    let sealed = edit(
+        &mut owner,
+        &released,
+        &edit_request(
+            "this_only",
+            Some("2099-03-09T09:00:00.000Z"),
+            RecurringUpdates {
+                calendar_id: Some(work.clone().into()),
+                encrypted_content: Some(fake_envelope()),
+                ..RecurringUpdates::default()
+            },
+        ),
+    )
+    .await;
+    assert_eq!(sealed.calendar.id.0, work);
+    let stored = stored_content(&app.db, &sealed.id.0).await;
+    assert_eq!(
+        (
+            stored.title.as_str(),
+            stored.description,
+            stored.location,
+            stored.encryption_state.as_str()
+        ),
+        ("", None, None, "encrypted"),
+        "ciphertext lets the occurrence in, without the series' plaintext"
+    );
 }
 
 #[tokio::test]

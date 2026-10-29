@@ -7,9 +7,7 @@ use serde_json::Value;
 
 use super::zod::{self, RefineCtx, Schema};
 use crate::addresses::is_reserved_system_email;
-use crate::entity_metadata::{
-    CALENDAR_COLORS, has_encrypted_payload_value, is_valid_calendar_color,
-};
+use crate::entity_metadata::{CALENDAR_COLORS, is_valid_calendar_color};
 
 pub fn calendar_color_schema() -> Schema {
     let message = format!(
@@ -79,7 +77,8 @@ pub fn event_content_encryption_fields() -> [(&'static str, Schema); 3] {
 
 /// The transient invitation copy only travels with new ciphertext and participants to mail it to.
 pub fn refine_invitation_content_body(body: &Value, ctx: &mut RefineCtx<'_>) {
-    let has_ciphertext = has_encrypted_payload_value(body.get("encryptedContent"));
+    let has_ciphertext =
+        zod::non_blank(body.get("encryptedContent").and_then(Value::as_str)).is_some();
     let has_participants = body
         .get("participants")
         .and_then(Value::as_array)

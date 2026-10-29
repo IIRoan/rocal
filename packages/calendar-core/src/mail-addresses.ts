@@ -12,7 +12,8 @@ export function normalizeEmailAddress(value: string): string {
 /** Parses `Name <email@example.com>` or a bare address, mirroring the webmail JMAP client. */
 export function parseRecipientString(value: string): ParsedMailAddress {
   const trimmed = value.trim();
-  const angleMatch = trimmed.match(/^(.+?)\s*<([^>]+)>$/);
+  // The name excludes "<" so it cannot overlap the spaces before it; `(.+?)\s*<` backtracked quadratically on hostile input.
+  const angleMatch = trimmed.match(/^([^<]+)<([^<>]+)>$/);
   if (angleMatch) {
     const name = angleMatch[1]?.trim();
     const email = normalizeEmailAddress(angleMatch[2] ?? "");
@@ -22,15 +23,17 @@ export function parseRecipientString(value: string): ParsedMailAddress {
   return { email: normalizeEmailAddress(trimmed) };
 }
 
+/** Comma- or semicolon-separated recipients as trimmed, non-empty tokens, display names kept. */
+export function splitRecipientList(raw: string): string[] {
+  return raw.split(/[,;]+/).flatMap((entry) => entry.trim() || []);
+}
+
 export function parseAddressList(raw: string): ParsedMailAddress[] {
   const seen = new Set<string>();
   const result: ParsedMailAddress[] = [];
 
-  for (const token of raw.split(/[,;]+/)) {
-    const trimmed = token.trim();
-    if (!trimmed) continue;
-
-    const parsed = parseRecipientString(trimmed);
+  for (const token of splitRecipientList(raw)) {
+    const parsed = parseRecipientString(token);
     if (!parsed.email || seen.has(parsed.email)) continue;
 
     seen.add(parsed.email);

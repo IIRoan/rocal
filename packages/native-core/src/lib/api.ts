@@ -7,6 +7,7 @@ import {
   NoopE2eeProvider,
 } from "@workspace/calendar-client";
 import * as Linking from "expo-linking";
+import { createLogger } from "@workspace/logger";
 import { API_BASE_URL, APP_SCHEME } from "./constants";
 import {
   getSessionCookie,
@@ -19,6 +20,8 @@ import { triggerSessionClear } from "./session-clear";
 import { triggerPasskeyStepUpRequired } from "./passkey-step-up-required";
 import { getFallbackSessionToken } from "./session-token-fallback";
 import { authClient } from "./auth-client";
+
+const log = createLogger("native:api");
 
 export function getNativeExpoOrigin() {
   return Linking.createURL("", { scheme: APP_SCHEME });
@@ -100,7 +103,11 @@ export const httpClient = new HttpClient({
   credentials: "omit",
   getHeaders: getAuthHeadersAsync,
   onAuthError: () => {
-    void confirmExpiredSessionThenClear().catch(() => undefined);
+    void confirmExpiredSessionThenClear().catch((error: unknown) => {
+      log.warn("Could not confirm the expired session", {
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
+    });
   },
   onPasskeyStepUpRequired: triggerPasskeyStepUpRequired,
   onResponseHeaders: persistRenewedSessionCookie,

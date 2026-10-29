@@ -259,7 +259,7 @@ describe("E2eeBootstrap component", () => {
     expect(container.textContent).not.toContain("Unlock encrypted data");
   });
 
-  it("does not show the unlock dialog when no sign-in password is available yet", async () => {
+  it("asks for the password when no sign-in password can open the envelope, as after a passkey sign-in", async () => {
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: false,
       bootstrap: createBootstrap({
@@ -269,7 +269,10 @@ describe("E2eeBootstrap component", () => {
 
     await renderComponent();
 
-    expect(container.textContent).not.toContain("Unlock encrypted data");
+    expect(container.textContent).toContain("Unlock encrypted data");
+    expect(container.textContent).toContain(
+      "This device needs your password to open your encrypted data.",
+    );
     expect(mockUnlockE2eeWithPassword).not.toHaveBeenCalled();
   });
 
@@ -286,9 +289,9 @@ describe("E2eeBootstrap component", () => {
 
     expect(container.textContent).toContain("Unlock encrypted data");
     expect(container.textContent).toContain(
-      "Your email sign-in password did not unlock encrypted data on this device.",
+      "If you changed it recently, enter the previous one.",
     );
-    expect(container.textContent).toContain("Email sign-in password");
+    expect(container.textContent).toContain("Password");
   });
 
   it("shows an empty-submit error in unlock mode", async () => {
@@ -311,9 +314,7 @@ describe("E2eeBootstrap component", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain(
-      "Enter your previous email sign-in password.",
-    );
+    expect(container.textContent).toContain("Enter your password.");
   });
 
   it("shows a previous-password error when manual unlock fails", async () => {

@@ -194,18 +194,10 @@ pub async fn remove(state: &AppState, user_id: &str) -> Result<AvatarResponse, A
         let transaction = state.db.begin().await?;
         let locked = queries::lock(&transaction, user_id).await?;
         let retired = if locked.image.is_none() {
-            queries::update_profile(&transaction, user_id, None, None, None).await?;
             locked.pending_avatar_id.clone()
         } else {
             delete_pending(state, &transaction, &locked).await?;
-            queries::update_profile(
-                &transaction,
-                user_id,
-                None,
-                None,
-                Some(locked.avatar_id.clone()),
-            )
-            .await?;
+            queries::detach(&transaction, user_id, locked.avatar_id.clone()).await?;
             locked.avatar_id.clone()
         };
         transaction.commit().await?;

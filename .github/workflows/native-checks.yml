@@ -30,6 +30,7 @@ jobs:
       - run: bun run check:rules
       - run: node scripts/tests/notification-extension.cjs
       - run: node scripts/tests/ios-no-camera.cjs
+      - run: node scripts/tests/easignore.cjs
       - run: bun run --cwd packages/native-core lint && bun run --cwd apps/native-calendar lint && bun run --cwd apps/native-mail lint
       - run: bun run typecheck:native
       - run: bun run test:native

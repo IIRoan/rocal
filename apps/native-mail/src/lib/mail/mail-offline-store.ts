@@ -14,7 +14,7 @@ import {
   type MailOfflineSnapshot,
 } from "./mail-offline-snapshot";
 
-const SNAPSHOT_FILE = "solace-mail-offline-snapshot.json";
+export const MAIL_OFFLINE_SNAPSHOT_FILE = "solace-mail-offline-snapshot.json";
 
 /** This-device-only so an iCloud/device backup of the keychain can never open the snapshot elsewhere. */
 const KEY_OPTIONS: SecureStore.SecureStoreOptions = {
@@ -25,7 +25,7 @@ const KEY_OPTIONS: SecureStore.SecureStoreOptions = {
 let generation = 0;
 
 function snapshotPath(): string {
-  return `${FileSystem.cacheDirectory ?? ""}${SNAPSHOT_FILE}`;
+  return `${FileSystem.cacheDirectory ?? ""}${MAIL_OFFLINE_SNAPSHOT_FILE}`;
 }
 
 function additionalData(userId: string): string {
