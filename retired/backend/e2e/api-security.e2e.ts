@@ -172,14 +172,17 @@ check("calendar plaintext name is rejected", async () => {
   await expectRejected(response, "Unrecognized key");
 });
 
-check("plaintext reminder displayTitle is rejected", async () => {
+check("legacy plaintext displayTitle is accepted but never stored", async () => {
   if (!cookie) skip();
+  // Shipped binaries still send it, so a 400 here would mean the whole reminder update failed.
   const response = await api(
     `/api/notifications/event/${crypto.randomUUID()}`,
     { method: "PUT", body: JSON.stringify({ notifications: [], displayTitle: "plaintext title" }) },
     true,
   );
-  await expectRejected(response, "Unrecognized key");
+  const body = await response.text();
+  assert(response.status !== 400, `legacy client rejected: ${body.slice(0, 200)}`);
+  assert(!body.includes("plaintext title"), "response echoed the plaintext title");
 });
 
 check("unknown reminder fields are still rejected", async () => {

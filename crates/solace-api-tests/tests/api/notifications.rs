@@ -36,6 +36,7 @@ fn update(settings: Vec<NotificationSetting>) -> UpdateEventNotificationsRequest
     UpdateEventNotificationsRequest {
         notifications: settings,
         encrypted_display_title: None,
+        display_title: None,
     }
 }
 
@@ -351,20 +352,24 @@ async fn the_title_ciphertext_is_stored_kept_and_cleared() {
         "an omitted title keeps the stored ciphertext"
     );
 
-    for plaintext in [json!("Lunch with Sam"), Value::Null] {
-        let mut body = to_json(&update(vec![setting("email", 25, true)]));
-        body["displayTitle"] = plaintext;
-        expect_unknown_field(
-            &owner
-                .put(&format!("/api/notifications/event/{event}"), body)
-                .await,
-            "displayTitle",
+    for plaintext in [Some("Lunch with Sam"), None] {
+        let mut legacy = update(vec![setting("email", 25, true)]);
+        legacy.display_title = Some(plaintext.map(str::to_owned));
+        put(&mut owner, &event, to_json(&legacy)).await;
+        assert_eq!(
+            schedules(&app, &event).await,
+            [("email".to_owned(), 25, Some(title.clone()))],
+            "the deprecated plaintext title from shipped binaries is accepted and dropped"
         );
     }
     assert_eq!(
-        schedules(&app, &event).await,
-        [("email".to_owned(), 20, Some(title.clone()))],
-        "a plaintext title is refused and changes nothing"
+        count(
+            &app.db,
+            "SELECT count(*) FROM event_notification WHERE event_id = $1 AND encrypted_display_title LIKE '%Lunch%'",
+            &event
+        )
+        .await,
+        0
     );
 
     let mut cleared = update(vec![setting("email", 30, true)]);
@@ -431,8 +436,8 @@ async fn title_ciphertext_and_settings_are_validated() {
         ),
         (
             json!({"notifications": one, "displayTitle": "x".repeat(256)}),
-            "Unrecognized key(s) in object: 'displayTitle'",
-            "root",
+            "String must contain at most 255 character(s)",
+            "displayTitle",
         ),
         (json!({}), "Required", "notifications"),
         (

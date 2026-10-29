@@ -7294,6 +7294,14 @@
           "notifications"
         ],
         "properties": {
+          "displayTitle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Binaries built before 2026-09-15 still send it; accepted and dropped, never stored.",
+            "deprecated": true
+          },
           "encryptedDisplayTitle": {
             "type": [
               "string",

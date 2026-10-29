@@ -2328,6 +2328,11 @@ export interface components {
             encryptionKeyVersion?: number;
         };
         UpdateEventNotificationsRequest: {
+            /**
+             * @deprecated
+             * @description Binaries built before 2026-09-15 still send it; accepted and dropped, never stored.
+             */
+            displayTitle?: string | null;
             /** @description `v1.<iv>.<ciphertext>` under the notification key; omitted keeps the stored one, `null` clears it. */
             encryptedDisplayTitle?: string | null;
             notifications: components["schemas"]["NotificationSetting"][];
