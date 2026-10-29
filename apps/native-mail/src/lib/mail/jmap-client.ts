@@ -554,17 +554,14 @@ export class StalwartJmapClient {
       encodeURIComponent(accountId),
     );
     const authorization = await this.getAuthorizationHeader();
-    const body = bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength,
-    ) as ArrayBuffer;
     const response = await this.fetcher(url, {
       method: "POST",
       headers: {
         Authorization: authorization,
         "Content-Type": contentType || "application/octet-stream",
       },
-      body,
+      // Our bytes never sit on a SharedArrayBuffer, and expo/fetch reads the view in place instead of copying it.
+      body: bytes as Uint8Array<ArrayBuffer>,
     });
     if (!response.ok) {
       throw new Error(`Blob upload failed with status ${response.status}.`);

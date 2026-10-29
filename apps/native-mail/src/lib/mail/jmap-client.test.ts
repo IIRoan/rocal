@@ -317,6 +317,8 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
       pending.type,
     );
     expect(uploaded.blobId).toBe("blob-uploaded");
+    // expo/fetch reads a typed array in place, so large attachments are not copied first.
+    expect(fetcher.mock.calls[0][1]?.body).toBe(pending.bytes);
     expect(fetcher.mock.calls[0][0]).toBe(
       "http://localhost:4001/api/mail/jmap/upload/acc1",
     );
