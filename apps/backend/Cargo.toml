@@ -27,6 +27,7 @@ reqwest.workspace = true
 rusty-s3.workspace = true
 scrypt.workspace = true
 sea-orm.workspace = true
+sea-orm-migration.workspace = true
 serde.workspace = true
 serde_cbor_2.workspace = true
 serde_json.workspace = true

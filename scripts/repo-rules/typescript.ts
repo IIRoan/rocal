@@ -2,7 +2,7 @@ import ts from "typescript";
 
 import { type FileContext, type Rule, find, matchLines, sourceUnder, walk } from "./engine";
 
-const TYPED_SOURCE = sourceUnder(["apps/", "packages/", "retired/"]);
+const TYPED_SOURCE = sourceUnder(["apps/", "packages/"]);
 
 /** True when a comment ends on the node's line or the line above; AGENTS.md requires one for every escape hatch. */
 function hasExplainingComment(file: FileContext, line: number) {
@@ -85,7 +85,7 @@ export const typescriptRules: Rule[] = [
         return source ? `${source} result cast to ${node.type.getText()}; keep it unknown and parse with a Zod schema` : null;
       }),
     examples: {
-      path: "retired/backend/lib/example.ts",
+      path: "packages/calendar-core/src/example.ts",
       bad: ["const a = JSON.parse(raw) as Settings;", "const b = (await response.json()) as Mailbox[];", "const c = response.json() as Promise<User>;"],
       good: ["const a = SettingsSchema.parse(JSON.parse(raw));", "const b: unknown = await response.json();", "const c = JSON.parse(raw) as unknown;"],
     },

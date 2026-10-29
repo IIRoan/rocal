@@ -20,7 +20,7 @@ In JSX use `{/* repo-rules-allow <rule-id>: <why> */}`, in CSS `/* repo-rules-al
 
 ## Adding a rule
 
-Add it to the matching module (`repository`, `comments`, `backend`, `client`, `typescript`, `react`, `ui`), give it `examples.bad` and `examples.good` (the runner self-tests them before every scan and fails if a bad example passes or a good one is reported), add a row below, and fix or allow-comment every existing violation in the same change.
+Add it to the matching module (`repository`, `comments`, `client`, `typescript`, `react`, `ui`), give it `examples.bad` and `examples.good` (the runner self-tests them before every scan and fails if a bad example passes or a good one is reported), add a row below, and fix or allow-comment every existing violation in the same change.
 
 ## Rules
 
@@ -34,9 +34,6 @@ Add it to the matching module (`repository`, `comments`, `backend`, `client`, `t
 | `comments-one-line` | Every comment, including JSDoc, is a single line: no multi-line blocks, no `//` pair wrapping one sentence. |
 | `no-commented-out-code` | Delete dead code instead of commenting it out. |
 | `todos-need-owner` | TODO, FIXME, HACK, and XXX comments name an owner `TODO(name)` or reference an issue. |
-| `thin-routes` | Backend routes may hand the Prisma client to a service constructor but never query it, and never import zod. |
-| `owner-scoped-data` | Service Prisma queries without an owner filter must sit in a function with owner/session context, or be allow-commented. |
-| `safe-user-url-fetch` | Backend outbound requests go through `safeFetch`; raw `fetch` only for fixed trusted endpoints, allow-commented. |
 | `client-api-boundary` | App code reaches Solace APIs through `@workspace/calendar-client`; raw `fetch`/`XMLHttpRequest` needs an allow comment naming the protocol. |
 | `api-path-ids` | Values interpolated into an `/api/` path are wrapped in `encodeURIComponent`, so an id from a link cannot leave its path segment. |
 | `e2ee-client-content` | Payloads never carry plaintext title/description/location/name next to ciphertext. |

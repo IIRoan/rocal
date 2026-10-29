@@ -5,8 +5,6 @@
 **/coverage
 **/.turbo
 **/out
-retired/backend/server
-retired/backend/dist
 webmail
 **/.wrangler
 **/.vinext

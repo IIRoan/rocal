@@ -9,12 +9,12 @@ use solace_api_types::mail::{
 };
 
 use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_invalid, expect_unauthorized, expect_unknown_field,
-    hex, json_body, ok,
+    TestApp, TestUser, count, expect_invalid, expect_unauthorized, expect_unknown_field, hex,
+    json_body, ok,
 };
 use crate::mail_support::{
     access_token, bootstrap, bootstrap_request, bridge_secret, kdf_params, mailbox, pgp_key,
-    provision, provisioning_turn, row_json, set_bridge_password, stalwart_account,
+    provision, row_json, set_bridge_password, stalwart_account,
 };
 
 const ENTRY_COUNT: &str = "SELECT count(*) FROM mail_directory_entry WHERE user_id = $1";
@@ -44,15 +44,10 @@ async fn anonymous_callers_are_refused() {
         .await));
     expect_unauthorized(&ok(anon.get("/api/mail/oauth/access-token").await));
 
-    // Elysia validated before the guard, so TypeScript gives a malformed anonymous body the Zod answer; Rust's guard answers first.
-    let malformed = ok(anon.put("/api/mail/account/vault-backup", json!({})).await);
-    match app.backend {
-        Backend::TypeScript => {
-            let error = ok(malformed.expect_error(400, "Validation Error", "Required"));
-            assert_eq!(error["details"]["issues"][0]["path"], json!("vaultVersion"));
-        }
-        Backend::Rust => expect_unauthorized(&malformed),
-    }
+    // The guard answers before a malformed body is validated.
+    expect_unauthorized(&ok(anon
+        .put("/api/mail/account/vault-backup", json!({}))
+        .await));
 }
 
 #[tokio::test]
@@ -476,12 +471,10 @@ async fn an_incomplete_mailbox_is_repaired_by_a_second_bootstrap() {
         ));
 
     let request = bootstrap_request(2);
-    let turn = provisioning_turn(&app).await;
-    let repaired: MailSignup = ok(bootstrap(&app, &mut owner.user, &request)
+    let repaired: MailSignup = ok(bootstrap(&mut owner.user, &request)
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
-    drop(turn);
     assert_eq!(
         repaired.stalwart_account_id, owner.signup.stalwart_account_id,
         "the Stalwart account is reused"
@@ -516,7 +509,7 @@ async fn repairing_an_entry_without_an_account_id_stores_the_new_account() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let (local_part, domain) = user.email.split_once('@').expect("email");
-    // A TypeScript run keeps its entry's empty id, which the unique index would refuse the next run.
+    // A run that failed before the repair leaves its empty id behind, which the unique index would refuse.
     sqlx::query("DELETE FROM mail_directory_entry WHERE stalwart_account_id = ''")
         .execute(&app.db)
         .await
@@ -535,12 +528,10 @@ async fn repairing_an_entry_without_an_account_id_stores_the_new_account() {
     .await
     .expect("entry without an account");
 
-    let turn = provisioning_turn(&app).await;
-    let signup: MailSignup = ok(bootstrap(&app, &mut user, &bootstrap_request(3))
+    let signup: MailSignup = ok(bootstrap(&mut user, &bootstrap_request(3))
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
-    drop(turn);
     let account_id = signup.stalwart_account_id.0;
     assert!(
         stalwart_account(&app, &account_id).await.is_some(),
@@ -553,10 +544,7 @@ async fn repairing_an_entry_without_an_account_id_stores_the_new_account() {
     .fetch_one(&app.db)
     .await
     .expect("entry");
-    match app.backend {
-        Backend::TypeScript => assert_eq!(stored, ""),
-        Backend::Rust => assert_eq!(stored, account_id),
-    }
+    assert_eq!(stored, account_id);
 }
 
 #[tokio::test]
@@ -828,10 +816,6 @@ async fn mailboxes_resolve_by_owner_and_never_attach_to_another_account() {
 #[tokio::test]
 async fn provisioning_and_first_mint_bursts_wait_out_stalwarts_concurrency_limit() {
     let app = TestApp::spawn().await;
-    // TypeScript answers the limit with 503 (its suite serializes provisioning), and its burst would fail concurrent cases' provisioning too.
-    if app.backend == Backend::TypeScript {
-        return;
-    }
     let mut users = Vec::new();
     for _ in 0..48 {
         users.push(app.user().await);
@@ -868,15 +852,14 @@ async fn provisioning_and_first_mint_bursts_wait_out_stalwarts_concurrency_limit
 async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let turn = provisioning_turn(&app).await;
     // No preset bridge password: the first mint logs in, is refused, sets the derived password and retries.
-    let signup: MailSignup = ok(bootstrap(&app, &mut user, &bootstrap_request(3))
+    let signup: MailSignup = ok(bootstrap(&mut user, &bootstrap_request(3))
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
     let account_id = signup.stalwart_account_id.0;
     let mut other = app.user().await;
-    let other_signup: MailSignup = ok(bootstrap(&app, &mut other, &bootstrap_request(4))
+    let other_signup: MailSignup = ok(bootstrap(&mut other, &bootstrap_request(4))
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
@@ -885,8 +868,7 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_secs();
-    let token: MailAccessToken = access_token(&app, &mut user).await;
-    drop(turn);
+    let token: MailAccessToken = access_token(&mut user).await;
     assert!(!token.access_token.is_empty());
     assert!(token.expires_in > 60, "{token:?}");
     assert!(
@@ -894,7 +876,7 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
             && token.expires_at <= before + token.expires_in + 300,
         "{token:?}"
     );
-    let again = access_token(&app, &mut user).await;
+    let again = access_token(&mut user).await;
     assert_eq!(again, token, "a valid token is reused, not reminted");
 
     // An https test Stalwart sits behind the backend gate, which these direct reads must pass too.
@@ -1029,7 +1011,7 @@ fn expect_step_up_required(response: &solace_api_tests::client::ApiResponse) {
     assert!(error.get("requestId").is_none(), "{error}");
 }
 
-/// TypeScript's proxy mints from a session that still needs step-up; Rust refuses it like the access-token route, and relays bearers as before.
+/// The proxy refuses a session that still needs step-up, like the access-token route, but still relays bearer tokens.
 #[tokio::test]
 async fn passkey_step_up_gates_the_mail_token_and_the_proxy_session() {
     let app = TestApp::spawn().await;
@@ -1043,10 +1025,12 @@ async fn passkey_step_up_gates_the_mail_token_and_the_proxy_session() {
         .await
         .expect_status(403));
 
-    let discovery = password_session
-        .get("/api/mail/jmap/.well-known/jmap")
-        .await;
-    let stale = ok(password_session
+    expect_step_up_required(
+        &password_session
+            .get("/api/mail/jmap/.well-known/jmap")
+            .await,
+    );
+    expect_step_up_required(&ok(password_session
         .agent
         .send(
             reqwest::Method::GET,
@@ -1054,18 +1038,7 @@ async fn passkey_step_up_gates_the_mail_token_and_the_proxy_session() {
             None,
             &[("authorization", "Bearer stale-token")],
         )
-        .await);
-    match app.backend {
-        Backend::TypeScript => {
-            let discovery = ok(discovery.expect_status(200).and_then(|r| r.value()));
-            assert_eq!(discovery["username"], json!(owner.user.email));
-            assert_eq!(stale.status.as_u16(), 200, "{}", stale.text());
-        }
-        Backend::Rust => {
-            expect_step_up_required(&discovery);
-            expect_step_up_required(&stale);
-        }
-    }
+        .await));
 
     let mut stepped_up = app.anonymous();
     ok(solace_api_tests::seed::passkey_sign_in(&mut stepped_up, &mut passkey, &app.origin).await);

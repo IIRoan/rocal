@@ -1,6 +1,5 @@
 //! Mail fixtures shared by the mail modules: provisioned mailboxes, JMAP through the proxy, Stalwart admin calls and webhook signatures.
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use base64::engine::DecodePaddingMode;
@@ -18,7 +17,7 @@ use solace_api_types::mail::{
     MailAccessToken, MailBootstrapRequest, MailSignup, MailSyncResult, MailVaultKdfParams,
 };
 
-use crate::helpers::{Backend, TestApp, TestUser, hex, json_body, ok};
+use crate::helpers::{TestApp, TestUser, hex, json_body, ok};
 
 pub const JMAP_MAIL: [&str; 3] = [
     "urn:ietf:params:jmap:core",
@@ -73,65 +72,9 @@ pub fn bootstrap_request(index: usize) -> MailBootstrapRequest {
     }
 }
 
-/// Stalwart limits concurrent JMAP requests per account, every backend provisions through one shared account, and only Rust resends what the limit refuses.
-static PROVISIONING: AtomicBool = AtomicBool::new(false);
-const STALWART_BUSY: &str = "Stalwart admin JMAP request failed with status 400.";
-
-pub struct ProvisioningTurn;
-
-impl Drop for ProvisioningTurn {
-    fn drop(&mut self) {
-        PROVISIONING.store(false, Ordering::Release);
-    }
-}
-
-/// Serializes this suite's provisioning on TypeScript so it does not trip that limit itself.
-pub async fn provisioning_turn(app: &TestApp) -> Option<ProvisioningTurn> {
-    if app.backend == Backend::Rust {
-        return None;
-    }
-    while PROVISIONING
-        .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-        .is_err()
-    {
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
-    Some(ProvisioningTurn)
-}
-
-/// Whether TypeScript answered with Stalwart refusing a provisioning call under load (other backends share the account).
-fn stalwart_busy(app: &TestApp, response: &ApiResponse) -> bool {
-    app.backend == Backend::TypeScript
-        && matches!(response.status.as_u16(), 400 | 503)
-        && response
-            .value()
-            .is_ok_and(|body| body["message"] == json!(STALWART_BUSY))
-}
-
-/// Sends until TypeScript stops answering that Stalwart is busy, at most eight times.
-async fn while_busy(app: &TestApp, mut send: impl AsyncFnMut() -> ApiResponse) -> ApiResponse {
-    let mut attempt = 0;
-    loop {
-        let response = send().await;
-        attempt += 1;
-        if !stalwart_busy(app, &response) || attempt == 8 {
-            return response;
-        }
-        tokio::time::sleep(Duration::from_millis(250 * attempt)).await;
-    }
-}
-
-/// `POST /api/mail/account/bootstrap`, retried while Stalwart is busy; call it holding a [`ProvisioningTurn`].
-pub async fn bootstrap(
-    app: &TestApp,
-    user: &mut TestUser,
-    request: &MailBootstrapRequest,
-) -> ApiResponse {
-    while_busy(app, async || {
-        user.post("/api/mail/account/bootstrap", json_body(request))
-            .await
-    })
-    .await
+pub async fn bootstrap(user: &mut TestUser, request: &MailBootstrapRequest) -> ApiResponse {
+    user.post("/api/mail/account/bootstrap", json_body(request))
+        .await
 }
 
 /// Bootstraps the user's mailbox, sets its bridge password so the backend's first login is not a failed one, and warms the mail token.
@@ -140,13 +83,12 @@ pub async fn provision(
     user: &mut TestUser,
     request: &MailBootstrapRequest,
 ) -> MailSignup {
-    let _turn = provisioning_turn(app).await;
-    let signup: MailSignup = ok(bootstrap(app, user, request)
+    let signup: MailSignup = ok(bootstrap(user, request)
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
     set_bridge_password(app, &signup.stalwart_account_id.0, &user.id, &user.email).await;
-    access_token(app, user).await;
+    access_token(user).await;
     signup
 }
 
@@ -181,7 +123,7 @@ pub async fn set_bridge_password(app: &TestApp, account_id: &str, user_id: &str,
     );
 }
 
-/// `deriveMailBridgeSecret`: HMAC-SHA-256 of `userId:email:mail-bridge:v1`, keyed by the leniently base64-decoded bridge key.
+/// The server's bridge password: HMAC-SHA-256 of `userId:email:mail-bridge:v1`, keyed by the leniently base64-decoded bridge key.
 pub fn bridge_secret(hmac_key: &str, user_id: &str, email: &str) -> String {
     let key = lenient_base64(hmac_key.trim());
     let message = format!("{user_id}:{}:mail-bridge:v1", email.trim().to_lowercase());
@@ -229,10 +171,12 @@ pub async fn stalwart_account(app: &TestApp, account_id: &str) -> Option<Value> 
     reply["methodResponses"][0][1]["list"].get(0).cloned()
 }
 
-/// `GET /api/mail/oauth/access-token`, retried while Stalwart is busy: a first mint makes admin calls.
-pub async fn access_token(app: &TestApp, user: &mut TestUser) -> MailAccessToken {
-    let response = while_busy(app, async || user.get("/api/mail/oauth/access-token").await).await;
-    ok(response.expect_status(200).and_then(|r| r.dto()))
+pub async fn access_token(user: &mut TestUser) -> MailAccessToken {
+    ok(user
+        .get("/api/mail/oauth/access-token")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()))
 }
 
 /// The arguments of the method response with this call id.
@@ -404,9 +348,9 @@ pub async fn row_json(db: &sqlx::PgPool, sql: &str, bind: &str) -> Value {
     serde_json::from_str(&text).expect("row JSON")
 }
 
-/// Expected values computed with Bun, which runs the TypeScript backend.
+/// The vectors the server pins in `mail/bridge.rs`, so the suite sets the password the backend logs in with.
 #[test]
-fn bridge_secrets_match_the_typescript_derivation() {
+fn bridge_secrets_match_the_server_derivation() {
     let cases: [(&str, &[u8]); 10] = [
         ("ab$cd", &[0x69, 0xb7, 0x1d]),
         ("a b-c_d", &[0x69, 0xbf, 0x9c, 0xfd]),

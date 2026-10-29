@@ -5,10 +5,6 @@
 !/apps/native-mail/**
 /packages/ui/**
 !/packages/ui/package.json
-/retired/backend/**
-!/retired/backend/package.json
-!/retired/backend/prisma
-!/retired/backend/prisma/**
 
 # Native builds do not use local agent checkouts or server infrastructure.
 /.claude
@@ -57,8 +53,6 @@ out/
 build
 dist
 apps/web/output
-retired/backend/generated/
-retired/backend/server
 
 
 # Debug

@@ -130,27 +130,6 @@ Patterns that fire diagnostics but are safe to suppress.
   `[...arr].sort(compareFn)` pattern is already immutable (spread creates a
   new array). Upgrading to ES2023 lib is deferred.
 
-## react-doctor/js-hoist-intl — NotificationCalculator timezone cache
-
-- **File**: `retired/backend/lib/notification-calculator.ts`
-- **Why FP**: `Intl.DateTimeFormat` options include a per-call IANA timezone.
-  Formatters are cached in a module-level `Map` keyed by resolved timezone
-  (`getLocalDateTimeFormatter`). Hoisting a single formatter to module scope
-  would drop timezone correctness.
-- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
-  for `**/lib/notification-calculator.ts`.
-
-## react-doctor/async-await-in-loop — intentional sequential side effects
-
-- **Files**:
-  - `retired/backend/services/event.service.ts` (event duplicate fan-out)
-  - `retired/backend/services/event-participant.service.ts` (invitation email delivery)
-  - `retired/backend/services/mail-sync.service.ts` (per-account JMAP receipt poll)
-- **Why FP**: Each iteration performs ordered side effects (create → sync
-  participants → send invites; outbound mail delivery; JMAP change detection
-  per mailbox). Parallelizing would race DB uniqueness, amplify rate limits,
-  or send invitations before dependent rows exist. Keep sequential `for…of`.
-
 ## react-doctor/no-giant-component — LoginForm auth surface
 
 - **File**: `apps/web/app/login/_content.tsx` (`LoginFormBody`)

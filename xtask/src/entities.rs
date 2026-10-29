@@ -1,4 +1,4 @@
-//! Regenerates `apps/backend/src/db/entities` with sea-orm-cli from a throwaway database built from the 57 migrations.
+//! Regenerates `apps/backend/src/db/entities` with sea-orm-cli from a throwaway database built by the API's migrations.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -19,9 +19,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let url = env.database_url_for(DATABASE)?;
     let mut admin = PgConnection::connect(&env.database_url).await?;
     crate::test_env::recreate_database(&mut admin, DATABASE, None).await?;
-    let mut db = PgConnection::connect(&url).await?;
-    crate::test_env::apply_migrations(&mut db).await?;
-    db.close().await?;
+    crate::test_env::apply_migrations(&url).await?;
 
     let root = crate::repo_root();
     let out = root.join("target/solace-entities");
@@ -41,7 +39,7 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
             "--banner-version",
             "off",
             "--ignore-tables",
-            "_prisma_migrations",
+            "seaql_migrations",
         ])
         .status()?;
     ensure!(status.success(), "sea-orm-cli failed");

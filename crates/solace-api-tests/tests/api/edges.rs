@@ -4,7 +4,7 @@ use reqwest::Method;
 use serde_json::json;
 use solace_api_tests::client::{ApiResponse, ResponseResult};
 
-use crate::helpers::{Backend, Mode, TestApp, expect_unauthorized, header, ok};
+use crate::helpers::{Mode, TestApp, expect_unauthorized, header, ok};
 
 fn assert_security_headers(app: &TestApp, response: &ApiResponse, corp: &str) {
     assert_eq!(header(response, "x-content-type-options"), Some("nosniff"));
@@ -203,15 +203,9 @@ async fn cross_site_writes_are_refused_from_untrusted_origins() {
             &[("origin", "https://evil.example")],
         )
         .await);
-    match app.backend {
-        // TypeScript checked the Origin only on Better Auth's routes.
-        Backend::TypeScript => assert!(cross_site.status.is_success(), "{}", cross_site.text()),
-        Backend::Rust => {
-            ok(cross_site
-                .expect_error(403, "Forbidden", "Invalid origin")
-                .map(|_| ()));
-        }
-    }
+    ok(cross_site
+        .expect_error(403, "Forbidden", "Invalid origin")
+        .map(|_| ()));
     let null_origin = ok(user
         .agent
         .send(
@@ -221,9 +215,7 @@ async fn cross_site_writes_are_refused_from_untrusted_origins() {
             &[("origin", "null")],
         )
         .await);
-    if app.backend == Backend::Rust {
-        assert_eq!(null_origin.status.as_u16(), 403);
-    }
+    assert_eq!(null_origin.status.as_u16(), 403);
     let trusted = ok(user
         .agent
         .post(
@@ -328,7 +320,7 @@ async fn malformed_json_is_a_parse_error() {
     assert!(body["requestId"].is_string() && body["timestamp"].is_string());
 }
 
-/// Rust's guard answers before a guarded route validates its body, query or path; Elysia validated first, so TypeScript answers 400.
+/// The guard answers before a guarded route validates its body, query or path.
 #[tokio::test]
 async fn guarded_routes_authenticate_before_they_validate() {
     let app = TestApp::spawn().await;
@@ -352,14 +344,10 @@ async fn guarded_routes_authenticate_before_they_validate() {
             ok(agent.get("/api/profiles/avatars/bad.id").await),
         ];
         for response in &malformed {
-            match (app.backend, anonymous) {
-                (Backend::TypeScript, _) => {
-                    assert_eq!(response.status.as_u16(), 400, "{}", response.text());
-                }
-                (Backend::Rust, true) => expect_unauthorized(response),
-                (Backend::Rust, false) => {
-                    ok(response.expect_error(403, "Forbidden", "Passkey verification required."));
-                }
+            if anonymous {
+                expect_unauthorized(response);
+            } else {
+                ok(response.expect_error(403, "Forbidden", "Passkey verification required."));
             }
         }
     }
@@ -371,11 +359,7 @@ async fn guarded_routes_authenticate_before_they_validate() {
         .send()
         .await
         .expect("request");
-    let expected = match app.backend {
-        Backend::TypeScript => 400,
-        Backend::Rust => 401,
-    };
-    assert_eq!(unparsable.status().as_u16(), expected);
+    assert_eq!(unparsable.status().as_u16(), 401);
 
     let public = ok(app
         .anonymous()
@@ -432,28 +416,20 @@ async fn integers_beyond_what_the_api_stores_are_validation_errors() {
     ];
     for (method, path, body, message, field) in cases {
         let response = ok(user.agent.send(method, path, body, &[]).await);
-        match app.backend {
-            // TypeScript validated these and then failed in the database or the client.
-            Backend::TypeScript => assert!(!response.status.is_success(), "{path}"),
-            Backend::Rust => {
-                let error = response
-                    .expect_error(400, "Validation Error", message)
-                    .unwrap_or_else(|e| panic!("{path}: {e}"));
-                assert_eq!(
-                    error["details"]["issues"][0]["path"],
-                    json!(field),
-                    "{path}"
-                );
-            }
-        }
+        let error = response
+            .expect_error(400, "Validation Error", message)
+            .unwrap_or_else(|e| panic!("{path}: {e}"));
+        assert_eq!(
+            error["details"]["issues"][0]["path"],
+            json!(field),
+            "{path}"
+        );
     }
-    if app.backend == Backend::Rust {
-        let large = ok(user
-            .agent
-            .get("/api/events/search?q=ab&offset=9000000000000000")
-            .await);
-        assert_eq!(large.status.as_u16(), 200, "{}", large.text());
-    }
+    let large = ok(user
+        .agent
+        .get("/api/events/search?q=ab&offset=9000000000000000")
+        .await);
+    assert_eq!(large.status.as_u16(), 200, "{}", large.text());
 }
 
 #[tokio::test]

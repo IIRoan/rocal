@@ -3,7 +3,6 @@
 use serde_json::{Value, json};
 use solace_api_tests::seed::fake_envelope;
 use solace_api_types::categories::{Category, CategoryList};
-use solace_api_types::common::OperationWarning;
 use solace_api_types::events::{
     BulkEventRequest, BulkEventResult, Event, EventDeleted, SealEncryptionRequest,
     UpdateEventRequest,
@@ -15,7 +14,7 @@ use crate::event_fixtures::{
     stored_content, to_json,
 };
 use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+    TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
 };
 
 const COLOR_MESSAGE: &str = "Color must be one of: blue, orange, violet, rose, emerald, red, cyan, lime, amber, indigo, pink, teal or a valid hex color (e.g., #FF0000)";
@@ -90,15 +89,8 @@ async fn anonymous_callers_are_refused() {
         .await));
     expect_unauthorized(&ok(anon.delete(&format!("/api/events/{id}")).await));
 
-    // Elysia validated before the guard, so TypeScript answers a malformed anonymous body 400; Rust's guard answers first.
-    let response = ok(anon.post("/api/events", json!({})).await);
-    match app.backend {
-        Backend::TypeScript => {
-            let error = ok(response.expect_error(400, "Validation Error", "Required"));
-            assert_eq!(issue_paths(&error), ["start", "end", "calendarId"]);
-        }
-        Backend::Rust => expect_unauthorized(&response),
-    }
+    // The guard answers before a malformed body is validated.
+    expect_unauthorized(&ok(anon.post("/api/events", json!({})).await));
 }
 
 #[tokio::test]
@@ -1073,36 +1065,21 @@ async fn an_overdue_reminder_on_an_upcoming_event_fires_on_the_next_minute() {
     let created = create_event(&mut owner, &request).await;
 
     assert_eq!(created.reminder, Some(1440));
-    let schedules = || {
+    assert_eq!(created.warnings, None);
+    assert_eq!(
         count(
             &app.db,
             "SELECT count(*) FROM event_notification WHERE event_id = $1",
             &created.id.0,
         )
-    };
-    match app.backend {
-        // TypeScript clamps to the current minute, which chk_notification_time_future (time > created_at) rejects.
-        Backend::TypeScript => {
-            assert_eq!(
-                created.warnings,
-                Some(vec![OperationWarning {
-                    code: "reminder_schedule_failed".into(),
-                    message: "Your event was saved, but the email reminder could not be scheduled. Try again from event settings.".into(),
-                    target: None,
-                }])
-            );
-            assert_eq!(schedules().await, 0);
-        }
-        Backend::Rust => {
-            assert_eq!(created.warnings, None);
-            assert_eq!(schedules().await, 1);
-            assert_eq!(
-                overdue_schedule_shape(&app, &created.id.0).await,
-                (true, true, true, true),
-                "after created_at, on a minute, within a minute, before the start"
-            );
-        }
-    }
+        .await,
+        1
+    );
+    assert_eq!(
+        overdue_schedule_shape(&app, &created.id.0).await,
+        (true, true, true, true),
+        "after created_at, on a minute, within a minute, before the start"
+    );
     assert_eq!(
         count(
             &app.db,
@@ -1729,15 +1706,7 @@ async fn synced_events_are_read_only() {
         .expect_error(
             400,
             "Validation Error",
-            match app.backend {
-                // TypeScript names the events by title, which is user content in the message.
-                Backend::TypeScript => {
-                    "Cannot modify synced events. The following synced events are read-only: Holiday"
-                }
-                Backend::Rust => {
-                    "Cannot modify synced events. Synced events are read-only (1 selected)."
-                }
-            },
+            "Cannot modify synced events. Synced events are read-only (1 selected).",
         ));
     assert_eq!(
         row_snapshot(&app.db, "calendar_event", &event).await,
@@ -1765,32 +1734,22 @@ async fn bulk_move_and_duplicate_refuse_a_read_only_target() {
         ("move", "Cannot move events to a read-only calendar."),
         ("duplicate", "Cannot copy events to a read-only calendar."),
     ] {
-        let response = owner
+        let error = ok(owner
             .post(
                 "/api/events/bulk",
                 json!({"action": action, "eventIds": [event.id], "targetCalendarId": feed}),
             )
-            .await;
-        match app.backend {
-            // TypeScript checks only that the target is owned.
-            Backend::TypeScript => {
-                ok(response.expect_status(200));
-            }
-            Backend::Rust => {
-                let error = ok(response.expect_error(400, "Validation Error", message));
-                assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
-            }
-        }
+            .await
+            .expect_error(400, "Validation Error", message));
+        assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
     }
-    if app.backend == Backend::Rust {
-        let stored = count(
-            &app.db,
-            "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
-            &feed,
-        )
-        .await;
-        assert_eq!(stored, 0, "nothing landed in the feed calendar");
-    }
+    let stored = count(
+        &app.db,
+        "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
+        &feed,
+    )
+    .await;
+    assert_eq!(stored, 0, "nothing landed in the feed calendar");
 }
 
 #[tokio::test]
@@ -1854,12 +1813,7 @@ async fn bulk_move_checks_the_target_calendar() {
         moved,
         BulkEventResult {
             success: true,
-            message: match app.backend {
-                // TypeScript names the target calendar, which is user content.
-                Backend::TypeScript => "Successfully moved 2 events to Family",
-                Backend::Rust => "Successfully moved 2 events",
-            }
-            .into(),
+            message: "Successfully moved 2 events".into(),
             events_processed: 2,
             action: "move".into(),
             created_events: None,
@@ -1934,35 +1888,25 @@ async fn bulk_duplicate_refuses_another_users_calendar() {
         &encrypted_event(&work, FUTURE_START, FUTURE_END),
     )
     .await;
-    let response = owner
+    let error = ok(owner
         .post(
             "/api/events/bulk",
             json!({"action": "duplicate", "eventIds": [event.id], "targetCalendarId": foreign}),
         )
-        .await;
-    let copies = match app.backend {
-        // TypeScript copies into any calendar id and returns that calendar, share token included.
-        Backend::TypeScript => {
-            ok(response.expect_status(200));
-            1
-        }
-        Backend::Rust => {
-            let error = ok(response.expect_error(
-                400,
-                "Validation Error",
-                "Target calendar not found or access denied",
-            ));
-            assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
-            0
-        }
-    };
+        .await
+        .expect_error(
+            400,
+            "Validation Error",
+            "Target calendar not found or access denied",
+        ));
+    assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
     let stored = count(
         &app.db,
         "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
         &foreign,
     )
     .await;
-    assert_eq!(stored, copies);
+    assert_eq!(stored, 0);
 }
 
 #[tokio::test]

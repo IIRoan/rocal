@@ -16,7 +16,17 @@ pub struct ScratchDatabase {
 }
 
 impl ScratchDatabase {
+    /// A copy of the template, which has every migration applied.
     pub async fn create() -> Self {
+        Self::new(Some(TEMPLATE)).await
+    }
+
+    /// A database with no tables, for the migrations themselves.
+    pub async fn empty() -> Self {
+        Self::new(None).await
+    }
+
+    async fn new(template: Option<&str>) -> Self {
         let admin_url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| LOCAL_SERVER.into());
         let mut url = url::Url::parse(&admin_url).expect("TEST_DATABASE_URL");
         assert!(
@@ -29,7 +39,10 @@ impl ScratchDatabase {
             .await
             .expect("connect to the test Postgres (cargo xtask test-env up)");
         admin
-            .execute_unprepared(&format!("CREATE DATABASE {name} TEMPLATE {TEMPLATE}"))
+            .execute_unprepared(&match template {
+                Some(template) => format!("CREATE DATABASE {name} TEMPLATE {template}"),
+                None => format!("CREATE DATABASE {name}"),
+            })
             .await
             .expect("clone the template database (cargo xtask test-env template)");
         let _ = admin.close().await;

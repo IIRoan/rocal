@@ -14,7 +14,7 @@ pub const LOCAL_STALWART_NOREPLY_PASSWORD: &str = "solace-test-noreply-local";
 /// Local S3 mock (adobe/s3mock) holding the avatar bucket, started by `cargo xtask test-env up`; it ignores credentials.
 pub const LOCAL_S3_PORT: u16 = 59000;
 pub const LOCAL_AVATAR_BUCKET: &str = "solace-test-avatars";
-/// Fixed server secrets for local runs, shared by both backends so sessions and bridge passwords interoperate.
+/// Fixed server secrets for local runs, which the suite also uses to verify cookies, derive bridge passwords and sign webhooks.
 pub const LOCAL_BETTER_AUTH_SECRET: &str = "solace-test-better-auth-secret-local-0001";
 pub const LOCAL_MAIL_BRIDGE_HMAC_KEY: &str = "solace-test-mail-bridge-hmac-local-0001";
 pub const LOCAL_STALWART_WEBHOOK_SECRET: &str = "solace-test-stalwart-webhook-local-0001";
@@ -150,7 +150,7 @@ pub const PRODUCTION_BACKEND_URL: &str = "https://api.solace.test";
 pub const DEVELOPMENT_FRONTEND_URL: &str = "http://localhost:4100";
 
 impl TestEnv {
-    /// The environment both backends run with, so the TypeScript and Rust servers see identical settings.
+    /// The environment the backend under test runs with.
     pub fn backend_vars(&self, target: &BackendTarget<'_>) -> Vec<(&'static str, String)> {
         let (node_env, backend_url, frontend_url) = if target.production {
             (
@@ -178,7 +178,7 @@ impl TestEnv {
                 "STALWART_WEBHOOK_SECRET",
                 self.stalwart_webhook_secret.clone(),
             ),
-            // Every STALWART_* variable is set: the TypeScript backend otherwise falls back to production Stalwart.
+            // Every STALWART_* variable is set: the backend otherwise falls back to production Stalwart.
             ("STALWART_BASE_URL", self.stalwart_url.clone()),
             ("STALWART_JMAP_URL", self.stalwart_url.clone()),
             ("STALWART_DEFAULT_DOMAIN", self.mail_domain.clone()),

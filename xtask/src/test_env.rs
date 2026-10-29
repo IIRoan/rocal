@@ -120,13 +120,12 @@ fn down() -> anyhow::Result<()> {
     ])
 }
 
-/// Applies every Prisma migration in order to a fresh template database.
+/// Builds a fresh template database with the API's migrations.
 async fn template(env: &TestEnv) -> anyhow::Result<()> {
     let mut admin = PgConnection::connect(&env.database_url).await?;
     recreate_database(&mut admin, TEMPLATE_DATABASE, None).await?;
-    let mut db = PgConnection::connect(&env.database_url_for(TEMPLATE_DATABASE)?).await?;
-    let applied = apply_migrations(&mut db).await?;
-    println!("{TEMPLATE_DATABASE}: {applied} migrations applied");
+    apply_migrations(&env.database_url_for(TEMPLATE_DATABASE)?).await?;
+    println!("{TEMPLATE_DATABASE}: migrations applied");
     Ok(())
 }
 
@@ -197,23 +196,13 @@ pub fn seed_manifest_path(env: &TestEnv, database: &str) -> std::path::PathBuf {
     ))
 }
 
-/// Runs `retired/backend/prisma/migrations/*/migration.sql` in name order, as `prisma migrate deploy` does.
-pub async fn apply_migrations(db: &mut PgConnection) -> anyhow::Result<usize> {
-    let dir = crate::repo_root().join("retired/backend/prisma/migrations");
-    let mut migrations: Vec<_> = std::fs::read_dir(&dir)?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path().join("migration.sql"))
-        .filter(|path| path.is_file())
-        .collect();
-    migrations.sort();
-    for path in &migrations {
-        let sql = std::fs::read_to_string(path)?;
-        sqlx::raw_sql(&sql)
-            .execute(&mut *db)
-            .await
-            .with_context(|| format!("migration {}", path.display()))?;
-    }
-    Ok(migrations.len())
+/// Runs the API's migrator, as its startup does.
+pub async fn apply_migrations(database_url: &str) -> anyhow::Result<()> {
+    // One connection holds the migration lock while the other applies them.
+    let db = solace_server::db::connect(database_url, 2).await?;
+    solace_server::db::migrate(&db).await?;
+    db.close().await?;
+    Ok(())
 }
 
 async fn wait_for_postgres(env: &TestEnv) -> anyhow::Result<()> {

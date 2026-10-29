@@ -15,7 +15,7 @@ use crate::event_fixtures::{
     stored_content, to_json, unfold,
 };
 use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+    TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
 };
 
 const WEEKLY_FIVE: &str = r#"{"frequency":"weekly","interval":1,"count":5}"#;
@@ -1747,12 +1747,8 @@ async fn single_bulk_and_calendar_deletes_take_the_series_exceptions() {
             .await,
             0
         );
-        let left = exceptions(&app, series).await.len();
-        match app.backend {
-            // recurrence_exception has no foreign key, and TypeScript leaves it behind.
-            Backend::TypeScript => assert_eq!(left, 1, "{series}"),
-            Backend::Rust => assert_eq!(left, 0, "{series}"),
-        }
+        // recurrence_exception has no foreign key, so the delete removes it explicitly.
+        assert_eq!(exceptions(&app, series).await.len(), 0, "{series}");
     }
 }
 

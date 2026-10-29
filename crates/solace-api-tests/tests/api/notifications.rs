@@ -11,9 +11,7 @@ use crate::event_fixtures::{
     insert_plaintext_event, insert_staging_calendar, iso_from_now, row_snapshot, to_json,
 };
 use crate::events::overdue_schedule_shape;
-use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok,
-};
+use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok};
 
 const NOT_FOUND: &str = "Event not found or access denied";
 
@@ -680,49 +678,27 @@ async fn an_overdue_schedule_fires_on_the_next_minute() {
         to_json(&update(vec![setting("email", 30, true)])),
     )
     .await;
-    let before = row_snapshot(&app.db, "calendar_event", &event).await;
 
-    let response = owner
+    let result: NotificationUpdateResult = ok(owner
         .put(
             &format!("/api/notifications/event/{event}"),
             to_json(&update(vec![setting("email", 1440, true)])),
         )
-        .await;
-    match app.backend {
-        // TypeScript clamps to the current minute, which breaks chk_notification_time_future and fails the whole transaction.
-        Backend::TypeScript => {
-            let error = ok(response.expect_error(
-                500,
-                "Internal Server Error",
-                "An unexpected error occurred. If this keeps happening, contact support and include the request id.",
-            ));
-            assert!(error["requestId"].is_string());
-            assert_eq!(
-                schedules(&app, &event).await,
-                [("email".to_owned(), 30, None)]
-            );
-            assert_eq!(
-                row_snapshot(&app.db, "calendar_event", &event).await,
-                before
-            );
-        }
-        Backend::Rust => {
-            let result: NotificationUpdateResult =
-                ok(response.expect_status(200).and_then(|r| r.dto()));
-            let data = result.data.expect("data");
-            assert_eq!((data.created, data.skipped), (1, 0));
-            assert_eq!(data.details.created_notifications[0].minutes_before, 1440);
-            assert_eq!(
-                schedules(&app, &event).await,
-                [("email".to_owned(), 1440, None)]
-            );
-            assert_eq!(reminder(&app, &event).await, Some(1440));
-            assert_eq!(
-                overdue_schedule_shape(&app, &event).await,
-                (true, true, true, true)
-            );
-        }
-    }
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    let data = result.data.expect("data");
+    assert_eq!((data.created, data.skipped), (1, 0));
+    assert_eq!(data.details.created_notifications[0].minutes_before, 1440);
+    assert_eq!(
+        schedules(&app, &event).await,
+        [("email".to_owned(), 1440, None)]
+    );
+    assert_eq!(reminder(&app, &event).await, Some(1440));
+    assert_eq!(
+        overdue_schedule_shape(&app, &event).await,
+        (true, true, true, true)
+    );
 }
 
 #[tokio::test]

@@ -1,4 +1,3 @@
-import { backendRules } from "./backend";
 import { clientRules } from "./client";
 import { commentRules } from "./comments";
 import type { Rule } from "./engine";
@@ -10,7 +9,6 @@ import { uiRules } from "./ui";
 export const rules: Rule[] = [
   ...repositoryRules,
   ...commentRules,
-  ...backendRules,
   ...clientRules,
   ...typescriptRules,
   ...reactRules,

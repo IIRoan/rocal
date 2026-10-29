@@ -11,7 +11,7 @@ use crate::helpers::{
 
 const UPDATED_SUBJECT: &str = "Your Solace password was updated";
 
-/// A password and the hash the TypeScript backend wrote for it at sign-up, before clients derived auth keys.
+/// A password and the legacy hash sign-up stored for it before clients derived auth keys.
 fn legacy_credential() -> (String, String) {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),

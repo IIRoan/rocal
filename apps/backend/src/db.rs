@@ -1,11 +1,15 @@
-//! The one database pool, the generated entities, and the id and timestamp defaults Prisma used to set.
+//! The one database pool, its migrations, the generated entities, and the id and timestamp defaults Prisma used to set.
 
 mod behavior;
 pub mod entities;
+// `async_trait` rejects a named `SchemaManager` lifetime in a migration's `up`.
+#[allow(elided_lifetimes_in_paths)]
+mod migrations;
 #[cfg(any(test, feature = "test-support"))]
 pub mod scratch;
 
 pub use behavior::cuid;
+pub use migrations::{Migrator, migrate};
 
 use std::time::Duration;
 

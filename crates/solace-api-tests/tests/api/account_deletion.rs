@@ -17,8 +17,8 @@ use solace_api_types::subscriptions::{EncryptedIcsEvent, EncryptedIcsImportReque
 use sqlx::PgPool;
 
 use crate::helpers::{
-    Backend, TestApp, TestUser, expect_invalid, expect_unauthorized, expect_unknown_field, hex,
-    json_body, ok,
+    TestApp, TestUser, expect_invalid, expect_unauthorized, expect_unknown_field, hex, json_body,
+    ok,
 };
 use crate::mail_support::bootstrap_request;
 use crate::passkeys::sha256_base64url;
@@ -30,7 +30,7 @@ type RowKey = (String, Option<String>);
 async fn tables(db: &PgPool) -> Vec<String> {
     sqlx::query_scalar(
         "SELECT table_name::text FROM information_schema.tables \
-         WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> '_prisma_migrations' ORDER BY 1",
+         WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> 'seaql_migrations' ORDER BY 1",
     )
     .fetch_all(db)
     .await
@@ -506,14 +506,15 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         .expect("one-time token")
         .to_owned();
     let one_time = format!("one-time-token:{}", sha256_base64url(&one_time_token));
-    let mut expected = vec!["one-time-token", "passkey-challenge", "reset-password"];
-    // Rust marks each passkey sign-in for the native bridge's complete-step-up.
-    if app.backend == Backend::Rust {
-        expected.push("step-up-marker");
-    }
+    // Each passkey sign-in leaves a step-up marker for the native bridge's complete-step-up.
     assert_eq!(
         verifications(&app.db, &victim.id, &one_time).await,
-        expected
+        [
+            "one-time-token",
+            "passkey-challenge",
+            "reset-password",
+            "step-up-marker"
+        ]
     );
 
     let (needles, owned) = owned_rows(&app.db, &victim).await;
@@ -575,31 +576,18 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         }
     );
 
-    let typescript = app.backend == Backend::TypeScript;
     let expected_leftovers: BTreeSet<RowKey> = owned
         .keys()
         .filter(|(table, id)| {
-            // TypeScript leaves the passkey challenge, the reset token and the FK-less recurrence exceptions behind.
-            (typescript && (table == "verification" || table == "recurrence_exception"))
-                || (table == "event_participant"
-                    && id.as_ref().is_some_and(|id| participants.contains(id)))
+            table == "event_participant" && id.as_ref().is_some_and(|id| participants.contains(id))
         })
         .cloned()
         .collect();
-    assert_eq!(
-        expected_leftovers
-            .iter()
-            .filter(|(t, _)| t == "recurrence_exception")
-            .count(),
-        if typescript { 2 } else { 0 }
-    );
     assert_eq!(remaining(&app.db, &needles).await, expected_leftovers);
-    let left: &[&str] = if typescript {
-        &["one-time-token", "passkey-challenge", "reset-password"]
-    } else {
-        &[]
-    };
-    assert_eq!(verifications(&app.db, &victim.id, &one_time).await, left);
+    assert_eq!(
+        verifications(&app.db, &victim.id, &one_time).await,
+        Vec::<String>::new()
+    );
     let mut kept = Vec::new();
     for id in &participants {
         let row: Participation = sqlx::query_as(
@@ -611,22 +599,15 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         .expect("bystander's participant row");
         kept.push(row);
     }
-    let expected = if typescript {
-        // TypeScript only cuts the link (ON DELETE SET NULL).
-        [
-            unlinked(&victim.email, Some("Victim"), "accepted"),
-            unlinked(&victim.email, Some("Victim"), "accepted"),
-            unlinked(&upper, Some("Typed name"), "tentative"),
-        ]
-    } else {
-        // The typed address stays; the account's RSVP and a name that may come from its profile go.
+    // The typed address stays; the account's RSVP and a name that may come from its profile go.
+    assert_eq!(
+        kept,
         [
             unlinked(&victim.email, None, "pending"),
             unlinked(&victim.email, None, "accepted"),
             unlinked(&upper, None, "pending"),
         ]
-    };
-    assert_eq!(kept, expected);
+    );
 
     let mut bystander_after = rows_mentioning(&app.db, &bystander_needles).await;
     let mut expected_bystander = bystander_before.clone();

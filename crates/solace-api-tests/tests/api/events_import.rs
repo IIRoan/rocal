@@ -11,9 +11,7 @@ use solace_api_types::subscriptions::{
 use crate::event_fixtures::{
     StoredContent, calendar_id, insert_calendar, list_events, stored_content, to_json,
 };
-use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok,
-};
+use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok};
 
 fn entry(external_id: &str) -> EncryptedIcsEvent {
     EncryptedIcsEvent {
@@ -289,23 +287,11 @@ async fn overrides_link_to_their_series() {
     )
     .await;
     let starts: Vec<&str> = list.events.iter().map(|e| e.start.0.as_str()).collect();
-    match app.backend {
-        // TypeScript's list never applies a series' exceptions (see events_list).
-        Backend::TypeScript => assert_eq!(
-            starts,
-            [
-                "2099-03-02T09:00:00.000Z",
-                "2099-03-09T09:00:00.000Z",
-                "2099-03-09T12:00:00.000Z",
-                "2099-03-16T09:00:00.000Z",
-            ]
-        ),
-        Backend::Rust => assert_eq!(
-            starts,
-            ["2099-03-02T09:00:00.000Z", "2099-03-09T12:00:00.000Z"],
-            "the override replaces its occurrence and the excluded date is gone"
-        ),
-    }
+    assert_eq!(
+        starts,
+        ["2099-03-02T09:00:00.000Z", "2099-03-09T12:00:00.000Z"],
+        "the override replaces its occurrence and the excluded date is gone"
+    );
 
     let mut orphan = entry("orphan-token");
     orphan.series_external_id = Some("missing-series".into());

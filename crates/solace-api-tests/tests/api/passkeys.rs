@@ -7,7 +7,7 @@ use solace_api_tests::webauthn::SoftPasskey;
 use solace_api_types::auth::{SessionWithUser, StatusFlag};
 
 use crate::helpers::{
-    Backend, TestApp, TestUser, auth_error, count, ok, set_cookies_named, signed_cookie_token,
+    TestApp, TestUser, auth_error, count, ok, set_cookies_named, signed_cookie_token,
 };
 
 const STEP_UP_COOKIE: &str = "solace-passkey-step-up";
@@ -631,7 +631,7 @@ async fn the_bridge_freshens_a_session_for_native_passkey_setup() {
     }
 }
 
-/// TypeScript lets any session mark itself passkey-verified here; Rust wants a session a passkey sign-in created.
+/// Only a session a passkey sign-in created can mark itself passkey-verified here.
 #[tokio::test]
 async fn complete_step_up_refuses_a_session_without_a_passkey_sign_in() {
     let app = TestApp::spawn().await;
@@ -642,25 +642,14 @@ async fn complete_step_up_refuses_a_session_without_a_passkey_sign_in() {
     let response = ok(password_only
         .post("/api/auth/passkey-bridge/complete-step-up", json!({}))
         .await);
-    match app.backend {
-        Backend::TypeScript => {
-            assert_eq!(
-                ok(response.expect_status(200).and_then(|r| r.value())),
-                json!({"ok": true})
-            );
-            ok(password_only.get("/api/settings").await.expect_status(200));
-        }
-        Backend::Rust => {
-            auth_error(
-                &response,
-                403,
-                "PASSKEY_STEP_UP_REQUIRED",
-                "Passkey verification required.",
-            );
-            assert!(set_cookies_named(&response, STEP_UP_COOKIE).is_empty());
-            expect_step_up_required(&ok(password_only.get("/api/settings").await));
-        }
-    }
+    auth_error(
+        &response,
+        403,
+        "PASSKEY_STEP_UP_REQUIRED",
+        "Passkey verification required.",
+    );
+    assert!(set_cookies_named(&response, STEP_UP_COOKIE).is_empty());
+    expect_step_up_required(&ok(password_only.get("/api/settings").await));
 }
 
 /// `signInWithBrowserPasskey`: the app's password session opens the web bridge, a passkey sign-in there makes a new session, and the app takes it and then its step-up.
@@ -720,15 +709,12 @@ async fn the_native_passkey_sign_in_bridge_hands_its_step_up_to_the_app() {
     let again = ok(native
         .post("/api/auth/passkey-bridge/complete-step-up", json!({}))
         .await);
-    match app.backend {
-        Backend::TypeScript => assert_eq!(again.status.as_u16(), 200),
-        Backend::Rust => auth_error(
-            &again,
-            403,
-            "PASSKEY_STEP_UP_REQUIRED",
-            "Passkey verification required.",
-        ),
-    }
+    auth_error(
+        &again,
+        403,
+        "PASSKEY_STEP_UP_REQUIRED",
+        "Passkey verification required.",
+    );
 }
 
 /// The plugin's `expiresIn: 3` is in minutes; the token is stored as a SHA-256 hash pointing at the issuing session.

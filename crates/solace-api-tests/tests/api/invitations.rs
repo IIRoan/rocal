@@ -13,7 +13,7 @@ use crate::event_fixtures::{
     FUTURE_END, FUTURE_START, StoredContent, assert_no_mail, calendar_id, create_event,
     encrypted_event, list_events, row_snapshot, sent_mail, stored_content, to_json, unfold,
 };
-use crate::helpers::{Backend, TestApp, TestUser, count, expect_unknown_field, hex, ok};
+use crate::helpers::{TestApp, TestUser, count, expect_unknown_field, hex, ok};
 
 const NOT_FOUND: &str = "Event not found or access denied";
 
@@ -201,41 +201,23 @@ async fn mailed_series_skip_their_excluded_and_overridden_occurrences() {
             &format!("2099-03-{day:02}T10:00:00.000Z"),
         )
     };
-    match app.backend {
-        // TypeScript stores overrides as unrelated events and ignores EXDATE.
-        Backend::TypeScript => {
-            assert_eq!(
-                first,
-                [
-                    monday(2),
-                    monday(9),
-                    monday(16),
-                    at("2099-03-16T14:00:00.000Z", "2099-03-16T15:00:00.000Z"),
-                    monday(23),
-                ]
-            );
-            assert_eq!(second.len(), 6);
-        }
-        Backend::Rust => {
-            assert_eq!(
-                first,
-                [
-                    monday(2),
-                    at("2099-03-16T14:00:00.000Z", "2099-03-16T15:00:00.000Z"),
-                    monday(23),
-                ]
-            );
-            assert_eq!(
-                second,
-                [
-                    monday(2),
-                    at("2099-03-16T14:00:00.000Z", "2099-03-16T15:00:00.000Z"),
-                    at("2099-03-23T16:00:00.000Z", "2099-03-23T17:00:00.000Z"),
-                ],
-                "a later override joins without losing the series' earlier exceptions"
-            );
-        }
-    }
+    assert_eq!(
+        first,
+        [
+            monday(2),
+            at("2099-03-16T14:00:00.000Z", "2099-03-16T15:00:00.000Z"),
+            monday(23),
+        ]
+    );
+    assert_eq!(
+        second,
+        [
+            monday(2),
+            at("2099-03-16T14:00:00.000Z", "2099-03-16T15:00:00.000Z"),
+            at("2099-03-23T16:00:00.000Z", "2099-03-23T17:00:00.000Z"),
+        ],
+        "a later override joins without losing the series' earlier exceptions"
+    );
 }
 
 async fn import(user: &mut TestUser, request: &ImportInvitationRequest) -> InvitationImportSummary {
@@ -1209,15 +1191,7 @@ async fn attendee_copies_are_read_only_and_deleting_declines() {
             .expect_error(
                 400,
                 "Validation Error",
-                match app.backend {
-                    // TypeScript names the events by title, which is user content in the message.
-                    Backend::TypeScript => {
-                        "Imported invitation events are read-only for attendees: Planning"
-                    }
-                    Backend::Rust => {
-                        "Imported invitation events are read-only for attendees (1 selected)."
-                    }
-                },
+                "Imported invitation events are read-only for attendees (1 selected).",
             ));
     }
     assert_eq!(

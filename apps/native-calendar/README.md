@@ -50,7 +50,7 @@ Changing native modules, Expo plugins, or app `version` requires a **new native 
 
 ## Build upload contents
 
-Both apps use the repository-root `.easignore`. It excludes local agent worktrees, caches, credentials and unrelated service/web source while retaining the shared native packages, patches, every Bun workspace manifest and the retired backend’s Prisma schema for its install hook. EAS uses this file instead of all `.gitignore` files, so keep secret and generated-file exclusions here too.
+Both apps use the repository-root `.easignore`. It excludes local agent worktrees, caches, credentials and unrelated service/web source while retaining the shared native packages, patches, and every Bun workspace manifest. EAS uses this file instead of all `.gitignore` files, so keep secret and generated-file exclusions here too.
 
 Run EAS commands from this app directory, using the CLI version in `packages/native-core/expo-apps.json` as CI does. Inspect the upload without starting a build:
 
@@ -140,7 +140,7 @@ PASSKEY_ORIGIN=https://app.example.com
 
 The development client uses `solace-dev://api/auth`. The backend trusts the
 production and dev schemes of both apps (`solace`, `solace-dev`, `solace-mail`, `solace-mail-dev`) by default
-(`DEFAULT_MOBILE_AUTH_CALLBACK_URLS` in `retired/backend/lib/origin-policy.ts`).
+(`DEFAULT_MOBILE_AUTH_CALLBACK_URLS` in `apps/backend/src/http/origins.rs`).
 
 Production backend values should also use HTTPS for `BACKEND_URL` and `FRONTEND_URL`.
 

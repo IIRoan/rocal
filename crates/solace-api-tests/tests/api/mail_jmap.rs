@@ -142,7 +142,7 @@ async fn paths_outside_the_jmap_allowlist_never_reach_stalwart() {
 async fn the_session_or_a_bearer_opens_the_callers_own_mailbox() {
     let app = TestApp::spawn().await;
     let mut owner = mailbox(&app).await;
-    let token = access_token(&app, &mut owner.user).await.access_token;
+    let token = access_token(&mut owner.user).await.access_token;
     let bearer = format!("Bearer {token}");
 
     let minted = send(
@@ -306,7 +306,7 @@ async fn mail_flows_between_users_and_tokens_stay_in_their_own_account() {
 async fn uploads_and_downloads_relay_binary_bodies_unchanged() {
     let app = TestApp::spawn().await;
     let mut owner: Mailbox = mailbox(&app).await;
-    let token = access_token(&app, &mut owner.user).await.access_token;
+    let token = access_token(&mut owner.user).await.access_token;
     let bytes: Vec<u8> = (0..=255u8).cycle().take(4096).collect();
 
     let upload = reqwest::Client::new()

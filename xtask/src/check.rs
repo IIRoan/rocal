@@ -1,4 +1,4 @@
-//! `cargo xtask check`: everything CI runs: fmt, clippy, unit tests, the API suite on Rust in both modes, generated-code diffs, Jest destinations and memory budgets.
+//! `cargo xtask check`: everything CI runs: fmt, clippy, unit tests, the API suite in both modes, generated-code diffs and memory budgets.
 
 use std::process::Command;
 
@@ -21,7 +21,6 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     }
     crate::openapi::run(&["--check"])?;
     crate::entities::run(&["--check"]).await?;
-    crate::jest_destinations::run(&["--complete"])?;
     if !skip_memory {
         crate::mem_budget::run(&[]).await?;
     }
@@ -41,7 +40,7 @@ fn cargo(args: &[&str]) -> anyhow::Result<()> {
 
 /// Runs the whole suite against the in-process Rust server.
 fn suite(mode: &str) -> anyhow::Result<()> {
-    println!("+ API suite on Rust ({mode})");
+    println!("+ API suite ({mode})");
     let status = Command::new("cargo")
         .current_dir(crate::repo_root())
         .args([
@@ -58,6 +57,6 @@ fn suite(mode: &str) -> anyhow::Result<()> {
         .env("TEST_BACKEND_MODE", mode)
         .status()
         .context("run the API suite (is `cargo xtask test-env up` running?)")?;
-    ensure!(status.success(), "API suite failed on Rust ({mode})");
+    ensure!(status.success(), "API suite failed ({mode})");
     Ok(())
 }
