@@ -4,6 +4,7 @@ import {
   encryptNameRequest,
   hydrateEncryptedEventWithoutSession,
   hydrateEncryptedName,
+  parseEncryptedJsonPayload,
   withoutPlaintextEventContent,
   withoutPlaintextName,
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
@@ -422,6 +423,29 @@ export function createNativeE2eeProvider({
       } catch {
         return [];
       }
+    },
+
+    async encryptJson(value: unknown, aad: string): Promise<string> {
+      return encryptWith(
+        "settings",
+        async (e2ee, session) =>
+          JSON.stringify(await e2ee.encryptJsonPayload(session.accountKey, value, aad)),
+        () => {
+          throw new Error("Encrypted data is not unlocked on this device.");
+        },
+      );
+    },
+
+    async decryptJson(encrypted: string, aad: string): Promise<unknown> {
+      const session = await waitForSession();
+      const e2ee = session ? await getModule() : null;
+      const payload = parseEncryptedJsonPayload(encrypted);
+      if (!session || !e2ee || !payload) {
+        return null;
+      }
+      return e2ee
+        .decryptJsonPayload<unknown>(session.accountKey, payload, aad)
+        .catch(() => null);
     },
   };
   return provider;

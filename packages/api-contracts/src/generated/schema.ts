@@ -2383,6 +2383,8 @@ export interface components {
             /** @description `month`, `week`, `3day`, `day` or `agenda`. */
             defaultView?: string;
             emailNotifications?: boolean;
+            /** @description Replaces the sealed preferences; their plaintext fields go back to the defaults and any sent with it are ignored. */
+            encryptedPreferences?: string;
             pushNotifications?: boolean;
             reminderSound?: boolean;
             showDeclinedEvents?: boolean;
@@ -2429,6 +2431,8 @@ export interface components {
             defaultEventDuration: number;
             defaultView: string;
             emailNotifications: boolean;
+            /** @description App-only preferences sealed on the device; while set, their fields above hold the defaults. */
+            encryptedPreferences: string | null;
             id: string;
             pushNotifications: boolean;
             reminderSound: boolean;

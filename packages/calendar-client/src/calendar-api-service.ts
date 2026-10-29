@@ -15,6 +15,11 @@ import {
   type InvitationImportEncryptionPayload,
   encryptedIcsImportEventSchema,
   type EncryptedIcsImportEvent,
+  USER_SETTINGS_PREFERENCES_AAD,
+  pickUserSettingsPreferences,
+  readUserSettingsPreferences,
+  splitUserSettingsUpdate,
+  type UserSettingsPreferences,
 } from "@workspace/calendar-core";
 import type {
   CalendarEvent,
@@ -747,9 +752,9 @@ export class CalendarApiService {
 
   async getUserSettings(): Promise<UserSettings> {
     try {
-      return (await this.client.get<Schema<"UserSettings">>(
-        "/api/settings",
-      )) as UserSettings;
+      return await this.openUserSettings(
+        await this.client.get<Schema<"UserSettings">>("/api/settings"),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to fetch user settings");
     }
@@ -759,13 +764,68 @@ export class CalendarApiService {
     settings: UpdateSettingsRequest,
   ): Promise<UserSettings> {
     try {
-      return (await this.client.put<Schema<"UserSettings">>(
-        "/api/settings",
-        settings satisfies Schema<"UpdateSettingsRequest">,
-      )) as UserSettings;
+      const { readable, preferences } = splitUserSettingsUpdate(settings);
+      const body: Schema<"UpdateSettingsRequest"> = preferences
+        ? { ...readable, encryptedPreferences: await this.sealUserSettings(preferences) }
+        : readable;
+      return await this.openUserSettings(
+        await this.client.put<Schema<"UserSettings">>("/api/settings", body),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to update user settings");
     }
+  }
+
+  /** Seals preferences a server still holds in plaintext; true when it moved them. */
+  async ensureSealedUserSettings(): Promise<boolean> {
+    if (!(await this.e2ee.hasActiveSession())) {
+      return false;
+    }
+    const settings = await this.client.get<Schema<"UserSettings">>("/api/settings");
+    if (settings.encryptedPreferences) {
+      return false;
+    }
+    await this.client.put<Schema<"UserSettings">>("/api/settings", {
+      encryptedPreferences: await this.e2ee.encryptJson(
+        pickUserSettingsPreferences(settings as UserSettings),
+        USER_SETTINGS_PREFERENCES_AAD,
+      ),
+    });
+    return true;
+  }
+
+  private async openUserSettings({
+    encryptedPreferences,
+    ...settings
+  }: ApiResponse<"UserSettings">): Promise<UserSettings> {
+    const opened = encryptedPreferences
+      ? await this.e2ee.decryptJson(encryptedPreferences, USER_SETTINGS_PREFERENCES_AAD)
+      : null;
+    return { ...(settings as UserSettings), ...readUserSettingsPreferences(opened) };
+  }
+
+  /** The whole blob is replaced, so changes merge onto the current preferences; one that cannot be opened is never overwritten. */
+  private async sealUserSettings(
+    changes: Partial<UserSettingsPreferences>,
+  ): Promise<string> {
+    const current = await this.client.get<Schema<"UserSettings">>("/api/settings");
+    const opened = current.encryptedPreferences
+      ? await this.e2ee.decryptJson(
+          current.encryptedPreferences,
+          USER_SETTINGS_PREFERENCES_AAD,
+        )
+      : {};
+    if (opened === null) {
+      throw new Error("Your settings could not be unlocked on this device.");
+    }
+    return this.e2ee.encryptJson(
+      {
+        ...pickUserSettingsPreferences(current as UserSettings),
+        ...readUserSettingsPreferences(opened),
+        ...changes,
+      },
+      USER_SETTINGS_PREFERENCES_AAD,
+    );
   }
 
   async resetUserSettings(): Promise<Schema<"SuccessMessage">> {

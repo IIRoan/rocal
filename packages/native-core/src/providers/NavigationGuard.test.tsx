@@ -8,8 +8,9 @@ import {
 } from "@workspace/calendar-core/product-info";
 import { NavigationGuard } from "./NavigationGuard";
 
-const mockQueryClient = {};
+const mockQueryClient = { invalidateQueries: jest.fn(async () => undefined) };
 const mockSignOut = jest.fn(async (_notice?: string) => undefined);
+const mockEnsureSealedUserSettings = jest.fn(async () => true);
 let mockBootstrap = jest.fn(() => new Promise<string | null>(() => undefined));
 let mockAuth: {
   isAuthenticated: boolean;
@@ -61,6 +62,7 @@ jest.mock("../lib/api", () => ({
   calendarApiService: {
     setE2eeProvider: () => undefined,
     ensureDefaultCalendars: () => Promise.resolve(false),
+    ensureSealedUserSettings: () => mockEnsureSealedUserSettings(),
   },
 }));
 jest.mock("../lib/session-query-reset", () => ({
@@ -158,4 +160,18 @@ it("keeps a session whose startup unlocked", async () => {
 
   expect(mockBootstrap).toHaveBeenCalled();
   expect(mockSignOut).not.toHaveBeenCalled();
+});
+
+it("seals plaintext app preferences once the session unlocks and refetches settings", async () => {
+  mockBootstrap = jest.fn(() => Promise.resolve(null));
+  signIn("sealing");
+  await renderGuard();
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  expect(mockEnsureSealedUserSettings).toHaveBeenCalled();
+  expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
+    queryKey: ["settings"],
+  });
 });

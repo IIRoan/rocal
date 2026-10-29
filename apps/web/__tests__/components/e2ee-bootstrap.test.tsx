@@ -25,7 +25,10 @@ jest.mock("@/lib/auth-client", () => ({
 }));
 
 jest.mock("@/lib/calendar-api-service", () => ({
-  calendarApiService: { ensureDefaultCalendars: jest.fn(async () => false) },
+  calendarApiService: {
+    ensureDefaultCalendars: jest.fn(async () => false),
+    ensureSealedUserSettings: jest.fn(async () => false),
+  },
 }));
 
 jest.mock("@/lib/e2ee-bootstrap", () => ({
@@ -84,6 +87,7 @@ import {
 } from "@/lib/enc-password-cookie";
 import { signOutAndClearLocalState } from "@/lib/auth-local-state";
 import { beginAuthNavigation } from "@/lib/auth-navigation";
+import { calendarApiService } from "@/lib/calendar-api-service";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -336,6 +340,17 @@ describe("E2eeBootstrap component", () => {
     expect(mockResetEncryptionPasswordForActiveSession).not.toHaveBeenCalled();
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(container.innerHTML).toBe("");
+  });
+
+  it("seals plaintext app preferences once this browser unlocks", async () => {
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: true,
+      bootstrap: createBootstrap(),
+    });
+
+    await renderComponent();
+
+    expect(calendarApiService.ensureSealedUserSettings).toHaveBeenCalled();
   });
 
   it("stores the missing envelope with the sign-in password when one is at hand", async () => {

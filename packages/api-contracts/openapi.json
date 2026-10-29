@@ -7446,6 +7446,10 @@
           "emailNotifications": {
             "type": "boolean"
           },
+          "encryptedPreferences": {
+            "type": "string",
+            "description": "Replaces the sealed preferences; their plaintext fields go back to the defaults and any sent with it are ignored."
+          },
           "pushNotifications": {
             "type": "boolean"
           },
@@ -7548,6 +7552,7 @@
           "compactView",
           "showWeekNumbers",
           "showDeclinedEvents",
+          "encryptedPreferences",
           "createdAt",
           "updatedAt"
         ],
@@ -7580,6 +7585,13 @@
           },
           "emailNotifications": {
             "type": "boolean"
+          },
+          "encryptedPreferences": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "App-only preferences sealed on the device; while set, their fields above hold the defaults."
           },
           "id": {
             "type": "string"

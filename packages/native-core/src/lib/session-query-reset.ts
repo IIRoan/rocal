@@ -7,5 +7,7 @@ export function resetPreSessionQueries(queryClient: QueryClient): Promise<void> 
     queryClient.resetQueries({ queryKey: QUERY_KEYS.eventsRoot() }),
     queryClient.resetQueries({ queryKey: QUERY_KEYS.calendars() }),
     queryClient.resetQueries({ queryKey: QUERY_KEYS.categories() }),
+    // Settings keep their readable time zone on screen while the sealed preferences are fetched again.
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() }),
   ]).then(() => undefined);
 }

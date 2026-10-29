@@ -60,6 +60,7 @@ export * from "./solace-profiles";
 export * from "./mail-display-settings";
 export * from "./mail-compose-settings";
 export * from "./mail-synced-settings";
+export * from "./user-settings-preferences";
 export * from "./mail-signature";
 export * from "./mail-reply-identity";
 export * from "./mail-simplelogin";

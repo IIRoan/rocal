@@ -124,6 +124,7 @@ fn record(settings: user_settings::Model) -> UserSettings {
         compact_view: settings.compact_view,
         show_week_numbers: settings.show_week_numbers,
         show_declined_events: settings.show_declined_events,
+        encrypted_preferences: settings.encrypted_preferences,
         created_at: instant::iso(settings.created_at),
         updated_at: instant::iso(settings.updated_at),
     }

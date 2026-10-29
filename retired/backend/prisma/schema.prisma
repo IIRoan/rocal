@@ -271,6 +271,8 @@ model UserSettings {
   compactView          Boolean  @default(false)
   showWeekNumbers      Boolean  @default(false)
   showDeclinedEvents   Boolean  @default(false)
+  // App-only preferences sealed with the account key; their columns above then hold defaults
+  encryptedPreferences String?  @map("encrypted_preferences")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 

@@ -206,13 +206,23 @@ export function NavigationGuard({
       // repo-rules-allow async-promise-handling: resetPreSessionQueries is Promise.all of resetQueries, which never rejects.
       void resetPreSessionQueries(queryClient);
 
-      // Silent on failure; the next launch retries the seed.
+      // Silent on failure; the next launch retries the seed and the sealing.
       void calendarApiService
         .ensureDefaultCalendars()
         .then(async (seeded) => {
           if (seeded && !cancelled) {
             await queryClient.invalidateQueries({
               queryKey: QUERY_KEYS.calendars(),
+            });
+          }
+        })
+        .catch(() => undefined);
+      void calendarApiService
+        .ensureSealedUserSettings()
+        .then(async (sealed) => {
+          if (sealed && !cancelled) {
+            await queryClient.invalidateQueries({
+              queryKey: QUERY_KEYS.settings(),
             });
           }
         })

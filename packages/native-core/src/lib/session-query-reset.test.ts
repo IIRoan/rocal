@@ -43,5 +43,6 @@ describe("resetPreSessionQueries", () => {
     expect(queryClient.getQueryData(QUERY_KEYS.calendars())).toBeUndefined();
     expect(queryClient.getQueryData(QUERY_KEYS.categories())).toBeUndefined();
     expect(queryClient.getQueryData(QUERY_KEYS.settings())).toEqual({ timezone: "UTC" });
+    expect(queryClient.getQueryState(QUERY_KEYS.settings())?.isInvalidated).toBe(true);
   });
 });

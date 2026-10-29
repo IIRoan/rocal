@@ -55,6 +55,12 @@ export interface E2eeProvider {
 
   /** Blind index tokens for a search query; empty when no E2EE session is active. */
   createBlindIndexTokens(value: string): Promise<string[]>;
+
+  /** Seals a JSON value with the account key; throws instead of sending plaintext when no session is active. */
+  encryptJson(value: unknown, aad: string): Promise<string>;
+
+  /** Opens a value `encryptJson` sealed; null without a session or when it does not open. */
+  decryptJson(encrypted: string, aad: string): Promise<unknown>;
 }
 
 /** Pre-session provider: content-free writes pass, plaintext content throws instead of leaving the device. */
@@ -103,5 +109,13 @@ export class NoopE2eeProvider implements E2eeProvider {
 
   async createBlindIndexTokens(_value: string): Promise<string[]> {
     return [];
+  }
+
+  async encryptJson(_value: unknown, _aad: string): Promise<string> {
+    throw new Error("Encrypted data is not unlocked on this device.");
+  }
+
+  async decryptJson(_encrypted: string, _aad: string): Promise<unknown> {
+    return null;
   }
 }

@@ -18,7 +18,12 @@ import {
   hydrateEncryptedName,
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
 } from "@workspace/e2ee";
-import { createBlindIndexTokens, decryptJsonPayload } from "./e2ee-crypto";
+import {
+  createBlindIndexTokens,
+  decryptJsonPayload,
+  encryptJsonPayload,
+  parseEncryptedJsonPayload,
+} from "./e2ee-crypto";
 import {
   attachCalendarEncryptionShadow,
   attachCategoryEncryptionShadow,
@@ -123,5 +128,24 @@ export class WebE2eeProvider implements E2eeProvider {
       return [];
     }
     return createBlindIndexTokens(session.blindIndexKey, value);
+  }
+
+  async encryptJson(value: unknown, aad: string): Promise<string> {
+    const session = await getE2eeSession();
+    if (!session) {
+      throw new Error("Encrypted data is not unlocked on this device.");
+    }
+    return JSON.stringify(await encryptJsonPayload(session.accountKey, value, aad));
+  }
+
+  async decryptJson(encrypted: string, aad: string): Promise<unknown> {
+    const session = await getE2eeSession();
+    const payload = parseEncryptedJsonPayload(encrypted);
+    if (!session || !payload) {
+      return null;
+    }
+    return decryptJsonPayload<unknown>(session.accountKey, payload, aad).catch(
+      () => null,
+    );
   }
 }

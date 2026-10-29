@@ -8,7 +8,7 @@ By default the suite starts the Rust server in-process on a fresh clone of the t
 
 ```sh
 cargo xtask test-env up                      # local Postgres 18 + test Stalwart (podman)
-cargo xtask test-env template                # solace_test_template from the 55 migrations
+cargo xtask test-env template                # solace_test_template from the 56 migrations
 cargo test -p solace-api-tests --test api
 ```
 

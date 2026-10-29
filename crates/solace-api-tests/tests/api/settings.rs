@@ -5,7 +5,9 @@ use solace_api_tests::seed::fake_envelope;
 use solace_api_types::SuccessMessage;
 use solace_api_types::settings::UserSettings;
 
-use crate::helpers::{Backend, TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
+use crate::helpers::{
+    Backend, TestApp, count, expect_invalid, expect_unauthorized, expect_unknown_field, hex, ok,
+};
 
 #[tokio::test]
 async fn anonymous_callers_are_refused() {
@@ -505,4 +507,106 @@ async fn read_only_and_staging_calendars_cannot_be_the_default() {
             "{name}"
         );
     }
+}
+
+#[tokio::test]
+async fn sealed_preferences_replace_their_plaintext_copies() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    ok(user
+        .put(
+            "/api/settings",
+            json!({"theme": "dark", "weekStartDay": 0, "workingDays": "[1,2]", "showWeekNumbers": true, "timezone": "Europe/Amsterdam"}),
+        )
+        .await
+        .expect_status(200));
+    let sealed = fake_envelope();
+
+    let settings: UserSettings = ok(user
+        .put(
+            "/api/settings",
+            json!({"encryptedPreferences": sealed, "theme": "system", "timeFormat": "12h"}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+
+    assert_eq!(
+        settings.encrypted_preferences.as_deref(),
+        Some(sealed.as_str())
+    );
+    assert_eq!(
+        (
+            settings.theme.as_str(),
+            settings.week_start_day,
+            settings.working_days.as_str()
+        ),
+        ("light", 1, "[1,2,3,4,5]"),
+        "the moved fields fall back to the defaults, ignoring any sent alongside"
+    );
+    assert!(!settings.show_week_numbers);
+    assert_eq!(
+        (settings.timezone.as_str(), settings.time_format.as_str()),
+        ("Europe/Amsterdam", "12h"),
+        "the fields the server reads stay readable"
+    );
+    let read: UserSettings = ok(user.get("/api/settings").await.dto());
+    assert_eq!(read.encrypted_preferences.as_deref(), Some(sealed.as_str()));
+}
+
+#[tokio::test]
+async fn shipped_clients_can_still_write_plaintext_preferences() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let sealed = fake_envelope();
+    ok(user
+        .put("/api/settings", json!({"encryptedPreferences": sealed}))
+        .await
+        .expect_status(200));
+
+    let settings: UserSettings = ok(user
+        .put(
+            "/api/settings",
+            json!({"theme": "dark", "compactView": true}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+
+    assert_eq!(
+        (settings.theme.as_str(), settings.compact_view),
+        ("dark", true)
+    );
+    assert_eq!(
+        settings.encrypted_preferences.as_deref(),
+        Some(sealed.as_str())
+    );
+}
+
+#[tokio::test]
+async fn sealed_preferences_must_be_a_bounded_string() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    for (body, message) in [
+        (
+            json!({"encryptedPreferences": ""}),
+            "String must contain at least 1 character(s)",
+        ),
+        (
+            json!({"encryptedPreferences": "x".repeat(16_385)}),
+            "String must contain at most 16384 character(s)",
+        ),
+        (
+            json!({"encryptedPreferences": null}),
+            "Expected string, received null",
+        ),
+    ] {
+        expect_invalid(
+            &user.put("/api/settings", body).await,
+            message,
+            "encryptedPreferences",
+        );
+    }
+    let settings: UserSettings = ok(user.get("/api/settings").await.dto());
+    assert_eq!(settings.encrypted_preferences, None);
 }
