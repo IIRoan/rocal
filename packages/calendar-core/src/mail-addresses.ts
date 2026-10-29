@@ -12,7 +12,8 @@ export function normalizeEmailAddress(value: string): string {
 /** Parses `Name <email@example.com>` or a bare address, mirroring the webmail JMAP client. */
 export function parseRecipientString(value: string): ParsedMailAddress {
   const trimmed = value.trim();
-  const angleMatch = trimmed.match(/^(.+?)\s*<([^>]+)>$/);
+  // The name excludes "<" so it cannot overlap the spaces before it; `(.+?)\s*<` backtracked quadratically on hostile input.
+  const angleMatch = trimmed.match(/^([^<]+)<([^<>]+)>$/);
   if (angleMatch) {
     const name = angleMatch[1]?.trim();
     const email = normalizeEmailAddress(angleMatch[2] ?? "");
