@@ -100,6 +100,24 @@ function renderInput(value = "") {
   });
 }
 
+function StatefulInput({
+  onKeyDown,
+}: {
+  onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+}) {
+  const [value, setValue] = React.useState("");
+  return (
+    <RecipientSuggestInput
+      value={value}
+      onChange={setValue}
+      onKeyDown={onKeyDown}
+      placeholder="To"
+      appearance="compose"
+      mode="mail"
+    />
+  );
+}
+
 function getInput() {
   return container.querySelector("input") as HTMLInputElement;
 }
@@ -169,6 +187,33 @@ describe("RecipientSuggestInput", () => {
 
     expect(onChange).toHaveBeenCalledWith(
       expect.stringContaining("alice@example.com"),
+    );
+  });
+
+  it("passes Enter to the field when no suggestion matches the typed address", () => {
+    const onKeyDown = jest.fn();
+    act(() => {
+      root.render(<StatefulInput onKeyDown={onKeyDown} />);
+    });
+
+    const input = getInput();
+    const setValue = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    act(() => {
+      setValue?.call(input, "new-person@example.org");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    act(() => {
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+
+    expect(onKeyDown).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "Enter" }),
     );
   });
 

@@ -243,8 +243,8 @@ export function RecipientSuggestInput({
       if (selected) {
         event.preventDefault();
         selectSuggestion(selected);
+        return;
       }
-      return;
     }
 
     if (event.key === "Escape") {
