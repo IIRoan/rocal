@@ -37,6 +37,7 @@ pub fn encrypted_event(calendar_id: &str, start: &str, end: &str) -> CreateEvent
         encryption_key_version: Some(1),
         participants: None,
         invitation_content: None,
+        attributes_encrypted: None,
     }
 }
 

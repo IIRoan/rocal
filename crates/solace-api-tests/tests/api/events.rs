@@ -2,6 +2,7 @@
 
 use serde_json::{Value, json};
 use solace_api_tests::seed::fake_envelope;
+use solace_api_types::categories::{Category, CategoryList};
 use solace_api_types::common::OperationWarning;
 use solace_api_types::events::{
     BulkEventRequest, BulkEventResult, Event, EventDeleted, SealEncryptionRequest,
@@ -13,7 +14,9 @@ use crate::event_fixtures::{
     insert_calendar, insert_plaintext_event, insert_staging_calendar, iso_from_now, row_snapshot,
     stored_content, to_json,
 };
-use crate::helpers::{Backend, TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
+use crate::helpers::{
+    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+};
 
 const COLOR_MESSAGE: &str = "Color must be one of: blue, orange, violet, rose, emerald, red, cyan, lime, amber, indigo, pink, teal or a valid hex color (e.g., #FF0000)";
 const NOT_FOUND: &str = "Event not found or access denied";
@@ -276,6 +279,83 @@ async fn named_and_hex_colors_are_accepted() {
         .expect_status(200)
         .and_then(|r| r.dto()));
     assert_eq!(updated.color.as_deref(), Some("#10B981"));
+}
+
+async fn stored_attributes(app: &TestApp, id: &str) -> (Option<String>, Option<String>) {
+    sqlx::query_as("SELECT color, category_id FROM calendar_event WHERE id = $1")
+        .bind(id)
+        .fetch_one(&app.db)
+        .await
+        .expect("event attributes")
+}
+
+async fn usage_count(user: &mut TestUser, category: &str) -> i64 {
+    let list: CategoryList = ok(user
+        .get("/api/categories")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    list.categories
+        .iter()
+        .find(|listed| listed.category.id.0 == category)
+        .map_or(0, |listed| listed.usage_count)
+}
+
+#[tokio::test]
+async fn sealed_colour_and_category_keep_no_plaintext_copy() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let category: Category = ok(owner
+        .post(
+            "/api/categories",
+            json!({"color": "blue", "encryptedName": fake_envelope()}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    let category = category.id.0;
+
+    let mut older = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
+    older.color = Some("red".into());
+    older.category_id = Some(category.clone().into());
+    let older = create_event(&mut owner, &older).await;
+    assert_eq!(
+        stored_attributes(&app, &older.id.0).await,
+        (Some("red".into()), Some(category.clone())),
+        "older apps still store them in plaintext"
+    );
+    assert_eq!(usage_count(&mut owner, &category).await, 1);
+
+    let mut sealed = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
+    sealed.color = Some("red".into());
+    sealed.category_id = Some("not-a-category".to_owned().into());
+    sealed.attributes_encrypted = Some(true);
+    let sealed = create_event(&mut owner, &sealed).await;
+    assert_eq!((&sealed.color, &sealed.category_id), (&None, &None));
+    assert_eq!(stored_attributes(&app, &sealed.id.0).await, (None, None));
+
+    let path = format!("/api/events/{}", older.id);
+    ok(owner
+        .put(&path, json!({"attributesEncrypted": true}))
+        .await
+        .expect_status(200));
+    assert_eq!(
+        stored_attributes(&app, &older.id.0).await,
+        (Some("red".into()), Some(category.clone())),
+        "without new ciphertext the plaintext copies are all there is"
+    );
+    let resealed: Event = ok(owner
+        .put(
+            &path,
+            json!({"attributesEncrypted": true, "encryptedContent": fake_envelope(), "color": "blue"}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!((&resealed.color, &resealed.category_id), (&None, &None));
+    assert_eq!(stored_attributes(&app, &older.id.0).await, (None, None));
+    assert_eq!(usage_count(&mut owner, &category).await, 0);
 }
 
 #[tokio::test]

@@ -89,7 +89,13 @@ describe("CalendarApiService encryption wrappers", () => {
   });
 
   it("puts attached event payloads on update", async () => {
-    const request = { title: "Event" };
+    const request = {
+      title: "Event",
+      description: "",
+      location: "",
+      color: "blue",
+      categoryId: "",
+    };
     const payload = { ...request, encryptedContent: "ciphertext" };
     mockE2ee.attachEventEncryptionShadow.mockResolvedValue(payload);
     client.put.mockResolvedValue({ id: "event-1" } as never);

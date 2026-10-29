@@ -2,6 +2,7 @@ import {
   decryptEntityName,
   encryptEventContentRequest,
   encryptNameRequest,
+  type DecryptedEventContent,
 } from "@workspace/e2ee";
 import type {
   EncryptedNameKind,
@@ -37,6 +38,8 @@ type EventSensitiveFields = {
   title: string;
   description: string | null;
   location: string | null;
+  color: string | null;
+  categoryId: string | null;
 };
 
 function normalizeOptionalText(
@@ -129,12 +132,12 @@ async function resolveEventSensitiveFields(
       throw new Error(`Encrypted event ${event.id} has a corrupt payload.`);
     }
 
-    const decrypted = await decryptJsonPayload<EventSensitiveFields>(
+    const decrypted = await decryptJsonPayload<DecryptedEventContent>(
       accountKey,
       encryptedContent,
       `event-content:v${event.encryptionKeyVersion ?? DEFAULT_ENCRYPTION_KEY_VERSION}`,
     );
-    const title = decrypted.title.trim();
+    const title = decrypted.title?.trim();
 
     if (!title) {
       throw new Error(`Encrypted event ${event.id} is missing a title.`);
@@ -144,6 +147,13 @@ async function resolveEventSensitiveFields(
       title,
       description: normalizeOptionalText(decrypted.description),
       location: normalizeOptionalText(decrypted.location),
+      // A plaintext copy still on the row is older ciphertext's, as in `withDecryptedEventContent`.
+      color:
+        normalizeOptionalText(event.color) ??
+        normalizeOptionalText(decrypted.color),
+      categoryId:
+        normalizeOptionalText(event.categoryId) ??
+        normalizeOptionalText(decrypted.categoryId),
     };
   }
 
@@ -157,6 +167,8 @@ async function resolveEventSensitiveFields(
     title,
     description: normalizeOptionalText(event.description),
     location: normalizeOptionalText(event.location),
+    color: normalizeOptionalText(event.color),
+    categoryId: normalizeOptionalText(event.categoryId),
   };
 }
 
@@ -174,6 +186,8 @@ async function buildEventUpdate(
       title: sensitiveFields.title,
       description: sensitiveFields.description ?? undefined,
       location: sensitiveFields.location ?? undefined,
+      color: sensitiveFields.color ?? undefined,
+      categoryId: sensitiveFields.categoryId ?? undefined,
     },
     keyVersion,
   );

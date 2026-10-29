@@ -340,11 +340,13 @@ pub async fn create(
     if let Some(rule) = request.recurrence.as_deref().filter(|r| !r.is_empty()) {
         assert_recurrence(rule)?;
     }
+    // Encrypted colour and category live only in the ciphertext.
+    let sealed = request.attributes_encrypted == Some(true);
     let category_id = request
         .category_id
         .as_ref()
         .map(|id| id.0.clone())
-        .filter(|id| !id.is_empty());
+        .filter(|id| !sealed && !id.is_empty());
     if let Some(category_id) = &category_id {
         assert_active_category(state, user, category_id).await?;
     }
@@ -377,7 +379,7 @@ pub async fn create(
         timezone: Set(timezone.clone()),
         all_day: Set(request.all_day.unwrap_or(false)),
         encrypted_content: Set(Some(request.encrypted_content.clone())),
-        color: Set(request.color.clone().filter(|c| !c.is_empty())),
+        color: Set(request.color.clone().filter(|c| !sealed && !c.is_empty())),
         calendar_id: Set(request.calendar_id.0.clone()),
         category_id: Set(category_id),
         reminder: Set(reminder),
@@ -498,7 +500,14 @@ pub async fn update(
         }
         None => None,
     };
-    if let Some(category_id) = request.category_id.as_deref().filter(|id| !id.is_empty()) {
+    // New ciphertext that carries colour and category replaces their plaintext copies.
+    let sealed = request.attributes_encrypted == Some(true)
+        && non_blank(request.encrypted_content.as_deref()).is_some();
+    if let Some(category_id) = request
+        .category_id
+        .as_deref()
+        .filter(|id| !sealed && !id.is_empty())
+    {
         assert_active_category(state, user, category_id).await?;
     }
     let final_calendar = match target {
@@ -539,14 +548,19 @@ pub async fn update(
     if request.timezone.is_some() {
         row.timezone = Set(timezone.clone());
     }
-    if let Some(color) = &request.color {
-        row.color = Set(Some(color.clone()).filter(|c| !c.is_empty()));
+    if sealed {
+        row.color = Set(None);
+        row.category_id = Set(None);
+    } else {
+        if let Some(color) = &request.color {
+            row.color = Set(Some(color.clone()).filter(|c| !c.is_empty()));
+        }
+        if let Some(category_id) = &request.category_id {
+            row.category_id = Set(Some(category_id.clone()).filter(|c| !c.is_empty()));
+        }
     }
     if let Some(calendar_id) = &request.calendar_id {
         row.calendar_id = Set(calendar_id.0.clone());
-    }
-    if let Some(category_id) = &request.category_id {
-        row.category_id = Set(Some(category_id.clone()).filter(|c| !c.is_empty()));
     }
     assert_no_reserved_participants(request.participants.as_deref())?;
     if request.reminder.is_some() {

@@ -23,6 +23,8 @@ export {
 export {
   ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
   hydrateEncryptedEventWithoutSession,
+  withDecryptedEventContent,
+  type DecryptedEventContent,
 } from "./hydration";
 
 export {

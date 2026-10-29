@@ -16,6 +16,7 @@ import { cn } from "@workspace/ui/lib/utils";
 
 import {
   useCategories,
+  useCategoryUsageCounts,
   useCreateCategory,
   useDeleteCategory,
   useUpdateCategory,
@@ -78,6 +79,7 @@ function CategoriesListView({
 }) {
   const categoriesQuery = useCategories();
   const categories = categoriesQuery.data ?? [];
+  const usage = useCategoryUsageCounts().data;
 
   const handleRetry = async () => {
     try {
@@ -123,7 +125,9 @@ function CategoriesListView({
               icon={Tag}
               iconColor={getColorSwatchValue(category.color)}
               label={category.name}
-              description={categoryUsageDetail(category)}
+              description={categoryUsageDetail(
+                usage?.[category.id] ?? category.usageCount,
+              )}
               onClick={() => onEdit(category.id)}
             />
           ))
@@ -310,7 +314,9 @@ function CategoryEditForm({
   const [color, setColor] = useState<EventColor>(() => category.color);
   const [nameError, setNameError] = useState<string>();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const usage = categoryUsageDetail(category);
+  const usage = categoryUsageDetail(
+    useCategoryUsageCounts().data?.[category.id] ?? category.usageCount,
+  );
 
   const handleSave = () => {
     if (updateCategory.isPending) return;

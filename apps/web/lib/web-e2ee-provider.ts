@@ -16,7 +16,8 @@ import type {
 import {
   hydrateEncryptedEventWithoutSession,
   hydrateEncryptedName,
-  ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+  withDecryptedEventContent,
+  type DecryptedEventContent,
 } from "@workspace/e2ee";
 import {
   createBlindIndexTokens,
@@ -94,21 +95,13 @@ export class WebE2eeProvider implements E2eeProvider {
 
     try {
       const payload = JSON.parse(event.encryptedContent);
-      const decrypted = await decryptJsonPayload<{
-        title: string;
-        description?: string | null;
-        location?: string | null;
-      }>(session.accountKey, payload, "event-content:v1");
+      const decrypted = await decryptJsonPayload<DecryptedEventContent>(
+        session.accountKey,
+        payload,
+        "event-content:v1",
+      );
 
-      return {
-        ...event,
-        title:
-          decrypted.title?.trim() ||
-          event.title?.trim() ||
-          ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
-        description: decrypted.description ?? null,
-        location: decrypted.location ?? null,
-      };
+      return withDecryptedEventContent(event, decrypted);
     } catch {
       return hydrateEncryptedEventWithoutSession(event);
     }

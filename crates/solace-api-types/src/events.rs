@@ -393,6 +393,10 @@ pub struct CreateEventRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub invitation_content: Option<InvitationContent>,
+    /// Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub attributes_encrypted: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -448,6 +452,10 @@ pub struct UpdateEventRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub invitation_content: Option<InvitationContent>,
+    /// Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub attributes_encrypted: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

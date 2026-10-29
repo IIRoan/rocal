@@ -64,7 +64,7 @@ pub fn reminder_field_schema() -> Schema {
 }
 
 /// `eventContentEncryptionFieldsSchema.shape`.
-pub fn event_content_encryption_fields() -> [(&'static str, Schema); 3] {
+pub fn event_content_encryption_fields() -> [(&'static str, Schema); 4] {
     [
         ("encryptedContent", zod::string().optional()),
         ("blindIndexTokens", zod::array(zod::string()).optional()),
@@ -72,6 +72,7 @@ pub fn event_content_encryption_fields() -> [(&'static str, Schema); 3] {
             "encryptionKeyVersion",
             zod::number().int().gte(1.0).max(zod::I32_MAX).optional(),
         ),
+        ("attributesEncrypted", zod::boolean().optional()),
     ]
 }
 

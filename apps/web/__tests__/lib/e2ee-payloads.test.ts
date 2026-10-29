@@ -144,6 +144,8 @@ describe("e2ee payload helpers", () => {
         title: "Secret event",
         description: "hidden agenda",
         location: "Room 7",
+        color: null,
+        categoryId: null,
       },
       "event-content:v1",
     );
@@ -163,6 +165,7 @@ describe("e2ee payload helpers", () => {
       }),
       blindIndexTokens: ["idx-1", "idx-2"],
       encryptionKeyVersion: 1,
+      attributesEncrypted: true,
     });
   });
 

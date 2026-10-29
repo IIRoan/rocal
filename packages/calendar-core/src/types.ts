@@ -76,6 +76,8 @@ export interface EventContentEncryptionShadowRequest {
   encryptedContent?: string;
   blindIndexTokens?: string[];
   encryptionKeyVersion?: number;
+  /** Colour and category travel inside `encryptedContent`, so the server clears its plaintext copies. */
+  attributesEncrypted?: boolean;
 }
 
 export interface Calendar {
@@ -303,7 +305,7 @@ export interface EventsResponse {
   calendars: Calendar[];
 }
 
-/** Client shape before encryption; on the wire `EventWireRequest` carries ciphertext in place of title, description and location. */
+/** Client shape before encryption; on the wire `EventWireRequest` carries ciphertext in place of title, description, location, colour and category. */
 export interface CreateEventRequest extends EventContentEncryptionShadowRequest {
   title: string;
   description?: string;

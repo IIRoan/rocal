@@ -1,5 +1,5 @@
 import React from "react";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { categoryUsageDetail, getErrorMessage } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useSheetPageNavigator } from "@workspace/native-core/components/sheet/SheetPageStack";
 import {
@@ -9,8 +9,7 @@ import {
   SheetScroll,
   SheetSection,
 } from "@workspace/native-core/components/sheet/SheetSections";
-import { useCategories } from "../../hooks/use-categories";
-import { categoryUsageDetail } from "../../lib/categories-model";
+import { useCategories, useCategoryUsageCounts } from "../../hooks/use-categories";
 import { isOptimisticId } from "../../lib/optimistic-events";
 import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 import { CATEGORY_CREATE_PAGE, categoryEditPage } from "../../lib/calendars-sheet-pages";
@@ -20,6 +19,7 @@ export function CategoriesListPage() {
   const { theme } = useTheme();
   const { push } = useSheetPageNavigator();
   const categoriesQuery = useCategories();
+  const usage = useCategoryUsageCounts().data;
 
   if (categoriesQuery.isLoading) {
     return <SheetCenteredState loading message="Loading categories…" />;
@@ -50,7 +50,7 @@ export function CategoriesListPage() {
             <SheetItem
               key={category.id}
               label={category.name}
-              detail={categoryUsageDetail(category)}
+              detail={categoryUsageDetail(usage?.[category.id] ?? category.usageCount)}
               swatch={resolveCalendarSwatchColor(category.color, theme)}
               chevron
               pending={isOptimisticId(category.id)}

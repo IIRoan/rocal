@@ -7,6 +7,7 @@ import {
 } from "@workspace/e2ee";
 import {
   DEFAULT_CALENDARS,
+  EVENT_CONTENT_FIELDS,
   partitionCalendarsByKind,
   validateEventData as coreValidateEventData,
   validateCategoryData as coreValidateCategoryData,
@@ -66,6 +67,28 @@ import type {
 } from "@workspace/calendar-core";
 
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
+
+/** New ciphertext replaces every content field, so an update that sets only some of them needs the stored rest. */
+function needsStoredContent(request: UpdateEventRequest): boolean {
+  const set = EVENT_CONTENT_FIELDS.filter(
+    (field) => request[field] !== undefined,
+  ).length;
+  return set > 0 && set < EVENT_CONTENT_FIELDS.length;
+}
+
+function withStoredContent(
+  request: UpdateEventRequest,
+  stored: CalendarEvent,
+): UpdateEventRequest {
+  return {
+    ...request,
+    title: request.title ?? stored.title,
+    description: request.description ?? stored.description ?? undefined,
+    location: request.location ?? stored.location ?? undefined,
+    color: request.color ?? stored.color ?? undefined,
+    categoryId: request.categoryId ?? stored.categoryId ?? undefined,
+  };
+}
 
 // `as` casts from API types only narrow free-text fields (kind, encryptionState, role, status) to calendar-core's literal unions.
 export class CalendarApiService {
@@ -548,6 +571,22 @@ export class CalendarApiService {
     }
   }
 
+  /** Events per category id, counted on this device because the category travels inside the ciphertext. */
+  async getCategoryUsageCounts(
+    signal?: AbortSignal,
+  ): Promise<Record<string, number>> {
+    const counts: Record<string, number> = {};
+    let offset = 0;
+    do {
+      const page = await this.getEventSearchCorpus({ limit: 200, offset }, signal);
+      for (const { categoryId } of page.events) {
+        if (categoryId) counts[categoryId] = (counts[categoryId] ?? 0) + 1;
+      }
+      offset = page.nextOffset ?? -1;
+    } while (offset >= 0 && !signal?.aborted);
+    return counts;
+  }
+
   async createEvent(
     event: CreateEventRequest,
   ): Promise<WithOperationWarnings<CalendarEvent>> {
@@ -570,7 +609,11 @@ export class CalendarApiService {
     event: UpdateEventRequest,
   ): Promise<WithOperationWarnings<CalendarEvent>> {
     try {
-      const payload = await this.e2ee.attachEventEncryptionShadow(event);
+      const payload = await this.e2ee.attachEventEncryptionShadow(
+        needsStoredContent(event)
+          ? withStoredContent(event, await this.getEvent(id))
+          : event,
+      );
       const response = await this.client.put<Schema<"Event">>(
         `/api/events/${encodeURIComponent(id)}`,
         payload satisfies Schema<"UpdateEventRequest">,
@@ -966,7 +1009,9 @@ export class CalendarApiService {
   ): Promise<CalendarEvent> {
     try {
       const updates = await this.e2ee.attachEventEncryptionShadow(
-        request.updates,
+        needsStoredContent(request.updates)
+          ? withStoredContent(request.updates, await this.getEvent(id))
+          : request.updates,
       );
       const response = await this.client.put<Schema<"Event">>(
         `/api/recurring/event/${encodeURIComponent(id)}`,

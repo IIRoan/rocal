@@ -1211,6 +1211,8 @@ export interface components {
         };
         CreateEventRequest: {
             allDay?: boolean;
+            /** @description Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared. */
+            attributesEncrypted?: boolean;
             blindIndexTokens?: string[];
             calendarId: components["schemas"]["CalendarId"];
             categoryId?: components["schemas"]["CategoryId"];
@@ -2127,6 +2129,8 @@ export interface components {
         };
         RecurringUpdates: {
             allDay?: boolean;
+            /** @description Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared. */
+            attributesEncrypted?: boolean;
             blindIndexTokens?: string[];
             calendarId?: components["schemas"]["CalendarId"];
             /** @description An empty id clears the category. */
@@ -2358,6 +2362,8 @@ export interface components {
         };
         UpdateEventRequest: {
             allDay?: boolean;
+            /** @description Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared. */
+            attributesEncrypted?: boolean;
             blindIndexTokens?: string[];
             calendarId?: components["schemas"]["CalendarId"];
             /** @description An empty id clears the category. */

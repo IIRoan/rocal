@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import {
   CATEGORIES_QUERY_KEY,
+  CATEGORY_USAGE_QUERY_KEY,
   buildOptimisticCategory,
   getErrorMessage,
   insertCategory,
@@ -57,6 +58,13 @@ export function useCategories(enabled = true) {
     queryFn: () => calendarApiService.getCategories(),
     enabled,
     select: sortCategories,
+  });
+}
+
+export function useCategoryUsageCounts() {
+  return useQuery({
+    queryKey: CATEGORY_USAGE_QUERY_KEY,
+    queryFn: ({ signal }) => calendarApiService.getCategoryUsageCounts(signal),
   });
 }
 

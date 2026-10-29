@@ -3070,6 +3070,10 @@
           "allDay": {
             "type": "boolean"
           },
+          "attributesEncrypted": {
+            "type": "boolean",
+            "description": "Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared."
+          },
           "blindIndexTokens": {
             "type": "array",
             "items": {
@@ -6548,6 +6552,10 @@
           "allDay": {
             "type": "boolean"
           },
+          "attributesEncrypted": {
+            "type": "boolean",
+            "description": "Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared."
+          },
           "blindIndexTokens": {
             "type": "array",
             "items": {
@@ -7371,6 +7379,10 @@
         "properties": {
           "allDay": {
             "type": "boolean"
+          },
+          "attributesEncrypted": {
+            "type": "boolean",
+            "description": "Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared."
           },
           "blindIndexTokens": {
             "type": "array",

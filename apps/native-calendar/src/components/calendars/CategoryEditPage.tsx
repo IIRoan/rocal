@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Alert } from "react-native";
 import {
+  categoryUsageDetail,
   getErrorMessage,
   type EventCategory,
   type EventColor,
@@ -19,14 +20,11 @@ import {
 } from "@workspace/native-core/components/sheet/SheetSections";
 import {
   useCategories,
+  useCategoryUsageCounts,
   useDeleteCategory,
   useUpdateCategory,
 } from "../../hooks/use-categories";
-import {
-  CATEGORY_NAME_MAX_LENGTH,
-  categoryUsageDetail,
-  validateCategoryName,
-} from "../../lib/categories-model";
+import { CATEGORY_NAME_MAX_LENGTH, validateCategoryName } from "../../lib/categories-model";
 import { ColorPicker } from "../event/ColorPicker";
 
 export function CategoryEditPage({ id }: { id: string }) {
@@ -61,6 +59,7 @@ function CategoryEditForm({
   const { back } = useSheetPageNavigator();
   const updateCategory = useUpdateCategory(category.id);
   const deleteCategory = useDeleteCategory(category.id);
+  const usageCount = useCategoryUsageCounts().data?.[category.id] ?? category.usageCount;
   const [name, setName] = useState(category.name);
   const [color, setColor] = useState<EventColor>(category.color);
   const [nameError, setNameError] = useState<string>();
@@ -84,7 +83,7 @@ function CategoryEditForm({
   };
 
   const confirmDelete = () => {
-    const usage = categoryUsageDetail(category);
+    const usage = categoryUsageDetail(usageCount);
     Alert.alert(
       `Delete ${category.name}?`,
       usage

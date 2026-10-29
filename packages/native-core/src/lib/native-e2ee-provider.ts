@@ -5,9 +5,10 @@ import {
   hydrateEncryptedEventWithoutSession,
   hydrateEncryptedName,
   parseEncryptedJsonPayload,
+  withDecryptedEventContent,
   withoutPlaintextEventContent,
   withoutPlaintextName,
-  ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+  type DecryptedEventContent,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
 } from "@workspace/e2ee";
@@ -379,21 +380,13 @@ export function createNativeE2eeProvider({
         }
 
         const payload = JSON.parse(event.encryptedContent);
-        const decrypted = await e2ee.decryptJsonPayload<{
-          title: string;
-          description?: string | null;
-          location?: string | null;
-        }>(session.accountKey, payload, "event-content:v1");
+        const decrypted = await e2ee.decryptJsonPayload<DecryptedEventContent>(
+          session.accountKey,
+          payload,
+          "event-content:v1",
+        );
 
-        return {
-          ...event,
-          title:
-            decrypted.title?.trim() ||
-            event.title?.trim() ||
-            ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
-          description: decrypted.description ?? null,
-          location: decrypted.location ?? null,
-        };
+        return withDecryptedEventContent(event, decrypted);
       } catch {
         return hydrateEncryptedEventWithoutSession(event);
       }

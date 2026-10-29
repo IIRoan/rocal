@@ -238,6 +238,8 @@ describe("resetEncryptionPasswordForActiveSession", () => {
         title: "Planning",
         description: "Discuss roadmap",
         location: "Room 7",
+        color: "blue",
+        categoryId: "category-1",
       },
       "event-content:v2",
     );
@@ -245,6 +247,7 @@ describe("resetEncryptionPasswordForActiveSession", () => {
       encryptedContent: newCiphertext,
       blindIndexTokens: ["new-index"],
       encryptionKeyVersion: 2,
+      attributesEncrypted: true,
     });
     expect(mockCreatePasswordEnvelope).toHaveBeenCalledWith(
       expect.anything(),
