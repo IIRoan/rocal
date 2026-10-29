@@ -7,8 +7,6 @@ export const webQueryKeys = {
   passkeys: () => ["passkeys"] as const,
   eventDetail: (eventId: string | null) =>
     ["events", "detail", eventId] as const,
-  eventSearch: (query: string) => ["events", "search", query] as const,
-  unifiedSearchCalendar: (query: string, limit: number) =>
-    ["unified-search", "calendar", query, limit] as const,
+  unifiedSearchCalendarCorpus: () => ["unified-search", "calendar-corpus"] as const,
   unifiedSearchMailCorpus: () => ["unified-search", "mail-corpus"] as const,
 } as const;

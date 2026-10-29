@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { createLogger } from "@workspace/logger";
+import { sealReadableInvitations } from "@workspace/calendar-client";
 import {
   SIGN_IN_TO_UNLOCK_NOTICE,
   UNLOCK_FAILED_NOTICE,
@@ -227,6 +228,9 @@ export function NavigationGuard({
           }
         })
         .catch(() => undefined);
+
+      // Invitation copies the server still stores readable are sealed now; any that fail wait for the next launch.
+      void sealReadableInvitations(calendarApiService).catch(() => undefined);
     })()
       .catch((error: unknown) => {
         log.warn("Session startup failed", {

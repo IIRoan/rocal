@@ -49,10 +49,10 @@ describe("respondToMailInvitation", () => {
     expect(api.respondToInvitation).not.toHaveBeenCalled();
   });
 
-  it("answers a synced copy through the API", async () => {
+  it("answers a synced copy through the API, which seals what it returns", async () => {
     const api = fakeApi();
     await expect(respond(api, { status: "tentative", event: synced, icsContent: null })).resolves.toEqual({
-      event: { ...synced, sealed: true },
+      event: synced,
       declined: false,
       message: "Marked as tentative.",
     });

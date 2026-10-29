@@ -23,64 +23,17 @@ export const CALENDAR_VIEWS: readonly CalendarView[] = [
 
 export const AgendaDaysToShow = 30;
 
-/** A calendar or category as a search hit embeds it: only what labels the hit. */
-export type EventSearchLabel = Pick<
-  Calendar,
-  "id" | "name" | "color" | "encryptedName" | "encryptionKeyVersion"
->;
-
-/** A search hit (`SearchEvent`): a subset of the event row with trimmed calendar and category labels instead of full rows. */
-export interface EventSearchHit
-  extends Pick<
-    CalendarEvent,
-    | "id"
-    | "title"
-    | "description"
-    | "encryptedContent"
-    | "blindIndexTokens"
-    | "encryptionState"
-    | "encryptionKeyVersion"
-    | "start"
-    | "end"
-    | "timezone"
-    | "allDay"
-    | "location"
-    | "color"
-    | "calendarId"
-    | "categoryId"
-    | "userId"
-    | "createdAt"
-    | "updatedAt"
-    | "recurrence"
-    | "participants"
-  > {
-  calendar?: EventSearchLabel | null;
-  category?: EventSearchLabel | null;
-}
-
-export interface EventSearchResult {
-  events: EventSearchHit[];
-  total: number;
-}
-
 export interface EventSearchCorpusResult {
   events: CalendarEvent[];
   total: number;
   nextOffset: number | null;
 }
 
-export interface EventSearchParams {
-  q: string;
-  limit?: number;
-  offset?: number;
-  startDate?: string;
-  endDate?: string;
-}
-
 export interface EventSearchCorpusParams {
   limit?: number;
   offset?: number;
   updatedAfter?: string;
+  readableInvitations?: boolean;
 }
 
 export type EventColor =

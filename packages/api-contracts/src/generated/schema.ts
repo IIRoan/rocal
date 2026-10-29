@@ -1572,6 +1572,8 @@ export interface components {
             limit?: number | null;
             /** Format: int64 */
             offset?: number | null;
+            /** @description Only invitation copies still stored readable, declined ones included, for the device to seal. */
+            readableInvitations?: boolean | null;
             updatedAfter?: string | null;
         };
         /** @description `GET /api/events/search`: plaintext `q`, or comma-separated blind-index tokens for encrypted events. */
@@ -3087,6 +3089,7 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 updatedAfter?: string;
+                readableInvitations?: boolean;
             };
             header?: never;
             path?: never;

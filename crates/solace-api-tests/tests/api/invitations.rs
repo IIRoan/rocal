@@ -4,9 +4,9 @@ use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use serde_json::json;
 use solace_api_tests::seed::fake_envelope;
 use solace_api_types::events::{
-    BulkEventResult, Event, EventDeleted, EventList, ImportInvitationRequest, InvitationContent,
-    InvitationDeclined, InvitationEncryptionEntry, InvitationImportSummary, InvitationLookup,
-    ParticipantInput, RsvpDeleted, UpdateEventRequest,
+    BulkEventResult, Event, EventDeleted, EventList, EventSearchCorpus, ImportInvitationRequest,
+    InvitationContent, InvitationDeclined, InvitationEncryptionEntry, InvitationImportSummary,
+    InvitationLookup, ParticipantInput, RsvpDeleted, UpdateEventRequest,
 };
 
 use crate::event_fixtures::{
@@ -1042,6 +1042,15 @@ async fn declining_keeps_a_hidden_tombstone_that_blocks_restaging() {
         .expect("calendar");
     assert_eq!(staging, "Invitations");
     assert_eq!(
+        (
+            row["title"].as_str(),
+            row["description"].is_null(),
+            row["location"].is_null()
+        ),
+        (Some(""), true, true),
+        "a declined copy keeps no readable text"
+    );
+    assert_eq!(
         count(
             &app.db,
             "SELECT count(*) FROM event_notification WHERE event_id = $1",
@@ -1107,6 +1116,69 @@ async fn declining_keeps_a_hidden_tombstone_that_blocks_restaging() {
         summary(0, 1, &[]),
         "accepting again revives the copy"
     );
+}
+
+async fn readable_invitations(user: &mut TestUser) -> Vec<String> {
+    ok(user
+        .get("/api/events/search-corpus?readableInvitations=true")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto::<EventSearchCorpus>()))
+    .events
+    .into_iter()
+    .map(|event| event.id.0)
+    .collect()
+}
+
+#[tokio::test]
+async fn the_corpus_lists_the_invitation_copies_still_readable_for_sealing() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let mut attendee = app.user().await;
+    let personal = calendar_id(&mut attendee, "Personal").await;
+    create_event(
+        &mut attendee,
+        &encrypted_event(&personal, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    let event = invite(&mut owner, &attendee.email).await;
+    let copy = staged_copy(&mut attendee, &owner, &event).await;
+    assert_eq!(
+        readable_invitations(&mut attendee).await,
+        [copy.id.0.as_str()],
+        "only the staged copy is readable"
+    );
+
+    ok(attendee
+        .post(
+            &format!("/api/events/{}/rsvp", copy.id),
+            json!({"status": "declined"}),
+        )
+        .await
+        .expect_status(200));
+    assert!(
+        readable_invitations(&mut attendee).await.is_empty(),
+        "a declined copy keeps no text to seal"
+    );
+    sqlx::query("UPDATE calendar_event SET title = 'Planning' WHERE id = $1")
+        .bind(&copy.id.0)
+        .execute(&app.db)
+        .await
+        .expect("an older tombstone kept its text");
+    assert_eq!(
+        readable_invitations(&mut attendee).await,
+        [copy.id.0.as_str()],
+        "declined copies that kept their text are listed too"
+    );
+
+    ok(attendee
+        .post(
+            &format!("/api/events/{}/seal-encryption", copy.id),
+            json!({"encryptedContent": fake_envelope()}),
+        )
+        .await
+        .expect_status(200));
+    assert!(readable_invitations(&mut attendee).await.is_empty());
 }
 
 #[tokio::test]

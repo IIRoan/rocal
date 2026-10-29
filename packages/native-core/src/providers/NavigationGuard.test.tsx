@@ -58,6 +58,12 @@ jest.mock("../components/WorkspaceLoadingScreen", () => ({
   }) => (active ? <p role="status">{message}</p> : null),
 }));
 
+const mockSealReadableInvitations = jest.fn(() => Promise.resolve());
+jest.mock("@workspace/calendar-client", () => ({
+  ...jest.requireActual<object>("@workspace/calendar-client"),
+  sealReadableInvitations: () => mockSealReadableInvitations(),
+}));
+
 jest.mock("../lib/api", () => ({
   calendarApiService: {
     setE2eeProvider: () => undefined,
@@ -113,6 +119,7 @@ const renderGuard = async () => {
 
 beforeEach(() => {
   mockSignOut.mockClear();
+  mockSealReadableInvitations.mockClear();
   mockBootstrap = jest.fn(() => new Promise<string | null>(() => undefined));
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -148,9 +155,10 @@ it.each([
   });
 
   expect(mockSignOut).toHaveBeenCalledWith(notice);
+  expect(mockSealReadableInvitations).not.toHaveBeenCalled();
 });
 
-it("keeps a session whose startup unlocked", async () => {
+it("keeps a session whose startup unlocked and seals invitation copies still readable", async () => {
   mockBootstrap = jest.fn(() => Promise.resolve(null));
   signIn("unlocked");
   await renderGuard();
@@ -160,6 +168,7 @@ it("keeps a session whose startup unlocked", async () => {
 
   expect(mockBootstrap).toHaveBeenCalled();
   expect(mockSignOut).not.toHaveBeenCalled();
+  expect(mockSealReadableInvitations).toHaveBeenCalledTimes(1);
 });
 
 it("seals plaintext app preferences once the session unlocks and refetches settings", async () => {

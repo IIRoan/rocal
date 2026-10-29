@@ -42,6 +42,7 @@ request_schema!(EventSearchCorpusQuery => zod::object([
     ("limit", optional_query_int(Some(1), Some(200))),
     ("offset", optional_query_int(Some(0), Some(zod::MAX_SAFE_INTEGER))),
     ("updatedAfter", zod::string().optional()),
+    ("readableInvitations", optional_query_boolean()),
 ])
 .strict());
 
@@ -130,7 +131,7 @@ pub async fn search(
 }
 
 /// Pages of the caller's events with their ciphertext, for device-local search indexing.
-#[utoipa::path(get, path = "/api/events/search-corpus", operation_id = "getEventSearchCorpus", tag = "Events", params(("limit" = Option<i64>, Query), ("offset" = Option<i64>, Query), ("updatedAfter" = Option<String>, Query)), responses((status = 200, body = EventSearchCorpus)))]
+#[utoipa::path(get, path = "/api/events/search-corpus", operation_id = "getEventSearchCorpus", tag = "Events", params(("limit" = Option<i64>, Query), ("offset" = Option<i64>, Query), ("updatedAfter" = Option<String>, Query), ("readableInvitations" = Option<bool>, Query)), responses((status = 200, body = EventSearchCorpus)))]
 #[tracing::instrument(skip_all)]
 pub async fn search_corpus(
     State(state): State<AppState>,

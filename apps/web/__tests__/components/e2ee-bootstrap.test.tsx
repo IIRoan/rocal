@@ -24,6 +24,11 @@ jest.mock("@/lib/auth-client", () => ({
   useSession: jest.fn(),
 }));
 
+const mockSealReadableInvitations = jest.fn(async () => undefined);
+jest.mock("@workspace/calendar-client", () => ({
+  sealReadableInvitations: () => mockSealReadableInvitations(),
+}));
+
 jest.mock("@/lib/calendar-api-service", () => ({
   calendarApiService: {
     ensureDefaultCalendars: jest.fn(async () => false),
@@ -234,6 +239,7 @@ describe("E2eeBootstrap component", () => {
 
     expect(mockUnlockE2eeWithPassword).toHaveBeenCalledWith("user-1", "pw");
     expect(mockSignOut).not.toHaveBeenCalled();
+    expect(mockSealReadableInvitations).toHaveBeenCalledTimes(1);
   });
 
   it("leaves the native passkey bridge's short-lived session alone", async () => {
@@ -253,6 +259,7 @@ describe("E2eeBootstrap component", () => {
 
     expect(mockUnlockE2eeWithPassword).not.toHaveBeenCalled();
     expectSignedOutWith("sign-in");
+    expect(mockSealReadableInvitations).not.toHaveBeenCalled();
   });
 
   it("signs out with the support notice when the sign-in password does not open the envelope", async () => {
@@ -340,6 +347,7 @@ describe("E2eeBootstrap component", () => {
     expect(mockResetEncryptionPasswordForActiveSession).not.toHaveBeenCalled();
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(container.innerHTML).toBe("");
+    expect(mockSealReadableInvitations).toHaveBeenCalledTimes(1);
   });
 
   it("seals plaintext app preferences once this browser unlocks", async () => {

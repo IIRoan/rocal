@@ -2,16 +2,16 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type {
-  EventSearchHit,
   UnifiedSearchResponse,
   UnifiedSearchResult,
 } from "@workspace/calendar-core";
 import {
   mergeUnifiedSearchResults,
+  searchCalendarEvents,
   searchTitleIndex,
   titleHitToUnifiedResult,
 } from "@workspace/calendar-core";
-import type { CalendarEvent as UiCalendarEvent } from "@workspace/ui/components/calendar";
+import { loadEventSearchCorpus } from "@workspace/calendar-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { webQueryKeys } from "@/lib/query-keys";
 import { mailDemoApiService } from "@/lib/mail/api-service";
@@ -20,7 +20,7 @@ import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 import { usePrivateTitleIndex } from "@/hooks/use-private-title-index";
 import { mailDocumentToMessageStub } from "@/lib/search/private-title-index";
-import { searchMailMessages, toCalendarSearchResult } from "@/lib/search/unified-search";
+import { searchMailMessages } from "@/lib/search/unified-search";
 
 const MAILBOX_PRIORITY: Record<string, number> = {
   inbox: 0,
@@ -43,29 +43,6 @@ type UseUnifiedSearchOptions = {
   includeMail?: boolean;
   includeCalendar?: boolean;
 };
-
-function mapApiEvent(e: EventSearchHit): UiCalendarEvent {
-  return {
-    id: e.id,
-    title: e.title,
-    description: e.description ?? undefined,
-    start: e.start instanceof Date ? e.start : new Date(e.start),
-    end: e.end instanceof Date ? e.end : new Date(e.end),
-    allDay: e.allDay,
-    location: e.location ?? undefined,
-    color: e.color ?? e.calendar?.color ?? undefined,
-    calendarId: e.calendarId,
-    categoryId: e.categoryId ?? undefined,
-    userId: e.userId,
-    createdAt: e.createdAt,
-    updatedAt: e.updatedAt,
-    recurrence: e.recurrence ?? undefined,
-    encryptedContent: e.encryptedContent,
-    blindIndexTokens: e.blindIndexTokens,
-    encryptionState: e.encryptionState,
-    encryptionKeyVersion: e.encryptionKeyVersion,
-  };
-}
 
 function sortMailboxPriority(role?: string | null) {
   if (!role) return 10;
@@ -143,21 +120,13 @@ export function useUnifiedSearch({
   const shouldLoadSharedMailMessages =
     canSearch && includeMail && mailMessages.length === 0;
 
+  // The decrypted corpus stays in memory and is searched here, so search words never reach the server.
   const calendarQuery = useQuery({
-    queryKey: webQueryKeys.unifiedSearchCalendar(
-      normalizedQuery,
-      perSourceLimit,
-    ),
-    queryFn: async ({ signal }) => {
-      const result = await calendarApiService.searchEvents(
-        { q: normalizedQuery, limit: perSourceLimit },
-        signal,
-      );
-      return result.events.map(mapApiEvent);
-    },
+    queryKey: webQueryKeys.unifiedSearchCalendarCorpus(),
+    queryFn: ({ signal }) =>
+      loadEventSearchCorpus(calendarApiService, {}, signal),
     enabled: canSearch && includeCalendar,
     staleTime: 30_000,
-    placeholderData: (previous) => previous,
   });
   const mailQuery = useQuery({
     queryKey: webQueryKeys.unifiedSearchMailCorpus(),
@@ -181,8 +150,10 @@ export function useUnifiedSearch({
       ? searchMailMessages(searchableMailMessages, normalizedQuery, perSourceLimit)
       : [];
     const calendarResults = includeCalendar
-      ? (calendarQuery.data ?? []).map((event, index) =>
-          toCalendarSearchResult(event, index),
+      ? searchCalendarEvents(
+          calendarQuery.data ?? [],
+          normalizedQuery,
+          perSourceLimit,
         )
       : [];
     const localHits = searchTitleIndex(
@@ -195,8 +166,9 @@ export function useUnifiedSearch({
     ).map((hit) =>
       titleHitToUnifiedResult(hit, mailDocumentToMessageStub),
     ) as UnifiedSearchResult<JmapEmailMessage>[];
+    // Live calendar hits go first so a tie keeps the full event over the index's stub.
     const results = mergeUnifiedSearchResults(
-      [localHits, mailResults, calendarResults],
+      [calendarResults, localHits, mailResults],
       limit,
     );
 

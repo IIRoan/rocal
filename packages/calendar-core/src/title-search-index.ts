@@ -245,6 +245,26 @@ export function searchTitleIndex(
     .slice(0, Math.max(limit, 0));
 }
 
+/** Scores decrypted events in memory like index documents, descriptions included, so search words never leave the device. */
+export function searchCalendarEvents(
+  events: CalendarEvent[],
+  query: string,
+  limit: number,
+): UnifiedCalendarSearchResult[] {
+  const eventsById = new Map(events.map((event) => [event.id, event]));
+  const documents = events.flatMap((event) => {
+    const document = eventToTitleIndexDocument(event);
+    const description = event.description?.trim();
+    if (!document) return [];
+    return [description ? { ...document, body: description } : document];
+  });
+  return searchTitleIndex(documents, query, limit).flatMap((hit) => {
+    const result = titleHitToUnifiedResult(hit);
+    const event = eventsById.get(hit.document.eventId ?? "");
+    return result.source === "calendar" && event ? [{ ...result, event }] : [];
+  });
+}
+
 function stubCalendarEvent(document: TitleIndexDocument): CalendarEvent {
   const start = document.timestamp ? new Date(document.timestamp) : new Date(0);
   return {

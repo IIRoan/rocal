@@ -1,13 +1,13 @@
 import {
   mergeUnifiedSearchResults,
+  searchCalendarEvents,
   searchTitleIndex,
   titleHitToUnifiedResult,
-  type EventSearchHit,
+  type CalendarEvent,
   type TitleIndexDocument,
   type UnifiedCalendarSearchResult,
   type UnifiedSearchResult,
 } from "@workspace/calendar-core";
-import { toCalendarSearchResult } from "./calendar-search-result";
 
 export type NativePaletteSearchResult = UnifiedCalendarSearchResult;
 
@@ -20,7 +20,8 @@ function isCalendarResult(
 export function mergePaletteSearchResults(input: {
   titleDocuments: TitleIndexDocument[];
   query: string;
-  events: EventSearchHit[];
+  /** The decrypted corpus held in memory; searched on the device. */
+  events: CalendarEvent[];
   limit: number;
 }): NativePaletteSearchResult[] {
   const localHits = searchTitleIndex(
@@ -31,11 +32,10 @@ export function mergePaletteSearchResults(input: {
     .map((hit) => titleHitToUnifiedResult(hit))
     .filter(isCalendarResult);
 
-  const calendarHits = input.events.map((event, index) =>
-    toCalendarSearchResult(event, index),
-  );
+  const liveHits = searchCalendarEvents(input.events, input.query, input.limit * 2);
 
-  return mergeUnifiedSearchResults([localHits, calendarHits], input.limit).filter(
+  // Live hits go first so a tie keeps the full event over the index's stub.
+  return mergeUnifiedSearchResults([liveHits, localHits], input.limit).filter(
     isCalendarResult,
   );
 }

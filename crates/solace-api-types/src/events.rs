@@ -337,6 +337,9 @@ pub struct EventSearchCorpusQuery {
     pub offset: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated_after: Option<String>,
+    /// Only invitation copies still stored readable, declined ones included, for the device to seal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub readable_invitations: Option<bool>,
 }
 
 /// `GET /api/events/invitations/by-external-id`.

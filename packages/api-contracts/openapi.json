@@ -892,6 +892,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "readableInvitations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -4531,6 +4539,13 @@
               "null"
             ],
             "format": "int64"
+          },
+          "readableInvitations": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Only invitation copies still stored readable, declined ones included, for the device to seal."
           },
           "updatedAfter": {
             "type": [

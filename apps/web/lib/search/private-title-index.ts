@@ -11,6 +11,7 @@ import {
   refreshMailBodyExcerpts,
   runTasksWithConcurrencyLimit,
 } from "@workspace/calendar-core";
+import { loadEventSearchCorpus } from "@workspace/calendar-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
@@ -89,22 +90,11 @@ function sortMailboxes(mailboxes: JmapMailbox[]): JmapMailbox[] {
 async function loadCalendarTitleDocuments(
   signal?: AbortSignal,
 ): Promise<TitleIndexDocument[]> {
-  const documents: TitleIndexDocument[] = [];
-  let offset = 0;
-
-  do {
-    const page = await calendarApiService.getEventSearchCorpus(
-      { limit: TITLE_PAGE_SIZE, offset },
-      signal,
-    );
-    for (const event of page.events) {
-      const document = eventToTitleIndexDocument(event);
-      if (document) documents.push(document);
-    }
-    offset = page.nextOffset ?? -1;
-  } while (offset >= 0 && !signal?.aborted);
-
-  return documents;
+  const events = await loadEventSearchCorpus(calendarApiService, {}, signal);
+  return events.flatMap((event) => {
+    const document = eventToTitleIndexDocument(event);
+    return document ? [document] : [];
+  });
 }
 
 async function loadMailTitleDocuments(

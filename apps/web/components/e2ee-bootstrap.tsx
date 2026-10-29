@@ -10,6 +10,7 @@ import {
   SETTINGS_QUERY_KEY,
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
+import { sealReadableInvitations } from "@workspace/calendar-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useSession } from "@/lib/auth-client";
 import {
@@ -68,6 +69,7 @@ async function refreshEncryptedQueries(
   // Failures are swallowed on purpose: seeding and sealing retry on the next bootstrap.
   void ensureDefaultCalendars(queryClient).catch(() => undefined);
   void ensureSealedSettings(queryClient).catch(() => undefined);
+  void sealReadableInvitations(calendarApiService).catch(() => undefined);
 
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY }),

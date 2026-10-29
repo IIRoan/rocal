@@ -57,8 +57,6 @@ import type {
   SyncSubscriptionResponse,
   ImportICSRequest,
   ImportICSResponse,
-  EventSearchResult,
-  EventSearchParams,
   EventSearchCorpusResult,
   EventSearchCorpusParams,
   SolaceProfileLookupRequest,
@@ -505,42 +503,12 @@ export class CalendarApiService {
       if ("deleted" in response) {
         return response;
       }
-      return await this.hydrateEncryptedEvent(response as CalendarEvent);
+      // Answering keeps the copy, so it is sealed here for every caller, as the mail card does.
+      return await this.sealImportedInvitationIfNeeded(
+        await this.hydrateEncryptedEvent(response as CalendarEvent),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to respond to invitation");
-    }
-  }
-
-  async searchEvents(
-    params: EventSearchParams,
-    signal?: AbortSignal,
-  ): Promise<EventSearchResult> {
-    try {
-      const searchParams = new URLSearchParams({ q: params.q });
-
-      const blindIndexTokens = await this.e2ee.createBlindIndexTokens(params.q);
-      if (blindIndexTokens.length > 0) {
-        searchParams.set("blindIndexTokens", blindIndexTokens.join(","));
-      }
-
-      if (params.limit != null) searchParams.set("limit", String(params.limit));
-      if (params.offset != null) searchParams.set("offset", String(params.offset));
-      if (params.startDate) searchParams.set("startDate", params.startDate);
-      if (params.endDate) searchParams.set("endDate", params.endDate);
-
-      const response = await this.client.get<Schema<"EventSearchResults">>(
-        `/api/events/search?${searchParams.toString()}`,
-        { signal },
-      );
-      return {
-        ...response,
-        // Hydration rewrites only content and label-name fields, so the trimmed `SearchLabel`s pass through it as `EventSearchHit` labels.
-        events: await this.hydrateEncryptedEvents(
-          response.events as CalendarEvent[],
-        ),
-      };
-    } catch (error) {
-      throw this.transformError(error, "Failed to search events");
     }
   }
 
@@ -554,6 +522,9 @@ export class CalendarApiService {
       if (params.offset != null) searchParams.set("offset", String(params.offset));
       if (params.updatedAfter) {
         searchParams.set("updatedAfter", params.updatedAfter);
+      }
+      if (params.readableInvitations) {
+        searchParams.set("readableInvitations", "true");
       }
 
       const query = searchParams.toString();

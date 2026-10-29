@@ -43,8 +43,7 @@ export const QUERY_KEYS = {
     ["mail", "messages", mailboxId, "search", revision] as const,
   signupConfig: () => ["account", "signupConfig"] as const,
   inviteValidation: (token: string) => ["inviteValidation", token] as const,
-  paletteEventSearch: (query: string) =>
-    ["command-palette-search", "events", query] as const,
+  paletteEventCorpus: () => ["command-palette-search", "events"] as const,
   paletteMailSearch: (mailboxId: string | null, query: string) =>
     ["command-palette-search", "mail", mailboxId, query] as const,
 } as const;

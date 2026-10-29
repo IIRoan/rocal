@@ -347,6 +347,7 @@ pub async fn search_corpus(
         &state.db,
         &user.id,
         updated_after,
+        query.readable_invitations == Some(true),
         u64::try_from(limit).unwrap_or(100),
         u64::try_from(offset).unwrap_or(0),
     )

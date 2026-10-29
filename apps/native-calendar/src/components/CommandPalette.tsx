@@ -57,7 +57,7 @@ import {
   type CommandAction,
 } from "./command-palette/command-actions";
 import { PaletteCalendarsSheet } from "./command-palette/PaletteCalendarsSheet";
-import { usePaletteEventSearch } from "./command-palette/use-palette-event-search";
+import { usePaletteEventCorpus } from "./command-palette/use-palette-event-search";
 
 const SEARCH_MIN_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -121,11 +121,8 @@ export function CommandPalette() {
   const trimmedQuery = debouncedQuery.trim();
   const searchEnabled = isOpen && trimmedQuery.length >= SEARCH_MIN_LENGTH;
 
-  const { data: eventSearchData, isFetching: eventSearchFetching } =
-    usePaletteEventSearch(trimmedQuery, {
-      enabled: searchEnabled,
-      limit: SEARCH_LIMIT,
-    });
+  const { data: eventCorpus, isFetching: eventSearchFetching } =
+    usePaletteEventCorpus(searchEnabled);
 
   const runCommonAction = useCommonCommandActions();
   const { runAfterClose, onCloseComplete } = useDeferredSheetAction(close);
@@ -153,12 +150,12 @@ export function CommandPalette() {
         ? mergePaletteSearchResults({
             titleDocuments: titleIndex.documents,
             query: trimmedQuery,
-            events: eventSearchData?.events ?? [],
+            events: eventCorpus ?? [],
             limit: SEARCH_LIMIT,
           })
         : [],
     [
-      eventSearchData?.events,
+      eventCorpus,
       searchEnabled,
       titleIndex.documents,
       trimmedQuery,

@@ -410,9 +410,33 @@ pub async fn move_to_calendar<C: ConnectionTrait>(
         .rows_affected)
 }
 
-/// The corpus filter: the owner's events, minus invitations the owner declined as an attendee.
-fn corpus_condition(user_id: &str, updated_after: Option<time::PrimitiveDateTime>) -> Condition {
+/// The corpus filter: the owner's events, minus invitations the owner declined as an attendee, or only the invitation copies still readable.
+fn corpus_condition(
+    user_id: &str,
+    updated_after: Option<time::PrimitiveDateTime>,
+    readable_invitations: bool,
+) -> Condition {
     use calendar_event::Column;
+    if readable_invitations {
+        return Condition::all()
+            .add(Column::UserId.eq(user_id))
+            .add(Column::ExternalId.is_not_null())
+            .add(Column::ExternalId.ne(""))
+            .add(Column::IsSynced.eq(false))
+            .add(Column::SubscriptionId.is_null())
+            .add(Column::EncryptionState.ne("encrypted"))
+            .add(
+                Condition::any()
+                    .add(Column::EncryptedContent.is_null())
+                    .add(Column::EncryptedContent.eq("")),
+            )
+            .add(
+                Condition::any()
+                    .add(Column::Title.ne(""))
+                    .add(Column::Description.ne(""))
+                    .add(Column::Location.ne("")),
+            );
+    }
     let declined = event_participant::Entity::find()
         .select_only()
         .column(event_participant::Column::EventId)
@@ -433,10 +457,11 @@ pub async fn corpus_page<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
     updated_after: Option<time::PrimitiveDateTime>,
+    readable_invitations: bool,
     limit: u64,
     offset: u64,
 ) -> Result<(Vec<calendar_event::Model>, u64), sea_orm::DbErr> {
-    let condition = corpus_condition(user_id, updated_after);
+    let condition = corpus_condition(user_id, updated_after, readable_invitations);
     let events = calendar_event::Entity::find()
         .filter(condition.clone())
         .order_by_asc(calendar_event::Column::UpdatedAt)
@@ -575,7 +600,7 @@ pub async fn search<C: ConnectionTrait>(
     Ok((rows, total))
 }
 
-/// The declined copy moves to the hidden staging calendar and forgets its Stalwart copy.
+/// The declined copy moves to the hidden staging calendar, forgets its Stalwart copy and keeps no readable text, as the mailed decline does.
 pub async fn stage_declined<C: ConnectionTrait>(
     db: &C,
     id: &str,
@@ -594,6 +619,15 @@ pub async fn stage_declined<C: ConnectionTrait>(
         .col_expr(
             calendar_event::Column::StalwartSyncedAt,
             Expr::value(None::<time::PrimitiveDateTime>),
+        )
+        .col_expr(calendar_event::Column::Title, Expr::value(""))
+        .col_expr(
+            calendar_event::Column::Description,
+            Expr::value(None::<String>),
+        )
+        .col_expr(
+            calendar_event::Column::Location,
+            Expr::value(None::<String>),
         )
         .col_expr(calendar_event::Column::UpdatedAt, Expr::value(now))
         .filter(calendar_event::Column::Id.eq(id))
