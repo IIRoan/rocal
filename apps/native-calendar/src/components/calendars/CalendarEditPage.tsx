@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useReducer } from "react";
 import { Alert } from "react-native";
 import type { Calendar, EventColor } from "@workspace/calendar-core";
 import { getErrorMessage, partitionCalendarsByKind } from "@workspace/calendar-core";
@@ -48,7 +48,41 @@ export function CalendarEditPage({ id }: { id: string }) {
   if (!calendar || !calendars) {
     return <SheetCenteredState tone="destructive" message="Calendar not found." />;
   }
-  return <CalendarEditForm calendar={calendar} calendars={calendars} />;
+  return <CalendarEditForm key={calendar.id} calendar={calendar} calendars={calendars} />;
+}
+
+interface CalendarDraft {
+  name: string;
+  color: EventColor;
+  isDefault: boolean;
+  nameError?: string;
+  moveTargetId?: string;
+}
+
+type CalendarDraftAction =
+  | { type: "name"; name: string }
+  | { type: "color"; color: EventColor }
+  | { type: "default"; isDefault: boolean }
+  | { type: "move-target"; id: string }
+  | { type: "validated"; nameError?: string };
+
+function initCalendarDraft(calendar: Calendar): CalendarDraft {
+  return { name: calendar.name, color: calendar.color, isDefault: calendar.isDefault };
+}
+
+function calendarDraftReducer(draft: CalendarDraft, action: CalendarDraftAction): CalendarDraft {
+  switch (action.type) {
+    case "name":
+      return { ...draft, name: action.name, nameError: undefined };
+    case "color":
+      return { ...draft, color: action.color };
+    case "default":
+      return { ...draft, isDefault: action.isDefault };
+    case "move-target":
+      return { ...draft, moveTargetId: action.id };
+    case "validated":
+      return { ...draft, nameError: action.nameError };
+  }
 }
 
 function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calendars: Calendar[] }) {
@@ -56,12 +90,11 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
   const { back } = useSheetPageNavigator();
   const updateCalendar = useUpdateCalendar(calendar.id);
   const deleteCalendar = useDeleteCalendar(calendar.id);
-
-  const [name, setName] = useState(calendar.name);
-  const [color, setColor] = useState<EventColor>(calendar.color);
-  const [isDefault, setIsDefault] = useState(calendar.isDefault);
-  const [nameError, setNameError] = useState<string>();
-  const [moveTargetId, setMoveTargetId] = useState<string>();
+  const [{ name, color, isDefault, nameError, moveTargetId }, dispatch] = useReducer(
+    calendarDraftReducer,
+    calendar,
+    initCalendarDraft,
+  );
 
   const moveTargets = useMemo(
     () =>
@@ -75,7 +108,7 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
 
   const handleSave = () => {
     const error = validateCalendarName(name);
-    setNameError(error);
+    dispatch({ type: "validated", nameError: error });
     if (error) return;
     updateCalendar.mutate({ name: name.trim(), color, isDefault }, { onSuccess: back });
   };
@@ -112,10 +145,7 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
         <SheetGroup>
           <SheetTextField
             value={name}
-            onChangeText={(value) => {
-              setName(value);
-              setNameError(undefined);
-            }}
+            onChangeText={(value) => dispatch({ type: "name", name: value })}
             placeholder="Calendar name"
             maxLength={CALENDAR_NAME_MAX_LENGTH}
             accessibilityLabel="Calendar name"
@@ -127,7 +157,10 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
       <SheetSection title="Color">
         <SheetGroup>
           <SheetGroupBlock>
-            <ColorPicker selectedColor={color} onColorSelect={setColor} />
+            <ColorPicker
+              selectedColor={color}
+              onColorSelect={(value) => dispatch({ type: "color", color: value })}
+            />
           </SheetGroupBlock>
         </SheetGroup>
       </SheetSection>
@@ -144,7 +177,7 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
             label="Default calendar"
             icon="star"
             value={isDefault}
-            onValueChange={setIsDefault}
+            onValueChange={(value) => dispatch({ type: "default", isDefault: value })}
             disabled={calendar.isDefault}
           />
         </SheetGroup>
@@ -164,7 +197,7 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
                   detail={entry.isDefault ? "Default" : undefined}
                   swatch={resolveCalendarSwatchColor(entry.color, theme)}
                   checked={selected}
-                  onPress={() => setMoveTargetId(entry.id)}
+                  onPress={() => dispatch({ type: "move-target", id: entry.id })}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selected }}
                 />

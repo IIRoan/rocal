@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useReducer, useState } from "react";
 import { Alert } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -35,10 +35,154 @@ const PROFILE_ACTION_KEYS: SettingsAccountActionKey[] = [
 ];
 const SESSION_ACTION_KEYS: SettingsAccountActionKey[] = ["sign-out", "delete-account"];
 
+type PasswordMode = "change-password" | "set-password";
+
+interface PasswordFormState {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+  error: string | null;
+  isPending: boolean;
+}
+
+type PasswordFormAction =
+  | {
+      type: "edit";
+      field: "currentPassword" | "newPassword" | "confirmPassword";
+      value: string;
+    }
+  | { type: "submit" }
+  | { type: "fail"; error: string };
+
+const EMPTY_PASSWORD_FORM: PasswordFormState = {
+  currentPassword: "",
+  newPassword: "",
+  confirmPassword: "",
+  error: null,
+  isPending: false,
+};
+
+function passwordFormReducer(
+  state: PasswordFormState,
+  action: PasswordFormAction,
+): PasswordFormState {
+  switch (action.type) {
+    case "edit":
+      return { ...state, [action.field]: action.value };
+    case "submit":
+      return { ...state, error: null, isPending: true };
+    case "fail":
+      return { ...state, error: action.error, isPending: false };
+  }
+}
+
+function getPasswordFormError(
+  mode: PasswordMode,
+  form: PasswordFormState,
+): string | null {
+  if (!form.newPassword.trim()) {
+    return mode === "change-password"
+      ? "Enter your current password and a new password."
+      : "Enter a new password and confirm it.";
+  }
+  if (mode === "change-password" && !form.currentPassword.trim()) {
+    return "Enter your current password and a new password.";
+  }
+  if (form.newPassword !== form.confirmPassword) {
+    return "New password and confirmation must match.";
+  }
+  return null;
+}
+
+function AccountPasswordForm({
+  mode,
+  onClose,
+}: {
+  mode: PasswordMode;
+  onClose: () => void;
+}) {
+  const { user } = useAuth();
+  const { resetEncryptionPassword } = useE2ee();
+  const { toast } = useToast();
+  const accountsQuery = useLinkedAuthAccounts();
+  const [form, dispatch] = useReducer(passwordFormReducer, EMPTY_PASSWORD_FORM);
+
+  const submit = async () => {
+    const invalid = getPasswordFormError(mode, form);
+    if (invalid) {
+      dispatch({ type: "fail", error: invalid });
+      return;
+    }
+    dispatch({ type: "submit" });
+
+    try {
+      if (mode === "change-password") {
+        const result = await authClient.changePassword({
+          currentPassword: form.currentPassword,
+          newPassword: form.newPassword,
+          email: user?.email ?? "",
+        });
+        if (result?.error) {
+          throw new Error(
+            result.error.message ?? "Unable to update your password.",
+          );
+        }
+        toast("Password updated");
+      } else {
+        const result = await (
+          authClient as typeof authClient & {
+            setPassword: (input: { newPassword: string }) => Promise<{
+              error?: { message?: string };
+            } | void>;
+          }
+        ).setPassword({
+          newPassword: form.newPassword,
+        });
+        if (result?.error) {
+          throw new Error(
+            result.error.message ?? "Unable to set your password.",
+          );
+        }
+        await accountsQuery.refetch();
+        toast("Email password added");
+      }
+      // The envelope follows the sign-in password; if this fails, the next device asks for the previous one and re-wraps.
+      await resetEncryptionPassword(form.newPassword).catch(() => false);
+      onClose();
+    } catch (error) {
+      dispatch({
+        type: "fail",
+        error: getErrorMessage(error, "Failed to update your password"),
+      });
+    }
+  };
+
+  return (
+    <SettingsPasswordForm
+      mode={mode}
+      currentPassword={form.currentPassword}
+      newPassword={form.newPassword}
+      confirmPassword={form.confirmPassword}
+      onCurrentPasswordChange={(value) =>
+        dispatch({ type: "edit", field: "currentPassword", value })
+      }
+      onNewPasswordChange={(value) =>
+        dispatch({ type: "edit", field: "newPassword", value })
+      }
+      onConfirmPasswordChange={(value) =>
+        dispatch({ type: "edit", field: "confirmPassword", value })
+      }
+      onSubmit={() => void submit()}
+      onCancel={onClose}
+      error={form.error}
+      isPending={form.isPending}
+    />
+  );
+}
+
 export function AccountSettingsContent() {
   const queryClient = useQueryClient();
   const { user, signOut, refreshUser } = useAuth();
-  const { resetEncryptionPassword } = useE2ee();
   const { toast } = useToast();
   const { resetSettingsMutation } = useNativeUserSettings();
 
@@ -61,28 +205,16 @@ export function AccountSettingsContent() {
     [hasOAuthAccount, hasPasswordAccount, hasProfilePicture, user],
   );
 
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [isSettingPassword, setIsSettingPassword] = useState(false);
-  const [isUpdatingProfilePicture, setIsUpdatingProfilePicture] =
-    useState(false);
-  const [activePasswordSheet, setActivePasswordSheet] = useState<
-    "change-password" | "set-password" | null
+  const [pendingAction, setPendingAction] = useState<
+    "sign-out" | "delete-account" | "change-profile-picture" | null
   >(null);
-  const [currentPasswordInput, setCurrentPasswordInput] = useState("");
-  const [newPasswordInput, setNewPasswordInput] = useState("");
-  const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
-  const [passwordChangeError, setPasswordChangeError] = useState<string | null>(
-    null,
+  const [activePasswordSheet, setActivePasswordSheet] =
+    useState<PasswordMode | null>(null);
+  const settleAction = useCallback(
+    (key: NonNullable<typeof pendingAction>) =>
+      setPendingAction((current) => (current === key ? null : current)),
+    [],
   );
-
-  const resetChangePasswordForm = useCallback(() => {
-    setCurrentPasswordInput("");
-    setNewPasswordInput("");
-    setConfirmPasswordInput("");
-    setPasswordChangeError(null);
-  }, []);
 
   const handleResetSettings = useCallback(() => {
     Alert.alert(
@@ -106,18 +238,18 @@ export function AccountSettingsContent() {
         text: "Sign Out",
         style: "destructive",
         onPress: () => {
-          setIsSigningOut(true);
+          setPendingAction("sign-out");
           signOut()
             .catch((error) => {
               toast(getErrorMessage(error, "Failed to sign out"), "error");
             })
             .finally(() => {
-              setIsSigningOut(false);
+              settleAction("sign-out");
             });
         },
       },
     ]);
-  }, [signOut, toast]);
+  }, [settleAction, signOut, toast]);
 
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
@@ -129,7 +261,7 @@ export function AccountSettingsContent() {
           text: "Delete Account",
           style: "destructive",
           onPress: () => {
-            setIsDeletingAccount(true);
+            setPendingAction("delete-account");
             calendarApiService
               .deleteAccount()
               .then(async () => {
@@ -143,99 +275,20 @@ export function AccountSettingsContent() {
                 );
               })
               .finally(() => {
-                setIsDeletingAccount(false);
+                settleAction("delete-account");
               });
           },
         },
       ],
     );
-  }, [queryClient, signOut, toast]);
-
-  const handleSubmitPasswordChange = useCallback(async () => {
-    setPasswordChangeError(null);
-    if (!newPasswordInput.trim()) {
-      setPasswordChangeError(
-        activePasswordSheet === "change-password"
-          ? "Enter your current password and a new password."
-          : "Enter a new password and confirm it.",
-      );
-      return;
-    }
-    if (
-      activePasswordSheet === "change-password" &&
-      !currentPasswordInput.trim()
-    ) {
-      setPasswordChangeError("Enter your current password and a new password.");
-      return;
-    }
-    if (newPasswordInput !== confirmPasswordInput) {
-      setPasswordChangeError("New password and confirmation must match.");
-      return;
-    }
-
-    try {
-      if (activePasswordSheet === "change-password") {
-        setIsChangingPassword(true);
-        const result = await authClient.changePassword({
-          currentPassword: currentPasswordInput,
-          newPassword: newPasswordInput,
-          email: user?.email ?? "",
-        });
-        if (result?.error) {
-          throw new Error(
-            result.error.message ?? "Unable to update your password.",
-          );
-        }
-        toast("Password updated");
-      } else {
-        setIsSettingPassword(true);
-        const result = await (
-          authClient as typeof authClient & {
-            setPassword: (input: { newPassword: string }) => Promise<{
-              error?: { message?: string };
-            } | void>;
-          }
-        ).setPassword({
-          newPassword: newPasswordInput,
-        });
-        if (result?.error) {
-          throw new Error(
-            result.error.message ?? "Unable to set your password.",
-          );
-        }
-        await accountsQuery.refetch();
-        toast("Email password added");
-      }
-      // The envelope follows the sign-in password; if this fails, the next device asks for the previous one and re-wraps.
-      await resetEncryptionPassword(newPasswordInput).catch(() => false);
-      resetChangePasswordForm();
-      setActivePasswordSheet(null);
-    } catch (error) {
-      setPasswordChangeError(
-        getErrorMessage(error, "Failed to update your password"),
-      );
-    } finally {
-      setIsChangingPassword(false);
-      setIsSettingPassword(false);
-    }
-  }, [
-    accountsQuery,
-    activePasswordSheet,
-    confirmPasswordInput,
-    currentPasswordInput,
-    newPasswordInput,
-    resetChangePasswordForm,
-    resetEncryptionPassword,
-    toast,
-    user?.email,
-  ]);
+  }, [queryClient, settleAction, signOut, toast]);
 
   const saveProfilePicture = useCallback(
     async (mode: "upload" | "remove") => {
       try {
         const image = mode === "upload" ? await pickProfilePicture() : null;
         if (mode === "upload" && !image) return;
-        setIsUpdatingProfilePicture(true);
+        setPendingAction("change-profile-picture");
         await (image
           ? calendarApiService.uploadProfileAvatar({ image })
           : calendarApiService.removeProfileAvatar());
@@ -250,10 +303,10 @@ export function AccountSettingsContent() {
           "error",
         );
       } finally {
-        setIsUpdatingProfilePicture(false);
+        settleAction("change-profile-picture");
       }
     },
-    [queryClient, refreshUser, toast, user?.email],
+    [queryClient, refreshUser, settleAction, toast, user?.email],
   );
 
   const handleChangeProfilePicture = useCallback(() => {
@@ -275,7 +328,6 @@ export function AccountSettingsContent() {
   const handleAccountAction = useCallback(
     (key: (typeof accountActions)[number]["key"]) => {
       if (key === "change-password" || key === "set-password") {
-        setPasswordChangeError(null);
         setActivePasswordSheet(key);
         return;
       }
@@ -302,17 +354,9 @@ export function AccountSettingsContent() {
   );
 
   const actionPending = (key: SettingsAccountActionKey) =>
-    key === "change-password"
-      ? isChangingPassword
-      : key === "set-password"
-        ? isSettingPassword
-        : key === "change-profile-picture"
-          ? isUpdatingProfilePicture
-          : key === "reset-preferences"
-            ? resetSettingsMutation.isPending
-            : key === "delete-account"
-              ? isDeletingAccount
-              : isSigningOut;
+    key === "reset-preferences"
+      ? resetSettingsMutation.isPending
+      : key === pendingAction;
 
   const renderActions = (keys: SettingsAccountActionKey[]) =>
     accountActions.flatMap((action) =>
@@ -344,6 +388,7 @@ export function AccountSettingsContent() {
           <SheetItem
             label={displayName ?? displayEmail ?? "Solace account"}
             detail={displayName ? (displayEmail ?? undefined) : undefined}
+            // oxlint-disable-next-line react-doctor/jsx-no-jsx-as-prop -- SheetItem is not memoized, so a fresh element costs nothing.
             leading={
               <BlobatarAvatar
                 email={user?.email}
@@ -372,21 +417,10 @@ export function AccountSettingsContent() {
         ) : null}
 
         {activePasswordSheet ? (
-          <SettingsPasswordForm
+          <AccountPasswordForm
+            key={activePasswordSheet}
             mode={activePasswordSheet}
-            currentPassword={currentPasswordInput}
-            newPassword={newPasswordInput}
-            confirmPassword={confirmPasswordInput}
-            onCurrentPasswordChange={setCurrentPasswordInput}
-            onNewPasswordChange={setNewPasswordInput}
-            onConfirmPasswordChange={setConfirmPasswordInput}
-            onSubmit={() => void handleSubmitPasswordChange()}
-            onCancel={() => {
-              setActivePasswordSheet(null);
-              resetChangePasswordForm();
-            }}
-            error={passwordChangeError}
-            isPending={isChangingPassword || isSettingPassword}
+            onClose={() => setActivePasswordSheet(null)}
           />
         ) : null}
 

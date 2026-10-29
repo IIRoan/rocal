@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useReducer, useState } from "react";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { getErrorMessage, partitionCalendarsByKind } from "@workspace/calendar-core";
@@ -41,6 +41,35 @@ type PickedIcsFile = {
   content: string;
 };
 
+interface FeedForm {
+  name: string;
+  url: string;
+  color: string;
+  errors: SubscriptionFieldErrors;
+}
+
+type FeedFormAction =
+  | { type: "edit"; field: "name" | "url"; value: string }
+  | { type: "color"; color: string }
+  | { type: "validated"; errors: SubscriptionFieldErrors };
+
+const EMPTY_FEED_FORM: FeedForm = { name: "", url: "", color: "indigo", errors: {} };
+
+function feedFormReducer(form: FeedForm, action: FeedFormAction): FeedForm {
+  switch (action.type) {
+    case "edit":
+      return {
+        ...form,
+        [action.field]: action.value,
+        errors: { ...form.errors, [action.field]: undefined },
+      };
+    case "color":
+      return { ...form, color: action.color };
+    case "validated":
+      return { ...form, errors: action.errors };
+  }
+}
+
 export function SubscriptionCreatePage() {
   const { theme } = useTheme();
   const { toast } = useToast();
@@ -50,10 +79,7 @@ export function SubscriptionCreatePage() {
   const createSubscription = useCreateSubscription();
   const importIcs = useImportIcs();
 
-  const [feedName, setFeedName] = useState("");
-  const [feedUrl, setFeedUrl] = useState("");
-  const [feedColor, setFeedColor] = useState<string>("indigo");
-  const [feedErrors, setFeedErrors] = useState<SubscriptionFieldErrors>({});
+  const [feed, dispatchFeed] = useReducer(feedFormReducer, EMPTY_FEED_FORM);
   const [pickedFile, setPickedFile] = useState<PickedIcsFile | null>(null);
   const [importCalendarId, setImportCalendarId] = useState<string>();
   const [holidaySearch, setHolidaySearch] = useState("");
@@ -86,15 +112,15 @@ export function SubscriptionCreatePage() {
 
   const handleAddFeed = () => {
     const errors = validateCreateSubscriptionInput({
-      name: feedName,
-      url: feedUrl,
-      color: feedColor,
+      name: feed.name,
+      url: feed.url,
+      color: feed.color,
     });
-    setFeedErrors(errors);
+    dispatchFeed({ type: "validated", errors });
     if (errors.name || errors.url || errors.color) return;
 
     createSubscription.mutate(
-      { name: feedName.trim(), url: normalizeSubscriptionUrl(feedUrl), color: feedColor.trim() },
+      { name: feed.name.trim(), url: normalizeSubscriptionUrl(feed.url), color: feed.color.trim() },
       { onSuccess: back },
     );
   };
@@ -142,7 +168,7 @@ export function SubscriptionCreatePage() {
     });
   };
 
-  const feedError = feedErrors.name ?? feedErrors.url;
+  const feedError = feed.errors.name ?? feed.errors.url;
 
   return (
     <SheetScroll>
@@ -150,21 +176,15 @@ export function SubscriptionCreatePage() {
         <SheetGroup>
           <SheetTextField
             key="name"
-            value={feedName}
-            onChangeText={(value) => {
-              setFeedName(value);
-              setFeedErrors((previous) => ({ ...previous, name: undefined }));
-            }}
+            value={feed.name}
+            onChangeText={(value) => dispatchFeed({ type: "edit", field: "name", value })}
             placeholder="Name"
             accessibilityLabel="Feed name"
           />
           <SheetTextField
             key="url"
-            value={feedUrl}
-            onChangeText={(value) => {
-              setFeedUrl(value);
-              setFeedErrors((previous) => ({ ...previous, url: undefined }));
-            }}
+            value={feed.url}
+            onChangeText={(value) => dispatchFeed({ type: "edit", field: "url", value })}
             placeholder="https://example.com/calendar.ics"
             autoCapitalize="none"
             autoCorrect={false}
@@ -179,18 +199,18 @@ export function SubscriptionCreatePage() {
         <SheetGroup>
           <SheetGroupBlock>
             <ColorPicker
-              selectedColor={isNamedCalendarColor(feedColor) ? feedColor : undefined}
-              onColorSelect={setFeedColor}
+              selectedColor={isNamedCalendarColor(feed.color) ? feed.color : undefined}
+              onColorSelect={(color) => dispatchFeed({ type: "color", color })}
             />
           </SheetGroupBlock>
         </SheetGroup>
-        {feedErrors.color ? <SheetMessage tone="destructive" text={feedErrors.color} /> : null}
+        {feed.errors.color ? <SheetMessage tone="destructive" text={feed.errors.color} /> : null}
       </SheetSection>
 
       <SheetButton
         label="Add feed"
         onPress={handleAddFeed}
-        pending={pendingSubscriptionUrl === normalizeSubscriptionUrl(feedUrl)}
+        pending={pendingSubscriptionUrl === normalizeSubscriptionUrl(feed.url)}
         disabled={createSubscription.isPending}
       />
 

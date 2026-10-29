@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState, type ReactNode } from "react";
+import { useEffect, useReducer, type ReactNode } from "react";
 import { View } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -45,6 +45,54 @@ export interface NavigationGuardProps {
   notificationExtensionSecrets: NotificationExtensionSecrets;
 }
 
+interface StartupState {
+  /** Signed-in user this startup belongs to; a different user resets it during render. */
+  userId: string | null;
+  isPreparing: boolean;
+  message: string;
+  restored: boolean | null;
+}
+
+type StartupAction =
+  | { type: "reset"; userId: string | null }
+  | { type: "started" }
+  | { type: "restored"; userId: string; restored: boolean }
+  | { type: "phase"; message: string }
+  | { type: "finished" };
+
+function initialStartup(userId: string | null): StartupState {
+  return {
+    userId,
+    isPreparing: false,
+    message: STARTUP_CRYPTO_INITIAL_PHASE,
+    restored: null,
+  };
+}
+
+function startupReducer(
+  state: StartupState,
+  action: StartupAction,
+): StartupState {
+  switch (action.type) {
+    case "reset":
+      return initialStartup(action.userId);
+    case "started":
+      return {
+        ...state,
+        isPreparing: true,
+        message: STARTUP_CRYPTO_INITIAL_PHASE,
+      };
+    case "restored":
+      return action.userId === state.userId
+        ? { ...state, restored: action.restored }
+        : state;
+    case "phase":
+      return { ...state, message: action.message };
+    case "finished":
+      return { ...state, isPreparing: false };
+  }
+}
+
 /** Shared auth gate: redirects by session state and blocks the UI while E2EE and app startup run. */
 export function NavigationGuard({
   children,
@@ -60,30 +108,28 @@ export function NavigationGuard({
   useAccountTimezoneSeed(isAuthenticated && Boolean(user));
   const queryClient = useQueryClient();
   const segments = useSegments();
-  const router = useRouter();
-  const [isPreparingStartupCrypto, setIsPreparingStartupCrypto] =
-    useState(false);
-  const [setupMessage, setSetupMessage] = useState(STARTUP_CRYPTO_INITIAL_PHASE);
+  const { replace } = useRouter();
+  const sessionUserId = isAuthenticated && user ? user.id : null;
+  const [startup, dispatchStartup] = useReducer(
+    startupReducer,
+    sessionUserId,
+    initialStartup,
+  );
+  if (startup.userId !== sessionUserId) {
+    dispatchStartup({ type: "reset", userId: sessionUserId });
+  }
   // Bumped after the encryption password unlocks this device, so startup runs again with the account key.
   const [startupRun, rerunStartup] = useReducer((run: number) => run + 1, 0);
-  const [restoreResult, setRestoreResult] = useState<{
-    userId: string;
-    restored: boolean;
-  } | null>(null);
-  const userId = user?.id ?? null;
   const isRestorePending =
     Boolean(restoreSession) &&
-    isAuthenticated &&
-    userId !== null &&
-    restoreResult?.userId !== userId;
-  const isRestored =
-    userId !== null &&
-    restoreResult?.userId === userId &&
-    restoreResult.restored;
+    sessionUserId !== null &&
+    startup.restored === null;
+  const isRestored = startup.restored === true;
 
   // The splash covers the short restore so neither the loading screen nor an empty inbox flashes first.
   useEffect(() => {
-    if (!isLoading && !isRestorePending) hideLaunchSplash();
+    if (isLoading || isRestorePending) return;
+    hideLaunchSplash();
   }, [isLoading, isRestorePending]);
 
   useEffect(() => {
@@ -96,28 +142,24 @@ export function NavigationGuard({
     if (!redirectPath) return;
 
     const timeoutId = setTimeout(() => {
-      router.replace(redirectPath as never);
+      replace(redirectPath as never);
     }, 0);
 
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [homeRoute, isAuthenticated, isLoading, segments, router]);
+  }, [homeRoute, isAuthenticated, isLoading, segments, replace]);
 
   useEffect(() => {
     calendarApiService.setE2eeProvider(provider);
 
     if (!isAuthenticated || !user) {
-      setIsPreparingStartupCrypto(false);
-      setSetupMessage(STARTUP_CRYPTO_INITIAL_PHASE);
-      setRestoreResult(null);
       clearSession();
       return;
     }
 
     let cancelled = false;
-    setIsPreparingStartupCrypto(true);
-    setSetupMessage(STARTUP_CRYPTO_INITIAL_PHASE);
+    dispatchStartup({ type: "started" });
 
     (async () => {
       if (restoreSession) {
@@ -127,7 +169,7 @@ export function NavigationGuard({
           () => cancelled,
         );
         if (cancelled) return;
-        setRestoreResult({ userId: user.id, restored });
+        dispatchStartup({ type: "restored", userId: user.id, restored });
       }
 
       const needsPassword = await bootstrap(user.id, API_BASE_URL);
@@ -140,7 +182,7 @@ export function NavigationGuard({
         displayName: user.name,
         onPhaseChange: (phase) => {
           if (!cancelled) {
-            setSetupMessage(phase);
+            dispatchStartup({ type: "phase", message: phase });
           }
         },
         isCancelled: () => cancelled,
@@ -166,7 +208,7 @@ export function NavigationGuard({
       .catch(() => undefined)
       .finally(() => {
         if (!cancelled) {
-          setIsPreparingStartupCrypto(false);
+          dispatchStartup({ type: "finished" });
         }
       });
 
@@ -185,7 +227,7 @@ export function NavigationGuard({
     startupRun,
   ]);
 
-  const isStartupRunning = !isE2eeReady || isPreparingStartupCrypto;
+  const isStartupRunning = !isE2eeReady || startup.isPreparing;
   // Cover the still-mounted navigator so sign-in stays put during passkey and the home screen never flashes underneath.
   const isPreparingWorkspace =
     isAuthenticated &&
@@ -206,7 +248,7 @@ export function NavigationGuard({
       />
       <WorkspaceLoadingScreen
         active={isPreparingWorkspace}
-        message={setupMessage}
+        message={startup.message}
       />
       <E2eeUnlockSheet onUnlocked={rerunStartup} />
     </View>
