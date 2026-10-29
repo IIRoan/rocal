@@ -35,7 +35,11 @@ function createRuntime() {
   const client = {
     searchMailboxMessagesWithFilter: jest.fn(),
     getMessagesByIds: jest.fn(async (_session: unknown, ids: string[]) =>
-      ids.map((id) => ({ id, keywords: id === "m1" ? { $flagged: true } : {} })),
+      ids.map((id) => ({
+        id,
+        keywords: id === "m1" ? { $flagged: true } : {},
+        mailboxIds: { inbox: true } as Record<string, boolean>,
+      })),
     ),
   };
   return { client, runtime: { client, session: {} } as unknown as MailRuntime };
@@ -57,6 +61,40 @@ describe("searchMailboxLocally", () => {
     expect(messages?.map((message) => message.id)).toEqual(["m1"]);
     expect(client.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
     expect(JSON.stringify(client.getMessagesByIds.mock.calls)).not.toContain("finance");
+  });
+
+  it("keeps the words on the device while the index is still empty or unreadable", async () => {
+    mockIndexEnabled.mockResolvedValue(true);
+    mockReadIndex.mockRejectedValue(new Error("unreadable"));
+    const { client, runtime } = createRuntime();
+
+    await expect(
+      searchMailboxLocally({
+        runtime,
+        mailboxId: "inbox",
+        fields: { subject: "invoice" },
+        listFilters: DEFAULT_MAIL_LIST_FILTERS,
+      }),
+    ).resolves.toEqual([]);
+    expect(client.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
+  });
+
+  it("drops a match that has since left the mailbox, such as one moved to Trash", async () => {
+    mockIndexEnabled.mockResolvedValue(true);
+    mockReadIndex.mockResolvedValue(documents);
+    const { client, runtime } = createRuntime();
+    client.getMessagesByIds.mockResolvedValue([
+      { id: "m1", keywords: {}, mailboxIds: { trash: true } },
+    ]);
+
+    await expect(
+      searchMailboxLocally({
+        runtime,
+        mailboxId: "inbox",
+        fields: { to: "finance" },
+        listFilters: DEFAULT_MAIL_LIST_FILTERS,
+      }),
+    ).resolves.toEqual([]);
   });
 
   it("leaves the search to the server when the index is off", async () => {

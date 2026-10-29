@@ -37,6 +37,7 @@ request_schema!(UpdateSettingsRequest => zod::object([
     ("showWeekNumbers", zod::boolean().optional()),
     ("showDeclinedEvents", zod::boolean().optional()),
     ("encryptedPreferences", zod::string().min(1).max(16_384).optional()),
+    ("expectedEncryptedPreferences", zod::string().max(16_384).nullable().optional()),
 ]).strict());
 
 pub fn routes() -> OpenApiRouter<AppState> {

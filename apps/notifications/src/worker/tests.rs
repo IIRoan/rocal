@@ -75,7 +75,19 @@ async fn due_reminders_become_one_job_per_channel_once() {
         (jobs[0].0.as_str(), jobs[0].1.as_str()),
         ("email", "pending")
     );
-    let payload: Value = serde_json::from_str(&jobs[0].2).unwrap();
+    let mut payload: Value = serde_json::from_str(&jobs[0].2).unwrap();
+    let scheduled: i64 = sqlx::query_scalar(
+        "SELECT FLOOR(EXTRACT(EPOCH FROM notification_time))::bigint FROM event_notification WHERE id = 'n1'",
+    )
+    .fetch_one(&worker.db)
+    .await
+    .unwrap();
+    assert_eq!(
+        payload["dueAt"].take(),
+        json!(scheduled),
+        "the job keeps when the reminder was due, so a late push still shows the right start"
+    );
+    payload.as_object_mut().unwrap().remove("dueAt");
     assert_eq!(
         payload,
         json!({"kind": "event_reminder", "eventId": "e1", "minutesBefore": 15})

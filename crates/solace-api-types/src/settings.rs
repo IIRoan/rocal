@@ -104,4 +104,11 @@ pub struct UpdateSettingsRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub encrypted_preferences: Option<String>,
+    /// The sealed preferences this change was merged onto (`null` for none); a different stored value refuses the write with 409.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "::serde_with::rust::double_option"
+    )]
+    pub expected_encrypted_preferences: Option<Option<String>>,
 }

@@ -2395,6 +2395,8 @@ export interface components {
             emailNotifications?: boolean;
             /** @description Replaces the sealed preferences; their plaintext fields go back to the defaults and any sent with it are ignored. */
             encryptedPreferences?: string;
+            /** @description The sealed preferences this change was merged onto (`null` for none); a different stored value refuses the write with 409. */
+            expectedEncryptedPreferences?: string | null;
             pushNotifications?: boolean;
             reminderSound?: boolean;
             showDeclinedEvents?: boolean;

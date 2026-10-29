@@ -7484,6 +7484,13 @@
             "type": "string",
             "description": "Replaces the sealed preferences; their plaintext fields go back to the defaults and any sent with it are ignored."
           },
+          "expectedEncryptedPreferences": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sealed preferences this change was merged onto (`null` for none); a different stored value refuses the write with 409."
+          },
           "pushNotifications": {
             "type": "boolean"
           },

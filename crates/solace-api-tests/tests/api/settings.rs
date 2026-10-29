@@ -610,3 +610,42 @@ async fn sealed_preferences_must_be_a_bounded_string() {
     let settings: UserSettings = ok(user.get("/api/settings").await.dto());
     assert_eq!(settings.encrypted_preferences, None);
 }
+
+#[tokio::test]
+async fn a_sealed_write_based_on_stale_preferences_is_refused() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let first = fake_envelope();
+    ok(user
+        .put(
+            "/api/settings",
+            json!({"encryptedPreferences": first, "expectedEncryptedPreferences": null}),
+        )
+        .await
+        .expect_status(200));
+
+    let newer = fake_envelope();
+    ok(user
+        .put(
+            "/api/settings",
+            json!({"encryptedPreferences": newer, "expectedEncryptedPreferences": first}),
+        )
+        .await
+        .expect_status(200));
+
+    for stale in [json!(first), json!(null)] {
+        let refused = user
+            .put(
+                "/api/settings",
+                json!({"encryptedPreferences": fake_envelope(), "expectedEncryptedPreferences": stale}),
+            )
+            .await;
+        assert_eq!(refused.status.as_u16(), 409, "{}", refused.text());
+    }
+    let settings: UserSettings = ok(user.get("/api/settings").await.dto());
+    assert_eq!(
+        settings.encrypted_preferences.as_deref(),
+        Some(newer.as_str()),
+        "a device that merged onto older preferences never replaces newer ones"
+    );
+}

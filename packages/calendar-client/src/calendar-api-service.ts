@@ -67,6 +67,17 @@ import type {
 } from "@workspace/calendar-core";
 
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
+const SETTINGS_WRITE_RETRIES = 2;
+
+/** The API answers 409 when sealed preferences changed since the write read them. */
+function isConflict(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "statusCode" in error &&
+    error.statusCode === 409
+  );
+}
 
 /** New ciphertext replaces every content field, so an update that sets only some of them needs the stored rest. */
 function needsStoredContent(request: UpdateEventRequest): boolean {
@@ -95,6 +106,7 @@ export class CalendarApiService {
   private client: HttpClient;
   private e2ee: E2eeProvider;
   private defaultCalendarsSeed: Promise<boolean> | null = null;
+  private settingsWrites: Promise<unknown> = Promise.resolve();
 
   constructor(client: HttpClient, e2eeProvider?: E2eeProvider) {
     this.client = client;
@@ -535,27 +547,34 @@ export class CalendarApiService {
     }
   }
 
+  private fetchEventSearchCorpus(
+    params: EventSearchCorpusParams,
+    signal?: AbortSignal,
+  ) {
+    const searchParams = new URLSearchParams();
+    if (params.limit != null) searchParams.set("limit", String(params.limit));
+    if (params.offset != null) searchParams.set("offset", String(params.offset));
+    if (params.updatedAfter) {
+      searchParams.set("updatedAfter", params.updatedAfter);
+    }
+    if (params.readableInvitations) {
+      searchParams.set("readableInvitations", "true");
+    }
+
+    const query = searchParams.toString();
+    return this.client.get<Schema<"EventSearchCorpus">>(
+      // repo-rules-allow api-path-ids: appends a URLSearchParams query string, not a path segment.
+      `/api/events/search-corpus${query ? `?${query}` : ""}`,
+      { signal },
+    );
+  }
+
   async getEventSearchCorpus(
     params: EventSearchCorpusParams = {},
     signal?: AbortSignal,
   ): Promise<EventSearchCorpusResult> {
     try {
-      const searchParams = new URLSearchParams();
-      if (params.limit != null) searchParams.set("limit", String(params.limit));
-      if (params.offset != null) searchParams.set("offset", String(params.offset));
-      if (params.updatedAfter) {
-        searchParams.set("updatedAfter", params.updatedAfter);
-      }
-      if (params.readableInvitations) {
-        searchParams.set("readableInvitations", "true");
-      }
-
-      const query = searchParams.toString();
-      const response = await this.client.get<Schema<"EventSearchCorpus">>(
-        // repo-rules-allow api-path-ids: appends a URLSearchParams query string, not a path segment.
-        `/api/events/search-corpus${query ? `?${query}` : ""}`,
-        { signal },
-      );
+      const response = await this.fetchEventSearchCorpus(params, signal);
 
       return {
         ...response,
@@ -752,8 +771,36 @@ export class CalendarApiService {
     }
   }
 
+  /** The server clears only its own column, so the events that seal this category are re-sealed without it before it goes. */
+  private async removeSealedCategory(id: string): Promise<void> {
+    const assigned: CalendarEvent[] = [];
+    let offset = 0;
+    do {
+      const page = await this.fetchEventSearchCorpus({ limit: 200, offset });
+      for (const event of page.events as CalendarEvent[]) {
+        if (event.encryptionState !== "encrypted") continue;
+        // Without the column the category read back is the sealed one, and an event that does not open is left as it is.
+        const opened = await this.e2ee
+          .hydrateEncryptedEvent({ ...event, categoryId: null })
+          .catch(() => null);
+        if (opened?.categoryId === id) assigned.push(opened);
+      }
+      offset = page.nextOffset ?? -1;
+    } while (offset >= 0);
+    for (const event of assigned) {
+      await this.updateEvent(event.id, {
+        title: event.title,
+        description: event.description ?? "",
+        location: event.location ?? "",
+        color: event.color ?? "",
+        categoryId: "",
+      });
+    }
+  }
+
   async deleteCategory(id: string): Promise<DeleteResponse> {
     try {
+      await this.removeSealedCategory(id);
       return await this.client.delete<Schema<"SuccessMessage">>(
         `/api/categories/${encodeURIComponent(id)}`,
       );
@@ -777,21 +824,48 @@ export class CalendarApiService {
   async updateUserSettings(
     settings: UpdateSettingsRequest,
   ): Promise<UserSettings> {
+    // One write at a time on this device, so two quick changes never merge onto the same preferences.
+    const write = this.settingsWrites.then(() => this.writeUserSettings(settings));
+    this.settingsWrites = write.catch(() => undefined);
+    return write;
+  }
+
+  private async writeUserSettings(
+    settings: UpdateSettingsRequest,
+    attempt = 0,
+  ): Promise<UserSettings> {
     try {
       const { readable, preferences } = splitUserSettingsUpdate(settings);
-      const body: Schema<"UpdateSettingsRequest"> = preferences
-        ? { ...readable, encryptedPreferences: await this.sealUserSettings(preferences) }
-        : readable;
+      if (!preferences) {
+        return await this.openUserSettings(
+          await this.client.put<Schema<"UserSettings">>("/api/settings", readable),
+        );
+      }
+      const current = await this.client.get<Schema<"UserSettings">>("/api/settings");
       return await this.openUserSettings(
-        await this.client.put<Schema<"UserSettings">>("/api/settings", body),
+        await this.client.put<Schema<"UserSettings">>("/api/settings", {
+          ...readable,
+          encryptedPreferences: await this.sealUserSettings(current, preferences),
+          expectedEncryptedPreferences: current.encryptedPreferences ?? null,
+        } satisfies Schema<"UpdateSettingsRequest">),
       );
     } catch (error) {
+      // Another device replaced the preferences first, so the change merges onto its version instead.
+      if (attempt < SETTINGS_WRITE_RETRIES && isConflict(error)) {
+        return this.writeUserSettings(settings, attempt + 1);
+      }
       throw this.transformError(error, "Failed to update user settings");
     }
   }
 
   /** Seals preferences a server still holds in plaintext; true when it moved them. */
   async ensureSealedUserSettings(): Promise<boolean> {
+    const run = this.settingsWrites.then(() => this.sealPlaintextUserSettings());
+    this.settingsWrites = run.catch(() => undefined);
+    return run;
+  }
+
+  private async sealPlaintextUserSettings(): Promise<boolean> {
     if (!(await this.e2ee.hasActiveSession())) {
       return false;
     }
@@ -799,13 +873,22 @@ export class CalendarApiService {
     if (settings.encryptedPreferences) {
       return false;
     }
-    await this.client.put<Schema<"UserSettings">>("/api/settings", {
-      encryptedPreferences: await this.e2ee.encryptJson(
-        pickUserSettingsPreferences(settings as UserSettings),
-        USER_SETTINGS_PREFERENCES_AAD,
-      ),
-    });
-    return true;
+    // A device that sealed them first wins; its preferences are the newer ones.
+    return this.client
+      .put<Schema<"UserSettings">>("/api/settings", {
+        encryptedPreferences: await this.e2ee.encryptJson(
+          pickUserSettingsPreferences(settings as UserSettings),
+          USER_SETTINGS_PREFERENCES_AAD,
+        ),
+        expectedEncryptedPreferences: null,
+      })
+      .then(
+        () => true,
+        (error: unknown) => {
+          if (isConflict(error)) return false;
+          throw error;
+        },
+      );
   }
 
   private async openUserSettings({
@@ -820,9 +903,9 @@ export class CalendarApiService {
 
   /** The whole blob is replaced, so changes merge onto the current preferences; one that cannot be opened is never overwritten. */
   private async sealUserSettings(
+    current: ApiResponse<"UserSettings">,
     changes: Partial<UserSettingsPreferences>,
   ): Promise<string> {
-    const current = await this.client.get<Schema<"UserSettings">>("/api/settings");
     const opened = current.encryptedPreferences
       ? await this.e2ee.decryptJson(
           current.encryptedPreferences,

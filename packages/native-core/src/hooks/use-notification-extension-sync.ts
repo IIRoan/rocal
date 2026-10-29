@@ -2,12 +2,15 @@ import { useEffect } from "react";
 import { AppState, Platform } from "react-native";
 import { useAuth } from "../providers/AuthProvider";
 import { useE2ee } from "../providers/E2eeProvider";
+import { useUserTimeFormat } from "./use-user-time-format";
+import { useUserTimezone } from "./use-user-timezone";
 import { getNativeExpoOrigin } from "../lib/api";
 import { API_BASE_URL } from "../lib/constants";
 import {
   clearNotificationExtensionSecrets,
   writeNotificationExtensionKey,
   writeNotificationExtensionMailAuth,
+  writeNotificationExtensionReminderFormat,
 } from "../lib/notification-extension-store";
 import { exportNotificationKey } from "../lib/notification-title-crypto";
 import { getSessionCookieAsync } from "../lib/session-cookie";
@@ -28,7 +31,7 @@ async function syncMailAuth(): Promise<void> {
 export interface NotificationExtensionSecrets {
   /** Session cookie so the extension can fetch sender and subject for mail pushes. */
   mailAuth: boolean;
-  /** Notification key so the extension can decrypt reminder titles. */
+  /** Notification key so the extension can decrypt reminder titles, with the account's time zone and format for their start. */
   notificationKey: boolean;
 }
 
@@ -39,6 +42,8 @@ export function useNotificationExtensionSync({
 }: NotificationExtensionSecrets): void {
   const { isAuthenticated, isLoading } = useAuth();
   const { isEnabled, isReady, runWithAccountKey } = useE2ee();
+  const timeZone = useUserTimezone();
+  const timeFormat = useUserTimeFormat();
 
   useEffect(() => {
     if (Platform.OS !== "ios" || isLoading) {
@@ -83,4 +88,13 @@ export function useNotificationExtensionSync({
       cancelled = true;
     };
   }, [isAuthenticated, isEnabled, isReady, notificationKey, runWithAccountKey]);
+
+  useEffect(() => {
+    if (!notificationKey || Platform.OS !== "ios" || !isAuthenticated) {
+      return;
+    }
+    void writeNotificationExtensionReminderFormat({ timeZone, timeFormat }).catch(
+      () => undefined,
+    );
+  }, [isAuthenticated, notificationKey, timeFormat, timeZone]);
 }

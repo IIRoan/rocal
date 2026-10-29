@@ -76,9 +76,8 @@ describe("sealed user settings", () => {
   });
 
   it("sends app preferences only sealed, merged onto the current ones", async () => {
-    const { put, service } = setup({
-      encryptedPreferences: sealed({ theme: "dark", showWeekNumbers: true }),
-    });
+    const stored = sealed({ theme: "dark", showWeekNumbers: true });
+    const { put, service } = setup({ encryptedPreferences: stored });
 
     await service.updateUserSettings({ weekStartDay: 0, timezone: "UTC" });
 
@@ -86,6 +85,7 @@ describe("sealed user settings", () => {
     expect(body).toEqual({
       timezone: "UTC",
       encryptedPreferences: expect.any(String),
+      expectedEncryptedPreferences: stored,
     });
     const blob = JSON.parse(
       String(body.encryptedPreferences).replace("sealed(user-settings:v1):", ""),
@@ -141,10 +141,65 @@ describe("sealed user settings", () => {
     await expect(plaintext.service.ensureSealedUserSettings()).resolves.toBe(true);
     expect(plaintext.put.mock.calls[0]?.[1]).toEqual({
       encryptedPreferences: expect.stringContaining('"theme":"dark"'),
+      expectedEncryptedPreferences: null,
     });
 
     const done = setup({ encryptedPreferences: sealed({ theme: "dark" }) });
     await expect(done.service.ensureSealedUserSettings()).resolves.toBe(false);
     expect(done.put).not.toHaveBeenCalled();
   });
+
+  it("keeps both of two quick changes, since writes on one device run one at a time", async () => {
+    const server = statefulServer({});
+
+    await Promise.all([
+      server.service.updateUserSettings({ theme: "dark" }),
+      server.service.updateUserSettings({ weekStartDay: 0 }),
+    ]);
+
+    expect(server.preferences()).toMatchObject({ theme: "dark", weekStartDay: 0 });
+  });
+
+  it("merges onto another device's newer preferences when the server refuses a stale write", async () => {
+    const server = statefulServer({ encryptedPreferences: sealed({ theme: "dark" }) });
+    server.beforeNextWrite(() => {
+      server.row.encryptedPreferences = sealed({ theme: "dark", compactView: true });
+    });
+
+    await server.service.updateUserSettings({ weekStartDay: 0 });
+
+    expect(server.preferences()).toMatchObject({ compactView: true, weekStartDay: 0 });
+  });
 });
+
+/** A fake /api/settings that refuses a sealed write merged onto preferences it no longer holds, as the API does. */
+function statefulServer(stored: Partial<typeof serverDefaults>) {
+  const client = new HttpClient({ baseURL: "https://api.test", retries: 0 });
+  const row = { ...serverDefaults, ...stored };
+  let interleave: (() => void) | null = null;
+  jest.spyOn(client, "get").mockImplementation(async () => ({ ...row }) as never);
+  jest.spyOn(client, "put").mockImplementation(async (_path: string, body: unknown) => {
+    const { expectedEncryptedPreferences, ...changes } = body as Record<string, unknown>;
+    interleave?.();
+    interleave = null;
+    if (
+      expectedEncryptedPreferences !== undefined &&
+      expectedEncryptedPreferences !== row.encryptedPreferences
+    ) {
+      throw { statusCode: 409, message: "Your settings changed on another device. Try again." };
+    }
+    Object.assign(row, changes);
+    return { ...row } as never;
+  });
+  return {
+    row,
+    service: new CalendarApiService(client, new SealingProvider()),
+    beforeNextWrite: (run: () => void) => {
+      interleave = run;
+    },
+    preferences: () =>
+      JSON.parse(
+        String(row.encryptedPreferences).replace("sealed(user-settings:v1):", ""),
+      ) as Record<string, unknown>,
+  };
+}

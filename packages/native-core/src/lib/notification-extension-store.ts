@@ -2,11 +2,13 @@
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import type { TimeFormat } from "@workspace/calendar-core";
 
 /** Must match `SharedKeychain` in plugins/notification-service-extension. */
 export const NOTIFICATION_EXTENSION_ITEMS = {
   notificationKey: "notification_key",
   mailAuth: "mail_auth",
+  reminderFormat: "reminder_format",
 } as const;
 
 export type NotificationExtensionMailAuth = {
@@ -64,6 +66,17 @@ export async function writeNotificationExtensionKey(
   notificationKey: string,
 ): Promise<void> {
   await writeItem(NOTIFICATION_EXTENSION_ITEMS.notificationKey, notificationKey);
+}
+
+/** The account's zone and 12/24-hour choice, so a reminder's start reads as it does in the app. */
+export async function writeNotificationExtensionReminderFormat(format: {
+  timeZone: string;
+  timeFormat: TimeFormat;
+}): Promise<void> {
+  await writeItem(
+    NOTIFICATION_EXTENSION_ITEMS.reminderFormat,
+    JSON.stringify(format),
+  );
 }
 
 export async function writeNotificationExtensionMailAuth(

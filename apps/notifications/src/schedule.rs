@@ -10,6 +10,8 @@ pub struct Due {
     pub event_id: String,
     pub user_id: String,
     pub minutes_before: i32,
+    /// The scheduled `notification_time`, in Unix seconds.
+    pub due_at: i64,
     pub email: bool,
     pub push: bool,
     pub has_push_device: bool,
@@ -23,6 +25,7 @@ const CLAIM_DUE: &str = r#"
         en.event_id,
         ce.user_id,
         en.minutes_before,
+        en.notification_time,
         COALESCE(us."emailNotifications", TRUE),
         COALESCE(us.push_notifications, TRUE),
         EXISTS (
@@ -51,7 +54,17 @@ const INSERT_JOB: &str = r#"
     ) VALUES ($1, $2, 'event_reminder', $3, $4, $5::jsonb, 'pending', 0, NOW(), NOW(), NOW())
 "#;
 
-type DueRow = (String, String, String, i32, bool, bool, bool, bool);
+type DueRow = (
+    String,
+    String,
+    String,
+    i32,
+    PrimitiveDateTime,
+    bool,
+    bool,
+    bool,
+    bool,
+);
 
 /// Claims reminders due by `now` (to the minute) and queues their jobs; returns how many were claimed.
 pub async fn claim_due(db: &PgPool, now: PrimitiveDateTime) -> Result<usize, sqlx::Error> {
@@ -64,12 +77,24 @@ pub async fn claim_due(db: &PgPool, now: PrimitiveDateTime) -> Result<usize, sql
         .fetch_all(&mut *tx)
         .await?;
     let count = rows.len();
-    for (id, event_id, user_id, minutes_before, email, push, has_push_device, own_mailbox) in rows {
+    for (
+        id,
+        event_id,
+        user_id,
+        minutes_before,
+        due_at,
+        email,
+        push,
+        has_push_device,
+        own_mailbox,
+    ) in rows
+    {
         let due = Due {
             id,
             event_id,
             user_id,
             minutes_before,
+            due_at: due_at.assume_utc().unix_timestamp(),
             email,
             push,
             has_push_device,
@@ -87,7 +112,10 @@ pub async fn claim_due(db: &PgPool, now: PrimitiveDateTime) -> Result<usize, sql
                 &mut *tx,
                 &due.user_id,
                 &due.event_id,
-                due.minutes_before,
+                Reminder {
+                    minutes_before: due.minutes_before,
+                    due_at: Some(due.due_at),
+                },
                 channel,
                 fallback,
             )
@@ -114,13 +142,22 @@ pub fn channels_for(due: &Due) -> Vec<&'static str> {
     channels
 }
 
+/// Which reminder of the event a job sends, and when it was due.
+struct Reminder {
+    minutes_before: i32,
+    due_at: Option<i64>,
+}
+
 /// Opaque refs only; the encrypted title is read at push time.
-fn reminder_payload(event_id: &str, minutes_before: i32, email_fallback: bool) -> String {
+fn reminder_payload(event_id: &str, reminder: &Reminder, email_fallback: bool) -> String {
     let mut payload = json!({
         "kind": "event_reminder",
         "eventId": event_id,
-        "minutesBefore": minutes_before,
+        "minutesBefore": reminder.minutes_before,
     });
+    if let Some(due_at) = reminder.due_at {
+        payload["dueAt"] = json!(due_at);
+    }
     if email_fallback {
         payload["emailFallback"] = json!(true);
     }
@@ -131,7 +168,7 @@ async fn insert_job<'e>(
     db: impl Executor<'e, Database = Postgres>,
     user_id: &str,
     event_id: &str,
-    minutes_before: i32,
+    reminder: Reminder,
     channel: &str,
     email_fallback: bool,
 ) -> Result<(), sqlx::Error> {
@@ -140,7 +177,7 @@ async fn insert_job<'e>(
         .bind(user_id)
         .bind(channel)
         .bind(event_id)
-        .bind(reminder_payload(event_id, minutes_before, email_fallback))
+        .bind(reminder_payload(event_id, &reminder, email_fallback))
         .execute(db)
         .await?;
     Ok(())
@@ -153,8 +190,11 @@ pub async fn queue_email_fallback<'e>(
     event_id: &str,
     minutes_before: i64,
 ) -> Result<(), sqlx::Error> {
-    let minutes = i32::try_from(minutes_before).unwrap_or_default();
-    insert_job(db, user_id, event_id, minutes, "email", false).await
+    let reminder = Reminder {
+        minutes_before: i32::try_from(minutes_before).unwrap_or_default(),
+        due_at: None,
+    };
+    insert_job(db, user_id, event_id, reminder, "email", false).await
 }
 
 #[cfg(test)]
@@ -191,21 +231,41 @@ mod tests {
 
     #[test]
     fn payloads_carry_opaque_refs_and_flag_the_deferring_push() {
+        let reminder = |due_at| Reminder {
+            minutes_before: 15,
+            due_at,
+        };
         let payload: serde_json::Value =
-            serde_json::from_str(&reminder_payload("e1", 15, false)).unwrap();
+            serde_json::from_str(&reminder_payload("e1", &reminder(None), false)).unwrap();
         assert_eq!(
             payload,
             json!({"kind": "event_reminder", "eventId": "e1", "minutesBefore": 15})
         );
         let flagged: serde_json::Value =
-            serde_json::from_str(&reminder_payload("e1", 15, true)).unwrap();
+            serde_json::from_str(&reminder_payload("e1", &reminder(None), true)).unwrap();
         assert_eq!(flagged["emailFallback"], json!(true));
+        let dated: serde_json::Value = serde_json::from_str(&reminder_payload(
+            "e1",
+            &reminder(Some(1_700_000_000)),
+            false,
+        ))
+        .unwrap();
+        assert_eq!(
+            dated["dueAt"],
+            json!(1_700_000_000),
+            "the push shows the start from when it was due, not when it went out"
+        );
+        assert_eq!(
+            crate::payload::parse(&dated.to_string()).and_then(|p| p.due_at),
+            Some(1_700_000_000)
+        );
     }
 
     #[test]
     fn the_due_query_matches_prisma_columns_and_the_account_email() {
         for column in [
             r#"us."emailNotifications""#,
+            "en.notification_time,",
             "us.push_notifications",
             "LOWER(mde.email) = LOWER(u.email)",
             "FOR UPDATE OF en SKIP LOCKED",

@@ -85,13 +85,13 @@ final class NotificationService: UNNotificationServiceExtension {
     }
   }
 
-  /// The start time from the send instant plus the sealed lead, so the visible push never carries it.
+  /// The start time from the reminder's due instant plus the sealed lead, so the visible push never carries it.
   private static func startText(
     userInfo: [AnyHashable: Any], eventId: String, key: SymmetricKey
   ) -> String? {
     guard
       let wire = userInfo["encl"] as? String,
-      let sent = (userInfo["sent"] as? NSNumber)?.doubleValue,
+      let due = (userInfo["due"] as? NSNumber)?.doubleValue,
       let plain = try? NotificationTitleCipher.open(
         wire, aad: "notification-lead:v1:\(eventId)", key: key),
       let minutes = Int(plain), minutes >= 0
@@ -101,15 +101,27 @@ final class NotificationService: UNNotificationServiceExtension {
     if minutes == 0 {
       return "Starting now"
     }
-    let start = Date(timeIntervalSince1970: sent + Double(minutes) * 60)
-    let formatter = DateFormatter()
-    formatter.timeStyle = .short
-    if Calendar.current.isDateInToday(start) {
-      return "Starts at \(formatter.string(from: start))"
+    let start = Date(timeIntervalSince1970: due + Double(minutes) * 60)
+    // The account's zone and 12/24-hour choice, so the time reads as it does in the app; the device's otherwise.
+    let format = SharedKeychain.read(SharedKeychain.reminderFormat).flatMap(ReminderFormat.init(json:))
+    let zone = format?.timeZone ?? .current
+    let clock = DateFormatter()
+    clock.timeZone = zone
+    if let template = format?.clockTemplate {
+      clock.setLocalizedDateFormatFromTemplate(template)
+    } else {
+      clock.timeStyle = .short
     }
-    formatter.doesRelativeDateFormatting = true
-    formatter.dateStyle = .medium
-    return "Starts \(formatter.string(from: start))"
+    var calendar = Calendar.current
+    calendar.timeZone = zone
+    if calendar.isDateInToday(start) {
+      return "Starts at \(clock.string(from: start))"
+    }
+    let day = DateFormatter()
+    day.timeZone = zone
+    day.doesRelativeDateFormatting = true
+    day.dateStyle = .medium
+    return "Starts \(day.string(from: start)) at \(clock.string(from: start))"
   }
 
   private func resolveNewMail(userInfo: [AnyHashable: Any]) {
@@ -205,6 +217,7 @@ enum Base64URL {
 enum SharedKeychain {
   static let notificationKey = "notification_key"
   static let mailAuth = "mail_auth"
+  static let reminderFormat = "reminder_format"
 
   /// Mirrors expo-secure-store: service "<service>:no-auth", account = key bytes, access group = App Group.
   static func read(_ key: String) -> String? {
@@ -231,6 +244,27 @@ enum SharedKeychain {
       return nil
     }
     return String(data: data, encoding: .utf8)
+  }
+}
+
+/// Mirrors writeNotificationExtensionReminderFormat in packages/native-core/src/lib/notification-extension-store.ts.
+struct ReminderFormat {
+  let timeZone: TimeZone?
+  let clockTemplate: String?
+
+  init?(json: String) {
+    guard
+      let data = json.data(using: .utf8),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return nil
+    }
+    self.timeZone = (object["timeZone"] as? String).flatMap { TimeZone(identifier: $0) }
+    switch object["timeFormat"] as? String {
+    case "12h": self.clockTemplate = "hmma"
+    case "24h": self.clockTemplate = "HHmm"
+    default: self.clockTemplate = nil
+    }
   }
 }
 

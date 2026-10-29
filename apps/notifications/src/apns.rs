@@ -55,8 +55,8 @@ pub struct Notification {
     pub account_id: String,
     pub encrypted_title: String,
     pub encrypted_lead: String,
-    /// When the worker sent it; Apple sees that anyway, and the extension adds the sealed lead to it.
-    pub sent_at: i64,
+    /// When the reminder was due; Apple sees about that anyway, and the extension adds the sealed lead to it.
+    pub due_at: i64,
 }
 
 /// A generic reminder: the title and lead travel sealed, so the visible text names no time.
@@ -64,7 +64,7 @@ pub fn event_reminder(
     event_id: &str,
     encrypted_title: &str,
     encrypted_lead: &str,
-    sent_at: i64,
+    due_at: i64,
 ) -> Notification {
     Notification {
         kind: Kind::EventReminder,
@@ -76,7 +76,7 @@ pub fn event_reminder(
         account_id: String::new(),
         encrypted_title: encrypted_title.trim().to_owned(),
         encrypted_lead: encrypted_lead.trim().to_owned(),
-        sent_at,
+        due_at,
     }
 }
 
@@ -97,7 +97,7 @@ pub fn new_mail(count: i64, email_id: &str, account_id: &str) -> Notification {
         account_id: account_id.trim().to_owned(),
         encrypted_title: String::new(),
         encrypted_lead: String::new(),
-        sent_at: 0,
+        due_at: 0,
     }
 }
 
@@ -137,7 +137,7 @@ pub fn payload(notification: &Notification) -> Value {
             }
             if !notification.encrypted_lead.is_empty() {
                 payload["encl"] = json!(notification.encrypted_lead);
-                payload["sent"] = json!(notification.sent_at);
+                payload["due"] = json!(notification.due_at);
             }
         }
         Kind::NewMail => {
@@ -333,7 +333,7 @@ mod tests {
         assert_eq!(body["eventId"], json!("evt1"));
         assert_eq!(body["enc"], json!("v1.iv.ct"));
         assert_eq!(body["encl"], json!("v1.iv.lead"));
-        assert_eq!(body["sent"], json!(1_700_000_000));
+        assert_eq!(body["due"], json!(1_700_000_000));
         assert_eq!(body["body"], json!({"t": "event", "eid": "evt1"}));
     }
 
@@ -344,7 +344,7 @@ mod tests {
         let body = payload(&reminder);
         assert_eq!(body.get("enc"), None);
         assert_eq!(body.get("encl"), None);
-        assert_eq!(body.get("sent"), None);
+        assert_eq!(body.get("due"), None);
     }
 
     #[test]

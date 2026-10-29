@@ -69,9 +69,8 @@ export function CommandPalette() {
   const trimmedQuery = debouncedQuery.trim();
   const searchEnabled = isOpen && trimmedQuery.length >= SEARCH_MIN_LENGTH;
 
-  // With the on-device index on, results come only from it, so the words never reach the mail server.
-  const searchesLocally =
-    titleIndex.enabled && titleIndex.documents.some((document) => document.source === "mail");
+  // With the on-device index on, results come only from it, even while it builds, so the words never reach the mail server.
+  const searchesLocally = titleIndex.enabled;
   const { data: mailSearchData, isFetching: mailSearchFetching } =
     usePaletteMailSearch(runtime, selectedMailboxId, trimmedQuery, {
       enabled: searchEnabled && !searchesLocally,

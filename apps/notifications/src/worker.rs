@@ -298,7 +298,12 @@ impl Worker {
                             .await?;
                     (reminder.encrypted_title, lead)
                 };
-                apns::event_reminder(event_id, &title, &lead, jiff::Timestamp::now().as_second())
+                // The scheduled instant, not now: a late or retried push must not show the event later than it starts.
+                let due_at = job
+                    .payload
+                    .due_at
+                    .unwrap_or_else(|| jiff::Timestamp::now().as_second());
+                apns::event_reminder(event_id, &title, &lead, due_at)
             }
             _ => return self.skip(job, "unknown kind").await,
         };

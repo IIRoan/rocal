@@ -1,5 +1,6 @@
 //! Settings rules: working hours and days, the default calendar, and full encryption closing share links.
 
+use sea_orm::TransactionTrait;
 use serde_json::Value;
 use solace_api_types::SuccessMessage;
 use solace_api_types::settings::{UpdateSettingsRequest, UserSettings};
@@ -69,7 +70,21 @@ pub async fn update(
         }
     }
     let now = instant::now();
-    let settings = queries::upsert(&state.db, &user.id, request, now).await?;
+    let Some(expected) = request.expected_encrypted_preferences.clone() else {
+        return Ok(record(
+            queries::upsert(&state.db, &user.id, request, now).await?,
+        ));
+    };
+    let transaction = state.db.begin().await?;
+    // The row lock makes compare-and-replace atomic, so two devices never both merge onto the same preferences.
+    let stored = queries::sealed_preferences_for_update(&transaction, &user.id).await?;
+    if stored != expected {
+        return Err(AppError::Conflict(
+            "Your settings changed on another device. Try again.".into(),
+        ));
+    }
+    let settings = queries::upsert(&transaction, &user.id, request, now).await?;
+    transaction.commit().await?;
     Ok(record(settings))
 }
 

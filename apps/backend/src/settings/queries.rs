@@ -2,7 +2,7 @@
 
 use sea_orm::prelude::TimeDateTime;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use solace_api_types::settings::UpdateSettingsRequest;
 
 use crate::db::cuid;
@@ -72,6 +72,19 @@ pub async fn own_calendar<C: ConnectionTrait>(
 }
 
 /// Prisma's native upsert: insert the row, or update only the given fields.
+/// The stored sealed preferences, row-locked until the caller's transaction ends; `None` when there is no row yet.
+pub async fn sealed_preferences_for_update<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+) -> Result<Option<String>, sea_orm::DbErr> {
+    Ok(user_settings::Entity::find()
+        .filter(user_settings::Column::UserId.eq(user_id))
+        .lock_exclusive()
+        .one(db)
+        .await?
+        .and_then(|row| row.encrypted_preferences))
+}
+
 pub async fn upsert<C: ConnectionTrait>(
     db: &C,
     user_id: &str,

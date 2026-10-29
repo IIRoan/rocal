@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { mailToTitleIndexDocument, type TitleIndexDocument } from "@workspace/calendar-core";
 
 const mockLoadLocalMailSearchDocuments =
-  jest.fn<(accountId: string) => Promise<TitleIndexDocument[] | null>>();
+  jest.fn<(accountId: string) => Promise<TitleIndexDocument[]>>();
+const mockIndexEnabled = { current: true };
+jest.mock("@/lib/search/private-index-flags", () => ({
+  isPrivateContentIndexEnabled: () => mockIndexEnabled.current,
+}));
 jest.mock("@/lib/search/private-title-index", () => ({
   loadLocalMailSearchDocuments: (accountId: string) =>
     mockLoadLocalMailSearchDocuments(accountId),
@@ -36,7 +40,11 @@ function createClient() {
     searchMailboxMessages: jest.fn(async () => ({ messages: [{ id: "server" }], total: 1 })),
     searchMailboxMessagesWithFilter: jest.fn(async () => ({ messages: [], total: 0 })),
     getMessagesByIds: jest.fn(async (_session: JmapSession, ids: string[]) =>
-      [...ids].reverse().map((id) => ({ id, keywords: id === "m2" ? { $flagged: true } : {} })),
+      [...ids].reverse().map((id) => ({
+        id,
+        keywords: id === "m2" ? { $flagged: true } : {},
+        mailboxIds: { inbox: true },
+      })),
     ),
   };
 }
@@ -44,6 +52,7 @@ function createClient() {
 describe("searchMailbox", () => {
   beforeEach(() => {
     mockLoadLocalMailSearchDocuments.mockReset();
+    mockIndexEnabled.current = true;
   });
 
   it("searches the on-device index and fetches matches by id when the index is on", async () => {
@@ -82,8 +91,46 @@ describe("searchMailbox", () => {
     expect(messages.map((message) => message.id)).toEqual(["m2"]);
   });
 
+  it("keeps the words on the device while the index is still empty or unreadable", async () => {
+    mockLoadLocalMailSearchDocuments.mockResolvedValue([]);
+    const client = createClient();
+
+    const messages = await searchMailbox({
+      client: client as unknown as StalwartJmapClient,
+      session,
+      mailboxId: "inbox",
+      text: "invoice",
+      filters: null,
+      limit: 40,
+    });
+
+    expect(client.searchMailboxMessages).not.toHaveBeenCalled();
+    expect(client.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
+    expect(messages).toEqual([]);
+  });
+
+  it("drops a match that has since left the mailbox, such as one moved to Trash", async () => {
+    mockLoadLocalMailSearchDocuments.mockResolvedValue(documents);
+    const client = createClient();
+    client.getMessagesByIds.mockResolvedValue([
+      { id: "m1", keywords: {}, mailboxIds: { trash: true } },
+      { id: "m2", keywords: {}, mailboxIds: { inbox: true } },
+    ] as never);
+
+    const messages = await searchMailbox({
+      client: client as unknown as StalwartJmapClient,
+      session,
+      mailboxId: "inbox",
+      text: "invoice",
+      filters: null,
+      limit: 40,
+    });
+
+    expect(messages.map((message) => message.id)).toEqual(["m2"]);
+  });
+
   it("asks the mail server when the index is off", async () => {
-    mockLoadLocalMailSearchDocuments.mockResolvedValue(null);
+    mockIndexEnabled.current = false;
     const client = createClient();
 
     const messages = await searchMailbox({

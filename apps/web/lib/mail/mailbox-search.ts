@@ -7,6 +7,7 @@ import {
   type MailSearchFilters,
 } from "@workspace/calendar-core";
 import { getActiveE2eeSession } from "@/lib/e2ee-session";
+import { isPrivateContentIndexEnabled } from "@/lib/search/private-index-flags";
 import { loadLocalMailSearchDocuments } from "@/lib/search/private-title-index";
 import type { StalwartJmapClient } from "./jmap-client";
 import type { JmapEmailMessage, JmapSession } from "./types";
@@ -22,10 +23,11 @@ export async function searchMailbox(input: {
   limit: number;
 }): Promise<JmapEmailMessage[]> {
   const { client, session, mailboxId, text, filters, timezone, limit } = input;
-  const accountId = getActiveE2eeSession()?.userId;
-  const documents = accountId ? await loadLocalMailSearchDocuments(accountId) : null;
 
-  if (documents) {
+  if (isPrivateContentIndexEnabled()) {
+    const accountId = getActiveE2eeSession()?.userId;
+    // While the index builds or recovers this finds nothing, rather than sending the words to the server.
+    const documents = accountId ? await loadLocalMailSearchDocuments(accountId) : [];
     const conditions = filters?.conditions ?? [];
     const filtersMessages = conditions.some(
       (condition) => condition.hasAttachment || condition.isFlagged || condition.isUnread,
@@ -37,8 +39,13 @@ export async function searchMailbox(input: {
       timezone,
       limit: filtersMessages ? LOCAL_MAIL_SEARCH_LIMIT : limit,
     });
-    const messages = await client.getMessagesByIds(session, ids, { includeBodies: false });
+    const messages =
+      ids.length > 0
+        ? await client.getMessagesByIds(session, ids, { includeBodies: false })
+        : [];
     return orderByIds(messages, ids)
+      // The index can still list a message in a folder it has left, such as one moved to Trash.
+      .filter((message) => message.mailboxIds?.[mailboxId] === true)
       .filter((message) => matchesMessageConditions(message, conditions))
       .slice(0, limit);
   }
