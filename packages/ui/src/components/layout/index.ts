@@ -7,5 +7,4 @@ export type { SidebarShellProps } from "./sidebar-shell";
 export type { SidebarPrimaryActionProps } from "./sidebar-primary-action";
 export { SidebarAppSwitcher } from "./sidebar-app-switcher";
 export { ThemeToggle } from "./theme-toggle";
-export { Participants } from "./participants";
 export { default as Logo } from "./logo";
