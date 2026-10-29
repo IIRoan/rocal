@@ -109,12 +109,8 @@ pub async fn register_device(
         request.key_version,
     )?;
     let keys = DeviceKeys {
-        device_label: request
-            .device_label
-            .as_deref()
-            .map(js_trim)
-            .filter(|label| !label.is_empty())
-            .map(str::to_owned),
+        // Older clients still send a label such as "iPhone"; nothing shows it, so it is not kept.
+        device_label: None,
         public_key,
         public_key_algorithm: trimmed_or(
             request.public_key_algorithm.as_deref(),

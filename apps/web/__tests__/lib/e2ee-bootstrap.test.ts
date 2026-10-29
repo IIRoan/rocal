@@ -389,6 +389,9 @@ describe("e2ee bootstrap guards", () => {
     expect(mockPutStoredE2eeDevice).toHaveBeenCalledWith(
       expect.objectContaining({ envelopeSalt: "salt-1" }),
     );
+    expect(mockUpsertDevice).toHaveBeenCalledWith(
+      expect.not.objectContaining({ deviceLabel: expect.anything() }),
+    );
     expect(mockClearPendingAuthPassword).toHaveBeenCalled();
   });
 

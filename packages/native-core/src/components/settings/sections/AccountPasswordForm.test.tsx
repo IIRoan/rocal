@@ -58,9 +58,7 @@ jest.mock("../SettingsAccountForms", () => ({
       <input aria-label="current" onChange={(e) => onCurrentPasswordChange(e.target.value)} />
       <input aria-label="new" onChange={(e) => onNewPasswordChange(e.target.value)} />
       <input aria-label="confirm" onChange={(e) => onConfirmPasswordChange(e.target.value)} />
-      <button type="button" onClick={onSubmit}>
-        Submit
-      </button>
+      <button type="button" aria-label="Submit" onClick={onSubmit} />
       {error ? <p role="alert">{error}</p> : null}
     </form>
   ),

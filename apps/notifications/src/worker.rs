@@ -242,7 +242,7 @@ impl Worker {
         }
         let minutes = job.minutes_before();
         let content = reminder::content(&reminder, minutes, event_id, &self.settings);
-        let message = reminder::message(&content, minutes, &mailer.config.from);
+        let message = reminder::message(&content, &mailer.config.from);
         let id = mailer::send(
             &self.http,
             &mailer.gate,
@@ -505,7 +505,7 @@ pub async fn send_test_email(settings: &Settings, recipient: &str) -> Result<(),
         time_format: "24h".into(),
     };
     let content = reminder::content(&sample, 30, "manual-test-event", settings);
-    let mut message = reminder::message(&content, 30, &config.from);
+    let mut message = reminder::message(&content, &config.from);
     message.message_id = None;
     let id = mailer::send(&reqwest::Client::new(), &gate, &config, recipient, &message)
         .await

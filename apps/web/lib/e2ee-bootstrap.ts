@@ -32,7 +32,6 @@ import {
   peekAuthPassword,
 } from "./e2ee-password-cache";
 import type { E2eeBootstrapResponse, E2eeDeviceRecord } from "./types/calendar";
-import { detectRuntime, getRuntimeDisplayName } from "@workspace/runtime";
 
 const log = createLogger("e2ee-bootstrap");
 
@@ -45,32 +44,6 @@ export interface E2eeBootstrapAttempt {
 const bootstrapPromises = new Map<string, Promise<E2eeBootstrapAttempt>>();
 let bootstrapGeneration = 0;
 let activeBootstrapUserId: string | null = null;
-
-type NavigatorWithUserAgentData = Navigator & {
-  userAgentData?: {
-    platform?: string;
-  };
-};
-
-function buildDeviceLabel(): string | undefined {
-  if (typeof navigator === "undefined") {
-    return undefined;
-  }
-
-  const runtime = detectRuntime();
-  const browserNavigator = navigator as NavigatorWithUserAgentData;
-  const platform =
-    browserNavigator.userAgentData?.platform || navigator.platform || "Browser";
-  const isMobile = /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
-  const runtimeLabel = getRuntimeDisplayName(runtime);
-  const deviceLabel = isMobile ? "mobile" : "browser";
-
-  if (runtime.kind === "browser") {
-    return isMobile ? `${platform} mobile` : `${platform} browser`;
-  }
-
-  return `${runtimeLabel} ${platform} ${deviceLabel}`;
-}
 
 function createAttempt(
   activated: boolean,
@@ -162,7 +135,6 @@ async function uploadDevice(
 ): Promise<E2eeDeviceRecord> {
   return e2eeApiService.upsertDevice({
     deviceId: localRecord.deviceId,
-    deviceLabel: buildDeviceLabel(),
     publicKey: localRecord.publicKey,
     publicKeyAlgorithm: "RSA-OAEP-256",
     wrappedAccountKey: localRecord.wrappedAccountKey,
