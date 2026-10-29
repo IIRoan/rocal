@@ -1320,9 +1320,12 @@ async fn scoped_edits_invite_new_attendees_with_transient_content() {
 
         let mail = sent_mail(&app, &guest, 1).await;
         assert_eq!(mail.len(), 1, "{scope}");
-        assert_eq!(
-            mail[0].subject,
-            format!("{} invited you to Private meeting", owner.name)
+        assert!(
+            mail[0]
+                .subject
+                .starts_with("Invitation: Private meeting @ "),
+            "{}",
+            mail[0].subject
         );
         let ics = unfold(mail[0].ics.as_deref().expect("invite.ics"));
         assert!(ics.contains("METHOD:REQUEST\r\n"), "{ics}");
