@@ -54,7 +54,7 @@ fn reminder_text(minutes: i64) -> String {
 
 fn duration(start: Timestamp, end: Timestamp, all_day: bool) -> String {
     if all_day {
-        return "All day".into();
+        return String::new();
     }
     let minutes = (end.as_second() - start.as_second()) / 60;
     match (minutes / 60, minutes % 60) {
@@ -87,7 +87,7 @@ pub fn content(reminder: &Reminder, minutes: i64, event_id: &str, settings: &Set
     let event_date = start.strftime("%A, %b %-d").to_string();
     let event_time = match () {
         _ if reminder.all_day => "All day".to_owned(),
-        _ if end > start => format!("{} - {}", clock(&start), clock(&end)),
+        _ if end > start => format!("{} – {}", clock(&start), clock(&end)),
         _ => clock(&start),
     };
     let summary = if reminder.all_day {
@@ -101,9 +101,7 @@ pub fn content(reminder: &Reminder, minutes: i64, event_id: &str, settings: &Set
     Content {
         event_id: event_id.to_owned(),
         summary,
-        time_until: reminder_text(minutes)
-            .trim_start_matches("Your event starts in ")
-            .to_owned(),
+        time_until: reminder_text(minutes),
         duration: duration(reminder.start, reminder.end, reminder.all_day),
         event_date,
         event_time,
@@ -117,7 +115,6 @@ pub fn content(reminder: &Reminder, minutes: i64, event_id: &str, settings: &Set
 impl Content {
     fn field(&self, name: &str) -> &str {
         match name {
-            "EventID" => &self.event_id,
             "EventTitle" => TITLE,
             "Summary" => &self.summary,
             "EventDate" => &self.event_date,
@@ -159,9 +156,8 @@ impl Content {
     pub fn text(&self) -> String {
         let mut text = String::new();
         if !self.time_until.is_empty() {
-            text.push_str(&format!("{}\n", self.time_until));
+            text.push_str(&format!("{}\n\n", self.time_until));
         }
-        text.push_str(&format!("{TITLE}\n\n"));
         if !self.summary.is_empty() {
             text.push_str(&format!("{}\n\n", self.summary));
         }
@@ -281,7 +277,8 @@ mod tests {
         );
         assert_eq!(
             duration(at("2026-01-01T10:00:00Z"), at("2026-01-02T10:00:00Z"), true),
-            "All day"
+            "",
+            "the time already says all day"
         );
     }
 
@@ -299,8 +296,8 @@ mod tests {
             &settings(),
         );
         assert_eq!(timed.event_date, "Wednesday, Jul 15");
-        assert_eq!(timed.event_time, "3:30 PM - 4:15 PM");
-        assert_eq!(timed.time_until, "30 minutes");
+        assert_eq!(timed.event_time, "3:30 PM – 4:15 PM");
+        assert_eq!(timed.time_until, "Your event starts in 30 minutes");
         assert_eq!(timed.duration, "45m");
         assert_eq!(
             timed.summary,
@@ -343,15 +340,18 @@ mod tests {
         );
         let html = timed.html();
         assert!(!html.contains("{{"), "unrendered placeholder");
-        assert!(html.contains("<title>Event reminder - 15 minutes</title>"));
+        assert!(html.contains("<title>Event reminder</title>"));
+        assert!(html.contains(">Your event starts in 15 minutes</h1>"));
+        assert!(
+            !html.contains("evt&lt;1&gt;"),
+            "the event id stays out of the body"
+        );
         assert!(html.contains(LOGO_URL));
-        assert!(html.contains("evt&lt;1&gt;"));
-        assert!(html.contains("1h"));
+        assert!(html.contains(">Wednesday, Jul 15 &middot; 1:30 PM – 2:30 PM &middot; 1h</p>"));
         assert!(html.starts_with("<!DOCTYPE") || html.contains("<html"));
         timed.duration.clear();
-        timed.event_id.clear();
         let html = timed.html();
-        assert!(!html.contains("evt&lt;1&gt;"));
+        assert!(html.contains(">Wednesday, Jul 15 &middot; 1:30 PM – 2:30 PM</p>"));
         assert!(!html.contains("{{"));
         assert!(html.trim_end().ends_with("</html>"));
     }
@@ -365,7 +365,9 @@ mod tests {
             &settings(),
         );
         let text = timed.text();
-        assert!(text.starts_with("15 minutes\nEvent reminder\n\nYou have an event at 1:30 PM."));
+        assert!(
+            text.starts_with("Your event starts in 15 minutes\n\nYou have an event at 1:30 PM.")
+        );
         assert!(text.contains("Duration: 1h\n"));
         assert!(text.contains("Event ID: evt1\n"));
         assert!(text.contains("Settings: https://solace.onl/settings\n"));
