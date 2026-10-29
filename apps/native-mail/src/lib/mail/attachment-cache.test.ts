@@ -11,6 +11,15 @@ jest.mock("expo-file-system/legacy", () => ({
   makeDirectoryAsync: jest.fn(async () => undefined),
   writeAsStringAsync: jest.fn(async () => undefined),
   deleteAsync: jest.fn(async () => undefined),
+  readDirectoryAsync: jest.fn(async () => []),
+  getInfoAsync: jest.fn(async (uri: string) => ({
+    exists: true,
+    uri,
+    isDirectory: !/\.(pdf|json)$/.test(uri),
+  })),
+}));
+jest.mock("./mail-offline-store", () => ({
+  MAIL_OFFLINE_SNAPSHOT_FILE: "solace-mail-offline-snapshot.json",
 }));
 jest.mock("expo-sharing", () => ({}));
 jest.mock("react-native", () => ({ Linking: {}, Platform: { OS: "ios" } }));
@@ -62,5 +71,24 @@ describe("attachment cache", () => {
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith("file:///cache/mail-attachments/", {
       idempotent: true,
     });
+  });
+
+  it("also wipes decrypted files earlier builds left in the cache root, keeping the mailbox snapshot and other caches", async () => {
+    jest.mocked(FileSystem.deleteAsync).mockClear();
+    jest
+      .mocked(FileSystem.readDirectoryAsync)
+      .mockResolvedValueOnce([
+        "invoice-cp3khzyld1zg.pdf",
+        "solace-mail-offline-snapshot.json",
+        "mail-attachments",
+        "ImagePicker",
+      ]);
+
+    await clearAttachmentCache();
+
+    expect(jest.mocked(FileSystem.deleteAsync).mock.calls.map(([uri]) => uri).sort()).toEqual([
+      "file:///cache/invoice-cp3khzyld1zg.pdf",
+      "file:///cache/mail-attachments/",
+    ]);
   });
 });
