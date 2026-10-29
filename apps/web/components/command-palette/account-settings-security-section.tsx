@@ -18,25 +18,19 @@ export function AccountSecuritySection({
   hasOAuthAccount,
   changingPassword,
   settingPassword,
-  resettingEncryptionPassword,
   handleChangePassword,
   handleSetPassword,
-  handleResetEncryptionPassword,
 }: {
   isBusy: boolean;
   hasPasswordAccount: boolean;
   hasOAuthAccount: boolean;
   changingPassword: boolean;
   settingPassword: boolean;
-  resettingEncryptionPassword: boolean;
   handleChangePassword: (values: {
     currentPassword: string;
     newPassword: string;
   }) => Promise<void>;
   handleSetPassword?: (values: { newPassword: string }) => Promise<void>;
-  handleResetEncryptionPassword?: (values: {
-    newPassword: string;
-  }) => Promise<void>;
 }) {
   const [security, dispatch] = useReducer(
     securityUiReducer,
@@ -44,8 +38,7 @@ export function AccountSecuritySection({
   );
 
   const isAnySecurityFormOpen = security.activeForm !== null;
-  const securityFormBusy =
-    changingPassword || settingPassword || resettingEncryptionPassword;
+  const securityFormBusy = changingPassword || settingPassword;
   const accessKind: SecurityAccessKind =
     hasOAuthAccount && hasPasswordAccount
       ? "oauth-and-password"
@@ -76,7 +69,6 @@ export function AccountSecuritySection({
         handlers={{
           handleChangePassword,
           handleSetPassword,
-          handleResetEncryptionPassword,
         }}
       />
     </PaletteSection>

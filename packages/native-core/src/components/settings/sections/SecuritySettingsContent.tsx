@@ -11,10 +11,8 @@ import type { Passkey as AuthPasskey } from "@better-auth/passkey/client";
 import {
   EVENT_ENCRYPTION_HINT,
   getErrorMessage,
-  summarizeLinkedAuthAccounts,
 } from "@workspace/calendar-core";
 import { SettingsPage } from "../SettingsPage";
-import { SettingsPasswordForm } from "../SettingsAccountForms";
 import { useMailSkin, type MailSkin } from "../../mail/mail-ui";
 import {
   SheetGroup,
@@ -25,23 +23,17 @@ import {
 } from "../../sheet/SheetSections";
 import { authClient } from "../../../lib/auth-client";
 import { getAuthCapabilities } from "../../../lib/auth-capabilities";
-import { useLinkedAuthAccounts } from "../../../hooks/use-linked-auth-accounts";
 import { formatStoredPasskeyDescription } from "../../../lib/passkey-auth";
 import {
   isPasskeyBridgeOriginSecure,
   resolvePasskeyBridgeBaseUrl,
 } from "../../../lib/passkey-browser-bridge";
 import {
-  getEncryptionPasswordValidationError,
-  canResetEncryptionPassword,
-} from "../../../lib/settings-encryption-password";
-import {
   isNativeTitleIndexEnabled,
   setNativeTitleIndexEnabled,
   subscribeNativeTitleIndexEnabled,
 } from "../../../lib/search/title-index-store";
 import { useAuth } from "../../../providers/AuthProvider";
-import { useE2ee } from "../../../providers/E2eeProvider";
 import { useTheme } from "../../../providers/ThemeProvider";
 import { useToast } from "../../../providers/ToastProvider";
 
@@ -51,9 +43,7 @@ export function SecuritySettingsContent() {
   const styles = useMemo(() => createStyles(skin), [skin]);
   const { registerPasskey, deletePasskey } = useAuth();
   const { toast } = useToast();
-  const { resetEncryptionPassword } = useE2ee();
   const passkeysQuery = authClient.useListPasskeys();
-  const accountsQuery = useLinkedAuthAccounts();
 
   const authCapabilities = useMemo(() => {
     const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
@@ -74,26 +64,12 @@ export function SecuritySettingsContent() {
     () => (Array.isArray(passkeysQuery.data) ? passkeysQuery.data : []),
     [passkeysQuery.data],
   );
-  const { hasOAuthAccount } = useMemo(
-    () => summarizeLinkedAuthAccounts(accountsQuery.data ?? []),
-    [accountsQuery.data],
-  );
-  const canResetEncryption = canResetEncryptionPassword({
-    hasOAuthAccount,
-    passkeyCount: storedPasskeys.length,
-  });
 
   const [titleIndexEnabled, setTitleIndexEnabled] = useState(true);
   const [isRegisteringPasskey, setIsRegisteringPasskey] = useState(false);
   const [pendingPasskeyDeletionId, setPendingPasskeyDeletionId] = useState<
     string | null
   >(null);
-  const [showResetEncryption, setShowResetEncryption] = useState(false);
-  const [newPasswordInput, setNewPasswordInput] = useState("");
-  const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [isResettingEncryptionPassword, setIsResettingEncryptionPassword] =
-    useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,12 +85,6 @@ export function SecuritySettingsContent() {
       cancelled = true;
       unsubscribe();
     };
-  }, []);
-
-  const resetForm = useCallback(() => {
-    setNewPasswordInput("");
-    setConfirmPasswordInput("");
-    setPasswordError(null);
   }, []);
 
   const handleRegisterPasskey = useCallback(async () => {
@@ -165,39 +135,6 @@ export function SecuritySettingsContent() {
     [deletePasskey, passkeysQuery, toast],
   );
 
-  const handleResetEncryption = useCallback(async () => {
-    const validationError = getEncryptionPasswordValidationError({
-      newPassword: newPasswordInput,
-      confirmPassword: confirmPasswordInput,
-    });
-    if (validationError) {
-      setPasswordError(validationError);
-      return;
-    }
-    setIsResettingEncryptionPassword(true);
-    try {
-      const ok = await resetEncryptionPassword(newPasswordInput);
-      if (!ok) {
-        throw new Error("Unable to reset your encryption password.");
-      }
-      toast("Encryption password updated");
-      resetForm();
-      setShowResetEncryption(false);
-    } catch (error) {
-      setPasswordError(
-        getErrorMessage(error, "Failed to update your password"),
-      );
-    } finally {
-      setIsResettingEncryptionPassword(false);
-    }
-  }, [
-    confirmPasswordInput,
-    newPasswordInput,
-    resetEncryptionPassword,
-    resetForm,
-    toast,
-  ]);
-
   const passkeyFooter = !isPasskeySupported
     ? Platform.OS === "web"
       ? passkeySupportMessage
@@ -224,40 +161,8 @@ export function SecuritySettingsContent() {
                 );
               }}
             />
-            {canResetEncryption ? (
-              <SheetItem
-                key="reset-encryption"
-                icon="lock"
-                label="Reset encryption password"
-                detail="Update the password used to unlock your keys on new devices. Existing data is not re-encrypted."
-                pending={isResettingEncryptionPassword}
-                onPress={() => {
-                  resetForm();
-                  setShowResetEncryption(true);
-                }}
-              />
-            ) : null}
           </SheetGroup>
         </SheetSection>
-
-        {showResetEncryption ? (
-          <SettingsPasswordForm
-            mode="reset-encryption"
-            currentPassword=""
-            newPassword={newPasswordInput}
-            confirmPassword={confirmPasswordInput}
-            onCurrentPasswordChange={() => undefined}
-            onNewPasswordChange={setNewPasswordInput}
-            onConfirmPasswordChange={setConfirmPasswordInput}
-            onSubmit={() => void handleResetEncryption()}
-            onCancel={() => {
-              setShowResetEncryption(false);
-              resetForm();
-            }}
-            error={passwordError}
-            isPending={isResettingEncryptionPassword}
-          />
-        ) : null}
 
         <SheetSection title="Passkeys" footer={passkeyFooter}>
           {isPasskeySupported ? (
@@ -281,6 +186,7 @@ export function SecuritySettingsContent() {
                   label={passkey.name || "Unnamed Passkey"}
                   detail={formatStoredPasskeyDescription(passkey)}
                   pending={pendingPasskeyDeletionId === passkey.id}
+                  // oxlint-disable-next-line react-doctor/jsx-no-jsx-as-prop -- SheetItem is not memoized, so a fresh element costs nothing.
                   trailing={
                     <Pressable
                       onPress={() => handleDeletePasskey(passkey)}

@@ -77,14 +77,12 @@ export type MailCommandPaletteViewContentProps = {
   deletingAccount: boolean;
   changingPassword: boolean;
   settingPassword: boolean;
-  resettingEncryptionPassword: boolean;
   updatingProfile: boolean;
   hasPasswordAccount: boolean;
   hasOAuthAccount: boolean;
   handleDeleteAccount: () => void;
   handleChangePassword: (values: PasswordValues) => Promise<void>;
   handleSetPassword: (values: NewPasswordValues) => Promise<void>;
-  handleResetEncryptionPassword: (values: NewPasswordValues) => Promise<void>;
   handleUpdateProfile: (values: { image: string | null }) => Promise<void>;
   mailboxes: JmapMailbox[];
   onCreateMailbox?: (name: string) => Promise<void>;
@@ -138,10 +136,8 @@ function MailSecurityView({
   hasOAuthAccount,
   changingPassword,
   settingPassword,
-  resettingEncryptionPassword,
   handleChangePassword,
   handleSetPassword,
-  handleResetEncryptionPassword,
 }: {
   goBack: () => void;
   goForward: (
@@ -153,10 +149,8 @@ function MailSecurityView({
   hasOAuthAccount: boolean;
   changingPassword: boolean;
   settingPassword: boolean;
-  resettingEncryptionPassword: boolean;
   handleChangePassword: (values: PasswordValues) => Promise<void>;
   handleSetPassword: (values: NewPasswordValues) => Promise<void>;
-  handleResetEncryptionPassword: (values: NewPasswordValues) => Promise<void>;
 }) {
   return (
     <PaletteView title="Security" onBack={goBack}>
@@ -184,10 +178,8 @@ function MailSecurityView({
           hasOAuthAccount={hasOAuthAccount}
           changingPassword={changingPassword}
           settingPassword={settingPassword}
-          resettingEncryptionPassword={resettingEncryptionPassword}
           handleChangePassword={handleChangePassword}
           handleSetPassword={handleSetPassword}
-          handleResetEncryptionPassword={handleResetEncryptionPassword}
         />
       </PaletteSection>
     </PaletteView>
@@ -254,10 +246,8 @@ export function MailCommandPaletteViewContent(
         hasOAuthAccount={props.hasOAuthAccount}
         changingPassword={props.changingPassword}
         settingPassword={props.settingPassword}
-        resettingEncryptionPassword={props.resettingEncryptionPassword}
         handleChangePassword={props.handleChangePassword}
         handleSetPassword={props.handleSetPassword}
-        handleResetEncryptionPassword={props.handleResetEncryptionPassword}
       />
     );
   }
@@ -286,12 +276,10 @@ export function MailCommandPaletteViewContent(
         sessionLoading={props.sessionLoading}
         changingPassword={props.changingPassword}
         settingPassword={props.settingPassword}
-        resettingEncryptionPassword={props.resettingEncryptionPassword}
         hasPasswordAccount={props.hasPasswordAccount}
         hasOAuthAccount={props.hasOAuthAccount}
         handleChangePassword={props.handleChangePassword}
         handleSetPassword={props.handleSetPassword}
-        handleResetEncryptionPassword={props.handleResetEncryptionPassword}
         updatingProfile={props.updatingProfile}
         handleUpdateProfile={props.handleUpdateProfile}
         onOpenInvites={() => goForward("invites")}

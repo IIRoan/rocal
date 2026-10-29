@@ -1,10 +1,6 @@
 import type { SectionMessage } from "./account-settings-types";
 
-export type SecurityForm =
-  | "change-password"
-  | "set-password"
-  | "reset-encryption"
-  | null;
+export type SecurityForm = "change-password" | "set-password" | null;
 
 export type SecurityUiState = {
   activeForm: SecurityForm;

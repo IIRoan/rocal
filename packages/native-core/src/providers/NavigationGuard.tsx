@@ -3,10 +3,13 @@ import { View } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { createLogger } from "@workspace/logger";
+import {
+  SIGN_IN_TO_UNLOCK_NOTICE,
+  UNLOCK_FAILED_NOTICE,
+} from "@workspace/calendar-core/product-info";
 import { useAuth } from "./AuthProvider";
 import { useE2ee } from "./E2eeProvider";
 import { PushNotificationNavigation } from "./PushNotificationNavigation";
-import { E2eeUnlockSheet } from "../components/E2eeUnlockSheet";
 import { WorkspaceLoadingScreen } from "../components/WorkspaceLoadingScreen";
 import { calendarApiService } from "../lib/api";
 import { QUERY_KEYS } from "../lib/query-keys";
@@ -105,7 +108,7 @@ export function NavigationGuard({
   pushTapHandler,
   notificationExtensionSecrets,
 }: NavigationGuardProps) {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, signOut } = useAuth();
   const { isReady: isE2eeReady, bootstrap, clearSession, provider } = useE2ee();
   useNotificationExtensionSync(notificationExtensionSecrets);
   useAccountTimezoneSeed(isAuthenticated && Boolean(user));
@@ -121,8 +124,6 @@ export function NavigationGuard({
   if (startup.userId !== sessionUserId) {
     dispatchStartup({ type: "reset", userId: sessionUserId });
   }
-  // Bumped after the encryption password unlocks this device, so startup runs again with the account key.
-  const [startupRun, rerunStartup] = useReducer((run: number) => run + 1, 0);
   const isRestorePending =
     Boolean(restoreSession) &&
     sessionUserId !== null &&
@@ -175,8 +176,17 @@ export function NavigationGuard({
         dispatchStartup({ type: "restored", userId: user.id, restored });
       }
 
-      const needsPassword = await bootstrap(user.id, API_BASE_URL);
-      if (cancelled || needsPassword) return;
+      const lock = await bootstrap(user.id, API_BASE_URL);
+      if (cancelled) return;
+      // A signed-in session always holds the account key; one that cannot open it ends instead of asking for a password.
+      if (lock) {
+        await signOut(
+          lock === "password-mismatch"
+            ? UNLOCK_FAILED_NOTICE
+            : SIGN_IN_TO_UNLOCK_NOTICE,
+        );
+        return;
+      }
 
       await prepareSession?.({
         queryClient,
@@ -231,7 +241,7 @@ export function NavigationGuard({
     provider,
     queryClient,
     restoreSession,
-    startupRun,
+    signOut,
   ]);
 
   const isStartupRunning = !isE2eeReady || startup.isPreparing;
@@ -257,7 +267,6 @@ export function NavigationGuard({
         active={isPreparingWorkspace}
         message={startup.message}
       />
-      <E2eeUnlockSheet onUnlocked={rerunStartup} />
     </View>
   );
 }

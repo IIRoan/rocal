@@ -18,7 +18,6 @@ import {
 import {
   handleMailPaletteKeyDown,
   runMailAccountDeletion,
-  runMailEncryptionPasswordReset,
   runMailPasswordChange,
   runMailPasswordSet,
   runMailProfileUpdate,
@@ -199,14 +198,6 @@ export function useMailCommandPaletteController({
       setBusy: (value) => dispatchBusy({ type: "setSettingPassword", value }),
     });
 
-  const handleResetEncryptionPassword = (input: { newPassword: string }) =>
-    runMailEncryptionPasswordReset({
-      ...input,
-      sessionUserId,
-      setBusy: (value) =>
-        dispatchBusy({ type: "setResettingEncryptionPassword", value }),
-    });
-
   const handleUpdateProfile = (input: { image: string | null }) =>
     runMailProfileUpdate({
       image: input.image,
@@ -299,7 +290,6 @@ export function useMailCommandPaletteController({
     handleDeleteAccount,
     handleChangePassword,
     handleSetPassword,
-    handleResetEncryptionPassword,
     handleUpdateProfile,
     mainListItems,
     showUnifiedSearch,

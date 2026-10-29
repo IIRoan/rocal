@@ -2,13 +2,20 @@
 
 import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import {
+  SIGN_IN_TO_UNLOCK_NOTICE,
+  UNLOCK_FAILED_NOTICE,
+} from "@workspace/calendar-core/product-info";
 import { NavigationGuard } from "./NavigationGuard";
 
 const mockQueryClient = {};
+const mockSignOut = jest.fn(async (_notice?: string) => undefined);
+let mockBootstrap = jest.fn(() => new Promise<string | null>(() => undefined));
 let mockAuth: {
   isAuthenticated: boolean;
   isLoading: boolean;
   user: { id: string; email: string; name: string } | null;
+  signOut: typeof mockSignOut;
 };
 
 jest.mock("react-native", () => ({
@@ -29,7 +36,7 @@ jest.mock("./AuthProvider", () => ({ useAuth: () => mockAuth }));
 jest.mock("./E2eeProvider", () => {
   const e2ee = {
     isReady: false,
-    bootstrap: () => new Promise<boolean>(() => undefined),
+    bootstrap: (...args: unknown[]) => mockBootstrap(...(args as [])),
     clearSession: () => undefined,
     provider: null,
   };
@@ -38,10 +45,6 @@ jest.mock("./E2eeProvider", () => {
 
 jest.mock("./PushNotificationNavigation", () => ({
   PushNotificationNavigation: () => null,
-}));
-
-jest.mock("../components/E2eeUnlockSheet", () => ({
-  E2eeUnlockSheet: () => null,
 }));
 
 jest.mock("../components/WorkspaceLoadingScreen", () => ({
@@ -55,7 +58,13 @@ jest.mock("../components/WorkspaceLoadingScreen", () => ({
 }));
 
 jest.mock("../lib/api", () => ({
-  calendarApiService: { setE2eeProvider: () => undefined },
+  calendarApiService: {
+    setE2eeProvider: () => undefined,
+    ensureDefaultCalendars: () => Promise.resolve(false),
+  },
+}));
+jest.mock("../lib/session-query-reset", () => ({
+  resetPreSessionQueries: () => Promise.resolve(),
 }));
 
 jest.mock("../lib/auth-routing", () => ({
@@ -81,6 +90,7 @@ const signIn = (id: string) => {
     isAuthenticated: true,
     isLoading: false,
     user: { id, email: `${id}@solace.test`, name: id },
+    signOut: mockSignOut,
   };
 };
 
@@ -100,6 +110,8 @@ const renderGuard = async () => {
 };
 
 beforeEach(() => {
+  mockSignOut.mockClear();
+  mockBootstrap = jest.fn(() => new Promise<string | null>(() => undefined));
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -120,4 +132,30 @@ it("drops the previous user's restored workspace when another user signs in", as
   expect(container.querySelector('[role="status"]')?.textContent).toBe(
     "Setting up encryption…",
   );
+});
+
+it.each([
+  ["sign-in-again", SIGN_IN_TO_UNLOCK_NOTICE],
+  ["password-mismatch", UNLOCK_FAILED_NOTICE],
+])("ends a session that cannot open the account key (%s) instead of asking for a password", async (lock, notice) => {
+  mockBootstrap = jest.fn(() => Promise.resolve(lock));
+  signIn("locked");
+  await renderGuard();
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  expect(mockSignOut).toHaveBeenCalledWith(notice);
+});
+
+it("keeps a session whose startup unlocked", async () => {
+  mockBootstrap = jest.fn(() => Promise.resolve(null));
+  signIn("unlocked");
+  await renderGuard();
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  expect(mockBootstrap).toHaveBeenCalled();
+  expect(mockSignOut).not.toHaveBeenCalled();
 });

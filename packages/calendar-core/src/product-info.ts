@@ -11,6 +11,13 @@ export const PRODUCT_ISSUES_URL = product.issuesUrl;
 /** Support handles forgotten passwords until account recovery exists. */
 export const FORGOT_PASSWORD_NOTICE = `Email ${product.supportEmail} from a different email address and include your Solace address. Solace does not reset passwords from the sign-in screen.`;
 
+/** A session that cannot open the account key ends; signing in with the password opens it again. */
+export const SIGN_IN_TO_UNLOCK_NOTICE =
+  "Sign in again to open your encrypted data on this device.";
+
+/** The sign-in password is the only key to the envelope, so a mismatch goes to support. */
+export const UNLOCK_FAILED_NOTICE = `Your password signed you in but did not open your encrypted data. Email ${product.supportEmail} from a different email address for help.`;
+
 export function supportContactUrl(
   value: unknown = product.supportEmail,
 ): string | null {

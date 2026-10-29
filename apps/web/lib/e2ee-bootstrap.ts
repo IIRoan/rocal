@@ -255,10 +255,18 @@ async function activateFromPasswordEnvelope(
     return createAttempt(false, bootstrap);
   }
 
-  const { accountKey, blindIndexKey } = await unwrapPasswordEnvelope(
-    password,
-    envelope,
+  // Only a failed unwrap is a wrong password; a failed device upload below is a network error, not a lock.
+  const keys = await unwrapPasswordEnvelope(password, envelope).catch(
+    (error: unknown) => {
+      log.info("Password did not unlock the E2EE envelope", { userId, error });
+      return null;
+    },
   );
+  if (!keys) {
+    clearActiveE2eeSession();
+    return createAttempt(false, bootstrap, { passwordUnlockFailed: true });
+  }
+  const { accountKey, blindIndexKey } = keys;
 
   if (!isBootstrapCurrent(userId, generation)) {
     return createAttempt(false, bootstrap);
@@ -342,23 +350,12 @@ async function bootstrapUser(
     const authPassword = peekAuthPassword();
 
     if (authPassword) {
-      try {
-        return await activateFromPasswordEnvelope(
-          userId,
-          generation,
-          remoteBootstrap,
-          authPassword,
-        );
-      } catch (error) {
-        log.info("Auth password did not unlock E2EE envelope", {
-          userId,
-          error,
-        });
-        clearActiveE2eeSession();
-        return createAttempt(false, remoteBootstrap, {
-          passwordUnlockFailed: true,
-        });
-      }
+      return activateFromPasswordEnvelope(
+        userId,
+        generation,
+        remoteBootstrap,
+        authPassword,
+      );
     }
 
     clearActiveE2eeSession();
@@ -406,33 +403,19 @@ export async function storePasswordEnvelopeForActiveSession(
   return true;
 }
 
+/** Network errors reject; a wrong password resolves with `passwordUnlockFailed`. */
 export async function unlockE2eeWithPassword(
   userId: string,
   password: string,
-): Promise<boolean> {
+): Promise<E2eeBootstrapAttempt> {
   if (!userId || !isWebCryptoAvailable()) {
-    return false;
+    return createAttempt(false, null);
   }
 
   const generation = beginBootstrap(userId);
   const bootstrap = await e2eeApiService.getBootstrap();
 
-  if (!bootstrap.passwordEnvelope) {
-    return false;
-  }
-
-  try {
-    const result = await activateFromPasswordEnvelope(
-      userId,
-      generation,
-      bootstrap,
-      password,
-    );
-    return result.activated;
-  } catch (error) {
-    log.info("Failed to unlock E2EE envelope with password", { userId, error });
-    return false;
-  }
+  return activateFromPasswordEnvelope(userId, generation, bootstrap, password);
 }
 
 export function ensureE2eeBootstrap(

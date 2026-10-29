@@ -75,7 +75,7 @@ export function SettingsPasswordForm({
   error,
   isPending,
 }: {
-  mode: "change-password" | "set-password" | "reset-encryption";
+  mode: "change-password" | "set-password";
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
@@ -88,35 +88,20 @@ export function SettingsPasswordForm({
   isPending: boolean;
 }) {
   const isChangePassword = mode === "change-password";
-  const isResetEncryption = mode === "reset-encryption";
 
   return (
     <SettingsInlineForm
-      submitLabel={
-        isResetEncryption
-          ? "Reset encryption password"
-          : isChangePassword
-            ? "Update Password"
-            : "Set Password"
-      }
+      submitLabel={isChangePassword ? "Update Password" : "Set Password"}
       onSubmit={onSubmit}
       onCancel={onCancel}
       isPending={isPending}
     >
       <SheetSection
-        title={
-          isResetEncryption
-            ? "Reset encryption password"
-            : isChangePassword
-              ? "Change password"
-              : "Set password"
-        }
+        title={isChangePassword ? "Change password" : "Set password"}
         footer={
-          isResetEncryption
-            ? "Choose a new encryption password for passkey sign-in. It protects your existing keys on new devices without re-encrypting your data."
-            : isChangePassword
-              ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
-              : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing your existing encrypted data."
+          isChangePassword
+            ? "Update your sign-in password. It also unlocks your encrypted data on every device you sign in to."
+            : "Add an email sign-in password to this account. It also unlocks your encrypted data on every device you sign in to."
         }
       >
         <SheetGroup>

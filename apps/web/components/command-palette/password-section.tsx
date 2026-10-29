@@ -2,7 +2,7 @@
 
 import { useId, useReducer } from "react";
 import { getErrorMessage } from "@workspace/calendar-core";
-import { Lock, RotateCcw } from "lucide-react";
+import { Lock } from "lucide-react";
 import { InlineMessage } from "./account-settings-inline-message";
 import {
   initialSecurityUiState,
@@ -21,13 +21,11 @@ interface PasswordSectionProps {
   hasOAuthAccount: boolean;
   changingPassword: boolean;
   settingPassword: boolean;
-  resettingEncryptionPassword: boolean;
   handleChangePassword: (v: {
     currentPassword: string;
     newPassword: string;
   }) => Promise<void>;
   handleSetPassword?: (v: { newPassword: string }) => Promise<void>;
-  handleResetEncryptionPassword?: (v: { newPassword: string }) => Promise<void>;
 }
 
 export function PasswordSection({
@@ -35,10 +33,8 @@ export function PasswordSection({
   hasOAuthAccount,
   changingPassword,
   settingPassword,
-  resettingEncryptionPassword,
   handleChangePassword,
   handleSetPassword,
-  handleResetEncryptionPassword,
 }: PasswordSectionProps) {
   const fieldId = useId();
   const [security, dispatch] = useReducer(
@@ -56,8 +52,7 @@ export function PasswordSection({
     dispatch({ type: "setMessage", message });
 
   const hasOAuthOnlyAccess = hasOAuthAccount && !hasPasswordAccount;
-  const isBusy =
-    changingPassword || settingPassword || resettingEncryptionPassword;
+  const isBusy = changingPassword || settingPassword;
   const isFormOpen = activeForm !== null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,9 +77,7 @@ export function PasswordSection({
               currentPassword: currentPwd,
               newPassword: newPwd,
             })
-        : activeForm === "set-password"
-          ? handleSetPassword
-          : handleResetEncryptionPassword) ?? (async () => {});
+        : handleSetPassword) ?? (async () => {});
     try {
       await submit({ newPassword: newPwd });
       setMsg({ kind: "success", text: "Password updated." });
@@ -97,17 +90,10 @@ export function PasswordSection({
     }
   };
 
-  if (!hasPasswordAccount && !hasOAuthOnlyAccess && !hasOAuthAccount)
-    return null;
+  if (!hasPasswordAccount && !hasOAuthOnlyAccess) return null;
 
-  const newLabel =
-    activeForm === "reset-encryption"
-      ? "New encryption password"
-      : "New password";
-  const confirmLabel =
-    activeForm === "reset-encryption"
-      ? "Confirm new encryption password"
-      : "Confirm new password";
+  const newLabel = "New password";
+  const confirmLabel = "Confirm new password";
 
   return (
     <div>
@@ -138,18 +124,6 @@ export function PasswordSection({
               trailing={null}
               onClick={() =>
                 dispatch({ type: "openForm", form: "set-password" })
-              }
-              disabled={isBusy}
-            />
-          ) : null}
-          {hasOAuthAccount ? (
-            <PaletteNavRow
-              icon={RotateCcw}
-              label="Reset Encryption Password"
-              description="Replace the password for OAuth / passkey sign-in keys"
-              trailing={null}
-              onClick={() =>
-                dispatch({ type: "openForm", form: "reset-encryption" })
               }
               disabled={isBusy}
             />
@@ -232,9 +206,7 @@ export function PasswordSection({
             <PaletteButton type="submit" variant="primary" loading={isBusy}>
               {activeForm === "change-password"
                 ? "Update Password"
-                : activeForm === "set-password"
-                  ? "Set Password"
-                  : "Reset Password"}
+                : "Set Password"}
             </PaletteButton>
           </PaletteFormActions>
         </form>

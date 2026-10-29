@@ -428,6 +428,34 @@ describe("e2ee bootstrap guards", () => {
     expect(mockSetActiveE2eeSession).not.toHaveBeenCalled();
   });
 
+  it("does not report a wrong password when only the device upload fails", async () => {
+    mockGetStoredE2eeDevice.mockResolvedValueOnce(null);
+    mockPeekAuthPassword.mockReturnValueOnce("correct horse battery staple");
+    mockUpsertDevice.mockRejectedValueOnce(new Error("offline"));
+    mockGetBootstrap.mockResolvedValue({
+      ...createRemoteBootstrap("user-1"),
+      devices: [],
+      passwordEnvelope: {
+        id: "password-envelope-1",
+        userId: "user-1",
+        kdfAlgorithm: "PBKDF2-SHA-256",
+        kdfSalt: "salt-1",
+        kdfIterations: 310000,
+        wrappedAccountKey: "wrapped-account",
+        wrappedSearchKey: "wrapped-search",
+        wrapAlgorithm: "AES-GCM-256",
+        keyVersion: 1,
+        createdAt: new Date("2026-04-22T10:00:00.000Z"),
+        updatedAt: new Date("2026-04-22T10:00:00.000Z"),
+      },
+    });
+
+    const result = await ensureE2eeBootstrap("user-1");
+
+    expect(result.passwordUnlockFailed).toBeUndefined();
+    expect(result.bootstrap).toBeNull();
+  });
+
   it("stores a password envelope for the active session", async () => {
     mockGetActiveE2eeSession.mockReturnValue({
       userId: "user-1",

@@ -225,7 +225,7 @@ describe("AccountSettings", () => {
     });
 
     expect(container.textContent).toContain(
-      "Update your email sign-in password. Solace also uses it for encryption after email sign-in.",
+      "Update your sign-in password. It also unlocks your encrypted data.",
     );
   });
 
@@ -285,11 +285,11 @@ describe("AccountSettings", () => {
       newPassword: "new-password",
     });
     expect(container.textContent).toContain(
-      "Your email sign-in password has been updated. After email sign-in, Solace will also use it to protect your encryption keys.",
+      "Your password has been updated. It also unlocks your encrypted data when you sign in.",
     );
   });
 
-  it("shows OAuth-specific account actions and explainer copy", async () => {
+  it("offers OAuth-only accounts an email password and no separate encryption password", async () => {
     await act(async () => {
       root.render(
         <AccountSettings
@@ -306,21 +306,18 @@ describe("AccountSettings", () => {
           changingPassword={false}
           handleChangePassword={async () => {}}
           handleSetPassword={async () => {}}
-          handleResetEncryptionPassword={async () => {}}
         />,
       );
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain(
-      "OAuth and passkey sign-in use a separate encryption password.",
-    );
+    expect(container.textContent).not.toContain("separate encryption password");
     expect(container.textContent).toContain("Set Email Password");
-    expect(container.textContent).toContain("Reset Encryption Password");
+    expect(container.textContent).not.toContain("Reset Encryption Password");
     expect(container.textContent).not.toContain("Change Password");
   });
 
-  it("submits the OAuth-only set-password flow with separate explainer copy", async () => {
+  it("submits the OAuth-only set-password flow", async () => {
     const handleSetPassword = jest.fn<() => Promise<void>>(
       async () => undefined,
     );
@@ -341,7 +338,6 @@ describe("AccountSettings", () => {
           changingPassword={false}
           handleChangePassword={async () => {}}
           handleSetPassword={handleSetPassword}
-          handleResetEncryptionPassword={async () => {}}
         />,
       );
       await Promise.resolve();
@@ -357,7 +353,7 @@ describe("AccountSettings", () => {
     });
 
     expect(container.textContent).toContain(
-      "This gives you an email/password sign-in option without changing the separate encryption password used by OAuth or passkey sign-in.",
+      "Add an email sign-in password to this account. It also unlocks your encrypted data when you sign in.",
     );
 
     const inputs = Array.from(container.querySelectorAll("input"));
@@ -382,7 +378,7 @@ describe("AccountSettings", () => {
       newPassword: "new-password",
     });
     expect(container.textContent).toContain(
-      "An email sign-in password has been added to your account. OAuth and passkey sign-in still use your separate encryption password unless you reset it below.",
+      "An email sign-in password has been added to your account. It also unlocks your encrypted data when you sign in.",
     );
   });
 });

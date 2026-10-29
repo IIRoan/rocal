@@ -108,14 +108,12 @@ export function MailCommandPalette({
                 deletingAccount={c.busy.deletingAccount}
                 changingPassword={c.busy.changingPassword}
                 settingPassword={c.busy.settingPassword}
-                resettingEncryptionPassword={c.busy.resettingEncryptionPassword}
                 updatingProfile={c.busy.updatingProfile}
                 hasPasswordAccount={c.hasPasswordAccount}
                 hasOAuthAccount={c.hasOAuthAccount}
                 handleDeleteAccount={c.handleDeleteAccount}
                 handleChangePassword={c.handleChangePassword}
                 handleSetPassword={c.handleSetPassword}
-                handleResetEncryptionPassword={c.handleResetEncryptionPassword}
                 handleUpdateProfile={c.handleUpdateProfile}
                 mailboxes={c.mailboxes}
                 onCreateMailbox={c.onCreateMailbox}

@@ -78,7 +78,6 @@ export type PaletteBusyState = {
   deletingAccount: boolean;
   changingPassword: boolean;
   settingPassword: boolean;
-  resettingEncryptionPassword: boolean;
   updatingProfile: boolean;
   localImageOverride: string | null | undefined;
 };
@@ -88,7 +87,6 @@ export type PaletteBusyAction =
   | { type: "setDeletingAccount"; value: boolean }
   | { type: "setChangingPassword"; value: boolean }
   | { type: "setSettingPassword"; value: boolean }
-  | { type: "setResettingEncryptionPassword"; value: boolean }
   | { type: "setUpdatingProfile"; value: boolean }
   | { type: "setLocalImageOverride"; value: string | null };
 
@@ -97,7 +95,6 @@ export const initialBusyState: PaletteBusyState = {
   deletingAccount: false,
   changingPassword: false,
   settingPassword: false,
-  resettingEncryptionPassword: false,
   updatingProfile: false,
   localImageOverride: undefined,
 };
@@ -115,8 +112,6 @@ export function paletteBusyReducer(
       return { ...state, changingPassword: action.value };
     case "setSettingPassword":
       return { ...state, settingPassword: action.value };
-    case "setResettingEncryptionPassword":
-      return { ...state, resettingEncryptionPassword: action.value };
     case "setUpdatingProfile":
       return { ...state, updatingProfile: action.value };
     case "setLocalImageOverride":

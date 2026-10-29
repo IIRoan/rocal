@@ -26,6 +26,7 @@ import { useNativeUserSettings } from "../../../hooks/use-native-user-settings";
 import { useLinkedAuthAccounts } from "../../../hooks/use-linked-auth-accounts";
 import { calendarApiService } from "../../../lib/api";
 import { pickProfilePicture } from "../../../lib/profile-picture";
+import { rememberDeviceEnvelopeSalt } from "../../../lib/native-e2ee-provider";
 import { useToast } from "../../../providers/ToastProvider";
 
 const PROFILE_ACTION_KEYS: SettingsAccountActionKey[] = [
@@ -94,7 +95,7 @@ function getPasswordFormError(
   return null;
 }
 
-function AccountPasswordForm({
+export function AccountPasswordForm({
   mode,
   onClose,
 }: {
@@ -102,7 +103,7 @@ function AccountPasswordForm({
   onClose: () => void;
 }) {
   const { user } = useAuth();
-  const { resetEncryptionPassword } = useE2ee();
+  const { createPasswordEnvelope } = useE2ee();
   const { toast } = useToast();
   const accountsQuery = useLinkedAuthAccounts();
   const [form, dispatch] = useReducer(passwordFormReducer, EMPTY_PASSWORD_FORM);
@@ -116,11 +117,14 @@ function AccountPasswordForm({
     dispatch({ type: "submit" });
 
     try {
+      // The envelope travels with the new password so the server stores both or neither.
+      const passwordEnvelope = await createPasswordEnvelope(form.newPassword);
       if (mode === "change-password") {
         const result = await authClient.changePassword({
           currentPassword: form.currentPassword,
           newPassword: form.newPassword,
           email: user?.email ?? "",
+          passwordEnvelope,
         });
         if (result?.error) {
           throw new Error(
@@ -131,12 +135,16 @@ function AccountPasswordForm({
       } else {
         const result = await (
           authClient as typeof authClient & {
-            setPassword: (input: { newPassword: string }) => Promise<{
+            setPassword: (input: {
+              newPassword: string;
+              passwordEnvelope: typeof passwordEnvelope;
+            }) => Promise<{
               error?: { message?: string };
             } | void>;
           }
         ).setPassword({
           newPassword: form.newPassword,
+          passwordEnvelope,
         });
         if (result?.error) {
           throw new Error(
@@ -146,8 +154,9 @@ function AccountPasswordForm({
         await accountsQuery.refetch();
         toast("Email password added");
       }
-      // The envelope follows the sign-in password; if this fails, the next device asks for the previous one and re-wraps.
-      await resetEncryptionPassword(form.newPassword).catch(() => false);
+      await rememberDeviceEnvelopeSalt(passwordEnvelope.kdfSalt).catch(
+        () => undefined,
+      );
       onClose();
     } catch (error) {
       dispatch({

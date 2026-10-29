@@ -6,12 +6,14 @@ import type { UpdateSettingsRequest, UserSettings } from "@/lib/types/calendar";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { authClient, signOut } from "@/lib/auth-client";
 import { storePasswordEnvelopeForActiveSession } from "@/lib/e2ee-bootstrap";
-import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
+import { createPasswordEnvelope } from "@/lib/e2ee-crypto";
+import { getActiveE2eeSession } from "@/lib/e2ee-session";
+import { rememberStoredDeviceEnvelopeSalt } from "@/lib/e2ee-storage";
 import { setEncPasswordCookie } from "@/lib/enc-password-cookie";
 
 const log = createLogger("command-palette");
 
-/** The envelope follows the sign-in password; if this fails, the next device asks for the previous one and re-wraps. */
+/** Wraps the keys to a newly added sign-in password. */
 async function rewrapEncryptionEnvelope(sessionUserId: string, password: string) {
   try {
     if (await storePasswordEnvelopeForActiveSession(sessionUserId, password)) {
@@ -96,10 +98,23 @@ export async function persistPasswordChange(input: {
   newPassword: string;
 }): Promise<{ ok: true } | { ok: false; error: unknown }> {
   try {
+    const session = getActiveE2eeSession();
+    if (!session || session.userId !== input.sessionUserId) {
+      throw new Error(
+        "Your encrypted data is not open in this browser. Sign in again, then change your password.",
+      );
+    }
+    // The server stores the password and its envelope together, so the sign-in password always opens the keys.
+    const passwordEnvelope = await createPasswordEnvelope(
+      session.accountKey,
+      session.blindIndexKey,
+      input.newPassword,
+    );
     const result = await authClient.changePassword({
       currentPassword: input.currentPassword,
       newPassword: input.newPassword,
       email: input.email,
+      passwordEnvelope,
     });
 
     if (result?.error) {
@@ -107,7 +122,16 @@ export async function persistPasswordChange(input: {
         result.error.message || "Unable to update your password.",
       );
     }
-    await rewrapEncryptionEnvelope(input.sessionUserId, input.newPassword);
+    await Promise.all([
+      rememberStoredDeviceEnvelopeSalt(
+        input.sessionUserId,
+        session.deviceId,
+        passwordEnvelope.kdfSalt,
+      ),
+      setEncPasswordCookie(input.newPassword),
+    ]).catch((error: unknown) => {
+      log.warn("Failed to update local encryption state", sanitizeContext({ error }));
+    });
     return { ok: true };
   } catch (error) {
     log.error("Failed to change password", sanitizeContext({ error }));
@@ -134,28 +158,6 @@ export async function persistPasswordSet(input: {
     return { ok: true };
   } catch (error) {
     log.error("Failed to set password", sanitizeContext({ error }));
-    return { ok: false, error };
-  }
-}
-
-export async function persistEncryptionPasswordReset(input: {
-  sessionUserId: string;
-  newPassword: string;
-}): Promise<{ ok: true } | { ok: false; error: unknown }> {
-  try {
-    const stored = await resetEncryptionPasswordForActiveSession(
-      input.sessionUserId,
-      input.newPassword,
-    );
-
-    if (!stored) {
-      throw new Error(
-        "Unlock your encrypted data on this device first, then try again.",
-      );
-    }
-    return { ok: true };
-  } catch (error) {
-    log.error("Failed to reset encryption password", sanitizeContext({ error }));
     return { ok: false, error };
   }
 }

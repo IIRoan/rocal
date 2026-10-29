@@ -176,8 +176,10 @@ export interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<SignInResult>;
   /** Create a new account. */
   signUp: (name: string, email: string, password: string) => Promise<void>;
-  /** Sign out and clear the session. */
-  signOut: () => Promise<void>;
+  /** Sign out and clear the session; a notice is shown on the sign-in screen until the next sign-in. */
+  signOut: (notice?: string) => Promise<void>;
+  /** Why the last session ended, when the app ended it. */
+  signInNotice: string | null;
   /** Authenticate using platform biometrics (passkey). */
   signInWithPasskey: () => Promise<void>;
   /** Verify a registered passkey after email/password sign-in. */
@@ -212,6 +214,7 @@ export function AuthProvider({
     dispatch,
   ] = useReducer(authReducer, SIGNED_OUT);
   const [isLoading, setIsLoading] = useState(true);
+  const [signInNotice, setSignInNotice] = useState<string | null>(null);
   const pendingAuthPasswordRef = useRef<string | null>(null);
   const sessionLoadIdRef = useRef(0);
   const hasLiveSessionRef = useRef(false);
@@ -475,6 +478,7 @@ export function AuthProvider({
 
   const signIn = useCallback(
     async (email: string, password: string) => {
+      setSignInNotice(null);
       setEmailPasswordAuthHints(password);
       sessionLoadIdRef.current += 1;
       let authData: unknown;
@@ -553,6 +557,7 @@ export function AuthProvider({
 
   const signUp = useCallback(
     async (name: string, email: string, password: string) => {
+      setSignInNotice(null);
       sessionLoadIdRef.current += 1;
       setEmailPasswordAuthHints(password);
       const result = await authClient.signUp.email({
@@ -583,7 +588,7 @@ export function AuthProvider({
     ],
   );
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (notice?: string) => {
     sessionLoadIdRef.current += 1;
     hasLiveSessionRef.current = false;
     // Capture before clearing the fallback so logout requests still authenticate when the jar is empty.
@@ -605,6 +610,7 @@ export function AuthProvider({
     }
     await wipeSessionData(lifecycleRef.current);
     clearSession();
+    setSignInNotice(notice ?? null);
   }, [clearSession]);
 
   useEffect(() => {
@@ -814,6 +820,7 @@ export function AuthProvider({
       signIn,
       signUp,
       signOut,
+      signInNotice,
       signInWithPasskey,
       completePasskeyStepUp,
       registerPasskey,
@@ -832,6 +839,7 @@ export function AuthProvider({
       signIn,
       signUp,
       signOut,
+      signInNotice,
       signInWithPasskey,
       completePasskeyStepUp,
       registerPasskey,

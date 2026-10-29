@@ -52,12 +52,6 @@ export const SHARED_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
   },
   {
     pageId: "security",
-    label: "Reset encryption password",
-    location: "Security · Encryption",
-    keywords: "keys",
-  },
-  {
-    pageId: "security",
     label: "Passkeys",
     location: "Security · Passkeys",
     keywords: "add passkey passwordless biometric",

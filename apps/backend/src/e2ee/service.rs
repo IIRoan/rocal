@@ -151,6 +151,14 @@ pub async fn store_password_envelope(
     user: &RouteUser,
     request: PasswordEnvelopeRequest,
 ) -> Result<PasswordEnvelope, AppError> {
+    let keys = password_keys(request)?;
+    let envelope = queries::upsert_password_envelope(&state.db, &user.id, keys).await?;
+    tracing::info!(envelope_id = %envelope.id, "E2EE password envelope stored");
+    Ok(password_record(envelope))
+}
+
+/// An envelope as stored, trimmed and with defaults filled in; a password change writes it in its own transaction.
+pub fn password_keys(request: PasswordEnvelopeRequest) -> Result<PasswordKeys, AppError> {
     let kdf_algorithm = trimmed_or(
         request.kdf_algorithm.as_deref(),
         DEFAULT_PASSWORD_KDF_ALGORITHM,
@@ -170,7 +178,7 @@ pub async fn store_password_envelope(
         &request.wrapped_search_key,
         request.key_version,
     )?;
-    let keys = PasswordKeys {
+    Ok(PasswordKeys {
         kdf_algorithm,
         kdf_salt,
         kdf_iterations,
@@ -181,10 +189,7 @@ pub async fn store_password_envelope(
             DEFAULT_PASSWORD_WRAP_ALGORITHM,
         ),
         key_version,
-    };
-    let envelope = queries::upsert_password_envelope(&state.db, &user.id, keys).await?;
-    tracing::info!(envelope_id = %envelope.id, "E2EE password envelope stored");
-    Ok(password_record(envelope))
+    })
 }
 
 /// Blind-index tokens are stored as a JSON array; anything unreadable is an empty list.

@@ -49,7 +49,8 @@ type SignInErrors = {
 const NO_ERRORS: SignInErrors = { email: null, password: null, server: null };
 
 export function SignInScreen() {
-  const { signIn, requiresPasskeyStepUp, completePasskeyStepUp } = useAuth();
+  const { signIn, requiresPasskeyStepUp, completePasskeyStepUp, signInNotice } =
+    useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -138,6 +139,7 @@ export function SignInScreen() {
   }, [handleVerifyPasskey, requiresPasskeyStepUp]);
 
   const isLoading = pending !== null;
+  const serverError = errors.server ?? signInNotice;
 
   const title = requiresPasskeyStepUp ? "Verify your passkey" : "Welcome back";
   const subtitle = requiresPasskeyStepUp
@@ -165,9 +167,9 @@ export function SignInScreen() {
               <Text style={styles.subtitle}>{subtitle}</Text>
             </View>
 
-            {errors.server ? (
+            {serverError ? (
               <View style={styles.serverErrorContainer}>
-                <Text style={styles.serverErrorText}>{errors.server}</Text>
+                <Text style={styles.serverErrorText}>{serverError}</Text>
               </View>
             ) : null}
 

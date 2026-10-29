@@ -5,6 +5,7 @@ import { createAuthKeyFetch } from "@workspace/calendar-client";
 import { getApiBaseUrl } from "./api-url";
 import { deriveAuthKey } from "./e2ee-crypto";
 import { AUTH_SESSION_REFRESH_INTERVAL_SECONDS } from "@workspace/calendar-core";
+import type { UpsertE2eePasswordRequest } from "./types/calendar";
 
 const baseAuthClient = createAuthClient({
   baseURL: getApiBaseUrl(),
@@ -26,6 +27,8 @@ export const authClient = baseAuthClient as typeof baseAuthClient & {
     newPassword: string;
     email: string;
     revokeOtherSessions?: boolean;
+    /** Stored with the new password in one transaction, so the two never diverge. */
+    passwordEnvelope?: UpsertE2eePasswordRequest;
   }) => Promise<{ data: unknown; error: { message?: string } | null }>;
 };
 

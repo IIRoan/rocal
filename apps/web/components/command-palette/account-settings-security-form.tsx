@@ -25,24 +25,17 @@ const FORM_COPY: Record<
 > = {
   "change-password": {
     helper:
-      "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys.",
+      "Update your sign-in password. It also unlocks your encrypted data, so your keys are rewrapped to the new one.",
     newLabel: "New password",
     confirmLabel: "Confirm new password",
     submitLabel: "Update Password",
   },
   "set-password": {
     helper:
-      "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing the separate encryption password used by OAuth or passkey sign-in.",
+      "Add an email sign-in password to this account. It also unlocks your encrypted data when you sign in.",
     newLabel: "New password",
     confirmLabel: "Confirm new password",
     submitLabel: "Set Password",
-  },
-  "reset-encryption": {
-    helper:
-      "Choose a new encryption password for OAuth or passkey sign-in. This only replaces the password wrapper around your existing encryption keys and does not change your OAuth sign-in method.",
-    newLabel: "New encryption password",
-    confirmLabel: "Confirm new encryption password",
-    submitLabel: "Reset Encryption Password",
   },
 };
 
@@ -63,9 +56,6 @@ export function AccountSecurityForm({
       newPassword: string;
     }) => Promise<void>;
     handleSetPassword?: (values: { newPassword: string }) => Promise<void>;
-    handleResetEncryptionPassword?: (values: {
-      newPassword: string;
-    }) => Promise<void>;
   };
 }) {
   if (!activeForm) return null;

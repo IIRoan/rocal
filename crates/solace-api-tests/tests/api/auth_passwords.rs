@@ -2,6 +2,7 @@
 
 use serde_json::{Value, json};
 use solace_api_tests::client::ResponseResult;
+use solace_api_tests::seed::fake_token;
 use solace_api_types::auth::{SessionWithUser, StatusFlag};
 
 use crate::helpers::{
@@ -316,6 +317,92 @@ async fn change_password_takes_auth_keys_salted_with_the_account_email() {
         "the API derives the same key from a raw password"
     );
     assert_eq!(sign_in_status(&app, &user.email, &current).await, 401);
+}
+
+async fn envelope_salt(app: &TestApp, user: &TestUser) -> Option<String> {
+    sqlx::query_scalar("SELECT kdf_salt FROM user_encryption_password WHERE user_id = $1")
+        .bind(&user.id)
+        .fetch_optional(&app.db)
+        .await
+        .expect("password envelope")
+}
+
+fn envelope(salt: &str) -> Value {
+    json!({"kdfSalt": salt, "wrappedAccountKey": fake_token(), "wrappedSearchKey": fake_token()})
+}
+
+#[tokio::test]
+async fn change_password_stores_the_envelope_for_the_new_password_with_it() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    ok(user
+        .put("/api/e2ee/password", envelope("salt-for-the-old-password"))
+        .await
+        .expect_status(200));
+    let current = user.password.clone();
+    ok(user
+        .post(
+            "/api/auth/change-password",
+            json!({
+                "currentPassword": current,
+                "newPassword": "solace-test-changed-password",
+                "passwordEnvelope": envelope(" salt-for-the-new-password "),
+            }),
+        )
+        .await
+        .expect_status(200));
+    assert_eq!(
+        envelope_salt(&app, &user).await.as_deref(),
+        Some("salt-for-the-new-password")
+    );
+    assert_eq!(
+        sign_in_status(&app, &user.email, "solace-test-changed-password").await,
+        200
+    );
+}
+
+#[tokio::test]
+async fn a_refused_password_change_keeps_the_previous_password_and_envelope() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    ok(user
+        .put("/api/e2ee/password", envelope("salt-for-the-old-password"))
+        .await
+        .expect_status(200));
+    let before = password_hash(&app, &user).await;
+    let current = user.password.clone();
+    let wrong = user
+        .post(
+            "/api/auth/change-password",
+            json!({
+                "currentPassword": "solace-test-wrong",
+                "newPassword": "solace-test-changed-password",
+                "passwordEnvelope": envelope("salt-for-the-new-password"),
+            }),
+        )
+        .await;
+    auth_error(&wrong, 400, "INVALID_PASSWORD", "Invalid password");
+    for broken in [
+        json!({"kdfSalt": "salt-for-the-new-password", "wrappedAccountKey": fake_token()}),
+        envelope("   "),
+    ] {
+        let response = user
+            .post(
+                "/api/auth/change-password",
+                json!({
+                    "currentPassword": current,
+                    "newPassword": "solace-test-changed-password",
+                    "passwordEnvelope": broken,
+                }),
+            )
+            .await;
+        assert_eq!(response.status.as_u16(), 400, "{}", response.text());
+    }
+    assert_eq!(password_hash(&app, &user).await, before);
+    assert_eq!(
+        envelope_salt(&app, &user).await.as_deref(),
+        Some("salt-for-the-old-password")
+    );
 }
 
 #[tokio::test]

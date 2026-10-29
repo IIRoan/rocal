@@ -5,9 +5,11 @@ use std::sync::LazyLock;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
+use sea_orm::TransactionTrait;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use solace_api_types::auth::{AuthUser, StatusFlag};
+use solace_api_types::e2ee::PasswordEnvelopeRequest;
 
 use super::api::{ApiError, codes, json, validate};
 use super::email_password::{check_auth_key_email, check_new_password};
@@ -18,7 +20,9 @@ use super::session;
 use super::sessions::require_session;
 use super::store;
 use crate::db::entities::user;
+use crate::e2ee;
 use crate::email;
+use crate::http::extract::RequestSchema;
 use crate::http::zod::{self, Schema};
 use crate::state::AppState;
 
@@ -29,6 +33,7 @@ struct ChangePasswordBody {
     current_password: String,
     revoke_other_sessions: Option<bool>,
     email: Option<String>,
+    password_envelope: Option<PasswordEnvelopeRequest>,
 }
 
 static CHANGE_PASSWORD: LazyLock<Schema> = LazyLock::new(|| {
@@ -37,6 +42,10 @@ static CHANGE_PASSWORD: LazyLock<Schema> = LazyLock::new(|| {
         ("currentPassword", zod::string()),
         ("revokeOtherSessions", zod::boolean().optional()),
         ("email", zod::string().optional()),
+        (
+            "passwordEnvelope",
+            PasswordEnvelopeRequest::schema().clone().optional(),
+        ),
     ])
 });
 
@@ -100,6 +109,14 @@ pub async fn change_password(
         if crate::http::zod::js_length(&body.current_password) > password::MAX_LENGTH {
             return Err(codes::password_too_long());
         }
+        // The envelope is wrapped with the new password; storing them together keeps every sign-in able to open it.
+        let envelope = body
+            .password_envelope
+            .map(e2ee::service::password_keys)
+            .transpose()
+            .map_err(|_| {
+                ApiError::message(StatusCode::BAD_REQUEST, "Invalid encryption envelope")
+            })?;
         let credential = store::credential_account(&state.db, &active.user.id).await?;
         let Some((credential, stored)) =
             credential.and_then(|a| a.password.clone().map(|p| (a, p)))
@@ -114,7 +131,12 @@ pub async fn change_password(
                 .await
                 .map_err(|_| ApiError::internal())?,
         )?;
-        store::set_password(&state.db, credential, new_hash).await?;
+        let transaction = state.db.begin().await?;
+        store::set_password(&transaction, credential, new_hash).await?;
+        if let Some(keys) = envelope {
+            e2ee::queries::upsert_password_envelope(&transaction, &active.user.id, keys).await?;
+        }
+        transaction.commit().await?;
         let mut token = None;
         if body.revoke_other_sessions == Some(true) {
             store::delete_user_sessions(&state.db, &active.user.id).await?;

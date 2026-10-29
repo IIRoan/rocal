@@ -22,7 +22,6 @@ import {
 } from "./command-palette-ui-state";
 import {
   persistAccountDeletion,
-  persistEncryptionPasswordReset,
   persistPasswordChange,
   persistPasswordSet,
   persistProfileUpdate,
@@ -250,26 +249,6 @@ export function useCommandPaletteController({
     }
   };
 
-  const handleResetEncryptionPassword = async ({
-    newPassword,
-  }: {
-    newPassword: string;
-  }) => {
-    if (!sessionUserId) {
-      throw new Error("Your session is unavailable. Please try again.");
-    }
-
-    dispatchBusy({ type: "setResettingEncryptionPassword", value: true });
-    const result = await persistEncryptionPasswordReset({
-      sessionUserId,
-      newPassword,
-    });
-    dispatchBusy({ type: "setResettingEncryptionPassword", value: false });
-    if (result.ok === false) {
-      throw result.error;
-    }
-  };
-
   const handleUpdateProfile = async (input: { image: string | null }) => {
     dispatchBusy({ type: "setUpdatingProfile", value: true });
     const result = await persistProfileUpdate({ ...input, queryClient });
@@ -400,7 +379,6 @@ export function useCommandPaletteController({
     handleDeleteAccount,
     handleChangePassword,
     handleSetPassword,
-    handleResetEncryptionPassword,
     handleUpdateProfile,
     paletteSearch,
     hasBothResults,

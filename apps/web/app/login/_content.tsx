@@ -36,11 +36,11 @@ import { isPasskeyAuthCancelled } from "@/lib/native-passkey-bridge";
 import { AnimatedCollapse } from "@workspace/ui/components/ui/animated-collapse";
 import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
 import {
+  createInitialLoginFormChrome,
   createInitialLoginFormFields,
   emailAvailabilityUiReducer,
   initialEmailAvailabilityUi,
   initialInviteValidationUi,
-  initialLoginFormChrome,
   inviteValidationUiReducer,
   loginFormChromeReducer,
   loginFormFieldsReducer,
@@ -214,7 +214,8 @@ type LoginFormBodyProps = {
 export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
   const [chrome, dispatchChrome] = useReducer(
     loginFormChromeReducer,
-    initialLoginFormChrome,
+    loginSearchParams.e2eeLock,
+    createInitialLoginFormChrome,
   );
   const [fields, dispatchFields] = useReducer(
     loginFormFieldsReducer,

@@ -158,12 +158,10 @@ export function CommandPalette({
           sessionLoading={c.sessionLoading}
           changingPassword={c.busy.changingPassword}
           settingPassword={c.busy.settingPassword}
-          resettingEncryptionPassword={c.busy.resettingEncryptionPassword}
           hasPasswordAccount={c.hasPasswordAccount}
           hasOAuthAccount={c.hasOAuthAccount}
           handleChangePassword={c.handleChangePassword}
           handleSetPassword={c.handleSetPassword}
-          handleResetEncryptionPassword={c.handleResetEncryptionPassword}
           updatingProfile={c.busy.updatingProfile}
           handleUpdateProfile={c.handleUpdateProfile}
           passkeyAddMode={c.chrome.passkeyAddMode}

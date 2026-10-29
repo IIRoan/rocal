@@ -31,10 +31,8 @@ interface AccountSettingsProps {
   hasOAuthAccount?: boolean;
   changingPassword: boolean;
   settingPassword?: boolean;
-  resettingEncryptionPassword?: boolean;
   handleChangePassword: (values: ChangePasswordValues) => Promise<void>;
   handleSetPassword?: (values: PasswordOnlyValues) => Promise<void>;
-  handleResetEncryptionPassword?: (values: PasswordOnlyValues) => Promise<void>;
   updatingProfile?: boolean;
   handleUpdateProfile?: (values: UpdateProfileValues) => Promise<void>;
   onOpenInvites?: () => void;
@@ -55,10 +53,8 @@ export function AccountSettings({
   hasOAuthAccount = false,
   changingPassword,
   settingPassword = false,
-  resettingEncryptionPassword = false,
   handleChangePassword,
   handleSetPassword,
-  handleResetEncryptionPassword,
   updatingProfile = false,
   handleUpdateProfile,
   onOpenInvites,
@@ -69,7 +65,6 @@ export function AccountSettings({
     deletingAccount ||
     changingPassword ||
     settingPassword ||
-    resettingEncryptionPassword ||
     updatingProfile;
 
   const displayName = accountName?.trim() || null;
@@ -93,10 +88,8 @@ export function AccountSettings({
           hasOAuthAccount={hasOAuthAccount}
           changingPassword={changingPassword}
           settingPassword={settingPassword}
-          resettingEncryptionPassword={resettingEncryptionPassword}
           handleChangePassword={handleChangePassword}
           handleSetPassword={handleSetPassword}
-          handleResetEncryptionPassword={handleResetEncryptionPassword}
         />
       ) : null}
 

@@ -47,7 +47,6 @@ type CommandPaletteViewContentProps = {
   sessionLoading: boolean;
   changingPassword: boolean;
   settingPassword: boolean;
-  resettingEncryptionPassword: boolean;
   hasPasswordAccount: boolean;
   hasOAuthAccount: boolean;
   handleChangePassword: (input: {
@@ -55,9 +54,6 @@ type CommandPaletteViewContentProps = {
     newPassword: string;
   }) => Promise<void>;
   handleSetPassword: (input: { newPassword: string }) => Promise<void>;
-  handleResetEncryptionPassword: (input: {
-    newPassword: string;
-  }) => Promise<void>;
   updatingProfile: boolean;
   handleUpdateProfile: (input: { image: string | null }) => Promise<void>;
   passkeyAddMode: boolean;
@@ -89,12 +85,10 @@ export function CommandPaletteViewContent({
   sessionLoading,
   changingPassword,
   settingPassword,
-  resettingEncryptionPassword,
   hasPasswordAccount,
   hasOAuthAccount,
   handleChangePassword,
   handleSetPassword,
-  handleResetEncryptionPassword,
   updatingProfile,
   handleUpdateProfile,
   passkeyAddMode,
@@ -169,12 +163,10 @@ export function CommandPaletteViewContent({
         sessionLoading={sessionLoading}
         changingPassword={changingPassword}
         settingPassword={settingPassword}
-        resettingEncryptionPassword={resettingEncryptionPassword}
         hasPasswordAccount={hasPasswordAccount}
         hasOAuthAccount={hasOAuthAccount}
         handleChangePassword={handleChangePassword}
         handleSetPassword={handleSetPassword}
-        handleResetEncryptionPassword={handleResetEncryptionPassword}
         updatingProfile={updatingProfile}
         handleUpdateProfile={handleUpdateProfile}
         onOpenInvites={() => goForward("invites")}
@@ -194,10 +186,8 @@ export function CommandPaletteViewContent({
         hasOAuthAccount={hasOAuthAccount}
         changingPassword={changingPassword}
         settingPassword={settingPassword}
-        resettingEncryptionPassword={resettingEncryptionPassword}
         handleChangePassword={handleChangePassword}
         handleSetPassword={handleSetPassword}
-        handleResetEncryptionPassword={handleResetEncryptionPassword}
       />
     );
   }

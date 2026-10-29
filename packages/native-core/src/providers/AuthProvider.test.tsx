@@ -448,6 +448,24 @@ describe("AuthProvider", () => {
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });
 
+  it("keeps the sign-out notice for the sign-in screen until the next sign-in", async () => {
+    await renderProvider();
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    await act(async () => {
+      await getAuth().signOut("Sign in again.");
+    });
+    await flushPromises();
+    expect(getAuth().signInNotice).toBe("Sign in again.");
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    expect(getAuth().signInNotice).toBeNull();
+  });
+
   it("authenticates logout requests with the fallback token when the cookie jar is empty", async () => {
     mockGetSession.mockResolvedValue(createAuthResult());
     await renderProvider();
