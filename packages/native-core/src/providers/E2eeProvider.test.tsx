@@ -359,8 +359,8 @@ describe("E2eeProvider", () => {
     expect(getE2ee().isEnabled).toBe(true);
   });
 
-  it("asks for the encryption password instead of minting keys when the auto-unlock fails", async () => {
-    peekPendingAuthPassword.mockReturnValue("wrong-password");
+  it("asks for the previous password after a reset and re-wraps the envelope to the new one", async () => {
+    peekPendingAuthPassword.mockReturnValue("new-sign-in-password");
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
@@ -381,7 +381,7 @@ describe("E2eeProvider", () => {
         );
       }
 
-      if (url.endsWith("/api/e2ee/device")) {
+      if (url.endsWith("/api/e2ee/device") || url.endsWith("/api/e2ee/password")) {
         return jsonResponse({});
       }
 
@@ -406,7 +406,7 @@ describe("E2eeProvider", () => {
       "https://api.solace.test/api/e2ee/password",
       expect.anything(),
     );
-    expect(clearPendingAuthPassword).toHaveBeenCalled();
+    expect(clearPendingAuthPassword).not.toHaveBeenCalled();
 
     await act(async () => {
       expect(await getE2ee().unlockWithPassword("still-wrong")).toBe(false);
@@ -430,6 +430,16 @@ describe("E2eeProvider", () => {
     );
     expect(getE2ee().needsPassword).toBe(false);
     expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
+    expect(mockE2eeModule.createPasswordEnvelope).toHaveBeenCalledWith(
+      accountKey,
+      blindIndexKey,
+      "new-sign-in-password",
+    );
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.solace.test/api/e2ee/password",
+      expect.objectContaining({ method: "PUT" }),
+    );
+    expect(clearPendingAuthPassword).toHaveBeenCalled();
   });
 
   it("clears the pending auth password when auto-storing the envelope fails", async () => {

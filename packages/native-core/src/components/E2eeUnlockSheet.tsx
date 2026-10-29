@@ -18,7 +18,7 @@ import {
 } from "./sheet/SheetActions";
 import { SheetMessage, SheetTextField } from "./sheet/SheetSections";
 
-const WRONG_PASSWORD =
+const UNLOCK_FAILED_MESSAGE =
   "That password did not unlock your data. If you changed it recently, try the previous one.";
 
 /** Asks for the encryption password when this device has no key and signing in did not open the account key. */
@@ -39,7 +39,7 @@ export function E2eeUnlockSheet({ onUnlocked }: { onUnlocked: () => void }) {
     const unlocked = await unlockWithPassword(password).catch(() => false);
     setIsPending(false);
     if (!unlocked) {
-      setError(WRONG_PASSWORD);
+      setError(UNLOCK_FAILED_MESSAGE);
       return;
     }
     setPassword("");

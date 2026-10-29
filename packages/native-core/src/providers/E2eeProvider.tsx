@@ -241,12 +241,12 @@ export function E2eeProvider({
 
         // The envelope holds the real account key, so a missing or wrong password waits for the unlock prompt instead of minting keys.
         if (bootstrapData.passwordEnvelope) {
+          // The sign-in password stays in memory so the envelope can be re-wrapped to it after the unlock.
           lockedRef.current = {
             userId,
             apiBaseUrl,
             envelope: bootstrapData.passwordEnvelope,
           };
-          clearPendingAuthPassword();
           setNeedsPassword(true);
           return true;
         }
@@ -387,10 +387,31 @@ export function E2eeProvider({
           userId: locked.userId,
           deviceId: nextSession.deviceId,
         });
+        // After a reset the sign-in password differs from the one just entered, so the envelope follows it.
+        const signInPassword = peekPendingAuthPassword();
+        if (signInPassword && signInPassword !== password) {
+          await storePasswordEnvelopeForActiveSession({
+            e2ee,
+            userId: locked.userId,
+            apiBaseUrl: locked.apiBaseUrl,
+            password: signInPassword,
+          }).catch((error: unknown) => {
+            log.warn("Failed to re-wrap the E2EE envelope to the sign-in password", {
+              userId: locked.userId,
+              error,
+            });
+          });
+        }
+        clearPendingAuthPassword();
       }
       return current;
     },
-    [getModule],
+    [
+      clearPendingAuthPassword,
+      getModule,
+      peekPendingAuthPassword,
+      storePasswordEnvelopeForActiveSession,
+    ],
   );
 
   const provider = useMemo<IE2eeProvider>(

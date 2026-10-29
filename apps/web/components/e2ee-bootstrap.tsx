@@ -14,6 +14,7 @@ import { useSession } from "@/lib/auth-client";
 import {
   ensureE2eeBootstrap,
   resetE2eeBootstrap,
+  storePasswordEnvelopeForActiveSession,
   unlockE2eeWithPassword,
 } from "@/lib/e2ee-bootstrap";
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
@@ -210,6 +211,8 @@ async function runEncryptionPasswordUnlock(input: {
     };
   }
 
+  // After a reset the sign-in password no longer opens the envelope; once the previous one does, the envelope follows it.
+  const signInPassword = peekAuthPassword() ?? password;
   const unlocked = await unlockE2eeWithPassword(userId, password);
 
   if (!unlocked) {
@@ -220,7 +223,14 @@ async function runEncryptionPasswordUnlock(input: {
     };
   }
 
-  await setEncPasswordCookie(password);
+  if (signInPassword !== password) {
+    await storePasswordEnvelopeForActiveSession(userId, signInPassword).catch(
+      (error: unknown) => {
+        log.warn("Failed to re-wrap the encryption envelope", { userId, error });
+      },
+    );
+  }
+  await setEncPasswordCookie(signInPassword);
   await refreshEncryptedQueries(queryClient);
   return { ok: true };
 }

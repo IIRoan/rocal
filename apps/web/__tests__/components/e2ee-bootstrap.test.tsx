@@ -38,6 +38,7 @@ jest.mock("@/lib/auth-client", () => ({
 jest.mock("@/lib/e2ee-bootstrap", () => ({
   ensureE2eeBootstrap: jest.fn(),
   resetE2eeBootstrap: jest.fn(),
+  storePasswordEnvelopeForActiveSession: jest.fn(),
   unlockE2eeWithPassword: jest.fn(),
 }));
 
@@ -105,6 +106,7 @@ import { useSession, signOut } from "@/lib/auth-client";
 import {
   ensureE2eeBootstrap,
   resetE2eeBootstrap,
+  storePasswordEnvelopeForActiveSession,
   unlockE2eeWithPassword,
 } from "@/lib/e2ee-bootstrap";
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
@@ -469,6 +471,46 @@ describe("E2eeBootstrap component", () => {
     });
 
     expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("my-unlock-pw");
+    expect(storePasswordEnvelopeForActiveSession).not.toHaveBeenCalled();
+  });
+
+  it("re-wraps the envelope to the new sign-in password after unlocking with the previous one", async () => {
+    mockPeekAuthPassword.mockReturnValue("new-sign-in-pw");
+    jest.mocked(storePasswordEnvelopeForActiveSession).mockResolvedValue(true);
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: false,
+      passwordUnlockFailed: true,
+      bootstrap: createBootstrap({
+        passwordEnvelope: createPasswordEnvelope(),
+      }),
+    });
+
+    await renderComponent();
+
+    const passwordInput = container.querySelector(
+      "#e2ee-password",
+    ) as HTMLInputElement;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (el) => el.textContent?.includes("Unlock"),
+    );
+
+    await act(async () => {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      );
+      descriptor?.set?.call(passwordInput, "previous-pw");
+      passwordInput.dispatchEvent(new Event("input", { bubbles: true }));
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(mockUnlockE2eeWithPassword).toHaveBeenCalledWith("user-1", "previous-pw");
+    expect(storePasswordEnvelopeForActiveSession).toHaveBeenCalledWith(
+      "user-1",
+      "new-sign-in-pw",
+    );
+    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("new-sign-in-pw");
   });
 
   it("writes the cookie after a successful manual password setup", async () => {

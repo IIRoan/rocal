@@ -5,9 +5,22 @@ import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
 import type { UpdateSettingsRequest, UserSettings } from "@/lib/types/calendar";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { authClient, signOut } from "@/lib/auth-client";
+import { storePasswordEnvelopeForActiveSession } from "@/lib/e2ee-bootstrap";
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
+import { setEncPasswordCookie } from "@/lib/enc-password-cookie";
 
 const log = createLogger("command-palette");
+
+/** The envelope follows the sign-in password; if this fails, the next device asks for the previous one and re-wraps. */
+async function rewrapEncryptionEnvelope(sessionUserId: string, password: string) {
+  try {
+    if (await storePasswordEnvelopeForActiveSession(sessionUserId, password)) {
+      await setEncPasswordCookie(password);
+    }
+  } catch (error) {
+    log.warn("Failed to re-wrap the encryption envelope", sanitizeContext({ error }));
+  }
+}
 
 export function toUpdateSettingsRequest(
   settings: UserSettings,
@@ -77,6 +90,7 @@ export async function persistAccountDeletion(input: {
 }
 
 export async function persistPasswordChange(input: {
+  sessionUserId: string;
   currentPassword: string;
   newPassword: string;
 }): Promise<{ ok: true } | { ok: false; error: unknown }> {
@@ -91,6 +105,7 @@ export async function persistPasswordChange(input: {
         result.error.message || "Unable to update your password.",
       );
     }
+    await rewrapEncryptionEnvelope(input.sessionUserId, input.newPassword);
     return { ok: true };
   } catch (error) {
     log.error("Failed to change password", sanitizeContext({ error }));
@@ -99,6 +114,7 @@ export async function persistPasswordChange(input: {
 }
 
 export async function persistPasswordSet(input: {
+  sessionUserId: string;
   newPassword: string;
   refetchAccounts?: () => Promise<unknown>;
 }): Promise<{ ok: true } | { ok: false; error: unknown }> {
@@ -110,6 +126,7 @@ export async function persistPasswordSet(input: {
     if (result?.error) {
       throw new Error(result.error.message || "Unable to set your password.");
     }
+    await rewrapEncryptionEnvelope(input.sessionUserId, input.newPassword);
 
     await input.refetchAccounts?.();
     return { ok: true };

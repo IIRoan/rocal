@@ -21,6 +21,7 @@ import {
   type SettingsAccountActionKey,
 } from "../../../lib/settings-screen-utils";
 import { useAuth } from "../../../providers/AuthProvider";
+import { useE2ee } from "../../../providers/E2eeProvider";
 import { useNativeUserSettings } from "../../../hooks/use-native-user-settings";
 import { useLinkedAuthAccounts } from "../../../hooks/use-linked-auth-accounts";
 import { calendarApiService } from "../../../lib/api";
@@ -37,6 +38,7 @@ const SESSION_ACTION_KEYS: SettingsAccountActionKey[] = ["sign-out", "delete-acc
 export function AccountSettingsContent() {
   const queryClient = useQueryClient();
   const { user, signOut, refreshUser } = useAuth();
+  const { resetEncryptionPassword } = useE2ee();
   const { toast } = useToast();
   const { resetSettingsMutation } = useNativeUserSettings();
 
@@ -203,6 +205,8 @@ export function AccountSettingsContent() {
         await accountsQuery.refetch();
         toast("Email password added");
       }
+      // The envelope follows the sign-in password; if this fails, the next device asks for the previous one and re-wraps.
+      await resetEncryptionPassword(newPasswordInput).catch(() => false);
       resetChangePasswordForm();
       setActivePasswordSheet(null);
     } catch (error) {
@@ -220,6 +224,7 @@ export function AccountSettingsContent() {
     currentPasswordInput,
     newPasswordInput,
     resetChangePasswordForm,
+    resetEncryptionPassword,
     toast,
   ]);
 
