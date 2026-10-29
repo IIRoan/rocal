@@ -1044,16 +1044,11 @@ export class CalendarApiService {
     }
   }
 
-  async deleteSubscription(
-    id: string,
-    deleteEvents = false,
-  ): Promise<DeleteSubscriptionResponse> {
+  /** Both apps promise the feed's events go with it; kept events would turn the feed into a writable calendar of plaintext. */
+  async deleteSubscription(id: string): Promise<DeleteSubscriptionResponse> {
     try {
-      const params = new URLSearchParams();
-      if (deleteEvents) params.append("deleteEvents", "true");
-
       return await this.client.delete<Schema<"DeleteSubscriptionResponse">>(
-        `/api/subscriptions/${encodeURIComponent(id)}?${params}`,
+        `/api/subscriptions/${encodeURIComponent(id)}?deleteEvents=true`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete subscription");
