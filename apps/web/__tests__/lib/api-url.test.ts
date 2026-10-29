@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import {
   getApiBaseUrl,
   getAppBaseUrl,
-  getAuthCallbackUrl,
   getSafeAuthCallbackUrl,
   resolveAuthRedirectTarget,
 } from "../../lib/api-url";
@@ -77,14 +76,6 @@ describe("api-url helpers", () => {
     expect(getAppBaseUrl()).toBe("http://192.168.88.246:4000");
   });
 
-  it("falls back to the configured app url for auth callbacks", () => {
-    process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
-
-    expect(getAuthCallbackUrl("/settings?tab=security")).toBe(
-      "https://app.solace.test/settings?tab=security",
-    );
-  });
-
   it("rejects callback urls from untrusted origins", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
     process.env.NEXT_PUBLIC_API_URL = "https://api.solace.test";
@@ -137,19 +128,35 @@ describe("api-url helpers", () => {
       "/\\evil.test/phish",
       "/\t/evil.test/phish",
       "https://evil.test/phish",
+      "/.//evil.test/phish",
+      "/..//evil.test/phish",
+      "/%2e//evil.test/phish",
+      "/./\\evil.test/phish",
     ]) {
       expect(resolveAuthRedirectTarget(nextPath, null)).toEqual({
         href: HOME_PATH,
         external: false,
       });
-      expect(getAuthCallbackUrl(nextPath)).toBe(
-        `https://app.solace.test${HOME_PATH}`,
-      );
     }
     expect(resolveAuthRedirectTarget("/admin?tab=1#top", null)).toEqual({
       href: "/admin?tab=1#top",
       external: false,
     });
+  });
+
+  it("never turns a same-origin callback into a protocol-relative path", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
+
+    for (const callbackUrl of [
+      "https://app.solace.test//evil.test/phish",
+      "https://app.solace.test/.//evil.test/phish",
+      "/./\\evil.test/phish",
+    ]) {
+      expect(resolveAuthRedirectTarget("/calendar", callbackUrl)).toEqual({
+        href: "/calendar",
+        external: false,
+      });
+    }
   });
 
   it("falls back to a safe relative next path when the callback is invalid", () => {
