@@ -46,22 +46,34 @@ export function CategoryEditPage({ id }: { id: string }) {
   if (!category || !categories) {
     return <SheetCenteredState tone="destructive" message="Category not found." />;
   }
-  return <CategoryEditForm category={category} categories={categories} />;
+  return (
+    <CategoryEditForm
+      key={category.id}
+      category={category}
+      categories={categories}
+      initialName={category.name}
+      initialColor={category.color}
+    />
+  );
 }
 
 function CategoryEditForm({
   category,
   categories,
+  initialName,
+  initialColor,
 }: {
   category: EventCategory;
   categories: EventCategory[];
+  initialName: string;
+  initialColor: EventColor;
 }) {
   const { back } = useSheetPageNavigator();
   const updateCategory = useUpdateCategory(category.id);
   const deleteCategory = useDeleteCategory(category.id);
   const usageCount = useCategoryUsageCounts().data?.[category.id] ?? category.usageCount;
-  const [name, setName] = useState(category.name);
-  const [color, setColor] = useState<EventColor>(category.color);
+  const [name, setName] = useState(initialName);
+  const [color, setColor] = useState<EventColor>(initialColor);
   const [nameError, setNameError] = useState<string>();
 
   const handleSave = () => {
