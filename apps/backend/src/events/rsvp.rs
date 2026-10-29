@@ -62,19 +62,25 @@ pub async fn respond(
                 "eventId",
             )
         })?;
-    if status != RsvpStatus::Declined
-        && let Some(target) =
-            resolve_accepted_invitation_target_calendar(&state.db, &user.id, None).await?
-        && event.calendar_id != target.id
-    {
-        queries::move_to_calendar(
-            &state.db,
-            &user.id,
-            vec![event.id.clone()],
-            &target.id,
-            instant::now(),
-        )
-        .await?;
+    if status != RsvpStatus::Declined {
+        // Clients seed their own calendars now, so an account can have none to accept into.
+        let target = resolve_accepted_invitation_target_calendar(&state.db, &user.id, None)
+            .await?
+            .ok_or_else(|| {
+                AppError::validation(
+                    "No writable calendar is available. Create a calendar before accepting invitations.",
+                )
+            })?;
+        if event.calendar_id != target.id {
+            queries::move_to_calendar(
+                &state.db,
+                &user.id,
+                vec![event.id.clone()],
+                &target.id,
+                instant::now(),
+            )
+            .await?;
+        }
     }
     let uid = export::uid(&event.id, event.external_id.as_deref());
     queries::set_participant_status(&state.db, attendee.clone(), status.as_str()).await?;

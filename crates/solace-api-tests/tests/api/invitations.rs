@@ -892,6 +892,50 @@ async fn accepting_needs_a_writable_calendar() {
 }
 
 #[tokio::test]
+async fn answering_a_staged_copy_needs_a_writable_calendar() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let mut attendee = app.user().await;
+    let event = invite(&mut owner, &attendee.email).await;
+    let copy = staged_copy(&mut attendee, &owner, &event).await;
+    let statuses = || async {
+        sqlx::query_scalar::<_, String>(
+            "SELECT string_agg(email || '=' || status, ',' ORDER BY email) FROM event_participant WHERE event_id = $1",
+        )
+        .bind(&copy.id.0)
+        .fetch_one(&app.db)
+        .await
+        .expect("statuses")
+    };
+    let before = (
+        row_snapshot(&app.db, "calendar_event", &copy.id.0).await,
+        statuses().await,
+    );
+    // A bundle that predates client-seeded calendars has none, and the copy must not stay hidden as accepted.
+    for status in ["accepted", "tentative"] {
+        ok(attendee
+            .post(
+                &format!("/api/events/{}/rsvp", copy.id),
+                json!({"status": status}),
+            )
+            .await
+            .expect_error(
+                400,
+                "Validation Error",
+                "No writable calendar is available. Create a calendar before accepting invitations.",
+            ));
+    }
+    assert_eq!(
+        (
+            row_snapshot(&app.db, "calendar_event", &copy.id.0).await,
+            statuses().await
+        ),
+        before
+    );
+    assert_no_mail(&app, &owner.email).await;
+}
+
+#[tokio::test]
 async fn accepting_moves_the_copy_to_the_default_calendar_and_replies() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
