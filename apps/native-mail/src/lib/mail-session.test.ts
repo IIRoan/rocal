@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { MAIL_AUTH_LIFECYCLE, restoreMailSession } from "./mail-session";
+import { clearAttachmentCache } from "./mail/attachment-cache";
 import { holdVaultUnlock } from "./mail/mail-crypto";
 import { hydrateMailOfflineSnapshot } from "./mail/mail-offline-snapshot";
 import { setMailSyncState } from "./mail/mail-sync";
@@ -38,6 +39,9 @@ jest.mock("./mail/mail-offline-store", () => ({
   loadMailOfflineSnapshot: (userId: string) => mockLoadSnapshot(userId),
   clearMailOfflineSnapshot: jest.fn(),
 }));
+jest.mock("./mail/attachment-cache", () => ({
+  clearAttachmentCache: jest.fn(async () => undefined),
+}));
 jest.mock("./mail/mail-offline-snapshot", () => ({
   hydrateMailOfflineSnapshot: jest.fn(),
 }));
@@ -64,6 +68,11 @@ describe("restoreMailSession", () => {
     );
     expect(holdVaultUnlock).toHaveBeenCalledTimes(1);
     expect(setMailSyncState).toHaveBeenCalledWith("s1");
+  });
+
+  it("wipes decrypted attachments on sign-out", async () => {
+    await MAIL_AUTH_LIFECYCLE.onSignedOut?.();
+    expect(clearAttachmentCache).toHaveBeenCalledTimes(1);
   });
 
   it.each(["sign-out", "cancellation", "new restore"])(

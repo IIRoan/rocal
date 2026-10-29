@@ -3,6 +3,7 @@ import type { AuthLifecycle } from "@workspace/native-core/providers/AuthProvide
 import type { AuthenticatedSessionInput } from "@workspace/native-core/lib/startup-crypto";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { bootstrapMailboxForAccount } from "./mail/account-bootstrap";
+import { clearAttachmentCache } from "./mail/attachment-cache";
 import {
   clearVaultCache,
   ensureVaultLoaded,
@@ -85,6 +86,8 @@ export async function prepareMailSession(
 
   // The guard only calls this once E2EE bootstrap settled, so waiting vault unlocks can proceed.
   releaseVaultUnlock();
+  // Decrypted attachments from an earlier session are no longer open in any viewer.
+  await clearAttachmentCache().catch(() => undefined);
   if (restoredUserId === input.userId) {
     await finishRestoredMailSession(input);
     return;
@@ -160,6 +163,7 @@ export const MAIL_AUTH_LIFECYCLE: AuthLifecycle = {
     await clearMailSettings();
     await clearMailListSettings();
     await clearMailOfflineSnapshot();
+    await clearAttachmentCache();
     resetMailSync();
     clearVaultCache();
     clearSenderKeyCache();

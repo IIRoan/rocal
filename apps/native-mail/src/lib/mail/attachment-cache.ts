@@ -28,6 +28,13 @@ export type CachedAttachment = {
   fileName: string;
 };
 
+/** Viewers and share sheets need decrypted files, so they live only here and the folder is wiped at session start and sign-out. */
+const ATTACHMENT_CACHE_DIRECTORY = `${FileSystem.cacheDirectory ?? ""}mail-attachments/`;
+
+export async function clearAttachmentCache(): Promise<void> {
+  await FileSystem.deleteAsync(ATTACHMENT_CACHE_DIRECTORY, { idempotent: true });
+}
+
 export async function writeAttachmentToCache(input: {
   attachment: JmapAttachment;
   cacheKey: string;
@@ -35,11 +42,14 @@ export async function writeAttachmentToCache(input: {
 }): Promise<CachedAttachment> {
   const fileName = input.attachment.name?.trim() || "attachment";
   const mimeType = inferAttachmentMimeType(fileName, input.attachment.type);
+  await FileSystem.makeDirectoryAsync(ATTACHMENT_CACHE_DIRECTORY, {
+    intermediates: true,
+  });
   const localUri = buildAttachmentCachePath(
     input.cacheKey,
     fileName,
     mimeType,
-    FileSystem.cacheDirectory ?? "",
+    ATTACHMENT_CACHE_DIRECTORY,
   );
 
   if (input.attachment.content != null) {
