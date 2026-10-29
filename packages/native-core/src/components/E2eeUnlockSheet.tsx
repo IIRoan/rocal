@@ -55,6 +55,11 @@ export function E2eeUnlockSheet({ onUnlocked }: { onUnlocked: () => void }) {
     onUnlocked();
   };
 
+  const submit = () => {
+    if (!password || isPending) return;
+    handleUnlock().catch(() => undefined);
+  };
+
   return (
     <BottomSheet
       visible={needsPassword}
@@ -74,9 +79,7 @@ export function E2eeUnlockSheet({ onUnlocked }: { onUnlocked: () => void }) {
           <SheetTextField
             value={password}
             onChangeText={setPassword}
-            onSubmitEditing={() => {
-              handleUnlock().catch(() => undefined);
-            }}
+            onSubmitEditing={submit}
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
@@ -100,9 +103,7 @@ export function E2eeUnlockSheet({ onUnlocked }: { onUnlocked: () => void }) {
           <SheetPrimaryButton
             label="Unlock"
             icon="unlock"
-            onPress={() => {
-              handleUnlock().catch(() => undefined);
-            }}
+            onPress={submit}
             disabled={!password}
             loading={isPending}
           />

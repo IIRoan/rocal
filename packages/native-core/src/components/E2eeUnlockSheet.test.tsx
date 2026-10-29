@@ -58,16 +58,19 @@ jest.mock("./sheet/SheetSections", () => ({
   SheetTextField: ({
     value,
     onChangeText,
+    onSubmitEditing,
     accessibilityLabel,
   }: {
     value: string;
     onChangeText: (value: string) => void;
+    onSubmitEditing: () => void;
     accessibilityLabel: string;
   }) => (
     <input
       aria-label={accessibilityLabel}
       value={value}
       onChange={(event) => onChangeText(event.target.value)}
+      onKeyDown={(event) => event.key === "Enter" && onSubmitEditing()}
     />
   ),
 }));
@@ -89,15 +92,29 @@ afterEach(() => {
   act(() => root.unmount());
 });
 
-async function submit(password: string) {
-  const input = container.querySelector<HTMLInputElement>('input[aria-label="Password"]');
+const passwordInput = () =>
+  container.querySelector<HTMLInputElement>('input[aria-label="Password"]');
+
+async function type(password: string) {
   const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
   await act(async () => {
-    setValue?.call(input, password);
-    input?.dispatchEvent(new Event("input", { bubbles: true }));
+    setValue?.call(passwordInput(), password);
+    passwordInput()?.dispatchEvent(new Event("input", { bubbles: true }));
   });
+}
+
+async function submit(password: string) {
+  await type(password);
   await act(async () => {
     container.querySelector<HTMLButtonElement>('button[aria-label="Unlock"]')?.click();
+  });
+}
+
+async function pressReturn() {
+  await act(async () => {
+    passwordInput()?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
   });
 }
 
@@ -136,4 +153,16 @@ it("offers signing out instead of unlocking", async () => {
 
   expect(mockSignOut).toHaveBeenCalledTimes(1);
   expect(mockUnlockWithPassword).not.toHaveBeenCalled();
+});
+
+it("ignores the return key without a password or while an unlock runs", async () => {
+  mockUnlockWithPassword.mockReturnValue(new Promise<boolean>(() => undefined));
+
+  await pressReturn();
+  expect(mockUnlockWithPassword).not.toHaveBeenCalled();
+
+  await type("previous-password");
+  await pressReturn();
+  await pressReturn();
+  expect(mockUnlockWithPassword).toHaveBeenCalledTimes(1);
 });
