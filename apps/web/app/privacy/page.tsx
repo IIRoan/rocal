@@ -142,8 +142,8 @@ export default function PrivacyPage() {
           </h2>
           <p className="mt-2">
             Your password protects your encryption keys; it is not the mail
-            vault secret. Email sign-in uses your email password. Passkey and
-            social sign-in use a separate encryption password. Changing that password rewraps your existing keys rather than
+            vault secret. Email sign-in uses your email password. Passkey
+            sign-in uses a separate encryption password. Changing that password rewraps your existing keys rather than
             re-encrypting your content. Changing your email password rewraps
             them to the new one. Up-to-date Solace apps never send your
             password: they send a key derived from it on your device, and
