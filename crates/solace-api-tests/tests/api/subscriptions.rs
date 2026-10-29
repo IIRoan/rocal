@@ -823,6 +823,83 @@ async fn delete_keeps_events_and_turns_the_calendar_into_an_owned_one() {
 }
 
 #[tokio::test]
+async fn a_kept_feed_calendar_and_its_events_can_be_sealed_until_no_plaintext_is_left() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let feed = insert_feed(&app, &user, "https://example.com/kept.ics", 0).await;
+    let events = [
+        insert_synced_event(&app, &user, &feed).await,
+        insert_synced_event(&app, &user, &feed).await,
+    ];
+    sqlx::query(
+        "UPDATE calendar_event SET description = 'Agenda', location = 'Room 1' WHERE id = $1",
+    )
+    .bind(&events[0])
+    .execute(&app.db)
+    .await
+    .expect("feed details");
+    ok(user
+        .delete(&format!("/api/subscriptions/{}", feed.subscription_id))
+        .await
+        .expect_status(200));
+    // The released calendar is writable, so plaintext edits are refused until a client seals it.
+    expect_field_error(
+        &user
+            .put(
+                &format!("/api/events/{}", events[0]),
+                json!({"color": "red"}),
+            )
+            .await,
+        "Event encryption requires an active encryption session.",
+        "encryptedContent",
+    );
+
+    ok(user
+        .put(
+            &format!("/api/calendars/{}", feed.calendar_id),
+            json!({"encryptedName": fake_envelope(), "blindIndexTokens": [fake_token()]}),
+        )
+        .await
+        .expect_status(200));
+    for event in &events {
+        ok(user
+            .post(
+                &format!("/api/events/{event}/seal-encryption"),
+                json!({"encryptedContent": fake_envelope(), "blindIndexTokens": [fake_token()]}),
+            )
+            .await
+            .expect_status(200));
+    }
+
+    let calendar: (String, bool, String) = sqlx::query_as(
+        "SELECT name, encrypted_name IS NOT NULL, encryption_state FROM calendar WHERE id = $1",
+    )
+    .bind(&feed.calendar_id)
+    .fetch_one(&app.db)
+    .await
+    .expect("calendar row");
+    assert_eq!(calendar, (String::new(), true, "encrypted".into()));
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE calendar_id = $1 \
+             AND (title <> '' OR description IS NOT NULL OR location IS NOT NULL OR encryption_state <> 'encrypted' OR encrypted_content IS NULL)",
+            &feed.calendar_id
+        )
+        .await,
+        0,
+        "no plaintext is left once the client has sealed everything"
+    );
+    ok(user
+        .put(
+            &format!("/api/events/{}", events[0]),
+            json!({"color": "red"}),
+        )
+        .await
+        .expect_status(200));
+}
+
+#[tokio::test]
 async fn delete_with_delete_events_removes_events_and_the_calendar() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
