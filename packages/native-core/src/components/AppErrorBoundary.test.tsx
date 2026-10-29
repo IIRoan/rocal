@@ -2,7 +2,6 @@
 
 import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { captureException } from "../lib/reporting";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 
 const mockUpdates = {
@@ -105,10 +104,9 @@ it("renders the app while nothing throws", () => {
   expect(container.querySelector("section")).toBeNull();
 });
 
-it("swaps a crashed screen for the recovery drawer and reports the error", () => {
+it("swaps a crashed screen for the recovery drawer", () => {
   render();
   expect(container.querySelector("h2")?.textContent).toBe("Something went wrong");
-  expect(captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { area: "render" } });
 });
 
 it("renders the app again on Try again, or when the drawer is swiped away", () => {

@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { CALENDAR_SCHEME } from "@workspace/native-core/lib/constants";
 import type {
   PushTapData,
   PushTapHandler,
@@ -17,7 +18,7 @@ export function calendarEventDeepLink(
   eventId: string,
   appVariant: string | null | undefined,
 ): string {
-  const scheme = appVariant === "development" ? "solace-dev" : "solace";
+  const scheme = `${CALENDAR_SCHEME}${appVariant === "development" ? "-dev" : ""}`;
   return `${scheme}://event/${encodeURIComponent(eventId)}`;
 }
 

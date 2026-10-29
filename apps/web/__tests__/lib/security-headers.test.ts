@@ -10,7 +10,6 @@ const PRODUCTION_ENV = {
   NODE_ENV: "production",
   NEXT_PUBLIC_API_URL: "https://api.solace.onl/",
   NEXT_PUBLIC_APP_URL: "https://app.solace.onl",
-  NEXT_PUBLIC_SENTRY_DSN: "https://publickey@errex.solace.onl/solace",
 };
 
 function directives(policy: string): Map<string, string[]> {
@@ -27,20 +26,17 @@ function headerMap(headers: Array<{ key: string; value: string }>) {
 }
 
 describe("buildContentSecurityPolicy", () => {
-  it("derives connect/frame/form hosts from env without leaking DSN credentials", () => {
-    const policy = buildContentSecurityPolicy(PRODUCTION_ENV);
-    const csp = directives(policy);
+  it("derives connect/frame/form hosts from env", () => {
+    const csp = directives(buildContentSecurityPolicy(PRODUCTION_ENV));
 
     expect(csp.get("connect-src")).toEqual([
       "'self'",
       "https://api.solace.onl",
-      "https://errex.solace.onl",
       "blob:",
       "data:",
     ]);
     expect(csp.get("frame-src")).toEqual(["'self'", "https://api.solace.onl", "https://app.solace.onl"]);
     expect(csp.get("form-action")).toEqual(["'self'", "https://api.solace.onl"]);
-    expect(policy).not.toContain("publickey@");
   });
 
   it("is strict about framing, plugins, base and scripts in production", () => {

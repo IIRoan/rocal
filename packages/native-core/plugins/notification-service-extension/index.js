@@ -1,20 +1,22 @@
 /** Adds the iOS Notification Service Extension; the App Group id doubles as its keychain access group. */
 const fs = require("fs");
 const path = require("path");
+const settings = require("../../expo-apps.json");
 const {
   withDangerousMod,
   withEntitlementsPlist,
   withXcodeProject,
 } = require("expo/config-plugins");
 
-const TARGET_NAME = "SolaceNotificationService";
+const TARGET_NAME = settings.notificationExtensionTargetName;
 const SWIFT_FILE = "NotificationService.swift";
 const INFO_PLIST_FILE = `${TARGET_NAME}-Info.plist`;
 const ENTITLEMENTS_FILE = `${TARGET_NAME}.entitlements`;
+const PRIVACY_FILE = "PrivacyInfo.xcprivacy";
 const APP_GROUPS_ENTITLEMENT = "com.apple.security.application-groups";
 
 function extensionBundleIdentifier(appBundleIdentifier) {
-  return `${appBundleIdentifier}.NotificationService`;
+  return `${appBundleIdentifier}.${settings.notificationExtensionBundleSuffix}`;
 }
 
 function escapeXml(value) {
@@ -90,17 +92,25 @@ function withExtensionFiles(config, props) {
   return withDangerousMod(config, [
     "ios",
     async (mod) => {
-      const targetDir = path.join(mod.modRequest.platformProjectRoot, TARGET_NAME);
+      const targetDir = path.join(
+        mod.modRequest.platformProjectRoot,
+        TARGET_NAME,
+      );
       await fs.promises.mkdir(targetDir, { recursive: true });
       await fs.promises.copyFile(
         require.resolve(`./${SWIFT_FILE}`),
         path.join(targetDir, SWIFT_FILE),
       );
+      await fs.promises.copyFile(
+        require.resolve(`./${PRIVACY_FILE}`),
+        path.join(targetDir, PRIVACY_FILE),
+      );
       await fs.promises.writeFile(
         path.join(targetDir, INFO_PLIST_FILE),
         infoPlist({
-          version: mod.version ?? "1.0.0",
-          buildNumber: mod.ios?.buildNumber ?? "1",
+          version: mod.version ?? settings.version,
+          buildNumber:
+            mod.ios?.buildNumber ?? String(settings.initialBuildNumber),
           appGroup: props.appGroup,
           keychainService: props.keychainService,
         }),
@@ -117,17 +127,11 @@ function withExtensionFiles(config, props) {
 function withExtensionTarget(config, props) {
   return withXcodeProject(config, (mod) => {
     const project = mod.modResults;
-    // `xcode` stores target names quoted, so match both spellings.
-    if (
-      project.pbxTargetByName(TARGET_NAME) ||
-      project.pbxTargetByName(`"${TARGET_NAME}"`)
-    ) {
-      return mod;
-    }
-
     const bundleIdentifier = mod.ios?.bundleIdentifier;
     if (!bundleIdentifier) {
-      throw new Error("notification-service-extension: ios.bundleIdentifier is required");
+      throw new Error(
+        "notification-service-extension: ios.bundleIdentifier is required",
+      );
     }
 
     // `xcode` assumes these sections exist when adding target dependencies.
@@ -135,23 +139,62 @@ function withExtensionTarget(config, props) {
     objects.PBXTargetDependency = objects.PBXTargetDependency ?? {};
     objects.PBXContainerItemProxy = objects.PBXContainerItemProxy ?? {};
 
-    const group = project.addPbxGroup(
-      [SWIFT_FILE, INFO_PLIST_FILE, ENTITLEMENTS_FILE],
-      TARGET_NAME,
-      TARGET_NAME,
-    );
+    let targetId =
+      project.findTargetKey(TARGET_NAME) ||
+      project.findTargetKey(`"${TARGET_NAME}"`);
     const mainGroupId = project.getFirstProject().firstProject.mainGroup;
-    project.addToPbxGroup(group.uuid, mainGroupId);
+    if (!targetId) {
+      const group = project.addPbxGroup(
+        [SWIFT_FILE, INFO_PLIST_FILE, ENTITLEMENTS_FILE],
+        TARGET_NAME,
+        TARGET_NAME,
+      );
+      project.addToPbxGroup(group.uuid, mainGroupId);
 
-    const target = project.addTarget(
-      TARGET_NAME,
-      "app_extension",
-      TARGET_NAME,
-      extensionBundleIdentifier(bundleIdentifier),
+      const target = project.addTarget(
+        TARGET_NAME,
+        "app_extension",
+        TARGET_NAME,
+        extensionBundleIdentifier(bundleIdentifier),
+      );
+      project.addBuildPhase(
+        [SWIFT_FILE],
+        "PBXSourcesBuildPhase",
+        "Sources",
+        target.uuid,
+      );
+      project.addBuildPhase(
+        [],
+        "PBXResourcesBuildPhase",
+        "Resources",
+        target.uuid,
+      );
+      project.addBuildPhase(
+        [],
+        "PBXFrameworksBuildPhase",
+        "Frameworks",
+        target.uuid,
+      );
+      targetId = target.uuid;
+      if (mod.ios?.appleTeamId) {
+        project.addTargetAttribute(
+          "DevelopmentTeam",
+          mod.ios.appleTeamId,
+          target,
+        );
+      }
+    }
+    const privacyFile = project.addFile(
+      `${TARGET_NAME}/${PRIVACY_FILE}`,
+      mainGroupId,
+      { lastKnownFileType: "text.xml" },
     );
-    project.addBuildPhase([SWIFT_FILE], "PBXSourcesBuildPhase", "Sources", target.uuid);
-    project.addBuildPhase([], "PBXResourcesBuildPhase", "Resources", target.uuid);
-    project.addBuildPhase([], "PBXFrameworksBuildPhase", "Frameworks", target.uuid);
+    if (privacyFile) {
+      privacyFile.uuid = project.generateUuid();
+      privacyFile.target = targetId;
+      project.addToPbxBuildFileSection(privacyFile);
+      project.addToPbxResourcesBuildPhase(privacyFile);
+    }
 
     const configurations = project.pbxXCBuildConfigurationSection();
     for (const key of Object.keys(configurations)) {
@@ -163,17 +206,17 @@ function withExtensionTarget(config, props) {
       buildSettings.CODE_SIGN_STYLE = "Automatic";
       buildSettings.INFOPLIST_FILE = `${TARGET_NAME}/${INFO_PLIST_FILE}`;
       buildSettings.IPHONEOS_DEPLOYMENT_TARGET = props.deploymentTarget;
-      buildSettings.MARKETING_VERSION = mod.version ?? "1.0.0";
-      buildSettings.CURRENT_PROJECT_VERSION = mod.ios?.buildNumber ?? "1";
+      buildSettings.MARKETING_VERSION = mod.version ?? settings.version;
+      buildSettings.CURRENT_PROJECT_VERSION =
+        mod.ios?.buildNumber ?? String(settings.initialBuildNumber);
       buildSettings.SWIFT_VERSION = "5.0";
-      buildSettings.TARGETED_DEVICE_FAMILY = `"1,2"`;
+      buildSettings.TARGETED_DEVICE_FAMILY = mod.ios?.supportsTablet
+        ? `"1,2"`
+        : `"1"`;
       buildSettings.GENERATE_INFOPLIST_FILE = "NO";
       if (mod.ios?.appleTeamId) {
         buildSettings.DEVELOPMENT_TEAM = mod.ios.appleTeamId;
       }
-    }
-    if (mod.ios?.appleTeamId) {
-      project.addTargetAttribute("DevelopmentTeam", mod.ios.appleTeamId, target);
     }
     return mod;
   });

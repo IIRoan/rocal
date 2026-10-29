@@ -60,6 +60,14 @@ export function resolveAppVariant(value: unknown): AppVariant {
   return "production";
 }
 
+export function getExpoUpdatesUrl(
+  owner: string | undefined,
+  slug: string | undefined,
+): string | null {
+  if (!owner || !slug) return null;
+  return `https://expo.dev/accounts/${encodeURIComponent(owner)}/projects/${encodeURIComponent(slug)}/updates`;
+}
+
 export function formatChannelLabel(
   channel: string | null | undefined,
   appVariant?: AppVariant | null,

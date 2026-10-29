@@ -12,7 +12,7 @@ import {
 import { createClient, pruneReleaseArtifacts, resolveUrl } from "./r2";
 
 const USAGE =
-  "Usage: publish-ios --profile <development|preview> --ipa <path> --bundle-id <id> --bundle-version <v> --title <title> [--out-dir <dir>]";
+  "Usage: publish-ios --profile <development|preview|testing> --ipa <path> --bundle-id <id> --bundle-version <v> --title <title> [--out-dir <dir>]";
 
 function parseArgs(argv: string[]) {
   const profile = getArg(argv, "--profile");

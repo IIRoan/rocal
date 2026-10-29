@@ -1,14 +1,24 @@
 # Stalwart on Railway (Solace mail)
 
-Stalwart mail server runs on [Railway](https://railway.app). A public VPS
-(`mail.solace.onl` / `193.180.211.139`) owns the MX, TLS certificates, and
-inbound ports. Railway containers connect **outbound** to the VPS over frp, and
-third-party mail traffic enters through the VPS. The Solace API and notifications
-worker use `http://stalwart.railway.internal:8081` through Railway's encrypted private
-network and the key-gated backend gate ([`backend-gate.cfg`](backend-gate.cfg)).
-Web and native mail use the API's JMAP proxy, so a VPS tunnel outage does not interrupt
-mailbox access. Public SMTP and third-party clients still depend on the VPS; queued
-outbound mail waits for its relay tunnel to recover.
+Stalwart runs on [Railway](https://railway.app). Public JMAP at
+`https://mail.solace.onl` go directly through Railway HTTPS to the restricted public
+gateway on `:8082`. The key-gated API entry on `:8081` stays separate; Solace's API
+and notifications use it over Railway's encrypted private network. Both gateways
+forward locally to Stalwart with PROXY v2 and never log request paths.
+
+The VPS (`mx.solace.onl` / `193.180.211.139`) owns public SMTP and the outbound relay.
+Railway containers connect outbound over frp for those routes. A tunnel outage can
+delay SMTP delivery while public and private JMAP remain available, including on
+startup: after a bounded tunnel wait, frpc reconnects in the background. Users sign
+in through Solace, whose private OAuth bridge stays key-gated. Operators can open
+`https://solace.onl/admin`, which redirects to Stalwart on its separate
+`mail.solace.onl` origin behind a Solace session gate, described below.
+
+The Stalwart plan declares `mx.solace.onl` as the default hostname and MX, with
+`mail.solace.onl` explicitly advertised for JMAP. Its automatic DNS publisher must
+keep that split. Before an HTTPS cutover, create the unproxied MX address, issue a
+certificate covering it, align the VPS PTR and Postfix hostname, and verify SMTP.
+Retain the original VPS HTTPS route and DNS snapshot for rollback until validation finishes.
 
 Desired state for Stalwart objects lives in [`stalwart/plan/`](stalwart/plan/).
 WebUI edits are overwritten on the next Railway boot. This tree lives in the Solace
@@ -44,7 +54,8 @@ does today; retire that token once the scoped one works (plan 001 step 7).
 ```mermaid
 flowchart TB
     subgraph Internet
-        MTA[Remote MTAs / mail clients]
+        MTA[Remote MTAs]
+        JMAP[Third-party JMAP clients]
         RCPT[Recipient mail servers]
         API[Solace API<br/>Railway service]
     end
@@ -65,12 +76,15 @@ flowchart TB
         REL[frpc relay visitor<br/>STCP :2525, same process]
         HEALTH[Health server<br/>:8090]
         GATE[Backend gate<br/>HAProxy :8081, key required]
+        PUBLIC[Public JMAP gateway<br/>HAProxy :8082]
         SW --> REL
         FRPC --> SW
         GATE -->|"PROXY v2"| SW
+        PUBLIC -->|"PROXY v2"| SW
     end
 
     MTA --> HAP
+    JMAP -->|"Railway HTTPS<br/>mail.solace.onl"| PUBLIC
     API -->|"Private network<br/>X-Solace-Gate"| GATE
     FRPS <-->|"TCP load-balancing groups<br/>HAProxy PROXY v2 passthrough"| FRPC
     FRPS <-->|"STCP tunnel"| REL
@@ -102,22 +116,81 @@ Failing apply fails the boot.
 
 DKIM keys rotate through a scheduled `Task/DkimManagement` (`dkimManagement: Automatic`, every 90 days), and `dnsManagement: Automatic` publishes records through the `DnsServer` Cloudflare token. Check `stalwart-cli query Task` shows a pending `DkimManagement`; if none is pending (the 1.0 migration carried none over), create one for domain `b`. Stalwart adds and updates records but never deletes ones it stops advertising. `scripts/stalwart-plan.sh dns-publish` republishes on demand. `SystemSettings.services` advertises only JMAP, the one protocol the edge exposes. Do not flip MTA-STS to `enforce` until TLS-RPT reports arrive.
 
-Admin UI is allowlisted on public HTTPS via VPS file `/etc/haproxy/admin-allow.lst` (from GitHub Environment secret `ADMIN_ALLOW_IP` on `mail-vps`; never committed). Tunnel fallback: `ssh -N -L 8080:127.0.0.1:8080 USER@mail.solace.onl` then `http://127.0.0.1:8080/admin/`.
+## Operator access
+
+Set the web server's `STALWART_ADMIN_URL` to that environment's Stalwart
+`https://<mail-host>/admin/` URL. `/admin` redirects only to this configured target;
+an unset value returns 404. HTTPS is required except for local loopback HTTP.
+Credentials, query strings and fragments are refused. Configure
+`SOLACE_ADMIN_LOGIN_URL` on the mail service to the same environment's Solace
+`https://<app-host>/login` URL. Local and preview instances have no implicit
+production redirect. Use hosts that share the Solace session cookie domain; for
+local HTTP, use `localhost` consistently and set `SOLACE_ADMIN_SESSION_COOKIE` to
+`better-auth.session_token`. Configure `SOLACE_ADMIN_STEP_UP_COOKIE` too if the API
+uses a custom cookie prefix.
+
+The Railway gateway opens the UI and direct Stalwart sign-in only to a live Solace
+session whose user ID is in the API's `STALWART_ADMIN_USER_IDS`; there is no
+operator IP allowlist. Stalwart still requires its own administrator credentials.
+The existing account passkey checks apply; this feature does not change password
+recovery or passkey enrollment privileges. Without a valid `SOLACE_ADMIN_AUTH_URL`
+the UI is closed to everyone. To set it up:
+
+1. Select the operator's opaque Solace user IDs and set `STALWART_ADMIN_USER_IDS`
+   on the API. An empty list grants nobody access.
+2. Set a random `STALWART_ADMIN_GATE_KEY` of at least 32 bytes on the mail service
+   and reference the same secret from the API. The key is server-only and never
+   belongs in the web environment or a `NEXT_PUBLIC_*` variable.
+3. Deploy the API endpoint and check its actual listening `PORT` and private
+   hostname (production: `solace-api.railway.internal:8080`, the port its Railway
+   domain targets). Use
+   `http://<API_PRIVATE_HOST>:<API_PORT>/api/internal/stalwart/admin-access` for
+   the authorizer.
+4. Verify that the keyed authorizer refuses missing credentials, then set
+   `SOLACE_ADMIN_AUTH_URL` to that private URL and validate the full browser login.
+
+The API verifies the gateway key in constant time and rate-limits each forwarded
+client address to 240 checks per minute before looking up a session. Public
+callers without the key receive 404 regardless of their account. The gateway
+accepts only an exact 204, refuses duplicate authentication cookies and fails
+closed for unavailable or malformed configuration. Requests without a valid
+edge-supplied `X-Real-IP` are denied before any authorizer call. The client
+address reaches both the authorizer's limiter and Stalwart's own login protections.
+
+The production environment's private DNS resolves to IPv6 only, so the API listens
+dual-stack. The HTTP client prefers IPv4 and falls back to IPv6, disables retries
+and uses a one-second server timeout with a 500 ms connection timeout. Lua has a one-second
+execution budget and one state per HAProxy thread. Public requests without cookies
+and responses without cookies skip cookie-processing actions. Authorization is
+checked on every protected request so session revocation takes effect immediately;
+there is no allow-cache that can outlive sign-out.
+
+Only the session, persistence preference and passkey cookies go to the API. Renewal
+cookies return to the browser; application cookies and gateway credentials never
+reach Stalwart. No cookie, credential, upstream body or administrator address is
+logged by these actions.
+
+Public JMAP, discovery and monitoring remain independent of this authorizer and
+retain Stalwart's own authentication and permissions. Existing administrator
+bearers remain valid until Stalwart revokes or expires them; Solace sign-out does
+not revoke those tokens. The VPS HTTPS rollback route keeps its separate operator
+IP restriction. Pinned VPS SSH access and the Stalwart CLI remain the recovery path
+while the Solace API is unavailable. This is operator tooling with no native screen.
 
 ## Inbound mail (Internet → Stalwart)
 
 ```mermaid
 sequenceDiagram
-    participant C as Mail client / MTA
+    participant C as Remote MTA
     participant H as HAProxy (VPS)
     participant F as frps → frpc tunnel
     participant S as Stalwart (Railway)
 
-    C->>H: SMTP :25 / HTTPS :443
-    Note over H: TLS termination on :443<br/>one PROXY v2 header from HAProxy; frpc must not add another
+    C->>H: SMTP :25
+    Note over H: One PROXY v2 header from HAProxy; frpc must not add another
     H->>F: Forward to the localhost frps group port
     F->>S: frpc TCP proxy → Stalwart listener
-    S-->>C: Mail delivery / JMAP
+    S-->>C: SMTP response
 ```
 
 Every container runs one frpc that registers its proxies into frp **load-balancing
@@ -236,6 +309,11 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 | `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
 | `FRPC_VERSION` | build | Pins the frpc version used by the Docker build; production currently uses `0.71.1` |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
+| `SOLACE_ADMIN_AUTH_URL` | admin UI | Verified private API URL including its actual port; unset keeps the UI closed |
+| `SOLACE_ADMIN_LOGIN_URL` | admin UI | Environment-specific Solace `/login` URL; HTTPS except loopback HTTP |
+| `STALWART_ADMIN_GATE_KEY` | admin UI | Shared server-only random key of at least 32 bytes; the API references the mail service value |
+| `STALWART_ADMIN_URL` | web only | Environment-specific Stalwart `/admin/` target; unset disables the web entry |
+| `STALWART_ADMIN_USER_IDS` | API only | Explicit opaque Solace user IDs allowed through the UI gate; empty grants nobody access |
 | `STALWART_GATE_KEY`             | yes      | Backend gate key (32+ chars); only its SHA-256 reaches HAProxy; missing key fails boot. API and notifications reference the same key and send `X-Solace-Gate` only to their configured HTTPS or Railway-private origin |
 | `STALWART_REDIS_URL` | yes | Private Redis connection for shared transient state and coordination during overlapping mail deployments |
 | `STALWART_WEBHOOK_SECRET` | yes | HMAC key the plan's mail-ingest webhook signs with; missing key fails boot |

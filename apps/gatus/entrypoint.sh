@@ -104,7 +104,7 @@ append_vps_ssh_endpoints() {
 		return 0
 	fi
 
-	VPS_MONITOR_SSH_HOST="${VPS_MONITOR_SSH_HOST:-mail.solace.onl}"
+	VPS_MONITOR_SSH_HOST="${VPS_MONITOR_SSH_HOST:-mx.solace.onl}"
 	VPS_MONITOR_SSH_PORT="${VPS_MONITOR_SSH_PORT:-22}"
 	VPS_MONITOR_SSH_COMMAND="${VPS_MONITOR_SSH_COMMAND:-/usr/local/bin/gatus-monitor.sh}"
 

@@ -12,11 +12,13 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
 import { LandingSignInButton } from "./landing-sign-in-button";
+import { PRODUCT_ROUTES } from "@workspace/calendar-core/product-info";
 
 const NAV_LINKS = [
   { label: "Calendar", href: "#calendar" },
   { label: "Mail", href: "#mail" },
-  { label: "Privacy", href: "/privacy" },
+  { label: "Privacy", href: PRODUCT_ROUTES.privacy },
+  { label: "Support", href: PRODUCT_ROUTES.support },
 ] as const;
 
 interface LandingNavbarProps {

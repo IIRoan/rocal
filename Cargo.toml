@@ -34,8 +34,6 @@ sea-orm = { version = "=2.0.4", default-features = false, features = ["sqlx-post
 utoipa-axum = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "json", "ansi"] }
-# Errex speaks the Sentry protocol.
-sentry = { version = "0.49", default-features = false, features = ["backtrace", "panic", "reqwest", "rustls"] }
 uuid = { version = "1", features = ["v4"] }
 hex = "0.4"
 # Picked over mimalloc and glibc by `cargo xtask mem-budget` (plan 001, step 4a).
@@ -62,7 +60,7 @@ icu_collator = "2"
 p256 = { version = "0.14", features = ["ecdsa"] }
 percent-encoding = "2"
 # Mailbox key fingerprints: `readKey` from openpgp.js, which `lib/mail-key-utils.ts` used.
-pgp = { version = "0.20", default-features = false }
+pgp = { version = "0.21", default-features = false }
 rand = "0.10"
 regex-lite = "0.1"
 # Decompression matches Bun's fetch, and safe fetch caps bodies after decoding.

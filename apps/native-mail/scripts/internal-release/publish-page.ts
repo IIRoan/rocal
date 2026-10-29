@@ -13,7 +13,7 @@ import {
 import { createClient, resolveUrl } from "./r2";
 
 const USAGE =
-  "Usage: publish-page --profile <development|preview> --title <title> [--out-dir <dir>]";
+  "Usage: publish-page --profile <development|preview|testing> --title <title> [--out-dir <dir>]";
 
 function parseArgs(argv: string[]) {
   const profile = getArg(argv, "--profile");

@@ -9,28 +9,27 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useMailSkin, type MailSkin } from "../mail/mail-ui";
 import { SheetGroup, SheetItem } from "../sheet/SheetSections";
 import { useAppUpdate } from "../../providers/AppUpdateProvider";
+import { SHOW_DEBUG_TOOLS } from "../../lib/constants";
 import {
   actionLabel,
   checkStatusDetail,
   formatChannelLabel,
   formatUpdateId,
   formatUpdateStamp,
+  getExpoUpdatesUrl,
   jsSourceLabel,
   presentUpdateCheckAlert,
   updateAccessoryIcon,
   updateDiagnosticsBody,
   updateDiagnosticsTitle,
 } from "../../lib/app-update";
-
-const EXPO_UPDATES_URL =
-  "https://expo.dev/accounts/astralgrove/projects/solace/updates";
 
 export function AppUpdateSettingsSection() {
   const { theme } = useTheme();
@@ -63,6 +62,9 @@ export function AppUpdateSettingsSection() {
     ? formatUpdateStamp(Updates.createdAt)
     : jsSourceLabel(runtime);
   const isDevBuild = runtime.appVariant === "development";
+  const expoUpdatesUrl = SHOW_DEBUG_TOOLS
+    ? getExpoUpdatesUrl(Constants.expoConfig?.owner, Constants.expoConfig?.slug)
+    : null;
 
   const showDiagnostics = () => {
     Alert.alert(updateDiagnosticsTitle(runtime), updateDiagnosticsBody(runtime));
@@ -137,31 +139,28 @@ export function AppUpdateSettingsSection() {
             ? `Looks for a newer bundle on ${channel}.`
             : "Updates are off in this session.")
         }
-        trailing={
-          <Feather
-            name={updateAccessoryIcon(enabled, action, checkStatus)}
-            size={16}
-            color={skin.textSecondary}
-          />
-        }
+        accessory={updateAccessoryIcon(enabled, action, checkStatus)}
         pending={checking}
         disabled={busy}
         onPress={onAction}
       />
 
-      <SheetItem
-        label="Browse Expo updates"
-        trailing={
-          <Feather name="external-link" size={16} color={skin.textSecondary} />
-        }
-        onPress={() => {
-          void Linking.openURL(EXPO_UPDATES_URL).catch(() =>
-            Alert.alert("Could not open", "Open the Expo updates page in a browser."),
-          );
-        }}
-        accessibilityRole="link"
-        accessibilityLabel="Browse Expo updates"
-      />
+      {expoUpdatesUrl ? (
+        <SheetItem
+          label="Browse Expo updates"
+          accessory="external-link"
+          onPress={() => {
+            void Linking.openURL(expoUpdatesUrl).catch(() =>
+              Alert.alert(
+                "Could not open",
+                "Open the Expo updates page in a browser.",
+              ),
+            );
+          }}
+          accessibilityRole="link"
+          accessibilityLabel="Browse Expo updates"
+        />
+      ) : null}
     </SheetGroup>
   );
 }

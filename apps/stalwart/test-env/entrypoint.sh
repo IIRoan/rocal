@@ -5,6 +5,7 @@ set -eu
 export HOME="${HOME:-/tmp}"
 STALWART_HTTP_PORT="${STALWART_HTTP_PORT:-8080}"
 STALWART_GATE_PORT="${STALWART_GATE_PORT:-8081}"
+STALWART_PUBLIC_PORT="${STALWART_PUBLIC_PORT:-8082}"
 
 log() { printf '%s [%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" >&2; }
 die() { log error "$1"; exit 1; }
@@ -77,7 +78,7 @@ if [ -n "${STALWART_GATE_KEY:-}" ]; then
 	require_test_secret STALWART_GATE_KEY
 	STALWART_GATE_KEY_SHA256="$(printf '%s' "$STALWART_GATE_KEY" | sha256sum | cut -d' ' -f1)"
 	unset STALWART_GATE_KEY
-	export STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT
+	export STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT STALWART_PUBLIC_PORT
 	runuser -u stalwart -- haproxy -db -f /usr/local/share/stalwart/backend-gate.cfg &
 	GATE_PID=$!
 	log info "Backend gate on :${STALWART_GATE_PORT}."

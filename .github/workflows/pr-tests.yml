@@ -18,10 +18,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
         with:
           node-version-file: .node-version
 
@@ -40,13 +40,17 @@ jobs:
         run: bun run typecheck && bun run typecheck:native
 
       - name: Run tests with coverage
-        run: bun run scripts/run-tests.ts --coverage --summary=$GITHUB_STEP_SUMMARY
+        run: bun run scripts/run-tests.ts --coverage --summary="$GITHUB_STEP_SUMMARY"
 
       - name: Check mail service helpers
         run: |
           python3 -B -m unittest discover -s apps/stalwart/tests -v
           python3 -B apps/stalwart/vps/gatus-monitor_test.py
           python3 -B -m unittest discover -s apps/gatus/tests -v
+      - name: Check iOS notification extension configuration
+        run: node scripts/tests/notification-extension.cjs
+      - name: Check iOS native code has no camera or microphone access
+        run: node scripts/tests/ios-no-camera.cjs
 
       - name: Upload backend coverage
         if: always()
@@ -81,7 +85,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Setup Rust
         run: rustup toolchain install
@@ -90,7 +94,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
         with:
           node-version-file: .node-version
 
@@ -107,6 +111,15 @@ jobs:
 
       - name: Start the test environment
         run: cargo xtask test-env up && cargo xtask test-env template
+
+      - name: Verify JMAP gateway access controls
+        run: >-
+          podman run --rm --network none
+          -e HAPROXY_TEST_BINARY=/usr/sbin/haproxy
+          -v "${GITHUB_WORKSPACE}/apps/stalwart:/work:ro"
+          --workdir /work --entrypoint python3
+          localhost/solace-test-stalwart
+          -B -m unittest discover -s tests -p 'test_*gate.py' -v
 
       # Memory budgets stay local: shared runners' RSS is too noisy for fixed MiB limits.
       - name: Run cargo xtask check

@@ -1,0 +1,108 @@
+# Keep every workspace manifest so Bun can use the frozen monorepo lockfile.
+/apps/*/**
+!/apps/*/package.json
+!/apps/native-calendar/**
+!/apps/native-mail/**
+/packages/ui/**
+!/packages/ui/package.json
+/retired/backend/**
+!/retired/backend/package.json
+!/retired/backend/prisma
+!/retired/backend/prisma/**
+
+# Native builds do not use local agent checkouts or server infrastructure.
+/.claude
+/.agents
+/.react-doctor
+/.cargo
+/.chainguard
+/.github
+/.railway
+/crates
+/xtask
+/plans
+/experiments
+
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+.pnpm-store
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Apple APNs private keys
+*.p8
+
+# Testing
+coverage
+
+# Turbo
+.turbo
+
+# Vercel
+.vercel
+
+# Build Outputs
+.next/
+.vercel/
+out/
+build
+dist
+apps/web/output
+retired/backend/generated/
+retired/backend/server
+
+
+# Debug
+npm-debug.log*
+# Node.js diagnostic reports (generated on crash/fatal error)
+report.*.json
+
+# Misc
+.DS_Store
+*.pem
+
+/ssh
+
+# Stalwart local certs / Python
+apps/stalwart/.local-certs/
+**/__pycache__/
+*.py[cod]
+
+# Local Railway CLI upload staging (not source)
+.railway-up-stage/
+.env*
+
+# Untracked third-party Bulwark (AGPL) reference; never commit.
+webmail/
+
+# Rust build output
+/target
+
+
+# .easignore replaces nested .gitignore files, including native credential exclusions.
+.git
+.expo/
+web-build/
+*.jks
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+.metro-health-check*
+*.tsbuildinfo
+expo-env.d.ts
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+/apps/native-*/ios
+/apps/native-*/android
+credentials.json

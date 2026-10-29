@@ -1,6 +1,6 @@
 import * as path from "path";
 
-import { type Finding, type Rule, CLIENT_SOURCE, matchLines, sourceUnder } from "./engine";
+import { type Finding, type Rule, CLIENT_SOURCE, appSourceUnder, matchLines, sourceUnder } from "./engine";
 
 const FORBIDDEN_DEPENDENCIES: Array<[RegExp, string]> = [
   [/^(nodemailer|imapflow|node-imap|imap|imap-simple|emailjs|smtp-.*|poplib|resend)$/, "mail is JMAP-only"],
@@ -8,6 +8,7 @@ const FORBIDDEN_DEPENDENCIES: Array<[RegExp, string]> = [
     /^(posthog-.*|mixpanel.*|@segment\/.*|@amplitude\/.*|amplitude-js|@vercel\/analytics|react-ga4?|logrocket|@fullstory\/.*|hotjar.*|@datadog\/browser-rum)$/,
     "no third-party analytics or session tracking",
   ],
+  [/^(@sentry\/.*|@bugsnag\/.*|bugsnag-.*|rollbar|@honeybadger-io\/.*|raygun.*|@embrace-io\/.*)$/, "no crash or error-reporting SDKs"],
   [/^@tanstack\/.*-persist(er|-client)?.*$/, "query cache must not be persisted (PII at rest)"],
   [/^(zustand|redux|@reduxjs\/toolkit|jotai|mobx|recoil|valtio)$/, "state is TanStack Query + React Context"],
   [/^(yup|joi|valibot|arktype|superstruct)$/, "validation is Zod"],
@@ -21,8 +22,36 @@ const ALLOWED_ENV_FILES = new Set(["apps/web/.env.production"]);
 
 export const repositoryRules: Rule[] = [
   {
+    id: "native-deployment-config",
+    summary: "Native deployment values come from shared EAS variables, never repeated build/workflow env or fixed Solace service URLs.",
+    files: (file) =>
+      /^apps\/native-(calendar|mail)\/eas\.json$/.test(file) ||
+      /^\.github\/workflows\/(expo-update|mobile-internal-build|mobile-store-build)\.ya?ml$/.test(file) ||
+      appSourceUnder(["apps/native-calendar/", "apps/native-mail/", "packages/native-core/src/"])(file),
+    check(file) {
+      const findings = matchLines(
+        file,
+        /https?:\/\/(?:[\w-]+\.)*solace\.onl\b/,
+        () => "derive native service URLs from the shared runtime environment",
+      );
+      if (/\.(json|ya?ml)$/.test(file.path)) {
+        findings.push(...matchLines(
+          file,
+          /\b(?:(?:EXPO_PUBLIC_|SOLACE_)(?:API_URL|APP_URL)|PASSKEY_ORIGIN|(?:EXPO|SOLACE)_ENABLE_IOS_ASSOCIATED_DOMAINS)["']?\s*:/,
+          () => "manage deployment values in shared EAS variables; profiles select only the variant and environment source",
+        ));
+      }
+      return findings;
+    },
+    examples: {
+      path: "apps/native-mail/eas.json",
+      bad: ['{"env":{"SOLACE_API_URL":"https://api.example.test"}}', '{"env":{"EXPO_PUBLIC_APP_URL":"https://app.example.test"}}', '{"url":"https://solace.onl/privacy"}'],
+      good: ['{"env":{"APP_VARIANT":"preview","SOLACE_ENV_SOURCE":"eas"}}'],
+    },
+  },
+  {
     id: "forbidden-dependencies",
-    summary: "Workspace manifests must not depend on banned mail, analytics, state, validation, HTTP, date, or UI libraries.",
+    summary: "Workspace manifests must not depend on banned mail, analytics, error-reporting, state, validation, HTTP, date, or UI libraries.",
     files: (file) => /^(apps|packages)\/[^/]+\/package\.json$/.test(file),
     check(file) {
       const manifest: Record<string, unknown> = JSON.parse(file.text);
@@ -39,7 +68,7 @@ export const repositoryRules: Rule[] = [
     },
     examples: {
       path: "apps/web/package.json",
-      bad: ['{ "dependencies": { "axios": "1.0.0" } }', '{ "devDependencies": { "framer-motion": "12.0.0" } }'],
+      bad: ['{ "dependencies": { "axios": "1.0.0" } }', '{ "devDependencies": { "framer-motion": "12.0.0" } }', '{ "dependencies": { "@sentry/nextjs": "10.0.0" } }'],
       good: ['{ "dependencies": { "zod": "3.25.0" } }'],
     },
   },

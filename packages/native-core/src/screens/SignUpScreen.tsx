@@ -35,6 +35,7 @@ import {
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { ThemeToggle } from "@workspace/native-core/components/ThemeToggle";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import { AppInformationLinks } from "@workspace/native-core/components/AppInformationLinks";
 
 const log = createLogger("auth:sign-up");
 
@@ -391,6 +392,7 @@ export function SignUpScreen() {
                 </Pressable>
               </Link>
             </View>
+            <AppInformationLinks />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

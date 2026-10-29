@@ -21,6 +21,7 @@ mod interop;
 mod invitations;
 mod invites;
 mod mail_account;
+mod mail_admin;
 mod mail_jmap;
 mod mail_realtime;
 mod mail_support;

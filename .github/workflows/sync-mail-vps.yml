@@ -65,7 +65,7 @@ jobs:
           echo "event=${GITHUB_EVENT_NAME} actor=${GITHUB_ACTOR} sha=${GITHUB_SHA}"
 
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 1
@@ -160,7 +160,7 @@ jobs:
             fi
           done <<<"$ADMIN_ALLOW_IP"
 
-          HOST="${VPS_SSH_HOST:-mail.solace.onl}"
+          HOST="${VPS_SSH_HOST:-mx.solace.onl}"
           USER="${VPS_SSH_USER:-Roan}"
           PORT="${VPS_SSH_PORT:-22}"
           echo "Deploy target: ${USER}@${HOST}:${PORT}"

@@ -4,8 +4,6 @@ type SecurityHeaderEnv = {
   NODE_ENV?: string;
   NEXT_PUBLIC_API_URL?: string;
   NEXT_PUBLIC_APP_URL?: string;
-  NEXT_PUBLIC_SENTRY_DSN?: string;
-  SENTRY_DSN?: string;
 };
 
 type Header = { key: string; value: string };
@@ -28,8 +26,6 @@ export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
   const isDev = env.NODE_ENV === "development";
   const apiOrigin = toOrigin(env.NEXT_PUBLIC_API_URL);
   const appOrigin = toOrigin(env.NEXT_PUBLIC_APP_URL);
-  // Errex tunnel host (see lib/sentry-options.ts); the DSN username is not part of the origin.
-  const errexOrigins = [toOrigin(env.NEXT_PUBLIC_SENTRY_DSN), toOrigin(env.SENTRY_DSN)];
 
   const directives: Array<[string, string[]]> = [
     ["default-src", ["'self'"]],
@@ -48,7 +44,6 @@ export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
       unique([
         "'self'",
         apiOrigin,
-        ...errexOrigins,
         "blob:",
         "data:",
         // Dev: HMR websocket and the loopback API remapped to LAN hosts (lib/api-url.ts).

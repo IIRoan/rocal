@@ -1,5 +1,4 @@
 import { Component, type ReactNode } from "react";
-import { captureException } from "../lib/reporting";
 import { AppErrorSheet } from "./AppErrorSheet";
 
 interface AppErrorBoundaryState {
@@ -15,10 +14,6 @@ export class AppErrorBoundary extends Component<
 
   static getDerivedStateFromError(): AppErrorBoundaryState {
     return { failed: true };
-  }
-
-  componentDidCatch(error: unknown) {
-    captureException(error, { tags: { area: "render" } });
   }
 
   retry = () => this.setState({ failed: false });

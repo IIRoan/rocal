@@ -22,7 +22,7 @@ export type InviteClaimResult = { ok: true } | { ok: false; error: string };
 export const INVITE_REQUIRED_MESSAGE =
   "An invite token is required to create an account.";
 export const INVITE_HINT_MESSAGE =
-  "Solace is invite-only. Enter the token shared with you.";
+  "Solace is invite-only. Ask someone who uses Solace for an invite, then enter its token.";
 
 /** Reads the `invite` deep-link param (e.g. solace://sign-up?invite=<token>). */
 export function readInviteTokenParam(

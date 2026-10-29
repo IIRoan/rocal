@@ -24,6 +24,8 @@ RUN apt-get update \
 
 COPY railway-entrypoint.sh /usr/local/bin/railway-entrypoint.sh
 COPY backend-gate.cfg /usr/local/share/stalwart/backend-gate.cfg
+COPY admin-gate.lua /usr/local/share/stalwart/admin-gate.lua
+ENV STALWART_GATE_LUA_PATH=/usr/local/share/stalwart/admin-gate.lua
 COPY stalwart/plan /usr/local/share/stalwart/plan
 COPY stalwart/cli-schema.json /usr/local/share/stalwart/cli-schema.json
 COPY stalwart/cli-schema.latest /usr/local/share/stalwart/cli-schema.latest
@@ -31,7 +33,7 @@ RUN sed -i 's/\r$//' /usr/local/bin/railway-entrypoint.sh \
     && chmod 755 /usr/local/bin/railway-entrypoint.sh \
     && chown stalwart:stalwart /usr/local/bin/railway-entrypoint.sh \
     && chown -R stalwart:stalwart /usr/local/share/stalwart \
-    && STALWART_GATE_PORT=8081 STALWART_HTTP_PORT=8080 STALWART_GATE_KEY_SHA256=0 \
+    && STALWART_GATE_PORT=8081 STALWART_PUBLIC_PORT=8082 STALWART_HTTP_PORT=8080 STALWART_GATE_KEY_SHA256=0 \
         haproxy -c -q -f /usr/local/share/stalwart/backend-gate.cfg
 
 USER root
@@ -39,6 +41,6 @@ USER root
 # The binary's network capability disables jemalloc environment configuration.
 RUN ln -sfn 'background_thread:true' /etc/malloc.conf
 
-EXPOSE 25 8080 8081 8090
+EXPOSE 25 8080 8081 8082 8090
 
 ENTRYPOINT ["/usr/local/bin/railway-entrypoint.sh"]

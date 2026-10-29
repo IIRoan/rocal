@@ -1,0 +1,35 @@
+name: Native release checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        with:
+          node-version-file: .node-version
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Check Expo SDK dependency compatibility
+        env:
+          CI: "1"
+          EXPO_OFFLINE: "1"
+          EXPO_NO_DOTENV: "1"
+        run: |
+          cd apps/native-calendar && bunx expo install --check
+          cd ../native-mail && bunx expo install --check
+      - run: bun run check:rules
+      - run: node scripts/tests/notification-extension.cjs
+      - run: node scripts/tests/ios-no-camera.cjs
+      - run: bun run --cwd packages/native-core lint && bun run --cwd apps/native-calendar lint && bun run --cwd apps/native-mail lint
+      - run: bun run typecheck:native
+      - run: bun run test:native

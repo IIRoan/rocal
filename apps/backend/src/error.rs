@@ -193,9 +193,6 @@ fn log_failure(
             "Request failed"
         );
     }
-    if status.is_server_error() {
-        telemetry::report_error(error, request_id);
-    }
 }
 
 /// A plain answer without the envelope's request id, as the auth guard and a few routes send it.

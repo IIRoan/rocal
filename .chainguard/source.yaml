@@ -1,0 +1,7 @@
+spec:
+  authorities:
+    # Trust the repository owner's published GPG keys and GitHub's merge signer.
+    - key:
+        kms: https://github.com/IIRoan.gpg
+    - key:
+        kms: https://github.com/web-flow.gpg

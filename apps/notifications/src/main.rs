@@ -67,10 +67,7 @@ fn parse_cli(args: impl Iterator<Item = String>) -> anyhow::Result<Cli> {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let settings = Settings::load();
-    let _reporting = solace_server::telemetry::init(
-        settings.is_production(),
-        settings.get("SENTRY_DSN").as_deref(),
-    );
+    solace_server::telemetry::init(settings.is_production());
     for file in &settings.loaded_files {
         tracing::info!(file = %file.display(), "Loaded environment file");
     }

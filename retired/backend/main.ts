@@ -2,7 +2,6 @@ import { Elysia, Manifest } from "elysia";
 import { unauthorizedBody } from "./lib/api-error-response";
 import { cors } from "@elysia/cors";
 import { installGlobalConsoleLogger } from "@workspace/logger";
-import { initSentry } from "./lib/sentry";
 import { getRequestAuthSession } from "./lib/auth-session";
 import { BETTER_AUTH_BASE_PATH } from "./lib/auth-constants";
 import { env } from "./lib/env";
@@ -44,7 +43,6 @@ import { createSecurityHeadersPlugin } from "./lib/security-headers";
 import { routeModels } from "./contracts";
 
 installGlobalConsoleLogger("backend");
-initSentry();
 
 const { frontendUrl } = env;
 

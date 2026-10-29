@@ -25,4 +25,43 @@ describe("settings search entries", () => {
     ).map((r) => r.label);
     expect(labels).toContain("Passkeys");
   });
+
+  it("keeps debugging tools out of store builds", () => {
+    expect(
+      filterAccountSheetSearchEntries(SHARED_SETTINGS_SEARCH_ENTRIES, "debug"),
+    ).toEqual([]);
+  });
+
+  it("lists debugging tools in development builds", () => {
+    jest.resetModules();
+    jest.doMock("expo-constants", () => ({
+      __esModule: true,
+      default: { expoConfig: { extra: { appVariant: "development" } } },
+    }));
+    const development: typeof import("./settings-search-entries") = jest.requireActual(
+      "./settings-search-entries",
+    );
+    expect(
+      filterAccountSheetSearchEntries(
+        development.SHARED_SETTINGS_SEARCH_ENTRIES,
+        "debug",
+      ).map((entry) => entry.label),
+    ).toEqual(["Copy diagnostics", "Clear session cookies"]);
+  });
+
+  it.each(["privacy", "support"])(
+    "makes %s available through settings search in both apps",
+    (query) => {
+      const results = filterAccountSheetSearchEntries(
+        SHARED_SETTINGS_SEARCH_ENTRIES,
+        query,
+      );
+      expect(
+        results.some(
+          (entry) =>
+            entry.pageId === "app" && entry.label.toLowerCase().includes(query),
+        ),
+      ).toBe(true);
+    },
+  );
 });

@@ -129,6 +129,29 @@ describe("api-url helpers", () => {
     });
   });
 
+  it("keeps next paths that resolve to another origin on the app", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
+
+    for (const nextPath of [
+      "//evil.test/phish",
+      "/\\evil.test/phish",
+      "/\t/evil.test/phish",
+      "https://evil.test/phish",
+    ]) {
+      expect(resolveAuthRedirectTarget(nextPath, null)).toEqual({
+        href: HOME_PATH,
+        external: false,
+      });
+      expect(getAuthCallbackUrl(nextPath)).toBe(
+        `https://app.solace.test${HOME_PATH}`,
+      );
+    }
+    expect(resolveAuthRedirectTarget("/admin?tab=1#top", null)).toEqual({
+      href: "/admin?tab=1#top",
+      external: false,
+    });
+  });
+
   it("falls back to a safe relative next path when the callback is invalid", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
 

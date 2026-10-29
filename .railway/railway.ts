@@ -105,6 +105,7 @@ export default defineRailway(() => {
       GATUS_CONFIG_PATH: "/data/config.yaml",
       PORT: "8080",
       TZ: "Europe/Amsterdam",
+      VPS_MONITOR_SSH_HOST: "mx.solace.onl",
       VPS_MONITOR_SSH_USERNAME: preserve(),
       VPS_MONITOR_SSH_PRIVATE_KEY_B64: preserve(),
       VPS_MONITOR_SSH_KNOWN_HOSTS: preserve(),
@@ -112,6 +113,9 @@ export default defineRailway(() => {
       prometheus_user: preserve(),
     },
   });
+
+  // The reference as Railway stores it: `ref()` writes the service name quoted, then reads that back as a change on every plan.
+  const fromApi = (name: string) => `\${{"Solace API".${name}}}`;
 
   const stalwartMail = service("stalwart-mail", {
     source: stalwartRepo,
@@ -125,6 +129,7 @@ export default defineRailway(() => {
     healthcheckTimeout: 300,
     replicas: { "europe-west4-drams3a": 1 },
     networking: { privateNetworkEndpoint: "stalwart" },
+    domains: [{ domain: "mail.solace.onl", port: 8082 }],
     deploy: {
       ipv6EgressEnabled: true,
       drainingSeconds: 120,
@@ -152,6 +157,9 @@ export default defineRailway(() => {
       PGUSER: ref(postgresStalwart, "PGUSER"),
       PORT: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
+      SOLACE_ADMIN_AUTH_URL: preserve(),
+      SOLACE_ADMIN_LOGIN_URL: `${fromApi("FRONTEND_URL")}/login`,
+      STALWART_ADMIN_GATE_KEY: preserve(),
       STALWART_GATE_KEY: preserve(),
       STALWART_REDIS_URL: ref(stalwartRedis, "REDIS_URL"),
       // The mail plan signs the ingest webhook with it; the API verifies with the same value.
@@ -159,8 +167,6 @@ export default defineRailway(() => {
     },
   });
 
-  // The reference as Railway stores it: `ref()` writes the service name quoted, then reads that back as a change on every plan.
-  const fromApi = (name: string) => `\${{"Solace API".${name}}}`;
   const api = service("Solace API", {
     source: solaceRepo,
     build: {
@@ -173,7 +179,6 @@ export default defineRailway(() => {
         "Cargo.toml",
         "Cargo.lock",
         "rust-toolchain.toml",
-        "packages/calendar-core/src/redaction-policy.js",
         "packages/calendar-ics/src/windows-zones.json",
       ],
     },
@@ -206,10 +211,10 @@ export default defineRailway(() => {
       FRONTEND_URL: "https://solace.onl",
       MAIL_BRIDGE_HMAC_KEY: preserve(),
       MOBILE_AUTH_CALLBACK_URL: preserve(),
-      SENTRY_DSN:
-        "https://65f1ae513c4a4865bc3b3384ce746653@errors.solace.onl/solace",
       // The same Stalwart admin token the server itself is configured with.
       STALWART_ADMIN_TOKEN: ref(stalwartMail, "STALWART_ADMIN_TOKEN"),
+      STALWART_ADMIN_USER_IDS: preserve(),
+      STALWART_ADMIN_GATE_KEY: preserve(),
       STALWART_BASE_URL: `http://${ref(stalwartMail, "RAILWAY_PRIVATE_DOMAIN")}:8081`,
       STALWART_GATE_KEY: ref(stalwartMail, "STALWART_GATE_KEY"),
       STALWART_DEFAULT_DOMAIN: "solace.onl",
@@ -235,7 +240,6 @@ export default defineRailway(() => {
         "Cargo.toml",
         "Cargo.lock",
         "rust-toolchain.toml",
-        "packages/calendar-core/src/redaction-policy.js",
         "packages/calendar-ics/src/windows-zones.json",
       ],
     },

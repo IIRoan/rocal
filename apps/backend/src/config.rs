@@ -78,13 +78,14 @@ pub struct Config {
     pub stalwart_webhook_secret: Option<String>,
     /// The backend-gate key the Railway Stalwart domain requires (`apps/stalwart/backend-gate.cfg`).
     pub stalwart_gate_key: Option<String>,
+    pub stalwart_admin_user_ids: Vec<String>,
+    pub stalwart_admin_gate_key: Option<String>,
     /// `main.ts` polled every linked mailbox only outside Vercel, so production never did; it stays off unless set, since it widens server-side invite ingestion.
     pub mail_receipt_polling: bool,
     /// `CALENDAR_SYNC=false` keeps a deployment that doesn't serve the API yet from syncing feeds beside the one that does.
     pub calendar_sync: bool,
     /// Base64 HMAC key for the per-user Stalwart bridge passwords; mail tokens fail without it.
     pub mail_bridge_hmac_key: Option<String>,
-    pub sentry_dsn: Option<String>,
     /// The private profile-picture bucket; uploads are unavailable without it.
     pub avatar_bucket: Option<AvatarBucketConfig>,
 }
@@ -159,13 +160,14 @@ impl Config {
             noreply_email,
             stalwart_webhook_secret: trimmed(&var, "STALWART_WEBHOOK_SECRET"),
             stalwart_gate_key: trimmed(&var, "STALWART_GATE_KEY"),
+            stalwart_admin_user_ids: csv(var("STALWART_ADMIN_USER_IDS").as_deref()),
+            stalwart_admin_gate_key: trimmed(&var, "STALWART_ADMIN_GATE_KEY"),
             mail_receipt_polling: matches!(
                 var("MAIL_RECEIPT_POLLING").as_deref(),
                 Some("1" | "true")
             ),
             calendar_sync: !matches!(var("CALENDAR_SYNC").as_deref(), Some("0" | "false")),
             mail_bridge_hmac_key: trimmed(&var, "MAIL_BRIDGE_HMAC_KEY"),
-            sentry_dsn: var("SENTRY_DSN").map(|dsn| dsn.trim().to_owned()),
             avatar_bucket: avatar_bucket(&var),
             backend_url,
         })
