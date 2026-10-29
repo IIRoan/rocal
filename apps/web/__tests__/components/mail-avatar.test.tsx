@@ -36,7 +36,7 @@ jest.mock("@workspace/ui/components/ui/blobatar-avatar", () => ({
 jest.mock("@/hooks/use-solace-profile-image", () => ({
   useSolaceProfileImage: (email?: string | null) =>
     email === "alice@acme.com"
-      ? "https://cloudflared.roan.dev/api/profiles/avatar?email=alice%40acme.com"
+      ? "https://api.solace.test/api/profiles/avatars/avatar-alice"
       : null,
 }));
 
@@ -79,7 +79,7 @@ describe("SenderAvatar", () => {
 
     const avatar = container.querySelector("[data-testid='blobatar-avatar']");
     expect(avatar?.getAttribute("data-src")).toBe(
-      "https://cloudflared.roan.dev/api/profiles/avatar?email=alice%40acme.com",
+      "https://api.solace.test/api/profiles/avatars/avatar-alice",
     );
   });
 
