@@ -51,6 +51,8 @@ jobs:
         run: node scripts/tests/notification-extension.cjs
       - name: Check iOS native code has no camera or microphone access
         run: node scripts/tests/ios-no-camera.cjs
+      - name: Check EAS uploads skip everything git ignores
+        run: node scripts/tests/easignore.cjs
 
       - name: Upload backend coverage
         if: always()
