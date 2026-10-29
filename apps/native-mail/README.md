@@ -74,7 +74,7 @@ Deployment values live in the `astralgrove` account's shared EAS environments:
 
 These are public app configuration values, never secrets. `eas.json` selects the variant and EAS environment through `APP_VARIANT` and `SOLACE_ENV_SOURCE=eas`. Builds and updates resolve the same values into `Constants.expoConfig.extra.runtimeEnvironment`, which native-core consumes. Local `.env` overrides are ignored for EAS deployment values. The pre-install build hook and OTA publisher reject missing required service values before building or publishing.
 
-If Apple issues an encryption compliance code, set `SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE` on this app’s EAS project for each relevant build environment. It is embedded by the shared builder; keep app-specific approval codes out of the account-wide shared variables. Complete the export questionnaire and territory/filing requirements before review.
+If Apple issues an encryption compliance code, set `SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE` on this app’s EAS project for each relevant build environment. It is embedded by the shared builder, which refuses it until `iosUsesNonExemptEncryption` in `packages/native-core/expo-apps.json` is `true`; keep app-specific approval codes out of the account-wide shared variables. Complete the export questionnaire and territory/filing requirements before review.
 
 For local development, `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_APP_URL`, and optional `PASSKEY_ORIGIN` remain supported overrides. `EXPO_OWNER`, `EXPO_PROJECT_ID` and `EXPO_PROJECT_SLUG` can override the linked project for a fork; the repository's defaults need no overrides.
 

@@ -58,6 +58,13 @@ function createNativeExpoConfig(app, environment = process.env) {
       ? [developmentScheme, identity.legacyDevelopmentScheme]
       : developmentScheme
     : identity.scheme;
+  const complianceCode =
+    environment.SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE?.trim();
+  if (complianceCode && !settings.iosUsesNonExemptEncryption) {
+    throw new Error(
+      "SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE requires iosUsesNonExemptEncryption: true",
+    );
+  }
 
   return {
     name: isDev ? identity.developmentName : identity.name,
@@ -82,11 +89,8 @@ function createNativeExpoConfig(app, environment = process.env) {
       buildNumber: String(settings.initialBuildNumber),
       infoPlist: {
         ITSAppUsesNonExemptEncryption: settings.iosUsesNonExemptEncryption,
-        ...(environment.SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE?.trim()
-          ? {
-              ITSEncryptionExportComplianceCode:
-                environment.SOLACE_IOS_ENCRYPTION_COMPLIANCE_CODE.trim(),
-            }
+        ...(complianceCode
+          ? { ITSEncryptionExportComplianceCode: complianceCode }
           : {}),
       },
       privacyManifests: {
