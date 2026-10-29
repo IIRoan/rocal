@@ -12,6 +12,7 @@ import { createE2eeModule } from "@workspace/e2ee";
 import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { useAuth } from "./AuthProvider";
 import { E2eeProvider, useE2ee } from "./E2eeProvider";
+import { getActiveE2eeSession } from "../lib/e2ee-session";
 
 jest.mock("react-native", () => ({
   StyleSheet: {
@@ -524,6 +525,33 @@ describe("E2eeProvider", () => {
       }),
     );
     expect(clearPendingAuthPassword).toHaveBeenCalled();
+  });
+
+  it("publishes a freshly minted session so sign-up can seal the mail vault", async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(createBootstrapResponse());
+      }
+
+      if (url.endsWith("/api/e2ee/device")) {
+        return jsonResponse({});
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+    await flushBootstrap();
+
+    expect(getActiveE2eeSession()).toMatchObject({
+      userId: "user-1",
+      deviceId: "device-1",
+      accountKey,
+    });
   });
 
   it("can reset the active encryption password after bootstrap completes", async () => {

@@ -31,7 +31,6 @@ import {
 
 const log = createLogger("native:e2ee");
 
-
 export interface E2eeContextValue {
   isReady: boolean;
   isEnabled: boolean;
@@ -294,6 +293,7 @@ export function E2eeProvider({
         }
 
         sessionRef.current = nextSession;
+        setActiveE2eeSession(nextSession);
 
         if (pendingPassword) {
           try {
@@ -493,7 +493,6 @@ export function E2eeProvider({
     </E2eeContext.Provider>
   );
 }
-
 
 export function useE2ee(): E2eeContextValue {
   const ctx = use(E2eeContext);
