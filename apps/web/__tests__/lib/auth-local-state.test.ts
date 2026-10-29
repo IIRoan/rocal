@@ -17,6 +17,9 @@ const mockResetE2eeBootstrap = jest.fn();
 const mockGetSession = jest.fn();
 const mockClearLocalSearchIndexDatabase = jest.fn<() => Promise<void>>();
 const mockDeleteRecoverableE2eeDevices = jest.fn<() => Promise<void>>();
+const mockListRecoverableE2eeDevices =
+  jest.fn<() => Promise<Array<{ userId: string; deviceId: string }>>>();
+const mockDeleteE2eeDevice = jest.fn<(deviceId: string) => Promise<unknown>>();
 
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
@@ -42,6 +45,13 @@ jest.mock("@/lib/e2ee-bootstrap", () => ({
 
 jest.mock("@/lib/e2ee-storage", () => ({
   deleteRecoverableE2eeDevices: () => mockDeleteRecoverableE2eeDevices(),
+  listRecoverableE2eeDevices: () => mockListRecoverableE2eeDevices(),
+}));
+
+jest.mock("@/lib/calendar-api-service", () => ({
+  calendarApiService: {
+    deleteE2eeDevice: (deviceId: string) => mockDeleteE2eeDevice(deviceId),
+  },
 }));
 
 jest.mock("@/lib/search/local-index-store", () => ({
@@ -69,6 +79,8 @@ describe("auth-local-state", () => {
     mockSignOut.mockResolvedValue(undefined as never);
     mockClearLocalSearchIndexDatabase.mockResolvedValue(undefined);
     mockDeleteRecoverableE2eeDevices.mockResolvedValue(undefined);
+    mockListRecoverableE2eeDevices.mockResolvedValue([]);
+    mockDeleteE2eeDevice.mockResolvedValue({ success: true });
     mockGetSession.mockResolvedValue({
       data: { user: { id: "user-1" } },
       error: null,
@@ -183,6 +195,31 @@ describe("auth-local-state", () => {
 
   it("signs out and clears local state even when server sign-out fails", async () => {
     mockSignOut.mockRejectedValueOnce(new Error("offline") as never);
+
+    await signOutAndClearLocalState();
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletes the server rows of recoverable device keys while the session still exists", async () => {
+    mockListRecoverableE2eeDevices.mockResolvedValue([
+      { userId: "user-1", deviceId: "web-device-1" },
+    ]);
+    mockSignOut.mockImplementation(async () => {
+      expect(mockDeleteE2eeDevice).toHaveBeenCalledWith("web-device-1");
+    });
+
+    await signOutAndClearLocalState();
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("still signs out when a device row cannot be deleted", async () => {
+    mockListRecoverableE2eeDevices.mockResolvedValue([
+      { userId: "user-1", deviceId: "web-device-1" },
+    ]);
+    mockDeleteE2eeDevice.mockRejectedValueOnce(new Error("offline"));
 
     await signOutAndClearLocalState();
 

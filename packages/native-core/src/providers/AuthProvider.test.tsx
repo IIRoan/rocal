@@ -4,6 +4,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { AppState } from "react-native";
 
+import { calendarApiService } from "../lib/api";
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
@@ -24,8 +25,10 @@ jest.mock("react-native", () => ({
 
 const mockClearNativeTitleIndex = jest.fn(async () => undefined);
 const mockClearRecoverableStoredDevice = jest.fn(async () => undefined);
+const mockRecoverableStoredDeviceId = jest.fn(async (): Promise<string | null> => null);
 jest.mock("../lib/native-e2ee-provider", () => ({
   clearRecoverableStoredDevice: () => mockClearRecoverableStoredDevice(),
+  recoverableStoredDeviceId: () => mockRecoverableStoredDeviceId(),
 }));
 jest.mock("../lib/search/title-index-store", () => ({
   clearNativeTitleIndex: () => mockClearNativeTitleIndex(),
@@ -472,6 +475,29 @@ describe("AuthProvider", () => {
       fetchOptions: { headers: { cookie } },
     });
     expect(getFallbackSessionToken()).toBeNull();
+  });
+
+  it("deletes the server row of a device key sign-out removes, before the session ends", async () => {
+    mockRecoverableStoredDeviceId.mockResolvedValueOnce("native-device-1");
+    const deleteRow = jest
+      .spyOn(calendarApiService, "deleteE2eeDevice")
+      .mockResolvedValue({ success: true, message: "Encryption device removed" });
+    mockSignOut.mockImplementationOnce(async () => {
+      expect(deleteRow).toHaveBeenCalledWith(
+        "native-device-1",
+        expect.objectContaining({ cookie: expect.any(String) }),
+      );
+      return { data: { success: true }, error: null } as never;
+    });
+    await renderProvider();
+
+    await act(async () => {
+      await getAuth().signOut();
+    });
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockClearRecoverableStoredDevice).toHaveBeenCalled();
+    deleteRow.mockRestore();
   });
 
   it("keeps the same user object when a renewal returns the same user", async () => {

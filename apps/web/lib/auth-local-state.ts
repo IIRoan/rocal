@@ -6,7 +6,11 @@ import {
   clearOrphanedEncPasswordCookie,
 } from "@/lib/enc-password-cookie";
 import { resetE2eeBootstrap } from "@/lib/e2ee-bootstrap";
-import { deleteRecoverableE2eeDevices } from "@/lib/e2ee-storage";
+import { calendarApiService } from "@/lib/calendar-api-service";
+import {
+  deleteRecoverableE2eeDevices,
+  listRecoverableE2eeDevices,
+} from "@/lib/e2ee-storage";
 import { clearLocalMailSettings } from "@/lib/mail/mail-settings-storage";
 import { MAIL_VAULT_DATABASE_NAME } from "@/lib/mail/vault-storage";
 import { clearLocalSearchIndexDatabase } from "@/lib/search/local-index-store";
@@ -50,6 +54,15 @@ export function clearOrphanedClientAuthArtifacts(): void {
 
 /** Best-effort server sign-out plus a full local auth artifact wipe. */
 export async function signOutAndClearLocalState(): Promise<void> {
+  // A device row is useless once its key is gone, and deleting it needs the session that sign-out ends.
+  await Promise.all(
+    (await listRecoverableE2eeDevices()).map((record) =>
+      calendarApiService.deleteE2eeDevice(record.deviceId),
+    ),
+  ).catch((error: unknown) => {
+    log.warn("Encryption device rows could not be deleted", { error });
+  });
+
   try {
     await signOut();
   } catch (error) {

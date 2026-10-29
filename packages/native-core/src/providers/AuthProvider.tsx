@@ -16,7 +16,7 @@ import {
 import { authClient } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { API_BASE_URL } from "../lib/constants";
-import { getAuthHeaders } from "../lib/api";
+import { calendarApiService, getAuthHeaders } from "../lib/api";
 import {
   deleteStoredPasskey,
   getDefaultPasskeyName,
@@ -42,7 +42,10 @@ import { registerClearSession } from "../lib/session-clear";
 import { registerPasskeyStepUpRequired } from "../lib/passkey-step-up-required";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
 import { clearNotificationExtensionSecrets } from "../lib/notification-extension-store";
-import { clearRecoverableStoredDevice } from "../lib/native-e2ee-provider";
+import {
+  clearRecoverableStoredDevice,
+  recoverableStoredDeviceId,
+} from "../lib/native-e2ee-provider";
 import { clearNativeTitleIndex } from "../lib/search/title-index-store";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
@@ -138,6 +141,14 @@ export interface AuthLifecycle {
   onSignedOut?: () => Promise<void>;
 }
 type SignInResult = { requiresPasskeyStepUp: boolean };
+
+/** A device row is useless once sign-out deletes its key, and deleting it needs the session sign-out ends. */
+async function deleteRecoverableDeviceRow(headers: Record<string, string>): Promise<void> {
+  const deviceId = await recoverableStoredDeviceId();
+  if (deviceId) {
+    await calendarApiService.deleteE2eeDevice(deviceId, headers);
+  }
+}
 
 /** The device key opens the account key and the search index holds decrypted text, so both go with the session in both apps. */
 async function wipeSessionData(lifecycle: AuthLifecycle | undefined): Promise<void> {
@@ -580,6 +591,7 @@ export function AuthProvider({
     setFallbackSessionToken(null);
     await Promise.all([
       unregisterNativePushDevice(logoutHeaders),
+      deleteRecoverableDeviceRow(logoutHeaders).catch(() => undefined),
       clearNotificationExtensionSecrets(),
     ]);
     try {

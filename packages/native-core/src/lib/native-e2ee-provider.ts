@@ -185,6 +185,14 @@ export async function registerDeviceForSession({
   };
 }
 
+/** This device's id when sign-out is about to forget its key pair, so its server row can go while the session lasts. */
+export async function recoverableStoredDeviceId(): Promise<string | null> {
+  if (!(await SecureStore.getItemAsync(SECURE_STORE_KEYS.E2EE_ENVELOPE_SALT))) {
+    return null;
+  }
+  return SecureStore.getItemAsync(SECURE_STORE_KEYS.E2EE_DEVICE_ID);
+}
+
 /** Forgets this device's key pair only when the password envelope is known to hold its account key; otherwise it may be the only copy. */
 export async function clearRecoverableStoredDevice(): Promise<void> {
   if (!(await SecureStore.getItemAsync(SECURE_STORE_KEYS.E2EE_ENVELOPE_SALT))) {

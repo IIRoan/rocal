@@ -111,13 +111,17 @@ export async function rememberStoredDeviceEnvelopeSalt(
 }
 
 /** Sign-out keeps a device key no password envelope is known to hold, since it may be the only copy of the account key. */
-export async function deleteRecoverableE2eeDevices(): Promise<void> {
+export async function listRecoverableE2eeDevices(): Promise<StoredE2eeDeviceRecord[]> {
   const records = await withStore<StoredE2eeDeviceRecord[]>("readonly", (store) =>
     store.getAll(),
   );
+  return (records ?? []).filter((record) => record.envelopeSalt);
+}
+
+export async function deleteRecoverableE2eeDevices(): Promise<void> {
   await Promise.all(
-    (records ?? [])
-      .filter((record) => record.envelopeSalt)
-      .map((record) => deleteStoredE2eeDevice(record.userId)),
+    (await listRecoverableE2eeDevices()).map((record) =>
+      deleteStoredE2eeDevice(record.userId),
+    ),
   );
 }
