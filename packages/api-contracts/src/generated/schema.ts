@@ -1534,7 +1534,7 @@ export interface components {
             email: string;
             eventId: components["schemas"]["EventId"];
             id: components["schemas"]["EventParticipantId"];
-            /** @description A Solace avatar path (`/api/profiles/avatars/:id`, or `/api/profiles/avatar?email=` for remote pictures), never a remote URL. */
+            /** @description A Solace avatar path (`/api/profiles/avatars/:id`), never a remote URL. */
             image: string | null;
             role: string;
             status: string;

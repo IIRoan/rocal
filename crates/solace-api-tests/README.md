@@ -8,7 +8,7 @@ By default the suite starts the Rust server in-process on a fresh clone of the t
 
 ```sh
 cargo xtask test-env up                      # local Postgres 18 + test Stalwart (podman)
-cargo xtask test-env template                # solace_test_template from the 53 migrations
+cargo xtask test-env template                # solace_test_template from the 55 migrations
 cargo test -p solace-api-tests --test api
 ```
 
@@ -36,8 +36,8 @@ Admin-gate configuration cases always use a single isolated Rust fixture through
 - Errors: `response.expect_error(status, error, message)` checks the `lib/errors.ts` envelope. Validation errors carry Zod v3's message and `details.issues[].path`; service errors carry `details.field`. The auth guard's 401 and 403 have no `requestId` (`expect_unauthorized`).
 - Cover each route for every role that applies:
   - **owner**: response DTO plus database (and `notification_job` outbox) state;
-  - **permitted sharee**: an event participant, a share-link holder;
-  - **revoked sharee**: after the participant is removed or the link disabled or rotated;
+  - **permitted sharee**: an event participant;
+  - **revoked sharee**: after the participant is removed;
   - **unrelated user**: their request must not read or change the owner's rows, and the database stays unchanged;
   - **anonymous caller**: `expect_unauthorized`;
   - **forged owner id**: `userId` and similar fields in bodies and queries are rejected (`expect_unknown_field`), and ids in paths that belong to someone else behave as not found.

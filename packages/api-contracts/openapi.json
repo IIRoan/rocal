@@ -4427,7 +4427,7 @@
               "string",
               "null"
             ],
-            "description": "A Solace avatar path (`/api/profiles/avatars/:id`, or `/api/profiles/avatar?email=` for remote pictures), never a remote URL."
+            "description": "A Solace avatar path (`/api/profiles/avatars/:id`), never a remote URL."
           },
           "role": {
             "type": "string"

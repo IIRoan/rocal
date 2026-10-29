@@ -3,7 +3,6 @@
 use std::sync::LazyLock;
 
 use regex_lite::Regex;
-use serde_json::Value;
 
 use crate::error::AppError;
 use crate::http::zod::js_trim;
@@ -26,13 +25,6 @@ pub fn is_valid_calendar_color(color: &str) -> bool {
     HEX_COLOR.is_match(color) || CALENDAR_COLORS.contains(&color)
 }
 
-/// `hasEncryptedPayloadValue`: a string with non-blank text.
-pub fn has_encrypted_payload_value(value: Option<&Value>) -> bool {
-    value
-        .and_then(Value::as_str)
-        .is_some_and(|text| !js_trim(text).is_empty())
-}
-
 pub fn assert_valid_entity_color(color: &str) -> Result<(), AppError> {
     if is_valid_calendar_color(color) {
         return Ok(());
@@ -47,15 +39,25 @@ pub fn assert_valid_entity_color(color: &str) -> Result<(), AppError> {
 }
 
 /// What a create or update writes to the name columns.
-pub enum NamePersistence {
-    /// The request left the name alone.
-    None,
-    Encrypted {
-        encrypted_name: String,
-        blind_index_tokens: String,
-        encryption_key_version: i32,
-    },
+pub struct EncryptedName {
+    pub encrypted_name: String,
+    pub blind_index_tokens: String,
+    pub encryption_key_version: i32,
 }
+
+/// Writes an `Option<EncryptedName>` onto a calendar or category row, blanking the plaintext name.
+macro_rules! apply_name {
+    ($row:expr, $name:expr) => {
+        if let Some(name) = $name {
+            $row.name = sea_orm::Set(String::new());
+            $row.encrypted_name = sea_orm::Set(Some(name.encrypted_name));
+            $row.blind_index_tokens = sea_orm::Set(Some(name.blind_index_tokens));
+            $row.encryption_state = sea_orm::Set("encrypted".into());
+            $row.encryption_key_version = sea_orm::Set(name.encryption_key_version);
+        }
+    };
+}
+pub(crate) use apply_name;
 
 pub struct NameInput<'a> {
     pub entity_label: &'static str,
@@ -65,9 +67,9 @@ pub struct NameInput<'a> {
 }
 
 /// An omitted name is left alone; a given one must be non-blank ciphertext.
-pub fn resolve_name_persistence(input: NameInput<'_>) -> Result<NamePersistence, AppError> {
+pub fn resolve_name_persistence(input: NameInput<'_>) -> Result<Option<EncryptedName>, AppError> {
     let Some(encrypted_name) = input.encrypted_name else {
-        return Ok(NamePersistence::None);
+        return Ok(None);
     };
     if js_trim(encrypted_name).is_empty() {
         return Err(AppError::field(
@@ -80,11 +82,11 @@ pub fn resolve_name_persistence(input: NameInput<'_>) -> Result<NamePersistence,
     }
     let tokens = serde_json::to_string(input.blind_index_tokens.unwrap_or_default())
         .map_err(AppError::internal)?;
-    Ok(NamePersistence::Encrypted {
+    Ok(Some(EncryptedName {
         encrypted_name: encrypted_name.to_owned(),
         blind_index_tokens: tokens,
         encryption_key_version: input.encryption_key_version.unwrap_or(1),
-    })
+    }))
 }
 
 /// The calendar label sent to Stalwart and ICS; encrypted names never leave the device.
@@ -133,12 +135,9 @@ mod tests {
         }
         assert!(matches!(
             resolve_name_persistence(input(Some("ct"))),
-            Ok(NamePersistence::Encrypted { encrypted_name, encryption_key_version: 1, .. }) if encrypted_name == "ct"
+            Ok(Some(EncryptedName { encrypted_name, encryption_key_version: 1, .. })) if encrypted_name == "ct"
         ));
-        assert!(matches!(
-            resolve_name_persistence(input(None)),
-            Ok(NamePersistence::None)
-        ));
+        assert!(matches!(resolve_name_persistence(input(None)), Ok(None)));
         assert!(resolve_name_persistence(input(Some("   "))).is_err());
     }
 }

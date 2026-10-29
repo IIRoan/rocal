@@ -81,7 +81,7 @@ pub async fn uploaded_avatar(
     ValidQuery(query): ValidQuery<AvatarSizeQuery>,
 ) -> Result<Response, AppError> {
     let picture = avatars::stream_uploaded(&state, &params.avatar_id, query.size).await?;
-    Ok(served(picture, UPLOADED_CACHE))
+    Ok(served(picture))
 }
 
 /// Stores the caller's square crop as WebP variants (32–512px) and retires the previous picture.
@@ -111,7 +111,7 @@ fn enforce_write_limit(user: &RouteUser) -> Result<(), AppError> {
     rate_limit::enforce("profile-avatar", &user.id, AVATAR_WRITE_LIMIT)
 }
 
-fn served(picture: Option<Picture>, cache_control: &'static str) -> Response {
+fn served(picture: Option<Picture>) -> Response {
     let Some(picture) = picture else {
         return StatusCode::NOT_FOUND.into_response();
     };
@@ -120,7 +120,7 @@ fn served(picture: Option<Picture>, cache_control: &'static str) -> Response {
             (header::CONTENT_TYPE, picture.content_type),
             (
                 header::CACHE_CONTROL,
-                HeaderValue::from_static(cache_control),
+                HeaderValue::from_static(UPLOADED_CACHE),
             ),
         ],
         picture.body,

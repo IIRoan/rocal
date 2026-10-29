@@ -10,7 +10,7 @@ use super::queries;
 use crate::auth::guard::RouteUser;
 use crate::db::entities::{calendar, user};
 use crate::entity_metadata::{
-    NameInput, NamePersistence, assert_valid_entity_color, is_mail_invitation_staging_calendar,
+    NameInput, apply_name, assert_valid_entity_color, is_mail_invitation_staging_calendar,
     resolve_name_persistence,
 };
 use crate::error::AppError;
@@ -77,24 +77,6 @@ pub async fn seed_defaults(
     list(state, user).await
 }
 
-/// Writes the encrypted name columns.
-fn apply_name(row: &mut calendar::ActiveModel, persistence: NamePersistence) {
-    match persistence {
-        NamePersistence::None => {}
-        NamePersistence::Encrypted {
-            encrypted_name,
-            blind_index_tokens,
-            encryption_key_version,
-        } => {
-            row.name = Set(String::new());
-            row.encrypted_name = Set(Some(encrypted_name));
-            row.blind_index_tokens = Set(Some(blind_index_tokens));
-            row.encryption_state = Set("encrypted".into());
-            row.encryption_key_version = Set(encryption_key_version);
-        }
-    }
-}
-
 /// A new owned calendar with a validated encrypted name and color.
 fn new_row(
     user: &RouteUser,
@@ -116,7 +98,7 @@ fn new_row(
         user_id: Set(user.id.clone()),
         ..Default::default()
     };
-    apply_name(&mut row, persistence);
+    apply_name!(row, persistence);
     Ok(row)
 }
 
@@ -152,7 +134,7 @@ pub async fn update(
         return Err(AppError::validation("Calendar not found or access denied"));
     };
     let visibility_only = request.is_visible.is_some()
-        && matches!(persistence, NamePersistence::None)
+        && persistence.is_none()
         && request.color.is_none()
         && request.is_default.is_none();
     if existing.kind != "owned" && !visibility_only {
@@ -178,7 +160,7 @@ pub async fn update(
         assert_valid_entity_color(color)?;
     }
     let mut row = existing.into_active_model();
-    apply_name(&mut row, persistence);
+    apply_name!(row, persistence);
     if let Some(color) = request.color {
         row.color = Set(color);
     }

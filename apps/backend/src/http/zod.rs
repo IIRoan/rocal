@@ -535,6 +535,11 @@ pub fn js_trim(text: &str) -> &str {
     text.trim_matches(is_js_whitespace)
 }
 
+/// The text unless it is missing or blank after `js_trim`.
+pub fn non_blank(text: Option<&str>) -> Option<&str> {
+    text.filter(|text| !js_trim(text).is_empty())
+}
+
 pub fn is_js_whitespace(c: char) -> bool {
     matches!(
         c,
