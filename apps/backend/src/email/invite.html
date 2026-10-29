@@ -1,29 +1,22 @@
 
-    <h1 class="email-title" style="margin:0;font-size:22px;line-height:130%;font-weight:700;letter-spacing:-0.01em;color:#000">You&rsquo;ve been invited to Solace</h1>
-    <p class="email-subtitle" style="margin:6px 0 0;font-size:15px;line-height:130%;color:rgba(0,0,0,0.50)">Invited by {{INVITER}}</p>
-    <p class="email-body" style="margin:20px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
-      {{INVITER}} has invited you to join Solace &mdash; a private, end-to-end encrypted calendar and email workspace.
-      Click the button below to create your account. Your invite expires in&nbsp;<strong>7&nbsp;days</strong>.
-    </p>
-    <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:fit-content;line-height:100%;padding:24px 0 0">
-      <tbody>
-        <tr>
-          <td align="center" valign="middle">
-            <a class="email-btn" href="{{SIGNUP_URL}}" style='display:inline-block;background:#fff;color:#000;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px;font-weight:500;line-height:100%;margin:0;text-decoration:none;padding:12px 20px;border:1px solid rgba(0,0,0,0.12);border-bottom:2px solid rgba(0,0,0,0.12);border-radius:12px'>Create your account</a>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <p class="email-body" style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#1a1a1a">
-      Your invite token (you&rsquo;ll need this on the sign-up page):
-    </p>
-    <p style="margin:8px 0 0;font-family:monospace;font-size:13px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:8px;padding:10px 14px;word-break:break-all;color:#1a1a1a">{{TOKEN}}</p>
-    <p class="email-footer" style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#a8a8a8">
-      If the button doesn&rsquo;t work, copy this link:
-      <a href="{{SIGNUP_URL}}" style="color:#a8a8a8;text-decoration:underline;word-break:break-all">{{SIGNUP_URL}}</a>
-    </p>
+              <table class="email-box" role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" align="center" style="max-width:520px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;border-collapse:separate">
+                <tr>
+                  <td align="center" style="padding:40px 24px">
+                    <img src="{{LOGO_URL}}" alt="Solace" width="40" height="40" style="display:block;width:40px;height:40px;margin:0 auto;border:0" />
+                    <div class="email-divider" style="padding:16px 0 24px;border-bottom:1px solid #e0e0e0;text-align:center">
+                      <h1 class="email-title" style="margin:0;font-size:24px;line-height:32px;font-weight:400;color:#202020">You&rsquo;re invited to Solace</h1>
+                      <p class="email-muted" style="margin:8px 0 0;font-size:14px;line-height:20px;color:#6b6b6b">Invited by {{INVITER}}</p>
+                    </div>
+                    <div style="padding-top:20px;text-align:left">
+                      <p class="email-text" style="margin:0;font-size:14px;line-height:20px;color:#202020">{{INVITER}} invited you to join Solace, a private, end-to-end encrypted calendar and mail workspace. Your invite expires in 7&nbsp;days.</p>
+                      <div style="padding-top:32px;text-align:center">
+                        <a class="email-btn" href="{{SIGNUP_URL}}" style="display:inline-block;min-width:90px;padding:10px 24px;border-radius:4px;background-color:#644a40;color:#ffffff;font-size:14px;font-weight:500;line-height:16px;text-decoration:none">Create your account</a>
+                      </div>
+                    </div>
+                    <div class="email-muted" style="padding-top:20px;font-size:12px;line-height:16px;color:#6b6b6b;text-align:center">Signing up in the Solace app? Use this invite token:<br /><span class="email-text" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#202020;word-break:break-all">{{TOKEN}}</span></div>
+                  </td>
+                </tr>
+              </table>
 <!-- footer -->
-
-    <p class="email-footer" style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#a8a8a8">
-      If you weren&rsquo;t expecting this invitation, you can safely ignore this email.
-    </p>
+              <p class="email-footer" style="margin:12px 0 0;font-size:11px;line-height:18px;color:#6b6b6b;text-align:center">If you weren&rsquo;t expecting this invitation, you can safely ignore this email.</p>
+              <p class="email-footer" style="margin:0;font-size:11px;line-height:18px;color:#6b6b6b;text-align:center"><a class="email-footer" href="{{APP_URL}}/privacy" style="color:#6b6b6b;text-decoration:underline">Privacy</a></p>
