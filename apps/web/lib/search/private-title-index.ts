@@ -38,6 +38,7 @@ import type {
   JmapMailbox,
   JmapSession,
 } from "@/lib/mail/types";
+import { PRIVATE_CONTENT_INDEX_ENABLED_KEY } from "./private-index-flags";
 import {
   BrowserSearchIndexStore,
   TITLE_INDEX_SHARD_ID,
@@ -266,6 +267,18 @@ async function tryCreateMailClient(): Promise<{
   } catch {
     return null;
   }
+}
+
+/** Stored mail documents while the index is switched on, so mailbox search stays on this device; null means search the server. */
+export async function loadLocalMailSearchDocuments(
+  accountId: string,
+): Promise<TitleIndexDocument[] | null> {
+  if (window.localStorage.getItem(PRIVATE_CONTENT_INDEX_ENABLED_KEY) !== "true") {
+    return null;
+  }
+  const { documents } = await loadPrivateTitleIndex(accountId);
+  const mail = documents.filter((document) => document.source === "mail");
+  return mail.length > 0 ? mail : null;
 }
 
 export async function loadPrivateTitleIndex(

@@ -1,4 +1,8 @@
-import { resolveMailServerPolicy } from "@workspace/calendar-core";
+import {
+  createMailboxNameCipher,
+  isSealedMailboxName,
+  resolveMailServerPolicy,
+} from "@workspace/calendar-core";
 import type { JmapSession } from "./types";
 import {
   createPendingComposeAttachment,
@@ -194,6 +198,21 @@ function parseJmapRequest(init?: RequestInit) {
   };
 }
 
+/** Reversible stand-in for AES-GCM, so the tests can assert no plaintext name leaves the device. */
+const testMailboxNameCipher = createMailboxNameCipher(
+  {
+    encryptJsonPayload: async (_key: string, payload: unknown) => ({
+      version: 1,
+      algorithm: "AES-GCM" as const,
+      iv: "iv",
+      ciphertext: Buffer.from(JSON.stringify(payload)).toString("base64url"),
+    }),
+    decryptJsonPayload: async <T,>(_key: string, payload: { ciphertext: string }) =>
+      JSON.parse(Buffer.from(payload.ciphertext, "base64url").toString()) as T,
+  },
+  "account-key",
+);
+
 describe("StalwartJmapClient mailbox and send implementations", () => {
   const session: JmapSession = {
     apiUrl: "http://localhost:4001/api/mail/jmap/",
@@ -209,6 +228,7 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
       baseUrl: "http://localhost:4001/api/mail/jmap",
       getAccessToken: async () => "mail-access-token",
       fetcher,
+      getMailboxNameCipher: async () => testMailboxNameCipher,
     });
   }
 
@@ -236,10 +256,65 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     expect(created).toMatchObject({ id: "mbx-9", name: "Projects", role: null });
     const request = parseJmapRequest(fetcher.mock.calls[0][1]);
     expect(request.methodCalls[0][0]).toBe("Mailbox/set");
-    expect(request.methodCalls[0][1]).toEqual({
-      accountId: "acc1",
-      create: { new: { name: "Projects" } },
+    const sealed = request.methodCalls[0][1].create.new.name as string;
+    expect(isSealedMailboxName(sealed)).toBe(true);
+    expect(String(fetcher.mock.calls[0][1]?.body)).not.toContain("Projects");
+    await expect(testMailboxNameCipher.open(sealed)).resolves.toBe("Projects");
+  });
+
+  it("refuses to name a folder without an unlocked session, sending nothing", async () => {
+    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
+      jsonOk({ methodResponses: [] }),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      getAccessToken: async () => "mail-access-token",
+      fetcher,
+      getMailboxNameCipher: async () => null,
     });
+
+    await expect(client.createMailbox(session, "Projects")).rejects.toThrow(
+      "Unlock your encrypted data",
+    );
+    await expect(client.renameMailbox(session, "mbx-9", "Work")).rejects.toThrow(
+      "Unlock your encrypted data",
+    );
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("opens sealed folder names and seals custom folders still named in plaintext", async () => {
+    const sealedWork = await testMailboxNameCipher.seal("Work");
+    const fetcher = jest.fn(async (_url: string, init?: RequestInit) =>
+      parseJmapRequest(init).methodCalls[0][0] === "Mailbox/get"
+        ? jsonOk({
+            methodResponses: [
+              [
+                "Mailbox/get",
+                {
+                  list: [
+                    { id: "in", name: "Inbox", role: "inbox" },
+                    { id: "w", name: sealedWork, role: null },
+                    { id: "r", name: "Receipts", role: null },
+                  ],
+                },
+                "c1",
+              ],
+            ],
+          })
+        : jsonOk({ methodResponses: [["Mailbox/set", { updated: { r: null } }, "c1"]] }),
+    );
+
+    const mailboxes = await createClient(fetcher).getMailboxes(session);
+
+    expect(mailboxes.map((mailbox) => mailbox.name)).toEqual(["Inbox", "Work", "Receipts"]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const migration = parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0];
+    expect(migration[0]).toBe("Mailbox/set");
+    expect(Object.keys(migration[1].update)).toEqual(["r"]);
+    expect(String(fetcher.mock.calls[1][1]?.body)).not.toContain("Receipts");
+    await expect(testMailboxNameCipher.open(migration[1].update.r.name)).resolves.toBe(
+      "Receipts",
+    );
   });
 
   it("renames, deletes, and reorders mailboxes through Mailbox/set", async () => {
@@ -257,10 +332,12 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     await client.updateMailboxSortOrders(session, []);
 
     expect(fetcher).toHaveBeenCalledTimes(3);
-    expect(parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1]).toEqual({
-      accountId: "acc1",
-      update: { "mbx-9": { name: "Work" } },
-    });
+    const renamed = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1];
+    expect(Object.keys(renamed.update)).toEqual(["mbx-9"]);
+    await expect(testMailboxNameCipher.open(renamed.update["mbx-9"].name)).resolves.toBe(
+      "Work",
+    );
+    expect(String(fetcher.mock.calls[0][1]?.body)).not.toContain("Work");
     expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1]).toEqual({
       accountId: "acc1",
       destroy: ["mbx-9"],

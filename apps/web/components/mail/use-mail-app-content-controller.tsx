@@ -20,11 +20,10 @@ import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { useMailKeyboardShortcuts } from "@/hooks/use-mail-keyboard-shortcuts";
 import { useMailListSettings } from "@/lib/mail/mail-list-settings";
 import {
-  buildJmapFilter,
   hasActiveFilters,
   mergeInlineSearchResults,
-  type MailSearchFilters,
 } from "@/lib/mail/mail-search-filter";
+import { searchMailbox } from "@/lib/mail/mailbox-search";
 import { registerComposeCloseActions } from "./mail-compose-bridge";
 import {
   useMailComposeChrome,
@@ -203,37 +202,15 @@ export function useMailAppContentController(
     ),
     queryFn: async () => {
       if (!activeMailbox || !mailboxId) return [];
-
-      const inlineText = trimmedDebouncedMailListSearch;
-
-      if (inlineText && !hasAdvancedFilters) {
-        const { messages } = await activeMailbox.client.searchMailboxMessages(
-          activeMailbox.session,
-          mailboxId,
-          inlineText,
-          40,
-        );
-        return messages;
-      }
-
-      if (inlineText || hasAdvancedFilters) {
-        const filters: MailSearchFilters = {
-          ...advancedFilters,
-          text: inlineText || advancedFilters.text?.trim() || undefined,
-        };
-        const jmapFilter = buildJmapFilter(mailboxId, filters, {
-          timezone: settings?.timezone,
-        });
-        const { messages } = await activeMailbox.client.searchMailboxMessagesWithFilter(
-          activeMailbox.session,
-          mailboxId,
-          jmapFilter,
-          40,
-        );
-        return messages;
-      }
-
-      return [];
+      return searchMailbox({
+        client: activeMailbox.client,
+        session: activeMailbox.session,
+        mailboxId,
+        text: trimmedDebouncedMailListSearch,
+        filters: hasAdvancedFilters ? advancedFilters : null,
+        timezone: settings?.timezone,
+        limit: 40,
+      });
     },
     enabled: Boolean(searchActive && activeMailbox && mailboxId),
     staleTime: 10_000,

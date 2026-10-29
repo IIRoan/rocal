@@ -15,7 +15,7 @@ const VAULT_SECRET_BYTES = 32;
 let cachedModule: E2eeModule | null = null;
 
 /** Imported lazily so this module's graph stays free of react-native. */
-async function getModule(): Promise<E2eeModule | null> {
+export async function getMailE2eeModule(): Promise<E2eeModule | null> {
   if (cachedModule) {
     return cachedModule;
   }
@@ -51,7 +51,7 @@ export function generateVaultSecret(): string {
 
 export async function wrapVaultSecret(secret: string): Promise<string | null> {
   const session = getActiveE2eeSession();
-  const e2ee = await getModule();
+  const e2ee = await getMailE2eeModule();
   if (!session || !e2ee) {
     return null;
   }
@@ -68,7 +68,7 @@ export async function unwrapVaultSecret(
   wrappedSecret: string,
 ): Promise<string | null> {
   const session = getActiveE2eeSession();
-  const e2ee = await getModule();
+  const e2ee = await getMailE2eeModule();
   if (!session || !e2ee) {
     return null;
   }

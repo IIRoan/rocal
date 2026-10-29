@@ -37,11 +37,15 @@ import {
   destroyMailboxMessagesInBatches,
   AUTH_RESULTS_JMAP_PROPERTY,
   SIMPLELOGIN_JMAP_PROPERTIES,
+  openMailboxNames,
+  sealPlaintextMailboxNames,
+  type MailboxNameCipher,
   type MailServerPolicy,
   type MailServerPolicyConfig,
 } from "@workspace/calendar-core";
 import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
 import { createLogger } from "@workspace/logger";
+import { getMailboxNameCipher } from "./mailbox-name-cipher";
 
 const log = createLogger("mail-jmap");
 const MAIL_SERVER_POLICY_REFRESH_TTL_MS = 60_000;
@@ -93,6 +97,7 @@ type JmapClientBearerAuthInput = {
   getAccessToken?: (() => Promise<string> | string) | undefined;
   onUnauthorized?: () => void | Promise<void>;
   fetcher?: Fetcher;
+  getMailboxNameCipher?: () => Promise<MailboxNameCipher | null>;
 };
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -254,6 +259,7 @@ export class StalwartJmapClient {
   private readonly accessTokenProvider?: () => Promise<string> | string;
   private readonly onUnauthorized?: () => void | Promise<void>;
   private readonly fetcher: Fetcher;
+  private readonly getMailboxNameCipher: () => Promise<MailboxNameCipher | null>;
   private mailServerPolicy: MailServerPolicy | null = null;
   private mailServerPolicyConfig: Partial<MailServerPolicyConfig> | null = null;
   private mailServerPolicyFetchedAtMs = 0;
@@ -267,10 +273,12 @@ export class StalwartJmapClient {
     baseUrl,
     fetcher = defaultFetcher,
     onUnauthorized,
+    getMailboxNameCipher: mailboxNameCipher = getMailboxNameCipher,
     ...auth
   }: JmapClientBearerAuthInput) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
     this.onUnauthorized = onUnauthorized;
+    this.getMailboxNameCipher = mailboxNameCipher;
 
     const accessTokenProvider =
       auth.getAccessToken ||
@@ -659,7 +667,38 @@ export class StalwartJmapClient {
       envelope,
       "Mailbox/get",
     );
-    return result.list ?? [];
+    return this.readMailboxes(session, result.list ?? []);
+  }
+
+  /** Opens sealed folder names and seals any custom folder still named in plaintext. */
+  private async readMailboxes(
+    session: JmapSession,
+    mailboxes: JmapMailbox[],
+  ): Promise<JmapMailbox[]> {
+    const cipher = await this.getMailboxNameCipher();
+    if (cipher) {
+      const update = await sealPlaintextMailboxNames(mailboxes, cipher);
+      if (Object.keys(update).length > 0) {
+        const accountId = this.requirePrimaryAccountId(session);
+        await this.call(
+          session,
+          ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+          [["Mailbox/set", { accountId, update }, "c1"]],
+        ).catch((error: unknown) => {
+          log.warn("Could not encrypt folder names", { error });
+        });
+      }
+    }
+    return openMailboxNames(mailboxes, cipher);
+  }
+
+  /** Custom folder names reach the server only sealed; without a session there is no key to seal them. */
+  private async sealMailboxName(name: string): Promise<string> {
+    const cipher = await this.getMailboxNameCipher();
+    if (!cipher) {
+      throw new Error("Unlock your encrypted data to name folders.");
+    }
+    return cipher.seal(name);
   }
 
   async getIdentities(session: JmapSession): Promise<JmapIdentity[]> {
@@ -793,9 +832,11 @@ export class StalwartJmapClient {
     // Soft — matches getStalwartPolicySingletons() try/catch behavior.
     const emailSettings = this.tryGetMethodListItem(envelope, "x:Email/get");
     const jmapSettings = this.tryGetMethodListItem(envelope, "x:Jmap/get");
-    const mailboxes =
+    const mailboxes = await this.readMailboxes(
+      session,
       this.getMethodResult<{ list?: JmapMailbox[] }>(envelope, "Mailbox/get")
-        .list ?? [];
+        .list ?? [],
+    );
     const identities =
       this.getMethodResult<{ list?: JmapIdentity[] }>(
         envelope,
@@ -1511,10 +1552,11 @@ export class StalwartJmapClient {
     name: string,
   ): Promise<void> {
     const accountId = this.requirePrimaryAccountId(session);
+    const sealed = await this.sealMailboxName(name);
     await this.call(
       session,
       ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-      [["Mailbox/set", { accountId, update: { [mailboxId]: { name } } }, "c1"]],
+      [["Mailbox/set", { accountId, update: { [mailboxId]: { name: sealed } } }, "c1"]],
     );
   }
 
@@ -1524,7 +1566,9 @@ export class StalwartJmapClient {
     role?: string | null,
   ): Promise<JmapMailbox> {
     const accountId = this.requirePrimaryAccountId(session);
-    const createPayload: Record<string, unknown> = { name };
+    const createPayload: Record<string, unknown> = {
+      name: role ? name : await this.sealMailboxName(name),
+    };
     if (role) {
       createPayload.role = role;
     }

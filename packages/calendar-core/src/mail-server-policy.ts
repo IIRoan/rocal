@@ -5,6 +5,10 @@ import {
   type MailServerLimits,
   type MailServerLimitsSource,
 } from "./mail-server-limits";
+import {
+  maxPlainMailboxNameLength,
+  sealedMailboxNameLength,
+} from "./mail-mailbox-names";
 
 const JMAP_CORE_CAPABILITY = "urn:ietf:params:jmap:core";
 
@@ -353,8 +357,8 @@ export function validateMailboxName(
   if (!trimmed) {
     return "Mailbox name is required.";
   }
-  if (trimmed.length > policy.maxMailboxNameLength) {
-    return `Mailbox name must be ${policy.maxMailboxNameLength} characters or fewer.`;
+  if (sealedMailboxNameLength(trimmed) > policy.maxMailboxNameLength) {
+    return `Mailbox name must be ${maxPlainMailboxNameLength(policy.maxMailboxNameLength)} characters or fewer.`;
   }
   const depth = resolveMailboxNameDepth(trimmed);
   if (depth > policy.maxMailboxDepth) {
