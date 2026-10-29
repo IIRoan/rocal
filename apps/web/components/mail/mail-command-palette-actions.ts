@@ -56,17 +56,19 @@ export async function runMailAccountDeletion(input: {
 
 export async function runMailPasswordChange(input: {
   sessionUserId: string | null;
+  sessionEmail: string | null;
   currentPassword: string;
   newPassword: string;
   setBusy: (value: boolean) => void;
 }): Promise<void> {
-  if (!input.sessionUserId) {
+  if (!input.sessionUserId || !input.sessionEmail) {
     throw new Error("Your session is unavailable. Please try again.");
   }
 
   input.setBusy(true);
   const result = await persistPasswordChange({
     sessionUserId: input.sessionUserId,
+    email: input.sessionEmail,
     currentPassword: input.currentPassword,
     newPassword: input.newPassword,
   });

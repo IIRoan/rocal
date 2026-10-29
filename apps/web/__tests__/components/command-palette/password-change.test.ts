@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 const mockChangePassword = jest.fn<
-  (input: { currentPassword: string; newPassword: string }) => Promise<{
+  (input: { currentPassword: string; newPassword: string; email: string }) => Promise<{
     error?: { message?: string } | null;
   }>
 >();
@@ -10,7 +10,7 @@ const mockSetCookie = jest.fn<(password: string) => Promise<void>>();
 
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
-    changePassword: (input: { currentPassword: string; newPassword: string }) =>
+    changePassword: (input: { currentPassword: string; newPassword: string; email: string }) =>
       mockChangePassword(input),
   },
   signOut: jest.fn(),
@@ -45,11 +45,17 @@ describe("persistPasswordChange", () => {
     await expect(
       persistPasswordChange({
         sessionUserId: "user-1",
+        email: "person@solace.test",
         currentPassword: "old-pw",
         newPassword: "new-pw",
       }),
     ).resolves.toEqual({ ok: true });
 
+    expect(mockChangePassword).toHaveBeenCalledWith({
+      currentPassword: "old-pw",
+      newPassword: "new-pw",
+      email: "person@solace.test",
+    });
     expect(mockStoreEnvelope).toHaveBeenCalledWith("user-1", "new-pw");
     expect(mockSetCookie).toHaveBeenCalledWith("new-pw");
   });
@@ -59,6 +65,7 @@ describe("persistPasswordChange", () => {
 
     const result = await persistPasswordChange({
       sessionUserId: "user-1",
+      email: "person@solace.test",
       currentPassword: "wrong",
       newPassword: "new-pw",
     });

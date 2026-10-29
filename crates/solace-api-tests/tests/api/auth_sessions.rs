@@ -115,9 +115,12 @@ async fn sign_up_creates_the_user_credential_session_and_accepts_the_invite() {
     .fetch_one(&app.db)
     .await
     .expect("credential account");
-    let (salt, key) = password.split_once(':').expect("hexSalt:hexKey");
+    let stored = password
+        .strip_prefix("ak1:")
+        .expect("an auth-key hash, even for a raw password");
+    let (salt, key) = stored.split_once(':').expect("hexSalt:hexKey");
     assert_eq!((salt.len(), key.len()), (32, 128));
-    assert!(password.chars().all(|c| c == ':' || c.is_ascii_hexdigit()));
+    assert!(stored.chars().all(|c| c == ':' || c.is_ascii_hexdigit()));
 
     let status: String = sqlx::query_scalar("SELECT status FROM invite WHERE token = $1")
         .bind(&token)

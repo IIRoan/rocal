@@ -1,15 +1,17 @@
-//! Password change, reset by email, verification and profile updates through Better Auth.
+//! Password change, auth keys, verification and profile updates through Better Auth; forgotten passwords go to support.
 
 use serde_json::{Value, json};
 use solace_api_tests::client::ResponseResult;
 use solace_api_types::auth::{SessionWithUser, StatusFlag};
 
 use crate::helpers::{
-    TestApp, TestUser, auth_error, count, ok, set_cookies_named, signed_cookie_token,
+    TestApp, TestUser, auth_error, auth_key, count, ok, set_cookies_named, signed_cookie_token,
 };
 
-const RESET_SUBJECT: &str = "Reset your Solace password";
 const UPDATED_SUBJECT: &str = "Your Solace password was updated";
+/// Written by the TypeScript backend at sign-up for `LEGACY_PASSWORD`, before clients derived auth keys.
+const LEGACY_HASH: &str = "dd9606626dae5b0a239158deba3bd517:f7ceb36210bb220f924c0085423c00d4fd9cfc3bc6c0bdf8d0907357c7610cbd52744f7c0016cade759d4a39954470e3c7ee2aad0761b3103637fdae72e4d86a";
+const LEGACY_PASSWORD: &str = "solace-test-pw-123";
 
 async fn password_hash(app: &TestApp, user: &TestUser) -> String {
     sqlx::query_scalar(
@@ -102,6 +104,10 @@ async fn change_password_replaces_the_hash_and_mails_a_confirmation() {
         text.contains("This is a confirmation that your Solace password was changed."),
         "{text}"
     );
+    assert!(
+        text.contains("email support@solace.onl from another address"),
+        "{text}"
+    );
     assert_eq!(
         message["from"][0]["email"],
         json!(format!("noreply@{}", app.env.mail_domain))
@@ -160,185 +166,81 @@ async fn change_password_can_revoke_the_other_sessions() {
 }
 
 #[tokio::test]
-async fn a_password_reset_round_trip() {
+async fn a_legacy_hash_takes_the_raw_password_once_then_the_auth_key() {
     let app = TestApp::spawn().await;
     let user = app.user().await;
-    app.plain_mailbox(user.local_part()).await;
+    sqlx::query(
+        "UPDATE account SET password = $1 WHERE user_id = $2 AND provider_id = 'credential'",
+    )
+    .bind(LEGACY_HASH)
+    .bind(&user.id)
+    .execute(&app.db)
+    .await
+    .expect("legacy hash");
+    let key = auth_key(LEGACY_PASSWORD, &user.email);
     let mut agent = app.anonymous();
-    let redirect = format!("{}/reset-password", app.origin);
-    let requested = ok(agent
+    let refused = ok(agent
         .post(
-            "/api/auth/request-password-reset",
-            json!({"email": user.email, "redirectTo": redirect}),
-        )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    assert_eq!(
-        requested,
-        json!({"status": true, "message": "If this email exists in our system, check your email for the reset link"})
-    );
-
-    let message = app.wait_for_message(user.local_part(), RESET_SUBJECT).await;
-    let text = text_body(&message);
-    let link = text
-        .lines()
-        .find(|line| line.contains("/api/auth/reset-password/"))
-        .expect("reset link")
-        .to_owned();
-    let token = link
-        .split("/api/auth/reset-password/")
-        .nth(1)
-        .and_then(|rest| rest.split('?').next())
-        .expect("token")
-        .to_owned();
-    assert_eq!(token.len(), 24, "{link}");
-    let encoded_redirect: String =
-        url::form_urlencoded::byte_serialize(redirect.as_bytes()).collect();
-    assert!(
-        link.ends_with(&format!("?callbackURL={encoded_redirect}")),
-        "{link}"
-    );
-    let stored: String = sqlx::query_scalar("SELECT value FROM verification WHERE identifier = $1")
-        .bind(format!("reset-password:{token}"))
-        .fetch_one(&app.db)
-        .await
-        .expect("verification row");
-    assert_eq!(stored, user.id);
-
-    let callback = ok(agent
-        .get(&format!(
-            "/api/auth/reset-password/{token}?callbackURL={encoded_redirect}"
-        ))
-        .await);
-    assert_eq!(callback.status.as_u16(), 302);
-    assert_eq!(
-        callback
-            .headers
-            .get("location")
-            .and_then(|v| v.to_str().ok()),
-        Some(format!("{redirect}?token={token}").as_str())
-    );
-
-    let reset: StatusFlag = ok(agent
-        .post(
-            "/api/auth/reset-password",
-            json!({"newPassword": "solace-test-reset-password", "token": token}),
-        )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.dto()));
-    assert!(reset.status);
-    assert_eq!(sign_in_status(&app, &user.email, &user.password).await, 401);
-    assert_eq!(
-        sign_in_status(&app, &user.email, "solace-test-reset-password").await,
-        200
-    );
-    let again = ok(agent
-        .post(
-            "/api/auth/reset-password",
-            json!({"newPassword": "solace-test-other-password", "token": token}),
-        )
-        .await);
-    auth_error(&again, 400, "INVALID_TOKEN", "Invalid token");
-
-    let updated = app
-        .wait_for_message(user.local_part(), UPDATED_SUBJECT)
-        .await;
-    assert!(
-        text_body(&updated).contains("password was reset."),
-        "{}",
-        text_body(&updated)
-    );
-}
-
-#[tokio::test]
-async fn a_reset_for_an_unknown_email_looks_the_same() {
-    let app = TestApp::spawn().await;
-    let mut agent = app.anonymous();
-    let email = format!("nobody{}@{}", crate::helpers::hex(5), app.env.mail_domain);
-    let body = ok(agent
-        .post(
-            "/api/auth/request-password-reset",
-            json!({"email": email, "redirectTo": format!("{}/reset-password", app.origin)}),
-        )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    assert_eq!(body["status"], json!(true));
-}
-
-#[tokio::test]
-async fn reset_redirects_must_be_trusted() {
-    let app = TestApp::spawn().await;
-    let user = app.user().await;
-    let mut agent = app.anonymous();
-    let response = ok(agent
-        .post(
-            "/api/auth/request-password-reset",
-            json!({"email": user.email, "redirectTo": "https://evil.example/reset"}),
+            "/api/auth/sign-in/email",
+            json!({"email": user.email, "password": key}),
         )
         .await);
     auth_error(
-        &response,
-        403,
-        "INVALID_REDIRECT_URL",
-        "Invalid redirectURL",
+        &refused,
+        400,
+        "PASSWORD_UPGRADE_REQUIRED",
+        "Send the password once more to finish upgrading its protection",
     );
+    assert_eq!(password_hash(&app, &user).await, LEGACY_HASH);
     assert_eq!(
-        count(
-            &app.db,
-            "SELECT count(*) FROM verification WHERE value = $1",
-            &user.id
-        )
-        .await,
-        0
+        sign_in_status(&app, &user.email, LEGACY_PASSWORD).await,
+        200
     );
+    assert!(password_hash(&app, &user).await.starts_with("ak1:"));
+    assert_eq!(sign_in_status(&app, &user.email, &key).await, 200);
+    assert_eq!(
+        sign_in_status(&app, &user.email, LEGACY_PASSWORD).await,
+        200,
+        "shipped binaries still send the raw password"
+    );
+    let wrong = auth_key("solace-test-wrong", &user.email);
+    assert_eq!(sign_in_status(&app, &user.email, &wrong).await, 401);
 }
 
 #[tokio::test]
-async fn reset_tokens_must_exist_and_be_unexpired() {
+async fn change_password_takes_auth_keys_salted_with_the_account_email() {
     let app = TestApp::spawn().await;
-    let user = app.user().await;
-    let mut agent = app.anonymous();
-    let bogus = ok(agent
+    let mut user = app.user().await;
+    let current = auth_key(&user.password, &user.email);
+    let new = auth_key("solace-test-changed-password", &user.email);
+    let before = password_hash(&app, &user).await;
+    let elsewhere = user
         .post(
-            "/api/auth/reset-password",
-            json!({"newPassword": "solace-test-new-password", "token": "bogus"}),
+            "/api/auth/change-password",
+            json!({"currentPassword": current, "newPassword": new, "email": "someone@else.test"}),
         )
-        .await);
-    auth_error(&bogus, 400, "INVALID_TOKEN", "Invalid token");
-
-    ok(agent
+        .await;
+    auth_error(
+        &elsewhere,
+        400,
+        "AUTH_KEY_EMAIL_MISMATCH",
+        "Enter the email address of this account",
+    );
+    assert_eq!(password_hash(&app, &user).await, before);
+    ok(user
         .post(
-            "/api/auth/request-password-reset",
-            json!({"email": user.email, "redirectTo": format!("{}/reset-password", app.origin)}),
+            "/api/auth/change-password",
+            json!({"currentPassword": current, "newPassword": new, "email": user.email.to_uppercase()}),
         )
         .await
         .expect_status(200));
-    let identifier: String = sqlx::query_scalar(
-        "SELECT identifier FROM verification WHERE value = $1 AND identifier LIKE 'reset-password:%'",
-    )
-    .bind(&user.id)
-    .fetch_one(&app.db)
-    .await
-    .expect("verification row");
-    sqlx::query(
-        "UPDATE verification SET expires_at = now() - interval '1 minute' WHERE identifier = $1",
-    )
-    .bind(&identifier)
-    .execute(&app.db)
-    .await
-    .expect("expire token");
-    let token = identifier.trim_start_matches("reset-password:");
-    let expired = ok(agent
-        .post(
-            "/api/auth/reset-password",
-            json!({"newPassword": "solace-test-new-password", "token": token}),
-        )
-        .await);
-    auth_error(&expired, 400, "INVALID_TOKEN", "Invalid token");
-    assert_eq!(sign_in_status(&app, &user.email, &user.password).await, 200);
+    assert_eq!(sign_in_status(&app, &user.email, &new).await, 200);
+    assert_eq!(
+        sign_in_status(&app, &user.email, "solace-test-changed-password").await,
+        200,
+        "the API derives the same key from a raw password"
+    );
+    assert_eq!(sign_in_status(&app, &user.email, &current).await, 401);
 }
 
 #[tokio::test]
@@ -389,10 +291,15 @@ async fn update_user_renames_and_reissues_the_session_cookie() {
 }
 
 #[tokio::test]
-async fn set_password_and_delete_user_are_not_exposed() {
+async fn set_password_reset_and_delete_user_are_not_exposed() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    for path in ["/api/auth/set-password", "/api/auth/delete-user"] {
+    for path in [
+        "/api/auth/set-password",
+        "/api/auth/request-password-reset",
+        "/api/auth/reset-password",
+        "/api/auth/delete-user",
+    ] {
         let response = user
             .post(path, json!({"newPassword": "solace-test-new-password"}))
             .await;

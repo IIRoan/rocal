@@ -102,6 +102,20 @@ pub mod codes {
             "Password too long",
         )
     }
+    pub fn password_upgrade_required() -> ApiError {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "PASSWORD_UPGRADE_REQUIRED",
+            "Send the password once more to finish upgrading its protection",
+        )
+    }
+    pub fn auth_key_email_mismatch() -> ApiError {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "AUTH_KEY_EMAIL_MISMATCH",
+            "Enter the email address of this account",
+        )
+    }
     pub fn invalid_email_or_password() -> ApiError {
         ApiError::new(
             StatusCode::UNAUTHORIZED,

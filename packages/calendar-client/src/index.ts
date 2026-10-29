@@ -1,4 +1,5 @@
 export { HttpClient } from "./http-client";
+export { createAuthKeyFetch } from "./auth-key-fetch";
 export { createMailAccessTokenManager } from "./mail-access-token";
 export type { MailAccessToken } from "./mail-access-token";
 export type {

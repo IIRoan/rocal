@@ -235,18 +235,6 @@ pub async fn consume_verification<C: ConnectionTrait>(
         .filter(|row| row.expires_at >= now))
 }
 
-/// `findVerificationValue`: the newest row for the identifier, without consuming it.
-pub async fn find_verification<C: ConnectionTrait>(
-    db: &C,
-    identifier: &str,
-) -> Result<Option<verification::Model>, sea_orm::DbErr> {
-    verification::Entity::find()
-        .filter(verification::Column::Identifier.eq(identifier))
-        .order_by_desc(verification::Column::CreatedAt)
-        .one(db)
-        .await
-}
-
 pub async fn user_passkeys<C: ConnectionTrait>(
     db: &C,
     user_id: &str,

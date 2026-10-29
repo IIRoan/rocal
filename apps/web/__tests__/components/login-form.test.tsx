@@ -174,7 +174,6 @@ jest.mock("@/lib/auth-local-state", () => ({
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
     getSession: jest.fn(),
-    requestPasswordReset: jest.fn(),
     signIn: {
       passkey: jest.fn(),
     },
@@ -209,7 +208,6 @@ import {
 
 const mockUseSession = jest.mocked(useSession);
 const mockGetSession = jest.mocked(authClient.getSession);
-const mockRequestPasswordReset = jest.mocked(authClient.requestPasswordReset);
 const mockPasskeySignIn = jest.mocked(authClient.signIn.passkey);
 const mockEmailSignIn = jest.mocked(signIn.email);
 const mockEmailSignUp = jest.mocked(signUp.email);
@@ -294,7 +292,6 @@ describe("LoginForm", () => {
       data: authSessionDataFixture,
       error: null,
     });
-    mockRequestPasswordReset.mockResolvedValue({});
     mockGetAuthStatus.mockResolvedValue({
       authenticated: true,
       hasPasskeys: false,
@@ -378,7 +375,7 @@ describe("LoginForm", () => {
     expect(container.textContent).toContain("@team.solace.onl");
   });
 
-  it("shows the clarified forgot-password title and subtitle", async () => {
+  it("sends a forgotten password to support instead of mailing a reset link", async () => {
     await renderForm();
 
     const forgotPasswordButton = Array.from(
@@ -391,55 +388,10 @@ describe("LoginForm", () => {
     });
 
     expect(container.textContent).toContain(
-      "Reset your email sign-in password",
+      "Email support@solace.onl from a different email address and include your Solace address.",
     );
-    expect(container.textContent).toContain(
-      "Enter your Solace account email and Solace will send a reset link for your email sign-in password.",
-    );
-  });
-
-  it("shows the clarified password reset success notice", async () => {
-    await renderForm();
-
-    const forgotPasswordButton = Array.from(
-      container.querySelectorAll("button"),
-    ).find((element) => element.textContent === "Forgot password?");
-
-    await act(async () => {
-      forgotPasswordButton?.click();
-      await Promise.resolve();
-    });
-
-    const emailInput = container.querySelector(
-      "#email",
-    ) as HTMLInputElement | null;
-    const submitButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Send reset link"),
-    );
-
-    await act(async () => {
-      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
-      submitButton?.click();
-      await Promise.resolve();
-    });
-
-    expect(mockRequestPasswordReset).toHaveBeenCalledWith({
-      email: "roan@solace.onl",
-      redirectTo: "https://solace.test/reset-password",
-    });
-    expect(container.textContent).toContain(
-      "If an account exists for that email, Solace sent a password reset link for your email sign-in password.",
-    );
-  });
-
-  it("shows the clarified reset-success banner from the query string", async () => {
-    mockSearchParams = new URLSearchParams("reset=success");
-
-    await renderForm();
-
-    expect(container.textContent).toContain(
-      "Your email sign-in password has been updated. The next time you sign in with email, Solace will also use it to protect your encryption keys.",
-    );
+    expect(container.textContent).toContain("Welcome back");
+    expect(container.querySelector("#password")).not.toBeNull();
   });
 
   it("stores the pending auth password after a successful email sign-in", async () => {

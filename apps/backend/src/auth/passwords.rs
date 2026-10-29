@@ -1,30 +1,26 @@
-//! Passwords and the profile through Better Auth: change, reset by mail, verify, `update-user`, and the disabled `delete-user`.
+//! Passwords and the profile through Better Auth: change, verify, `update-user`, and the disabled `delete-user`; support handles forgotten passwords.
 
 use std::sync::LazyLock;
 
-use axum::extract::{Path, RawQuery, State};
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
-use axum::response::{IntoResponse, Response};
+use axum::extract::State;
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::Response;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use solace_api_types::auth::{AuthUser, StatusFlag};
 
-use super::api::{ApiError, codes, generate_id, json, validate};
-use super::email_password::check_length;
+use super::api::{ApiError, codes, json, validate};
+use super::email_password::{check_auth_key_email, check_new_password};
 use super::hooks::{self, Reply};
-use super::pipeline::{AuthBody, is_trusted_target};
+use super::password::{self, Verdict};
+use super::pipeline::AuthBody;
 use super::session;
 use super::sessions::require_session;
-use super::{password, store};
+use super::store;
 use crate::db::entities::user;
-use crate::email::{self, PasswordAction};
+use crate::email;
 use crate::http::zod::{self, Schema};
-use crate::instant;
 use crate::state::AppState;
-
-const RESET_TOKEN_SECONDS: i64 = 60 * 60;
-const RESET_REQUESTED: &str =
-    "If this email exists in our system, check your email for the reset link";
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +28,7 @@ struct ChangePasswordBody {
     new_password: String,
     current_password: String,
     revoke_other_sessions: Option<bool>,
+    email: Option<String>,
 }
 
 static CHANGE_PASSWORD: LazyLock<Schema> = LazyLock::new(|| {
@@ -39,34 +36,7 @@ static CHANGE_PASSWORD: LazyLock<Schema> = LazyLock::new(|| {
         ("newPassword", zod::string()),
         ("currentPassword", zod::string()),
         ("revokeOtherSessions", zod::boolean().optional()),
-    ])
-});
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ResetRequestBody {
-    email: String,
-    redirect_to: Option<String>,
-}
-
-static RESET_REQUEST: LazyLock<Schema> = LazyLock::new(|| {
-    zod::object([
-        ("email", zod::string().email()),
-        ("redirectTo", zod::string().optional()),
-    ])
-});
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ResetBody {
-    new_password: String,
-    token: Option<String>,
-}
-
-static RESET: LazyLock<Schema> = LazyLock::new(|| {
-    zod::object([
-        ("newPassword", zod::string()),
-        ("token", zod::string().optional()),
+        ("email", zod::string().optional()),
     ])
 });
 
@@ -76,23 +46,6 @@ struct PasswordBody {
 }
 
 static VERIFY: LazyLock<Schema> = LazyLock::new(|| zod::object([("password", zod::string())]));
-
-#[derive(Deserialize)]
-struct CallbackQuery {
-    #[serde(rename = "callbackURL")]
-    callback_url: String,
-}
-
-static CALLBACK_QUERY: LazyLock<Schema> =
-    LazyLock::new(|| zod::object([("callbackURL", zod::string())]));
-
-#[derive(Deserialize)]
-struct ResetTokenQuery {
-    token: Option<String>,
-}
-
-static RESET_QUERY: LazyLock<Schema> =
-    LazyLock::new(|| zod::object([("token", zod::string().optional())]).optional());
 
 /// The sign-in page the "password updated" mail links to.
 fn sign_in_url(state: &AppState) -> String {
@@ -108,8 +61,8 @@ fn greeting(user: &user::Model) -> String {
     }
 }
 
-async fn notify_password_updated(state: &AppState, user: &user::Model, action: PasswordAction) {
-    let message = email::password_updated(&greeting(user), action, &sign_in_url(state));
+async fn notify_password_updated(state: &AppState, user: &user::Model) {
+    let message = email::password_updated(&greeting(user), &sign_in_url(state));
     let _ = email::send(
         state,
         "password update notification",
@@ -129,7 +82,12 @@ pub async fn change_password(
     let outcome = async {
         let body: ChangePasswordBody = validate(&CHANGE_PASSWORD, body.as_ref(), "body")?;
         let active = require_session(&state, &headers, &mut cookies).await?;
-        check_length(&body.new_password)?;
+        check_new_password(&body.new_password)?;
+        check_auth_key_email(
+            &body.new_password,
+            body.email.as_deref(),
+            &active.user.email,
+        )?;
         if crate::http::zod::js_length(&body.current_password) > password::MAX_LENGTH {
             return Err(codes::password_too_long());
         }
@@ -139,14 +97,16 @@ pub async fn change_password(
         else {
             return Err(codes::credential_account_not_found());
         };
-        let new_hash = password::hash(&body.new_password)
+        let new_hash = password::hash(&body.new_password, &active.user.email)
             .await
             .map_err(|_| ApiError::internal())?;
-        if !password::verify(&stored, &body.current_password)
+        match password::verify(&stored, &body.current_password, &active.user.email)
             .await
             .map_err(|_| ApiError::internal())?
         {
-            return Err(codes::invalid_password());
+            Verdict::Match { .. } => {}
+            Verdict::Mismatch => return Err(codes::invalid_password()),
+            Verdict::UpgradeRequired => return Err(codes::password_upgrade_required()),
         }
         store::set_password(&state.db, credential, new_hash).await?;
         let mut token = None;
@@ -156,165 +116,12 @@ pub async fn change_password(
             cookies.extend(hooks::session_cookies(&state, &fresh.token, false));
             token = Some(fresh.token);
         }
-        notify_password_updated(&state, &active.user, PasswordAction::Changed).await;
+        notify_password_updated(&state, &active.user).await;
         let user: AuthUser = session::user_dto(&active.user);
         Ok(json(&json!({"token": token, "user": user})))
     }
     .await;
     hooks::after_sign_in_or_out(&state, &headers, hooks::with_cookies(outcome, cookies))
-}
-
-pub async fn request_password_reset(
-    State(state): State<AppState>,
-    AuthBody(body): AuthBody,
-) -> Response {
-    let outcome: Result<Response, ApiError> = async {
-        let body: ResetRequestBody = validate(&RESET_REQUEST, body.as_ref(), "body")?;
-        let answer = json(&json!({"status": true, "message": RESET_REQUESTED}));
-        let Some(found) = store::find_user_by_email(&state.db, &body.email.to_lowercase()).await?
-        else {
-            return Ok(answer);
-        };
-        let token = generate_id()[..24].to_owned();
-        store::create_verification(
-            &state.db,
-            &format!("reset-password:{token}"),
-            found.id.clone(),
-            RESET_TOKEN_SECONDS,
-        )
-        .await?;
-        let callback = body
-            .redirect_to
-            .as_deref()
-            .map(super::cookies::encode_uri_component)
-            .unwrap_or_default();
-        let url = format!(
-            "{}/api/auth/reset-password/{token}?callbackURL={callback}",
-            state.config.backend_url.trim_end_matches('/')
-        );
-        let message = email::password_reset(&greeting(&found), &url);
-        email::send(
-            &state,
-            "password reset",
-            &found.email,
-            &message,
-            email::Mode::Required,
-        )
-        .await
-        .map_err(|_| ApiError::internal())?;
-        Ok(answer)
-    }
-    .await;
-    outcome.unwrap_or_else(IntoResponse::into_response)
-}
-
-/// The link in the reset mail: back to the app with the token, or with `error=INVALID_TOKEN`.
-pub async fn reset_password_callback(
-    State(state): State<AppState>,
-    Path(token): Path<String>,
-    RawQuery(query): RawQuery,
-) -> Response {
-    let outcome: Result<Response, ApiError> = async {
-        let query = Value::Object(crate::http::extract::form_object(
-            query.unwrap_or_default().as_bytes(),
-        ));
-        let query: CallbackQuery = validate(&CALLBACK_QUERY, Some(&query), "query")?;
-        if !query.callback_url.is_empty() && !is_trusted_target(&state, &query.callback_url) {
-            return Err(ApiError::new(
-                StatusCode::FORBIDDEN,
-                "INVALID_CALLBACK_URL",
-                "Invalid callbackURL",
-            ));
-        }
-        let base = format!(
-            "{}/api/auth",
-            state.config.backend_url.trim_end_matches('/')
-        );
-        let found = store::find_verification(&state.db, &format!("reset-password:{token}")).await?;
-        let valid = found.is_some_and(|row| row.expires_at >= instant::now());
-        let (key, value) = if valid {
-            ("token", token.as_str())
-        } else {
-            ("error", "INVALID_TOKEN")
-        };
-        Ok(redirect(&with_param(
-            &base,
-            &query.callback_url,
-            key,
-            value,
-        )))
-    }
-    .await;
-    outcome.unwrap_or_else(IntoResponse::into_response)
-}
-
-/// `new URL(callbackURL, baseURL)` with one search parameter set.
-fn with_param(base: &str, target: &str, key: &str, value: &str) -> String {
-    let joined = url::Url::parse(&format!("{base}/")).and_then(|base| base.join(target));
-    match joined {
-        Ok(mut url) => {
-            let kept: Vec<(String, String)> = url
-                .query_pairs()
-                .filter(|(k, _)| k != key)
-                .map(|(k, v)| (k.into_owned(), v.into_owned()))
-                .collect();
-            url.query_pairs_mut()
-                .clear()
-                .extend_pairs(kept)
-                .append_pair(key, value);
-            url.to_string()
-        }
-        Err(_) => format!("{base}/error?{key}={value}"),
-    }
-}
-
-fn redirect(location: &str) -> Response {
-    let mut response = StatusCode::FOUND.into_response();
-    if let Ok(value) = HeaderValue::from_str(location) {
-        response.headers_mut().insert(header::LOCATION, value);
-    }
-    response
-}
-
-pub async fn reset_password(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    RawQuery(query): RawQuery,
-    AuthBody(body): AuthBody,
-) -> Response {
-    let outcome = async {
-        let query = query.map(|q| Value::Object(crate::http::extract::form_object(q.as_bytes())));
-        let query: Option<ResetTokenQuery> = validate(&RESET_QUERY, query.as_ref(), "query")?;
-        let body: ResetBody = validate(&RESET, body.as_ref(), "body")?;
-        let token = body
-            .token
-            .clone()
-            .filter(|t| !t.is_empty())
-            .or_else(|| query.and_then(|q| q.token).filter(|t| !t.is_empty()))
-            .ok_or_else(codes::invalid_token)?;
-        check_length(&body.new_password)?;
-        let row = store::consume_verification(&state.db, &format!("reset-password:{token}"))
-            .await?
-            .ok_or_else(codes::invalid_token)?;
-        let found = store::find_user(&state.db, &row.value)
-            .await?
-            .ok_or_else(|| {
-                ApiError::new(StatusCode::BAD_REQUEST, "USER_NOT_FOUND", "User not found")
-            })?;
-        let hash = password::hash(&body.new_password)
-            .await
-            .map_err(|_| ApiError::internal())?;
-        match store::credential_account(&state.db, &found.id).await? {
-            Some(credential) => store::set_password(&state.db, credential, hash).await?,
-            None => {
-                store::link_credential(&state.db, &found.id, &hash).await?;
-            }
-        }
-        notify_password_updated(&state, &found, PasswordAction::Reset).await;
-        Ok(json(&StatusFlag { status: true }))
-    }
-    .await;
-    hooks::after_sign_in_or_out(&state, &headers, hooks::with_cookies(outcome, Vec::new()))
 }
 
 pub async fn verify_password(
@@ -333,14 +140,16 @@ pub async fn verify_password(
         let stored = store::credential_account(&state.db, &active.user.id)
             .await?
             .and_then(|a| a.password);
-        let matches = match stored {
-            Some(stored) => password::verify(&stored, &body.password)
+        let verdict = match stored {
+            Some(stored) => password::verify(&stored, &body.password, &active.user.email)
                 .await
                 .map_err(|_| ApiError::internal())?,
-            None => false,
+            None => Verdict::Mismatch,
         };
-        if !matches {
-            return Err(codes::invalid_password());
+        match verdict {
+            Verdict::Match { .. } => {}
+            Verdict::Mismatch => return Err(codes::invalid_password()),
+            Verdict::UpgradeRequired => return Err(codes::password_upgrade_required()),
         }
         Ok(json(&StatusFlag { status: true }))
     }
