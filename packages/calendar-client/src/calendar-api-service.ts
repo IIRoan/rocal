@@ -870,6 +870,17 @@ export class CalendarApiService {
     }
   }
 
+  /** Removes this device's E2EE row once sign-out has deleted its private key. */
+  async deleteE2eeDevice(deviceId: string): Promise<Schema<"SuccessMessage">> {
+    try {
+      return await this.client.delete<Schema<"SuccessMessage">>(
+        `/api/e2ee/devices/${encodeURIComponent(deviceId)}`,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to remove encryption device");
+    }
+  }
+
   // ─── Recurring Events ────────────────────────────────────────────────────────
 
   async validateRecurrence(

@@ -4,11 +4,11 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use serde_json::{Value, json};
 use solace_api_tests::seed::fake_envelope;
-use solace_api_types::Timestamp;
 use solace_api_types::e2ee::{
     E2eeAlgorithms, E2eeBootstrap, EncryptionDevice, PasswordEnvelope, PasswordEnvelopeRequest,
     RegisterDeviceRequest, ResetSnapshot,
 };
+use solace_api_types::{SuccessMessage, Timestamp};
 
 use crate::helpers::{
     TestApp, TestUser, count, expect_field_error, expect_invalid, expect_unauthorized,
@@ -88,6 +88,74 @@ async fn anonymous_callers_are_refused() {
     expect_unauthorized(&ok(anon
         .put("/api/e2ee/password", json_body(&envelope()))
         .await));
+    expect_unauthorized(&ok(anon.delete("/api/e2ee/devices/anon-device").await));
+}
+
+#[tokio::test]
+async fn a_signed_out_device_is_deleted_by_its_owner_only() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let mut other = app.user().await;
+    register(&mut owner, &device("phone")).await;
+    register(&mut owner, &device("laptop")).await;
+    register(&mut other, &device("phone")).await;
+    let laptop = device_row(&app, &owner, "laptop").await;
+
+    ok(other.delete("/api/e2ee/devices/laptop").await.expect_error(
+        404,
+        "Not Found",
+        "Encryption device not found",
+    ));
+    assert_eq!(device_row(&app, &owner, "laptop").await, laptop);
+
+    let deleted: SuccessMessage = ok(owner
+        .delete("/api/e2ee/devices/phone")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(
+        deleted,
+        SuccessMessage {
+            success: true,
+            message: "Encryption device removed".into()
+        }
+    );
+    let left: Vec<String> = bootstrap(&mut owner)
+        .await
+        .devices
+        .into_iter()
+        .map(|d| d.device_id)
+        .collect();
+    assert_eq!(left, ["laptop"]);
+    assert_eq!(
+        bootstrap(&mut other).await.devices.len(),
+        1,
+        "another user's device with the same id stays"
+    );
+    ok(owner.delete("/api/e2ee/devices/phone").await.expect_error(
+        404,
+        "Not Found",
+        "Encryption device not found",
+    ));
+}
+
+#[tokio::test]
+async fn device_deletes_are_rate_limited_per_user() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let mut other = app.user().await;
+    for index in 0..30 {
+        ok(user
+            .delete(&format!("/api/e2ee/devices/gone-{index}"))
+            .await
+            .expect_status(404));
+    }
+    let limited = user.delete("/api/e2ee/devices/another").await;
+    assert_eq!(limited.status.as_u16(), 429, "{}", limited.text());
+    ok(other
+        .delete("/api/e2ee/devices/gone-0")
+        .await
+        .expect_status(404));
 }
 
 #[tokio::test]

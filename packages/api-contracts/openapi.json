@@ -511,6 +511,39 @@
         }
       }
     },
+    "/api/e2ee/devices/{deviceId}": {
+      "delete": {
+        "tags": [
+          "E2EE"
+        ],
+        "summary": "Removes one of the caller's devices by its client-chosen id, as signing out on it does; another user's id is not found.",
+        "operationId": "deleteE2eeDevice",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such device for the caller"
+          }
+        }
+      }
+    },
     "/api/e2ee/password": {
       "put": {
         "tags": [

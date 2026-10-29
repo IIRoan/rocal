@@ -1,7 +1,8 @@
 //! `/api/e2ee` handlers.
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Path, State};
+use solace_api_types::SuccessMessage;
 use solace_api_types::e2ee::{
     E2eeBootstrap, EncryptionDevice, PasswordEnvelope, PasswordEnvelopeRequest,
     RegisterDeviceRequest, ResetSnapshot,
@@ -13,9 +14,12 @@ use super::service;
 use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
+use crate::http::rate_limit::{self, Limit};
 use crate::http::zod;
 use crate::request_schema;
 use crate::state::AppState;
+
+const DELETE_DEVICE_LIMIT: Limit = Limit::per_minute(30);
 
 request_schema!(RegisterDeviceRequest => zod::object([
     ("deviceId", zod::string().min(1).max(128)),
@@ -43,6 +47,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(bootstrap))
         .routes(routes!(reset_snapshot))
         .routes(routes!(register_device))
+        .routes(routes!(delete_device))
         .routes(routes!(store_password_envelope))
 }
 
@@ -75,6 +80,20 @@ pub async fn register_device(
     ValidJson(body): ValidJson<RegisterDeviceRequest>,
 ) -> Result<Json<EncryptionDevice>, AppError> {
     Ok(Json(service::register_device(&state, &user, body).await?))
+}
+
+/// Removes one of the caller's devices by its client-chosen id, as signing out on it does; another user's id is not found.
+#[utoipa::path(delete, path = "/api/e2ee/devices/{deviceId}", operation_id = "deleteE2eeDevice", tag = "E2EE", params(("deviceId" = String, Path)), responses((status = 200, body = SuccessMessage), (status = 404, description = "No such device for the caller")))]
+#[tracing::instrument(skip_all)]
+pub async fn delete_device(
+    State(state): State<AppState>,
+    user: RouteUser,
+    Path(device_id): Path<String>,
+) -> Result<Json<SuccessMessage>, AppError> {
+    rate_limit::enforce("e2ee-devices", &user.id, DELETE_DEVICE_LIMIT)?;
+    Ok(Json(
+        service::delete_device(&state, &user, &device_id).await?,
+    ))
 }
 
 /// Stores or rotates the password-wrapped account keys used to unlock a new device.

@@ -1,5 +1,6 @@
 //! Key envelopes are stored as the client sent them (trimmed, defaults filled in); the server never unwraps them.
 
+use solace_api_types::SuccessMessage;
 use solace_api_types::e2ee::{
     E2eeAlgorithms, E2eeBootstrap, EncryptionCalendar, EncryptionCategory, EncryptionDevice,
     EncryptionEvent, PasswordEnvelope, PasswordEnvelopeRequest, RegisterDeviceRequest,
@@ -127,6 +128,22 @@ pub async fn register_device(
     let device = queries::upsert_device(&state.db, &user.id, device_id, keys).await?;
     tracing::info!(device_row_id = %device.id, "E2EE device registered");
     Ok(device_record(device))
+}
+
+/// Signing out deletes the device's private key, so its wrapped keys are useless and go too.
+pub async fn delete_device(
+    state: &AppState,
+    user: &RouteUser,
+    device_id: &str,
+) -> Result<SuccessMessage, AppError> {
+    if queries::delete_device(&state.db, &user.id, device_id).await? == 0 {
+        return Err(AppError::NotFound("Encryption device not found".into()));
+    }
+    tracing::info!("E2EE device removed");
+    Ok(SuccessMessage {
+        success: true,
+        message: "Encryption device removed".into(),
+    })
 }
 
 pub async fn store_password_envelope(
