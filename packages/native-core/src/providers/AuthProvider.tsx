@@ -107,10 +107,24 @@ const SIGNED_OUT: AuthState = {
   lastAuthMethod: "unknown",
 };
 
+/** Renewals return a new user object; keeping the old one stops effects keyed on it from restarting startup. */
+function isSameUser(current: User | null, next: User): current is User {
+  return (
+    current?.id === next.id &&
+    current.name === next.name &&
+    current.email === next.email &&
+    (current.image ?? null) === (next.image ?? null)
+  );
+}
+
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
     case "loaded":
-      return { ...state, user: action.user, session: action.session };
+      return {
+        ...state,
+        user: isSameUser(state.user, action.user) ? state.user : action.user,
+        session: action.session,
+      };
     case "cleared":
       return SIGNED_OUT;
     case "method":

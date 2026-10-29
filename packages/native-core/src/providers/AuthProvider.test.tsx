@@ -481,6 +481,17 @@ describe("AuthProvider", () => {
     expect(getFallbackSessionToken()).toBeNull();
   });
 
+  it("keeps the same user object when a renewal returns the same user", async () => {
+    jest.useFakeTimers();
+    mockGetSession.mockImplementation(async () => createAuthResult());
+    await renderProvider();
+    const user = getAuth().user;
+    await act(async () => { await jest.advanceTimersByTimeAsync(60 * 60 * 1000); });
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+    expect(getAuth().user).toBe(user);
+    jest.useRealTimers();
+  });
+
   it("renews hourly and on resume, retaining the session on network failure", async () => {
     jest.useFakeTimers();
     mockGetSession.mockResolvedValue(createAuthResult());
