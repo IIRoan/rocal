@@ -8,6 +8,9 @@ export const PRODUCT_ROUTES = {
 
 export const PRODUCT_ISSUES_URL = product.issuesUrl;
 
+/** Support handles forgotten passwords until account recovery exists. */
+export const FORGOT_PASSWORD_NOTICE = `Email ${product.supportEmail} from a different email address and include your Solace address. Solace does not reset passwords from the sign-in screen.`;
+
 export function supportContactUrl(
   value: unknown = product.supportEmail,
 ): string | null {

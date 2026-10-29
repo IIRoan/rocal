@@ -101,6 +101,7 @@ function AccountPasswordForm({
   mode: PasswordMode;
   onClose: () => void;
 }) {
+  const { user } = useAuth();
   const { resetEncryptionPassword } = useE2ee();
   const { toast } = useToast();
   const accountsQuery = useLinkedAuthAccounts();
@@ -119,6 +120,7 @@ function AccountPasswordForm({
         const result = await authClient.changePassword({
           currentPassword: form.currentPassword,
           newPassword: form.newPassword,
+          email: user?.email ?? "",
         });
         if (result?.error) {
           throw new Error(

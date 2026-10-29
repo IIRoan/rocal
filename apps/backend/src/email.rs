@@ -9,10 +9,11 @@ use crate::state::AppState;
 use crate::telemetry;
 
 const SHELL: &str = include_str!("email/shell.html");
-const PASSWORD_RESET: &str = include_str!("email/password_reset.html");
 const PASSWORD_UPDATED: &str = include_str!("email/password_updated.html");
 const INVITE: &str = include_str!("email/invite.html");
 const EVENT_INVITATION: &str = include_str!("email/event_invitation.html");
+/// Password resets go through support until account recovery exists; mirrors `supportEmail` in `product-info.json`.
+const SUPPORT_EMAIL: &str = "support@solace.onl";
 const LOGO_URL: &str = "https://solace.onl/favicon-192x192.png";
 const APP_URL: &str = "https://solace.onl";
 const FOOTER_SEPARATOR: &str = "\n<!-- footer -->\n";
@@ -57,69 +58,25 @@ fn layout(template: &str, title: &str, preview: &str, fill: &[(&str, &str)]) -> 
         .replace("{{FOOTER}}", &footer)
 }
 
-pub fn password_reset(name: &str, reset_url: &str) -> Message {
-    let html = layout(
-        PASSWORD_RESET,
-        "Reset your Solace password",
-        "Reset your Solace password — this link expires in 1 hour.",
-        &[
-            ("NAME", &escape_html(name)),
-            ("RESET_URL", &escape_html(reset_url)),
-        ],
-    );
-    let text = [
-        format!("Hi {name},"),
-        String::new(),
-        "Solace received a request to reset your password.".into(),
-        "If you sign in with email and password, Solace also uses that password to protect your encryption keys after you sign in.".into(),
-        "GitHub and passkey sign-in keep using a separate encryption password.".into(),
-        String::new(),
-        "Use the link below to choose a new password:".into(),
-        reset_url.into(),
-        String::new(),
-        "This link expires in 1 hour.".into(),
-        String::new(),
-        "If you did not request this change, you can safely ignore this email.".into(),
-    ]
-    .join("\n");
-    Message {
-        subject: "Reset your Solace password".into(),
-        text,
-        html,
-        attachments: Vec::new(),
-        message_id: None,
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum PasswordAction {
-    Changed,
-    Reset,
-}
-
-pub fn password_updated(name: &str, action: PasswordAction, sign_in_url: &str) -> Message {
-    let action = match action {
-        PasswordAction::Changed => "changed",
-        PasswordAction::Reset => "reset",
-    };
+pub fn password_updated(name: &str, sign_in_url: &str) -> Message {
     let html = layout(
         PASSWORD_UPDATED,
-        &format!("Your Solace password was {action}"),
-        &format!("Your Solace password was successfully {action}."),
+        "Your Solace password was changed",
+        "Your Solace password was successfully changed.",
         &[
             ("NAME", &escape_html(name)),
             ("SIGN_IN_URL", &escape_html(sign_in_url)),
-            ("ACTION", &escape_html(action)),
+            ("SUPPORT_EMAIL", &escape_html(SUPPORT_EMAIL)),
         ],
     );
     let text = [
         format!("Hi {name},"),
         String::new(),
-        format!("This is a confirmation that your Solace password was {action}."),
+        "This is a confirmation that your Solace password was changed.".into(),
         "If you made this change, no further action is needed.".into(),
         "After you sign in with email and password, Solace will also use this password to protect your encryption keys.".into(),
         "GitHub and passkey sign-in keep using a separate encryption password.".into(),
-        format!("If you did not make this change, reset your password immediately: {sign_in_url}"),
+        format!("If you did not make this change, email {SUPPORT_EMAIL} from another address right away."),
     ]
     .join("\n");
     Message {
@@ -362,30 +319,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reset_mail_escapes_the_name_in_html() {
-        let message = password_reset("<Roan>", "https://solace.test/reset?token=abc");
-        assert_eq!(message.subject, "Reset your Solace password");
-        assert!(message.text.contains("https://solace.test/reset?token=abc"));
+    fn updated_mail_sends_strangers_to_support() {
+        let changed = password_updated("<Roan>", "https://solace.test/login");
+        assert_eq!(changed.subject, "Your Solace password was updated");
+        assert!(changed.text.contains("was changed") && changed.html.contains("Open Solace"));
         assert!(
-            message
+            changed
                 .text
-                .contains("GitHub and passkey sign-in keep using a separate encryption password.")
+                .contains("email support@solace.onl from another address")
         );
-        assert!(message.html.contains("Hi &lt;Roan&gt;"));
-        assert!(message.html.contains("Reset password"));
-        assert!(!message.html.contains("{{"), "every placeholder is filled");
-    }
-
-    #[test]
-    fn updated_mail_names_the_action() {
-        let reset = password_updated("Roan", PasswordAction::Reset, "https://solace.test/login");
-        assert_eq!(reset.subject, "Your Solace password was updated");
-        assert!(reset.text.contains("was reset") && reset.html.contains("Open Solace"));
-        let changed =
-            password_updated("Roan", PasswordAction::Changed, "https://solace.test/login");
-        assert!(
-            changed.text.contains("was changed") && changed.html.contains("password was changed")
-        );
+        assert!(changed.html.contains("Hi &lt;Roan&gt;"));
+        assert!(!changed.html.contains("{{"), "every placeholder is filled");
     }
 
     /// A state without a database; its mailer, when configured, points at a closed port.
@@ -410,14 +354,13 @@ mod tests {
         .unwrap()
     }
 
-    fn reset() -> Message {
-        password_reset("Roan", "https://solace.test/reset?token=abc")
+    fn required() -> Message {
+        invite("Roan", "https://solace.test/login", "abc")
     }
 
     #[tokio::test]
     async fn password_update_notices_are_best_effort() {
-        let message =
-            password_updated("Roan", PasswordAction::Changed, "https://solace.test/login");
+        let message = password_updated("Roan", "https://solace.test/login");
         let sent = send(
             &state(false, true),
             "password update notification",
@@ -433,18 +376,18 @@ mod tests {
     async fn a_missing_mailer_is_logged_in_development() {
         let sent = send(
             &state(false, false),
-            "password reset",
+            "invite",
             "roan@solace.test",
-            &reset(),
+            &required(),
             Mode::Required,
         )
         .await;
         assert!(matches!(sent, Ok(false)), "{sent:?}");
         let sent = send(
             &state(true, false),
-            "password reset",
+            "invite",
             "roan@solace.test",
-            &reset(),
+            &required(),
             Mode::Required,
         )
         .await;
@@ -455,15 +398,15 @@ mod tests {
     async fn required_mail_failures_are_errors() {
         let sent = send(
             &state(false, true),
-            "password reset",
+            "invite",
             "roan@solace.test",
-            &reset(),
+            &required(),
             Mode::Required,
         )
         .await;
         assert_eq!(
             sent.unwrap_err().to_string(),
-            "password reset email could not be delivered"
+            "invite email could not be delivered"
         );
     }
 

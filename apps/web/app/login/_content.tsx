@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
-import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
+import { resolveAuthRedirectTarget } from "@/lib/api-url";
+import { FORGOT_PASSWORD_NOTICE } from "@workspace/calendar-core/product-info";
 import {
   completeAuthNavigation,
   isAuthNavigationPending,
@@ -65,39 +66,6 @@ async function fetchInviteTokenValidation(trimmed: string) {
     return await inviteApiService.validateInviteToken(trimmed);
   } catch {
     return { valid: false as const, reason: "Could not validate token" };
-  }
-}
-
-async function requestPasswordResetForLogin(email: string, redirectTo: string) {
-  try {
-    const result = await authClient.requestPasswordReset({
-      email,
-      redirectTo,
-    });
-
-    if (result?.error) {
-      return {
-        errorMessage:
-          result.error.message ||
-          "Unable to send a password reset link for your email sign-in password.",
-        notice: null,
-      };
-    }
-
-    return {
-      errorMessage: null,
-      notice:
-        "If an account exists for that email, Solace sent a password reset link for your email sign-in password.",
-    };
-  } catch (err) {
-    log.error("Password reset request failed:", err);
-    return {
-      errorMessage: getErrorMessage(
-        err,
-        "Unable to send a password reset link for your email sign-in password.",
-      ),
-      notice: null,
-    };
   }
 }
 
@@ -304,11 +272,10 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
   } = useSession();
   const router = useSmoothRouter();
   const isCheckingSession = isPending;
-  const { nextPath, callbackUrl, resetSucceeded, stepUpRequired } =
+  const { nextPath, callbackUrl, stepUpRequired } =
     loginSearchParams;
 
   const isSignUp = authMode === "sign-up";
-  const isForgotPassword = authMode === "forgot-password";
   const { overlayVisible, overlayFading, requiresPasskeyStepUp } = loginSessionUi;
 
   const getRedirectTarget = () =>
@@ -898,61 +865,21 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     dispatchChrome({ type: "finish-email-auth" });
   };
 
-  async function handleForgotPassword(event: React.FormEvent) {
-    event.preventDefault();
-    dispatchChrome({ type: "start-email-auth" });
+  const title = isSignUp
+    ? "Create an account"
+    : requiresPasskeyStepUp
+      ? "Verify your passkey"
+      : "Welcome back";
 
-    if (!email.trim()) {
-      dispatchChrome({
-        type: "set-error",
-        error: "Please enter your email address.",
-      });
-      dispatchChrome({ type: "finish-email-auth" });
-      return;
-    }
+  const subtitle = isSignUp
+    ? `Choose your @${signupDomain} Solace email and password. Your Solace email becomes both your account address and mailbox, and this password is used locally to protect your encrypted mail vault.`
+    : requiresPasskeyStepUp
+      ? "This device still needs to verify a passkey registered on another device."
+      : "Sign in with your email and password. If your account has passkeys, you'll verify with one right after.";
 
-    const resetResult = await requestPasswordResetForLogin(
-      email.trim(),
-      new URL("/reset-password", getAppBaseUrl()).toString(),
-    );
+  const primaryButtonLabel = isSignUp ? "Create account" : "Sign in";
 
-    if (resetResult.errorMessage) {
-      dispatchChrome({ type: "set-error", error: resetResult.errorMessage });
-      dispatchChrome({ type: "finish-email-auth" });
-      return;
-    }
-
-    dispatchChrome({ type: "set-notice", notice: resetResult.notice });
-    dispatchChrome({ type: "finish-email-auth" });
-  };
-
-  const title = isForgotPassword
-    ? "Reset your email sign-in password"
-    : isSignUp
-      ? "Create an account"
-      : requiresPasskeyStepUp
-        ? "Verify your passkey"
-        : "Welcome back";
-
-  const subtitle = isForgotPassword
-    ? "Enter your Solace account email and Solace will send a reset link for your email sign-in password."
-    : isSignUp
-      ? `Choose your @${signupDomain} Solace email and password. Your Solace email becomes both your account address and mailbox, and this password is used locally to protect your encrypted mail vault.`
-      : requiresPasskeyStepUp
-        ? "This device still needs to verify a passkey registered on another device."
-        : "Sign in with your email and password. If your account has passkeys, you'll verify with one right after.";
-
-  const primaryButtonLabel = isForgotPassword
-    ? "Send reset link"
-    : isSignUp
-      ? "Create account"
-      : "Sign in";
-
-  const primaryLoadingLabel = isForgotPassword
-    ? "Sending link…"
-    : isSignUp
-      ? "Creating account…"
-      : "Signing in…";
+  const primaryLoadingLabel = isSignUp ? "Creating account…" : "Signing in…";
 
   return (
     <>
@@ -979,16 +906,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
             </div>
 
             <div>
-              {resetSucceeded && !isForgotPassword ? (
-                <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
-                  <p className="text-sm text-foreground">
-                    Your email sign-in password has been updated. The next time
-                    you sign in with email, Solace will also use it to protect
-                    your encryption keys.
-                  </p>
-                </div>
-              ) : null}
-
               {notice ? (
                 <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
                   <p className="text-sm text-foreground">{notice}</p>
@@ -1004,12 +921,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                 </div>
               ) : null}
 
-              <form
-                onSubmit={
-                  isForgotPassword ? handleForgotPassword : handleEmailAuth
-                }
-                className="space-y-5"
-              >
+              <form onSubmit={handleEmailAuth} className="space-y-5">
                 <AnimatedCollapse isOpen={isSignUp}>
                   <div className="space-y-2 pb-0.5">
                     <Label htmlFor="name" className="text-sm font-medium">
@@ -1197,70 +1109,73 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                   </div>
                 </AnimatedCollapse>
 
-                <AnimatedCollapse isOpen={!isForgotPassword}>
-                  <div className="space-y-2 pb-0.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <Label htmlFor="password" className="text-sm font-medium">
-                        Password
-                      </Label>
-                      {!isSignUp ? (
-                        <button
-                          type="button"
-                          onClick={() => switchMode("forgot-password")}
-                          className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
-                        >
-                          Forgot password?
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        name="password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete={
-                          isSignUp ? "new-password" : "current-password"
-                        }
-                        placeholder="Enter your password"
-                        value={password}
-                        onChange={(e) =>
-                          dispatchFields({
-                            type: "set-password",
-                            password: e.target.value,
-                          })
-                        }
-                        required={!isForgotPassword}
-                        disabled={emailLoading}
-                        className="h-11 rounded-lg pr-10"
-                      />
+                <div className="space-y-2 pb-0.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="password" className="text-sm font-medium">
+                      Password
+                    </Label>
+                    {!isSignUp ? (
                       <button
                         type="button"
                         onClick={() =>
-                          dispatchFields({ type: "toggle-show-password" })
+                          dispatchChrome({
+                            type: "set-notice",
+                            notice: FORGOT_PASSWORD_NOTICE,
+                          })
                         }
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
+                        className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
                       >
-                        {showPassword ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
+                        Forgot password?
                       </button>
-                    </div>
-                    {isSignUp && password.length > 0 && (
-                      <PasswordRequirements password={password} />
-                    )}
-                    {isSignUp && password.length === 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Min. 8 characters with uppercase, lowercase, number
-                        &amp; special character.
-                      </p>
-                    )}
+                    ) : null}
                   </div>
-                </AnimatedCollapse>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete={
+                        isSignUp ? "new-password" : "current-password"
+                      }
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) =>
+                        dispatchFields({
+                          type: "set-password",
+                          password: e.target.value,
+                        })
+                      }
+                      required
+                      disabled={emailLoading}
+                      className="h-11 rounded-lg pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        dispatchFields({ type: "toggle-show-password" })
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                    >
+                      {showPassword ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </button>
+                  </div>
+                  {isSignUp && password.length > 0 && (
+                    <PasswordRequirements password={password} />
+                  )}
+                  {isSignUp && password.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Min. 8 characters with uppercase, lowercase, number
+                      &amp; special character.
+                    </p>
+                  )}
+                </div>
 
                 <Button
                   type="submit"
@@ -1285,74 +1200,59 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                 </Button>
               </form>
 
-              <AnimatedCollapse isOpen={!isForgotPassword}>
-                <div className="pb-0.5">
-                  {requiresPasskeyStepUp && isPasskeySupported ? (
-                    <>
-                      <div className="my-6 flex items-center gap-3">
-                        <div className="h-px flex-1 bg-border" />
-                        <span className="text-xs font-medium text-muted-foreground">
-                          second factor required
-                        </span>
-                        <div className="h-px flex-1 bg-border" />
-                      </div>
+              <div className="pb-0.5">
+                {requiresPasskeyStepUp && isPasskeySupported ? (
+                  <>
+                    <div className="my-6 flex items-center gap-3">
+                      <div className="h-px flex-1 bg-border" />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        second factor required
+                      </span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
 
-                      <Button
-                        onClick={handlePasskeyStepUp}
-                        disabled={passkeyLoading}
-                        variant="outline"
-                        className="h-11 w-full rounded-lg"
-                        aria-busy={passkeyLoading}
-                      >
-                        {passkeyLoading ? (
-                          <>
-                            <div
-                              className="size-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
-                              style={{
-                                borderTopColor: "currentColor",
-                                opacity: 1,
-                              }}
-                              aria-hidden="true"
-                            />
-                            <span>Waiting for your passkey…</span>
-                          </>
-                        ) : (
-                          <>
-                            <Key className="size-4" />
-                            <span>Use passkey</span>
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
-              </AnimatedCollapse>
+                    <Button
+                      onClick={handlePasskeyStepUp}
+                      disabled={passkeyLoading}
+                      variant="outline"
+                      className="h-11 w-full rounded-lg"
+                      aria-busy={passkeyLoading}
+                    >
+                      {passkeyLoading ? (
+                        <>
+                          <div
+                            className="size-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                            style={{
+                              borderTopColor: "currentColor",
+                              opacity: 1,
+                            }}
+                            aria-hidden="true"
+                          />
+                          <span>Waiting for your passkey…</span>
+                        </>
+                      ) : (
+                        <>
+                          <Key className="size-4" />
+                          <span>Use passkey</span>
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : null}
+              </div>
 
-              {isForgotPassword ? (
-                <p className="mt-6 text-center text-sm text-muted-foreground">
-                  Remembered your password?{" "}
-                  <button
-                    type="button"
-                    onClick={() => switchMode("sign-in")}
-                    className="font-medium text-primary transition-colors hover:text-primary/80"
-                  >
-                    Back to sign in
-                  </button>
-                </p>
-              ) : (
-                <p className="mt-6 text-center text-sm text-muted-foreground">
-                  {isSignUp
-                    ? "Already have an account?"
-                    : "Don't have an account?"}{" "}
-                  <button
-                    type="button"
-                    onClick={() => switchMode(isSignUp ? "sign-in" : "sign-up")}
-                    className="font-medium text-primary transition-colors hover:text-primary/80 underline-offset-4 hover:underline"
-                  >
-                    {isSignUp ? "Sign in" : "Sign up"}
-                  </button>
-                </p>
-              )}
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                {isSignUp
+                  ? "Already have an account?"
+                  : "Don't have an account?"}{" "}
+                <button
+                  type="button"
+                  onClick={() => switchMode(isSignUp ? "sign-in" : "sign-up")}
+                  className="font-medium text-primary transition-colors hover:text-primary/80 underline-offset-4 hover:underline"
+                >
+                  {isSignUp ? "Sign in" : "Sign up"}
+                </button>
+              </p>
 
               <p className="mt-6 text-center text-xs text-muted-foreground">
                 Before continuing, please read Solace&apos;s{" "}

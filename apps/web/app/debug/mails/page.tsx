@@ -5,9 +5,8 @@ import { MailViewer, type EmailPreview } from "./mail-viewer";
 // ─── Fake data ────────────────────────────────────────────────────────────────
 
 const FAKE_NAME = "Alex Rivera";
-const FAKE_RESET_URL =
-  "https://solace.example.com/reset-password?token=preview_token_abc123xyz456";
 const FAKE_SIGN_IN_URL = "https://solace.example.com/login";
+const SUPPORT_EMAIL = "support@solace.onl";
 const LOGO_URL = "https://solace.onl/favicon-192x192.png";
 const APP_URL = "https://solace.example.com";
 
@@ -80,53 +79,16 @@ function buildEmailHtml({
 </html>`;
 }
 
-function buildPasswordResetHtml(): string {
-  const safeName = escapeHtml(FAKE_NAME);
-  const safeResetUrl = escapeHtml(FAKE_RESET_URL);
-
-  const bodyHtml = `
-    <h1 class="email-title" style="margin:0;font-size:22px;line-height:130%;font-weight:700;letter-spacing:-0.01em;color:#000">Reset your password</h1>
-    <p class="email-subtitle" style="margin:6px 0 0;font-size:15px;line-height:130%;color:rgba(0,0,0,0.50)">Hi ${safeName}</p>
-    <p class="email-body" style="margin:20px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
-      Solace received a request to reset your password.
-      Click the button below to choose a new one &mdash; this link expires in&nbsp;<strong>1&nbsp;hour</strong>.
-    </p>
-    <p class="email-body" style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
-      If you sign in with email and password, Solace also uses that password to protect your encryption keys after you sign in. GitHub and passkey sign-in keep using a separate encryption password.
-    </p>
-    <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:fit-content;line-height:100%;padding:24px 0 0">
-      <tbody><tr><td align="center" valign="middle">
-        <a class="email-btn" href="${safeResetUrl}" style='display:inline-block;background:#fff;color:#000;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px;font-weight:500;line-height:100%;margin:0;text-decoration:none;padding:12px 20px;border:1px solid rgba(0,0,0,0.12);border-bottom:2px solid rgba(0,0,0,0.12);border-radius:12px'>Reset password</a>
-      </td></tr></tbody>
-    </table>
-    <p class="email-footer" style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#a8a8a8">
-      If the button doesn&rsquo;t work, copy this link:
-      <a href="${safeResetUrl}" style="color:#a8a8a8;text-decoration:underline;word-break:break-all">${safeResetUrl}</a>
-    </p>`;
-
-  const footerHtml = `
-    <p class="email-footer" style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#a8a8a8">
-      If you didn&rsquo;t request a password reset, you can safely ignore this email.
-    </p>`;
-
-  return buildEmailHtml({
-    title: "Reset your Solace password",
-    previewText: "Reset your Solace password — this link expires in 1 hour.",
-    bodyHtml,
-    footerHtml,
-  });
-}
-
-function buildPasswordUpdatedHtml(action: "changed" | "reset"): string {
+function buildPasswordUpdatedHtml(): string {
   const safeName = escapeHtml(FAKE_NAME);
   const safeSignInUrl = escapeHtml(FAKE_SIGN_IN_URL);
-  const actionText = action === "reset" ? "reset" : "changed";
+  const safeSupportEmail = escapeHtml(SUPPORT_EMAIL);
 
   const bodyHtml = `
-    <h1 class="email-title" style="margin:0;font-size:22px;line-height:130%;font-weight:700;letter-spacing:-0.01em;color:#000">Your password was ${escapeHtml(actionText)}</h1>
+    <h1 class="email-title" style="margin:0;font-size:22px;line-height:130%;font-weight:700;letter-spacing:-0.01em;color:#000">Your password was changed</h1>
     <p class="email-subtitle" style="margin:6px 0 0;font-size:15px;line-height:130%;color:rgba(0,0,0,0.50)">Hi ${safeName}</p>
     <p class="email-body" style="margin:20px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
-      This is a confirmation that your Solace password was successfully <strong>${escapeHtml(actionText)}</strong>.
+      This is a confirmation that your Solace password was successfully <strong>changed</strong>.
       If you made this change, no further action is needed &mdash; you&rsquo;re all set.
     </p>
     <p class="email-body" style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
@@ -140,13 +102,12 @@ function buildPasswordUpdatedHtml(action: "changed" | "reset"): string {
 
   const footerHtml = `
     <p class="email-footer" style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#a8a8a8">
-      If you did not make this change, reset your password immediately.
-      Visit <a href="${safeSignInUrl}" style="color:#a8a8a8;text-decoration:underline">${safeSignInUrl}</a>.
+      If you did not make this change, email <a href="mailto:${safeSupportEmail}" style="color:#a8a8a8;text-decoration:underline">${safeSupportEmail}</a> from another address right away.
     </p>`;
 
   return buildEmailHtml({
-    title: `Your Solace password was ${actionText}`,
-    previewText: `Your Solace password was successfully ${actionText}.`,
+    title: "Your Solace password was changed",
+    previewText: "Your Solace password was successfully changed.",
     bodyHtml,
     footerHtml,
   });
@@ -245,31 +206,13 @@ export default function DebugMailsPage() {
 
   const previews: EmailPreview[] = [
     {
-      id: "password-reset",
-      category: "Authentication",
-      label: "Password Reset Link",
-      description:
-        "Sent when a user requests a password reset. Contains a one-time link valid for 1 hour.",
-      subject: "Reset your Solace password",
-      html: buildPasswordResetHtml(),
-    },
-    {
       id: "password-changed",
       category: "Authentication",
       label: "Password Changed",
       description:
         "Security notification sent after a user successfully changes their password from account settings.",
       subject: "Your Solace password was updated",
-      html: buildPasswordUpdatedHtml("changed"),
-    },
-    {
-      id: "password-reset-confirm",
-      category: "Authentication",
-      label: "Password Reset Confirmation",
-      description:
-        "Security notification sent after a user resets their password via the email reset link.",
-      subject: "Your Solace password was updated",
-      html: buildPasswordUpdatedHtml("reset"),
+      html: buildPasswordUpdatedHtml(),
     },
     {
       id: "event-reminder",

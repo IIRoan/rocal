@@ -8,7 +8,6 @@ describe("readLoginSearchParams", () => {
     ).toEqual({
       nextPath: "/calendar",
       callbackUrl: null,
-      resetSucceeded: false,
       inviteToken: null,
       stepUpRequired: true,
     });

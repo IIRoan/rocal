@@ -26,6 +26,10 @@ const PASSWORD_SALT_BYTES = 16;
 export const PASSWORD_KDF_ALGORITHM = "PBKDF2-SHA-256";
 export const PASSWORD_WRAP_ALGORITHM = "AES-GCM-256";
 export const DEFAULT_PASSWORD_KDF_ITERATIONS = 310000;
+/** Mirrors `apps/backend/src/auth/password.rs`; changing any of these locks every account out. */
+const AUTH_KEY_PREFIX = "solace-ak1:";
+const AUTH_KEY_SALT_PREFIX = "solace-auth-key-v1:";
+const AUTH_KEY_ITERATIONS = 600000;
 
 // ---------------------------------------------------------------------------
 // Payload types
@@ -212,6 +216,8 @@ export interface E2eeModule {
   ): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }>;
   generatePasswordSalt(): string;
   generateDeviceId(): string;
+  /** What clients send instead of the password: unlike the envelope's random salt, this one is the email, so the server never sees the password or the envelope key. */
+  deriveAuthKey(password: string, email: string): Promise<string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -521,6 +527,33 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
     return crypto.randomUUID();
   }
 
+  async function deriveAuthKey(password: string, email: string): Promise<string> {
+    const passwordKey = await crypto.subtle.importKey(
+      "raw",
+      textEncoder.encode(password.normalize("NFKC")),
+      PBKDF2_ALGORITHM,
+      false,
+      ["deriveKey"],
+    );
+    // The provider has no deriveBits, so the 32 bytes come out as an exportable AES key.
+    const derived = await crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: textEncoder.encode(
+          `${AUTH_KEY_SALT_PREFIX}${email.trim().toLowerCase()}`,
+        ),
+        iterations: AUTH_KEY_ITERATIONS,
+        hash: "SHA-256",
+      },
+      passwordKey,
+      AES_GCM_ALGORITHM,
+      true,
+      ["encrypt"],
+    );
+    const raw = await crypto.subtle.exportKey("raw", derived);
+    return `${AUTH_KEY_PREFIX}${bytesToBase64Url(new Uint8Array(raw))}`;
+  }
+
   return {
     generateWrappingKeyPair,
     exportWrappingPublicKey,
@@ -537,5 +570,6 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
     unwrapPasswordEnvelope,
     generatePasswordSalt,
     generateDeviceId,
+    deriveAuthKey,
   };
 }

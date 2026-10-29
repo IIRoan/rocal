@@ -487,14 +487,16 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
     .await;
     let participants = [participant.clone(), organizer.clone(), typed.clone()];
 
-    ok(app
-        .anonymous()
-        .post(
-            "/api/auth/request-password-reset",
-            json!({"email": victim.email, "redirectTo": format!("{}/reset-password", app.origin)}),
-        )
-        .await
-        .and_then(|r| r.expect_status(200)));
+    // Reset links are gone, but production still holds unexpired ones until the hourly cleanup.
+    let reset_id = format!("reset-{}", crate::helpers::hex(8));
+    let reset_identifier = format!("reset-password:{}", crate::helpers::hex(12));
+    exec(
+        &app.db,
+        "INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at) \
+         VALUES ($1, $2, $3, now() + interval '1 hour', now(), now())",
+        &[&reset_id, &reset_identifier, &victim.id],
+    )
+    .await;
     let one_time_token = ok(victim
         .get("/api/auth/one-time-token/generate")
         .await

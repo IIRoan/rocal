@@ -59,6 +59,7 @@ export function useCommandPaletteController({
   const queryClient = useQueryClient();
   const { data: session, isPending: sessionLoading } = useSession();
   const sessionUserId = session?.user?.id ?? null;
+  const sessionEmail = session?.user?.email ?? null;
   const accountsQuery = useLinkedAuthAccounts();
   const { setCurrentDate, setCurrentView: setCalendarView } =
     useCalendarContext();
@@ -211,13 +212,14 @@ export function useCommandPaletteController({
     currentPassword: string;
     newPassword: string;
   }) => {
-    if (!sessionUserId) {
+    if (!sessionUserId || !sessionEmail) {
       throw new Error("Your session is unavailable. Please try again.");
     }
 
     dispatchBusy({ type: "setChangingPassword", value: true });
     const result = await persistPasswordChange({
       sessionUserId,
+      email: sessionEmail,
       currentPassword,
       newPassword,
     });

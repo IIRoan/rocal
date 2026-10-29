@@ -16,13 +16,11 @@ import {
 import { Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
-import { authClient } from "@workspace/native-core/lib/auth-client";
-import { APP_BASE_URL } from "@workspace/native-core/lib/constants";
+import { FORGOT_PASSWORD_NOTICE } from "@workspace/calendar-core/product-info";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { AUTH_SIGN_UP_ROUTE } from "@workspace/native-core/lib/auth-routing";
 import { resolvePasskeyAutoPromptAction } from "@workspace/native-core/lib/passkey-step-up-prompt";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
-import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import { ThemeToggle } from "@workspace/native-core/components/ThemeToggle";
 import { AppInformationLinks } from "@workspace/native-core/components/AppInformationLinks";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -42,53 +40,33 @@ function validatePassword(password: string): string | null {
   return null;
 }
 
-function resolvePasswordResetRedirectUrl(): string | null {
-  if (!APP_BASE_URL) {
-    return null;
-  }
+type SignInErrors = {
+  email: string | null;
+  password: string | null;
+  server: string | null;
+};
 
-  try {
-    return new URL("/reset-password", APP_BASE_URL).toString();
-  } catch {
-    return `${APP_BASE_URL.replace(/\/+$/, "")}/reset-password`;
-  }
-}
+const NO_ERRORS: SignInErrors = { email: null, password: null, server: null };
 
 export function SignInScreen() {
   const { signIn, requiresPasskeyStepUp, completePasskeyStepUp } = useAuth();
-  const { toast } = useToast();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [isResetMode, setIsResetMode] = useState(false);
-
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [isRequestingPasswordReset, setIsRequestingPasswordReset] =
-    useState(false);
-  const [isVerifyingPasskey, setIsVerifyingPasskey] = useState(false);
+  const [errors, setErrors] = useState<SignInErrors>(NO_ERRORS);
+  const [pending, setPending] = useState<"sign-in" | "passkey" | null>(null);
   const hasStartedPasskeyPromptRef = useRef(false);
+  const signInInFlightRef = useRef(false);
 
   const passwordRef = useRef<TextInput>(null);
 
-  const clearErrors = useCallback(() => {
-    setEmailError(null);
-    setPasswordError(null);
-    setServerError(null);
-  }, []);
-
   const handleSignIn = useCallback(async () => {
-    clearErrors();
-
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
 
-    if (eErr) setEmailError(eErr);
-    if (pErr) setPasswordError(pErr);
+    setErrors({ email: eErr, password: pErr, server: null });
     if (eErr || pErr) {
       log.warn("Sign-in validation failed", {
         emailError: eErr,
@@ -98,14 +76,17 @@ export function SignInScreen() {
     }
 
     log.info("Attempting email sign-in", { email: email.trim() });
-    setIsSigningIn(true);
+    setPending("sign-in");
+    signInInFlightRef.current = true;
     try {
       const result = await signIn(email.trim(), password);
       log.ok("Sign-in successful");
       if (result.requiresPasskeyStepUp) {
-        setServerError(
-          "Password accepted, but passkeys are unavailable on this device. Sign in from a device that can verify your passkey.",
-        );
+        setErrors({
+          ...NO_ERRORS,
+          server:
+            "Password accepted, but passkeys are unavailable on this device. Sign in from a device that can verify your passkey.",
+        });
       }
     } catch (err: unknown) {
       const message =
@@ -113,66 +94,17 @@ export function SignInScreen() {
           ? err.message
           : "Sign-in failed. Please check your credentials.";
       log.error("Sign-in failed", err);
-      setServerError(message);
+      setErrors({ ...NO_ERRORS, server: message });
     } finally {
-      setIsSigningIn(false);
+      signInInFlightRef.current = false;
+      setPending(null);
     }
-  }, [clearErrors, email, password, signIn]);
-
-  const handleRequestPasswordReset = useCallback(async () => {
-    clearErrors();
-
-    const eErr = validateEmail(email);
-    if (eErr) {
-      setEmailError(eErr);
-      return;
-    }
-
-    const redirectTo = resolvePasswordResetRedirectUrl();
-    if (!redirectTo) {
-      setServerError(
-        "Password reset is unavailable because the public app URL is not configured.",
-      );
-      return;
-    }
-
-    log.info("Requesting password reset", { email: email.trim() });
-    setIsRequestingPasswordReset(true);
-
-    try {
-      const result = await authClient.requestPasswordReset({
-        email: email.trim(),
-        redirectTo,
-      });
-
-      if (result?.error) {
-        throw new Error(
-          result.error.message ?? "Unable to send a password reset link.",
-        );
-      }
-
-      Alert.alert(
-        "Check your email",
-        "If an account exists for that email, Solace sent a password reset link for your email sign-in password.",
-      );
-      toast("Password reset link sent");
-      setIsResetMode(false);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : "Unable to send a password reset link right now.";
-      log.error("Password reset request failed", err);
-      setServerError(message);
-    } finally {
-      setIsRequestingPasswordReset(false);
-    }
-  }, [clearErrors, email, toast]);
+  }, [email, password, signIn]);
 
   const handleVerifyPasskey = useCallback(async () => {
     hasStartedPasskeyPromptRef.current = true;
-    clearErrors();
-    setIsVerifyingPasskey(true);
+    setErrors(NO_ERRORS);
+    setPending("passkey");
     try {
       await completePasskeyStepUp();
     } catch (err: unknown) {
@@ -181,16 +113,17 @@ export function SignInScreen() {
           ? err.message
           : "Passkey verification failed. Please try again.";
       log.error("Passkey verification failed", err);
-      setServerError(message);
+      setErrors({ ...NO_ERRORS, server: message });
     } finally {
-      setIsVerifyingPasskey(false);
+      setPending(null);
     }
-  }, [clearErrors, completePasskeyStepUp]);
+  }, [completePasskeyStepUp]);
 
+  // The step-up flag comes from the auth provider; a password sign-in on this screen handles its own step-up.
   useEffect(() => {
     const action = resolvePasskeyAutoPromptAction({
       requiresPasskeyStepUp,
-      isPasswordSignInInFlight: isSigningIn,
+      isPasswordSignInInFlight: signInInFlightRef.current,
       hasStartedPrompt: hasStartedPasskeyPromptRef.current,
     });
 
@@ -200,35 +133,16 @@ export function SignInScreen() {
 
     hasStartedPasskeyPromptRef.current = true;
     if (action === "prompt") {
-      void handleVerifyPasskey();
+      handleVerifyPasskey().catch(() => undefined);
     }
-  }, [handleVerifyPasskey, isSigningIn, requiresPasskeyStepUp]);
+  }, [handleVerifyPasskey, requiresPasskeyStepUp]);
 
-  const switchMode = useCallback(
-    (nextMode: boolean) => {
-      setIsResetMode(nextMode);
-      clearErrors();
+  const isLoading = pending !== null;
 
-      if (nextMode) {
-        setPassword("");
-      }
-    },
-    [clearErrors],
-  );
-
-  const isLoading =
-    isSigningIn || isRequestingPasswordReset || isVerifyingPasskey;
-
-  const title = isResetMode
-    ? "Reset your email sign-in password"
-    : requiresPasskeyStepUp
-      ? "Verify your passkey"
-      : "Welcome back";
-  const subtitle = isResetMode
-    ? "Enter your email and Solace will send a web link to reset your email sign-in password."
-    : requiresPasskeyStepUp
-      ? "This device still needs to verify a passkey registered on another device."
-      : "Sign in with your email and password.";
+  const title = requiresPasskeyStepUp ? "Verify your passkey" : "Welcome back";
+  const subtitle = requiresPasskeyStepUp
+    ? "This device still needs to verify a passkey registered on another device."
+    : "Sign in with your email and password.";
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -251,22 +165,22 @@ export function SignInScreen() {
               <Text style={styles.subtitle}>{subtitle}</Text>
             </View>
 
-            {serverError ? (
+            {errors.server ? (
               <View style={styles.serverErrorContainer}>
-                <Text style={styles.serverErrorText}>{serverError}</Text>
+                <Text style={styles.serverErrorText}>{errors.server}</Text>
               </View>
             ) : null}
 
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Email</Text>
               <TextInput
-                style={[styles.input, emailError && styles.inputError]}
+                style={[styles.input, errors.email && styles.inputError]}
                 placeholder="you@example.com"
                 placeholderTextColor={theme.colors.mutedForeground}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
-                  if (emailError) setEmailError(null);
+                  if (errors.email) setErrors({ ...errors, email: null });
                 }}
                 autoCapitalize="none"
                 autoComplete="email"
@@ -274,70 +188,55 @@ export function SignInScreen() {
                 inputMode="email"
                 keyboardType="email-address"
                 textContentType="emailAddress"
-                returnKeyType={isResetMode ? "done" : "next"}
-                onSubmitEditing={() => {
-                  if (isResetMode) {
-                    void handleRequestPasswordReset();
-                  } else {
-                    passwordRef.current?.focus();
-                  }
-                }}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
                 editable={!isLoading}
                 accessibilityLabel="Email address"
                 accessibilityHint="Enter your email address"
               />
-              {emailError ? (
-                <Text style={styles.fieldError}>{emailError}</Text>
+              {errors.email ? (
+                <Text style={styles.fieldError}>{errors.email}</Text>
               ) : null}
             </View>
 
-            {!isResetMode ? (
-              <View style={styles.fieldContainer}>
-                <View style={styles.inlineLabelRow}>
-                  <Text style={styles.label}>Password</Text>
-                  <Pressable
-                    onPress={() => switchMode(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Forgot password"
-                  >
-                    <Text style={styles.inlineLink}>Forgot password?</Text>
-                  </Pressable>
-                </View>
-                <TextInput
-                  ref={passwordRef}
-                  style={[styles.input, passwordError && styles.inputError]}
-                  placeholder="Enter your password"
-                  placeholderTextColor={theme.colors.mutedForeground}
-                  value={password}
-                  onChangeText={(text) => {
-                    setPassword(text);
-                    if (passwordError) setPasswordError(null);
-                  }}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoComplete="password"
-                  autoCorrect={false}
-                  textContentType="password"
-                  returnKeyType="done"
-                  onSubmitEditing={handleSignIn}
-                  editable={!isLoading}
-                  accessibilityLabel="Password"
-                  accessibilityHint="Enter your password"
-                />
-                {passwordError ? (
-                  <Text style={styles.fieldError}>{passwordError}</Text>
-                ) : null}
+            <View style={styles.fieldContainer}>
+              <View style={styles.inlineLabelRow}>
+                <Text style={styles.label}>Password</Text>
+                <Pressable
+                  onPress={() =>
+                    Alert.alert("Forgot your password?", FORGOT_PASSWORD_NOTICE)
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Forgot password"
+                >
+                  <Text style={styles.inlineLink}>Forgot password?</Text>
+                </Pressable>
               </View>
-            ) : (
-              <View style={styles.helperCard}>
-                <Text style={styles.helperText}>
-                  Solace will email you a secure link to reset your email sign-in
-                  password on the web. If you sign in with email, Solace also
-                  uses that password to protect your encryption keys after you
-                  sign in.
-                </Text>
-              </View>
-            )}
+              <TextInput
+                ref={passwordRef}
+                style={[styles.input, errors.password && styles.inputError]}
+                placeholder="Enter your password"
+                placeholderTextColor={theme.colors.mutedForeground}
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errors.password) setErrors({ ...errors, password: null });
+                }}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password"
+                autoCorrect={false}
+                textContentType="password"
+                returnKeyType="done"
+                onSubmitEditing={handleSignIn}
+                editable={!isLoading}
+                accessibilityLabel="Password"
+                accessibilityHint="Enter your password"
+              />
+              {errors.password ? (
+                <Text style={styles.fieldError}>{errors.password}</Text>
+              ) : null}
+            </View>
 
             <Pressable
               style={({ pressed }) => [
@@ -345,22 +244,20 @@ export function SignInScreen() {
                 pressed && styles.primaryButtonPressed,
                 isLoading && styles.buttonDisabled,
               ]}
-              onPress={isResetMode ? handleRequestPasswordReset : handleSignIn}
+              onPress={handleSignIn}
               disabled={isLoading}
               accessibilityRole="button"
-              accessibilityLabel={isResetMode ? "Send reset link" : "Sign in"}
+              accessibilityLabel="Sign in"
               accessibilityState={{ disabled: isLoading }}
             >
-              {isSigningIn || isRequestingPasswordReset ? (
+              {pending === "sign-in" ? (
                 <ActivityIndicator color={theme.colors.primaryForeground} />
               ) : (
-                <Text style={styles.primaryButtonText}>
-                  {isResetMode ? "Send reset link" : "Sign in"}
-                </Text>
+                <Text style={styles.primaryButtonText}>Sign in</Text>
               )}
             </Pressable>
 
-            {requiresPasskeyStepUp && !isResetMode ? (
+            {requiresPasskeyStepUp ? (
               <Pressable
                 style={({ pressed }) => [
                   styles.secondaryButton,
@@ -368,14 +265,14 @@ export function SignInScreen() {
                   isLoading && styles.buttonDisabled,
                 ]}
                 onPress={() => {
-                  void handleVerifyPasskey();
+                  handleVerifyPasskey().catch(() => undefined);
                 }}
                 disabled={isLoading}
                 accessibilityRole="button"
                 accessibilityLabel="Use passkey"
                 accessibilityState={{ disabled: isLoading }}
               >
-                {isVerifyingPasskey ? (
+                {pending === "passkey" ? (
                   <ActivityIndicator color={theme.colors.foreground} />
                 ) : (
                   <Text style={styles.secondaryButtonText}>Use passkey</Text>
@@ -384,28 +281,12 @@ export function SignInScreen() {
             ) : null}
 
             <View style={styles.footer}>
-              {isResetMode ? (
-                <>
-                  <Text style={styles.footerText}>Remembered it? </Text>
-                  <Pressable
-                    onPress={() => switchMode(false)}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.footerLink}>Back to sign in</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.footerText}>
-                    Don&apos;t have an account?{" "}
-                  </Text>
-                  <Link href={AUTH_SIGN_UP_ROUTE} asChild>
-                    <Pressable accessibilityRole="link">
-                      <Text style={styles.footerLink}>Sign up</Text>
-                    </Pressable>
-                  </Link>
-                </>
-              )}
+              <Text style={styles.footerText}>Don&apos;t have an account? </Text>
+              <Link href={AUTH_SIGN_UP_ROUTE} asChild>
+                <Pressable accessibilityRole="link">
+                  <Text style={styles.footerLink}>Sign up</Text>
+                </Pressable>
+              </Link>
             </View>
             <AppInformationLinks />
           </View>
@@ -458,15 +339,6 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
       marginBottom: theme.spacing["1"],
-    },
-    helperCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.muted + "20",
-      borderRadius: theme.borderRadius.lg,
-      paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["3"],
-      marginBottom: theme.spacing["4"],
     },
     inputError: {
       borderColor: theme.colors.destructive,
@@ -548,11 +420,6 @@ function createStyles(theme: ThemeTokens) {
       lineHeight: theme.typography.fontSize.xs.lineHeight,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.primaryBase,
-    },
-    helperText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
     },
     input: {
       borderWidth: 1,
