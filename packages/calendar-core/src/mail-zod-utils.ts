@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 
 export function throwFirstZodIssue(error: z.ZodError, fallback: string): never {
   const message = error.issues[0]?.message?.trim();

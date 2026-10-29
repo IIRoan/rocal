@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import { nonEmptyTrimmedString, throwFirstZodIssue } from "./mail-zod-utils";
 
 export const jmapBlobUploadResponseSchema = z.object({
@@ -26,7 +26,7 @@ export function parseJmapBlobUploadResponse(
     .superRefine((data, ctx) => {
       if (!data.blobId) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           message: `${label} did not return a blob id.`,
           path: ["blobId"],
         });
@@ -36,7 +36,7 @@ export function parseJmapBlobUploadResponse(
       const size = data.size ?? expectedSize;
       if (size !== expectedSize) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           message: `${label} size mismatch (expected ${expectedSize} bytes, got ${size}).`,
           path: ["size"],
         });

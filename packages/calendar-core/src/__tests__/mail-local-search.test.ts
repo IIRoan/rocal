@@ -62,7 +62,7 @@ describe("searchIndexedMailbox", () => {
   });
 
   it("checks keyword and attachment conditions on the fetched messages and keeps the index order", () => {
-    const messages = [
+    const messages: { id: string; keywords: Record<string, boolean>; hasAttachment: boolean }[] = [
       { id: "m2", keywords: { $seen: true }, hasAttachment: true },
       { id: "m1", keywords: { $flagged: true }, hasAttachment: false },
     ];

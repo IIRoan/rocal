@@ -10,7 +10,7 @@ import {
   type MailVaultBackup as SharedMailVaultBackup,
   type MailVaultKdfParams,
 } from "@workspace/calendar-core";
-import { z } from "zod";
+import { z } from "@workspace/calendar-core/zod";
 
 export type { MailDemoConfig, MailOAuthConfig, MailVaultKdfParams };
 
@@ -205,11 +205,7 @@ const jmapHeaderValuesSchema = jmapOptional(
   ),
 );
 
-const jmapBodyStructureSchema: z.ZodType<
-  JmapBodyStructure,
-  z.ZodTypeDef,
-  unknown
-> = z.lazy(() =>
+const jmapBodyStructureSchema: z.ZodType<JmapBodyStructure, unknown> = z.lazy(() =>
   z.object({
     type: jmapOptional(z.string().optional()),
     blobId: jmapOptional(z.string().optional()),
@@ -233,19 +229,19 @@ const jmapEmailMessageSchema = z.object({
   messageId: z.array(z.string()).optional(),
   inReplyTo: z.array(z.string()).optional(),
   references: z.array(z.string()).optional(),
-  mailboxIds: z.record(z.boolean()).optional(),
+  mailboxIds: z.record(z.string(), z.boolean()).optional(),
   subject: z.string().nullable().optional(),
   from: jmapOptional(z.array(mailAddressSchema).optional()),
   to: jmapOptional(z.array(mailAddressSchema).optional()),
   cc: jmapOptional(z.array(mailAddressSchema).optional()),
   bcc: jmapOptional(z.array(mailAddressSchema).optional()),
   receivedAt: z.string().optional(),
-  keywords: z.record(z.boolean()).optional(),
+  keywords: z.record(z.string(), z.boolean()).optional(),
   preview: z.string().nullable().optional(),
   hasAttachment: z.boolean().optional(),
   size: z.number().optional(),
   bodyStructure: jmapBodyStructureSchema.optional(),
-  bodyValues: z.record(jmapBodyValueSchema).optional(),
+  bodyValues: z.record(z.string(), jmapBodyValueSchema).optional(),
   textBody: z.array(jmapBodyPartRefSchema).optional(),
   htmlBody: z.array(jmapBodyPartRefSchema).optional(),
   attachments: z.array(jmapAttachmentSchema).optional(),

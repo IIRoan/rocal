@@ -63,9 +63,6 @@
     "react-native": "0.86.3",
     "expo-constants": "~57.0.22",
     "expo-file-system": "~57.0.7",
-    "@prisma/config": {
-      "deepmerge-ts": "8.0.2"
-    },
     "eslint-plugin-sonarjs": {
       "minimatch": "10.2.6"
     },

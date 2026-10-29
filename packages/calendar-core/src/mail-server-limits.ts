@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 
 const JMAP_CORE_CAPABILITY = "urn:ietf:params:jmap:core";
 

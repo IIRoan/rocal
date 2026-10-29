@@ -1,5 +1,5 @@
 import type { Schema } from "@workspace/api-contracts";
-import { z } from "zod";
+import { z } from "./zod";
 import type {
   CreateCalendarRequest,
   CreateCategoryRequest,

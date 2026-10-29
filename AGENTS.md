@@ -66,7 +66,7 @@ Default stance: **the server should not be able to read user content, and we sho
 
 ## 3. API contract (MUST)
 
-- **Zod is the only TypeScript validation library** (enforced); shared schemas live in `packages/calendar-core` (`route-schemas.ts`). The API validates with its Zod port (`apps/backend/src/http/zod.rs`, below), and `http/contract_tests.rs` probes every request validator against its DTO's OpenAPI schema (required, nullable, integer range).
+- **Zod is the only TypeScript validation library** (enforced), Zod 4 imported as `z` from `@workspace/calendar-core/zod` (or `./zod` inside it), which runs it jitless because the web CSP forbids `eval`; shared schemas live in `packages/calendar-core` (`route-schemas.ts`). The API validates with its Zod port (`apps/backend/src/http/zod.rs`, below), and `http/contract_tests.rs` probes every request validator against its DTO's OpenAPI schema (required, nullable, integer range).
 - One change = Rust DTO + handler/service + `cargo xtask openapi` + `@workspace/calendar-client` + both app consumers, in the same PR. Request and response types come from `@workspace/api-contracts` (a `z.infer` request type is paired with its `Schema<…>` so apps/web's non-strict build keeps required keys) — never hand-write a divergent client copy.
 - Errors use the `AppError` envelope (`apps/backend/src/error.rs`: `{ error, message, statusCode, details?, requestId, timestamp }`). Never leak internals or user content in `message`/`details`.
 - Breaking changes must stay compatible with the **shipped native binary/OTA** (additive fields, optional new inputs, deprecate before removing).

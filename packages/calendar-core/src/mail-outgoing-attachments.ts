@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import {
   DEFAULT_MAX_BLOB_UPLOAD_BYTES,
   formatAttachmentByteLimit,
@@ -67,7 +67,7 @@ export const preparedOutgoingAttachmentSchema = z.object({
   filename: nonEmptyTrimmedString,
   contentType: z.string().min(1),
   content: z.instanceof(Uint8Array).refine((content) => content.byteLength > 0, {
-    message: "Attachment content is empty.",
+    error: "Attachment content is empty.",
   }),
   size: z.number().int().positive(),
 });
@@ -257,7 +257,7 @@ export function validateUploadedBlob(input: {
     .superRefine((data, ctx) => {
       if (!data.blobId) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           message: `${label} did not return a blob id.`,
           path: ["blobId"],
         });
@@ -267,7 +267,7 @@ export function validateUploadedBlob(input: {
       const size = data.size ?? input.expectedSize;
       if (size !== input.expectedSize) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           message: `${label} size mismatch (expected ${input.expectedSize} bytes, got ${size}).`,
           path: ["size"],
         });

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import product from "./product-info.json";
 
 export const PRODUCT_ROUTES = {
@@ -21,7 +21,7 @@ export const UNLOCK_FAILED_NOTICE = `This device could not open your encrypted d
 export function supportContactUrl(
   value: unknown = product.supportEmail,
 ): string | null {
-  const email = z.string().trim().email().safeParse(value);
+  const email = z.string().trim().pipe(z.email()).safeParse(value);
   return email.success ? `mailto:${email.data}` : null;
 }
 

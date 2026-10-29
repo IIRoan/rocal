@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import { themeSchema } from "./route-schemas";
 import type { UpdateSettingsRequest, UserSettings } from "./types";
 

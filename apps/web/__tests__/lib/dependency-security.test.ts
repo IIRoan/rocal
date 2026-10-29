@@ -70,12 +70,9 @@ describe("dependency compatibility", () => {
     `);
   });
 
-  it("loads Prisma's config merger and React Doctor's TOML parser", () => {
+  it("loads React Doctor's TOML parser", () => {
     runDependencyCheck(`
       const { createRequire } = require("node:module");
-      const prismaRequire = createRequire(require.resolve("@prisma/config"));
-      const { deepmerge } = prismaRequire("deepmerge-ts");
-      assert.deepEqual(deepmerge({ db: { host: "localhost" } }, { db: { port: 5432 } }), { db: { host: "localhost", port: 5432 } });
       const doctorRequire = createRequire(require.resolve("react-doctor"));
       const effectRequire = createRequire(doctorRequire.resolve("effect"));
       assert.equal(effectRequire("toml").parse('[scan]\\nenabled = true').scan.enabled, true);
