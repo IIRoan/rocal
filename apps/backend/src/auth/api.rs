@@ -109,6 +109,20 @@ pub mod codes {
             "Send the password once more to finish upgrading its protection",
         )
     }
+    pub fn password_envelope_required() -> ApiError {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "PASSWORD_ENVELOPE_REQUIRED",
+            "Update Solace to change your password",
+        )
+    }
+    pub fn passkey_step_up_required() -> ApiError {
+        ApiError::new(
+            StatusCode::FORBIDDEN,
+            "PASSKEY_STEP_UP_REQUIRED",
+            "Passkey verification required.",
+        )
+    }
     pub fn auth_key_email_mismatch() -> ApiError {
         ApiError::new(
             StatusCode::BAD_REQUEST,

@@ -376,17 +376,17 @@ export async function storePasswordEnvelopeForActiveSession(
 }
 
 /** Network errors reject; a wrong password resolves with `passwordUnlockFailed`. */
+/** Opens the envelope in `bootstrap`, which the caller already fetched, with a password that arrived after it ran. */
 export async function unlockE2eeWithPassword(
   userId: string,
   password: string,
+  bootstrap: E2eeBootstrapResponse,
 ): Promise<E2eeBootstrapAttempt> {
   if (!userId || !isWebCryptoAvailable()) {
     return createAttempt(false, null);
   }
 
   const generation = beginBootstrap(userId);
-  const bootstrap = await e2eeApiService.getBootstrap();
-
   return activateFromPasswordEnvelope(userId, generation, bootstrap, password);
 }
 

@@ -1,6 +1,5 @@
 import { Lock, type LucideIcon } from "lucide-react";
 
-import type { SecurityAccessKind } from "./account-settings-types";
 import type { SecurityForm } from "./account-settings-ui-state";
 import {
   PaletteIconBox,
@@ -43,41 +42,25 @@ function SecurityActionButton({
 }
 
 export function AccountSecurityActions({
-  accessKind,
+  hasPasswordAccount,
   busy,
   formOpen,
   onOpenForm,
 }: {
-  accessKind: SecurityAccessKind;
+  hasPasswordAccount: boolean;
   busy: boolean;
   formOpen: boolean;
   onOpenForm: (form: NonNullable<SecurityForm>) => void;
 }) {
-  const disabled = busy || formOpen;
-  const hasPasswordAccess =
-    accessKind === "password" || accessKind === "oauth-and-password";
+  if (!hasPasswordAccount || formOpen) return null;
 
   return (
-    <>
-      {hasPasswordAccess && !formOpen ? (
-        <SecurityActionButton
-          label="Change Password"
-          description="Update your sign-in password. It also unlocks your encrypted data."
-          icon={Lock}
-          disabled={disabled}
-          onClick={() => onOpenForm("change-password")}
-        />
-      ) : null}
-
-      {accessKind === "oauth-only" && !formOpen ? (
-        <SecurityActionButton
-          label="Set Email Password"
-          description="Add an email sign-in password to this account. It also unlocks your encrypted data."
-          icon={Lock}
-          disabled={disabled}
-          onClick={() => onOpenForm("set-password")}
-        />
-      ) : null}
-    </>
+    <SecurityActionButton
+      label="Change Password"
+      description="Update your sign-in password. It also unlocks your encrypted data."
+      icon={Lock}
+      disabled={busy}
+      onClick={() => onOpenForm("change-password")}
+    />
   );
 }

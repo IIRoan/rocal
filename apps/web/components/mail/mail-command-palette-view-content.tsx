@@ -40,10 +40,6 @@ type PasswordValues = {
   newPassword: string;
 };
 
-type NewPasswordValues = {
-  newPassword: string;
-};
-
 export type MailCommandPaletteViewContentProps = {
   open: boolean;
   currentView: MailPaletteView;
@@ -76,13 +72,10 @@ export type MailCommandPaletteViewContentProps = {
   sessionLoading: boolean;
   deletingAccount: boolean;
   changingPassword: boolean;
-  settingPassword: boolean;
   updatingProfile: boolean;
   hasPasswordAccount: boolean;
-  hasOAuthAccount: boolean;
   handleDeleteAccount: () => void;
   handleChangePassword: (values: PasswordValues) => Promise<void>;
-  handleSetPassword: (values: NewPasswordValues) => Promise<void>;
   handleUpdateProfile: (values: { image: string | null }) => Promise<void>;
   mailboxes: JmapMailbox[];
   onCreateMailbox?: (name: string) => Promise<void>;
@@ -133,11 +126,8 @@ function MailSecurityView({
   goForward,
   privateSearchIndex,
   hasPasswordAccount,
-  hasOAuthAccount,
   changingPassword,
-  settingPassword,
   handleChangePassword,
-  handleSetPassword,
 }: {
   goBack: () => void;
   goForward: (
@@ -146,11 +136,8 @@ function MailSecurityView({
   ) => void;
   privateSearchIndex: PrivateSearchIndexControls;
   hasPasswordAccount: boolean;
-  hasOAuthAccount: boolean;
   changingPassword: boolean;
-  settingPassword: boolean;
   handleChangePassword: (values: PasswordValues) => Promise<void>;
-  handleSetPassword: (values: NewPasswordValues) => Promise<void>;
 }) {
   return (
     <PaletteView title="Security" onBack={goBack}>
@@ -175,11 +162,8 @@ function MailSecurityView({
       <PaletteSection label="Password">
         <PasswordSection
           hasPasswordAccount={hasPasswordAccount}
-          hasOAuthAccount={hasOAuthAccount}
           changingPassword={changingPassword}
-          settingPassword={settingPassword}
           handleChangePassword={handleChangePassword}
-          handleSetPassword={handleSetPassword}
         />
       </PaletteSection>
     </PaletteView>
@@ -243,11 +227,8 @@ export function MailCommandPaletteViewContent(
         goForward={goForward}
         privateSearchIndex={props.privateSearchIndex}
         hasPasswordAccount={props.hasPasswordAccount}
-        hasOAuthAccount={props.hasOAuthAccount}
         changingPassword={props.changingPassword}
-        settingPassword={props.settingPassword}
         handleChangePassword={props.handleChangePassword}
-        handleSetPassword={props.handleSetPassword}
       />
     );
   }
@@ -275,11 +256,8 @@ export function MailCommandPaletteViewContent(
         accountImage={props.accountImage}
         sessionLoading={props.sessionLoading}
         changingPassword={props.changingPassword}
-        settingPassword={props.settingPassword}
         hasPasswordAccount={props.hasPasswordAccount}
-        hasOAuthAccount={props.hasOAuthAccount}
         handleChangePassword={props.handleChangePassword}
-        handleSetPassword={props.handleSetPassword}
         updatingProfile={props.updatingProfile}
         handleUpdateProfile={props.handleUpdateProfile}
         onOpenInvites={() => goForward("invites")}

@@ -19,7 +19,6 @@ import {
   handleMailPaletteKeyDown,
   runMailAccountDeletion,
   runMailPasswordChange,
-  runMailPasswordSet,
   runMailProfileUpdate,
   runMailSettingUpdate,
   selectMailPaletteItem,
@@ -87,8 +86,7 @@ export function useMailCommandPaletteController({
   const queryClient = useQueryClient();
   const accountsQuery = useLinkedAuthAccounts();
   const linkedAccounts = accountsQuery.data ?? [];
-  const { hasOAuthAccount, hasPasswordAccount } =
-    summarizeLinkedAuthAccounts(linkedAccounts);
+  const { hasPasswordAccount } = summarizeLinkedAuthAccounts(linkedAccounts);
   const accountImage =
     busy.localImageOverride !== undefined
       ? busy.localImageOverride
@@ -190,14 +188,6 @@ export function useMailCommandPaletteController({
         dispatchBusy({ type: "setChangingPassword", value }),
     });
 
-  const handleSetPassword = (input: { newPassword: string }) =>
-    runMailPasswordSet({
-      ...input,
-      sessionUserId,
-      refetchAccounts: accountsQuery.refetch,
-      setBusy: (value) => dispatchBusy({ type: "setSettingPassword", value }),
-    });
-
   const handleUpdateProfile = (input: { image: string | null }) =>
     runMailProfileUpdate({
       image: input.image,
@@ -273,7 +263,6 @@ export function useMailCommandPaletteController({
     session,
     sessionLoading,
     accountImage,
-    hasOAuthAccount,
     hasPasswordAccount,
     busy,
     mailboxes,
@@ -289,7 +278,6 @@ export function useMailCommandPaletteController({
     updateSetting,
     handleDeleteAccount,
     handleChangePassword,
-    handleSetPassword,
     handleUpdateProfile,
     mainListItems,
     showUnifiedSearch,

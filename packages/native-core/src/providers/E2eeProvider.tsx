@@ -8,7 +8,9 @@ import React, {
 } from "react";
 import {
   createE2eeModule,
+  lockWithoutDeviceKeys,
   resolveDeviceEnvelopeSalt,
+  type E2eeLock,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
   type PasswordEnvelopePayload,
@@ -22,16 +24,17 @@ import {
   registerDeviceForSession,
   rememberDeviceEnvelopeSalt,
   unwrapStoredDeviceKeys,
+  uploadPasswordEnvelope as uploadPasswordEnvelopeToApi,
   type E2eeSession,
 } from "../lib/native-e2ee-provider";
+import { calendarApiService } from "../lib/api";
+import type { PasswordEnvelopeRequest } from "@workspace/calendar-client";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "./AuthProvider";
 import { setActiveE2eeSession } from "../lib/e2ee-session";
 
 const log = createLogger("native:e2ee");
 
-/** Why a signed-in device cannot open the account key; the session then ends instead of asking for a password. */
-export type E2eeLock = "sign-in-again" | "password-mismatch";
 
 export interface E2eeContextValue {
   isReady: boolean;
@@ -39,8 +42,10 @@ export interface E2eeContextValue {
   provider: IE2eeProvider;
   /** Resolves to a lock when this device cannot open the account key, else null. */
   bootstrap: (userId: string, apiBaseUrl: string) => Promise<E2eeLock | null>;
-  /** Wraps the active session's keys to a new sign-in password; throws without an unlocked session. */
+  /** Wraps the active session's keys to a new sign-in password, once a startup unlock has finished; throws without an unlocked session. */
   createPasswordEnvelope: (password: string) => Promise<PasswordEnvelopePayload>;
+  /** Stores an envelope a password change could not, when the API predates storing it with the change. */
+  uploadPasswordEnvelope: (envelope: PasswordEnvelopeRequest) => Promise<void>;
   clearSession: () => void;
   runWithAccountKey: <T>(
     fn: (accountKey: CryptoKey, e2ee: E2eeModule) => Promise<T>,
@@ -163,11 +168,20 @@ export function E2eeProvider({
         const { existingDevice, privateKeyJwk, envelopeSalt } =
           await readStoredDevice(bootstrapData);
 
-        // A stored key that no longer opens counts as no key, so the envelope decides.
+        // A stored key that no longer opens counts as no key, so the envelope decides; its server row goes.
         const deviceKeys =
           existingDevice && privateKeyJwk
             ? await unwrapStoredDeviceKeys(e2ee, privateKeyJwk, existingDevice).catch(
-                () => null,
+                (error: unknown) => {
+                  log.warn("Stored E2EE device key no longer opens", {
+                    userId,
+                    errorName: error instanceof Error ? error.name : typeof error,
+                  });
+                  void calendarApiService
+                    .deleteE2eeDevice(existingDevice.deviceId)
+                    .catch(() => undefined);
+                  return null;
+                },
               )
             : null;
 
@@ -232,23 +246,31 @@ export function E2eeProvider({
         }
 
         // The envelope holds the real account key and only the sign-in password opens it, so nothing here mints keys.
-        if (bootstrapData.passwordEnvelope) {
-          if (!pendingPassword) {
-            return "sign-in-again";
-          }
-          const keys = await e2ee
-            .unwrapPasswordEnvelope(pendingPassword, bootstrapData.passwordEnvelope)
-            .catch(() => null);
-          if (!keys) {
-            log.warn("Sign-in password did not unlock the E2EE envelope", { userId });
-            return isStale() ? null : "password-mismatch";
-          }
+        const envelope = bootstrapData.passwordEnvelope;
+        const keys =
+          envelope && pendingPassword
+            ? await e2ee
+                .unwrapPasswordEnvelope(pendingPassword, envelope)
+                .catch(() => null)
+            : null;
+        const lock = lockWithoutDeviceKeys({
+          hasEnvelope: Boolean(envelope),
+          hasOtherDevices: bootstrapData.devices.length > 0,
+          password: pendingPassword ? "sign-in" : "none",
+          opened: Boolean(keys),
+        });
+        if (lock) {
+          log.warn("This device cannot open the account key", { userId, lock });
+          return isStale() ? null : lock;
+        }
+
+        if (envelope && keys) {
           const nextSession = await registerDeviceForSession({
             e2ee,
             userId,
             apiBaseUrl,
             ...keys,
-            envelopeSalt: bootstrapData.passwordEnvelope.kdfSalt,
+            envelopeSalt: envelope.kdfSalt,
           });
 
           if (isStale()) {
@@ -263,14 +285,6 @@ export function E2eeProvider({
             deviceId: nextSession.deviceId,
           });
           return null;
-        }
-
-        // Without an envelope the keys live only on other devices; fresh keys here would orphan their content.
-        if (bootstrapData.devices.length > 0) {
-          log.warn("E2EE devices exist without a password envelope; this device cannot unlock", {
-            userId,
-          });
-          return "password-mismatch";
         }
 
         const accountKey = await e2ee.generateAccountKey();
@@ -345,6 +359,9 @@ export function E2eeProvider({
 
   const createPasswordEnvelope = useCallback(
     async (password: string) => {
+      if (pendingBootstrapRef.current) {
+        await pendingBootstrapRef.current;
+      }
       const session = sessionRef.current;
       const e2ee = await getModule();
       if (!session || !e2ee) {
@@ -357,6 +374,17 @@ export function E2eeProvider({
       );
     },
     [getModule],
+  );
+
+  const uploadPasswordEnvelope = useCallback(
+    async (envelope: PasswordEnvelopeRequest) => {
+      const session = sessionRef.current;
+      if (!session) {
+        throw new Error("Your encrypted data is not unlocked on this device.");
+      }
+      await uploadPasswordEnvelopeToApi(session.apiBaseUrl, envelope);
+    },
+    [],
   );
 
   const provider = useMemo<IE2eeProvider>(
@@ -394,6 +422,7 @@ export function E2eeProvider({
       provider,
       bootstrap,
       createPasswordEnvelope,
+      uploadPasswordEnvelope,
       clearSession,
       runWithAccountKey,
     }),
@@ -401,6 +430,7 @@ export function E2eeProvider({
       bootstrap,
       clearSession,
       createPasswordEnvelope,
+      uploadPasswordEnvelope,
       isEnabled,
       isReady,
       provider,

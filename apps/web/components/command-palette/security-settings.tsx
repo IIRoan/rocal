@@ -21,14 +21,11 @@ interface SecuritySettingsProps {
   goBack: () => void;
   goForward: (view: string) => void;
   hasPasswordAccount?: boolean;
-  hasOAuthAccount?: boolean;
   changingPassword?: boolean;
-  settingPassword?: boolean;
   handleChangePassword?: (v: {
     currentPassword: string;
     newPassword: string;
   }) => Promise<void>;
-  handleSetPassword?: (v: { newPassword: string }) => Promise<void>;
 }
 
 export function SecuritySettings({
@@ -36,14 +33,10 @@ export function SecuritySettings({
   goBack,
   goForward,
   hasPasswordAccount = false,
-  hasOAuthAccount = false,
   changingPassword = false,
-  settingPassword = false,
   handleChangePassword,
-  handleSetPassword,
 }: SecuritySettingsProps) {
   const privateSearchIndex = usePrivateSearchIndexControls();
-  const showPasswordSection = hasPasswordAccount || hasOAuthAccount;
 
   return (
     <PaletteView title="Security" onBack={goBack}>
@@ -83,15 +76,12 @@ export function SecuritySettings({
         />
       </PaletteSection>
 
-      {showPasswordSection && handleChangePassword ? (
+      {hasPasswordAccount && handleChangePassword ? (
         <PaletteSection label="Password">
           <PasswordSection
             hasPasswordAccount={hasPasswordAccount}
-            hasOAuthAccount={hasOAuthAccount}
             changingPassword={changingPassword}
-            settingPassword={settingPassword}
             handleChangePassword={handleChangePassword}
-            handleSetPassword={handleSetPassword}
           />
         </PaletteSection>
       ) : null}

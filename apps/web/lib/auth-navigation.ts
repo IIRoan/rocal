@@ -1,5 +1,6 @@
 "use client";
 
+import type { E2eeLock } from "@workspace/e2ee";
 import { LOGIN_PATH } from "@/lib/app-routes";
 
 const PASSKEY_BRIDGE_PATH = "/passkey/native";
@@ -70,10 +71,8 @@ export function buildPasskeyStepUpLoginHref(currentPath: string): string {
   return `${LOGIN_PATH}?${params.toString()}`;
 }
 
-/** Why a session that could not open the account key was ended; the login page shows the matching notice. */
-export type E2eeLockReason = "sign-in" | "failed";
-
-export function buildE2eeLockLoginHref(reason: E2eeLockReason): string {
+/** The login page shows the notice matching why a session that could not open the account key ended. */
+export function buildE2eeLockLoginHref(reason: E2eeLock): string {
   return `${LOGIN_PATH}?e2ee=${reason}`;
 }
 

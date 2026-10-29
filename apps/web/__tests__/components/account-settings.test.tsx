@@ -289,7 +289,7 @@ describe("AccountSettings", () => {
     );
   });
 
-  it("offers OAuth-only accounts an email password and no separate encryption password", async () => {
+  it("offers no password action to an account without an email password", async () => {
     await act(async () => {
       root.render(
         <AccountSettings
@@ -302,83 +302,15 @@ describe("AccountSettings", () => {
           accountEmail="roan@example.com"
           sessionLoading={false}
           hasPasswordAccount={false}
-          hasOAuthAccount={true}
           changingPassword={false}
           handleChangePassword={async () => {}}
-          handleSetPassword={async () => {}}
         />,
       );
       await Promise.resolve();
     });
 
-    expect(container.textContent).not.toContain("separate encryption password");
-    expect(container.textContent).toContain("Set Email Password");
-    expect(container.textContent).not.toContain("Reset Encryption Password");
+    expect(container.textContent).not.toContain("Set Email Password");
     expect(container.textContent).not.toContain("Change Password");
-  });
-
-  it("submits the OAuth-only set-password flow", async () => {
-    const handleSetPassword = jest.fn<() => Promise<void>>(
-      async () => undefined,
-    );
-
-    await act(async () => {
-      root.render(
-        <AccountSettings
-          goBack={() => {}}
-          saving={false}
-          handleReset={() => {}}
-          deletingAccount={false}
-          handleDeleteAccount={() => {}}
-          accountName="Roan"
-          accountEmail="roan@example.com"
-          sessionLoading={false}
-          hasPasswordAccount={false}
-          hasOAuthAccount={true}
-          changingPassword={false}
-          handleChangePassword={async () => {}}
-          handleSetPassword={handleSetPassword}
-        />,
-      );
-      await Promise.resolve();
-    });
-
-    const openSetPasswordButton = Array.from(
-      container.querySelectorAll("button"),
-    ).find((element) => element.textContent?.includes("Set Email Password"));
-
-    await act(async () => {
-      openSetPasswordButton?.click();
-      await Promise.resolve();
-    });
-
-    expect(container.textContent).toContain(
-      "Add an email sign-in password to this account. It also unlocks your encrypted data when you sign in.",
-    );
-
-    const inputs = Array.from(container.querySelectorAll("input"));
-    expect(inputs).toHaveLength(2);
-
-    await act(async () => {
-      setInputValue(inputs[0] as HTMLInputElement, "new-password");
-      setInputValue(inputs[1] as HTMLInputElement, "new-password");
-      await Promise.resolve();
-    });
-
-    const submitButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Set Password"),
-    );
-
-    await act(async () => {
-      submitButton?.click();
-      await Promise.resolve();
-    });
-
-    expect(handleSetPassword).toHaveBeenCalledWith({
-      newPassword: "new-password",
-    });
-    expect(container.textContent).toContain(
-      "An email sign-in password has been added to your account. It also unlocks your encrypted data when you sign in.",
-    );
+    expect(container.textContent).not.toContain("separate encryption password");
   });
 });

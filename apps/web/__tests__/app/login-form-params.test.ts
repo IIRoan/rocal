@@ -22,19 +22,19 @@ describe("readLoginSearchParams", () => {
   it("reads only the known encryption lock reasons", () => {
     const lockOf = (query: string) =>
       readLoginSearchParams(new URLSearchParams(query)).e2eeLock;
-    expect(lockOf("e2ee=sign-in")).toBe("sign-in");
-    expect(lockOf("e2ee=failed")).toBe("failed");
+    expect(lockOf("e2ee=sign-in-again")).toBe("sign-in-again");
+    expect(lockOf("e2ee=cannot-open")).toBe("cannot-open");
     expect(lockOf("e2ee=other")).toBeNull();
   });
 });
 
 describe("createInitialLoginFormChrome", () => {
   it("explains why an encryption lock ended the session", () => {
-    expect(createInitialLoginFormChrome("sign-in")).toMatchObject({
+    expect(createInitialLoginFormChrome("sign-in-again")).toMatchObject({
       notice: SIGN_IN_TO_UNLOCK_NOTICE,
       error: null,
     });
-    expect(createInitialLoginFormChrome("failed")).toMatchObject({
+    expect(createInitialLoginFormChrome("cannot-open")).toMatchObject({
       notice: null,
       error: UNLOCK_FAILED_NOTICE,
     });

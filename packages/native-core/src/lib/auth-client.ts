@@ -1,8 +1,11 @@
 import { createAuthClient } from "better-auth/react";
 import { expoClient } from "@better-auth/expo/client";
 import { passkeyClient } from "@better-auth/passkey/client";
-import { createAuthKeyFetch } from "@workspace/calendar-client";
-import { createE2eeModule, type PasswordEnvelopePayload } from "@workspace/e2ee";
+import {
+  createAuthKeyFetch,
+  type PasswordEnvelopeRequest,
+} from "@workspace/calendar-client";
+import { createE2eeModule } from "@workspace/e2ee";
 import { API_BASE_URL, APP_SCHEME, AUTH_STORAGE_PREFIX } from "./constants";
 import { createNativeCryptoProvider } from "./native-crypto-provider";
 import { authSecureStore } from "./secure-store-chunked";
@@ -38,7 +41,7 @@ export const authClient = baseAuthClient as typeof baseAuthClient & {
     currentPassword: string;
     newPassword: string;
     email: string;
-    passwordEnvelope: PasswordEnvelopePayload;
+    passwordEnvelope: PasswordEnvelopeRequest;
     revokeOtherSessions?: boolean;
   }) => Promise<{ data: unknown; error: { message?: string } | null }>;
 };

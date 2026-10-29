@@ -523,63 +523,6 @@ export interface E2eeBootstrapResponse {
   calendars: E2eeBootstrapCalendar[];
 }
 
-export interface E2eeResetSnapshotCalendar {
-  id: string;
-  name: string;
-  encryptedName?: string | null;
-  blindIndexTokens?: string[] | null;
-  encryptionState?: EncryptionState;
-  encryptionKeyVersion?: number;
-  color: EventColor;
-  kind: CalendarKind;
-  isDefault: boolean;
-  isVisible: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface E2eeResetSnapshotCategory {
-  id: string;
-  name: string;
-  encryptedName?: string | null;
-  blindIndexTokens?: string[] | null;
-  encryptionState?: EncryptionState;
-  encryptionKeyVersion?: number;
-  color: string;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface E2eeResetSnapshotEvent {
-  id: string;
-  title: string;
-  description?: string | null;
-  encryptedContent?: string | null;
-  blindIndexTokens?: string[] | null;
-  encryptionState?: EncryptionState;
-  encryptionKeyVersion?: number;
-  start: Date;
-  end: Date;
-  timezone?: string | null;
-  allDay: boolean;
-  location?: string | null;
-  color?: string | null;
-  calendarId: string;
-  categoryId?: string | null;
-  reminder?: number | null;
-  recurrence?: string | null;
-  parentEventId?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface E2eeResetSnapshotResponse {
-  calendars: E2eeResetSnapshotCalendar[];
-  categories: E2eeResetSnapshotCategory[];
-  events: E2eeResetSnapshotEvent[];
-}
-
 export interface UpsertE2eeDeviceRequest {
   deviceId: string;
   deviceLabel?: string;

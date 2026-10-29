@@ -145,7 +145,7 @@ it("drops the previous user's restored workspace when another user signs in", as
 
 it.each([
   ["sign-in-again", SIGN_IN_TO_UNLOCK_NOTICE],
-  ["password-mismatch", UNLOCK_FAILED_NOTICE],
+  ["cannot-open", UNLOCK_FAILED_NOTICE],
 ])("ends a session that cannot open the account key (%s) instead of asking for a password", async (lock, notice) => {
   mockBootstrap = jest.fn(() => Promise.resolve(lock));
   signIn("locked");

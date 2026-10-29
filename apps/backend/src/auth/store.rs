@@ -2,13 +2,15 @@
 
 use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, ModelTrait,
-    QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 
 use super::api::generate_id;
 use super::cookies::SESSION_LIFETIME_SECONDS;
 use crate::db::entities::{account, passkey, session, user, verification};
+use crate::e2ee;
+use crate::e2ee::service::PasswordKeys;
 use crate::instant;
 
 /// A session that is not remembered lasts a day, as Better Auth's `createSession(..., dontRememberMe)` does.
@@ -42,6 +44,22 @@ pub async fn set_password<C: ConnectionTrait>(
     let mut updated = credential.into_active_model();
     updated.password = Set(Some(hash));
     updated.update(db).await.map(|_| ())
+}
+
+/// The new hash and, when the client sent one, the envelope wrapped with the new password, both or neither.
+pub async fn change_password(
+    db: &DatabaseConnection,
+    credential: account::Model,
+    hash: String,
+    envelope: Option<PasswordKeys>,
+) -> Result<(), sea_orm::DbErr> {
+    let user_id = credential.user_id.clone();
+    let transaction = db.begin().await?;
+    set_password(&transaction, credential, hash).await?;
+    if let Some(keys) = envelope {
+        e2ee::service::store_password_keys(&transaction, &user_id, keys).await?;
+    }
+    transaction.commit().await
 }
 
 /// Replaces `legacy` only while it is still stored, so a password changed since it was read is never undone.

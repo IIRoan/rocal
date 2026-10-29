@@ -2,7 +2,7 @@ import {
   SIGN_IN_TO_UNLOCK_NOTICE,
   UNLOCK_FAILED_NOTICE,
 } from "@workspace/calendar-core/product-info";
-import type { E2eeLockReason } from "@/lib/auth-navigation";
+import type { E2eeLock } from "@workspace/e2ee";
 
 export type AuthMode = "sign-in" | "sign-up";
 
@@ -68,12 +68,12 @@ export const initialLoginFormChrome: LoginFormChromeState = {
 };
 
 export function createInitialLoginFormChrome(
-  e2eeLock: E2eeLockReason | null,
+  e2eeLock: E2eeLock | null,
 ): LoginFormChromeState {
   return {
     ...initialLoginFormChrome,
-    error: e2eeLock === "failed" ? UNLOCK_FAILED_NOTICE : null,
-    notice: e2eeLock === "sign-in" ? SIGN_IN_TO_UNLOCK_NOTICE : null,
+    error: e2eeLock === "cannot-open" ? UNLOCK_FAILED_NOTICE : null,
+    notice: e2eeLock === "sign-in-again" ? SIGN_IN_TO_UNLOCK_NOTICE : null,
   };
 }
 

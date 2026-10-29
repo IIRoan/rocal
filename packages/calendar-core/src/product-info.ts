@@ -15,8 +15,8 @@ export const FORGOT_PASSWORD_NOTICE = `Email ${product.supportEmail} from a diff
 export const SIGN_IN_TO_UNLOCK_NOTICE =
   "Sign in again to open your encrypted data on this device.";
 
-/** The sign-in password is the only key to the envelope, so a mismatch goes to support. */
-export const UNLOCK_FAILED_NOTICE = `Your password signed you in but did not open your encrypted data. Email ${product.supportEmail} from a different email address for help.`;
+/** A device still signed in elsewhere repairs the envelope by changing the password, which rewraps it in the same step. */
+export const UNLOCK_FAILED_NOTICE = `This device could not open your encrypted data with your password. If Solace is still open on another device, change your password there, then sign in here with the new one. Otherwise email ${product.supportEmail} from a different email address.`;
 
 export function supportContactUrl(
   value: unknown = product.supportEmail,

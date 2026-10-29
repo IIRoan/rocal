@@ -24,6 +24,18 @@ export function storePendingAuthPassword(password: string): void {
   authPasswordMemory.set(CACHED_AUTH_PASSWORD_KEY, trimmed);
 }
 
+/** A password this browser kept from an earlier sign-in; it may be stale, so it never shows the envelope is wrong. */
+export function storeRememberedAuthPassword(password: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const trimmed = password.trim();
+  if (trimmed) {
+    authPasswordMemory.set(CACHED_AUTH_PASSWORD_KEY, trimmed);
+  }
+}
+
 export function peekPendingAuthPassword(): string | null {
   if (typeof window === "undefined") {
     return null;

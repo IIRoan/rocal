@@ -597,23 +597,27 @@ export function AuthProvider({
     // Capture before clearing the fallback so logout requests still authenticate when the jar is empty.
     const logoutHeaders = getAuthHeaders();
     setFallbackSessionToken(null);
-    await Promise.all([
-      unregisterNativePushDevice(logoutHeaders),
-      deleteRecoverableDeviceRow(logoutHeaders).catch(() => undefined),
-      clearNotificationExtensionSecrets(),
-    ]);
-    try {
-      await authClient.signOut(
-        logoutHeaders.cookie
-          ? { fetchOptions: { headers: { cookie: logoutHeaders.cookie } } }
-          : undefined,
-      );
-    } catch {
-      // Best-effort — clear local state regardless.
-    }
-    await wipeSessionData(lifecycleRef.current);
-    clearSession();
-    setSignInNotice(notice ?? null);
+    const leave = async () => {
+      await Promise.all([
+        unregisterNativePushDevice(logoutHeaders),
+        deleteRecoverableDeviceRow(logoutHeaders).catch(() => undefined),
+        clearNotificationExtensionSecrets(),
+      ]);
+      await authClient
+        .signOut(
+          logoutHeaders.cookie
+            ? { fetchOptions: { headers: { cookie: logoutHeaders.cookie } } }
+            : undefined,
+        )
+        // Best-effort — local state is cleared regardless.
+        .catch(() => undefined);
+      await wipeSessionData(lifecycleRef.current);
+    };
+    // A failing cleanup step still ends the session, so the app is never left signed in without its keys.
+    await leave().finally(() => {
+      clearSession();
+      setSignInNotice(notice ?? null);
+    });
   }, [clearSession]);
 
   useEffect(() => {

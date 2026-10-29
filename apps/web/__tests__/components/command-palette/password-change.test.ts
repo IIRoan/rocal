@@ -9,13 +9,15 @@ type ChangePasswordInput = {
 
 const mockChangePassword = jest.fn<
   (input: ChangePasswordInput) => Promise<{
+    data?: unknown;
     error?: { message?: string } | null;
   }>
 >();
+const mockUploadEnvelope = jest.fn<(envelope: unknown) => Promise<unknown>>();
 const mockCreateEnvelope = jest.fn<
   (accountKey: unknown, blindIndexKey: unknown, password: string) => Promise<{ kdfSalt: string }>
 >();
-const mockGetSession = jest.fn<() => unknown>();
+const mockGetSession = jest.fn<() => Promise<unknown>>();
 const mockRememberSalt = jest.fn<
   (userId: string, deviceId: string, salt: string | null) => Promise<void>
 >();
@@ -27,15 +29,17 @@ jest.mock("@/lib/auth-client", () => ({
   },
   signOut: jest.fn(),
 }));
-jest.mock("@/lib/e2ee-bootstrap", () => ({
-  storePasswordEnvelopeForActiveSession: jest.fn(),
+jest.mock("@/lib/e2ee-api-service", () => ({
+  e2eeApiService: {
+    upsertPasswordEnvelope: (envelope: unknown) => mockUploadEnvelope(envelope),
+  },
 }));
 jest.mock("@/lib/e2ee-crypto", () => ({
   createPasswordEnvelope: (accountKey: unknown, blindIndexKey: unknown, password: string) =>
     mockCreateEnvelope(accountKey, blindIndexKey, password),
 }));
-jest.mock("@/lib/e2ee-session", () => ({
-  getActiveE2eeSession: () => mockGetSession(),
+jest.mock("@/lib/e2ee-payloads", () => ({
+  getEncryptionSession: () => mockGetSession(),
 }));
 jest.mock("@/lib/e2ee-storage", () => ({
   rememberStoredDeviceEnvelopeSalt: (userId: string, deviceId: string, salt: string | null) =>
@@ -61,7 +65,7 @@ const input = {
 describe("persistPasswordChange", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetSession.mockReturnValue({
+    mockGetSession.mockResolvedValue({
       userId: "user-1",
       deviceId: "device-1",
       accountKey: "account-key",
@@ -70,10 +74,14 @@ describe("persistPasswordChange", () => {
     mockCreateEnvelope.mockResolvedValue({ kdfSalt: "new-salt" });
     mockRememberSalt.mockResolvedValue(undefined);
     mockSetCookie.mockResolvedValue(undefined);
+    mockUploadEnvelope.mockResolvedValue({});
   });
 
   it("sends the envelope for the new password with the change in one request", async () => {
-    mockChangePassword.mockResolvedValue({ error: null });
+    mockChangePassword.mockResolvedValue({
+      data: { envelopeStored: true },
+      error: null,
+    });
 
     await expect(persistPasswordChange(input)).resolves.toEqual({ ok: true });
 
@@ -88,8 +96,17 @@ describe("persistPasswordChange", () => {
       email: "person@solace.test",
       passwordEnvelope: { kdfSalt: "new-salt" },
     });
+    expect(mockUploadEnvelope).not.toHaveBeenCalled();
     expect(mockRememberSalt).toHaveBeenCalledWith("user-1", "device-1", "new-salt");
     expect(mockSetCookie).toHaveBeenCalledWith("new-pw");
+  });
+
+  it("uploads the envelope on its own when an older API changed only the password", async () => {
+    mockChangePassword.mockResolvedValue({ data: { token: null }, error: null });
+
+    await expect(persistPasswordChange(input)).resolves.toEqual({ ok: true });
+
+    expect(mockUploadEnvelope).toHaveBeenCalledWith({ kdfSalt: "new-salt" });
   });
 
   it("keeps the local state when the server refuses the change", async () => {
@@ -103,7 +120,7 @@ describe("persistPasswordChange", () => {
   });
 
   it("refuses to change the password without open encryption keys", async () => {
-    mockGetSession.mockReturnValue(null);
+    mockGetSession.mockResolvedValue(null);
 
     const result = await persistPasswordChange(input);
 

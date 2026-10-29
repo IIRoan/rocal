@@ -11,17 +11,19 @@ import {
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { sealReadableInvitations } from "@workspace/calendar-client";
+import { lockWithoutDeviceKeys, type E2eeLock } from "@workspace/e2ee";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useSession } from "@/lib/auth-client";
 import {
   ensureE2eeBootstrap,
   resetE2eeBootstrap,
+  storePasswordEnvelopeForActiveSession,
   unlockE2eeWithPassword,
 } from "@/lib/e2ee-bootstrap";
-import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
 import {
   clearAuthPasswords,
-  peekAuthPassword,
+  peekCachedAuthPassword,
+  peekPendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -32,11 +34,9 @@ import {
   beginAuthNavigation,
   buildE2eeLockLoginHref,
   isPasskeyBridgePath,
-  type E2eeLockReason,
 } from "@/lib/auth-navigation";
 
 const log = createLogger("e2ee-bootstrap");
-const PASSWORD_SETUP_RETRY_ATTEMPTS = 4;
 
 function clearCalendarQueries(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -79,38 +79,13 @@ async function refreshEncryptedQueries(
   ]);
 }
 
-async function attemptEncryptionPasswordSetup(
-  userId: string,
-  password: string,
-  attempt = 0,
-): Promise<boolean> {
-  if (attempt >= PASSWORD_SETUP_RETRY_ATTEMPTS) {
-    return false;
-  }
-
-  const stored = await resetEncryptionPasswordForActiveSession(
-    userId,
-    password,
-  );
-
-  if (stored) {
-    return true;
-  }
-
-  if (attempt + 1 < PASSWORD_SETUP_RETRY_ATTEMPTS) {
-    await Promise.resolve();
-  }
-
-  return attemptEncryptionPasswordSetup(userId, password, attempt + 1);
-}
-
 /** Resolves the lock that ends this session, null when it may stay; network failures never lock. */
 async function resolveBootstrapLock(input: {
   userId: string;
   result: Awaited<ReturnType<typeof ensureE2eeBootstrap>>;
   queryClient: ReturnType<typeof useQueryClient>;
   isCancelled: () => boolean;
-}): Promise<E2eeLockReason | null> {
+}): Promise<E2eeLock | null> {
   const { userId, result, queryClient, isCancelled } = input;
   const bootstrap = result.bootstrap;
 
@@ -118,41 +93,46 @@ async function resolveBootstrapLock(input: {
     return null;
   }
 
+  const signInPassword = peekPendingAuthPassword();
   if (result.activated) {
-    const pendingPassword = peekAuthPassword();
-    // This browser holds the only keys, so it stays signed in; the envelope is stored once the sign-in password is at hand.
-    if (!bootstrap.passwordEnvelope && pendingPassword) {
-      await attemptEncryptionPasswordSetup(userId, pendingPassword);
+    // A browser holding the only keys stays signed in; only a password the server just accepted may wrap them.
+    if (!bootstrap.passwordEnvelope && signInPassword) {
+      await storePasswordEnvelopeForActiveSession(userId, signInPassword).catch(
+        (error: unknown) => {
+          log.warn("Failed to store the missing encryption envelope", {
+            userId,
+            error,
+          });
+        },
+      );
     }
     return null;
   }
 
-  if (!bootstrap.passwordEnvelope) {
-    return bootstrap.devices.length > 0 ? "failed" : null;
+  const password = signInPassword ?? peekCachedAuthPassword();
+  let opened = false;
+  if (bootstrap.passwordEnvelope && password && !result.passwordUnlockFailed) {
+    // The sign-in password can arrive after the bootstrap ran.
+    const unlocked = await unlockE2eeWithPassword(userId, password, bootstrap);
+    if (isCancelled() || (!unlocked.activated && !unlocked.passwordUnlockFailed)) {
+      return null;
+    }
+    opened = unlocked.activated;
+    if (opened) {
+      await refreshEncryptedQueries(queryClient);
+    }
   }
 
-  if (result.passwordUnlockFailed) {
-    return "failed";
-  }
-
-  const pendingPassword = peekAuthPassword();
-  if (!pendingPassword) {
-    return "sign-in";
-  }
-
-  const unlocked = await unlockE2eeWithPassword(userId, pendingPassword);
-  if (isCancelled()) {
-    return null;
-  }
-  if (unlocked.activated) {
-    await refreshEncryptedQueries(queryClient);
-    return null;
-  }
-  return unlocked.passwordUnlockFailed ? "failed" : null;
+  return lockWithoutDeviceKeys({
+    hasEnvelope: Boolean(bootstrap.passwordEnvelope),
+    hasOtherDevices: bootstrap.devices.length > 0,
+    password: signInPassword ? "sign-in" : password ? "remembered" : "none",
+    opened,
+  });
 }
 
 /** Signed in means unlocked: a session that cannot open the account key ends, and the login page says why. */
-function endLockedSession(reason: E2eeLockReason): void {
+function endLockedSession(reason: E2eeLock): void {
   const finishNavigation = beginAuthNavigation(buildE2eeLockLoginHref(reason));
   if (!finishNavigation) return;
   void signOutAndClearLocalState()

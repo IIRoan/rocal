@@ -63,7 +63,6 @@ function SettingsInlineForm({
 }
 
 export function SettingsPasswordForm({
-  mode,
   currentPassword,
   newPassword,
   confirmPassword,
@@ -75,7 +74,6 @@ export function SettingsPasswordForm({
   error,
   isPending,
 }: {
-  mode: "change-password" | "set-password";
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
@@ -87,33 +85,25 @@ export function SettingsPasswordForm({
   error: string | null;
   isPending: boolean;
 }) {
-  const isChangePassword = mode === "change-password";
-
   return (
     <SettingsInlineForm
-      submitLabel={isChangePassword ? "Update Password" : "Set Password"}
+      submitLabel="Update Password"
       onSubmit={onSubmit}
       onCancel={onCancel}
       isPending={isPending}
     >
       <SheetSection
-        title={isChangePassword ? "Change password" : "Set password"}
-        footer={
-          isChangePassword
-            ? "Update your sign-in password. It also unlocks your encrypted data on every device you sign in to."
-            : "Add an email sign-in password to this account. It also unlocks your encrypted data on every device you sign in to."
-        }
+        title="Change password"
+        footer="Update your sign-in password. It also unlocks your encrypted data on every device you sign in to."
       >
         <SheetGroup>
-          {isChangePassword ? (
-            <PasswordField
-              key="current"
-              label="Current password"
-              value={currentPassword}
-              onChangeText={onCurrentPasswordChange}
-              autoComplete="password"
-            />
-          ) : null}
+          <PasswordField
+            key="current"
+            label="Current password"
+            value={currentPassword}
+            onChangeText={onCurrentPasswordChange}
+            autoComplete="password"
+          />
           <PasswordField
             key="new"
             label="New password"

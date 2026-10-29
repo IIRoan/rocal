@@ -23,7 +23,6 @@ import {
 import {
   persistAccountDeletion,
   persistPasswordChange,
-  persistPasswordSet,
   persistProfileUpdate,
   persistSettingsReset,
   persistSettingsUpdate,
@@ -104,8 +103,7 @@ export function useCommandPaletteController({
   };
 
   const linkedAccounts = accountsQuery.data ?? [];
-  const { hasOAuthAccount, hasPasswordAccount } =
-    summarizeLinkedAuthAccounts(linkedAccounts);
+  const { hasPasswordAccount } = summarizeLinkedAuthAccounts(linkedAccounts);
   const accountImage =
     busy.localImageOverride !== undefined
       ? busy.localImageOverride
@@ -223,27 +221,6 @@ export function useCommandPaletteController({
       newPassword,
     });
     dispatchBusy({ type: "setChangingPassword", value: false });
-    if (result.ok === false) {
-      throw result.error;
-    }
-  };
-
-  const handleSetPassword = async ({
-    newPassword,
-  }: {
-    newPassword: string;
-  }) => {
-    if (!sessionUserId) {
-      throw new Error("Your session is unavailable. Please try again.");
-    }
-
-    dispatchBusy({ type: "setSettingPassword", value: true });
-    const result = await persistPasswordSet({
-      sessionUserId,
-      newPassword,
-      refetchAccounts: accountsQuery.refetch,
-    });
-    dispatchBusy({ type: "setSettingPassword", value: false });
     if (result.ok === false) {
       throw result.error;
     }
@@ -369,7 +346,6 @@ export function useCommandPaletteController({
     session,
     sessionLoading,
     accountImage,
-    hasOAuthAccount,
     hasPasswordAccount,
     activeSubscriptionEditCalendarId,
     goForward,
@@ -378,7 +354,6 @@ export function useCommandPaletteController({
     handleReset,
     handleDeleteAccount,
     handleChangePassword,
-    handleSetPassword,
     handleUpdateProfile,
     paletteSearch,
     hasBothResults,

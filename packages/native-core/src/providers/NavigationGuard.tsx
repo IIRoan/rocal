@@ -182,7 +182,7 @@ export function NavigationGuard({
       // A signed-in session always holds the account key; one that cannot open it ends instead of asking for a password.
       if (lock) {
         await signOut(
-          lock === "password-mismatch"
+          lock === "cannot-open"
             ? UNLOCK_FAILED_NOTICE
             : SIGN_IN_TO_UNLOCK_NOTICE,
         );

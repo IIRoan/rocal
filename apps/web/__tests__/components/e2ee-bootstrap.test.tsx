@@ -39,16 +39,14 @@ jest.mock("@/lib/calendar-api-service", () => ({
 jest.mock("@/lib/e2ee-bootstrap", () => ({
   ensureE2eeBootstrap: jest.fn(),
   resetE2eeBootstrap: jest.fn(),
+  storePasswordEnvelopeForActiveSession: jest.fn(),
   unlockE2eeWithPassword: jest.fn(),
-}));
-
-jest.mock("@/lib/e2ee-password-reset", () => ({
-  resetEncryptionPasswordForActiveSession: jest.fn(),
 }));
 
 jest.mock("@/lib/e2ee-password-cache", () => ({
   clearAuthPasswords: jest.fn(),
-  peekAuthPassword: jest.fn(),
+  peekCachedAuthPassword: jest.fn(),
+  peekPendingAuthPassword: jest.fn(),
 }));
 
 jest.mock("@/lib/enc-password-cookie", () => ({
@@ -79,12 +77,13 @@ import type { E2eeBootstrapResponse } from "../../lib/types/calendar";
 import { useSession } from "@/lib/auth-client";
 import {
   ensureE2eeBootstrap,
+  storePasswordEnvelopeForActiveSession,
   unlockE2eeWithPassword,
 } from "@/lib/e2ee-bootstrap";
-import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
 import {
   clearAuthPasswords,
-  peekAuthPassword,
+  peekCachedAuthPassword,
+  peekPendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -104,11 +103,12 @@ let queryClient: QueryClient;
 const mockUseSession = jest.mocked(useSession);
 const mockEnsureE2eeBootstrap = jest.mocked(ensureE2eeBootstrap);
 const mockUnlockE2eeWithPassword = jest.mocked(unlockE2eeWithPassword);
-const mockResetEncryptionPasswordForActiveSession = jest.mocked(
-  resetEncryptionPasswordForActiveSession,
+const mockStorePasswordEnvelope = jest.mocked(
+  storePasswordEnvelopeForActiveSession,
 );
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
-const mockPeekAuthPassword = jest.mocked(peekAuthPassword);
+const mockPeekPendingAuthPassword = jest.mocked(peekPendingAuthPassword);
+const mockPeekCachedAuthPassword = jest.mocked(peekCachedAuthPassword);
 const mockInitEncPasswordFromCookie = jest.mocked(initEncPasswordFromCookie);
 const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
 const mockSignOut = jest.mocked(signOutAndClearLocalState);
@@ -189,12 +189,13 @@ describe("E2eeBootstrap component", () => {
       activated: false,
       bootstrap: createBootstrap(),
     });
-    mockPeekAuthPassword.mockReturnValue(null);
+    mockPeekPendingAuthPassword.mockReturnValue(null);
+    mockPeekCachedAuthPassword.mockReturnValue(null);
     mockUnlockE2eeWithPassword.mockResolvedValue({
       activated: true,
       bootstrap: createBootstrap(),
     });
-    mockResetEncryptionPasswordForActiveSession.mockResolvedValue(true);
+    mockStorePasswordEnvelope.mockResolvedValue(true);
     mockInitEncPasswordFromCookie.mockResolvedValue(undefined);
     mockSignOut.mockResolvedValue(undefined);
     mockPathname.current = "/calendar";
@@ -232,12 +233,16 @@ describe("E2eeBootstrap component", () => {
   });
 
   it("unlocks with the sign-in password that arrived after bootstrap and stays signed in", async () => {
-    mockPeekAuthPassword.mockReturnValue("pw");
+    mockPeekPendingAuthPassword.mockReturnValue("pw");
     mockEnsureE2eeBootstrap.mockResolvedValue(lockedBootstrap());
 
     await renderComponent();
 
-    expect(mockUnlockE2eeWithPassword).toHaveBeenCalledWith("user-1", "pw");
+    expect(mockUnlockE2eeWithPassword).toHaveBeenCalledWith(
+      "user-1",
+      "pw",
+      expect.objectContaining({ passwordEnvelope: expect.anything() }),
+    );
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(mockSealReadableInvitations).toHaveBeenCalledTimes(1);
   });
@@ -258,22 +263,34 @@ describe("E2eeBootstrap component", () => {
     await renderComponent();
 
     expect(mockUnlockE2eeWithPassword).not.toHaveBeenCalled();
-    expectSignedOutWith("sign-in");
+    expectSignedOutWith("sign-in-again");
     expect(mockSealReadableInvitations).not.toHaveBeenCalled();
   });
 
   it("signs out with the support notice when the sign-in password does not open the envelope", async () => {
+    mockPeekPendingAuthPassword.mockReturnValue("pw");
     mockEnsureE2eeBootstrap.mockResolvedValue(
       lockedBootstrap({ passwordUnlockFailed: true }),
     );
 
     await renderComponent();
 
-    expectSignedOutWith("failed");
+    expectSignedOutWith("cannot-open");
+  });
+
+  it("asks for a sign-in, not support, when only a remembered password failed", async () => {
+    mockPeekCachedAuthPassword.mockReturnValue("old-password");
+    mockEnsureE2eeBootstrap.mockResolvedValue(
+      lockedBootstrap({ passwordUnlockFailed: true }),
+    );
+
+    await renderComponent();
+
+    expectSignedOutWith("sign-in-again");
   });
 
   it("signs out with the support notice when a late password does not open the envelope", async () => {
-    mockPeekAuthPassword.mockReturnValue("wrong");
+    mockPeekPendingAuthPassword.mockReturnValue("wrong");
     mockEnsureE2eeBootstrap.mockResolvedValue(lockedBootstrap());
     mockUnlockE2eeWithPassword.mockResolvedValue({
       activated: false,
@@ -283,7 +300,7 @@ describe("E2eeBootstrap component", () => {
 
     await renderComponent();
 
-    expectSignedOutWith("failed");
+    expectSignedOutWith("cannot-open");
   });
 
   it("signs out with the support notice when keys exist only on other devices", async () => {
@@ -312,7 +329,7 @@ describe("E2eeBootstrap component", () => {
 
     await renderComponent();
 
-    expectSignedOutWith("failed");
+    expectSignedOutWith("cannot-open");
   });
 
   it("keeps the session when the bootstrap fails, since a network error is not a lock", async () => {
@@ -327,7 +344,7 @@ describe("E2eeBootstrap component", () => {
   });
 
   it("keeps the session when a late unlock hits a network error", async () => {
-    mockPeekAuthPassword.mockReturnValue("pw");
+    mockPeekPendingAuthPassword.mockReturnValue("pw");
     mockEnsureE2eeBootstrap.mockResolvedValue(lockedBootstrap());
     mockUnlockE2eeWithPassword.mockRejectedValue(new Error("offline"));
 
@@ -344,7 +361,7 @@ describe("E2eeBootstrap component", () => {
 
     await renderComponent();
 
-    expect(mockResetEncryptionPasswordForActiveSession).not.toHaveBeenCalled();
+    expect(mockStorePasswordEnvelope).not.toHaveBeenCalled();
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(container.innerHTML).toBe("");
     expect(mockSealReadableInvitations).toHaveBeenCalledTimes(1);
@@ -361,24 +378,30 @@ describe("E2eeBootstrap component", () => {
     expect(calendarApiService.ensureSealedUserSettings).toHaveBeenCalled();
   });
 
-  it("stores the missing envelope with the sign-in password when one is at hand", async () => {
-    mockPeekAuthPassword.mockReturnValue("pw");
+  it("stores the missing envelope in one upload with a password the server just accepted", async () => {
+    mockPeekPendingAuthPassword.mockReturnValue("pw");
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: true,
       bootstrap: createBootstrap(),
     });
-    mockResetEncryptionPasswordForActiveSession
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
 
     await renderComponent();
 
-    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenCalledTimes(2);
-    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenLastCalledWith(
-      "user-1",
-      "pw",
-    );
+    expect(mockStorePasswordEnvelope).toHaveBeenCalledTimes(1);
+    expect(mockStorePasswordEnvelope).toHaveBeenCalledWith("user-1", "pw");
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it("never wraps the keys with a remembered password, which may be stale", async () => {
+    mockPeekCachedAuthPassword.mockReturnValue("old-password");
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: true,
+      bootstrap: createBootstrap(),
+    });
+
+    await renderComponent();
+
+    expect(mockStorePasswordEnvelope).not.toHaveBeenCalled();
   });
 
   it("calls initEncPasswordFromCookie before running the bootstrap", async () => {

@@ -14,53 +14,23 @@ import type {
 } from "./account-settings-ui-state";
 import { PaletteButton, PaletteFormActions } from "./palette-ui";
 
-const FORM_COPY: Record<
-  NonNullable<SecurityForm>,
-  {
-    helper: string;
-    newLabel: string;
-    confirmLabel: string;
-    submitLabel: string;
-  }
-> = {
-  "change-password": {
-    helper:
-      "Update your sign-in password. It also unlocks your encrypted data, so your keys are rewrapped to the new one.",
-    newLabel: "New password",
-    confirmLabel: "Confirm new password",
-    submitLabel: "Update Password",
-  },
-  "set-password": {
-    helper:
-      "Add an email sign-in password to this account. It also unlocks your encrypted data when you sign in.",
-    newLabel: "New password",
-    confirmLabel: "Confirm new password",
-    submitLabel: "Set Password",
-  },
-};
-
 export function AccountSecurityForm({
   security,
   dispatch,
   activeForm,
   submission,
-  handlers,
+  handleChangePassword,
 }: {
   security: SecurityUiState;
   dispatch: Dispatch<SecurityUiAction>;
   activeForm: SecurityForm;
   submission: { busy: boolean };
-  handlers: {
-    handleChangePassword: (values: {
-      currentPassword: string;
-      newPassword: string;
-    }) => Promise<void>;
-    handleSetPassword?: (values: { newPassword: string }) => Promise<void>;
-  };
+  handleChangePassword: (values: {
+    currentPassword: string;
+    newPassword: string;
+  }) => Promise<void>;
 }) {
   if (!activeForm) return null;
-
-  const copy = FORM_COPY[activeForm];
 
   return (
     <AnimatedCollapse isOpen>
@@ -69,8 +39,7 @@ export function AccountSecurityForm({
           await submitAccountSecurityPassword({
             security,
             dispatch,
-            activeForm,
-            ...handlers,
+            handleChangePassword,
           });
         }}
       >
@@ -80,22 +49,21 @@ export function AccountSecurityForm({
           </div>
         ) : null}
         <p className="p-2 text-[13px] leading-[130%] text-muted-foreground">
-          {copy.helper}
+          Update your sign-in password. It also unlocks your encrypted data, so
+          your keys are rewrapped to the new one.
         </p>
-        {activeForm === "change-password" ? (
-          <FieldInput
-            label="Current password"
-            type="password"
-            value={security.currentPassword}
-            onChange={(value) =>
-              dispatch({ type: "setField", field: "currentPassword", value })
-            }
-            autoComplete="current-password"
-            disabled={submission.busy}
-          />
-        ) : null}
         <FieldInput
-          label={copy.newLabel}
+          label="Current password"
+          type="password"
+          value={security.currentPassword}
+          onChange={(value) =>
+            dispatch({ type: "setField", field: "currentPassword", value })
+          }
+          autoComplete="current-password"
+          disabled={submission.busy}
+        />
+        <FieldInput
+          label="New password"
           type="password"
           value={security.newPassword}
           onChange={(value) =>
@@ -105,7 +73,7 @@ export function AccountSecurityForm({
           disabled={submission.busy}
         />
         <FieldInput
-          label={copy.confirmLabel}
+          label="Confirm new password"
           type="password"
           value={security.confirmPassword}
           onChange={(value) =>
@@ -127,7 +95,7 @@ export function AccountSecurityForm({
             variant="primary"
             loading={submission.busy}
           >
-            {submission.busy ? "Saving…" : copy.submitLabel}
+            {submission.busy ? "Saving…" : "Update Password"}
           </PaletteButton>
         </PaletteFormActions>
       </form>

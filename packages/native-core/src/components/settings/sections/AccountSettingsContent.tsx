@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useReducer, useState } from "react";
 import { Alert } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
+import { changePasswordWithEnvelope } from "@workspace/calendar-client";
 import {
   getErrorMessage,
   solaceProfileImageQueryKey,
@@ -31,12 +32,9 @@ import { useToast } from "../../../providers/ToastProvider";
 
 const PROFILE_ACTION_KEYS: SettingsAccountActionKey[] = [
   "change-password",
-  "set-password",
   "change-profile-picture",
 ];
 const SESSION_ACTION_KEYS: SettingsAccountActionKey[] = ["sign-out", "delete-account"];
-
-type PasswordMode = "change-password" | "set-password";
 
 interface PasswordFormState {
   currentPassword: string;
@@ -77,16 +75,8 @@ function passwordFormReducer(
   }
 }
 
-function getPasswordFormError(
-  mode: PasswordMode,
-  form: PasswordFormState,
-): string | null {
-  if (!form.newPassword.trim()) {
-    return mode === "change-password"
-      ? "Enter your current password and a new password."
-      : "Enter a new password and confirm it.";
-  }
-  if (mode === "change-password" && !form.currentPassword.trim()) {
+function getPasswordFormError(form: PasswordFormState): string | null {
+  if (!form.newPassword.trim() || !form.currentPassword.trim()) {
     return "Enter your current password and a new password.";
   }
   if (form.newPassword !== form.confirmPassword) {
@@ -95,80 +85,55 @@ function getPasswordFormError(
   return null;
 }
 
-export function AccountPasswordForm({
-  mode,
-  onClose,
-}: {
-  mode: PasswordMode;
-  onClose: () => void;
-}) {
+export function AccountPasswordForm({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
-  const { createPasswordEnvelope } = useE2ee();
+  const { createPasswordEnvelope, uploadPasswordEnvelope } = useE2ee();
   const { toast } = useToast();
-  const accountsQuery = useLinkedAuthAccounts();
   const [form, dispatch] = useReducer(passwordFormReducer, EMPTY_PASSWORD_FORM);
 
-  const submit = async () => {
-    const invalid = getPasswordFormError(mode, form);
-    if (invalid) {
-      dispatch({ type: "fail", error: invalid });
-      return;
-    }
-    dispatch({ type: "submit" });
-
-    try {
-      // The envelope travels with the new password so the server stores both or neither.
-      const passwordEnvelope = await createPasswordEnvelope(form.newPassword);
-      if (mode === "change-password") {
+  const changePassword = async () => {
+    const envelope = await createPasswordEnvelope(form.newPassword);
+    // The envelope travels with the new password so the server stores both or neither.
+    await changePasswordWithEnvelope({
+      envelope,
+      change: async (passwordEnvelope) => {
         const result = await authClient.changePassword({
           currentPassword: form.currentPassword,
           newPassword: form.newPassword,
           email: user?.email ?? "",
           passwordEnvelope,
         });
-        if (result?.error) {
+        if (result.error) {
           throw new Error(
             result.error.message ?? "Unable to update your password.",
           );
         }
-        toast("Password updated");
-      } else {
-        const result = await (
-          authClient as typeof authClient & {
-            setPassword: (input: {
-              newPassword: string;
-              passwordEnvelope: typeof passwordEnvelope;
-            }) => Promise<{
-              error?: { message?: string };
-            } | void>;
-          }
-        ).setPassword({
-          newPassword: form.newPassword,
-          passwordEnvelope,
-        });
-        if (result?.error) {
-          throw new Error(
-            result.error.message ?? "Unable to set your password.",
-          );
-        }
-        await accountsQuery.refetch();
-        toast("Email password added");
-      }
-      await rememberDeviceEnvelopeSalt(passwordEnvelope.kdfSalt).catch(
-        () => undefined,
-      );
-      onClose();
-    } catch (error) {
+        return result.data;
+      },
+      upload: uploadPasswordEnvelope,
+    });
+    await rememberDeviceEnvelopeSalt(envelope.kdfSalt).catch(() => undefined);
+    toast("Password updated");
+    onClose();
+  };
+
+  const submit = async () => {
+    const invalid = getPasswordFormError(form);
+    if (invalid) {
+      dispatch({ type: "fail", error: invalid });
+      return;
+    }
+    dispatch({ type: "submit" });
+    await changePassword().catch((error: unknown) => {
       dispatch({
         type: "fail",
         error: getErrorMessage(error, "Failed to update your password"),
       });
-    }
+    });
   };
 
   return (
     <SettingsPasswordForm
-      mode={mode}
       currentPassword={form.currentPassword}
       newPassword={form.newPassword}
       confirmPassword={form.confirmPassword}
@@ -196,7 +161,7 @@ export function AccountSettingsContent() {
   const { resetSettingsMutation } = useNativeUserSettings();
 
   const accountsQuery = useLinkedAuthAccounts();
-  const { hasPasswordAccount, hasOAuthAccount } = useMemo(
+  const { hasPasswordAccount } = useMemo(
     () => summarizeLinkedAuthAccounts(accountsQuery.data ?? []),
     [accountsQuery.data],
   );
@@ -208,17 +173,15 @@ export function AccountSettingsContent() {
       getSettingsAccountActions({
         canSignOut: Boolean(user),
         hasPasswordAccount,
-        hasOAuthAccount,
         hasProfilePicture,
       }),
-    [hasOAuthAccount, hasPasswordAccount, hasProfilePicture, user],
+    [hasPasswordAccount, hasProfilePicture, user],
   );
 
   const [pendingAction, setPendingAction] = useState<
     "sign-out" | "delete-account" | "change-profile-picture" | null
   >(null);
-  const [activePasswordSheet, setActivePasswordSheet] =
-    useState<PasswordMode | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const settleAction = useCallback(
     (key: NonNullable<typeof pendingAction>) =>
       setPendingAction((current) => (current === key ? null : current)),
@@ -336,8 +299,8 @@ export function AccountSettingsContent() {
 
   const handleAccountAction = useCallback(
     (key: (typeof accountActions)[number]["key"]) => {
-      if (key === "change-password" || key === "set-password") {
-        setActivePasswordSheet(key);
+      if (key === "change-password") {
+        setIsChangingPassword(true);
         return;
       }
       if (key === "change-profile-picture") {
@@ -411,26 +374,13 @@ export function AccountSettingsContent() {
         </SheetGroup>
 
         {profileActions.length > 0 ? (
-          <SheetSection
-            title="Profile and sign-in"
-            footer={
-              hasOAuthAccount
-                ? hasPasswordAccount
-                  ? "Email sign-in updates your login password. Existing encrypted data stays intact."
-                  : "Adding an email password gives this account an email sign-in option without changing your existing encrypted data."
-                : undefined
-            }
-          >
+          <SheetSection title="Profile and sign-in">
             <SheetGroup>{profileActions}</SheetGroup>
           </SheetSection>
         ) : null}
 
-        {activePasswordSheet ? (
-          <AccountPasswordForm
-            key={activePasswordSheet}
-            mode={activePasswordSheet}
-            onClose={() => setActivePasswordSheet(null)}
-          />
+        {isChangingPassword ? (
+          <AccountPasswordForm onClose={() => setIsChangingPassword(false)} />
         ) : null}
 
         {preferenceActions.length > 0 ? (

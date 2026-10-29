@@ -46,14 +46,11 @@ type CommandPaletteViewContentProps = {
   accountImage: string | null;
   sessionLoading: boolean;
   changingPassword: boolean;
-  settingPassword: boolean;
   hasPasswordAccount: boolean;
-  hasOAuthAccount: boolean;
   handleChangePassword: (input: {
     currentPassword: string;
     newPassword: string;
   }) => Promise<void>;
-  handleSetPassword: (input: { newPassword: string }) => Promise<void>;
   updatingProfile: boolean;
   handleUpdateProfile: (input: { image: string | null }) => Promise<void>;
   passkeyAddMode: boolean;
@@ -84,11 +81,8 @@ export function CommandPaletteViewContent({
   accountImage,
   sessionLoading,
   changingPassword,
-  settingPassword,
   hasPasswordAccount,
-  hasOAuthAccount,
   handleChangePassword,
-  handleSetPassword,
   updatingProfile,
   handleUpdateProfile,
   passkeyAddMode,
@@ -162,11 +156,8 @@ export function CommandPaletteViewContent({
         accountImage={accountImage}
         sessionLoading={sessionLoading}
         changingPassword={changingPassword}
-        settingPassword={settingPassword}
         hasPasswordAccount={hasPasswordAccount}
-        hasOAuthAccount={hasOAuthAccount}
         handleChangePassword={handleChangePassword}
-        handleSetPassword={handleSetPassword}
         updatingProfile={updatingProfile}
         handleUpdateProfile={handleUpdateProfile}
         onOpenInvites={() => goForward("invites")}
@@ -183,11 +174,8 @@ export function CommandPaletteViewContent({
         goBack={goBack}
         goForward={goForward}
         hasPasswordAccount={hasPasswordAccount}
-        hasOAuthAccount={hasOAuthAccount}
         changingPassword={changingPassword}
-        settingPassword={settingPassword}
         handleChangePassword={handleChangePassword}
-        handleSetPassword={handleSetPassword}
       />
     );
   }

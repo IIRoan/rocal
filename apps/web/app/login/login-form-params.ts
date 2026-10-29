@@ -1,15 +1,15 @@
-import type { E2eeLockReason } from "@/lib/auth-navigation";
+import type { E2eeLock } from "@workspace/e2ee";
 
 export type LoginSearchParams = {
   nextPath: string | null;
   callbackUrl: string | null;
   inviteToken: string | null;
   stepUpRequired: boolean;
-  e2eeLock: E2eeLockReason | null;
+  e2eeLock: E2eeLock | null;
 };
 
-function readE2eeLock(value: string | null): E2eeLockReason | null {
-  return value === "sign-in" || value === "failed" ? value : null;
+function readE2eeLock(value: string | null): E2eeLock | null {
+  return value === "sign-in-again" || value === "cannot-open" ? value : null;
 }
 
 export function readLoginSearchParams(searchParams: {

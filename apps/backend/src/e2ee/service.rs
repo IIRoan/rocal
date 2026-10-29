@@ -7,7 +7,10 @@ use solace_api_types::e2ee::{
     ResetSnapshot,
 };
 
-use super::queries::{self, DeviceKeys, EventRow, PasswordKeys};
+pub use super::queries::PasswordKeys;
+use sea_orm::ConnectionTrait;
+
+use super::queries::{self, DeviceKeys, EventRow};
 use crate::auth::guard::RouteUser;
 use crate::db::entities::{
     calendar, event_category, user_encryption_device, user_encryption_password,
@@ -151,6 +154,27 @@ pub async fn store_password_envelope(
     let envelope = queries::upsert_password_envelope(&state.db, &user.id, keys).await?;
     tracing::info!(envelope_id = %envelope.id, "E2EE password envelope stored");
     Ok(password_record(envelope))
+}
+
+/// Whether the account's keys are wrapped with its password, which a password change must then rewrap.
+pub async fn has_password_envelope(
+    state: &AppState,
+    user_id: &str,
+) -> Result<bool, sea_orm::DbErr> {
+    Ok(queries::password_envelope(&state.db, user_id)
+        .await?
+        .is_some())
+}
+
+/// Stores `keys` on `db`, which a password change passes as the transaction that also writes the new hash.
+pub async fn store_password_keys<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+    keys: PasswordKeys,
+) -> Result<(), sea_orm::DbErr> {
+    let envelope = queries::upsert_password_envelope(db, user_id, keys).await?;
+    tracing::info!(envelope_id = %envelope.id, "E2EE password envelope stored");
+    Ok(())
 }
 
 /// An envelope as stored, trimmed and with defaults filled in; a password change writes it in its own transaction.

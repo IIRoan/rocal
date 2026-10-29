@@ -9,6 +9,7 @@ const mockCreatePasswordEnvelope = jest.fn();
 const mockChangePassword = jest.fn();
 const mockRememberDeviceEnvelopeSalt = jest.fn(async (_salt: string) => undefined);
 const mockToast = jest.fn();
+const mockUploadPasswordEnvelope = jest.fn(async (_envelope: unknown) => undefined);
 
 jest.mock("react-native", () => ({ Alert: { alert: jest.fn() } }));
 jest.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({}) }));
@@ -32,7 +33,10 @@ jest.mock("../../../providers/AuthProvider", () => ({
   useAuth: () => ({ user: { email: "ada@solace.test" } }),
 }));
 jest.mock("../../../providers/E2eeProvider", () => ({
-  useE2ee: () => ({ createPasswordEnvelope: mockCreatePasswordEnvelope }),
+  useE2ee: () => ({
+    createPasswordEnvelope: mockCreatePasswordEnvelope,
+    uploadPasswordEnvelope: mockUploadPasswordEnvelope,
+  }),
 }));
 jest.mock("../../../providers/ToastProvider", () => ({
   useToast: () => ({ toast: mockToast }),
@@ -84,7 +88,7 @@ function type(label: string, value: string) {
 
 async function submitChange(onClose: () => void) {
   act(() => {
-    root.render(<AccountPasswordForm mode="change-password" onClose={onClose} />);
+    root.render(<AccountPasswordForm onClose={onClose} />);
   });
   type("current", "old-password");
   type("new", "new-password");
@@ -108,7 +112,10 @@ afterEach(() => {
 
 it("sends the envelope for the new password with the change so the server stores both", async () => {
   mockCreatePasswordEnvelope.mockResolvedValue(envelope);
-  mockChangePassword.mockResolvedValue({ data: {}, error: null });
+  mockChangePassword.mockResolvedValue({
+    data: { envelopeStored: true },
+    error: null,
+  });
   const onClose = jest.fn();
 
   await submitChange(onClose);
@@ -120,7 +127,19 @@ it("sends the envelope for the new password with the change so the server stores
     email: "ada@solace.test",
     passwordEnvelope: envelope,
   });
+  expect(mockUploadPasswordEnvelope).not.toHaveBeenCalled();
   expect(mockRememberDeviceEnvelopeSalt).toHaveBeenCalledWith("new-salt");
+  expect(onClose).toHaveBeenCalled();
+});
+
+it("uploads the envelope on its own when an older API changed only the password", async () => {
+  mockCreatePasswordEnvelope.mockResolvedValue(envelope);
+  mockChangePassword.mockResolvedValue({ data: { token: null }, error: null });
+  const onClose = jest.fn();
+
+  await submitChange(onClose);
+
+  expect(mockUploadPasswordEnvelope).toHaveBeenCalledWith(envelope);
   expect(onClose).toHaveBeenCalled();
 });
 

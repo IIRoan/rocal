@@ -463,6 +463,23 @@ describe("AuthProvider", () => {
     expect(queryClient.getQueryData(["decrypted-for-test"])).toBeUndefined();
   });
 
+  it("ends the session with its notice even when a cleanup step fails", async () => {
+    await renderProvider();
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    mockOnSignedOut.mockRejectedValueOnce(new Error("cleanup failed"));
+
+    await act(async () => {
+      await expect(getAuth().signOut("Sign in again.")).rejects.toThrow(
+        "cleanup failed",
+      );
+    });
+
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().signInNotice).toBe("Sign in again.");
+  });
+
   it("keeps the sign-out notice for the sign-in screen until the next sign-in", async () => {
     await renderProvider();
 

@@ -1,7 +1,7 @@
 /** The password is stored AES-GCM encrypted in a cookie; its key lives in localStorage and both clear on sign-out. */
 
 import {
-  storePendingAuthPassword,
+  storeRememberedAuthPassword,
   clearAuthPasswords,
 } from "./e2ee-password-cache";
 
@@ -136,8 +136,8 @@ export async function initEncPasswordFromCookie(): Promise<void> {
     );
     const password = new TextDecoder().decode(decrypted);
     _memoryPassword = password;
-    // Populate the shared auth-password memory cache so peekCachedAuthPassword() callers need no changes.
-    storePendingAuthPassword(password);
+    // Kept as remembered, not as a fresh sign-in: the password may have changed on another device since.
+    storeRememberedAuthPassword(password);
   } catch {
     // Cookie or device key is corrupt/mismatched — clean up.
     clearEncPasswordCookie();

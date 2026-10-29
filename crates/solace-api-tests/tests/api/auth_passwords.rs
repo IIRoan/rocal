@@ -340,7 +340,7 @@ async fn change_password_stores_the_envelope_for_the_new_password_with_it() {
     let current = user.password.clone();
     let changed = format!("solace-test-{}", hex(8));
     let new_salt = fake_token();
-    ok(user
+    let response = ok(user
         .post(
             "/api/auth/change-password",
             json!({
@@ -350,7 +350,13 @@ async fn change_password_stores_the_envelope_for_the_new_password_with_it() {
             }),
         )
         .await
-        .expect_status(200));
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    assert_eq!(
+        response["envelopeStored"],
+        json!(true),
+        "clients only skip their fallback upload when the API says so"
+    );
     assert_eq!(
         envelope_salt(&app, &user).await.as_deref(),
         Some(new_salt.as_str())
@@ -402,6 +408,85 @@ async fn a_refused_password_change_keeps_the_previous_password_and_envelope() {
     assert_eq!(
         envelope_salt(&app, &user).await.as_deref(),
         Some(old_salt.as_str())
+    );
+}
+
+#[tokio::test]
+async fn an_account_with_an_envelope_needs_it_rewrapped_with_the_new_password() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let salt = fake_token();
+    ok(user
+        .put("/api/e2ee/password", envelope(&salt))
+        .await
+        .expect_status(200));
+    let before = password_hash(&app, &user).await;
+    let current = user.password.clone();
+    let bare = user
+        .post(
+            "/api/auth/change-password",
+            json!({"currentPassword": current, "newPassword": format!("solace-test-{}", hex(8))}),
+        )
+        .await;
+    auth_error(
+        &bare,
+        400,
+        "PASSWORD_ENVELOPE_REQUIRED",
+        "Update Solace to change your password",
+    );
+    assert_eq!(password_hash(&app, &user).await, before);
+    assert_eq!(
+        envelope_salt(&app, &user).await.as_deref(),
+        Some(salt.as_str())
+    );
+}
+
+#[tokio::test]
+async fn a_new_envelope_needs_the_passkey_step_up() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    crate::passkeys::register(&app, &mut user, "Laptop").await;
+    let mut password_only = app.anonymous();
+    ok(password_only
+        .post(
+            "/api/auth/sign-in/email",
+            json!({"email": user.email, "password": user.password}),
+        )
+        .await
+        .expect_status(200));
+    let before = password_hash(&app, &user).await;
+    let changed = format!("solace-test-{}", hex(8));
+    let planted = password_only
+        .post(
+            "/api/auth/change-password",
+            json!({
+                "currentPassword": user.password,
+                "newPassword": changed,
+                "passwordEnvelope": envelope(&fake_token()),
+            }),
+        )
+        .await;
+    auth_error(
+        &ok(planted),
+        403,
+        "PASSKEY_STEP_UP_REQUIRED",
+        "Passkey verification required.",
+    );
+    assert_eq!(password_hash(&app, &user).await, before);
+    assert_eq!(envelope_salt(&app, &user).await, None);
+
+    let plain = ok(password_only
+        .post(
+            "/api/auth/change-password",
+            json!({"currentPassword": user.password, "newPassword": changed}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    assert_eq!(
+        plain["envelopeStored"],
+        json!(false),
+        "a change without an envelope still works and says nothing was stored"
     );
 }
 

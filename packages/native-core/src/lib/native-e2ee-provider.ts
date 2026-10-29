@@ -26,6 +26,7 @@ import type {
   UpdateCategoryRequest,
   UpdateEventRequest,
 } from "@workspace/calendar-core";
+import type { PasswordEnvelopeRequest } from "@workspace/calendar-client";
 import { createLogger } from "@workspace/logger";
 import { createNativeCryptoProvider } from "./native-crypto-provider";
 import { encryptReminderLead } from "./notification-title-crypto";
@@ -248,12 +249,21 @@ export async function putPasswordEnvelope({
   apiBaseUrl: string;
   password: string;
 }): Promise<void> {
-  const envelope = await e2ee.createPasswordEnvelope(
-    session.accountKey,
-    session.blindIndexKey,
-    password,
+  await uploadPasswordEnvelope(
+    apiBaseUrl,
+    await e2ee.createPasswordEnvelope(
+      session.accountKey,
+      session.blindIndexKey,
+      password,
+    ),
   );
+}
 
+/** Stores an envelope already wrapped with the password, and remembers its salt as this device's. */
+export async function uploadPasswordEnvelope(
+  apiBaseUrl: string,
+  envelope: PasswordEnvelopeRequest,
+): Promise<void> {
   // repo-rules-allow client-api-boundary: E2EE password-envelope endpoint; @workspace/calendar-client does not expose it.
   const response = await fetch(getE2eeApiUrl(apiBaseUrl, "/password"), {
     method: "PUT",
