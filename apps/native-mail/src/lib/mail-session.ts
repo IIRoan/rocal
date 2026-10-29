@@ -15,7 +15,6 @@ import {
   clearCachedPrivateKey,
   clearDerivedVaultKey,
   clearMailVaultPassword,
-  saveMailVaultPassword,
 } from "./mail/mail-password-cache";
 import { buildMailRuntime, type MailRuntime } from "./mail/mail-runtime";
 import { clearSenderKeyCache } from "./mail/mail-sender-key";
@@ -86,8 +85,12 @@ export async function prepareMailSession(
 
   // The guard only calls this once E2EE bootstrap settled, so waiting vault unlocks can proceed.
   releaseVaultUnlock();
-  // Decrypted attachments from an earlier session are no longer open in any viewer.
-  await clearAttachmentCache().catch(() => undefined);
+  // Decrypted attachments from an earlier session are no longer open in any viewer; the password and derived key are what older versions stored.
+  await Promise.all([
+    clearAttachmentCache().catch(() => undefined),
+    clearMailVaultPassword(),
+    clearDerivedVaultKey(),
+  ]);
   if (restoredUserId === input.userId) {
     await finishRestoredMailSession(input);
     return;
@@ -151,9 +154,8 @@ export async function prepareMailSession(
   await ensureVaultLoaded(runtime);
 }
 
-/** Keeps the vault password for this device's unlock and wipes every vault secret on sign-out. */
+/** Wipes every vault secret and decrypted copy on sign-out. */
 export const MAIL_AUTH_LIFECYCLE: AuthLifecycle = {
-  onPasswordAuthenticated: (password) => saveMailVaultPassword(password),
   async onSignedOut() {
     restoreGeneration += 1;
     restoredUserId = null;

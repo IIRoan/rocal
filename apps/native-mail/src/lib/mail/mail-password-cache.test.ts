@@ -2,11 +2,7 @@
  * Tests for mail-password-cache.ts
  */
 
-import {
-  saveMailVaultPassword,
-  loadMailVaultPassword,
-  clearMailVaultPassword,
-} from "./mail-password-cache";
+import { clearMailVaultPassword } from "./mail-password-cache";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -41,48 +37,6 @@ describe("mail-password-cache", () => {
     Object.keys(mockSecureStore).forEach((k) => delete mockSecureStore[k]);
   });
 
-  describe("saveMailVaultPassword", () => {
-    it("writes the password to SecureStore", async () => {
-      await saveMailVaultPassword("hunter2");
-      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-        "MAIL_VAULT_PASSWORD",
-        "hunter2",
-      );
-    });
-
-    it("is a no-op for empty strings", async () => {
-      await saveMailVaultPassword("");
-      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
-    });
-
-    it("does not throw if SecureStore fails", async () => {
-      (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(
-        new Error("SecureStore unavailable"),
-      );
-      await expect(saveMailVaultPassword("pw")).resolves.toBeUndefined();
-    });
-  });
-
-  describe("loadMailVaultPassword", () => {
-    it("returns the stored password", async () => {
-      mockSecureStore["MAIL_VAULT_PASSWORD"] = "stored-pw";
-      const result = await loadMailVaultPassword();
-      expect(result).toBe("stored-pw");
-    });
-
-    it("returns null when nothing is stored", async () => {
-      const result = await loadMailVaultPassword();
-      expect(result).toBeNull();
-    });
-
-    it("returns null and does not throw if SecureStore fails", async () => {
-      (SecureStore.getItemAsync as jest.Mock).mockRejectedValueOnce(
-        new Error("SecureStore unavailable"),
-      );
-      await expect(loadMailVaultPassword()).resolves.toBeNull();
-    });
-  });
-
   describe("clearMailVaultPassword", () => {
     it("deletes the password from SecureStore", async () => {
       mockSecureStore["MAIL_VAULT_PASSWORD"] = "pw";
@@ -97,15 +51,6 @@ describe("mail-password-cache", () => {
         new Error("SecureStore unavailable"),
       );
       await expect(clearMailVaultPassword()).resolves.toBeUndefined();
-    });
-  });
-
-  describe("full lifecycle", () => {
-    it("save → load → clear → load returns null", async () => {
-      await saveMailVaultPassword("my-secret");
-      expect(await loadMailVaultPassword()).toBe("my-secret");
-      await clearMailVaultPassword();
-      expect(await loadMailVaultPassword()).toBeNull();
     });
   });
 });

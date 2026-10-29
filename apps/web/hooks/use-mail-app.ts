@@ -38,7 +38,8 @@ import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { toast } from "sonner";
 import { createLogger } from "@workspace/logger";
-import { useSession, signOut } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
+import { signOutAndClearLocalState } from "@/lib/auth-local-state";
 import {
   beginAuthNavigation,
   completeAuthNavigation,
@@ -50,7 +51,7 @@ import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { useSimpleLoginAliasAction } from "@/hooks/use-simplelogin-alias-action";
 import { peekCachedAuthPassword } from "@/lib/e2ee-password-cache";
 import { resolveAvatarUrl } from "@/lib/profile-picture";
-import { clearEncPasswordCookie, initEncPasswordFromCookie } from "@/lib/enc-password-cookie";
+import { initEncPasswordFromCookie } from "@/lib/enc-password-cookie";
 import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
@@ -2966,10 +2967,7 @@ export function useMailApp() {
     const finishNavigation = beginAuthNavigation("/");
     if (!finishNavigation) return;
     await handleDisconnect()
-      .then(() => {
-        clearEncPasswordCookie();
-        return signOut();
-      })
+      .then(signOutAndClearLocalState)
       .finally(finishNavigation);
   };
 

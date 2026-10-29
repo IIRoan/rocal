@@ -1,6 +1,6 @@
 import type { MailVaultBackupRecord } from "./types";
 
-const DATABASE_NAME = "solace-mail";
+export const MAIL_VAULT_DATABASE_NAME = "solace-mail";
 /** Bumped to 2 so derived-vault-keys can share this DB (see derived-vault-key-storage). */
 const DATABASE_VERSION = 2;
 const STORE_NAME = "vault-backups";
@@ -12,7 +12,7 @@ async function openDatabase(): Promise<IDBDatabase | null> {
   }
 
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+    const request = indexedDB.open(MAIL_VAULT_DATABASE_NAME, DATABASE_VERSION);
 
     request.onupgradeneeded = () => {
       const database = request.result;

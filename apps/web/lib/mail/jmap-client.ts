@@ -432,12 +432,19 @@ export class StalwartJmapClient {
     return null;
   }
 
-  private async refreshRegisteredBlobUploads(session: JmapSession): Promise<void> {
+  /** Re-uploads only this message's expired blobs, so attachments from earlier plaintext sends never return to the server. */
+  private async refreshRegisteredBlobUploads(
+    session: JmapSession,
+    blobIds: string[],
+  ): Promise<void> {
     const uploadTtlMs = this.getUploadTtlMs();
     const now = Date.now();
+    const records = new Set(
+      blobIds.flatMap((blobId) => this.blobUploadRegistry.get(blobId) ?? []),
+    );
 
     await runTasksWithConcurrencyLimit(
-      this.blobUploadRegistry.listRegistered().map((record) => async () => {
+      [...records].map((record) => async () => {
         if (!isBlobUploadExpired(record.uploadedAt, uploadTtlMs, now)) {
           return;
         }
@@ -486,7 +493,10 @@ export class StalwartJmapClient {
       return input;
     }
 
-    await this.refreshRegisteredBlobUploads(session);
+    await this.refreshRegisteredBlobUploads(session, [
+      ...(input.attachments ?? []).map((attachment) => attachment.blobId),
+      ...(input.pgpMimeCiphertext ? [input.pgpMimeCiphertext.blobId] : []),
+    ]);
 
     const attachments = input.attachments?.map((attachment) => {
       const refreshed = this.blobUploadRegistry.get(attachment.blobId);
@@ -1353,20 +1363,6 @@ export class StalwartJmapClient {
     }>(threadEnvelope, "Thread/get");
     const emailIds = threadResult.list?.[0]?.emailIds ?? [];
     return this.getMessagesByIds(session, emailIds, { includeBodies: false });
-  }
-
-  async uploadFile(session: JmapSession, file: File): Promise<JmapAttachmentInput> {
-    const uploaded = await this.uploadBlob(
-      session,
-      file,
-      file.type || "application/octet-stream",
-    );
-    return {
-      blobId: uploaded.blobId,
-      name: file.name,
-      type: uploaded.type,
-      size: uploaded.size,
-    };
   }
 
   async uploadBlob(

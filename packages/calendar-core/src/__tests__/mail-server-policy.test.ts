@@ -210,7 +210,7 @@ describe("MailBlobUploadRegistry", () => {
     expect(registry.get("original")?.blobId).toBe("third");
     expect(registry.get("second")?.blobId).toBe("third");
     expect(registry.get("third")?.uploadedAt).toBe(200);
-    expect(registry.listRegistered()).toHaveLength(1);
+    expect(registry.get("original")).toBe(registry.get("third"));
   });
 });
 

@@ -395,9 +395,12 @@ function ComposeSession({
       if (result.canceled) return;
       const asset = result.assets[0];
       if (!asset?.uri) return;
+      // The picker's cache copy is plaintext, so it is deleted once read.
       const base64 = await FileSystem.readAsStringAsync(asset.uri, {
         encoding: FileSystem.EncodingType.Base64,
-      });
+      }).finally(() =>
+        FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(() => undefined),
+      );
       const bytes = decodeBase64ToBytes(base64);
       setAttachments((current) => [
         ...current,

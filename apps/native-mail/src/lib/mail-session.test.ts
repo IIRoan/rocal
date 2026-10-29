@@ -21,7 +21,6 @@ jest.mock("./mail/mail-password-cache", () => ({
   clearCachedPrivateKey: jest.fn(),
   clearDerivedVaultKey: jest.fn(),
   clearMailVaultPassword: jest.fn(),
-  saveMailVaultPassword: jest.fn(),
 }));
 jest.mock("./mail/mail-settings-store", () => ({
   clearMailSettings: jest.fn(),

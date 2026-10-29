@@ -1,4 +1,4 @@
-const DATABASE_NAME = "solace-e2ee";
+export const E2EE_DATABASE_NAME = "solace-e2ee";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "device-bootstrap";
 
@@ -21,7 +21,7 @@ function openDatabase(): Promise<IDBDatabase | null> {
   }
 
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+    const request = indexedDB.open(E2EE_DATABASE_NAME, DATABASE_VERSION);
 
     request.onupgradeneeded = () => {
       const database = request.result;

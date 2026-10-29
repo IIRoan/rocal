@@ -680,6 +680,7 @@ async fn record_declined_tombstone(
             input.status = Some("declined".into());
         }
     }
+    // A tombstone only blocks re-importing the invitation, so the declined event's text is not kept.
     let event_id = match events::by_external_id(&state.db, user_id, &parsed.uid).await? {
         Some(existing) => {
             let id = existing.id.clone();
@@ -687,11 +688,15 @@ async fn record_declined_tombstone(
             row.calendar_id = Set(staging.id);
             row.stalwart_event_id = Set(None);
             row.stalwart_synced_at = Set(None);
+            row.title = Set(String::new());
+            row.description = Set(None);
+            row.location = Set(None);
             events::update(&state.db, row).await?;
             id
         }
         None => {
-            let data = local_data(parsed, None, None);
+            let mut data = local_data(parsed, None, None);
+            data.content = Some((String::new(), None, None));
             events::insert(&state.db, data.new_row(parsed, user_id, &staging.id))
                 .await?
                 .id

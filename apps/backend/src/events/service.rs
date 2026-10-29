@@ -72,6 +72,20 @@ async fn writable_target(
     }
 }
 
+/// Writable calendars hold only ciphertext, so staged or legacy plaintext rows cannot be moved or copied into one.
+fn refuse_plaintext(events: &[calendar_event::Model]) -> Result<(), AppError> {
+    if events
+        .iter()
+        .any(|e| !e.is_synced && !has_text(e.encrypted_content.as_deref()))
+    {
+        return Err(AppError::field(
+            "Event encryption requires an active encryption session.",
+            "encryptedContent",
+        ));
+    }
+    Ok(())
+}
+
 fn has_text(value: Option<&str>) -> bool {
     value.is_some_and(|value| !js_trim(value).is_empty())
 }
@@ -729,6 +743,7 @@ pub async fn bulk(
                 "Cannot move events to a read-only calendar.",
             )
             .await?;
+            refuse_plaintext(&events)?;
             let moved =
                 queries::move_to_calendar(&state.db, &user.id, ids, &target.id, instant::now())
                     .await?;
@@ -784,6 +799,7 @@ pub async fn bulk(
                     "Cannot copy events to a read-only calendar.",
                 )
                 .await?;
+                refuse_plaintext(&events)?;
             }
             duplicate(state, user, &events, &relations, target).await
         }

@@ -36,7 +36,6 @@ Hourly (`:17`), the worker deletes ephemeral rows in batches of 500 (`DELETE ...
 | Table                                        | Deleted when                                                     |
 | -------------------------------------------- | ---------------------------------------------------------------- |
 | `session`, `verification`                    | `expires_at` older than 1 day                                    |
-| `oauth_access_token`, `oauth_refresh_token`  | `expires_at` older than 1 day                                    |
 | `invite`                                     | pending past `expires_at` + 30d; revoked/abandoned claim after 30d; accepted invites are kept (inviter's history) |
 | `notification_job`                           | `sent` after 7d; any other non-pending status after 30d (pending/leased never touched) |
 | `notification_log`                           | `created_at` older than 30 days                                  |

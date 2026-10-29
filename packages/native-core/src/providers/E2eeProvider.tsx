@@ -259,12 +259,15 @@ export function E2eeProvider({
 
         if (pendingPassword) {
           try {
-            await storePasswordEnvelopeForActiveSession({
-              e2ee,
-              userId,
-              apiBaseUrl,
-              password: pendingPassword,
-            });
+            // An existing envelope still holds the real account key; replacing it would orphan every encrypted item.
+            if (!bootstrapData.passwordEnvelope) {
+              await storePasswordEnvelopeForActiveSession({
+                e2ee,
+                userId,
+                apiBaseUrl,
+                password: pendingPassword,
+              });
+            }
           } catch (error) {
             log.warn("Failed to auto-store E2EE password envelope", {
               userId,

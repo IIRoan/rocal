@@ -55,7 +55,6 @@ jest.mock("@workspace/native-core/lib/constants", () => ({
 
 // Mock vault crypto with a fast in-memory implementation
 const mockUnlockVault = jest.fn();
-const mockUnlockVaultWithDerivedKey = jest.fn();
 const mockCreateEncryptedMailVault = jest.fn();
 const mockWrapVaultSecret = jest.fn(
   async (secret: string): Promise<string | null> => `wrapped:${secret}`,
@@ -77,25 +76,16 @@ jest.mock("./native-vault-crypto", () => {
   return {
     ...actual,
     unlockEncryptedMailVault: (...args: unknown[]) => mockUnlockVault(...args),
-    unlockEncryptedMailVaultWithDerivedKey: (...args: unknown[]) =>
-      mockUnlockVaultWithDerivedKey(...args),
     createEncryptedMailVault: (...args: unknown[]) =>
       mockCreateEncryptedMailVault(...args),
   };
 });
 
-// Control stored password + derived key + cached private key
-const mockLoadMailVaultPassword = jest.fn<Promise<string | null>, []>();
-const mockLoadDerivedVaultKey = jest.fn<Promise<string | null>, []>();
-const mockSaveDerivedVaultKey = jest.fn();
+// Control the cached private key
 const mockLoadCachedPrivateKey = jest.fn<Promise<string | null>, []>();
 const mockSaveCachedPrivateKey = jest.fn();
 jest.mock("./mail-password-cache", () => ({
-  loadMailVaultPassword: () => mockLoadMailVaultPassword(),
-  saveMailVaultPassword: jest.fn(),
   clearMailVaultPassword: jest.fn(),
-  loadDerivedVaultKey: () => mockLoadDerivedVaultKey(),
-  saveDerivedVaultKey: (...args: unknown[]) => mockSaveDerivedVaultKey(...args),
   clearDerivedVaultKey: jest.fn(),
   loadCachedPrivateKey: () => mockLoadCachedPrivateKey(),
   saveCachedPrivateKey: (...args: unknown[]) => mockSaveCachedPrivateKey(...args),
@@ -238,9 +228,6 @@ describe("mail-crypto", () => {
     mockUnwrapVaultSecret.mockImplementation(async (wrapped) =>
       wrapped.replace(/^wrapped:/, ""),
     );
-    mockLoadMailVaultPassword.mockResolvedValue(null);
-    mockLoadDerivedVaultKey.mockResolvedValue(null);
-    mockSaveDerivedVaultKey.mockResolvedValue(undefined);
     mockLoadCachedPrivateKey.mockResolvedValue(null);
     mockSaveCachedPrivateKey.mockResolvedValue(undefined);
     mockUpsertAccountVaultBackup.mockResolvedValue(undefined);
@@ -277,7 +264,6 @@ describe("mail-crypto", () => {
         MOCK_VAULT_BACKUP.encryptedVaultB64,
         "sealed-secret",
         MOCK_VAULT_BACKUP.kdfParams,
-        expect.any(Function),
       );
       // Only the vault backup is fetched; no server key material exists.
       expect(mockMailFetch).toHaveBeenCalledTimes(1);
@@ -399,7 +385,6 @@ describe("mail-crypto", () => {
         MOCK_SAFE_VAULT_BACKUP.encryptedVaultB64,
         "sealed-secret",
         MOCK_SAFE_VAULT_BACKUP.kdfParams,
-        expect.any(Function),
       );
       // Only the vault backup was fetched — no key-material request at all.
       expect(mockMailFetch).toHaveBeenCalledTimes(1);
@@ -574,9 +559,6 @@ describe("mail-crypto", () => {
     mockUnwrapVaultSecret.mockImplementation(async (wrapped) =>
       wrapped.replace(/^wrapped:/, ""),
     );
-    mockLoadMailVaultPassword.mockResolvedValue(null);
-      mockLoadDerivedVaultKey.mockResolvedValue(null);
-      mockSaveDerivedVaultKey.mockResolvedValue(undefined);
 
       mockMailFetch.mockResolvedValueOnce({
         ok: false,

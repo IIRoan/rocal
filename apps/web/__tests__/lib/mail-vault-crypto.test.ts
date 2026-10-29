@@ -60,11 +60,7 @@ describe("mail vault crypto", () => {
       parallelism: 1,
     });
     const keyBytes = await deriveVaultKeyBytes(passphrase, encrypted.kdfParams);
-    const derivedKeyB64 = Buffer.from(keyBytes)
-      .toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
+    const derivedKeyB64 = Buffer.from(keyBytes).toString("base64");
 
     await expect(
       unlockEncryptedMailVaultWithDerivedKey(

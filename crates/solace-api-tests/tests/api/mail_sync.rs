@@ -697,8 +697,8 @@ async fn a_declined_invitation_is_kept_as_a_hidden_tombstone_that_mail_does_not_
     let after = row_json(&app.db, &event_sql().replace("::text", ""), &uid).await;
     assert_eq!(
         after["title"],
-        json!("Unwanted sync"),
-        "a declined invitation is not updated from mail"
+        json!(""),
+        "a declined invitation keeps no text and is not updated from mail"
     );
     assert_eq!(me(&after), Some(json!("declined")));
 }

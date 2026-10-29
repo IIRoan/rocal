@@ -9,7 +9,6 @@ import {
   type UserKeyVault,
 } from "./native-vault-crypto";
 import {
-  saveDerivedVaultKey,
   loadCachedPrivateKey,
   saveCachedPrivateKey,
 } from "./mail-password-cache";
@@ -296,9 +295,6 @@ async function doLoadVault(runtime: MailRuntime): Promise<UnlockedVault> {
       backup.encryptedVaultB64,
       sealedSecret,
       backup.kdfParams,
-      (keyB64) => {
-        void saveDerivedVaultKey(keyB64).catch(() => undefined);
-      },
     );
     const privateKey =
       (await loadCachedPrivateKeyForVault(unlockedVault)) ??

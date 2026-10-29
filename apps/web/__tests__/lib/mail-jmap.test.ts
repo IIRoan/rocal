@@ -1040,6 +1040,8 @@ describe("StalwartJmapClient", () => {
       const attachments = await Promise.all(
         Array.from({ length: 5 }, () => client.uploadTextBlob(session, "x")),
       );
+      // An earlier plaintext send's attachment stays registered but is not part of this message.
+      await client.uploadTextBlob(session, "earlier attachment");
       peak = 0;
       now.mockReturnValue(7_200_000);
       client.setMailServerPolicy(
@@ -1066,10 +1068,10 @@ describe("StalwartJmapClient", () => {
       ).resolves.toEqual(expect.objectContaining({ emailId: "email" }));
 
       expect(peak).toBeLessThanOrEqual(4);
-      expect(uploadedCount).toBe(10);
+      expect(uploadedCount).toBe(11);
       const body = String(fetcher.mock.calls[0]?.[1]?.body);
-      expect(body).toContain('"blob-6"');
-      expect(body).toContain('"blob-10"');
+      expect(body).toContain('"blob-7"');
+      expect(body).toContain('"blob-11"');
       expect(body).not.toContain('"blob-1"');
     } finally {
       now.mockRestore();

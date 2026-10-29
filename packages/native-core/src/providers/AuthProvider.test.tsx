@@ -22,6 +22,10 @@ jest.mock("react-native", () => ({
   },
 }));
 
+const mockClearNativeTitleIndex = jest.fn(async () => undefined);
+jest.mock("../lib/search/title-index-store", () => ({
+  clearNativeTitleIndex: () => mockClearNativeTitleIndex(),
+}));
 jest.mock("expo-linking", () => ({
   createURL: jest.fn(() => "solace://"),
 }));
@@ -95,7 +99,6 @@ const mockGetAuthCapabilities = jest.mocked(getAuthCapabilities);
 const mockWaitForSessionCookie = jest.mocked(waitForSessionCookie);
 const mockSignInWithBrowserPasskey = jest.mocked(signInWithBrowserPasskey);
 const mockUnregisterNativePushDevice = jest.mocked(unregisterNativePushDevice);
-const mockOnPasswordAuthenticated = jest.fn(async (_password: string) => {});
 const mockOnSignedOut = jest.fn(async () => {});
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
@@ -161,7 +164,6 @@ describe("AuthProvider", () => {
       root.render(
         <AuthProvider
           lifecycle={{
-            onPasswordAuthenticated: mockOnPasswordAuthenticated,
             onSignedOut: mockOnSignedOut,
           }}
         >
@@ -201,7 +203,6 @@ describe("AuthProvider", () => {
     mockWaitForSessionCookie.mockReset();
     mockSignInWithBrowserPasskey.mockReset();
     mockUnregisterNativePushDevice.mockReset();
-    mockOnPasswordAuthenticated.mockClear();
     mockOnSignedOut.mockClear();
 
     mockGetAuthCapabilities.mockReturnValue({
@@ -250,7 +251,6 @@ describe("AuthProvider", () => {
     expect(getAuth().peekPendingAuthPassword()).toBe("secret-password");
     expect(getAuth().consumePendingAuthPassword()).toBe("secret-password");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
-    expect(mockOnPasswordAuthenticated).toHaveBeenCalledWith("secret-password");
   });
 
   it("stashes the email sign-in password before the session can become available", async () => {
@@ -285,6 +285,19 @@ describe("AuthProvider", () => {
     expect(getAuth().lastAuthMethod).toBe("email-password");
     expect(getAuth().consumePendingAuthPassword()).toBe("new-account-password");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
+  });
+
+  it.each([
+    ["the server reports no session", { data: null }, 1],
+    ["the session check fails", { data: null, error: { status: 503 } }, 0],
+  ])("wipes app data on startup only when %s", async (_case, response, wipes) => {
+    mockGetSession.mockResolvedValue(response as never);
+
+    await renderProvider();
+    await flushPromises();
+
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(mockOnSignedOut).toHaveBeenCalledTimes(wipes);
   });
 
   it("accepts a successful sign-in response while cookie persistence catches up", async () => {
@@ -411,6 +424,7 @@ describe("AuthProvider", () => {
     expect(mockUnregisterNativePushDevice).toHaveBeenCalled();
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockOnSignedOut).toHaveBeenCalled();
+    expect(mockClearNativeTitleIndex).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });

@@ -404,6 +404,10 @@ describe("E2eeProvider", () => {
       expect.objectContaining({ method: "PUT" }),
     );
     expect(clearPendingAuthPassword).toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      "https://api.solace.test/api/e2ee/password",
+      expect.anything(),
+    );
   });
 
   it("clears the pending auth password when auto-storing the envelope fails", async () => {

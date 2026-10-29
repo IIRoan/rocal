@@ -228,6 +228,7 @@ jest.mock("@/hooks/use-compose-draft-autosave", () => ({
 }));
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
+  clearAuthPasswords: jest.fn(),
   peekCachedAuthPassword: jest.fn(),
 }));
 
@@ -948,7 +949,9 @@ describe("MailApp", () => {
     await renderApp(true, true);
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+    await waitForExpectation(() =>
+      expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1),
+    );
     expect(mockWorkerClient.clear).toHaveBeenCalled();
     expect(mockCompleteAuthNavigation.mock.calls).toEqual([["/"]]);
     expect(container.textContent).not.toContain("Encrypted hello");

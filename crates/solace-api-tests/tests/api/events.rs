@@ -1247,6 +1247,34 @@ async fn protected_fields_need_new_ciphertext_on_update() {
             "Event encryption requires an active encryption session.",
         ));
     assert_eq!(error["details"], json!({"field": "encryptedContent"}));
+    for action in ["move", "duplicate"] {
+        let error = ok(owner
+            .post(
+                "/api/events/bulk",
+                json!({"action": action, "eventIds": [staged], "targetCalendarId": calendar}),
+            )
+            .await
+            .expect_error(
+                400,
+                "Validation Error",
+                "Event encryption requires an active encryption session.",
+            ));
+        assert_eq!(
+            error["details"],
+            json!({"field": "encryptedContent"}),
+            "{action}"
+        );
+    }
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
+            &calendar
+        )
+        .await,
+        1,
+        "no plaintext copy reaches the owned calendar"
+    );
     assert_eq!(
         row_snapshot(&app.db, "calendar_event", &staged).await,
         staged_before

@@ -1341,6 +1341,12 @@ async fn declining_from_mail_replies_and_records_a_tombstone() {
     let tombstone = lookup(&mut attendee, &uid).await.expect("tombstone");
     assert_eq!(tombstone.calendar.name, "Invitations");
     assert!(people(&tombstone).contains(&person(&attendee.email, "attendee", "declined")));
+    let stored = stored_content(&app.db, &tombstone.id.0).await;
+    assert_eq!(
+        (stored.title.as_str(), stored.description, stored.location),
+        ("", None, None),
+        "a declined invitation keeps none of its text"
+    );
     assert_eq!(
         import(&mut attendee, &import_request(ics.clone(), None)).await,
         summary(0, 0, &[])

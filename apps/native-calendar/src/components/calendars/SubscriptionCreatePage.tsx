@@ -113,7 +113,10 @@ export function SubscriptionCreatePage() {
         toast("Choose a .ics calendar file to import", "error");
         return;
       }
-      setPickedFile({ name: asset.name, content: await new File(asset.uri).text() });
+      const file = new File(asset.uri);
+      // The picker's cache copy is plaintext, so it is deleted once read.
+      const content = await file.text().finally(() => file.delete());
+      setPickedFile({ name: asset.name, content });
     } catch (error) {
       toast(getErrorMessage(error, "Failed to read the selected file"), "error");
     }
