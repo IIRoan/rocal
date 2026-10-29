@@ -14,7 +14,6 @@ import {
   setFallbackSessionToken,
 } from "../lib/session-token-fallback";
 import { AuthProvider, useAuth } from "./AuthProvider";
-import { setAccountHasPasswordEnvelope } from "../lib/e2ee-session";
 
 jest.mock("react-native", () => ({
   AppState: { currentState: "active", addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
@@ -24,9 +23,9 @@ jest.mock("react-native", () => ({
 }));
 
 const mockClearNativeTitleIndex = jest.fn(async () => undefined);
-const mockClearStoredDevice = jest.fn(async () => undefined);
+const mockClearRecoverableStoredDevice = jest.fn(async () => undefined);
 jest.mock("../lib/native-e2ee-provider", () => ({
-  clearStoredDevice: () => mockClearStoredDevice(),
+  clearRecoverableStoredDevice: () => mockClearRecoverableStoredDevice(),
 }));
 jest.mock("../lib/search/title-index-store", () => ({
   clearNativeTitleIndex: () => mockClearNativeTitleIndex(),
@@ -209,6 +208,7 @@ describe("AuthProvider", () => {
     mockSignInWithBrowserPasskey.mockReset();
     mockUnregisterNativePushDevice.mockReset();
     mockOnSignedOut.mockClear();
+    mockClearRecoverableStoredDevice.mockClear();
 
     mockGetAuthCapabilities.mockReturnValue({
       supportsPassword: true,
@@ -414,20 +414,14 @@ describe("AuthProvider", () => {
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });
 
-  it("keeps the device key on sign-out when the account has no password envelope", async () => {
-    await renderProvider();
-    await act(async () => {
-      await getAuth().signIn("roan@example.com", "secret-password");
-    });
-    setAccountHasPasswordEnvelope(false);
+  it("drops a recoverable device key when the server ends the session before startup ran", async () => {
+    mockGetSession.mockResolvedValue({ data: null, error: null });
 
-    await act(async () => {
-      await getAuth().signOut();
-    });
+    await renderProvider();
     await flushPromises();
 
+    expect(mockClearRecoverableStoredDevice).toHaveBeenCalledTimes(1);
     expect(mockOnSignedOut).toHaveBeenCalled();
-    expect(mockClearStoredDevice).not.toHaveBeenCalled();
   });
 
   it("clears pending auth hints on sign-out", async () => {
@@ -436,7 +430,6 @@ describe("AuthProvider", () => {
     await act(async () => {
       await getAuth().signIn("roan@example.com", "secret-password");
     });
-    setAccountHasPasswordEnvelope(true);
 
     await act(async () => {
       await getAuth().signOut();
@@ -447,7 +440,7 @@ describe("AuthProvider", () => {
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockOnSignedOut).toHaveBeenCalled();
     expect(mockClearNativeTitleIndex).toHaveBeenCalled();
-    expect(mockClearStoredDevice).toHaveBeenCalled();
+    expect(mockClearRecoverableStoredDevice).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });

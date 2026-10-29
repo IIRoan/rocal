@@ -1,3 +1,4 @@
+import { resolveDeviceEnvelopeSalt } from "@workspace/e2ee";
 import { createLogger } from "@workspace/logger";
 import { e2eeApiService } from "./e2ee-api-service";
 import {
@@ -8,10 +9,13 @@ import {
 import {
   getStoredE2eeDevice,
   putStoredE2eeDevice,
+  rememberStoredDeviceEnvelopeSalt,
   type StoredE2eeDeviceRecord,
 } from "./e2ee-storage";
 import {
   createPasswordEnvelope,
+  decryptJsonPayload,
+  encryptJsonPayload,
   exportWrappingPublicKey,
   generateAccountKey,
   generateBlindIndexKey,
@@ -131,6 +135,25 @@ async function activateFromRemote(
   }
 
   activateSession(userId, remoteRecord.deviceId, accountKey, blindIndexKey);
+  // Keys minted while another key's envelope existed must survive sign-out, so a changed envelope is checked again.
+  await resolveDeviceEnvelopeSalt(
+    { unwrapPasswordEnvelope, encryptJsonPayload, decryptJsonPayload },
+    {
+      storedSalt: localRecord.envelopeSalt,
+      envelope: bootstrap.passwordEnvelope,
+      password: peekAuthPassword(),
+      accountKey,
+    },
+  )
+    .then((salt) =>
+      rememberStoredDeviceEnvelopeSalt(userId, localRecord.deviceId, salt),
+    )
+    .catch((error: unknown) => {
+      log.warn("Failed to check the device key against the envelope", {
+        userId,
+        error,
+      });
+    });
   return createAttempt(true, bootstrap);
 }
 
@@ -153,6 +176,7 @@ async function createDeviceRecord(
   userId: string,
   accountKey: CryptoKey,
   blindIndexKey: CryptoKey,
+  envelopeSalt: string | undefined,
 ): Promise<StoredE2eeDeviceRecord> {
   const wrappingKeyPair = await generateWrappingKeyPair();
   const [publicKey, wrappedAccountKey, wrappedSearchKey] = await Promise.all([
@@ -173,6 +197,7 @@ async function createDeviceRecord(
     keyVersion: 1,
     createdAt: timestamp,
     updatedAt: timestamp,
+    envelopeSalt,
   };
 }
 
@@ -180,11 +205,13 @@ async function provisionLocalDevice(
   userId: string,
   accountKey: CryptoKey,
   blindIndexKey: CryptoKey,
+  envelopeSalt?: string,
 ): Promise<E2eeDeviceRecord> {
   const localRecord = await createDeviceRecord(
     userId,
     accountKey,
     blindIndexKey,
+    envelopeSalt,
   );
   const remoteRecord = await uploadDevice(localRecord);
   await putStoredE2eeDevice(localRecord);
@@ -223,13 +250,14 @@ async function activateFromPasswordEnvelope(
   bootstrap: E2eeBootstrapResponse,
   password: string,
 ): Promise<E2eeBootstrapAttempt> {
-  if (!bootstrap.passwordEnvelope) {
+  const envelope = bootstrap.passwordEnvelope;
+  if (!envelope) {
     return createAttempt(false, bootstrap);
   }
 
   const { accountKey, blindIndexKey } = await unwrapPasswordEnvelope(
     password,
-    bootstrap.passwordEnvelope,
+    envelope,
   );
 
   if (!isBootstrapCurrent(userId, generation)) {
@@ -245,7 +273,14 @@ async function activateFromPasswordEnvelope(
 
   const deviceId = matchingRemote
     ? matchingRemote.deviceId
-    : (await provisionLocalDevice(userId, accountKey, blindIndexKey)).deviceId;
+    : (
+        await provisionLocalDevice(
+          userId,
+          accountKey,
+          blindIndexKey,
+          envelope.kdfSalt,
+        )
+      ).deviceId;
 
   if (!isBootstrapCurrent(userId, generation)) {
     return createAttempt(false, bootstrap);
@@ -362,6 +397,11 @@ export async function storePasswordEnvelopeForActiveSession(
   );
 
   await e2eeApiService.upsertPasswordEnvelope(envelope);
+  await rememberStoredDeviceEnvelopeSalt(
+    userId,
+    session.deviceId,
+    envelope.kdfSalt,
+  );
   clearPendingAuthPassword();
   return true;
 }

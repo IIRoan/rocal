@@ -18,6 +18,7 @@ import {
 } from "./e2ee-crypto";
 import { clearPendingAuthPassword } from "./e2ee-password-cache";
 import { getActiveE2eeSession } from "./e2ee-session";
+import { rememberStoredDeviceEnvelopeSalt } from "./e2ee-storage";
 import { httpClient } from "./api-clients";
 import type {
   E2eeResetSnapshotCalendar,
@@ -237,6 +238,11 @@ export async function resetEncryptionPasswordForActiveSession(
   );
 
   await e2eeApiService.upsertPasswordEnvelope(envelope);
+  await rememberStoredDeviceEnvelopeSalt(
+    userId,
+    session.deviceId,
+    envelope.kdfSalt,
+  );
   clearPendingAuthPassword();
   return true;
 }

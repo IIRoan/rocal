@@ -38,6 +38,8 @@ export const SECURE_STORE_KEYS = {
   SESSION_TOKEN: "SESSION_TOKEN",
   E2EE_DEVICE_ID: "E2EE_DEVICE_ID",
   E2EE_PRIVATE_KEY: "E2EE_PRIVATE_KEY",
+  /** Salt of the password envelope known to hold this device's account key; without it sign-out keeps the key. */
+  E2EE_ENVELOPE_SALT: "E2EE_ENVELOPE_SALT",
   PUSH_TOKEN: "PUSH_TOKEN",
   THEME_PREFERENCE: "THEME_PREFERENCE",
   /** Login password persisted for mail vault decryption. Cleared on sign-out. */

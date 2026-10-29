@@ -17,10 +17,13 @@ jest.mock("../../lib/e2ee-session", () => ({
 jest.mock("../../lib/e2ee-storage", () => ({
   getStoredE2eeDevice: jest.fn(),
   putStoredE2eeDevice: jest.fn(),
+  rememberStoredDeviceEnvelopeSalt: jest.fn(),
 }));
 
 jest.mock("../../lib/e2ee-crypto", () => ({
   createPasswordEnvelope: jest.fn(),
+  decryptJsonPayload: jest.fn(),
+  encryptJsonPayload: jest.fn(),
   exportWrappingPublicKey: jest.fn(),
   generateAccountKey: jest.fn(),
   generateBlindIndexKey: jest.fn(),
@@ -47,9 +50,12 @@ import {
 import {
   getStoredE2eeDevice,
   putStoredE2eeDevice,
+  rememberStoredDeviceEnvelopeSalt,
 } from "../../lib/e2ee-storage";
 import {
   createPasswordEnvelope,
+  decryptJsonPayload,
+  encryptJsonPayload,
   exportWrappingPublicKey,
   generateAccountKey,
   generateBlindIndexKey,
@@ -96,6 +102,11 @@ const mockGetStoredE2eeDevice = getStoredE2eeDevice as jest.MockedFunction<
 const mockPutStoredE2eeDevice = putStoredE2eeDevice as jest.MockedFunction<
   typeof putStoredE2eeDevice
 >;
+const mockRememberStoredDeviceEnvelopeSalt = jest.mocked(
+  rememberStoredDeviceEnvelopeSalt,
+);
+const mockDecryptJsonPayload = jest.mocked(decryptJsonPayload);
+const mockEncryptJsonPayload = jest.mocked(encryptJsonPayload);
 const mockCreatePasswordEnvelope =
   createPasswordEnvelope as jest.MockedFunction<typeof createPasswordEnvelope>;
 const mockExportWrappingPublicKey =
@@ -151,6 +162,20 @@ function createLocalDeviceRecord(userId: string) {
     updatedAt: "2026-04-22T10:00:00.000Z",
   };
 }
+
+const passwordEnvelope = {
+  id: "password-envelope-1",
+  userId: "user-1",
+  kdfAlgorithm: "PBKDF2-SHA-256",
+  kdfSalt: "salt-1",
+  kdfIterations: 310000,
+  wrappedAccountKey: "wrapped-account",
+  wrappedSearchKey: "wrapped-search",
+  wrapAlgorithm: "AES-GCM-256",
+  keyVersion: 1,
+  createdAt: new Date("2026-04-22T10:00:00.000Z"),
+  updatedAt: new Date("2026-04-22T10:00:00.000Z"),
+};
 
 function createRemoteBootstrap(userId: string): E2eeBootstrapResponse {
   return {
@@ -245,6 +270,39 @@ describe("e2ee bootstrap guards", () => {
       updatedAt: new Date("2026-04-22T10:00:00.000Z"),
     });
     mockPutStoredE2eeDevice.mockResolvedValue(undefined);
+    mockRememberStoredDeviceEnvelopeSalt.mockResolvedValue(undefined);
+    mockEncryptJsonPayload.mockResolvedValue({
+      version: 1,
+      algorithm: "AES-GCM",
+      iv: "iv",
+      ciphertext: "probe",
+    });
+  });
+
+  it.each([
+    ["the envelope holds the device's account key", true, "salt-1"],
+    ["the device minted a second account key", false, null],
+  ])("verifies a restored device key with the sign-in password when %s", async (_case, sameKey, salt) => {
+    mockPeekAuthPassword.mockReturnValue("correct horse battery staple");
+    if (sameKey) {
+      mockDecryptJsonPayload.mockResolvedValue(true);
+    } else {
+      mockDecryptJsonPayload.mockRejectedValue(new Error("OperationError"));
+    }
+    mockGetBootstrap.mockResolvedValue({
+      ...createRemoteBootstrap("user-1"),
+      passwordEnvelope,
+    });
+
+    await expect(ensureE2eeBootstrap("user-1")).resolves.toEqual(
+      expect.objectContaining({ activated: true }),
+    );
+
+    expect(mockRememberStoredDeviceEnvelopeSalt).toHaveBeenCalledWith(
+      "user-1",
+      "device-user-1",
+      salt,
+    );
   });
 
   it("discards a stale bootstrap result after reset", async () => {
@@ -328,6 +386,9 @@ describe("e2ee bootstrap guards", () => {
       "correct horse battery staple",
       expect.objectContaining({ kdfSalt: "salt-1" }),
     );
+    expect(mockPutStoredE2eeDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ envelopeSalt: "salt-1" }),
+    );
     expect(mockClearPendingAuthPassword).toHaveBeenCalled();
   });
 
@@ -390,6 +451,11 @@ describe("e2ee bootstrap guards", () => {
     );
     expect(mockUpsertPasswordEnvelope).toHaveBeenCalledWith(
       expect.objectContaining({ kdfSalt: "salt-1" }),
+    );
+    expect(mockRememberStoredDeviceEnvelopeSalt).toHaveBeenCalledWith(
+      "user-1",
+      "device-user-1",
+      "salt-1",
     );
     expect(mockClearPendingAuthPassword).toHaveBeenCalled();
   });

@@ -42,11 +42,7 @@ import { registerClearSession } from "../lib/session-clear";
 import { registerPasskeyStepUpRequired } from "../lib/passkey-step-up-required";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
 import { clearNotificationExtensionSecrets } from "../lib/notification-extension-store";
-import {
-  getAccountHasPasswordEnvelope,
-  setAccountHasPasswordEnvelope,
-} from "../lib/e2ee-session";
-import { clearStoredDevice } from "../lib/native-e2ee-provider";
+import { clearRecoverableStoredDevice } from "../lib/native-e2ee-provider";
 import { clearNativeTitleIndex } from "../lib/search/title-index-store";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
@@ -145,11 +141,8 @@ type SignInResult = { requiresPasskeyStepUp: boolean };
 
 /** The device key opens the account key and the search index holds decrypted text, so both go with the session in both apps. */
 async function wipeSessionData(lifecycle: AuthLifecycle | undefined): Promise<void> {
-  // Without a known password envelope the device key may be the only way back into the account, so it stays.
-  const keepDeviceKey = getAccountHasPasswordEnvelope() !== true;
-  setAccountHasPasswordEnvelope(null);
   await Promise.all([
-    keepDeviceKey ? Promise.resolve() : clearStoredDevice().catch(() => undefined),
+    clearRecoverableStoredDevice().catch(() => undefined),
     clearNativeTitleIndex().catch(() => undefined),
     lifecycle?.onSignedOut?.(),
   ]);

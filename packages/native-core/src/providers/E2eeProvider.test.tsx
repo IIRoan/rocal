@@ -13,6 +13,7 @@ import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import { useAuth } from "./AuthProvider";
 import { E2eeProvider, useE2ee } from "./E2eeProvider";
 import { getActiveE2eeSession } from "../lib/e2ee-session";
+import { clearRecoverableStoredDevice } from "../lib/native-e2ee-provider";
 
 jest.mock("react-native", () => ({
   StyleSheet: {
@@ -24,6 +25,7 @@ jest.mock("react-native", () => ({
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
 }));
 
 jest.mock("../lib/api", () => ({
@@ -57,6 +59,7 @@ jest.mock("@workspace/e2ee", () => {
     encryptEventContentRequest: actual.encryptEventContentRequest,
     encryptNameRequest: actual.encryptNameRequest,
     hydrateEncryptedName: actual.hydrateEncryptedName,
+    resolveDeviceEnvelopeSalt: actual.resolveDeviceEnvelopeSalt,
     withoutPlaintextEventContent: actual.withoutPlaintextEventContent,
     withoutPlaintextName: actual.withoutPlaintextName,
   };
@@ -70,6 +73,7 @@ type E2eeContextValue = ReturnType<typeof useE2ee>;
 
 const mockGetItemAsync = jest.mocked(SecureStore.getItemAsync);
 const mockSetItemAsync = jest.mocked(SecureStore.setItemAsync);
+const mockDeleteItemAsync = jest.mocked(SecureStore.deleteItemAsync);
 const mockCreateE2eeModule = jest.mocked(createE2eeModule);
 const mockCreateNativeCryptoProvider = jest.mocked(createNativeCryptoProvider);
 const mockUseAuth = jest.mocked(useAuth);
@@ -88,6 +92,8 @@ const mockE2eeModule = {
   exportWrappingPublicKey: jest.fn(),
   wrapSymmetricKey: jest.fn(),
   generateDeviceId: jest.fn(),
+  unwrapAccountKey: jest.fn(),
+  unwrapBlindIndexKey: jest.fn(),
   unwrapPasswordEnvelope: jest.fn(),
   generateAccountKey: jest.fn(),
   generateBlindIndexKey: jest.fn(),
@@ -146,6 +152,31 @@ function createMockAuthContext(
     ...overrides,
   };
 }
+
+function storeDevice(envelopeSalt: string | null) {
+  const stored: Record<string, string | null> = {
+    E2EE_DEVICE_ID: "device-1",
+    E2EE_PRIVATE_KEY: '{"kty":"RSA"}',
+    E2EE_ENVELOPE_SALT: envelopeSalt,
+  };
+  mockGetItemAsync.mockImplementation(async (key: string) => stored[key] ?? null);
+}
+
+const storedDeviceRecord = {
+  id: "device-row",
+  userId: "user-1",
+  deviceId: "device-1",
+  deviceLabel: null,
+  publicKey: "public-key",
+  publicKeyAlgorithm: "RSA-OAEP-4096",
+  wrappedAccountKey: "wrapped-account-key",
+  wrappedSearchKey: "wrapped-search-key",
+  wrapAlgorithm: "RSA-OAEP-4096",
+  keyVersion: 1,
+  lastSeenAt: new Date(0),
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+};
 
 function createPasswordRecord(): E2eePasswordRecord {
   return {
@@ -236,6 +267,7 @@ describe("E2eeProvider", () => {
 
     mockGetItemAsync.mockReset();
     mockSetItemAsync.mockReset();
+    mockDeleteItemAsync.mockReset();
     mockCreateE2eeModule.mockReset();
     mockCreateNativeCryptoProvider.mockReset();
     mockUseAuth.mockReset();
@@ -246,6 +278,8 @@ describe("E2eeProvider", () => {
     mockE2eeModule.exportWrappingPublicKey.mockReset();
     mockE2eeModule.wrapSymmetricKey.mockReset();
     mockE2eeModule.generateDeviceId.mockReset();
+    mockE2eeModule.unwrapAccountKey.mockReset();
+    mockE2eeModule.unwrapBlindIndexKey.mockReset();
     mockE2eeModule.unwrapPasswordEnvelope.mockReset();
     mockE2eeModule.generateAccountKey.mockReset();
     mockE2eeModule.generateBlindIndexKey.mockReset();
@@ -265,6 +299,7 @@ describe("E2eeProvider", () => {
 
     mockGetItemAsync.mockResolvedValue(null);
     mockSetItemAsync.mockResolvedValue();
+    mockDeleteItemAsync.mockResolvedValue();
     mockCreateE2eeModule.mockReturnValue(mockE2eeModule as never);
     mockCreateNativeCryptoProvider.mockReturnValue(mockCryptoProvider as never);
 
@@ -356,6 +391,7 @@ describe("E2eeProvider", () => {
         method: "PUT",
       }),
     );
+    expect(mockSetItemAsync).toHaveBeenLastCalledWith("E2EE_ENVELOPE_SALT", "salt");
     expect(getE2ee().isReady).toBe(true);
     expect(getE2ee().isEnabled).toBe(true);
   });
@@ -552,6 +588,93 @@ describe("E2eeProvider", () => {
       deviceId: "device-1",
       accountKey,
     });
+    expect(mockSetItemAsync).not.toHaveBeenCalledWith(
+      "E2EE_ENVELOPE_SALT",
+      expect.anything(),
+    );
+  });
+
+  it.each([
+    ["the envelope holds the device's account key", true, "salt"],
+    ["the device minted a second account key", false, undefined],
+  ])("verifies a restored device key with the sign-in password when %s", async (_case, sameKey, marker) => {
+    storeDevice(null);
+    peekPendingAuthPassword.mockReturnValue("secret-password");
+    mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
+    mockE2eeModule.unwrapAccountKey.mockResolvedValue(accountKey);
+    mockE2eeModule.unwrapBlindIndexKey.mockResolvedValue(blindIndexKey);
+    mockE2eeModule.unwrapPasswordEnvelope.mockResolvedValue({
+      accountKey: { type: "envelope-account-key" },
+      blindIndexKey,
+    });
+    mockE2eeModule.encryptJsonPayload.mockResolvedValue({ ciphertext: "probe" });
+    mockE2eeModule.decryptJsonPayload.mockImplementation(async () => {
+      if (!sameKey) throw new Error("OperationError");
+      return true;
+    });
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(
+          createBootstrapResponse({
+            devices: [storedDeviceRecord],
+            passwordEnvelope: createPasswordRecord(),
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+    await flushBootstrap();
+
+    expect(getActiveE2eeSession()).toMatchObject({ deviceId: "device-1", accountKey });
+    expect(
+      mockSetItemAsync.mock.calls.find(([key]) => key === "E2EE_ENVELOPE_SALT")?.[1],
+    ).toBe(marker);
+  });
+
+  it("forgets the envelope check of a restored device key once the envelope changed", async () => {
+    storeDevice("previous-salt");
+    mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
+    mockE2eeModule.unwrapAccountKey.mockResolvedValue(accountKey);
+    mockE2eeModule.unwrapBlindIndexKey.mockResolvedValue(blindIndexKey);
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(
+          createBootstrapResponse({
+            devices: [storedDeviceRecord],
+            passwordEnvelope: createPasswordRecord(),
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+    await flushBootstrap();
+
+    expect(mockDeleteItemAsync).toHaveBeenCalledWith("E2EE_ENVELOPE_SALT");
+  });
+
+  it.each([
+    ["deletes the device key the envelope is known to hold", "salt", true],
+    ["keeps a device key no envelope is known to hold", null, false],
+  ])("%s on sign-out", async (_case, marker, deleted) => {
+    storeDevice(marker);
+
+    await clearRecoverableStoredDevice();
+
+    expect(mockDeleteItemAsync.mock.calls.map(([key]) => key)).toEqual(
+      deleted ? ["E2EE_DEVICE_ID", "E2EE_PRIVATE_KEY", "E2EE_ENVELOPE_SALT"] : [],
+    );
   });
 
   it("can reset the active encryption password after bootstrap completes", async () => {

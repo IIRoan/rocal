@@ -6,7 +6,7 @@ import {
   clearOrphanedEncPasswordCookie,
 } from "@/lib/enc-password-cookie";
 import { resetE2eeBootstrap } from "@/lib/e2ee-bootstrap";
-import { E2EE_DATABASE_NAME } from "@/lib/e2ee-storage";
+import { deleteRecoverableE2eeDevices } from "@/lib/e2ee-storage";
 import { clearLocalMailSettings } from "@/lib/mail/mail-settings-storage";
 import { MAIL_VAULT_DATABASE_NAME } from "@/lib/mail/vault-storage";
 import { clearLocalSearchIndexDatabase } from "@/lib/search/local-index-store";
@@ -34,7 +34,7 @@ export function clearSolaceClientAuthArtifacts(): void {
   clearLocalMailSettings();
   // The device key, the mail vault key and the search index would otherwise stay on disk after sign-out.
   void Promise.all([
-    deleteDatabase(E2EE_DATABASE_NAME),
+    deleteRecoverableE2eeDevices(),
     deleteDatabase(MAIL_VAULT_DATABASE_NAME),
     clearLocalSearchIndexDatabase(),
   ]).catch((error: unknown) => {

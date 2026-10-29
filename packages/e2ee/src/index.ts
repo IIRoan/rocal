@@ -4,6 +4,7 @@ export type { E2eeProvider } from "./provider";
 export { NoopE2eeProvider } from "./provider";
 
 export { createE2eeModule } from "./e2ee-module";
+export { resolveDeviceEnvelopeSalt } from "./device-key";
 export type {
   E2eeModule,
   EncryptedJsonPayload,

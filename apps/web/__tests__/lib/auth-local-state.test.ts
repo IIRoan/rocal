@@ -16,6 +16,7 @@ const mockClearOrphanedEncPasswordCookie = jest.fn();
 const mockResetE2eeBootstrap = jest.fn();
 const mockGetSession = jest.fn();
 const mockClearLocalSearchIndexDatabase = jest.fn<() => Promise<void>>();
+const mockDeleteRecoverableE2eeDevices = jest.fn<() => Promise<void>>();
 
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
@@ -37,6 +38,10 @@ jest.mock("@/lib/enc-password-cookie", () => ({
 
 jest.mock("@/lib/e2ee-bootstrap", () => ({
   resetE2eeBootstrap: (...args: unknown[]) => mockResetE2eeBootstrap(...args),
+}));
+
+jest.mock("@/lib/e2ee-storage", () => ({
+  deleteRecoverableE2eeDevices: () => mockDeleteRecoverableE2eeDevices(),
 }));
 
 jest.mock("@/lib/search/local-index-store", () => ({
@@ -63,6 +68,7 @@ describe("auth-local-state", () => {
     jest.clearAllMocks();
     mockSignOut.mockResolvedValue(undefined as never);
     mockClearLocalSearchIndexDatabase.mockResolvedValue(undefined);
+    mockDeleteRecoverableE2eeDevices.mockResolvedValue(undefined);
     mockGetSession.mockResolvedValue({
       data: { user: { id: "user-1" } },
       error: null,
@@ -82,7 +88,7 @@ describe("auth-local-state", () => {
     expect(mockResetE2eeBootstrap).toHaveBeenCalledTimes(1);
   });
 
-  it("deletes the device key, mail vault key and search index from disk", () => {
+  it("deletes recoverable device keys, the mail vault key and the search index from disk", () => {
     const deleteDatabase = jest.fn((_name: string) => ({}));
     Object.defineProperty(globalThis, "indexedDB", {
       value: { deleteDatabase },
@@ -91,10 +97,11 @@ describe("auth-local-state", () => {
 
     clearSolaceClientAuthArtifacts();
 
+    // The device-key database keeps keys no password envelope is known to hold.
     expect(deleteDatabase.mock.calls.map(([name]) => name)).toEqual([
-      "solace-e2ee",
       "solace-mail",
     ]);
+    expect(mockDeleteRecoverableE2eeDevices).toHaveBeenCalledTimes(1);
     expect(mockClearLocalSearchIndexDatabase).toHaveBeenCalledTimes(1);
     Reflect.deleteProperty(globalThis, "indexedDB");
   });
