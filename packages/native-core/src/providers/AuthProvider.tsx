@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -70,10 +71,6 @@ function isAuthStatusPayload(value: unknown): value is AuthStatusPayload {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 interface User {
   id: string;
   name: string;
@@ -88,6 +85,42 @@ interface Session {
 }
 
 export type AuthMethod = "email-password" | "passkey" | "unknown";
+
+interface AuthState {
+  user: User | null;
+  session: Session | null;
+  requiresPasskeyStepUp: boolean;
+  lastAuthMethod: AuthMethod;
+}
+
+type AuthAction =
+  | { type: "loaded"; user: User; session: Session }
+  | { type: "cleared" }
+  | { type: "method"; method: AuthMethod }
+  | { type: "hints-reset" }
+  | { type: "step-up"; required: boolean };
+
+const SIGNED_OUT: AuthState = {
+  user: null,
+  session: null,
+  requiresPasskeyStepUp: false,
+  lastAuthMethod: "unknown",
+};
+
+function authReducer(state: AuthState, action: AuthAction): AuthState {
+  switch (action.type) {
+    case "loaded":
+      return { ...state, user: action.user, session: action.session };
+    case "cleared":
+      return SIGNED_OUT;
+    case "method":
+      return { ...state, lastAuthMethod: action.method };
+    case "hints-reset":
+      return { ...state, lastAuthMethod: "unknown", requiresPasskeyStepUp: false };
+    case "step-up":
+      return { ...state, requiresPasskeyStepUp: action.required };
+  }
+}
 
 /** App-specific hooks into the shared auth flow; both apps run the same sign-in code. */
 export interface AuthLifecycle {
@@ -145,15 +178,7 @@ export interface AuthContextValue {
   refreshUser: () => Promise<void>;
 }
 
-// ---------------------------------------------------------------------------
-// Context
-// ---------------------------------------------------------------------------
-
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
 
 export function AuthProvider({
   children,
@@ -164,11 +189,11 @@ export function AuthProvider({
 }): React.ReactNode {
   const lifecycleRef = useRef(lifecycle);
   lifecycleRef.current = lifecycle;
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [
+    { user, session, requiresPasskeyStepUp, lastAuthMethod },
+    dispatch,
+  ] = useReducer(authReducer, SIGNED_OUT);
   const [isLoading, setIsLoading] = useState(true);
-  const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod>("unknown");
-  const [requiresPasskeyStepUp, setRequiresPasskeyStepUp] = useState(false);
   const pendingAuthPasswordRef = useRef<string | null>(null);
   const sessionLoadIdRef = useRef(0);
   const hasLiveSessionRef = useRef(false);
@@ -184,7 +209,6 @@ export function AuthProvider({
     });
   }, []);
 
-  // ── Session hydration ────────────────────────────────────────────────
   const fetchAuthStatus = useCallback(async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(
@@ -206,19 +230,12 @@ export function AuthProvider({
     }
 
     await persistRenewedSessionCookie(response.headers, requestHeaders);
-
-    if (!response.ok) {
-      throw new Error("Unable to load authentication status.");
-    }
-
-    const payload: unknown = await response.json();
+    const payload: unknown = response.ok ? await response.json() : null;
     if (!isAuthStatusPayload(payload)) {
       throw new Error("Unable to load authentication status.");
     }
     return payload;
   }, []);
-
-  // ── Auth actions ─────────────────────────────────────────────────────
 
   const applySessionData = useCallback(
     (data: unknown) => {
@@ -240,23 +257,31 @@ export function AuthProvider({
 
       if (typedData.session) {
         hasLiveSessionRef.current = true;
-        setUser(typedData.user);
-        setSession(typedData.session);
+        dispatch({
+          type: "loaded",
+          user: typedData.user,
+          session: typedData.session,
+        });
         return true;
       }
 
       if (!token) return false;
 
       hasLiveSessionRef.current = true;
-      setUser(typedData.user);
-      setSession({
-        token,
-        userId: typedData.user.id,
-        expiresAt: new Date(Date.now() + AUTH_SESSION_LIFETIME_SECONDS * 1000),
+      dispatch({
+        type: "loaded",
+        user: typedData.user,
+        session: {
+          token,
+          userId: typedData.user.id,
+          expiresAt: new Date(
+            Date.now() + AUTH_SESSION_LIFETIME_SECONDS * 1000,
+          ),
+        },
       });
       return true;
     },
-    [setUser, setSession],
+    [],
   );
 
   const clearPendingAuthPassword = useCallback(() => {
@@ -275,18 +300,17 @@ export function AuthProvider({
 
   const resetAuthMethodHints = useCallback(() => {
     pendingAuthPasswordRef.current = null;
-    setLastAuthMethod("unknown");
-    setRequiresPasskeyStepUp(false);
+    dispatch({ type: "hints-reset" });
   }, []);
 
   const setEmailPasswordAuthHints = useCallback((password: string) => {
     pendingAuthPasswordRef.current = password;
-    setLastAuthMethod("email-password");
+    dispatch({ type: "method", method: "email-password" });
   }, []);
 
   const setProviderAuthHints = useCallback((method: "passkey") => {
     pendingAuthPasswordRef.current = null;
-    setLastAuthMethod(method);
+    dispatch({ type: "method", method });
   }, []);
 
   const finalizeAuthenticatedSession = useCallback(
@@ -335,11 +359,11 @@ export function AuthProvider({
       const authStatus = await fetchAuthStatus();
       const requiresStepUp =
         authStatus.authenticated && authStatus.requiresPasskeyStepUp;
-      setRequiresPasskeyStepUp(requiresStepUp);
+      dispatch({ type: "step-up", required: requiresStepUp });
       return requiresStepUp;
     } catch {
       // Password/passkey authentication already succeeded. The status request is only a follow-up for step-up UI and must not undo the new session.
-      setRequiresPasskeyStepUp(false);
+      dispatch({ type: "step-up", required: false });
       return false;
     }
   }, [fetchAuthStatus]);
@@ -347,6 +371,7 @@ export function AuthProvider({
   const waitForPasskeyStepUpToClear = useCallback(async () => {
     for (const delayMs of AUTH_STATUS_RETRY_DELAYS_MS) {
       if (delayMs > 0) {
+        // oxlint-disable-next-line react-doctor/async-await-in-loop -- each retry waits for the previous status, with backoff.
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
 
@@ -355,7 +380,7 @@ export function AuthProvider({
         const requiresStepUp =
           authStatus.authenticated && authStatus.requiresPasskeyStepUp;
         if (!requiresStepUp) {
-          setRequiresPasskeyStepUp(false);
+          dispatch({ type: "step-up", required: false });
           return;
         }
       } catch {
@@ -363,17 +388,16 @@ export function AuthProvider({
       }
     }
 
-    setRequiresPasskeyStepUp(false);
+    dispatch({ type: "step-up", required: false });
   }, [fetchAuthStatus]);
 
   const clearSession = useCallback(() => {
     sessionLoadIdRef.current += 1;
     hasLiveSessionRef.current = false;
     setFallbackSessionToken(null);
-    setUser(null);
-    setSession(null);
-    resetAuthMethodHints();
-  }, [resetAuthMethodHints]);
+    pendingAuthPasswordRef.current = null;
+    dispatch({ type: "cleared" });
+  }, []);
 
   // A session the server ended (revoked, expired, 401/403) gets the sign-out wipe; a network failure keeps the device's data.
   const endSession = useCallback(() => {
@@ -391,7 +415,7 @@ export function AuthProvider({
 
   useEffect(() => {
     registerPasskeyStepUpRequired(() => {
-      setRequiresPasskeyStepUp(true);
+      dispatch({ type: "step-up", required: true });
     });
     return () => {
       registerPasskeyStepUpRequired(() => {});
@@ -528,7 +552,7 @@ export function AuthProvider({
 
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-up");
-        setRequiresPasskeyStepUp(false);
+        dispatch({ type: "step-up", required: false });
       } catch (error) {
         resetAuthMethodHints();
         throw error;
@@ -567,38 +591,38 @@ export function AuthProvider({
   useEffect(() => {
     let ignore = false;
     const loadId = ++sessionLoadIdRef.current;
+    const isStale = () => ignore || loadId !== sessionLoadIdRef.current;
 
     async function loadSession() {
       try {
         // Legacy jars used a bare `"1"` chunk meta; Better Auth JSON.parses that to number 1 and crashes on Set-Cookie. Flatten before any auth I/O.
         await healAuthCookieJar();
-        if (ignore || loadId !== sessionLoadIdRef.current) return;
+        if (isStale()) return;
 
         const result = await authClient.getSession({
           query: { disableCookieCache: true },
         });
-        if (ignore || loadId !== sessionLoadIdRef.current) return;
+        if (isStale()) return;
 
         if (applySessionData(result?.data)) {
           try {
             const authStatus = await fetchAuthStatus();
-            if (ignore || loadId !== sessionLoadIdRef.current) return;
+            if (isStale()) return;
             if (authStatus.authenticated) {
-              setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+              dispatch({
+                type: "step-up",
+                required: authStatus.requiresPasskeyStepUp,
+              });
             }
           } catch {
             // Keep a session that Better Auth just validated.
           }
-        } else if (
-          !ignore &&
-          loadId === sessionLoadIdRef.current &&
-          !hasLiveSessionRef.current
-        ) {
+        } else if (!isStale() && !hasLiveSessionRef.current) {
           if (result?.error) clearSession();
           else endSession();
         }
       } catch {
-        if (!ignore && loadId === sessionLoadIdRef.current && !hasLiveSessionRef.current) {
+        if (!isStale() && !hasLiveSessionRef.current) {
           clearSession();
         }
       } finally {
@@ -760,8 +784,6 @@ export function AuthProvider({
     applySessionData(result?.data);
   }, [applySessionData]);
 
-  // ── Context value ────────────────────────────────────────────────────
-
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -804,10 +826,6 @@ export function AuthProvider({
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
 
 export function useAuth(): AuthContextValue {
   const ctx = use(AuthContext);
