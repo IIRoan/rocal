@@ -28,6 +28,7 @@ import type {
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { createNativeCryptoProvider } from "./native-crypto-provider";
+import { encryptReminderLead } from "./notification-title-crypto";
 import { SECURE_STORE_KEYS } from "./constants";
 import { getE2eeApiUrl } from "./e2ee-api-url";
 import { getAuthHeaders } from "./api";
@@ -439,6 +440,16 @@ export function createNativeE2eeProvider({
       return e2ee
         .decryptJsonPayload<unknown>(session.accountKey, payload, aad)
         .catch(() => null);
+    },
+
+    async encryptNotificationLead(
+      eventId: string,
+      minutesBefore: number,
+    ): Promise<string | undefined> {
+      const session = await waitForSession();
+      return session
+        ? encryptReminderLead(session.accountKey, eventId, minutesBefore)
+        : undefined;
     },
   };
   return provider;

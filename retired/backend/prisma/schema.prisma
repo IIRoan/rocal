@@ -345,6 +345,7 @@ model EventNotification {
   isSent           Boolean       @default(false) @map("is_sent")
   /// Ciphertext under the client-derived notification key (@workspace/e2ee notification-title).
   encryptedDisplayTitle String?  @map("encrypted_display_title")
+  encryptedLead         String?  @map("encrypted_lead")
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 

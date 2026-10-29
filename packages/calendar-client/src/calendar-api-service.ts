@@ -1195,10 +1195,21 @@ export class CalendarApiService {
     options?: Pick<CreateNotificationRequest, "encryptedDisplayTitle">,
   ): Promise<Schema<"NotificationUpdateResult">> {
     try {
+      // Sealed here so every caller's reminders can show their start on iPhone without the push carrying it.
+      const sealed = await Promise.all(
+        notifications.map(async (setting) => {
+          const encryptedLead = await this.e2ee
+            .encryptNotificationLead(eventId, setting.minutesBefore)
+            .catch(() => undefined);
+          return encryptedLead === undefined
+            ? setting
+            : { ...setting, encryptedLead };
+        }),
+      );
       return await this.client.put<Schema<"NotificationUpdateResult">>(
         `/api/notifications/event/${encodeURIComponent(eventId)}`,
         {
-          notifications,
+          notifications: sealed,
           ...(options?.encryptedDisplayTitle !== undefined
             ? { encryptedDisplayTitle: options.encryptedDisplayTitle }
             : {}),

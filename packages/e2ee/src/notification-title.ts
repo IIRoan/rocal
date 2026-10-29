@@ -18,6 +18,10 @@ export function notificationTitleAad(eventId: string): string {
   return `notification-title:${NOTIFICATION_TITLE_PREFIX}:${eventId}`;
 }
 
+export function notificationLeadAad(eventId: string): string {
+  return `notification-lead:${NOTIFICATION_TITLE_PREFIX}:${eventId}`;
+}
+
 export function normalizeNotificationTitle(value: string): string | null {
   const collapsed = value.trim().replace(/\s+/g, " ");
   if (!collapsed) {
@@ -72,25 +76,17 @@ export async function importNotificationKey(
   );
 }
 
-export async function encryptNotificationTitle(
+async function seal(
   crypto: CryptoProvider,
   notificationKey: CryptoKey,
-  eventId: string,
-  title: string,
-): Promise<string | null> {
-  const normalized = normalizeNotificationTitle(title);
-  if (!normalized) {
-    return null;
-  }
+  aad: string,
+  plaintext: string,
+): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(GCM_IV_BYTES));
   const sealed = await crypto.subtle.encrypt(
-    {
-      name: "AES-GCM",
-      iv,
-      additionalData: textEncoder.encode(notificationTitleAad(eventId)),
-    },
+    { name: "AES-GCM", iv, additionalData: textEncoder.encode(aad) },
     notificationKey,
-    textEncoder.encode(normalized),
+    textEncoder.encode(plaintext),
   );
   return [
     NOTIFICATION_TITLE_PREFIX,
@@ -99,10 +95,10 @@ export async function encryptNotificationTitle(
   ].join(".");
 }
 
-export async function decryptNotificationTitle(
+async function open(
   crypto: CryptoProvider,
   notificationKey: CryptoKey,
-  eventId: string,
+  aad: string,
   value: string,
 ): Promise<string> {
   const [prefix, iv, sealed] = value.split(".");
@@ -113,16 +109,64 @@ export async function decryptNotificationTitle(
     base64UrlToArrayBuffer(iv).byteLength !== GCM_IV_BYTES ||
     base64UrlToArrayBuffer(sealed).byteLength < GCM_TAG_BYTES
   ) {
-    throw new Error("Invalid encrypted notification title");
+    throw new Error("Invalid encrypted notification value");
   }
   const plaintext = await crypto.subtle.decrypt(
     {
       name: "AES-GCM",
       iv: base64UrlToArrayBuffer(iv),
-      additionalData: textEncoder.encode(notificationTitleAad(eventId)),
+      additionalData: textEncoder.encode(aad),
     },
     notificationKey,
     base64UrlToArrayBuffer(sealed),
   );
   return textDecoder.decode(plaintext);
+}
+
+export async function encryptNotificationTitle(
+  crypto: CryptoProvider,
+  notificationKey: CryptoKey,
+  eventId: string,
+  title: string,
+): Promise<string | null> {
+  const normalized = normalizeNotificationTitle(title);
+  if (!normalized) {
+    return null;
+  }
+  return seal(crypto, notificationKey, notificationTitleAad(eventId), normalized);
+}
+
+export async function decryptNotificationTitle(
+  crypto: CryptoProvider,
+  notificationKey: CryptoKey,
+  eventId: string,
+  value: string,
+): Promise<string> {
+  return open(crypto, notificationKey, notificationTitleAad(eventId), value);
+}
+
+/** Seals a reminder's lead minutes, so the push shows the start time without Apple seeing it. */
+export async function encryptNotificationLead(
+  crypto: CryptoProvider,
+  notificationKey: CryptoKey,
+  eventId: string,
+  minutesBefore: number,
+): Promise<string> {
+  const minutes = Math.max(0, Math.trunc(minutesBefore));
+  return seal(crypto, notificationKey, notificationLeadAad(eventId), String(minutes));
+}
+
+export async function decryptNotificationLead(
+  crypto: CryptoProvider,
+  notificationKey: CryptoKey,
+  eventId: string,
+  value: string,
+): Promise<number> {
+  const minutes = Number(
+    await open(crypto, notificationKey, notificationLeadAad(eventId), value),
+  );
+  if (!Number.isInteger(minutes) || minutes < 0) {
+    throw new Error("Invalid encrypted notification value");
+  }
+  return minutes;
 }

@@ -180,7 +180,6 @@ mod tests {
             all_day,
             user_email: "ann@example.com".into(),
             timezone: timezone.into(),
-            time_format: "24h".into(),
         }
     }
 

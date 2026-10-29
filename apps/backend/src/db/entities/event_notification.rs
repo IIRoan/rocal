@@ -23,6 +23,8 @@ pub struct Model {
     pub notification_timezone: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub encrypted_display_title: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub encrypted_lead: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

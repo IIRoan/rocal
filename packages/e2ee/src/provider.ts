@@ -61,6 +61,12 @@ export interface E2eeProvider {
 
   /** Opens a value `encryptJson` sealed; null without a session or when it does not open. */
   decryptJson(encrypted: string, aad: string): Promise<unknown>;
+
+  /** A reminder's lead sealed for the iPhone extension; undefined without a session, so a stored one is kept. */
+  encryptNotificationLead(
+    eventId: string,
+    minutesBefore: number,
+  ): Promise<string | undefined>;
 }
 
 /** Pre-session provider: content-free writes pass, plaintext content throws instead of leaving the device. */
@@ -117,5 +123,12 @@ export class NoopE2eeProvider implements E2eeProvider {
 
   async decryptJson(_encrypted: string, _aad: string): Promise<unknown> {
     return null;
+  }
+
+  async encryptNotificationLead(
+    _eventId: string,
+    _minutesBefore: number,
+  ): Promise<string | undefined> {
+    return undefined;
   }
 }

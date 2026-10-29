@@ -36,6 +36,9 @@ export {
   importNotificationKey,
   encryptNotificationTitle,
   decryptNotificationTitle,
+  notificationLeadAad,
+  encryptNotificationLead,
+  decryptNotificationLead,
 } from "./notification-title";
 
 export {

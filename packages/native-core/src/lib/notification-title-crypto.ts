@@ -1,6 +1,7 @@
 import {
   bytesToBase64Url,
   deriveNotificationKeyBytes,
+  encryptNotificationLead,
   encryptNotificationTitle,
   importNotificationKey,
 } from "@workspace/e2ee";
@@ -44,5 +45,19 @@ export async function encryptReminderTitle(
     (await notificationKeyFor(accountKey)).key,
     eventId,
     title,
+  );
+}
+
+/** Ciphertext of a reminder's lead minutes, which the iPhone extension adds to the push's send time. */
+export async function encryptReminderLead(
+  accountKey: CryptoKey,
+  eventId: string,
+  minutesBefore: number,
+): Promise<string> {
+  return encryptNotificationLead(
+    createNativeCryptoProvider(),
+    (await notificationKeyFor(accountKey)).key,
+    eventId,
+    minutesBefore,
   );
 }

@@ -1914,6 +1914,8 @@ export interface components {
         };
         NotificationId: string;
         NotificationSetting: {
+            /** @description `minutes_before` sealed under the notification key, so a push shows the start time without carrying it; omitted keeps a stored one. */
+            encryptedLead?: string | null;
             isEnabled: boolean;
             /** Format: int32 */
             minutesBefore: number;

@@ -5797,6 +5797,13 @@
           "isEnabled"
         ],
         "properties": {
+          "encryptedLead": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`minutes_before` sealed under the notification key, so a push shows the start time without carrying it; omitted keeps a stored one."
+          },
           "isEnabled": {
             "type": "boolean"
           },

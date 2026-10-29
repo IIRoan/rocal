@@ -233,13 +233,20 @@ fn attendee_copy(
 }
 
 /// `insertUpcomingEventReminder`: `false` when the event already started.
+/// A reminder's ciphertexts under the notification key, kept when its schedule is rebuilt.
+#[derive(Default)]
+pub struct Sealed {
+    pub title: Option<String>,
+    pub lead: Option<String>,
+}
+
 pub async fn insert_reminder<C: sea_orm::ConnectionTrait>(
     db: &C,
     event_id: &str,
     start: time::PrimitiveDateTime,
     minutes_before: i32,
     timezone: &str,
-    encrypted_display_title: Option<String>,
+    sealed: Sealed,
     notification_type: &str,
 ) -> Result<bool, AppError> {
     let now = instant::now();
@@ -266,7 +273,8 @@ pub async fn insert_reminder<C: sea_orm::ConnectionTrait>(
             notification_timezone: Set(schedule.notification_timezone),
             is_enabled: Set(true),
             is_sent: Set(false),
-            encrypted_display_title: Set(encrypted_display_title),
+            encrypted_display_title: Set(sealed.title),
+            encrypted_lead: Set(sealed.lead),
             // The schedule is after this instant, which chk_notification_time_future requires of created_at.
             created_at: Set(now),
             updated_at: Set(now),
@@ -411,7 +419,13 @@ pub async fn create(
     if let Some(minutes) = reminder.filter(|m| *m > 0)
         && schedules_reminders(settings.as_ref())
         && let Err(error) = insert_reminder(
-            &state.db, &event.id, start, minutes, &timezone, None, "email",
+            &state.db,
+            &event.id,
+            start,
+            minutes,
+            &timezone,
+            Sealed::default(),
+            "email",
         )
         .await
     {
@@ -617,7 +631,7 @@ pub async fn update(
     Ok(event)
 }
 
-/// Rebuilds the event's reminders after a time or reminder change, keeping the encrypted display title.
+/// Rebuilds the event's reminders after a time or reminder change, keeping the encrypted title and leads.
 async fn reschedule_reminders(
     state: &AppState,
     event_id: &str,
@@ -631,10 +645,20 @@ async fn reschedule_reminders(
     let preserved = existing
         .iter()
         .find_map(|n| n.encrypted_display_title.clone());
-    let configs: Vec<(String, i32, bool, Option<String>)> = if reminder_changed {
+    let lead_for = |minutes: i32| {
+        existing
+            .iter()
+            .find(|n| n.minutes_before == minutes)
+            .and_then(|n| n.encrypted_lead.clone())
+    };
+    let configs: Vec<(String, i32, bool, Sealed)> = if reminder_changed {
         match final_reminder.filter(|m| *m > 0) {
             Some(minutes) if schedules_reminders(settings) => {
-                vec![("email".into(), minutes, true, preserved)]
+                let sealed = Sealed {
+                    title: preserved,
+                    lead: lead_for(minutes),
+                };
+                vec![("email".into(), minutes, true, sealed)]
             }
             _ => Vec::new(),
         }
@@ -642,21 +666,26 @@ async fn reschedule_reminders(
         existing
             .iter()
             .map(|n| {
+                let sealed = Sealed {
+                    title: n
+                        .encrypted_display_title
+                        .clone()
+                        .or_else(|| preserved.clone()),
+                    lead: n.encrypted_lead.clone(),
+                };
                 (
                     n.notification_type.clone(),
                     n.minutes_before,
                     n.is_enabled,
-                    n.encrypted_display_title
-                        .clone()
-                        .or_else(|| preserved.clone()),
+                    sealed,
                 )
             })
             .collect()
     };
     queries::delete_reminders(&state.db, vec![event_id.to_owned()]).await?;
-    for (kind, minutes, enabled, title) in configs {
+    for (kind, minutes, enabled, sealed) in configs {
         if enabled {
-            insert_reminder(&state.db, event_id, start, minutes, timezone, title, &kind).await?;
+            insert_reminder(&state.db, event_id, start, minutes, timezone, sealed, &kind).await?;
         }
     }
     Ok(())
@@ -899,7 +928,7 @@ async fn duplicate(
                 copy.start,
                 minutes,
                 &copy.timezone,
-                None,
+                Sealed::default(),
                 "email",
             )
             .await
