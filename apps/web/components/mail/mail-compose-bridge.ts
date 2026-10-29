@@ -3,6 +3,7 @@ import type { ComposeDraft, DraftSaveStatus, MailComposeBridge } from "./mail-co
 export type ComposeDraftSaver = {
   save: () => Promise<string | null>;
   flush: () => Promise<string | null>;
+  settle: () => Promise<void>;
   cancelPending: () => void;
 };
 
@@ -37,6 +38,11 @@ export async function flushComposeDraftSave(): Promise<string | null> {
     return null;
   }
   return composeDraftSaveRef.current.flush();
+}
+
+/** Drops a pending autosave and waits for one in flight, so a send replaces the draft that is actually stored. */
+export async function settleComposeDraftSave(): Promise<void> {
+  await composeDraftSaveRef.current?.settle();
 }
 
 export function cancelComposeDraftSave(): void {

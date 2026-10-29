@@ -82,7 +82,7 @@ import {
   isTrashMailboxRole,
 } from "@/lib/mail/mail-mailbox-roles";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
-import { getMailComposeBridge, flushComposeDraftSave } from "@/components/mail/mail-compose-bridge";
+import { getMailComposeBridge, settleComposeDraftSave } from "@/components/mail/mail-compose-bridge";
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
 import { useConversationDecryptedPreviews } from "@/hooks/use-conversation-decrypted-previews";
 import { replaceSavedDraftInMailboxList } from "@/lib/mail/compose-draft-cache";
@@ -1583,6 +1583,8 @@ export function useMailApp() {
       }
     }
     const send = async () => {
+      // The send replaces the stored draft itself, so a pending autosave would only seal a throwaway copy.
+      await settleComposeDraftSave();
       const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
         force: true,
       });
@@ -1733,12 +1735,8 @@ export function useMailApp() {
         }
       }
 
-      const flushedDraftId = await flushComposeDraftSave();
       const previousDraftId =
-        flushedDraftId ??
-        getMailComposeBridge()?.getDraft().draftId ??
-        composeDraftId ??
-        undefined;
+        getMailComposeBridge()?.getDraftIdRef() ?? composeDraftId ?? undefined;
 
       const sendResult = await mailbox.client.sendMessage(
         mailbox.session,

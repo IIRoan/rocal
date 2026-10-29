@@ -167,6 +167,16 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     return promise;
   };
 
+  /** Drops a pending autosave and waits for one in flight, so a send replaces the draft that is actually stored. */
+  const settleDraftSave = async (): Promise<string | null> => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    await inflightSaveRef.current;
+    return lastSavedDraftIdRef.current ?? input.draftId;
+  };
+
   const autosave = useEffectEvent(() => {
     void saveDraft().catch((error) =>
       log.error("Draft autosave failed unexpectedly", sanitizeContext({ error })),
@@ -227,5 +237,5 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     [queryClient],
   );
 
-  return { saveDraft, inflightSaveRef };
+  return { saveDraft, settleDraftSave, inflightSaveRef };
 }

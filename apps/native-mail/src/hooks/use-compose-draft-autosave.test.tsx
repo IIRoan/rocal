@@ -98,3 +98,56 @@ it("saves a draft only as ciphertext sealed to the account's own key", async () 
     act(() => root.unmount());
   }
 });
+
+it("settles before a send without sealing a throwaway draft", async () => {
+  jest.useFakeTimers();
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  saveDraft.mockClear();
+  jest.mocked(encryptForRecipients).mockClear();
+  const root = createRoot(document.createElement("div"));
+  let settle: (() => Promise<string | null>) | null = null;
+
+  function Probe() {
+    const autosave = useComposeDraftAutosave({
+      runtime,
+      enabled: true,
+      to: "ann@example.com",
+      cc: "",
+      bcc: "",
+      subject: "Plans",
+      body: "Typed just now",
+      identityId: "identity-1",
+      draftId: "draft-1",
+      setDraftId: () => undefined,
+      setDraftSaveStatus: () => undefined,
+    });
+    useEffect(() => {
+      settle = autosave.settleDraftSave;
+    });
+    return null;
+  }
+
+  try {
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Probe />
+        </QueryClientProvider>,
+      ),
+    );
+    let draftId: string | null | undefined;
+    await act(async () => {
+      draftId = await settle?.();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    expect(draftId).toBe("draft-1");
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(encryptForRecipients).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    jest.useRealTimers();
+  }
+});

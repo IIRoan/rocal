@@ -157,7 +157,7 @@ function ComposeSession({
     form.seed ?? EMPTY_COMPOSE_FIELDS,
   );
 
-  const { saveDraft } = useComposeDraftAutosave({
+  const { saveDraft, settleDraftSave } = useComposeDraftAutosave({
     runtime,
     enabled: Boolean(composeContext) && hasUserContent,
     to,
@@ -179,7 +179,7 @@ function ComposeSession({
     composeContext,
     settings: composeSettings,
     signatureOptions,
-    saveDraft,
+    settleDraftSave,
     setError,
     onSent: onClose,
   });

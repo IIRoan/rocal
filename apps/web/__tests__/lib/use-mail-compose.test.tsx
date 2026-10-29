@@ -74,6 +74,7 @@ describe("useMailCompose", () => {
     registerComposeDraftSaver({
       save: async () => flushResult,
       flush: async () => flushResult,
+      settle: async () => {},
       cancelPending: () => {},
     });
     return closeActions;

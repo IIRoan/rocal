@@ -241,16 +241,14 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     return promise;
   };
 
-  const flushDraftSave = async (): Promise<string | null> => {
+  const settleDraftSave = async (): Promise<void> => {
     cancelPendingSave();
-    const previous = inflightSaveRef.current;
-    if (previous) {
-      try {
-        await previous;
-      } catch {
-        /* prior failure already surfaced */
-      }
-    }
+    // A prior failure already surfaced through the save status.
+    await inflightSaveRef.current?.catch(() => null);
+  };
+
+  const flushDraftSave = async (): Promise<string | null> => {
+    await settleDraftSave();
     return saveDraftOnce();
   };
 
@@ -259,6 +257,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     registerComposeDraftSaver({
       save: saveDraft,
       flush: flushDraftSave,
+      settle: settleDraftSave,
       cancelPending: cancelPendingSave,
     });
     return () => registerComposeDraftSaver(null);
