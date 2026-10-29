@@ -35,6 +35,7 @@ const RUNTIME_STALE_MS = 5 * 60_000;
 
 let restoredUserId: string | null = null;
 let restoreGeneration = 0;
+let launchCleanupDone = false;
 
 /** Seeds the cache from the encrypted snapshot before E2EE starts, so the mailbox opens without the loading screen. */
 export async function restoreMailSession(input: {
@@ -85,12 +86,15 @@ export async function prepareMailSession(
 
   // The guard only calls this once E2EE bootstrap settled, so waiting vault unlocks can proceed.
   releaseVaultUnlock();
-  // Decrypted attachments from an earlier session are no longer open in any viewer; the password and derived key are what older versions stored.
-  await Promise.all([
-    clearAttachmentCache().catch(() => undefined),
-    clearMailVaultPassword(),
-    clearDerivedVaultKey(),
-  ]);
+  // Once per launch: earlier launches' attachments are no longer open in a viewer, and the password and derived key are what older versions stored.
+  if (!launchCleanupDone) {
+    launchCleanupDone = true;
+    await Promise.all([
+      clearAttachmentCache().catch(() => undefined),
+      clearMailVaultPassword(),
+      clearDerivedVaultKey(),
+    ]);
+  }
   if (restoredUserId === input.userId) {
     await finishRestoredMailSession(input);
     return;

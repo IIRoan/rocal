@@ -122,6 +122,40 @@ fn series_request(uid: &str, organizer: &str, attendee: &str, master: bool) -> S
 }
 
 #[tokio::test]
+async fn accepting_a_mailed_series_seals_its_moved_occurrences_with_the_series() {
+    let app = TestApp::spawn().await;
+    let mut attendee = app.user().await;
+    calendar_id(&mut attendee, "Work").await;
+    let uid = format!("series-{}@example.com", hex(6));
+    let email = attendee.email.clone();
+    let mut request = import_request(
+        series_request(&uid, "organizer@example.com", &email, true),
+        Some("accepted"),
+    );
+    // Clients seal the invitation once, under the series UID.
+    request.encryption = Some(vec![InvitationEncryptionEntry {
+        external_id: uid.clone(),
+        encrypted_content: fake_envelope(),
+        blind_index_tokens: None,
+        encryption_key_version: None,
+    }]);
+
+    let result = import(&mut attendee, &request).await;
+    assert_eq!(result.errors, Vec::<String>::new());
+    assert!(result.events_created >= 2, "{result:?}");
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE external_id LIKE $1 || '%' AND (title <> '' OR encrypted_content IS NULL)",
+            &uid
+        )
+        .await,
+        0,
+        "the series and its moved occurrence are stored only as ciphertext"
+    );
+}
+
+#[tokio::test]
 async fn mailed_series_skip_their_excluded_and_overridden_occurrences() {
     let app = TestApp::spawn().await;
     let mut attendee = app.user().await;

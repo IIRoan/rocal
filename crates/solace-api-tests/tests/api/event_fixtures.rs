@@ -232,15 +232,15 @@ pub async fn assert_no_mail(app: &TestApp, to: &str) {
 }
 
 async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
-    let Some(account) = app.stalwart_account_id("sink").await else {
+    let Some(sink) = app.stalwart_account_id("sink").await else {
         return Vec::new();
     };
     let response = app
         .stalwart_admin(
             &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
             json!([
-                ["Email/query", {"accountId": account, "filter": {"to": to}, "sort": [{"property": "receivedAt", "isAscending": true}]}, "q"],
-                ["Email/get", {"accountId": account, "#ids": {"resultOf": "q", "name": "Email/query", "path": "/ids"},
+                ["Email/query", {"accountId": sink, "filter": {"to": to}, "sort": [{"property": "receivedAt", "isAscending": true}]}, "q"],
+                ["Email/get", {"accountId": sink, "#ids": {"resultOf": "q", "name": "Email/query", "path": "/ids"},
                     "properties": ["subject", "attachments", "textBody", "bodyValues"], "fetchTextBodyValues": true}, "g"],
             ]),
         )
@@ -254,7 +254,7 @@ async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
         let text_part = email["textBody"][0]["partId"].as_str().unwrap_or_default();
         let attachment = email["attachments"].get(0);
         let ics = match attachment.and_then(|a| a["blobId"].as_str()) {
-            Some(blob) => Some(download(app, &account, blob).await),
+            Some(blob) => Some(download(app, &sink, blob).await),
             None => None,
         };
         mail.push(SentMail {
@@ -271,10 +271,10 @@ async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
 }
 
 /// The raw blob, since JMAP body values normalize the CRLF line endings ICS requires.
-async fn download(app: &TestApp, account: &str, blob: &str) -> String {
+async fn download(app: &TestApp, sink: &str, blob: &str) -> String {
     let base = app.env.stalwart_url.trim_end_matches('/');
     let mut request = reqwest::Client::new()
-        .get(format!("{base}/jmap/download/{account}/{blob}/invite.ics"))
+        .get(format!("{base}/jmap/download/{sink}/{blob}/invite.ics"))
         .basic_auth("admin", Some(&app.env.stalwart_admin_password));
     if let Some(key) = &app.env.stalwart_gate_key {
         request = request.header("X-Solace-Gate", key);

@@ -24,7 +24,10 @@ import {
 import type { E2eeBootstrapResponse } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "./AuthProvider";
-import { setActiveE2eeSession } from "../lib/e2ee-session";
+import {
+  setAccountHasPasswordEnvelope,
+  setActiveE2eeSession,
+} from "../lib/e2ee-session";
 
 const log = createLogger("native:e2ee");
 
@@ -116,6 +119,7 @@ export function E2eeProvider({
       }
 
       await putPasswordEnvelope({ e2ee, session, apiBaseUrl, password });
+      setAccountHasPasswordEnvelope(true);
 
       clearPendingAuthPassword();
       log.info("Stored native E2EE password envelope for active session", {
@@ -166,6 +170,7 @@ export function E2eeProvider({
         }
 
         setIsEnabled(true);
+        setAccountHasPasswordEnvelope(Boolean(bootstrapData.passwordEnvelope));
 
         const { existingDevice, privateKeyJwk } =
           await readStoredDevice(bootstrapData);
@@ -189,6 +194,21 @@ export function E2eeProvider({
             apiBaseUrl,
           };
           setActiveE2eeSession(sessionRef.current);
+          // An account whose first envelope write failed gets another try whenever the sign-in password is at hand.
+          const pendingPassword = peekPendingAuthPassword();
+          if (!bootstrapData.passwordEnvelope && pendingPassword) {
+            await storePasswordEnvelopeForActiveSession({
+              e2ee,
+              userId,
+              apiBaseUrl,
+              password: pendingPassword,
+            }).catch((error: unknown) => {
+              log.warn("Failed to store the missing E2EE password envelope", {
+                userId,
+                error,
+              });
+            });
+          }
           clearPendingAuthPassword();
           log.info("Restored native E2EE session from existing device", {
             userId,

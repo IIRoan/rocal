@@ -14,6 +14,7 @@ import {
   setFallbackSessionToken,
 } from "../lib/session-token-fallback";
 import { AuthProvider, useAuth } from "./AuthProvider";
+import { setAccountHasPasswordEnvelope } from "../lib/e2ee-session";
 
 jest.mock("react-native", () => ({
   AppState: { currentState: "active", addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
@@ -413,12 +414,29 @@ describe("AuthProvider", () => {
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });
 
+  it("keeps the device key on sign-out when the account has no password envelope", async () => {
+    await renderProvider();
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    setAccountHasPasswordEnvelope(false);
+
+    await act(async () => {
+      await getAuth().signOut();
+    });
+    await flushPromises();
+
+    expect(mockOnSignedOut).toHaveBeenCalled();
+    expect(mockClearStoredDevice).not.toHaveBeenCalled();
+  });
+
   it("clears pending auth hints on sign-out", async () => {
     await renderProvider();
 
     await act(async () => {
       await getAuth().signIn("roan@example.com", "secret-password");
     });
+    setAccountHasPasswordEnvelope(true);
 
     await act(async () => {
       await getAuth().signOut();

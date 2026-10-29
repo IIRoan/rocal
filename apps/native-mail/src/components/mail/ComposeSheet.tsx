@@ -577,8 +577,13 @@ function ComposeSession({
 
   const finishDraftDecrypt = useEffectEvent(
     (fields: ComposeTextFields, decryptError: string | null) => {
-      if (decryptError) setError(decryptError);
       setIsDraftDecrypting(false);
+      // An editor without the body would autosave over the encrypted draft, so it closes and leaves it intact.
+      if (decryptError) {
+        toast(decryptError, "error");
+        onClose();
+        return;
+      }
       seedCompose(fields);
     },
   );

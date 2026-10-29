@@ -113,6 +113,17 @@ struct Ingest {
     encryption: HashMap<String, InvitationEncryptionEntry>,
 }
 
+impl Ingest {
+    /// A moved occurrence (`UID::RECURRENCE::...`) the client did not seal on its own takes its series' sealed content.
+    fn seal_for(&self, external_id: &str) -> Option<&InvitationEncryptionEntry> {
+        self.encryption.get(external_id).or_else(|| {
+            external_id
+                .split_once("::RECURRENCE::")
+                .and_then(|(series, _)| self.encryption.get(series))
+        })
+    }
+}
+
 fn summary(messages_scanned: usize, parts: usize) -> InvitationImportSummary {
     InvitationImportSummary {
         messages_scanned: messages_scanned as i64,
@@ -341,7 +352,7 @@ async fn ingest(
             && parsed
                 .events
                 .iter()
-                .any(|event| !options.encryption.contains_key(&event.uid))
+                .any(|event| options.seal_for(&event.uid).is_none())
         {
             summary.errors.push(format!(
                 "{}: This calendar requires encrypted event details; automatic server-side mail import is unavailable.",
@@ -549,7 +560,7 @@ async fn upsert(
         .collect();
     let (mut created, mut updated) = (0, 0);
     for parsed in parsed_events {
-        let encryption = options.encryption.get(&parsed.uid);
+        let encryption = options.seal_for(&parsed.uid);
         let inputs = participant_inputs(parsed.participants.as_deref());
         let Some(existing) = by_uid.get(parsed.uid.as_str()).copied() else {
             let data = local_data(parsed, encryption, None);

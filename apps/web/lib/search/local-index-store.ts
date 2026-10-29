@@ -46,7 +46,12 @@ function openDatabase(): Promise<IDBDatabase> {
       }
     };
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const database = request.result;
+      // Sign-out in another tab deletes this database; holding it open would block the next sign-in's index.
+      database.onversionchange = () => database.close();
+      resolve(database);
+    };
   });
 }
 

@@ -8,3 +8,4 @@
 {"@type":"update","object":"Http","value":{"rateLimitAnonymous":null,"rateLimitAuthenticated":null}}
 {"@type":"upsert","object":"OAuthClient","matchOn":["clientId"],"value":{"solace-mail-bridge":{"clientId":"solace-mail-bridge","description":"Solace mail backend bridge","redirectUris":{"http://localhost:4001/api/mail/oauth/stalwart/callback":true},"firstParty":true,"scopes":{"mail":true}}}}
 {"@type":"upsert","object":"MtaInboundThrottle","matchOn":["description"],"value":{"throttle-rcpt":{"enable":false,"description":"Sender address to recipient throttle","key":{"senderDomain":true,"rcpt":true},"match":{"match":{},"else":"true"},"rate":{"count":25,"period":3600000}},"throttle-ip":{"enable":false,"description":"Sender IP throttle","key":{"remoteIp":true},"match":{"match":{},"else":"true"},"rate":{"count":5,"period":1000}}}}
+{"@type":"update","object":"Email","value":{"maxSubmissions":20000}}

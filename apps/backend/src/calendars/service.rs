@@ -53,7 +53,7 @@ pub async fn seed_defaults(
     user: &RouteUser,
     request: SeedDefaultCalendarsRequest,
 ) -> Result<CalendarList, AppError> {
-    let mut rows = Vec::with_capacity(request.calendars.len());
+    let mut rows = Vec::new();
     let mut has_default = false;
     for calendar in request.calendars {
         let is_default = !has_default && calendar.is_default == Some(true);

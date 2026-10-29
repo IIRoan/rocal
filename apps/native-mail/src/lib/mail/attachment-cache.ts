@@ -28,7 +28,7 @@ export type CachedAttachment = {
   fileName: string;
 };
 
-/** Viewers and share sheets need decrypted files, so they live only here and the folder is wiped at session start and sign-out. */
+/** Viewers and share sheets need decrypted files, so they live only here and the folder is wiped at launch and on sign-out. */
 const ATTACHMENT_CACHE_DIRECTORY = `${FileSystem.cacheDirectory ?? ""}mail-attachments/`;
 
 export async function clearAttachmentCache(): Promise<void> {

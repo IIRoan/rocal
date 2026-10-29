@@ -2021,8 +2021,8 @@ export function useMailApp() {
       } catch (error) {
         log.error("Failed to decrypt draft", error);
         toast.error(getErrorMessage(error, "Could not decrypt this draft."));
-        // Still open the headers, as native does; the seeded baseline keeps an untouched draft from being overwritten.
-        overrides = { plaintext: "", html: "" };
+        // An editor without the body would autosave over the encrypted draft, so it stays closed and intact.
+        return;
       }
     }
 

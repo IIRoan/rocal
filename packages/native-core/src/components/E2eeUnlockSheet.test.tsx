@@ -120,6 +120,15 @@ it("restarts startup once the password unlocks the account key", async () => {
   expect(container.querySelector('[role="alert"]')).toBeNull();
 });
 
+it("tells a network failure apart from a wrong password", async () => {
+  mockUnlockWithPassword.mockRejectedValue(new Error("Network request failed"));
+
+  await submit("previous-password");
+
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("connection");
+  expect(onUnlocked).not.toHaveBeenCalled();
+});
+
 it("offers signing out instead of unlocking", async () => {
   await act(async () => {
     container.querySelector<HTMLButtonElement>('button[aria-label="Sign out"]')?.click();

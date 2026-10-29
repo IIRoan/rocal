@@ -76,7 +76,7 @@ describe("resolveMailServerPolicy", () => {
         maxBlobUploadBytes: 100_000_000,
         maxAttachmentSizeBytes: 100_000_000,
         maxMessageSizeBytes: 150_000_000,
-        maxOutgoingAttachmentBytes: 100_000_000,
+        maxOutgoingAttachmentBytes: 50_000_000,
       },
       maxMailboxDepth: 8,
       maxMailboxNameLength: 120,

@@ -149,7 +149,8 @@ export function resolveMailServerLimits(
   const maxAttachmentSizeBytes = resolveAttachmentSizeBytes(source);
   const maxMessageSizeBytes = resolveMessageSizeBytes(source);
 
-  const outgoingCandidates = [maxBlobUploadBytes];
+  // A send with attachments also uploads an encrypted copy (armored, about 1.8x their size), so they get half the upload limit.
+  const outgoingCandidates = [Math.floor(maxBlobUploadBytes / 2)];
   if (maxAttachmentSizeBytes) {
     outgoingCandidates.push(maxAttachmentSizeBytes);
   }
