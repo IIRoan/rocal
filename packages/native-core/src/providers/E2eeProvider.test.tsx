@@ -56,7 +56,8 @@ jest.mock("@workspace/e2ee", () => {
     encryptEventContentRequest: actual.encryptEventContentRequest,
     encryptNameRequest: actual.encryptNameRequest,
     hydrateEncryptedName: actual.hydrateEncryptedName,
-    shouldEncryptEventContent: actual.shouldEncryptEventContent,
+    withoutPlaintextEventContent: actual.withoutPlaintextEventContent,
+    withoutPlaintextName: actual.withoutPlaintextName,
   };
 });
 
@@ -99,8 +100,6 @@ function createBootstrapResponse(
   overrides?: Partial<E2eeBootstrapResponse>,
 ): E2eeBootstrapResponse {
   return {
-    enabled: true,
-    rolloutStage: "encrypted",
     algorithms: {
       content: "AES-GCM-256",
       blindIndex: "HMAC-SHA-256",
@@ -360,8 +359,8 @@ describe("E2eeProvider", () => {
     expect(getE2ee().isEnabled).toBe(true);
   });
 
-  it("starts a fresh E2EE session when the auto-unlock fails (e.g. password changed)", async () => {
-    peekPendingAuthPassword.mockReturnValue("wrong-password");
+  it("asks for the previous password after a reset and re-wraps the envelope to the new one", async () => {
+    peekPendingAuthPassword.mockReturnValue("new-sign-in-password");
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
@@ -382,7 +381,7 @@ describe("E2eeProvider", () => {
         );
       }
 
-      if (url.endsWith("/api/e2ee/device")) {
+      if (url.endsWith("/api/e2ee/device") || url.endsWith("/api/e2ee/password")) {
         return jsonResponse({});
       }
 
@@ -396,12 +395,48 @@ describe("E2eeProvider", () => {
     });
     await flushBootstrap();
 
-    // Unlock failed → starts a fresh device session with newly-generated keys.
     expect(getE2ee().isReady).toBe(true);
-    expect(getE2ee().isEnabled).toBe(true);
-    expect(mockE2eeModule.generateAccountKey).toHaveBeenCalled();
+    expect(getE2ee().needsPassword).toBe(true);
+    expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      "https://api.solace.test/api/e2ee/device",
+      expect.anything(),
+    );
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      "https://api.solace.test/api/e2ee/password",
+      expect.anything(),
+    );
+    expect(clearPendingAuthPassword).not.toHaveBeenCalled();
+
+    await act(async () => {
+      expect(await getE2ee().unlockWithPassword("still-wrong")).toBe(false);
+    });
+    expect(getE2ee().needsPassword).toBe(true);
+
+    mockE2eeModule.unwrapPasswordEnvelope.mockResolvedValueOnce({
+      accountKey,
+      blindIndexKey,
+    });
+    await act(async () => {
+      expect(await getE2ee().unlockWithPassword("previous-password")).toBe(true);
+    });
+    expect(mockE2eeModule.unwrapPasswordEnvelope).toHaveBeenLastCalledWith(
+      "previous-password",
+      expect.objectContaining({ wrappedAccountKey: "wrapped-account" }),
+    );
     expect(mockFetch).toHaveBeenCalledWith(
       "https://api.solace.test/api/e2ee/device",
+      expect.objectContaining({ method: "PUT" }),
+    );
+    expect(getE2ee().needsPassword).toBe(false);
+    expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
+    expect(mockE2eeModule.createPasswordEnvelope).toHaveBeenCalledWith(
+      accountKey,
+      blindIndexKey,
+      "new-sign-in-password",
+    );
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.solace.test/api/e2ee/password",
       expect.objectContaining({ method: "PUT" }),
     );
     expect(clearPendingAuthPassword).toHaveBeenCalled();
@@ -646,10 +681,60 @@ describe("E2eeProvider", () => {
     ).resolves.toMatchObject({ name: "Therapy" });
   });
 
-  it("starts a fresh E2EE session for passkey users when a password envelope exists", async () => {
-    // Passkey users have no pending auth password, so they can't unwrap an
-    // existing password envelope. The provider should start a fresh session
-    // rather than disabling E2EE.
+  it("does not mint new keys when other devices hold them without a password envelope", async () => {
+    peekPendingAuthPassword.mockReturnValue("secret-password");
+    mockUseAuth.mockReturnValue(
+      createMockAuthContext({
+        clearPendingAuthPassword,
+        consumePendingAuthPassword,
+        peekPendingAuthPassword,
+        lastAuthMethod: "email-password",
+      }),
+    );
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(
+          createBootstrapResponse({
+            devices: [
+              {
+                id: "device-row",
+                userId: "user-1",
+                deviceId: "other-device",
+                deviceLabel: null,
+                publicKey: "public-key",
+                publicKeyAlgorithm: "RSA-OAEP-4096",
+                wrappedAccountKey: "wrapped-account-key",
+                wrappedSearchKey: "wrapped-search-key",
+                wrapAlgorithm: "RSA-OAEP-4096",
+                keyVersion: 1,
+                lastSeenAt: new Date(0),
+                createdAt: new Date(0),
+                updatedAt: new Date(0),
+              },
+            ],
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+    await flushBootstrap();
+
+    expect(getE2ee().isReady).toBe(true);
+    expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
+    await expect(getE2ee().provider.hasActiveSession()).resolves.toBe(false);
+    await expect(
+      getE2ee().provider.attachCalendarEncryptionShadow({ name: "Therapy", color: "blue" }),
+    ).rejects.toThrow("Encryption is not ready");
+  });
+
+  it("asks passkey users for the encryption password when a password envelope exists", async () => {
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
@@ -680,11 +765,11 @@ describe("E2eeProvider", () => {
     await flushBootstrap();
 
     expect(getE2ee().isReady).toBe(true);
-    expect(getE2ee().isEnabled).toBe(true);
-    expect(mockE2eeModule.generateAccountKey).toHaveBeenCalled();
-    expect(mockFetch).toHaveBeenCalledWith(
+    expect(getE2ee().needsPassword).toBe(true);
+    expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalledWith(
       "https://api.solace.test/api/e2ee/device",
-      expect.objectContaining({ method: "PUT" }),
+      expect.anything(),
     );
   });
 });

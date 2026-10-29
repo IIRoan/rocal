@@ -1,4 +1,4 @@
-import { LockOpen, ShieldAlert, ShieldCheck } from "lucide-react";
+import { LockOpen, ShieldCheck } from "lucide-react";
 import {
   getCalendarEncryptionNotice,
   type CalendarEncryptionKind,
@@ -19,12 +19,7 @@ export function getEncryptionStatusMeta(
   const notice = getCalendarEncryptionNotice(item, kind);
   return {
     ...notice,
-    Icon:
-      notice.state === "encrypted"
-        ? ShieldCheck
-        : notice.state === "pending"
-          ? ShieldAlert
-          : LockOpen,
+    Icon: notice.state === "encrypted" ? ShieldCheck : LockOpen,
     iconClassName:
       notice.state === "encrypted" ? "text-primary" : "text-muted-foreground",
   };

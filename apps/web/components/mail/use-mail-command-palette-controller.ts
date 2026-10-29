@@ -184,6 +184,7 @@ export function useMailCommandPaletteController({
   }) =>
     runMailPasswordChange({
       ...input,
+      sessionUserId,
       setBusy: (value) =>
         dispatchBusy({ type: "setChangingPassword", value }),
     });
@@ -191,6 +192,7 @@ export function useMailCommandPaletteController({
   const handleSetPassword = (input: { newPassword: string }) =>
     runMailPasswordSet({
       ...input,
+      sessionUserId,
       refetchAccounts: accountsQuery.refetch,
       setBusy: (value) => dispatchBusy({ type: "setSettingPassword", value }),
     });

@@ -1,6 +1,7 @@
 //! `/api/settings`: defaults on first read, validated updates, reset, and per-user isolation.
 
 use serde_json::json;
+use solace_api_tests::seed::fake_envelope;
 use solace_api_types::SuccessMessage;
 use solace_api_types::settings::UserSettings;
 
@@ -53,7 +54,6 @@ async fn first_read_creates_the_defaults() {
         (540, 1020)
     );
     assert_eq!(settings.working_days, "[1,2,3,4,5]");
-    assert_eq!(settings.event_encryption_mode, "full");
     assert_eq!(settings.default_event_duration, 60);
     assert_eq!(settings.default_calendar_id, None);
     assert!(
@@ -296,9 +296,9 @@ async fn invalid_values_are_rejected_with_the_zod_message() {
             "timezone",
         ),
         (
-            json!({"eventEncryptionMode": "none"}),
-            "Invalid enum value. Expected 'hybrid' | 'full', received 'none'",
-            "eventEncryptionMode",
+            json!({"eventEncryptionMode": "full"}),
+            "Unrecognized key(s) in object: 'eventEncryptionMode'",
+            "root",
         ),
     ];
     for (body, message, path) in cases {
@@ -395,7 +395,7 @@ async fn the_default_calendar_must_be_an_own_editable_calendar() {
     let calendar = ok(owner
         .post(
             "/api/calendars",
-            json!({"name": "Work", "color": "#3b82f6"}),
+            json!({"encryptedName": fake_envelope(), "color": "#3b82f6"}),
         )
         .await
         .expect_status(200)
@@ -425,56 +425,6 @@ async fn the_default_calendar_must_be_an_own_editable_calendar() {
         .expect_status(200)
         .and_then(|r| r.dto()));
     assert_eq!(cleared.default_calendar_id, None, "null clears the default");
-}
-
-#[tokio::test]
-async fn full_encryption_turns_off_calendar_share_links() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    ok(user
-        .put("/api/settings", json!({"eventEncryptionMode": "hybrid"}))
-        .await
-        .expect_status(200));
-    let calendar = ok(user
-        .post(
-            "/api/calendars",
-            json!({"name": "Shared", "color": "#22c55e"}),
-        )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    let calendar_id = calendar["id"].as_str().expect("calendar id").to_owned();
-    ok(user
-        .post(
-            &format!("/api/calendars/{calendar_id}/share-link"),
-            json!({}),
-        )
-        .await
-        .expect_status(200));
-    let (enabled, token): (bool, Option<String>) =
-        sqlx::query_as("SELECT ics_share_enabled, ics_share_token FROM calendar WHERE id = $1")
-            .bind(&calendar_id)
-            .fetch_one(&app.db)
-            .await
-            .expect("calendar");
-    assert!(enabled && token.is_some());
-
-    let settings: UserSettings = ok(user
-        .put("/api/settings", json!({"eventEncryptionMode": "full"}))
-        .await
-        .expect_status(200)
-        .and_then(|r| r.dto()));
-    assert_eq!(settings.event_encryption_mode, "full");
-    let (enabled, token): (bool, Option<String>) =
-        sqlx::query_as("SELECT ics_share_enabled, ics_share_token FROM calendar WHERE id = $1")
-            .bind(&calendar_id)
-            .fetch_one(&app.db)
-            .await
-            .expect("calendar");
-    assert!(
-        !enabled && token.is_none(),
-        "share link disabled and token dropped"
-    );
 }
 
 #[tokio::test]
@@ -555,66 +505,4 @@ async fn read_only_and_staging_calendars_cannot_be_the_default() {
             "{name}"
         );
     }
-}
-
-#[tokio::test]
-async fn switching_to_full_encryption_drops_plaintext_beside_ciphertext_in_shared_calendars() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    let calendar = ok(user
-        .post(
-            "/api/calendars",
-            json!({"name": "Shared", "color": "#22c55e"}),
-        )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    let calendar_id = calendar["id"].as_str().expect("calendar id").to_owned();
-    ok(user
-        .post(
-            &format!("/api/calendars/{calendar_id}/share-link"),
-            json!({}),
-        )
-        .await
-        .expect_status(200));
-    // A row from the hybrid era: ciphertext next to a plaintext copy.
-    let event_id = format!("suiteevt{}", hex(8));
-    sqlx::query(
-        "INSERT INTO calendar_event (id, title, description, location, encrypted_content, encryption_state, start, \"end\", user_id, calendar_id, created_at, updated_at) \
-         VALUES ($1, 'Legacy title', 'Legacy body', 'Legacy room', '{\"version\":1}', 'plaintext', now(), now() + interval '1 hour', $2, $3, now(), now())",
-    )
-    .bind(&event_id)
-    .bind(&user.id)
-    .bind(&calendar_id)
-    .execute(&app.db)
-    .await
-    .expect("insert legacy event");
-
-    let settings: UserSettings = ok(user
-        .put("/api/settings", json!({"eventEncryptionMode": "hybrid"}))
-        .await
-        .expect_status(200)
-        .and_then(|r| r.dto()));
-    assert_eq!(
-        settings.event_encryption_mode, "full",
-        "hybrid is stored as full"
-    );
-
-    let row: (String, Option<String>, Option<String>, String, Option<String>) = sqlx::query_as(
-        "SELECT title, description, location, encryption_state, encrypted_content FROM calendar_event WHERE id = $1",
-    )
-    .bind(&event_id)
-    .fetch_one(&app.db)
-    .await
-    .expect("event");
-    assert_eq!(
-        row,
-        (
-            String::new(),
-            None,
-            None,
-            "encrypted".into(),
-            Some("{\"version\":1}".into())
-        )
-    );
 }

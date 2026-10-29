@@ -1,3 +1,8 @@
+import { encryptForRecipients, ensureVaultLoaded } from "./mail-crypto";
+import { getRecipientKey } from "./mail-api";
+import { resolveOutgoingMessageBody } from "./outgoing-message-crypto";
+import type { MailRuntime } from "./mail-runtime";
+
 jest.mock("./mail-crypto", () => ({
   encryptForRecipients: jest.fn(),
   ensureVaultLoaded: jest.fn(),
@@ -7,23 +12,18 @@ jest.mock("./mail-api", () => ({
   getRecipientKey: jest.fn(),
 }));
 
-import { encryptForRecipients, ensureVaultLoaded } from "./mail-crypto";
-import { getRecipientKey } from "./mail-api";
-import { resolveOutgoingMessageBody } from "./outgoing-message-crypto";
-import type { MailRuntime } from "./mail-runtime";
+const ARMORED = "-----BEGIN PGP MESSAGE-----\nciphertext\n-----END PGP MESSAGE-----";
+const uploadBlob = jest.fn();
 
-function createRuntime(
-  overrides: Partial<MailRuntime["config"]> = {},
-): MailRuntime {
+function createRuntime(): MailRuntime {
   return {
     config: {
       defaultDomain: "solace.onl",
       discoveryBaseUrl: "https://mail.solace.onl",
       signupEnabled: true,
       oauth: {} as MailRuntime["config"]["oauth"],
-      ...overrides,
     },
-    client: {} as MailRuntime["client"],
+    client: { uploadBlob } as unknown as MailRuntime["client"], // Only the blob upload is exercised.
     session: {} as MailRuntime["session"],
     accountId: "acc-1",
     mailboxes: [],
@@ -36,6 +36,12 @@ function createRuntime(
   };
 }
 
+const attachment = {
+  filename: "notes.txt",
+  contentType: "text/plain",
+  content: new Uint8Array([1, 2, 3]),
+};
+
 describe("resolveOutgoingMessageBody", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -45,159 +51,60 @@ describe("resolveOutgoingMessageBody", () => {
     (getRecipientKey as jest.Mock).mockResolvedValue({
       publicKeyArmored: "recipient-public-key",
     });
-    (encryptForRecipients as jest.Mock).mockResolvedValue({
-      armoredMessage:
-        "-----BEGIN PGP MESSAGE-----\nciphertext\n-----END PGP MESSAGE-----",
+    (encryptForRecipients as jest.Mock).mockResolvedValue({ armoredMessage: ARMORED });
+    uploadBlob.mockResolvedValue({
+      blobId: "sealed-blob",
+      size: ARMORED.length,
+      name: "",
+      type: "text/plain",
     });
   });
 
-  it("returns plaintext for external recipients without touching the vault", async () => {
+  it("submits external mail in plaintext and uploads a Sent copy sealed to the vault key", async () => {
     const result = await resolveOutgoingMessageBody({
       runtime: createRuntime(),
-      recipients: ["friend@gmail.com"],
+      recipients: ["bob@solace.onl", "friend@gmail.com"],
       plaintext: "Hello Gmail",
+      html: "<p>Hello Gmail</p>",
+      mimeAttachments: [attachment],
     });
 
     expect(result).toEqual({
       textBody: "Hello Gmail",
       encrypted: false,
+      sentCopyCiphertext: { blobId: "sealed-blob", size: ARMORED.length },
     });
-    expect(ensureVaultLoaded).not.toHaveBeenCalled();
+    expect(encryptForRecipients).toHaveBeenCalledWith({
+      plaintext: expect.stringContaining('filename="notes.txt"'),
+      recipientPublicKeysArmored: ["sender-public-key"],
+    });
+    expect(uploadBlob).toHaveBeenCalledWith(
+      {},
+      new TextEncoder().encode(ARMORED),
+      "text/plain",
+    );
     expect(getRecipientKey).not.toHaveBeenCalled();
-    expect(encryptForRecipients).not.toHaveBeenCalled();
   });
 
-  it("returns plaintext for mixed internal and external recipients", async () => {
-    const result = await resolveOutgoingMessageBody({
-      runtime: createRuntime(),
-      recipients: ["bob@solace.onl", "friend@gmail.com"],
-      plaintext: "Hello everyone",
-    });
-
-    expect(result).toEqual({
-      textBody: "Hello everyone",
-      encrypted: false,
-    });
-    expect(encryptForRecipients).not.toHaveBeenCalled();
-  });
-
-  it("returns plaintext when the configured internal domain is missing", async () => {
-    const result = await resolveOutgoingMessageBody({
-      runtime: createRuntime({ defaultDomain: "" }),
-      recipients: ["bob@solace.onl"],
-      plaintext: "Hello Bob",
-    });
-
-    expect(result).toEqual({
-      textBody: "Hello Bob",
-      encrypted: false,
-    });
-    expect(encryptForRecipients).not.toHaveBeenCalled();
-  });
-
-  it("encrypts rich text as multipart/alternative MIME for internal recipients", async () => {
-    const result = await resolveOutgoingMessageBody({
-      runtime: createRuntime(),
-      recipients: ["bob@solace.onl"],
-      plaintext: "Hello world",
-      html: "<p>Hello <strong>world</strong></p>",
-    });
-
-    expect(result.encrypted).toBe(true);
-    expect(result.textBody).toContain("BEGIN PGP MESSAGE");
-    expect(encryptForRecipients).toHaveBeenCalledWith({
-      plaintext: expect.stringContaining("multipart/alternative"),
-      recipientPublicKeysArmored: expect.arrayContaining([
-        "sender-public-key",
-        "recipient-public-key",
-      ]),
-    });
-    const encryptedPayload = (encryptForRecipients as jest.Mock).mock
-      .calls[0][0].plaintext as string;
-    expect(encryptedPayload).toContain("Content-Type: text/html; charset=utf-8");
-    expect(encryptedPayload).toContain("<p>Hello <strong>world</strong></p>");
-  });
-
-  it("encrypts when every recipient is on the configured Solace domain", async () => {
-    const result = await resolveOutgoingMessageBody({
-      runtime: createRuntime(),
-      recipients: ["bob@solace.onl"],
-      plaintext: "Secret body",
-    });
-
-    expect(result.encrypted).toBe(true);
-    expect(result.textBody).toContain("BEGIN PGP MESSAGE");
-    expect(encryptForRecipients).toHaveBeenCalledWith({
-      plaintext: "Secret body",
-      recipientPublicKeysArmored: expect.arrayContaining([
-        "sender-public-key",
-        "recipient-public-key",
-      ]),
-    });
-  });
-
-  it("includes cc and bcc recipients in the internal-only encryption check", async () => {
-    const result = await resolveOutgoingMessageBody({
-      runtime: createRuntime(),
-      recipients: ["bob@solace.onl", "watch@solace.onl", "spy@gmail.com"],
-      plaintext: "Should stay plaintext",
-    });
-
-    expect(result.encrypted).toBe(false);
-    expect(result.textBody).toBe("Should stay plaintext");
-    expect(encryptForRecipients).not.toHaveBeenCalled();
-  });
-
-  it("uploads PGP/MIME ciphertext when attachments are present for internal mail", async () => {
-    const uploadPgpMimeCiphertext = jest
-      .fn()
-      .mockResolvedValue({ blobId: "blob-1", size: 128 });
-
+  it("encrypts internal mail with attachments to the recipient and sender as PGP/MIME", async () => {
     const result = await resolveOutgoingMessageBody({
       runtime: createRuntime(),
       recipients: ["bob@solace.onl"],
       plaintext: "See attached",
-      mimeAttachments: [
-        {
-          filename: "notes.txt",
-          contentType: "text/plain",
-          content: new Uint8Array([1, 2, 3]),
-        },
-      ],
-      uploadPgpMimeCiphertext,
+      html: "<p>See attached</p>",
+      mimeAttachments: [attachment],
     });
 
     expect(result).toEqual({
       textBody: "",
       encrypted: true,
-      pgpMimeCiphertext: { blobId: "blob-1", size: 128 },
+      pgpMimeCiphertext: { blobId: "sealed-blob", size: ARMORED.length },
+      sentCopyCiphertext: null,
     });
-    expect(uploadPgpMimeCiphertext).toHaveBeenCalledWith(
-      "-----BEGIN PGP MESSAGE-----\nciphertext\n-----END PGP MESSAGE-----",
-    );
-  });
-
-  it("does not upload PGP/MIME ciphertext for external recipients with attachments", async () => {
-    const uploadPgpMimeCiphertext = jest.fn();
-
-    const result = await resolveOutgoingMessageBody({
-      runtime: createRuntime(),
-      recipients: ["friend@gmail.com"],
-      plaintext: "See attached",
-      mimeAttachments: [
-        {
-          filename: "notes.txt",
-          contentType: "text/plain",
-          content: new Uint8Array([1, 2, 3]),
-        },
-      ],
-      uploadPgpMimeCiphertext,
+    expect(encryptForRecipients).toHaveBeenCalledWith({
+      plaintext: expect.stringContaining("Content-Type: text/html; charset=utf-8"),
+      recipientPublicKeysArmored: ["sender-public-key", "recipient-public-key"],
     });
-
-    expect(result).toEqual({
-      textBody: "See attached",
-      encrypted: false,
-    });
-    expect(uploadPgpMimeCiphertext).not.toHaveBeenCalled();
+    expect(getRecipientKey).toHaveBeenCalledWith("bob@solace.onl");
   });
 });

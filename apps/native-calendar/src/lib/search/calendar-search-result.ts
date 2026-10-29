@@ -10,11 +10,7 @@ export function toCalendarSearchResult(
   // The palette never shows the hit's trimmed labels, and they are not the full rows `CalendarEvent` carries.
   const { calendar: _calendar, category: _category, ...event } = hit;
   const encryptionStatus =
-    event.encryptionState === "encrypted"
-      ? "encrypted-indexed"
-      : event.encryptionState === "shadow_write"
-        ? "metadata-only"
-        : "plaintext";
+    event.encryptionState === "encrypted" ? "encrypted-indexed" : "plaintext";
 
   return {
     id: `calendar:${event.id}`,

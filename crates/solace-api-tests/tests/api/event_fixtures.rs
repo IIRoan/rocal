@@ -1,9 +1,12 @@
-//! Shared setup for the event modules: calendars, encrypted events, legacy plaintext rows and the noreply mail they send.
+//! Shared setup for the event modules: calendars, encrypted events, feed and staged plaintext rows and the noreply mail they send.
 
 use std::time::Duration;
 
 use serde_json::{Value, json};
 use solace_api_tests::seed::{fake_envelope, fake_token};
+use solace_api_types::calendars::{
+    CalendarList, CreateCalendarRequest, SeedDefaultCalendarsRequest,
+};
 use solace_api_types::events::{CreateEventRequest, Event, EventList};
 use sqlx::PgPool;
 
@@ -23,16 +26,13 @@ pub fn encrypted_event(calendar_id: &str, start: &str, end: &str) -> CreateEvent
         start: start.into(),
         end: end.into(),
         calendar_id: calendar_id.to_owned().into(),
-        title: None,
-        description: None,
-        location: None,
         all_day: None,
         color: None,
         category_id: None,
         timezone: None,
         reminder: None,
         recurrence: None,
-        encrypted_content: Some(fake_envelope()),
+        encrypted_content: fake_envelope(),
         blind_index_tokens: Some(vec![fake_token(), fake_token()]),
         encryption_key_version: Some(1),
         participants: None,
@@ -56,34 +56,79 @@ pub async fn list_events(user: &mut TestUser, start: &str, end: &str) -> EventLi
         .and_then(|r| r.dto()))
 }
 
-/// The user's calendar by name; the first event list creates Personal, Work and Family.
+/// The starting set a client seeds, told apart by color since the names are ciphertext; Personal is the default.
+pub const DEFAULT_CALENDARS: [(&str, &str); 3] = [
+    ("Personal", "#10b981"),
+    ("Work", "#3b82f6"),
+    ("Family", "#f43f5e"),
+];
+
+/// An owned calendar as clients create it: an encrypted name only.
+pub fn encrypted_calendar(color: &str, is_default: bool) -> CreateCalendarRequest {
+    CreateCalendarRequest {
+        color: color.into(),
+        is_default: Some(is_default),
+        encrypted_name: fake_envelope(),
+        blind_index_tokens: Some(vec![fake_token()]),
+        encryption_key_version: Some(1),
+    }
+}
+
+pub fn seed_defaults_request() -> SeedDefaultCalendarsRequest {
+    SeedDefaultCalendarsRequest {
+        calendars: DEFAULT_CALENDARS
+            .iter()
+            .enumerate()
+            .map(|(index, (_, color))| encrypted_calendar(color, index == 0))
+            .collect(),
+    }
+}
+
+/// `POST /api/calendars/defaults`, which stores the set only while the user owns no calendar yet.
+pub async fn seed_default_calendars(user: &mut TestUser) -> CalendarList {
+    ok(user
+        .post("/api/calendars/defaults", to_json(&seed_defaults_request()))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()))
+}
+
+/// The user's starting calendar by its old name, seeding the set first.
 pub async fn calendar_id(user: &mut TestUser, name: &str) -> String {
-    let list = list_events(user, FUTURE_START, FUTURE_END).await;
-    list.calendars
+    let color = DEFAULT_CALENDARS
+        .iter()
+        .find(|(label, _)| *label == name)
+        .map(|(_, color)| *color)
+        .unwrap_or_else(|| panic!("no default calendar {name}"));
+    seed_default_calendars(user)
+        .await
+        .calendars
         .into_iter()
-        .find(|calendar| calendar.name == name)
+        .find(|calendar| calendar.color == color && calendar.kind == "owned")
         .map(|calendar| calendar.id.0)
         .unwrap_or_else(|| panic!("no calendar {name}"))
 }
 
-/// A calendar row inserted directly, for kinds the API never creates (subscribed, sync-only, shared).
+/// A calendar row inserted directly, for kinds the API never creates (subscribed, sync-only, shared); owned rows get an encrypted name.
 pub async fn insert_calendar(app: &TestApp, user_id: &str, kind: &str, sync_only: bool) -> String {
     let id = format!("suitecal{}", hex(8));
+    let encrypted_name = (kind == "owned").then(fake_envelope);
     sqlx::query(
-        "INSERT INTO calendar (id, name, color, kind, is_sync_only, user_id, created_at, updated_at) \
-         VALUES ($1, 'Feed', '#64748b', $2, $3, $4, now(), now())",
+        "INSERT INTO calendar (id, name, encrypted_name, encryption_state, color, kind, is_sync_only, user_id, created_at, updated_at) \
+         VALUES ($1, CASE WHEN $5::text IS NULL THEN 'Feed' ELSE '' END, $5, CASE WHEN $5::text IS NULL THEN 'plaintext' ELSE 'encrypted' END, '#64748b', $2, $3, $4, now(), now())",
     )
     .bind(&id)
     .bind(kind)
     .bind(sync_only)
     .bind(user_id)
+    .bind(encrypted_name)
     .execute(&app.db)
     .await
     .expect("insert calendar");
     id
 }
 
-/// A plaintext row as legacy clients, subscriptions and invitation imports leave them.
+/// A plaintext row, as only feed sync and staged invitation imports write one.
 pub async fn insert_plaintext_event(
     app: &TestApp,
     user_id: &str,
@@ -107,6 +152,11 @@ pub async fn insert_plaintext_event(
     .await
     .expect("insert plaintext event");
     id
+}
+
+/// The hidden Invitations calendar, the one owned calendar whose staged copies stay plaintext.
+pub async fn insert_staging_calendar(app: &TestApp, user_id: &str) -> String {
+    crate::calendars::insert_calendar(&app.db, user_id, crate::calendars::STAGING).await
 }
 
 /// The content columns of a `calendar_event` row.
@@ -152,7 +202,7 @@ pub async fn iso_from_now(db: &PgPool, seconds: i64) -> String {
     .expect("now")
 }
 
-/// One message the noreply identity sent, with its calendar attachment.
+/// One message the noreply identity sent, as the test Stalwart's catch-all sink received it.
 #[derive(Debug)]
 pub struct SentMail {
     pub subject: String,
@@ -182,39 +232,19 @@ pub async fn assert_no_mail(app: &TestApp, to: &str) {
 }
 
 async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
-    let base = app.env.stalwart_url.trim_end_matches('/');
-    let session: Value = serde_json::from_str(
-        &noreply_jmap(
-            app,
-            reqwest::Method::GET,
-            &format!("{base}/jmap/session"),
-            None,
+    let Some(sink) = app.stalwart_account_id("sink").await else {
+        return Vec::new();
+    };
+    let response = app
+        .stalwart_admin(
+            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+            json!([
+                ["Email/query", {"accountId": sink, "filter": {"to": to}, "sort": [{"property": "receivedAt", "isAscending": true}]}, "q"],
+                ["Email/get", {"accountId": sink, "#ids": {"resultOf": "q", "name": "Email/query", "path": "/ids"},
+                    "properties": ["subject", "attachments", "textBody", "bodyValues"], "fetchTextBodyValues": true}, "g"],
+            ]),
         )
-        .await,
-    )
-    .expect("JMAP session");
-    let account = session["primaryAccounts"]["urn:ietf:params:jmap:mail"]
-        .as_str()
-        .expect("mail account")
-        .to_owned();
-    let calls = json!({
-        "using": ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-        "methodCalls": [
-            ["Email/query", {"accountId": account, "filter": {"to": to}, "sort": [{"property": "receivedAt", "isAscending": true}]}, "q"],
-            ["Email/get", {"accountId": account, "#ids": {"resultOf": "q", "name": "Email/query", "path": "/ids"},
-                "properties": ["subject", "attachments", "textBody", "bodyValues"], "fetchTextBodyValues": true}, "g"],
-        ],
-    });
-    let response: Value = serde_json::from_str(
-        &noreply_jmap(
-            app,
-            reqwest::Method::POST,
-            &format!("{base}/jmap/"),
-            Some(&calls),
-        )
-        .await,
-    )
-    .expect("JMAP body");
+        .await;
     let list = response["methodResponses"][1][1]["list"]
         .as_array()
         .cloned()
@@ -222,17 +252,9 @@ async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
     let mut mail = Vec::new();
     for email in list {
         let text_part = email["textBody"][0]["partId"].as_str().unwrap_or_default();
-        let attachment = email["attachments"].get(0).cloned();
-        let ics = match attachment.as_ref().and_then(|a| a["blobId"].as_str()) {
-            Some(blob) => Some(
-                noreply_jmap(
-                    app,
-                    reqwest::Method::GET,
-                    &format!("{base}/jmap/download/{account}/{blob}/invite.ics"),
-                    None,
-                )
-                .await,
-            ),
+        let attachment = email["attachments"].get(0);
+        let ics = match attachment.and_then(|a| a["blobId"].as_str()) {
+            Some(blob) => Some(download(app, &sink, blob).await),
             None => None,
         };
         mail.push(SentMail {
@@ -248,40 +270,22 @@ async fn query_sent_mail(app: &TestApp, to: &str) -> Vec<SentMail> {
     mail
 }
 
-/// The backends send as noreply too, so the suite reads one request at a time under Stalwart's per-account concurrency limit.
-static NOREPLY_READS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
-
-async fn noreply_jmap(
-    app: &TestApp,
-    method: reqwest::Method,
-    url: &str,
-    body: Option<&Value>,
-) -> String {
-    let _permit = NOREPLY_READS.acquire().await.expect("semaphore");
-    let user = format!("noreply@{}", app.env.mail_domain);
-    for _ in 0..50 {
-        let mut request = reqwest::Client::new()
-            .request(method.clone(), url)
-            .basic_auth(&user, Some(&app.env.stalwart_noreply_password));
-        if let Some(key) = &app.env.stalwart_gate_key {
-            request = request.header("X-Solace-Gate", key);
-        }
-        if let Some(body) = body {
-            request = request.json(body);
-        }
-        let text = request
-            .send()
-            .await
-            .expect("JMAP request")
-            .text()
-            .await
-            .expect("JMAP text");
-        if !text.contains("urn:ietf:params:jmap:error:limit") {
-            return text;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+/// The raw blob, since JMAP body values normalize the CRLF line endings ICS requires.
+async fn download(app: &TestApp, sink: &str, blob: &str) -> String {
+    let base = app.env.stalwart_url.trim_end_matches('/');
+    let mut request = reqwest::Client::new()
+        .get(format!("{base}/jmap/download/{sink}/{blob}/invite.ics"))
+        .basic_auth("admin", Some(&app.env.stalwart_admin_password));
+    if let Some(key) = &app.env.stalwart_gate_key {
+        request = request.header("X-Solace-Gate", key);
     }
-    panic!("Stalwart kept refusing noreply reads at its concurrency limit");
+    request
+        .send()
+        .await
+        .expect("JMAP download")
+        .text()
+        .await
+        .expect("JMAP download text")
 }
 
 /// Unfolds RFC 5545 continuation lines so assertions can match whole properties.

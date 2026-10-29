@@ -15,6 +15,7 @@ const mockClearEncPasswordCookie = jest.fn();
 const mockClearOrphanedEncPasswordCookie = jest.fn();
 const mockResetE2eeBootstrap = jest.fn();
 const mockGetSession = jest.fn();
+const mockClearLocalSearchIndexDatabase = jest.fn<() => Promise<void>>();
 
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
@@ -38,6 +39,10 @@ jest.mock("@/lib/e2ee-bootstrap", () => ({
   resetE2eeBootstrap: (...args: unknown[]) => mockResetE2eeBootstrap(...args),
 }));
 
+jest.mock("@/lib/search/local-index-store", () => ({
+  clearLocalSearchIndexDatabase: () => mockClearLocalSearchIndexDatabase(),
+}));
+
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
     info: jest.fn(),
@@ -57,6 +62,7 @@ describe("auth-local-state", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSignOut.mockResolvedValue(undefined as never);
+    mockClearLocalSearchIndexDatabase.mockResolvedValue(undefined);
     mockGetSession.mockResolvedValue({
       data: { user: { id: "user-1" } },
       error: null,
@@ -74,6 +80,23 @@ describe("auth-local-state", () => {
     expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
     expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
     expect(mockResetE2eeBootstrap).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletes the device key, mail vault key and search index from disk", () => {
+    const deleteDatabase = jest.fn((_name: string) => ({}));
+    Object.defineProperty(globalThis, "indexedDB", {
+      value: { deleteDatabase },
+      configurable: true,
+    });
+
+    clearSolaceClientAuthArtifacts();
+
+    expect(deleteDatabase.mock.calls.map(([name]) => name)).toEqual([
+      "solace-e2ee",
+      "solace-mail",
+    ]);
+    expect(mockClearLocalSearchIndexDatabase).toHaveBeenCalledTimes(1);
+    Reflect.deleteProperty(globalThis, "indexedDB");
   });
 
   it("clears local mail settings so they cannot seed the next account", () => {

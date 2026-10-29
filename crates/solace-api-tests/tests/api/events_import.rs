@@ -1,13 +1,15 @@
-//! `POST /api/subscriptions/import-ics`: ICS files parsed and encrypted on-device, plus the legacy plaintext body.
+//! `POST /api/subscriptions/import-ics`: ICS files parsed and encrypted on-device; the server never parses a plaintext file.
 
 use serde_json::{Value, json};
 use solace_api_tests::seed::fake_envelope;
 use solace_api_types::Timestamp;
-use solace_api_types::events::{IcsImportResult, ParticipantInput};
-use solace_api_types::subscriptions::{EncryptedIcsEvent, EncryptedIcsImportRequest};
+use solace_api_types::events::ParticipantInput;
+use solace_api_types::subscriptions::{
+    EncryptedIcsEvent, EncryptedIcsImportRequest, ImportIcsResponse,
+};
 
 use crate::event_fixtures::{
-    StoredContent, calendar_id, insert_calendar, list_events, stored_content, to_json, unfold,
+    StoredContent, calendar_id, insert_calendar, list_events, stored_content, to_json,
 };
 use crate::helpers::{
     Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok,
@@ -38,7 +40,7 @@ fn body(calendar: &str, events: Vec<EncryptedIcsEvent>) -> Value {
     })
 }
 
-async fn import(user: &mut TestUser, body: Value) -> IcsImportResult {
+async fn import(user: &mut TestUser, body: Value) -> ImportIcsResponse {
     ok(user
         .post("/api/subscriptions/import-ics", body)
         .await
@@ -55,13 +57,11 @@ async fn event_id(app: &TestApp, calendar: &str, external_id: &str) -> String {
         .expect("imported event")
 }
 
-fn result(created: i64, total: i64, errors: Option<Vec<&str>>) -> IcsImportResult {
-    IcsImportResult {
+fn result(created: i64, total: i64, errors: Option<Vec<&str>>) -> ImportIcsResponse {
+    ImportIcsResponse {
         success: true,
         events_created: created,
         events_total: total,
-        file_name: None,
-        calendar_name: None,
         errors: errors.map(|errors| errors.into_iter().map(str::to_owned).collect()),
     }
 }
@@ -433,110 +433,4 @@ async fn encrypted_entries_are_strictly_validated() {
         .await,
         0
     );
-}
-
-#[tokio::test]
-async fn legacy_plaintext_imports_still_work() {
-    let app = TestApp::spawn().await;
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    let ics = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "X-WR-CALNAME:Legacy",
-        "BEGIN:VEVENT",
-        "UID:legacy-uid-1",
-        "DTSTAMP:20990101T000000Z",
-        "SUMMARY:Legacy meeting",
-        "DTSTART:20990302T090000Z",
-        "DTEND:20990302T100000Z",
-        "END:VEVENT",
-        "END:VCALENDAR",
-        "",
-    ]
-    .join("\r\n");
-    let first = import(
-        &mut owner,
-        json!({"calendarId": calendar, "icsContent": ics, "fileName": "legacy.ics"}),
-    )
-    .await;
-    assert_eq!(
-        first,
-        IcsImportResult {
-            success: true,
-            events_created: 1,
-            events_total: 1,
-            file_name: Some("legacy.ics".into()),
-            calendar_name: Some("Legacy".into()),
-            errors: None,
-        }
-    );
-    let id = event_id(&app, &calendar, "legacy-uid-1").await;
-    assert_eq!(
-        stored_content(&app.db, &id).await.title,
-        "Legacy meeting",
-        "shipped clients still send plaintext ICS"
-    );
-    let again = import(
-        &mut owner,
-        json!({"calendarId": calendar, "icsContent": ics}),
-    )
-    .await;
-    assert_eq!(
-        again,
-        IcsImportResult {
-            success: true,
-            events_created: 0,
-            events_total: 1,
-            file_name: Some("unknown.ics".into()),
-            calendar_name: Some("Legacy".into()),
-            errors: Some(vec![
-                match app.backend {
-                    // TypeScript names the event by title, which is the file's content.
-                    Backend::TypeScript => {
-                        "Event \"Legacy meeting\" with UID legacy-uid-1 already exists in calendar"
-                    }
-                    Backend::Rust => "An event already exists in this calendar.",
-                }
-                .into()
-            ]),
-        }
-    );
-}
-
-#[tokio::test]
-async fn a_single_day_all_day_import_exports_as_one_day() {
-    let app = TestApp::spawn().await;
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    let ics = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "BEGIN:VEVENT",
-        "UID:single-day-holiday",
-        "DTSTART;VALUE=DATE:20990302",
-        "DTEND;VALUE=DATE:20990303",
-        "SUMMARY:Single-day holiday",
-        "END:VEVENT",
-        "END:VCALENDAR",
-    ]
-    .join("\r\n");
-    let imported = import(
-        &mut owner,
-        json!({"calendarId": calendar, "icsContent": ics}),
-    )
-    .await;
-    assert_eq!((imported.events_created, imported.calendar_name), (1, None));
-    let id = event_id(&app, &calendar, "single-day-holiday").await;
-    let exported = ok(owner
-        .get(&format!("/api/events/{id}/ics"))
-        .await
-        .expect_status(200))
-    .text();
-    let exported = unfold(&exported);
-    assert!(
-        exported.contains("DTSTART;VALUE=DATE:20990302\r\nDTEND;VALUE=DATE:20990303\r\n"),
-        "{exported}"
-    );
-    assert!(exported.contains("UID:single-day-holiday\r\n"));
 }

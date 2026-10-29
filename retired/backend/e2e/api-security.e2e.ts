@@ -1,9 +1,4 @@
 /** Live-API security checks; env: E2E_API_URL (required), E2E_WEB_URL, E2E_COOKIE, E2E_RATE_LIMIT. */
-import {
-  PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
-  PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE,
-} from "@workspace/calendar-core";
-
 const apiUrl = requiredEnv("E2E_API_URL").replace(/\/$/, "");
 const webUrl = process.env.E2E_WEB_URL?.replace(/\/$/, "");
 const cookie = process.env.E2E_COOKIE;
@@ -136,7 +131,7 @@ async function firstCalendarId(): Promise<string> {
   return calendars[0].id;
 }
 
-check("event plaintext alongside ciphertext is rejected", async () => {
+check("event plaintext content is rejected", async () => {
   if (!cookie) skip();
   const calendarId = await firstCalendarId();
   const start = new Date(Date.now() + 86_400_000);
@@ -156,10 +151,10 @@ check("event plaintext alongside ciphertext is rejected", async () => {
     },
     true,
   );
-  await expectRejected(response, PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE);
+  await expectRejected(response, "Unrecognized key");
 });
 
-check("calendar plaintext name alongside ciphertext is rejected", async () => {
+check("calendar plaintext name is rejected", async () => {
   if (!cookie) skip();
   const response = await api(
     "/api/calendars",
@@ -174,20 +169,17 @@ check("calendar plaintext name alongside ciphertext is rejected", async () => {
     },
     true,
   );
-  await expectRejected(response, PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE);
+  await expectRejected(response, "Unrecognized key");
 });
 
-check("legacy plaintext displayTitle is accepted but never stored", async () => {
+check("plaintext reminder displayTitle is rejected", async () => {
   if (!cookie) skip();
-  // Shipped binaries still send it, so a 400 here would mean the whole reminder update failed.
   const response = await api(
     `/api/notifications/event/${crypto.randomUUID()}`,
     { method: "PUT", body: JSON.stringify({ notifications: [], displayTitle: "plaintext title" }) },
     true,
   );
-  const body = await response.text();
-  assert(response.status !== 400, `legacy client rejected: ${body.slice(0, 200)}`);
-  assert(!body.includes("plaintext title"), "response echoed the plaintext title");
+  await expectRejected(response, "Unrecognized key");
 });
 
 check("unknown reminder fields are still rejected", async () => {

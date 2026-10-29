@@ -5,8 +5,8 @@ use solace_api_types::events::{Event, EventSearchCorpus, EventSearchResults, Rec
 use solace_api_types::recurring::RecurringDeleted;
 
 use crate::event_fixtures::{
-    FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event, insert_plaintext_event,
-    list_events,
+    DEFAULT_CALENDARS, FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event,
+    insert_calendar, insert_plaintext_event, list_events, seed_default_calendars,
 };
 use crate::helpers::{Backend, TestApp, TestUser, count, hex, ok};
 
@@ -83,46 +83,42 @@ async fn corpus(user: &mut TestUser, query: &str) -> EventSearchCorpus {
 }
 
 #[tokio::test]
-async fn the_first_list_creates_the_default_calendars() {
+async fn the_first_list_creates_no_calendars() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let sql = "SELECT count(*) FROM calendar WHERE user_id = $1";
     assert_eq!(count(&app.db, sql, &user.id).await, 0);
 
     let list = list_events(&mut user, MARCH_START, MARCH_END).await;
-    assert_eq!((list.events.len(), list.categories.len()), (0, 0));
-    let summary: Vec<(&str, &str, bool, bool, &str)> = list
+    assert_eq!(
+        (
+            list.events.len(),
+            list.categories.len(),
+            list.calendars.len()
+        ),
+        (0, 0, 0)
+    );
+    assert_eq!(
+        count(&app.db, sql, &user.id).await,
+        0,
+        "clients seed the encrypted set"
+    );
+
+    seed_default_calendars(&mut user).await;
+    let list = list_events(&mut user, MARCH_START, MARCH_END).await;
+    let colors: Vec<(&str, bool)> = list
         .calendars
         .iter()
-        .map(|c| {
-            (
-                c.name.as_str(),
-                c.color.as_str(),
-                c.is_default,
-                c.force_full_encryption,
-                c.kind.as_str(),
-            )
-        })
+        .map(|c| (c.color.as_str(), c.is_default))
         .collect();
-    assert_eq!(
-        summary,
-        [
-            ("Personal", "#10b981", true, false, "owned"),
-            ("Family", "#f43f5e", false, false, "owned"),
-            ("Work", "#3b82f6", false, false, "owned"),
-        ],
-        "default first, then by name"
-    );
+    assert_eq!(colors.len(), 3);
+    assert_eq!(colors[0], (DEFAULT_CALENDARS[0].1, true), "default first");
     assert!(list.calendars.iter().all(|c| c.user_id.0 == user.id
-        && c.is_visible
-        && !c.is_public
-        && !c.is_sync_only
-        && c.encryption_state == "plaintext"));
-
-    list_events(&mut user, MARCH_START, MARCH_END).await;
-    assert_eq!(count(&app.db, sql, &user.id).await, 3, "created once");
+        && c.name.is_empty()
+        && c.encrypted_name.is_some()
+        && c.encryption_state == "encrypted"
+        && c.kind == "owned"));
 }
-
 #[tokio::test]
 async fn the_range_must_be_valid() {
     let app = TestApp::spawn().await;
@@ -167,7 +163,7 @@ async fn the_range_must_be_valid() {
         assert!(error.get("details").is_none(), "{query}: {error}");
     }
     let list = list_events(&mut user, "2099-03-01", "2099-03-02").await;
-    assert_eq!(list.calendars.len(), 3, "date-only bounds parse");
+    assert!(list.events.is_empty(), "date-only bounds parse");
 }
 
 #[tokio::test]
@@ -227,7 +223,10 @@ async fn events_overlapping_the_range_are_listed_by_start() {
         .expect("listed");
     assert_eq!(first.is_recurring_instance, None);
     assert_eq!(first.recurrence_exceptions, None);
-    assert_eq!(first.calendar.name, "Work");
+    assert_eq!(
+        (first.calendar.id.0.as_str(), first.calendar.name.as_str()),
+        (calendar.as_str(), "")
+    );
     assert_eq!(
         first.participants.as_ref().map(|p| p[0].role.as_str()),
         Some("organizer")
@@ -649,7 +648,8 @@ async fn a_split_series_lists_both_halves_and_the_detached_row_once() {
 async fn rows_with_unreadable_rules_are_dropped_except_standups() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = calendar_id(&mut user, "Work").await;
+    // Feed events are the plaintext rows the server still reads.
+    let calendar = insert_calendar(&app, &user.id, "subscribed", true).await;
     let garbage = insert_plaintext_event(
         &app,
         &user.id,
@@ -833,7 +833,7 @@ async fn search_finds_encrypted_events_by_blind_index_token() {
     let label = hit.calendar.as_ref().expect("calendar label");
     assert_eq!(
         (label.id.as_str(), label.name.as_str(), label.color.as_str()),
-        (calendar.as_str(), "Work", "#3b82f6")
+        (calendar.as_str(), "", "#3b82f6")
     );
     assert_eq!(hit.category, None);
     assert_eq!(hit.participants.len(), 1);
@@ -863,7 +863,8 @@ async fn search_finds_encrypted_events_by_blind_index_token() {
 async fn search_matches_plaintext_rows_by_words_and_title_substring() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = calendar_id(&mut user, "Work").await;
+    // Feed events are the plaintext rows the server still reads.
+    let calendar = insert_calendar(&app, &user.id, "subscribed", true).await;
     let review = insert_plaintext_event(
         &app,
         &user.id,
@@ -940,9 +941,13 @@ async fn search_matches_plaintext_rows_by_words_and_title_substring() {
 async fn search_hits_carry_trimmed_calendar_and_category_labels() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = calendar_id(&mut user, "Work").await;
+    // Feed events are the plaintext rows the server still reads.
+    let calendar = insert_calendar(&app, &user.id, "subscribed", true).await;
     let category = ok(user
-        .post("/api/categories", json!({"name": "Focus", "color": "blue"}))
+        .post(
+            "/api/categories",
+            json!({"encryptedName": "focus-ciphertext", "color": "blue"}),
+        )
         .await
         .expect_status(200)
         .and_then(|r| r.value()));
@@ -1010,8 +1015,12 @@ async fn search_hits_carry_trimmed_calendar_and_category_labels() {
     assert_eq!(keys(&hit["calendar"]), label);
     assert_eq!(keys(&hit["category"]), label);
     assert_eq!(
-        (&hit["calendar"]["id"], &hit["category"]["name"]),
-        (&json!(calendar), &json!("Focus"))
+        (
+            &hit["calendar"]["id"],
+            &hit["category"]["name"],
+            &hit["category"]["encryptedName"]
+        ),
+        (&json!(calendar), &json!(""), &json!("focus-ciphertext"))
     );
 }
 
@@ -1019,7 +1028,8 @@ async fn search_hits_carry_trimmed_calendar_and_category_labels() {
 async fn search_paging_coerces_query_strings_like_zod() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = calendar_id(&mut user, "Work").await;
+    // Feed events are the plaintext rows the server still reads.
+    let calendar = insert_calendar(&app, &user.id, "subscribed", true).await;
     for day in 2..=4 {
         insert_plaintext_event(
             &app,
@@ -1188,10 +1198,11 @@ async fn other_users_never_see_each_others_events() {
     request.blind_index_tokens = Some(vec!["private-token".into()]);
     request.recurrence = Some(r#"{"frequency":"daily","interval":1,"count":3}"#.into());
     create_event(&mut owner, &request).await;
+    let feed = insert_calendar(&app, &owner.id, "subscribed", true).await;
     insert_plaintext_event(
         &app,
         &owner.id,
-        &calendar,
+        &feed,
         "Owner meeting",
         FUTURE_START,
         FUTURE_END,

@@ -1,4 +1,4 @@
-export type GateMode = "hidden" | "setup" | "unlock" | "legacy";
+export type GateMode = "hidden" | "setup" | "unlock";
 
 export type E2eeGateState = {
   mode: GateMode;

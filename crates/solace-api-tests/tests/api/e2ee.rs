@@ -99,7 +99,6 @@ async fn a_new_account_has_no_key_material() {
         state,
         E2eeBootstrap {
             enabled: true,
-            rollout_stage: "encrypted".into(),
             algorithms: E2eeAlgorithms {
                 content: "AES-GCM-256".into(),
                 blind_index: "HMAC-SHA-256".into(),

@@ -14,6 +14,7 @@ import { useSession } from "@/lib/auth-client";
 import {
   ensureE2eeBootstrap,
   resetE2eeBootstrap,
+  storePasswordEnvelopeForActiveSession,
   unlockE2eeWithPassword,
 } from "@/lib/e2ee-bootstrap";
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
@@ -51,26 +52,19 @@ function clearCalendarQueries(
   queryClient.removeQueries({ queryKey: SETTINGS_QUERY_KEY });
 }
 
-async function backfillEncryptedNames(
+async function ensureDefaultCalendars(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
-  const result = await calendarApiService.backfillEncryptedNames();
-
-  await Promise.all([
-    result.calendars > 0
-      ? queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY })
-      : undefined,
-    result.categories > 0
-      ? queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY })
-      : undefined,
-  ]);
+  if (await calendarApiService.ensureDefaultCalendars()) {
+    await queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY });
+  }
 }
 
 async function refreshEncryptedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
-  // Failures are swallowed on purpose: the backfill retries on the next bootstrap.
-  void backfillEncryptedNames(queryClient).catch(() => undefined);
+  // Failures are swallowed on purpose: seeding retries on the next bootstrap.
+  void ensureDefaultCalendars(queryClient).catch(() => undefined);
 
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY }),
@@ -167,10 +161,6 @@ async function resolveBootstrapGateState(input: {
     return { mode: "hidden", isSubmitting: false };
   }
 
-  if (result.bootstrap.devices.length > 0) {
-    return { mode: "legacy", isSubmitting: false };
-  }
-
   return { mode: "hidden", isSubmitting: false };
 }
 
@@ -221,6 +211,8 @@ async function runEncryptionPasswordUnlock(input: {
     };
   }
 
+  // After a reset the sign-in password no longer opens the envelope; once the previous one does, the envelope follows it.
+  const signInPassword = peekAuthPassword() ?? password;
   const unlocked = await unlockE2eeWithPassword(userId, password);
 
   if (!unlocked) {
@@ -231,7 +223,14 @@ async function runEncryptionPasswordUnlock(input: {
     };
   }
 
-  await setEncPasswordCookie(password);
+  if (signInPassword !== password) {
+    await storePasswordEnvelopeForActiveSession(userId, signInPassword).catch(
+      (error: unknown) => {
+        log.warn("Failed to re-wrap the encryption envelope", { userId, error });
+      },
+    );
+  }
+  await setEncPasswordCookie(signInPassword);
   await refreshEncryptedQueries(queryClient);
   return { ok: true };
 }
@@ -373,30 +372,6 @@ export function E2eeBootstrap() {
     };
   }, [isPending, queryClient, userId]);
 
-  const rerunBootstrap = () => {
-    if (!userId || isPending) {
-      return;
-    }
-
-    const runId = ++bootstrapRunIdRef.current;
-    dispatchGate({ type: "clear-error" });
-
-    void runBootstrapCycle({
-      userId,
-      queryClient,
-      runId,
-      bootstrapRunIdRef,
-      isCancelled: () => runId !== bootstrapRunIdRef.current,
-      onGateResolved: (nextGate) => {
-        dispatchGate({
-          type: "set-from-bootstrap",
-          mode: nextGate.mode,
-          isSubmitting: nextGate.isSubmitting,
-        });
-      },
-    });
-  };
-
   async function handleSetup() {
     if (!userId) {
       return;
@@ -479,7 +454,7 @@ export function E2eeBootstrap() {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (gate.isSubmitting || gate.mode === "legacy") {
+    if (gate.isSubmitting) {
       return;
     }
     const submit = gate.mode === "unlock" ? handleUnlock : handleSetup;
@@ -506,7 +481,6 @@ export function E2eeBootstrap() {
         // runEncryptionGateSignOut logs its own failures, so this promise never rejects.
         void handleSignOut().catch(() => undefined);
       }}
-      onRetryBootstrap={rerunBootstrap}
     />
   );
 }

@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { MAIL_AUTH_LIFECYCLE, restoreMailSession } from "./mail-session";
+import { clearAttachmentCache } from "./mail/attachment-cache";
 import { holdVaultUnlock } from "./mail/mail-crypto";
 import { hydrateMailOfflineSnapshot } from "./mail/mail-offline-snapshot";
 import { setMailSyncState } from "./mail/mail-sync";
@@ -9,9 +10,6 @@ const mockLoadSnapshot = jest.fn<
   [string]
 >();
 
-jest.mock("@workspace/native-core/lib/startup-crypto", () => ({
-  enforceFullEventEncryption: jest.fn(),
-}));
 jest.mock("./mail/account-bootstrap", () => ({
   bootstrapMailboxForAccount: jest.fn(),
 }));
@@ -23,7 +21,6 @@ jest.mock("./mail/mail-password-cache", () => ({
   clearCachedPrivateKey: jest.fn(),
   clearDerivedVaultKey: jest.fn(),
   clearMailVaultPassword: jest.fn(),
-  saveMailVaultPassword: jest.fn(),
 }));
 jest.mock("./mail/mail-settings-store", () => ({
   clearMailSettings: jest.fn(),
@@ -40,6 +37,9 @@ jest.mock("./mail/mail-sync", () => ({
 jest.mock("./mail/mail-offline-store", () => ({
   loadMailOfflineSnapshot: (userId: string) => mockLoadSnapshot(userId),
   clearMailOfflineSnapshot: jest.fn(),
+}));
+jest.mock("./mail/attachment-cache", () => ({
+  clearAttachmentCache: jest.fn(async () => undefined),
 }));
 jest.mock("./mail/mail-offline-snapshot", () => ({
   hydrateMailOfflineSnapshot: jest.fn(),
@@ -67,6 +67,11 @@ describe("restoreMailSession", () => {
     );
     expect(holdVaultUnlock).toHaveBeenCalledTimes(1);
     expect(setMailSyncState).toHaveBeenCalledWith("s1");
+  });
+
+  it("wipes decrypted attachments on sign-out", async () => {
+    await MAIL_AUTH_LIFECYCLE.onSignedOut?.();
+    expect(clearAttachmentCache).toHaveBeenCalledTimes(1);
   });
 
   it.each(["sign-out", "cancellation", "new restore"])(

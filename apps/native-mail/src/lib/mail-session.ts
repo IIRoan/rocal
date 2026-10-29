@@ -1,11 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AuthLifecycle } from "@workspace/native-core/providers/AuthProvider";
-import {
-  enforceFullEventEncryption,
-  type AuthenticatedSessionInput,
-} from "@workspace/native-core/lib/startup-crypto";
+import type { AuthenticatedSessionInput } from "@workspace/native-core/lib/startup-crypto";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { bootstrapMailboxForAccount } from "./mail/account-bootstrap";
+import { clearAttachmentCache } from "./mail/attachment-cache";
 import {
   clearVaultCache,
   ensureVaultLoaded,
@@ -17,7 +15,6 @@ import {
   clearCachedPrivateKey,
   clearDerivedVaultKey,
   clearMailVaultPassword,
-  saveMailVaultPassword,
 } from "./mail/mail-password-cache";
 import { buildMailRuntime, type MailRuntime } from "./mail/mail-runtime";
 import { clearSenderKeyCache } from "./mail/mail-sender-key";
@@ -38,6 +35,7 @@ const RUNTIME_STALE_MS = 5 * 60_000;
 
 let restoredUserId: string | null = null;
 let restoreGeneration = 0;
+let launchCleanupDone = false;
 
 /** Seeds the cache from the encrypted snapshot before E2EE starts, so the mailbox opens without the loading screen. */
 export async function restoreMailSession(input: {
@@ -67,7 +65,6 @@ async function finishRestoredMailSession(
     QUERY_KEYS.mailRuntime(),
   );
   await Promise.all([
-    enforceFullEventEncryption(input),
     queryClient.fetchQuery({
       queryKey: QUERY_KEYS.mailRuntime(),
       queryFn: buildMailRuntime,
@@ -89,13 +86,19 @@ export async function prepareMailSession(
 
   // The guard only calls this once E2EE bootstrap settled, so waiting vault unlocks can proceed.
   releaseVaultUnlock();
+  // Once per launch: earlier launches' attachments are no longer open in a viewer, and the password and derived key are what older versions stored.
+  if (!launchCleanupDone) {
+    launchCleanupDone = true;
+    await Promise.all([
+      clearAttachmentCache().catch(() => undefined),
+      clearMailVaultPassword(),
+      clearDerivedVaultKey(),
+    ]);
+  }
   if (restoredUserId === input.userId) {
     await finishRestoredMailSession(input);
     return;
   }
-
-  await enforceFullEventEncryption(input);
-  if (input.isCancelled()) return;
 
   setPhase("Checking encrypted mail…");
 
@@ -155,9 +158,8 @@ export async function prepareMailSession(
   await ensureVaultLoaded(runtime);
 }
 
-/** Keeps the vault password for this device's unlock and wipes every vault secret on sign-out. */
+/** Wipes every vault secret and decrypted copy on sign-out. */
 export const MAIL_AUTH_LIFECYCLE: AuthLifecycle = {
-  onPasswordAuthenticated: (password) => saveMailVaultPassword(password),
   async onSignedOut() {
     restoreGeneration += 1;
     restoredUserId = null;
@@ -167,6 +169,7 @@ export const MAIL_AUTH_LIFECYCLE: AuthLifecycle = {
     await clearMailSettings();
     await clearMailListSettings();
     await clearMailOfflineSnapshot();
+    await clearAttachmentCache();
     resetMailSync();
     clearVaultCache();
     clearSenderKeyCache();

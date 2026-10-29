@@ -10,14 +10,12 @@ use solace_api_types::events::{
 
 use crate::event_fixtures::{
     FUTURE_END, FUTURE_START, StoredContent, calendar_id, create_event, encrypted_event,
-    insert_calendar, insert_plaintext_event, iso_from_now, row_snapshot, stored_content, to_json,
-    unfold,
+    insert_calendar, insert_plaintext_event, insert_staging_calendar, iso_from_now, row_snapshot,
+    stored_content, to_json,
 };
 use crate::helpers::{Backend, TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
 
 const COLOR_MESSAGE: &str = "Color must be one of: blue, orange, violet, rose, emerald, red, cyan, lime, amber, indigo, pink, teal or a valid hex color (e.g., #FF0000)";
-const PLAINTEXT_BESIDE_CIPHERTEXT: &str =
-    "Plaintext event content must not be sent alongside encrypted content.";
 const NOT_FOUND: &str = "Event not found or access denied";
 
 /// type, minutes, time, local time, zone, enabled, sent, title ciphertext.
@@ -52,7 +50,6 @@ async fn anonymous_callers_are_refused() {
     for path in [
         "/api/events?start=2099-03-01T00:00:00.000Z&end=2099-03-31T00:00:00.000Z".to_owned(),
         format!("/api/events/{id}"),
-        format!("/api/events/{id}/ics"),
         "/api/events/search?q=team".to_owned(),
         "/api/events/search-corpus".to_owned(),
         "/api/events/invitations/by-external-id?externalId=x".to_owned(),
@@ -111,14 +108,17 @@ async fn an_encrypted_event_is_stored_as_ciphertext_only() {
     request.color = Some("blue".into());
     request.all_day = Some(false);
     request.encryption_key_version = Some(2);
-    let ciphertext = request.encrypted_content.clone().expect("ciphertext");
+    let ciphertext = request.encrypted_content.clone();
     let tokens = request.blind_index_tokens.clone().expect("tokens");
 
     let created = create_event(&mut owner, &request).await;
 
     assert_eq!(created.user_id.0, owner.id);
     assert_eq!(created.calendar_id.0, calendar);
-    assert_eq!(created.calendar.name, "Work");
+    assert_eq!(
+        created.calendar.name, "",
+        "the calendar name is ciphertext too"
+    );
     assert_eq!(created.category, None);
     assert_eq!(
         (
@@ -335,34 +335,25 @@ async fn plaintext_content_beside_ciphertext_is_rejected() {
     )
     .await;
     let before = row_snapshot(&app.db, "calendar_event", &existing.id.0).await;
-    let cases = [
-        (json!({"title": "Secret title"}), vec!["title"]),
-        (json!({"description": "Secret notes"}), vec!["description"]),
-        (json!({"location": "Secret place"}), vec!["location"]),
-        (
-            json!({"title": "T", "description": "D", "location": "L"}),
-            vec!["title", "description", "location"],
-        ),
-    ];
-    for (plaintext, paths) in cases {
+    // Blank values are refused as well: the keys no longer exist.
+    for (key, value) in [
+        ("title", "Secret title"),
+        ("description", "Secret notes"),
+        ("location", "Secret place"),
+        ("title", ""),
+        ("description", "   "),
+    ] {
         let mut body = to_json(&encrypted_event(&calendar, FUTURE_START, FUTURE_END));
-        for (key, value) in plaintext.as_object().expect("object") {
-            body[key] = value.clone();
-        }
-        let error = ok(owner.post("/api/events", body).await.expect_error(
-            400,
-            "Validation Error",
-            PLAINTEXT_BESIDE_CIPHERTEXT,
-        ));
-        assert_eq!(issue_paths(&error), paths, "create {plaintext}");
+        body[key] = json!(value);
+        expect_unknown_field(&owner.post("/api/events", body).await, key);
 
-        let mut update = plaintext.clone();
-        update["encryptedContent"] = json!(fake_envelope());
-        let error = ok(owner
-            .put(&format!("/api/events/{}", existing.id), update)
-            .await
-            .expect_error(400, "Validation Error", PLAINTEXT_BESIDE_CIPHERTEXT));
-        assert_eq!(issue_paths(&error), paths, "update {plaintext}");
+        let update = json!({key: value, "encryptedContent": fake_envelope()});
+        expect_unknown_field(
+            &owner
+                .put(&format!("/api/events/{}", existing.id), update)
+                .await,
+            key,
+        );
     }
     assert_eq!(
         count(
@@ -378,29 +369,6 @@ async fn plaintext_content_beside_ciphertext_is_rejected() {
         before
     );
 }
-
-#[tokio::test]
-async fn blank_plaintext_fields_beside_ciphertext_are_accepted_and_dropped() {
-    let app = TestApp::spawn().await;
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    let mut request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
-    request.title = Some(String::new());
-    request.description = Some("   ".into());
-    request.location = Some(String::new());
-    let created = create_event(&mut owner, &request).await;
-    let stored = stored_content(&app.db, &created.id.0).await;
-    assert_eq!(
-        (
-            stored.title.as_str(),
-            stored.description,
-            stored.location,
-            stored.encryption_state.as_str()
-        ),
-        ("", None, None, "encrypted")
-    );
-}
-
 #[tokio::test]
 async fn invitation_content_needs_ciphertext_and_participants() {
     let app = TestApp::spawn().await;
@@ -422,12 +390,12 @@ async fn invitation_content_needs_ciphertext_and_participants() {
         "participants": [{"email": "guest@example.com"}],
         "invitationContent": {"title": "Planning"},
     });
-    let error = ok(owner.post("/api/events", body).await.expect_error(
-        400,
-        "Validation Error",
-        "Title is required and cannot be empty",
-    ));
-    assert_eq!(issue_paths(&error), ["title", "invitationContent"]);
+    let error =
+        ok(owner
+            .post("/api/events", body)
+            .await
+            .expect_error(400, "Validation Error", "Required"));
+    assert_eq!(issue_paths(&error), ["encryptedContent"]);
 
     let mut body = to_json(&encrypted_event(&calendar, FUTURE_START, FUTURE_END));
     body["participants"] = json!([{"email": "guest@example.com"}]);
@@ -759,27 +727,17 @@ async fn field_shapes_are_validated_with_the_zod_message() {
         .expect_error(400, "Validation Error", "Required"));
     assert_eq!(issue_paths(&error), ["start"]);
 
-    let long = "x".repeat(256);
     let cases = [
+        (json!({}), "Required", "encryptedContent"),
         (
-            json!({"title": long}),
-            "String must contain at most 255 character(s)",
-            "title",
+            json!({"encryptedContent": 7}),
+            "Expected string, received number",
+            "encryptedContent",
         ),
         (
-            json!({"title": "Ok", "description": "x".repeat(1001)}),
-            "String must contain at most 1000 character(s)",
-            "description",
-        ),
-        (
-            json!({"title": "Ok", "location": "x".repeat(256)}),
-            "String must contain at most 255 character(s)",
-            "location",
-        ),
-        (
-            json!({"title": "   "}),
-            "Title is required and cannot be empty",
-            "title",
+            json!({"encryptedContent": null}),
+            "Expected string, received null",
+            "encryptedContent",
         ),
     ];
     for (fields, message, path) in cases {
@@ -892,11 +850,15 @@ async fn service_rules_reject_inconsistent_events() {
             json!({"start": FUTURE_START, "end": FUTURE_END, "calendarId": calendar, "title": "Plain"}),
         )
         .await
-        .expect_error(
-            400,
-            "Validation Error",
-            "Event encryption requires an active encryption session.",
-        ));
+        .expect_error(400, "Validation Error", "Required"));
+    assert_eq!(issue_paths(&error), ["encryptedContent", "root"]);
+    let mut blank = to_json(&encrypted_event(&calendar, FUTURE_START, FUTURE_END));
+    blank["encryptedContent"] = json!("   ");
+    let error = ok(owner.post("/api/events", blank).await.expect_error(
+        400,
+        "Validation Error",
+        "Event encryption requires an active encryption session.",
+    ));
     assert_eq!(error["details"], json!({"field": "encryptedContent"}));
     for user_id in [&owner.id, &other.id] {
         assert_eq!(
@@ -1103,7 +1065,6 @@ async fn other_users_cannot_read_change_or_delete_an_event() {
 
     for response in [
         other.get(&path).await,
-        other.get(&format!("{path}/ics")).await,
         other
             .put(
                 &path,
@@ -1242,23 +1203,17 @@ async fn protected_fields_need_new_ciphertext_on_update() {
     )
     .await;
     let before = row_snapshot(&app.db, "calendar_event", &event.id.0).await;
-    for body in [
-        json!({"title": "Plain"}),
-        json!({"description": ""}),
-        json!({"location": "Room"}),
+    for (key, value) in [
+        ("title", json!("Plain")),
+        ("description", json!("")),
+        ("location", json!("Room")),
+        ("title", Value::Null),
     ] {
-        let error = ok(owner
-            .put(&format!("/api/events/{}", event.id), body.clone())
-            .await
-            .expect_error(
-                400,
-                "Validation Error",
-                "Encrypted content payload is required when updating protected event fields.",
-            ));
-        assert_eq!(
-            error["details"],
-            json!({"field": "encryptedContent"}),
-            "{body}"
+        expect_unknown_field(
+            &owner
+                .put(&format!("/api/events/{}", event.id), json!({key: value}))
+                .await,
+            key,
         );
     }
     let error = ok(owner
@@ -1273,17 +1228,58 @@ async fn protected_fields_need_new_ciphertext_on_update() {
             "Event encryption requires an active encryption session.",
         ));
     assert_eq!(error["details"], json!({"field": "encryptedContent"}));
-    let error = ok(owner
-        .put(&format!("/api/events/{}", event.id), json!({"title": null}))
-        .await
-        .expect_error(400, "Validation Error", "Expected string, received null"));
-    assert_eq!(issue_paths(&error), ["title"]);
     assert_eq!(
         row_snapshot(&app.db, "calendar_event", &event.id.0).await,
         before
     );
-}
 
+    // A staged invitation copy is plaintext and takes no edit until it is sealed.
+    let staging = insert_staging_calendar(&app, &owner.id).await;
+    let staged =
+        insert_plaintext_event(&app, &owner.id, &staging, "Plain", FUTURE_START, FUTURE_END).await;
+    let staged_before = row_snapshot(&app.db, "calendar_event", &staged).await;
+    let error = ok(owner
+        .put(&format!("/api/events/{staged}"), json!({"color": "red"}))
+        .await
+        .expect_error(
+            400,
+            "Validation Error",
+            "Event encryption requires an active encryption session.",
+        ));
+    assert_eq!(error["details"], json!({"field": "encryptedContent"}));
+    for action in ["move", "duplicate"] {
+        let error = ok(owner
+            .post(
+                "/api/events/bulk",
+                json!({"action": action, "eventIds": [staged], "targetCalendarId": calendar}),
+            )
+            .await
+            .expect_error(
+                400,
+                "Validation Error",
+                "Event encryption requires an active encryption session.",
+            ));
+        assert_eq!(
+            error["details"],
+            json!({"field": "encryptedContent"}),
+            "{action}"
+        );
+    }
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE calendar_id = $1",
+            &calendar
+        )
+        .await,
+        1,
+        "no plaintext copy reaches the owned calendar"
+    );
+    assert_eq!(
+        row_snapshot(&app.db, "calendar_event", &staged).await,
+        staged_before
+    );
+}
 #[tokio::test]
 async fn an_update_stores_new_ciphertext_and_schedule() {
     let app = TestApp::spawn().await;
@@ -1300,7 +1296,6 @@ async fn an_update_stores_new_ciphertext_and_schedule() {
         encrypted_content: Some(ciphertext.clone()),
         blind_index_tokens: Some(vec!["fresh-token".into()]),
         encryption_key_version: Some(3),
-        title: Some(String::new()),
         start: Some("2099-03-03T09:00:00.000Z".into()),
         end: Some("2099-03-03T11:30:00.000Z".into()),
         all_day: Some(true),
@@ -1332,9 +1327,9 @@ async fn an_update_stores_new_ciphertext_and_schedule() {
     assert_eq!(
         (
             updated.calendar_id.0.as_str(),
-            updated.calendar.name.as_str()
+            updated.calendar.id.0.as_str()
         ),
-        (family.as_str(), "Family")
+        (family.as_str(), family.as_str())
     );
     assert_eq!(
         updated.recurrence.as_deref(),
@@ -1671,252 +1666,6 @@ async fn synced_events_are_read_only() {
 }
 
 #[tokio::test]
-async fn encrypted_events_cannot_be_exported_as_ics() {
-    let app = TestApp::spawn().await;
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    let event = create_event(
-        &mut owner,
-        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
-    )
-    .await;
-    let body = ok(owner
-        .get(&format!("/api/events/{}/ics", event.id))
-        .await
-        .expect_error(
-            400,
-            "Validation Error",
-            "Encrypted event details cannot be exported as ICS by the server.",
-        ));
-    assert!(body["requestId"].is_string());
-}
-
-#[tokio::test]
-async fn plaintext_events_export_as_an_ics_attachment() {
-    let app = TestApp::spawn().await;
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    let title = "Team, sync; planning with a title long enough to need folding at 75 octets";
-    let event =
-        insert_plaintext_event(&app, &owner.id, &calendar, title, FUTURE_START, FUTURE_END).await;
-    sqlx::query(
-        "UPDATE calendar_event SET description = E'Line1\\nLine2', location = 'Room 4', \
-         recurrence = '{\"frequency\":\"weekly\",\"interval\":2,\"count\":3,\"byWeekDay\":[1,3]}' WHERE id = $1",
-    )
-    .bind(&event)
-    .execute(&app.db)
-    .await
-    .expect("details");
-
-    let response = owner.get(&format!("/api/events/{event}/ics")).await;
-    let response = ok(response.expect_status(200));
-    let header = |name: &str| {
-        response
-            .headers
-            .get(name)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_default()
-            .to_owned()
-    };
-    assert_eq!(header("content-type"), "text/calendar; charset=utf-8");
-    assert_eq!(
-        header("content-disposition"),
-        "attachment; filename=\"team-sync-planning-with-a-title-long-enough-to-need-folding-at-75-octets.ics\""
-    );
-    assert_eq!(header("cache-control"), "no-store");
-    let ics = response.text();
-    assert!(ics.ends_with("END:VCALENDAR\r\n"));
-    assert!(
-        ics.split("\r\n").all(|line| line.len() <= 75),
-        "lines fold at 75 octets: {ics}"
-    );
-    assert!(!ics.replace("\r\n", "").contains('\n'), "CRLF only");
-    let unfolded = unfold(&ics);
-    for line in [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//Solace Calendar//Calendar Export//EN",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-        "X-WR-CALNAME:Work",
-        "X-WR-TIMEZONE:Europe/Amsterdam",
-        &format!("UID:{event}@solace-calendar.local"),
-        "SUMMARY:Team\\, sync\\; planning with a title long enough to need folding at 75 octets",
-        "DTSTART:20990302T090000Z",
-        "DTEND:20990302T100000Z",
-        "DESCRIPTION:Line1\\nLine2",
-        "LOCATION:Room 4",
-        "RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=3;BYDAY=MO,WE",
-    ] {
-        assert!(
-            unfolded.split("\r\n").any(|l| l == line),
-            "missing {line}: {unfolded}"
-        );
-    }
-
-    let response = ok(owner
-        .get(&format!("/api/events/{event}_2099-03-04T09:00:00.000Z/ics"))
-        .await
-        .expect_status(200));
-    let disposition = response
-        .headers
-        .get("content-disposition")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default()
-        .to_owned();
-    assert!(disposition.ends_with("-2099-03-04.ics\""), "{disposition}");
-    let unfolded = unfold(&response.text());
-    assert!(unfolded.contains(&format!(
-        "UID:{event}-2099-03-04T09:00:00.000Z@solace-calendar.local\r\n"
-    )));
-    assert!(unfolded.contains("DTSTART:20990304T090000Z\r\nDTEND:20990304T100000Z\r\n"));
-    assert!(!unfolded.contains("RRULE"), "an occurrence has no rule");
-}
-
-#[tokio::test]
-async fn a_series_exports_with_its_exceptions() {
-    let app = TestApp::spawn().await;
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    let insert = |title: &'static str, start: &'static str, end: &'static str| {
-        insert_plaintext_event(&app, &owner.id, &calendar, title, start, end)
-    };
-    let series = insert(
-        "Weekly",
-        "2099-03-02T09:00:00.000Z",
-        "2099-03-02T10:00:00.000Z",
-    )
-    .await;
-    let moved = insert(
-        "Moved",
-        "2099-03-16T14:00:00.000Z",
-        "2099-03-16T15:00:00.000Z",
-    )
-    .await;
-    let sealed = insert("", "2099-03-23T15:00:00.000Z", "2099-03-23T16:00:00.000Z").await;
-    let sql = |statement: &'static str, id: String| {
-        let db = app.db.clone();
-        let series = series.clone();
-        async move {
-            sqlx::query(statement)
-                .bind(id)
-                .bind(series)
-                .execute(&db)
-                .await
-                .expect(statement);
-        }
-    };
-    sql(
-        "UPDATE calendar_event SET recurrence = '{\"frequency\":\"weekly\",\"interval\":1,\"count\":4}' WHERE id = $1 OR id = $2",
-        series.clone(),
-    )
-    .await;
-    sql(
-        "UPDATE calendar_event SET parent_event_id = $2 WHERE id = $1",
-        moved.clone(),
-    )
-    .await;
-    sql(
-        "UPDATE calendar_event SET parent_event_id = $2, encryption_state = 'encrypted', encrypted_content = 'v1.sealed' WHERE id = $1",
-        sealed.clone(),
-    )
-    .await;
-    for (date, kind, modified) in [
-        ("2099-03-09 09:00:00", "deleted", None),
-        ("2099-03-16 09:00:00", "modified", Some(&moved)),
-        ("2099-03-23 09:00:00", "modified", Some(&sealed)),
-    ] {
-        sqlx::query(
-            "INSERT INTO recurrence_exception (id, parent_event_id, exception_date, modified_event_id, type, created_at, updated_at) \
-             VALUES ($1, $2, $3::timestamp, $4, $5, now(), now())",
-        )
-        .bind(format!("suiteexc{}", hex(8)))
-        .bind(&series)
-        .bind(date)
-        .bind(modified)
-        .bind(kind)
-        .execute(&app.db)
-        .await
-        .expect("insert exception");
-    }
-
-    let ics = unfold(
-        &ok(owner
-            .get(&format!("/api/events/{series}/ics"))
-            .await
-            .expect_status(200))
-        .text(),
-    );
-    let uid = format!("UID:{series}@solace-calendar.local\r\n");
-    let markers = [
-        "RRULE:FREQ=WEEKLY;COUNT=4\r\nEXDATE:20990309T090000Z,20990323T090000Z\r\n",
-        "SUMMARY:Moved\r\nDTSTART:20990316T140000Z\r\nDTEND:20990316T150000Z\r\nRECURRENCE-ID:20990316T090000Z\r\n",
-    ];
-    match app.backend {
-        // TypeScript exports the bare rule.
-        Backend::TypeScript => {
-            assert_eq!(ics.matches(&uid).count(), 1, "{ics}");
-            assert!(markers.iter().all(|m| !ics.contains(m)), "{ics}");
-        }
-        Backend::Rust => {
-            assert_eq!(
-                ics.matches(&uid).count(),
-                2,
-                "the override shares the UID: {ics}"
-            );
-            for marker in markers {
-                assert!(ics.contains(marker), "{marker} in {ics}");
-            }
-            assert_eq!(
-                ics.matches("BEGIN:VEVENT").count(),
-                2,
-                "the sealed row stays out: {ics}"
-            );
-        }
-    }
-}
-
-#[tokio::test]
-async fn all_day_events_export_local_dates_with_an_exclusive_end() {
-    let app = TestApp::spawn().await;
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    let event = insert_plaintext_event(
-        &app,
-        &owner.id,
-        &calendar,
-        "",
-        "2099-03-01T23:00:00.000Z",
-        "2099-03-02T22:59:59.000Z",
-    )
-    .await;
-    sqlx::query("UPDATE calendar_event SET all_day = true, external_id = 'imported-uid@example.com' WHERE id = $1")
-        .bind(&event)
-        .execute(&app.db)
-        .await
-        .expect("all day");
-    let response = ok(owner
-        .get(&format!("/api/events/{event}/ics"))
-        .await
-        .expect_status(200));
-    assert_eq!(
-        response
-            .headers
-            .get("content-disposition")
-            .and_then(|v| v.to_str().ok()),
-        Some("attachment; filename=\"calendar.ics\""),
-        "an empty title falls back to calendar.ics"
-    );
-    let ics = unfold(&response.text());
-    assert!(ics.contains("UID:imported-uid@example.com\r\n"), "{ics}");
-    assert!(ics.contains("SUMMARY:Untitled Event\r\n"), "{ics}");
-    assert!(
-        ics.contains("DTSTART;VALUE=DATE:20990302\r\nDTEND;VALUE=DATE:20990303\r\n"),
-        "{ics}"
-    );
-}
-
-#[tokio::test]
 async fn bulk_move_and_duplicate_refuse_a_read_only_target() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
@@ -2008,28 +1757,6 @@ async fn bulk_move_checks_the_target_calendar() {
             "Target calendar not found or access denied",
         ));
     assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
-    sqlx::query("UPDATE calendar SET ics_share_enabled = true WHERE id = $1")
-        .bind(&family)
-        .execute(&app.db)
-        .await
-        .expect("share family");
-    let error = ok(owner
-        .post(
-            "/api/events/bulk",
-            json!({"action": "move", "eventIds": ids, "targetCalendarId": family}),
-        )
-        .await
-        .expect_error(
-            400,
-            "Validation Error",
-            "Events with encrypted details cannot be moved into a calendar with ICS sharing enabled.",
-        ));
-    assert_eq!(error["details"], json!({"field": "targetCalendarId"}));
-    sqlx::query("UPDATE calendar SET ics_share_enabled = false WHERE id = $1")
-        .bind(&family)
-        .execute(&app.db)
-        .await
-        .expect("unshare family");
 
     let moved: BulkEventResult = ok(owner
         .post(
@@ -2174,20 +1901,11 @@ async fn bulk_duplicate_copies_ciphertext_attendees_and_reminders() {
         status: Some("accepted".into()),
     }]);
     let source = create_event(&mut owner, &request).await;
-    let plain = insert_plaintext_event(
-        &app,
-        &owner.id,
-        &calendar,
-        "Lunch",
-        FUTURE_START,
-        FUTURE_END,
-    )
-    .await;
 
     let result: BulkEventResult = ok(owner
         .post(
             "/api/events/bulk",
-            json!({"action": "duplicate", "eventIds": [source.id, plain], "targetCalendarId": family}),
+            json!({"action": "duplicate", "eventIds": [source.id], "targetCalendarId": family}),
         )
         .await
         .expect_status(200)
@@ -2199,7 +1917,7 @@ async fn bulk_duplicate_copies_ciphertext_attendees_and_reminders() {
             result.events_processed,
             result.action.as_str()
         ),
-        (true, "Successfully duplicated 2 events", 2, "duplicate")
+        (true, "Successfully duplicated 1 events", 1, "duplicate")
     );
     let created = result.created_events.expect("created events");
     let copy = created
@@ -2247,12 +1965,6 @@ async fn bulk_duplicate_copies_ciphertext_attendees_and_reminders() {
         [(20, None)],
         "the copy starts with a generic reminder"
     );
-
-    let plain_copy = created
-        .iter()
-        .find(|event| event.encryption_state == "plaintext")
-        .expect("plaintext copy");
-    assert_eq!(plain_copy.title, "Lunch (Copy)");
 }
 
 #[tokio::test]
@@ -2309,11 +2021,12 @@ async fn bulk_delete_removes_events_and_their_reminders() {
 async fn sealing_replaces_plaintext_with_ciphertext() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
+    // A staged invitation copy is the plaintext row a client seals once it is accepted.
+    let staging = insert_staging_calendar(&app, &owner.id).await;
     let event = insert_plaintext_event(
         &app,
         &owner.id,
-        &calendar,
+        &staging,
         "Imported",
         FUTURE_START,
         FUTURE_END,

@@ -3,7 +3,6 @@
 pub mod account;
 pub mod addresses;
 pub mod auth;
-pub mod calendar_sharing;
 pub mod calendars;
 pub mod categories;
 pub mod config;
@@ -65,7 +64,6 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(invites::routes())
         .merge(calendars::routes())
         .merge(categories::routes())
-        .merge(calendar_sharing::routes())
         .merge(settings::routes())
         .merge(recent_contacts::routes())
         .merge(push_devices::routes())

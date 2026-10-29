@@ -11,11 +11,11 @@ import type {
   UpsertEncryptionDeviceInput,
   UpsertEncryptionPasswordInput,
 } from "../contracts/e2ee.contract";
-import { E2EE_ROLLOUT_STAGE } from "@workspace/calendar-core";
 import { ValidationError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:e2ee-service");
+const E2EE_ROLLOUT_STAGE = "encrypted";
 
 const DEFAULT_PUBLIC_KEY_ALGORITHM = "RSA-OAEP-256";
 const DEFAULT_WRAP_ALGORITHM = "RSA-OAEP-256";

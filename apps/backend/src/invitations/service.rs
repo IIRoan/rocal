@@ -13,8 +13,8 @@ use super::queries;
 use super::rsvp_reply::{self, Reply, RsvpStatus};
 use crate::calendars::queries as calendars;
 use crate::db::entities::{calendar, calendar_event, event_participant};
+use crate::entity_metadata::is_mail_invitation_staging_calendar;
 use crate::error::AppError;
-use crate::events::encryption::resolve_persistence_policy;
 use crate::events::{participants, queries as events};
 use crate::http::zod::js_trim;
 use crate::instant;
@@ -35,7 +35,7 @@ const CALENDAR_MIME_TYPES: [&str; 5] = [
     "application/x-ical",
 ];
 
-/// `resolveAcceptedInvitationTargetCalendar`: the requested, then the default, then the first writable calendar; a user without calendars gets Personal.
+/// `resolveAcceptedInvitationTargetCalendar`: the requested, then the default, then the first writable calendar.
 pub async fn resolve_accepted_invitation_target_calendar<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
@@ -55,14 +55,7 @@ pub async fn resolve_accepted_invitation_target_calendar<C: ConnectionTrait>(
     {
         return Ok(Some(default));
     }
-    if let Some(existing) = queries::first_writable_calendar(db, user_id).await? {
-        return Ok(Some(existing));
-    }
-    if calendars::count_owned_by(db, user_id).await? > 0 {
-        return Ok(None);
-    }
-    let personal = calendars::new_calendar(user_id, "Personal", "#10b981", true, true);
-    calendars::insert(db, personal).await.map(Some)
+    queries::first_writable_calendar(db, user_id).await
 }
 
 /// `resolveInvitationStagingCalendar`: the hidden Invitations calendar, created on first use.
@@ -118,6 +111,17 @@ struct Ingest {
     status: Option<RsvpStatus>,
     calendar_id: Option<String>,
     encryption: HashMap<String, InvitationEncryptionEntry>,
+}
+
+impl Ingest {
+    /// A moved occurrence (`UID::RECURRENCE::...`) the client did not seal on its own takes its series' sealed content.
+    fn seal_for(&self, external_id: &str) -> Option<&InvitationEncryptionEntry> {
+        self.encryption.get(external_id).or_else(|| {
+            external_id
+                .split_once("::RECURRENCE::")
+                .and_then(|(series, _)| self.encryption.get(series))
+        })
+    }
 }
 
 fn summary(messages_scanned: usize, parts: usize) -> InvitationImportSummary {
@@ -302,10 +306,13 @@ async fn ingest(
             .push("No writable calendar is available for ICS mail imports.".into());
         return Ok(summary);
     };
-    if target.force_full_encryption {
-        summary.errors.push("This calendar requires encrypted event details; automatic server-side mail import is unavailable.".into());
-        return Ok(summary);
-    }
+    // Only the hidden staging calendar holds server-readable copies; other calendars take client-sealed ones.
+    let needs_seal = !is_mail_invitation_staging_calendar(
+        &target.kind,
+        target.is_sync_only,
+        target.is_visible,
+        &target.name,
+    );
     let account_id = queries::stalwart_account_id(&state.db, user_id).await?;
     let place = Target {
         calendar: &target,
@@ -337,6 +344,19 @@ async fn ingest(
                 "{}: ICS file contains {} events which exceeds the limit of {MAX_ICS_EVENTS_PER_FILE}; skipped.",
                 source.id,
                 parsed.events.len()
+            ));
+            continue;
+        }
+        if needs_seal
+            && parsed.method != "CANCEL"
+            && parsed
+                .events
+                .iter()
+                .any(|event| options.seal_for(&event.uid).is_none())
+        {
+            summary.errors.push(format!(
+                "{}: This calendar requires encrypted event details; automatic server-side mail import is unavailable.",
+                source.id
             ));
             continue;
         }
@@ -397,7 +417,7 @@ struct Sealed {
     encryption_key_version: i32,
 }
 
-/// `buildInvitationLocalEventData`: scheduling fields, plus either the parsed plaintext or the client's ciphertext.
+/// `buildInvitationLocalEventData`: scheduling fields, plus the parsed plaintext for staging or the client's ciphertext.
 struct LocalData {
     start: time::PrimitiveDateTime,
     end: time::PrimitiveDateTime,
@@ -436,13 +456,7 @@ fn local_data(
     let Some(entry) = encryption.filter(|e| !js_trim(&e.encrypted_content).is_empty()) else {
         return data;
     };
-    let policy = resolve_persistence_policy(
-        true,
-        &parsed.title,
-        parsed.description.as_deref(),
-        parsed.location.as_deref(),
-    );
-    data.content = Some((policy.title, policy.description, policy.location));
+    data.content = Some((String::new(), None, None));
     data.sealed = Some(Sealed {
         encrypted_content: entry.encrypted_content.clone(),
         blind_index_tokens: entry
@@ -546,7 +560,7 @@ async fn upsert(
         .collect();
     let (mut created, mut updated) = (0, 0);
     for parsed in parsed_events {
-        let encryption = options.encryption.get(&parsed.uid);
+        let encryption = options.seal_for(&parsed.uid);
         let inputs = participant_inputs(parsed.participants.as_deref());
         let Some(existing) = by_uid.get(parsed.uid.as_str()).copied() else {
             let data = local_data(parsed, encryption, None);
@@ -677,6 +691,7 @@ async fn record_declined_tombstone(
             input.status = Some("declined".into());
         }
     }
+    // A tombstone only blocks re-importing the invitation, so the declined event's text is not kept.
     let event_id = match events::by_external_id(&state.db, user_id, &parsed.uid).await? {
         Some(existing) => {
             let id = existing.id.clone();
@@ -684,11 +699,15 @@ async fn record_declined_tombstone(
             row.calendar_id = Set(staging.id);
             row.stalwart_event_id = Set(None);
             row.stalwart_synced_at = Set(None);
+            row.title = Set(String::new());
+            row.description = Set(None);
+            row.location = Set(None);
             events::update(&state.db, row).await?;
             id
         }
         None => {
-            let data = local_data(parsed, None, None);
+            let mut data = local_data(parsed, None, None);
+            data.content = Some((String::new(), None, None));
             events::insert(&state.db, data.new_row(parsed, user_id, &staging.id))
                 .await?
                 .id

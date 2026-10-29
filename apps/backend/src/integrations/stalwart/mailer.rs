@@ -96,12 +96,11 @@ pub async fn send(
         client.send_context(&session, &config.from),
         upload_all(&client, &session, &message.attachments),
     );
-    let (drafts, sent, identity) = context?;
+    let (drafts, identity) = context?;
     let attachments = uploads?;
     let calls = send_calls(
         &session,
         &drafts,
-        sent.as_deref(),
         &identity,
         config,
         to,
@@ -109,7 +108,11 @@ pub async fn send(
         &attachments,
     );
     let envelope = client.call(&session.api_url, calls).await?;
-    assert_success(&without_sent_move(&envelope), "Stalwart email send")?;
+    if let Err(error) = assert_success(&without_implicit_destroy(&envelope), "Stalwart email send")
+    {
+        discard_unsent(&client, &session, &envelope).await;
+        return Err(error);
+    }
     method_result(&envelope, "EmailSubmission/set")?
         .pointer("/created/s1/id")
         .and_then(Value::as_str)
@@ -208,7 +211,7 @@ impl Jmap<'_> {
         &self,
         session: &Discovered,
         from: &str,
-    ) -> Result<(String, Option<String>, String), MailerError> {
+    ) -> Result<(String, String), MailerError> {
         let envelope = self
             .call(
                 &session.api_url,
@@ -230,7 +233,7 @@ impl Jmap<'_> {
         let identities = list("Identity/get")?;
         let drafts = pick_mailbox(&mailboxes, "drafts").ok_or(MailerError::NoDrafts)?;
         let identity = pick_identity(&identities, from).ok_or(MailerError::NoIdentity)?;
-        Ok((drafts, pick_mailbox(&mailboxes, "sent"), identity))
+        Ok((drafts, identity))
     }
 
     async fn upload(
@@ -296,28 +299,22 @@ async fn upload_all(
 fn send_calls(
     session: &Discovered,
     drafts: &str,
-    sent: Option<&str>,
     identity: &str,
     config: &MailerConfig,
     to: &str,
     message: &Message,
     attachments: &[Value],
 ) -> Value {
-    let mut submission = json!({
+    // App mail can carry invitation details and reset links, so the noreply account keeps no copy once it is queued.
+    let submission = json!({
         "accountId": session.submission_account,
         "create": {"s1": {
             "emailId": "#draft1",
             "identityId": identity,
             "envelope": {"mailFrom": {"email": config.from}, "rcptTo": [{"email": to}]},
         }},
+        "onSuccessDestroyEmail": ["#s1"],
     });
-    if let Some(sent) = sent {
-        submission["onSuccessUpdateEmail"] = json!({"#s1": {
-            format!("mailboxIds/{sent}"): true,
-            format!("mailboxIds/{drafts}"): null,
-            "keywords/$draft": null,
-        }});
-    }
     let mut draft = json!({
         "mailboxIds": {drafts: true},
         "keywords": {"$seen": true, "$draft": true},
@@ -340,8 +337,8 @@ fn send_calls(
     ])
 }
 
-/// The envelope without the implicit `Email/set` that answers `onSuccessUpdateEmail` (call id `c2`): once the submission is queued, a failed move to Sent must not fail, and so resend, the mail.
-fn without_sent_move(envelope: &Value) -> Value {
+/// The envelope without the implicit `Email/set` that answers `onSuccessDestroyEmail` (call id `c2`): once the submission is queued, a failed cleanup must not fail, and so resend, the mail.
+fn without_implicit_destroy(envelope: &Value) -> Value {
     let mut queued = envelope.clone();
     if let Some(responses) = queued
         .get_mut("methodResponses")
@@ -352,6 +349,21 @@ fn without_sent_move(envelope: &Value) -> Value {
         });
     }
     queued
+}
+
+/// A refused submission leaves its email in Drafts; it is destroyed so no copy of the mail stays behind.
+async fn discard_unsent(client: &Jmap<'_>, session: &Discovered, envelope: &Value) {
+    let Some(id) = method_result(envelope, "Email/set")
+        .ok()
+        .and_then(|result| result.pointer("/created/draft1/id"))
+        .and_then(Value::as_str)
+    else {
+        return;
+    };
+    let destroy = json!([["Email/set", {"accountId": session.mail_account, "destroy": [id]}, "d"]]);
+    if client.call(&session.api_url, destroy).await.is_err() {
+        tracing::warn!("Unsent app mail could not be removed from Drafts");
+    }
 }
 
 /// Method errors and the first `notCreated`/`notUpdated`/`notDestroyed` entry fail the send, naming only the method and error type.
@@ -616,14 +628,32 @@ mod tests {
             json!({"d": true})
         );
         assert_eq!(submit[1][1]["create"]["s1"]["identityId"], json!("id1"));
-        assert_eq!(
-            submit[1][1]["onSuccessUpdateEmail"]["#s1"]["mailboxIds/s"],
-            json!(true)
-        );
+        assert_eq!(submit[1][1]["onSuccessDestroyEmail"], json!(["#s1"]));
+        assert_eq!(submit[1][1].get("onSuccessUpdateEmail"), None);
     }
 
     #[tokio::test]
-    async fn a_failed_move_to_sent_does_not_fail_queued_mail() {
+    async fn a_refused_submission_discards_the_created_email() {
+        let (fake, _) = stalwart(
+            noreply(),
+            vec![(
+                "Email/set",
+                Reply::json(json!({"methodResponses": [
+                    ["Email/set", {"created": {"draft1": {"id": "e1"}}}, "c1"],
+                    ["EmailSubmission/set", {"notCreated": {"s1": {"type": "forbiddenToSend"}}}, "c2"],
+                ]})),
+            )],
+        )
+        .await;
+        assert!(send_with(&fake, &fake.gate).await.is_err());
+        let calls = calls(&fake);
+        let cleanup = &calls.last().unwrap()["methodCalls"][0];
+        assert_eq!(cleanup[0], json!("Email/set"));
+        assert_eq!(cleanup[1]["destroy"], json!(["e1"]));
+    }
+
+    #[tokio::test]
+    async fn a_failed_cleanup_does_not_fail_queued_mail() {
         let (fake, _) = stalwart(
             noreply(),
             vec![(
@@ -631,7 +661,7 @@ mod tests {
                 Reply::json(json!({"methodResponses": [
                     ["Email/set", {"created": {"draft1": {"id": "e1"}}}, "c1"],
                     ["EmailSubmission/set", {"created": {"s1": {"id": "sub1"}}}, "c2"],
-                    ["Email/set", {"notUpdated": {"e1": {"type": "notFound"}}}, "c2"],
+                    ["Email/set", {"notDestroyed": {"e1": {"type": "notFound"}}}, "c2"],
                 ]})),
             )],
         )

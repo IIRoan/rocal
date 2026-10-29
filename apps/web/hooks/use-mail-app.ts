@@ -17,6 +17,7 @@ import {
   resolveMessageReplyRecipients,
   validateComposeRecipients,
   prepareOutgoingAttachments,
+  runTasksWithConcurrencyLimit,
   validateUploadedAttachmentSet,
   validateMailboxCreate,
   validateMailboxName,
@@ -25,6 +26,7 @@ import {
   isCurrentUserMailAddress,
   resolveEncryptionInternalDomain,
   shouldEncryptOutgoingMail,
+  type JmapAttachmentInput,
   type OutgoingMimeAttachment,
   resolveAttachmentPreviewKind,
   appendMailboxMessages,
@@ -36,7 +38,8 @@ import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { toast } from "sonner";
 import { createLogger } from "@workspace/logger";
-import { useSession, signOut } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
+import { signOutAndClearLocalState } from "@/lib/auth-local-state";
 import {
   beginAuthNavigation,
   completeAuthNavigation,
@@ -48,7 +51,7 @@ import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { useSimpleLoginAliasAction } from "@/hooks/use-simplelogin-alias-action";
 import { peekCachedAuthPassword } from "@/lib/e2ee-password-cache";
 import { resolveAvatarUrl } from "@/lib/profile-picture";
-import { clearEncPasswordCookie, initEncPasswordFromCookie } from "@/lib/enc-password-cookie";
+import { initEncPasswordFromCookie } from "@/lib/enc-password-cookie";
 import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
@@ -62,7 +65,6 @@ import { unwrapVaultSecret } from "@/lib/mail/vault-secret";
 import {
   getPrimaryMailAccountId,
   StalwartJmapClient,
-  type JmapAttachmentInput,
 } from "@/lib/mail/jmap-client";
 import { getConversationForMessage } from "@/lib/mail/conversation-thread";
 import {
@@ -128,7 +130,6 @@ import {
   resolveAttachmentBlob,
   buildTextAttachmentPreview,
   resolveOutgoingMessageBody,
-  sealVaultToAccountKey,
   resolveSignatureVerificationState,
   getPrimaryMailboxId,
   messageBelongsToMailbox,
@@ -153,9 +154,6 @@ export type { ActiveMailboxState } from "@/lib/mail/mail-app-helpers";
 
 const log = createLogger("mail-app");
 
-const MAILBOX_REAUTH_REQUIRED_MESSAGE =
-  "This mailbox still needs a one-time password migration. Sign out and sign back in with your email password once to finish automatic unlocking.";
-
 /** The account's vault backup, preferring the server copy and caching it on this device. */
 async function loadMailVaultBackup(
   email: string,
@@ -179,11 +177,16 @@ async function unlockMailVaultBackup(
   backup: MailVaultBackupRecord,
   accountUserId: string | null | undefined,
 ): Promise<{ unlockedVault: UserKeyVault; effectivePassphrase: string }> {
-  const sealedSecret = backup.wrappedSecret
-    ? await unwrapVaultSecret(backup.wrappedSecret)
-    : null;
+  if (!backup.wrappedSecret) {
+    throw new Error(
+      "This mail vault is not sealed to your encryption key and cannot be opened.",
+    );
+  }
+  const sealedSecret = await unwrapVaultSecret(backup.wrappedSecret);
   if (!sealedSecret) {
-    throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
+    throw new Error(
+      "Your encryption keys are not unlocked on this device. Sign in with your email password, then try again.",
+    );
   }
 
   const cachedDerivedKey = accountUserId
@@ -1346,16 +1349,6 @@ export function useMailApp() {
         log.warn("Failed to disable Stalwart encryptOnAppend on sign-in", error);
       });
 
-      // Seal a legacy vault to the account key; the server keeps no copy.
-      if (!backup.wrappedSecret) {
-        void sealVaultToAccountKey({
-          unlockedVault,
-          currentPassphrase: effectivePassphrase,
-          email,
-          vaultVersion: backup.vaultVersion,
-        }).catch(() => undefined);
-      }
-
       const mailServerPolicy = resolveMailServerPolicy({
         session: jmapSession,
         emailSettings: stalwartPolicy.emailSettings,
@@ -1492,19 +1485,14 @@ export function useMailApp() {
     if (!activeMailbox) return null;
     const uploadImage = async () => {
       const contentType = file.type || "application/octet-stream";
-      const [uploaded, dataUrl, content] = await Promise.all([
-        activeMailbox.client.uploadBlob(
-          activeMailbox.session,
-          file,
-          contentType,
-        ),
+      const [dataUrl, content] = await Promise.all([
         readBlobAsDataUrl(file),
         file.arrayBuffer().then((buffer) => new Uint8Array(buffer)),
       ]);
       const cid = `${crypto.randomUUID()}@solace`;
       registerComposeInlineImage({
         cid,
-        blobId: uploaded.blobId,
+        blobId: null,
         type: contentType,
         name: file.name,
         size: file.size,
@@ -1647,24 +1635,14 @@ export function useMailApp() {
       const embedInlineImagesInEncryptedHtml =
         willEncrypt && hasInlineComposeImages && !hasFileAttachments;
 
-      const rewritten =
-        !plainTextMode && htmlWithSignature
-          ? embedInlineImagesInEncryptedHtml
-            ? { html: htmlWithSignature, attachments: [] as const }
-            : rewriteComposeInlineImages(htmlWithSignature)
-          : { html: htmlWithSignature, attachments: [] as const };
+      const rewritten: {
+        html: string | undefined;
+        attachments: ReturnType<typeof rewriteComposeInlineImages>["attachments"];
+      } =
+        !plainTextMode && htmlWithSignature && !embedInlineImagesInEncryptedHtml
+          ? rewriteComposeInlineImages(htmlWithSignature)
+          : { html: htmlWithSignature, attachments: [] };
       const htmlForSend = plainTextMode ? undefined : (rewritten.html ?? htmlWithSignature);
-      const inlineJmapAttachments: JmapAttachmentInput[] =
-        embedInlineImagesInEncryptedHtml
-          ? []
-          : rewritten.attachments.map((attachment) => ({
-            blobId: attachment.blobId,
-            name: attachment.name,
-            type: attachment.type,
-            size: attachment.size,
-            disposition: "inline" as const,
-            cid: attachment.cid,
-          }));
       const inlineMimeAttachments: OutgoingMimeAttachment[] =
         embedInlineImagesInEncryptedHtml
           ? []
@@ -1691,7 +1669,7 @@ export function useMailApp() {
         inlineMimeAttachments.length > 0 || fileMimeAttachments.length > 0
           ? [...inlineMimeAttachments, ...fileMimeAttachments]
           : undefined;
-      const { textBody, encrypted, pgpMimeCiphertext } =
+      const { textBody, encrypted, pgpMimeCiphertext, sentCopyCiphertext } =
         await resolveOutgoingMessageBody({
           activeMailbox: mailbox,
           recipients: allRecipients,
@@ -1711,6 +1689,23 @@ export function useMailApp() {
 
       let uploadedAttachments: JmapAttachmentInput[] | undefined;
       if (!pgpMimeCiphertext) {
+        // Inserted images reach the server only now, for a plaintext send; encrypted mail carries them inside its ciphertext.
+        const inlineJmapAttachments = await runTasksWithConcurrencyLimit(
+          rewritten.attachments.map(({ content, ...attachment }) => async () => ({
+            ...attachment,
+            blobId:
+              attachment.blobId ??
+              (
+                await mailbox.client.uploadPreparedAttachment(mailbox.session, {
+                  filename: attachment.name,
+                  contentType: attachment.type,
+                  size: attachment.size,
+                  content: content.slice(),
+                })
+              ).blobId,
+          })),
+          mailbox.mailServerPolicy.maxConcurrentUploads,
+        );
         const fileUploads =
           preparedAttachments.length > 0
             ? await mailbox.client.uploadPreparedAttachments(
@@ -1761,6 +1756,7 @@ export function useMailApp() {
           identityId,
           attachments: uploadedAttachments,
           pgpMimeCiphertext,
+          sentCopyCiphertext,
           inReplyTo: composeReplyContext?.inReplyTo,
           references: composeReplyContext?.references,
           previousDraftId,
@@ -2025,6 +2021,7 @@ export function useMailApp() {
       } catch (error) {
         log.error("Failed to decrypt draft", error);
         toast.error(getErrorMessage(error, "Could not decrypt this draft."));
+        // An editor without the body would autosave over the encrypted draft, so it stays closed and intact.
         return;
       }
     }
@@ -2130,7 +2127,7 @@ export function useMailApp() {
             content,
           }))
           : undefined;
-      const { textBody, encrypted, pgpMimeCiphertext } =
+      const { textBody, encrypted, pgpMimeCiphertext, sentCopyCiphertext } =
         await resolveOutgoingMessageBody({
           activeMailbox: mailbox,
           recipients,
@@ -2171,6 +2168,7 @@ export function useMailApp() {
           identityId,
           attachments,
           pgpMimeCiphertext,
+          sentCopyCiphertext,
           inReplyTo: replyContext.inReplyTo,
           references: replyContext.references,
         },
@@ -2969,10 +2967,7 @@ export function useMailApp() {
     const finishNavigation = beginAuthNavigation("/");
     if (!finishNavigation) return;
     await handleDisconnect()
-      .then(() => {
-        clearEncPasswordCookie();
-        return signOut();
-      })
+      .then(signOutAndClearLocalState)
       .finally(finishNavigation);
   };
 

@@ -17,13 +17,33 @@ import {
 } from "@/components/mail/mail-compose-context";
 import { resolveMailServerLimits } from "@workspace/calendar-core";
 import { useComposeDraftAutosave } from "@/hooks/use-compose-draft-autosave";
-import type { JmapSession } from "@/lib/mail/types";
+import type { JmapSession, UserKeyVault } from "@/lib/mail/types";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const saveDraft = jest.fn(async () => "draft-2");
+const saveDraft = jest.fn(
+  async (_session: JmapSession, _input: Record<string, unknown>) => "draft-2",
+);
+const uploadTextBlob = jest.fn(async () => ({
+  blobId: "sealed-draft",
+  size: 128,
+  type: "text/plain",
+}));
+const mockEncryptForRecipients = jest.fn(
+  async (_input: { plaintext: string; recipientPublicKeysArmored: string[] }) => ({
+    armoredMessage: "-----BEGIN PGP MESSAGE-----\nsealed\n-----END PGP MESSAGE-----",
+  }),
+);
+jest.mock("@/lib/mail/worker-client", () => ({
+  mailCryptoWorkerClient: {
+    encryptForRecipients: (input: {
+      plaintext: string;
+      recipientPublicKeysArmored: string[];
+    }) => mockEncryptForRecipients(input),
+  },
+}));
 const fallbackMailServerLimits = resolveMailServerLimits({});
 
 function AutosaveProbe({
@@ -35,8 +55,10 @@ function AutosaveProbe({
   const autosave = useComposeDraftAutosave({
     client: {
       saveDraft,
+      uploadTextBlob,
     } as never,
     session: { apiUrl: "https://mail.example.com/jmap/" } as JmapSession,
+    unlockedVault: { publicKeyArmored: "alice-public-key" } as UserKeyVault,
     mailboxes: [{ id: "drafts-1", role: "drafts" }],
     identities: [{ id: "identity-1", email: "alice@solace.onl", name: "Alice" }],
     fallbackFromEmail: "alice@solace.onl",
@@ -86,6 +108,8 @@ describe("useComposeDraftAutosave", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     saveDraft.mockClear();
+    uploadTextBlob.mockClear();
+    mockEncryptForRecipients.mockClear();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -141,7 +165,20 @@ describe("useComposeDraftAutosave", () => {
         fromEmail: "alice@solace.onl",
         fromName: "Alice",
         subject: "(No subject)",
+        ciphertext: { blobId: "sealed-draft", size: 128, type: "text/plain" },
       }),
+    );
+    const saved = saveDraft.mock.calls[0]?.[1];
+    expect(saved).not.toHaveProperty("textBody");
+    expect(saved).not.toHaveProperty("htmlBody");
+    expect(mockEncryptForRecipients).toHaveBeenCalledWith({
+      plaintext: expect.stringContaining("Content-Type: text/plain"),
+      recipientPublicKeysArmored: ["alice-public-key"],
+    });
+    expect(uploadTextBlob).toHaveBeenCalledWith(
+      expect.objectContaining({ apiUrl: "https://mail.example.com/jmap/" }),
+      "-----BEGIN PGP MESSAGE-----\nsealed\n-----END PGP MESSAGE-----",
+      "text/plain",
     );
   });
 });

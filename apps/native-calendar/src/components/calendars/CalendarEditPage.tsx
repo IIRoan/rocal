@@ -1,13 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { Alert } from "react-native";
-import * as Clipboard from "expo-clipboard";
 import type { Calendar, EventColor } from "@workspace/calendar-core";
-import { CALENDAR_ICS_SHARING_HINT, getErrorMessage, partitionCalendarsByKind } from "@workspace/calendar-core";
+import { getErrorMessage, partitionCalendarsByKind } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
-import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import {
-  useCalendarShareLink,
-  useCalendarShareLinkActions,
   useCalendars,
   useDeleteCalendar,
   useUpdateCalendar,
@@ -57,7 +53,6 @@ export function CalendarEditPage({ id }: { id: string }) {
 
 function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calendars: Calendar[] }) {
   const { theme } = useTheme();
-  const { toast } = useToast();
   const { back } = useSheetPageNavigator();
   const updateCalendar = useUpdateCalendar(calendar.id);
   const deleteCalendar = useDeleteCalendar(calendar.id);
@@ -157,8 +152,6 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
 
       <SheetButton label="Save changes" onPress={handleSave} pending={updateCalendar.isPending} />
 
-      <CalendarSharingSection calendarId={calendar.id} onCopied={() => toast("Share link copied")} />
-
       {canDelete && moveTargets.length > 0 ? (
         <SheetSection title="Move events to">
           <SheetGroup>
@@ -213,80 +206,5 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
         </SheetGroup>
       </SheetSection>
     </SheetScroll>
-  );
-}
-
-function CalendarSharingSection({
-  calendarId,
-  onCopied,
-}: {
-  calendarId: string;
-  onCopied: () => void;
-}) {
-  const { toast } = useToast();
-  const shareLinkQuery = useCalendarShareLink(calendarId);
-  const { enable, disable } = useCalendarShareLinkActions(calendarId);
-  const shareLink = shareLinkQuery.data;
-  const busy = shareLinkQuery.isLoading || enable.isPending || disable.isPending;
-
-  const handleToggle = (next: boolean) => {
-    if (next) enable.mutate(false);
-    else disable.mutate();
-  };
-
-  const confirmRegenerate = () => {
-    Alert.alert(
-      "Regenerate share link?",
-      "The current link stops working. Anyone subscribed will need the new link.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Regenerate", style: "destructive", onPress: () => enable.mutate(true) },
-      ],
-    );
-  };
-
-  const handleCopy = async () => {
-    if (!shareLink?.shareUrl) return;
-    await Clipboard.setStringAsync(shareLink.shareUrl);
-    onCopied();
-  };
-
-  return (
-    <SheetSection
-      title="Sharing"
-      footer={CALENDAR_ICS_SHARING_HINT}
-    >
-      <SheetGroup>
-        <SheetSwitchItem
-          key="toggle"
-          label="ICS sharing"
-          icon="link-2"
-          value={shareLink?.enabled ?? false}
-          onValueChange={handleToggle}
-          disabled={busy}
-        />
-        {shareLink?.enabled && shareLink.shareUrl ? (
-          <SheetItem
-            key="copy"
-            label="Copy link"
-            detail={shareLink.shareUrl}
-            icon="copy"
-            onPress={() =>
-              void handleCopy().catch(() => toast("Could not copy link", "error"))
-            }
-          />
-        ) : null}
-        {shareLink?.enabled ? (
-          <SheetItem
-            key="regenerate"
-            label="Regenerate link"
-            icon="refresh-cw"
-            pending={enable.isPending && enable.variables === true}
-            disabled={busy}
-            onPress={confirmRegenerate}
-          />
-        ) : null}
-      </SheetGroup>
-    </SheetSection>
   );
 }

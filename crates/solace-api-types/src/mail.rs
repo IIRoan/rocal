@@ -44,14 +44,7 @@ pub struct MailBootstrapRequest {
     pub encrypted_vault_b64: String,
     pub kdf: String,
     pub kdf_params: MailVaultKdfParams,
-    /// Optional on the wire, but the service rejects a bootstrap without it.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "serde_with::rust::double_option"
-    )]
-    #[schema(value_type = Option<String>)]
-    pub wrapped_secret: Option<Option<String>>,
+    pub wrapped_secret: String,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -82,13 +75,10 @@ pub struct MailVaultBackupRequest {
     pub encrypted_vault_b64: String,
     pub kdf: String,
     pub kdf_params: MailVaultKdfParams,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "serde_with::rust::double_option"
-    )]
-    #[schema(value_type = Option<String>)]
-    pub wrapped_secret: Option<Option<String>>,
+    /// Absent keeps the stored seal; a vault is never left unsealed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub wrapped_secret: Option<String>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -107,9 +97,7 @@ pub struct MailVaultBackup {
     pub encrypted_vault_b64: String,
     pub kdf: String,
     pub kdf_params: MailVaultKdfParams,
-    /// Null for legacy vaults sealed before the account-key seal existed.
-    #[schema(required = true)]
-    pub wrapped_secret: Option<String>,
+    pub wrapped_secret: String,
     #[schema(required = true)]
     pub wrap_algorithm: Option<String>,
 }

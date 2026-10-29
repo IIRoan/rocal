@@ -15,6 +15,7 @@ import type {
   JmapIdentity,
   JmapMailbox,
   JmapSession,
+  UserKeyVault,
 } from "@/lib/mail/types";
 import type { MailServerPolicy } from "@workspace/calendar-core";
 
@@ -30,6 +31,7 @@ function MailComposeAutosave({
     identities: JmapIdentity[];
     email: string;
     mailServerPolicy: MailServerPolicy;
+    unlockedVault: UserKeyVault;
   } | null;
   accountEmail: string;
   onDraftSaved: Parameters<typeof useComposeDraftAutosave>[0]["onDraftSaved"];
@@ -37,6 +39,7 @@ function MailComposeAutosave({
   useComposeDraftAutosave({
     client: activeMailbox?.client ?? null,
     session: activeMailbox?.session ?? null,
+    unlockedVault: activeMailbox?.unlockedVault ?? null,
     mailboxes: activeMailbox?.mailboxes ?? [],
     identities: activeMailbox?.identities ?? [],
     fallbackFromEmail: activeMailbox?.email ?? accountEmail,

@@ -1,6 +1,8 @@
 import {
   encryptEventContentRequest,
   encryptNameRequest,
+  withoutPlaintextEventContent,
+  withoutPlaintextName,
 } from "@workspace/e2ee";
 import type {
   EventWireRequest,
@@ -41,7 +43,7 @@ export async function attachCalendarEncryptionShadow<
 >(request: T): Promise<NameWireRequest<T>> {
   const session = await getEncryptionSession();
   if (!session) {
-    return request;
+    return withoutPlaintextName(request);
   }
 
   return encryptNameRequest(contentEncrypter, session, "calendar", request);
@@ -52,7 +54,7 @@ export async function attachCategoryEncryptionShadow<
 >(request: T): Promise<NameWireRequest<T>> {
   const session = await getEncryptionSession();
   if (!session) {
-    return request;
+    return withoutPlaintextName(request);
   }
 
   return encryptNameRequest(contentEncrypter, session, "category", request);
@@ -63,7 +65,7 @@ export async function attachEventEncryptionShadow<
 >(request: T): Promise<EventWireRequest<T>> {
   const session = await getEncryptionSession();
   if (!session) {
-    return request;
+    return withoutPlaintextEventContent(request);
   }
 
   return encryptEventContentRequest(contentEncrypter, session, request);

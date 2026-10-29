@@ -10,11 +10,10 @@ use crate::instant;
 
 #[derive(Debug, sea_orm::FromQueryResult)]
 pub struct AvatarOwner {
-    pub avatar_id: Option<String>,
-    pub image: Option<String>,
+    pub avatar_id: String,
 }
 
-/// A user whose own address or mailbox alias is `email` and who has a picture of either kind.
+/// A user whose own address or mailbox alias is `email` and who has an uploaded picture.
 pub async fn avatar_owner<C: ConnectionTrait>(
     db: &C,
     email: &str,
@@ -27,17 +26,12 @@ pub async fn avatar_owner<C: ConnectionTrait>(
     user::Entity::find()
         .select_only()
         .column(user::Column::AvatarId)
-        .column(user::Column::Image)
         .filter(
             Condition::any()
                 .add(user::Column::Email.eq(email))
                 .add(user::Column::Id.in_subquery(alias_owner)),
         )
-        .filter(
-            Condition::any()
-                .add(user::Column::AvatarId.is_not_null())
-                .add(user::Column::Image.is_not_null()),
-        )
+        .filter(user::Column::AvatarId.is_not_null())
         .into_model::<AvatarOwner>()
         .one(db)
         .await

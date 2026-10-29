@@ -4,7 +4,6 @@ import { resolveMailServerPolicy } from "@workspace/calendar-core";
 import {
   StalwartJmapClient,
   buildBearerAuthHeader,
-  buildSendMessageMethodCalls,
   getPrimaryMailAccountId,
   normalizeJmapSession,
 } from "../../lib/mail/jmap-client";
@@ -112,274 +111,6 @@ describe("mail JMAP helpers", () => {
         primaryAccounts: {},
       }),
     ).toBe("a");
-  });
-
-  it("builds plain-text send method calls for Email/set and EmailSubmission/set", () => {
-    expect(
-      buildSendMessageMethodCalls({
-        draftsMailboxId: "drafts-1",
-        fromEmail: "alice@solace.onl",
-        to: ["bob@example.com", "cara@example.com"],
-        subject: "Hello",
-        textBody: "Hello from Solace Mail",
-        identityId: "identity-1",
-      }),
-    ).toEqual([
-      [
-        "Email/set",
-        {
-          create: {
-            draft1: {
-              mailboxIds: { "drafts-1": true },
-              keywords: { $seen: true, $draft: true },
-              from: [{ email: "alice@solace.onl" }],
-              to: [{ email: "bob@example.com" }, { email: "cara@example.com" }],
-              subject: "Hello",
-              textBody: [{ partId: "text", type: "text/plain" }],
-              bodyValues: {
-                text: {
-                  value: "Hello from Solace Mail",
-                },
-              },
-            },
-          },
-        },
-        "c1",
-      ],
-      [
-        "EmailSubmission/set",
-        {
-          create: {
-            s1: {
-              emailId: "#draft1",
-              identityId: "identity-1",
-              envelope: {
-                mailFrom: { email: "alice@solace.onl" },
-                rcptTo: [
-                  { email: "bob@example.com" },
-                  { email: "cara@example.com" },
-                ],
-              },
-            },
-          },
-        },
-        "c2",
-      ],
-    ]);
-  });
-
-  it("builds multipart/encrypted body structure for PGP/MIME ciphertext", () => {
-    expect(
-      buildSendMessageMethodCalls({
-        draftsMailboxId: "drafts-1",
-        fromEmail: "alice@solace.onl",
-        to: ["bob@solace.onl"],
-        subject: "Encrypted attachment",
-        textBody: "",
-        identityId: "identity-1",
-        pgpMimeCiphertext: { blobId: "blob-abc", size: 4096 },
-      }),
-    ).toEqual([
-      [
-        "Email/set",
-        {
-          create: {
-            draft1: {
-              mailboxIds: { "drafts-1": true },
-              keywords: { $seen: true, $draft: true },
-              from: [{ email: "alice@solace.onl" }],
-              to: [{ email: "bob@solace.onl" }],
-              subject: "Encrypted attachment",
-              bodyStructure: {
-                type: "multipart/encrypted",
-                subParts: [
-                  { type: "application/pgp-encrypted", partId: "pgp-version" },
-                  {
-                    type: "application/octet-stream",
-                    blobId: "blob-abc",
-                    size: 4096,
-                  },
-                ],
-              },
-              bodyValues: {
-                "pgp-version": { value: "Version: 1\r\n" },
-              },
-            },
-          },
-        },
-        "c1",
-      ],
-      expect.any(Array),
-    ]);
-  });
-
-  it("moves the sent message into the sent mailbox when one is provided", () => {
-    expect(
-      buildSendMessageMethodCalls({
-        draftsMailboxId: "drafts-1",
-        sentMailboxId: "sent-1",
-        fromEmail: "alice@solace.onl",
-        to: ["bob@example.com"],
-        subject: "Hello",
-        textBody: "Hello from Solace Mail",
-        identityId: "identity-1",
-      }),
-    ).toEqual([
-      expect.any(Array),
-      [
-        "EmailSubmission/set",
-        {
-          create: {
-            s1: {
-              emailId: "#draft1",
-              identityId: "identity-1",
-              envelope: {
-                mailFrom: { email: "alice@solace.onl" },
-                rcptTo: [{ email: "bob@example.com" }],
-              },
-            },
-          },
-          onSuccessUpdateEmail: {
-            "#s1": {
-              "mailboxIds/sent-1": true,
-              "mailboxIds/drafts-1": null,
-              "keywords/$draft": null,
-            },
-          },
-        },
-        "c2",
-      ],
-    ]);
-  });
-
-  it("includes thread metadata when building a reply", () => {
-    expect(
-      buildSendMessageMethodCalls({
-        draftsMailboxId: "drafts-1",
-        sentMailboxId: "sent-1",
-        fromEmail: "alice@solace.onl",
-        to: ["bob@example.com"],
-        subject: "Re: Hello",
-        textBody: "Hello from Solace Mail",
-        identityId: "identity-1",
-        inReplyTo: ["<message-1@example.com>"],
-        references: [
-          "<message-0@example.com>",
-          "<message-1@example.com>",
-        ],
-      }),
-    ).toEqual([
-      [
-        "Email/set",
-        {
-          create: {
-            draft1: expect.objectContaining({
-              inReplyTo: ["<message-1@example.com>"],
-              references: [
-                "<message-0@example.com>",
-                "<message-1@example.com>",
-              ],
-            }),
-          },
-        },
-        "c1",
-      ],
-      expect.any(Array),
-    ]);
-  });
-
-  it("builds html and top-level attachments for multipart messages", () => {
-    expect(
-      buildSendMessageMethodCalls({
-        draftsMailboxId: "drafts-1",
-        fromEmail: "alice@solace.onl",
-        to: ["bob@example.com"],
-        subject: "Files",
-        textBody: "See attached",
-        htmlBody: "<p>See attached</p>",
-        identityId: "identity-1",
-        attachments: [
-          {
-            blobId: "blob-1",
-            name: "note.txt",
-            type: "text/plain",
-            size: 12,
-          },
-        ],
-      }),
-    ).toEqual([
-      [
-        "Email/set",
-        {
-          create: {
-            draft1: expect.objectContaining({
-              textBody: [{ partId: "text", type: "text/plain" }],
-              htmlBody: [{ partId: "html", type: "text/html" }],
-              bodyValues: {
-                text: { value: "See attached" },
-                html: { value: "<p>See attached</p>" },
-              },
-              attachments: [
-                {
-                  blobId: "blob-1",
-                  name: "note.txt",
-                  type: "text/plain",
-                  disposition: "attachment",
-                },
-              ],
-            }),
-          },
-        },
-        "c1",
-      ],
-      expect.any(Array),
-    ]);
-  });
-
-  it("includes inline attachments with cid at the top level", () => {
-    expect(
-      buildSendMessageMethodCalls({
-        draftsMailboxId: "drafts-1",
-        fromEmail: "alice@solace.onl",
-        to: ["bob@example.com"],
-        subject: "Inline image",
-        textBody: "",
-        htmlBody: '<p><img src="cid:img@solace"></p>',
-        identityId: "identity-1",
-        attachments: [
-          {
-            blobId: "blob-img",
-            name: "inline.png",
-            type: "image/png",
-            size: 42,
-            disposition: "inline",
-            cid: "img@solace",
-          },
-        ],
-      }),
-    ).toEqual([
-      [
-        "Email/set",
-        {
-          create: {
-            draft1: expect.objectContaining({
-              htmlBody: [{ partId: "html", type: "text/html" }],
-              attachments: [
-                {
-                  blobId: "blob-img",
-                  name: "inline.png",
-                  type: "image/png",
-                  disposition: "inline",
-                  cid: "img@solace",
-                },
-              ],
-            }),
-          },
-        },
-        "c1",
-      ],
-      expect.any(Array),
-    ]);
   });
 });
 
@@ -1088,7 +819,7 @@ describe("StalwartJmapClient", () => {
         fromEmail: "alice@solace.onl",
         to: ["bob@solace.onl"],
         subject: "Hello",
-        textBody: "x".repeat(5_000),
+        ciphertext: { blobId: "sealed-draft", size: 5_000 },
       }),
     ).rejects.toThrow(/exceeds the .* server limit/);
 
@@ -1129,6 +860,7 @@ describe("StalwartJmapClient", () => {
         subject: "Hello",
         textBody: "x".repeat(5_000),
         identityId: "identity-1",
+        sentCopyCiphertext: null,
       }),
     ).rejects.toThrow(/exceeds the .* server limit/);
   });
@@ -1177,6 +909,7 @@ describe("StalwartJmapClient", () => {
         subject: "Hello",
         textBody: "x".repeat(5_000),
         identityId: "identity-1",
+        sentCopyCiphertext: null,
       }),
     ).rejects.toThrow(/exceeds the .* server limit/);
 
@@ -1267,7 +1000,7 @@ describe("StalwartJmapClient", () => {
     expect(uploaded.blobId).toBe("blob-1");
   });
 
-  it("respects upload concurrency when refreshing expired draft attachments", async () => {
+  it("respects upload concurrency when refreshing expired outgoing attachments", async () => {
     const now = jest.spyOn(Date, "now").mockReturnValue(1_000);
     const fetcher = jest.fn<
       (url: string, init?: RequestInit) => Promise<Response>
@@ -1276,7 +1009,8 @@ describe("StalwartJmapClient", () => {
         new Response(
           JSON.stringify({
             methodResponses: [
-              ["Email/set", { created: { draft1: { id: "draft" } } }, "c1"],
+              ["Email/set", { created: { draft1: { id: "email" } } }, "c1"],
+              ["EmailSubmission/set", { created: { s1: { id: "sub" } } }, "c2"],
             ],
           }),
         ),
@@ -1306,6 +1040,8 @@ describe("StalwartJmapClient", () => {
       const attachments = await Promise.all(
         Array.from({ length: 5 }, () => client.uploadTextBlob(session, "x")),
       );
+      // An earlier plaintext send's attachment stays registered but is not part of this message.
+      await client.uploadTextBlob(session, "earlier attachment");
       peak = 0;
       now.mockReturnValue(7_200_000);
       client.setMailServerPolicy(
@@ -1315,24 +1051,27 @@ describe("StalwartJmapClient", () => {
       );
 
       await expect(
-        client.saveDraft(session, {
+        client.sendMessage(session, {
           draftsMailboxId: "drafts",
+          sentMailboxId: null,
           fromEmail: "alice@example.test",
-          to: [],
-          subject: "Draft",
+          to: ["bob@solace.onl"],
+          subject: "Files",
           textBody: "Hello",
+          identityId: "identity-1",
+          sentCopyCiphertext: null,
           attachments: attachments.map((attachment, index) => ({
             ...attachment,
             name: `attachment-${index}.txt`,
           })),
         }),
-      ).resolves.toBe("draft");
+      ).resolves.toEqual(expect.objectContaining({ emailId: "email" }));
 
       expect(peak).toBeLessThanOrEqual(4);
-      expect(uploadedCount).toBe(10);
+      expect(uploadedCount).toBe(11);
       const body = String(fetcher.mock.calls[0]?.[1]?.body);
-      expect(body).toContain('"blob-6"');
-      expect(body).toContain('"blob-10"');
+      expect(body).toContain('"blob-7"');
+      expect(body).toContain('"blob-11"');
       expect(body).not.toContain('"blob-1"');
     } finally {
       now.mockRestore();
@@ -1416,9 +1155,170 @@ describe("StalwartJmapClient", () => {
           subject: "Hello",
           textBody: "Hello",
           identityId: "identity-1",
+          sentCopyCiphertext: null,
         },
       ),
     ).rejects.toThrow("not submitted for delivery");
+  });
+
+  describe("sending to external recipients", () => {
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+      accounts: { account: {} },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+    };
+    const external = {
+      draftsMailboxId: "drafts-1",
+      sentMailboxId: "sent-1",
+      fromEmail: "alice@solace.onl",
+      to: ["bob@example.com"],
+      subject: "Hello",
+      textBody: "Plain hello",
+      identityId: "identity-1",
+      sentCopyCiphertext: { blobId: "sealed-copy", size: 900 },
+    };
+    const requestBodies = (fetcher: jest.Mock<(input: string, init?: RequestInit) => Promise<Response>>) =>
+      fetcher.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+
+    it("submits plaintext and stores only the encrypted copy in Sent, in one request", async () => {
+      const fetcher = jest.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+        async () =>
+          new Response(
+            JSON.stringify({
+              methodResponses: [
+                [
+                  "Email/set",
+                  { created: { draft1: { id: "plain-1" }, sent1: { id: "copy-1", threadId: "t-1" } } },
+                  "c1",
+                ],
+                ["EmailSubmission/set", { created: { s1: { id: "sub-1" } } }, "c2"],
+                ["Email/set", { destroyed: ["plain-1"] }, "c2"],
+              ],
+            }),
+          ),
+      );
+      const client = new StalwartJmapClient({
+        baseUrl: "http://localhost:4001/api/mail/jmap",
+        accessToken: "mail-access-token",
+        fetcher,
+      });
+      client.setMailServerPolicy(resolveMailServerPolicy({}));
+
+      await expect(client.sendMessage(session, external)).resolves.toEqual({
+        emailId: "copy-1",
+        threadId: "t-1",
+        submissionId: "sub-1",
+      });
+
+      const [request] = requestBodies(fetcher);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      const [[, emailSet], [, submission]] = request.methodCalls;
+      expect(emailSet.create.draft1.bodyValues.text.value).toBe("Plain hello");
+      expect(emailSet.create.sent1.mailboxIds).toEqual({ "sent-1": true });
+      expect(emailSet.create.sent1.bodyStructure.subParts[1].blobId).toBe("sealed-copy");
+      expect(JSON.stringify(emailSet.create.sent1)).not.toContain("Plain hello");
+      expect(submission.onSuccessDestroyEmail).toEqual(["#s1"]);
+      expect(submission.onSuccessUpdateEmail).toBeUndefined();
+    });
+
+    it("drops the plaintext and keeps the encrypted copy as the draft when the submission is refused", async () => {
+      const fetcher = jest.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+        async () =>
+          new Response(
+            JSON.stringify({
+              methodResponses:
+                fetcher.mock.calls.length === 1
+                  ? [
+                      [
+                        "Email/set",
+                        { created: { draft1: { id: "plain-1" }, sent1: { id: "copy-1" } } },
+                        "c1",
+                      ],
+                      [
+                        "EmailSubmission/set",
+                        { notCreated: { s1: { type: "forbiddenToSend", description: "Quota" } } },
+                        "c2",
+                      ],
+                    ]
+                  : [["Email/set", { destroyed: ["plain-1"], updated: { "copy-1": null } }, "c1"]],
+            }),
+          ),
+      );
+      const client = new StalwartJmapClient({
+        baseUrl: "http://localhost:4001/api/mail/jmap",
+        accessToken: "mail-access-token",
+        fetcher,
+      });
+      client.setMailServerPolicy(resolveMailServerPolicy({}));
+
+      await expect(client.sendMessage(session, external)).rejects.toThrow("Quota");
+
+      const [, cleanup] = requestBodies(fetcher);
+      expect(cleanup.methodCalls).toEqual([
+        [
+          "Email/set",
+          {
+            accountId: "account",
+            destroy: ["plain-1"],
+            update: {
+              "copy-1": {
+                mailboxIds: { "drafts-1": true },
+                keywords: { $draft: true, $seen: true },
+              },
+            },
+          },
+          "c1",
+        ],
+      ]);
+    });
+  });
+
+  it("saves drafts only as PGP/MIME ciphertext with readable headers", async () => {
+    const fetcher = jest.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [["Email/set", { created: { draft1: { id: "draft-2" } } }, "c1"]],
+          }),
+        ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+    client.setMailServerPolicy(resolveMailServerPolicy({}));
+
+    await expect(
+      client.saveDraft(
+        {
+          apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+          accounts: { account: {} },
+          primaryAccounts: { "urn:ietf:params:jmap:mail": "account" },
+        },
+        {
+          draftsMailboxId: "drafts-1",
+          fromEmail: "alice@solace.onl",
+          to: ["bob@example.com"],
+          subject: "Plans",
+          ciphertext: { blobId: "sealed-draft", size: 512 },
+          previousDraftId: "draft-1",
+        },
+      ),
+    ).resolves.toBe("draft-2");
+
+    const draft = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)).methodCalls[0][1];
+    expect(draft.destroy).toEqual(["draft-1"]);
+    expect(draft.create.draft1).toEqual(
+      expect.objectContaining({
+        subject: "Plans",
+        to: [{ email: "bob@example.com" }],
+        bodyStructure: expect.objectContaining({ type: "multipart/encrypted" }),
+      }),
+    );
+    expect(draft.create.draft1).not.toHaveProperty("textBody");
+    expect(draft.create.draft1).not.toHaveProperty("htmlBody");
+    expect(draft.create.draft1).not.toHaveProperty("attachments");
   });
 
   it("includes upstream details when discovery cannot reach the mail server", async () => {

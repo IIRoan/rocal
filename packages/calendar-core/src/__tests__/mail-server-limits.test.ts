@@ -41,7 +41,7 @@ describe("resolveMailServerLimits", () => {
     ).toMatchObject({
       maxBlobUploadBytes: 100_000_000,
       maxAttachmentSizeBytes: null,
-      maxOutgoingAttachmentBytes: 100_000_000,
+      maxOutgoingAttachmentBytes: 50_000_000,
     });
   });
 
@@ -71,7 +71,7 @@ describe("resolveMailServerLimits", () => {
     ).toMatchObject({
       maxBlobUploadBytes: 75_000_000,
       maxAttachmentSizeBytes: null,
-      maxOutgoingAttachmentBytes: 75_000_000,
+      maxOutgoingAttachmentBytes: 37_500_000,
     });
   });
 
@@ -88,7 +88,7 @@ describe("resolveMailServerLimits", () => {
       maxBlobUploadBytes: 80_000_000,
       maxAttachmentSizeBytes: 60_000_000,
       maxMessageSizeBytes: 90_000_000,
-      maxOutgoingAttachmentBytes: 60_000_000,
+      maxOutgoingAttachmentBytes: 40_000_000,
     });
   });
 
@@ -97,7 +97,7 @@ describe("resolveMailServerLimits", () => {
       maxBlobUploadBytes: DEFAULT_MAX_BLOB_UPLOAD_BYTES,
       maxAttachmentSizeBytes: DEFAULT_MAX_ATTACHMENT_BYTES,
       maxMessageSizeBytes: null,
-      maxOutgoingAttachmentBytes: DEFAULT_MAX_ATTACHMENT_BYTES,
+      maxOutgoingAttachmentBytes: DEFAULT_MAX_BLOB_UPLOAD_BYTES / 2,
     });
   });
 
@@ -113,7 +113,7 @@ describe("resolveMailServerLimits", () => {
     ).toMatchObject({
       maxBlobUploadBytes: 80_000_000,
       maxAttachmentSizeBytes: null,
-      maxOutgoingAttachmentBytes: 80_000_000,
+      maxOutgoingAttachmentBytes: 40_000_000,
     });
   });
 
@@ -128,7 +128,7 @@ describe("resolveMailServerLimits", () => {
     ).toMatchObject({
       maxAttachmentSizeBytes: 40_000_000,
       maxMessageSizeBytes: 75_000_000,
-      maxOutgoingAttachmentBytes: 40_000_000,
+      maxOutgoingAttachmentBytes: DEFAULT_MAX_BLOB_UPLOAD_BYTES / 2,
     });
   });
 });
@@ -144,7 +144,7 @@ describe("resolveMaxOutgoingAttachmentBytes", () => {
         },
         emailSettings: { maxAttachmentSize: 100 * 1024 * 1024 },
       }),
-    ).toBe(100 * 1024 * 1024);
+    ).toBe(50 * 1024 * 1024);
   });
 });
 

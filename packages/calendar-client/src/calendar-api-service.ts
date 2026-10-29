@@ -6,10 +6,8 @@ import {
   type E2eeProvider,
 } from "@workspace/e2ee";
 import {
-  backfillEncryptedNames,
-  type NameEncryptionBackfillResult,
-} from "./name-encryption-backfill";
-import {
+  DEFAULT_CALENDARS,
+  partitionCalendarsByKind,
   validateEventData as coreValidateEventData,
   validateCategoryData as coreValidateCategoryData,
   shouldSealImportedInvitationEncryption,
@@ -54,9 +52,6 @@ import type {
   SyncSubscriptionResponse,
   ImportICSRequest,
   ImportICSResponse,
-  CalendarShareLink,
-  CreateCalendarShareLinkRequestPayload,
-  DisableCalendarShareLinkResponsePayload,
   EventSearchResult,
   EventSearchParams,
   EventSearchCorpusResult,
@@ -73,7 +68,7 @@ const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
 export class CalendarApiService {
   private client: HttpClient;
   private e2ee: E2eeProvider;
-  private nameBackfill: Promise<NameEncryptionBackfillResult> | null = null;
+  private defaultCalendarsSeed: Promise<boolean> | null = null;
 
   constructor(client: HttpClient, e2eeProvider?: E2eeProvider) {
     this.client = client;
@@ -85,15 +80,40 @@ export class CalendarApiService {
     this.e2ee = provider;
   }
 
-  /** Safe on every launch: already-encrypted rows are skipped and failures retry next time. */
-  backfillEncryptedNames(): Promise<NameEncryptionBackfillResult> {
-    this.nameBackfill ??= backfillEncryptedNames({
-      client: this.client,
-      e2ee: this.e2ee,
-    }).finally(() => {
-      this.nameBackfill = null;
+  /** Safe on every launch: resolves true only when it asked the server to create the encrypted default calendars. */
+  ensureDefaultCalendars(): Promise<boolean> {
+    this.defaultCalendarsSeed ??= this.seedDefaultCalendars().finally(() => {
+      this.defaultCalendarsSeed = null;
     });
-    return this.nameBackfill;
+    return this.defaultCalendarsSeed;
+  }
+
+  private async seedDefaultCalendars(): Promise<boolean> {
+    if (!(await this.e2ee.hasActiveSession())) {
+      return false;
+    }
+
+    const existing = await this.client.get<Schema<"CalendarList">>("/api/calendars");
+    if (partitionCalendarsByKind(existing.calendars as Calendar[]).ownedCalendars.length > 0) {
+      return false;
+    }
+
+    const calendars = await Promise.all(
+      DEFAULT_CALENDARS.map(async (calendar) => {
+        const { encryptedName, ...wire } =
+          await this.e2ee.attachCalendarEncryptionShadow(calendar);
+        // Never upload a body that still carries a plaintext name (session lost mid-run).
+        if (!encryptedName || "name" in wire) {
+          throw new Error("Default calendar names were not encrypted");
+        }
+        return { ...wire, encryptedName };
+      }),
+    );
+
+    await this.client.post<Schema<"CalendarList">>("/api/calendars/defaults", {
+      calendars,
+    } satisfies Schema<"SeedDefaultCalendarsRequest">);
+    return true;
   }
 
   // ─── Normalization helpers ───────────────────────────────────────────────────
@@ -366,7 +386,7 @@ export class CalendarApiService {
     icsContent: string,
   ): Promise<InvitationImportEncryptionPayload[] | undefined> {
     const parsed = parseMailCalendarInviteFromIcs(icsContent);
-    if (!parsed) {
+    if (!parsed || !(await this.e2ee.hasActiveSession())) {
       return undefined;
     }
 
@@ -421,7 +441,10 @@ export class CalendarApiService {
       | "encryptedContent"
     >,
   ): Promise<CalendarEvent | null> {
-    if (!shouldSealImportedInvitationEncryption(event)) {
+    if (
+      !shouldSealImportedInvitationEncryption(event) ||
+      !(await this.e2ee.hasActiveSession())
+    ) {
       return null;
     }
 
@@ -553,10 +576,12 @@ export class CalendarApiService {
     event: CreateEventRequest,
   ): Promise<WithOperationWarnings<CalendarEvent>> {
     try {
-      const payload = await this.e2ee.attachEventEncryptionShadow(event);
+      const { encryptedContent, ...payload } =
+        await this.e2ee.attachEventEncryptionShadow(event);
+      if (!encryptedContent) throw new Error("Event title is required");
       const response = await this.client.post<Schema<"Event">>(
         "/api/events",
-        payload satisfies Schema<"CreateEventRequest">,
+        { ...payload, encryptedContent } satisfies Schema<"CreateEventRequest">,
       );
       return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
@@ -604,10 +629,12 @@ export class CalendarApiService {
 
   async createCalendar(calendar: CreateCalendarRequest): Promise<Calendar> {
     try {
-      const payload = await this.e2ee.attachCalendarEncryptionShadow(calendar);
+      const { encryptedName, ...payload } =
+        await this.e2ee.attachCalendarEncryptionShadow(calendar);
+      if (!encryptedName) throw new Error("Calendar name is required");
       const response = await this.client.post<Schema<"Calendar">>(
         "/api/calendars",
-        payload satisfies Schema<"CreateCalendarRequest">,
+        { ...payload, encryptedName } satisfies Schema<"CreateCalendarRequest">,
       );
       return await this.hydrateCalendar(response as Calendar);
     } catch (error) {
@@ -677,10 +704,12 @@ export class CalendarApiService {
     category: CreateCategoryRequest,
   ): Promise<EventCategory> {
     try {
-      const payload = await this.e2ee.attachCategoryEncryptionShadow(category);
+      const { encryptedName, ...payload } =
+        await this.e2ee.attachCategoryEncryptionShadow(category);
+      if (!encryptedName) throw new Error("Category name is required");
       const response = await this.client.post<Schema<"Category">>(
         "/api/categories",
-        payload satisfies Schema<"CreateCategoryRequest">,
+        { ...payload, encryptedName } satisfies Schema<"CreateCategoryRequest">,
       );
       return await this.hydrateCategory(response as EventCategory);
     } catch (error) {
@@ -1039,44 +1068,6 @@ export class CalendarApiService {
       )) as SyncSubscriptionResponse;
     } catch (error) {
       throw this.transformError(error, "Failed to sync subscription");
-    }
-  }
-
-  // ─── Calendar Sharing ────────────────────────────────────────────────────────
-
-  async getCalendarShareLink(calendarId: string): Promise<CalendarShareLink> {
-    try {
-      return await this.client.get<Schema<"CalendarShareLink">>(
-        `/api/calendars/${encodeURIComponent(calendarId)}/share-link`,
-      );
-    } catch (error) {
-      throw this.transformError(error, "Failed to get calendar share link");
-    }
-  }
-
-  async enableCalendarShareLink(
-    calendarId: string,
-    request?: CreateCalendarShareLinkRequestPayload,
-  ): Promise<CalendarShareLink> {
-    try {
-      return await this.client.post<Schema<"CalendarShareLink">>(
-        `/api/calendars/${encodeURIComponent(calendarId)}/share-link`,
-        (request || {}) satisfies Schema<"CreateShareLinkRequest">,
-      );
-    } catch (error) {
-      throw this.transformError(error, "Failed to enable calendar share link");
-    }
-  }
-
-  async disableCalendarShareLink(
-    calendarId: string,
-  ): Promise<DisableCalendarShareLinkResponsePayload> {
-    try {
-      return await this.client.delete<Schema<"DisableShareLinkResponse">>(
-        `/api/calendars/${encodeURIComponent(calendarId)}/share-link`,
-      );
-    } catch (error) {
-      throw this.transformError(error, "Failed to disable calendar share link");
     }
   }
 

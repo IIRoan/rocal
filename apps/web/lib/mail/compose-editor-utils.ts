@@ -67,12 +67,13 @@ export function rewriteCidImagesForEditor(html: string): string {
 export function rewriteComposeInlineImages(html: string): {
   html: string;
   attachments: Array<{
-    blobId: string;
+    blobId: string | null;
     name: string;
     type: string;
     size: number;
     disposition: "inline";
     cid: string;
+    content: Uint8Array;
   }>;
 } {
   const known = getComposeInlineImages();
@@ -109,6 +110,7 @@ export function rewriteComposeInlineImages(html: string): {
       size: entry.size,
       disposition: "inline" as const,
       cid: entry.cid,
+      content: entry.content,
     })),
   };
 }

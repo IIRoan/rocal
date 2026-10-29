@@ -1,13 +1,13 @@
-//! `/api/categories`: plaintext and encrypted names, usage counts, ownership and deletion.
+//! `/api/categories`: encrypted names, usage counts, ownership and deletion.
 
 use serde_json::{Value, json};
+use solace_api_tests::seed::{fake_envelope, fake_token};
 use solace_api_types::SuccessMessage;
 use solace_api_types::categories::{Category, CategoryList, CreateCategoryRequest};
 use sqlx::PgPool;
 
 use crate::calendars::{
-    COLOR_MESSAGE, EventRow, PLAINTEXT_BESIDE_CIPHERTEXT, add_encryption_device, create_calendar,
-    db_json, event_row, insert_event, wire_timestamps,
+    COLOR_MESSAGE, EventRow, create_calendar, db_json, event_row, insert_event, wire_timestamps,
 };
 use crate::helpers::{
     TestApp, TestUser, count, expect_field_error, expect_invalid, expect_unauthorized,
@@ -15,15 +15,35 @@ use crate::helpers::{
 };
 
 const NOT_FOUND: &str = "Category not found or access denied";
-const DUPLICATE: &str = "A category with this name already exists";
 
-async fn create_category(user: &mut TestUser, name: &str, color: &str) -> Category {
-    let request = CreateCategoryRequest {
-        name: Some(name.into()),
+fn encrypted_category(color: &str) -> CreateCategoryRequest {
+    CreateCategoryRequest {
         color: color.into(),
-        ..Default::default()
-    };
-    create_category_with(user, &request).await
+        encrypted_name: fake_envelope(),
+        blind_index_tokens: Some(vec![fake_token()]),
+        encryption_key_version: Some(1),
+    }
+}
+
+async fn create_category(user: &mut TestUser, color: &str) -> Category {
+    create_category_with(user, &encrypted_category(color)).await
+}
+
+/// An encrypted category row straight in the database, for states the API cannot reach.
+async fn insert_category(db: &PgPool, user_id: &str, active: bool) -> String {
+    let id = format!("suitecat{}", hex(8));
+    sqlx::query(
+        "INSERT INTO event_category (id, name, encrypted_name, encryption_state, color, is_active, user_id, created_at, updated_at) \
+         VALUES ($1, '', $2, 'encrypted', 'teal', $3, $4, now(), now())",
+    )
+    .bind(&id)
+    .bind(fake_envelope())
+    .bind(active)
+    .bind(user_id)
+    .execute(db)
+    .await
+    .expect("insert category");
+    id
 }
 
 async fn create_category_with(user: &mut TestUser, request: &CreateCategoryRequest) -> Category {
@@ -67,7 +87,10 @@ async fn anonymous_callers_are_refused() {
     let mut anon = app.anonymous();
     expect_unauthorized(&ok(anon.get("/api/categories").await));
     expect_unauthorized(&ok(anon
-        .post("/api/categories", json!({"name": "Work", "color": "blue"}))
+        .post(
+            "/api/categories",
+            json!({"encryptedName": "ct", "color": "blue"}),
+        )
         .await));
     expect_unauthorized(&ok(anon
         .put("/api/categories/some-id", json!({"color": "rose"}))
@@ -76,57 +99,50 @@ async fn anonymous_callers_are_refused() {
 }
 
 #[tokio::test]
-async fn create_trims_plaintext_names() {
+async fn create_stores_only_the_encrypted_name() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let created = create_category(&mut user, "  Work  ", "#123456").await;
+    let request = encrypted_category("#123456");
+    let created = create_category_with(&mut user, &request).await;
 
     assert_eq!(
         (created.name.as_str(), created.color.as_str()),
-        ("Work", "#123456")
+        ("", "#123456")
+    );
+    assert_eq!(
+        created.encrypted_name.as_ref(),
+        Some(&request.encrypted_name)
     );
     assert_eq!(created.user_id.0, user.id);
     assert!(created.is_active);
-    assert_eq!(created.encryption_state, "plaintext");
-    assert_eq!(
-        (&created.encrypted_name, &created.blind_index_tokens),
-        (&None, &None)
-    );
+    assert_eq!(created.encryption_state, "encrypted");
     assert_eq!(created.encryption_key_version, 1);
     assert_eq!(created.created_at, created.updated_at);
     let row = category_row(&app.db, &created.id.0).await.expect("row");
     assert_eq!(
         (&row["name"], &row["user_id"], &row["encryption_state"]),
-        (&json!("Work"), &json!(user.id), &json!("plaintext"))
+        (&json!(""), &json!(user.id), &json!("encrypted"))
     );
+    assert_eq!(row["encrypted_name"], json!(request.encrypted_name));
     assert_eq!(
         wire_timestamps(&app.db, "event_category", &created.id.0).await,
         (created.created_at.0.clone(), created.updated_at.0.clone())
     );
 }
-
 #[tokio::test]
 async fn the_list_holds_own_active_categories_by_name_with_usage_counts() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let mut other = app.user().await;
-    let calendar = create_calendar(&mut user, "Cal", "blue").await;
-    let work = create_category(&mut user, "Work", "blue").await;
-    let alpha = create_category(&mut user, "Alpha", "emerald").await;
-    create_category(&mut other, "Foreign", "red").await;
-    sqlx::query(
-        "INSERT INTO event_category (id, name, color, is_active, user_id, created_at, updated_at) \
-         VALUES ($1, 'Archived', 'teal', false, $2, now(), now())",
-    )
-    .bind(format!("suitecat{}", hex(8)))
-    .bind(&user.id)
-    .execute(&app.db)
-    .await
-    .expect("insert inactive category");
+    let calendar = create_calendar(&mut user, "blue").await;
+    let work = create_category(&mut user, "blue").await;
+    let alpha = create_category(&mut user, "emerald").await;
+    create_category(&mut other, "red").await;
+    insert_category(&app.db, &user.id, false).await;
     for _ in 0..4 {
         let event = EventRow {
             category_id: Some(&work.id.0),
-            ..Default::default()
+            ..EventRow::sealed()
         };
         insert_event(&app.db, &user.id, &calendar.id.0, event).await;
     }
@@ -136,24 +152,32 @@ async fn the_list_holds_own_active_categories_by_name_with_usage_counts() {
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
-    let summary: Vec<(&str, i64)> = list
-        .categories
-        .iter()
-        .map(|c| (c.category.name.as_str(), c.usage_count))
-        .collect();
-    assert_eq!(summary, [("Alpha", 0), ("Work", 4)]);
-    assert_eq!(list.categories[0].category, alpha);
-    assert_eq!(list.categories[1].category, work);
+    assert_eq!(
+        list.categories.len(),
+        2,
+        "inactive and foreign ones are left out"
+    );
+    for (category, usage) in [(&alpha, 0), (&work, 4)] {
+        let listed = list
+            .categories
+            .iter()
+            .find(|c| c.category.id == category.id)
+            .expect("listed category");
+        assert_eq!((&listed.category, listed.usage_count), (category, usage));
+    }
 }
 
 #[tokio::test]
 async fn invalid_colors_are_rejected_with_the_allowed_list() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let target = create_category(&mut user, "Target", "blue").await;
+    let target = create_category(&mut user, "blue").await;
     for color in ["chartreuse", "BLUE", "#12345", ""] {
         let created = user
-            .post("/api/categories", json!({"name": "Work", "color": color}))
+            .post(
+                "/api/categories",
+                json!({"encryptedName": "ct", "color": color}),
+            )
             .await;
         expect_invalid(&created, COLOR_MESSAGE, "color");
         let updated = user
@@ -174,36 +198,27 @@ async fn create_validation_reports_zod_messages() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let cases = [
-        (json!({"name": "Work"}), "Required", "color"),
+        (json!({"encryptedName": "ct"}), "Required", "color"),
+        (json!({"color": "blue"}), "Required", "encryptedName"),
         (
-            json!({"name": 5, "color": "blue"}),
+            json!({"encryptedName": 5, "color": "blue"}),
             "Expected string, received number",
-            "name",
+            "encryptedName",
         ),
         (
-            json!({"name": "Work", "color": "blue", "encryptionState": "invalid_state"}),
-            "Invalid enum value. Expected 'plaintext' | 'shadow_write' | 'encrypted', received 'invalid_state'",
-            "encryptionState",
+            json!({"encryptedName": "ct", "color": "blue", "encryptionState": "encrypted"}),
+            "Unrecognized key(s) in object: 'encryptionState'",
+            "root",
         ),
         (
-            json!({"name": "Work", "color": "blue", "encryptionKeyVersion": 0}),
+            json!({"encryptedName": "ct", "color": "blue", "encryptionKeyVersion": 0}),
             "Number must be greater than or equal to 1",
             "encryptionKeyVersion",
         ),
         (
-            json!({"name": "Work", "color": "blue", "unexpected": true}),
+            json!({"encryptedName": "ct", "color": "blue", "unexpected": true}),
             "Unrecognized key(s) in object: 'unexpected'",
             "root",
-        ),
-        (
-            json!({"color": "blue"}),
-            "Category name is required.",
-            "encryptedName",
-        ),
-        (
-            json!({"name": "  ", "color": "blue"}),
-            "Category name is required.",
-            "encryptedName",
         ),
     ];
     for (body, message, path) in cases {
@@ -226,126 +241,50 @@ async fn create_validation_reports_zod_messages() {
         body["details"]["issues"],
         json!([
             {"path": "color", "message": COLOR_MESSAGE},
-            {"path": "encryptedName", "message": "Category name is required."},
+            {"path": "encryptedName", "message": "Required"},
+            {"path": "root", "message": "Unrecognized key(s) in object: 'name'"},
         ])
     );
     assert_eq!(category_count(&app.db, &user.id).await, 0);
 }
-
-#[tokio::test]
-async fn names_are_at_most_100_utf16_units_after_trimming() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    for name in ["x".repeat(101), "\u{1F600}".repeat(51)] {
-        let response = user
-            .post("/api/categories", json!({"name": name, "color": "blue"}))
-            .await;
-        expect_field_error(
-            &response,
-            "Category name cannot exceed 100 characters",
-            "name",
-        );
-    }
-    assert_eq!(category_count(&app.db, &user.id).await, 0);
-
-    let padded = create_category(&mut user, &format!("  {}  ", "x".repeat(100)), "blue").await;
-    assert_eq!(padded.name, "x".repeat(100));
-    let emoji = create_category(&mut user, &"\u{1F600}".repeat(50), "blue").await;
-    assert_eq!(emoji.name.chars().count(), 50);
-}
-
-#[tokio::test]
-async fn blank_names_on_update_fail_in_the_service() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    let category = create_category(&mut user, "Keep", "blue").await;
-    let path = format!("/api/categories/{}", category.id);
-    for name in ["   ", ""] {
-        expect_field_error(
-            &user.put(&path, json!({"name": name})).await,
-            "Category name is required and cannot be empty",
-            "name",
-        );
-    }
-    expect_field_error(
-        &user.put(&path, json!({"name": "x".repeat(101)})).await,
-        "Category name cannot exceed 100 characters",
-        "name",
-    );
-    let row = category_row(&app.db, &category.id.0).await.expect("row");
-    assert_eq!(row["name"], json!("Keep"));
-}
-
-#[tokio::test]
-async fn duplicate_plaintext_names_are_rejected() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    let work = create_category(&mut user, "Work", "blue").await;
-    let personal = create_category(&mut user, "Personal", "blue").await;
-    sqlx::query(
-        "INSERT INTO event_category (id, name, color, is_active, user_id, created_at, updated_at) \
-         VALUES ($1, 'Archived', 'teal', false, $2, now(), now())",
-    )
-    .bind(format!("suitecat{}", hex(8)))
-    .bind(&user.id)
-    .execute(&app.db)
-    .await
-    .expect("insert inactive category");
-
-    // Inactive categories still hold their names.
-    for name in ["Work", " Work ", "Archived"] {
-        let response = user
-            .post("/api/categories", json!({"name": name, "color": "blue"}))
-            .await;
-        expect_field_error(&response, DUPLICATE, "name");
-    }
-    let renamed = user
-        .put(
-            &format!("/api/categories/{}", work.id),
-            json!({"name": "  Personal  "}),
-        )
-        .await;
-    expect_field_error(&renamed, DUPLICATE, "name");
-    let row = category_row(&app.db, &work.id.0).await.expect("row");
-    assert_eq!(row["name"], json!("Work"));
-    assert_eq!(category_count(&app.db, &user.id).await, 3);
-
-    let same = update_category(&mut user, &personal.id.0, json!({"name": " Personal "})).await;
-    assert_eq!(same.name, "Personal", "keeping its own name is fine");
-}
-
 #[tokio::test]
 async fn updates_change_name_and_color() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let created = create_category(&mut user, "Work", "blue").await;
+    let created = create_category(&mut user, "blue").await;
 
     let updated = update_category(
         &mut user,
         &created.id.0,
-        json!({"name": "  Focus  ", "color": "emerald"}),
+        json!({"encryptedName": "renamed-ciphertext", "color": "emerald"}),
     )
     .await;
     assert_eq!(
-        (updated.name.as_str(), updated.color.as_str()),
-        ("Focus", "emerald")
+        (
+            updated.encrypted_name.as_deref(),
+            updated.color.as_str(),
+            updated.name.as_str()
+        ),
+        (Some("renamed-ciphertext"), "emerald", "")
     );
-    assert_eq!(updated.encryption_state, "plaintext");
+    assert_eq!(updated.encryption_state, "encrypted");
     assert_eq!(updated.created_at, created.created_at);
     assert!(updated.updated_at > created.updated_at);
     let row = category_row(&app.db, &created.id.0).await.expect("row");
     assert_eq!(
-        (&row["name"], &row["color"]),
-        (&json!("Focus"), &json!("emerald"))
+        (&row["encrypted_name"], &row["color"]),
+        (&json!("renamed-ciphertext"), &json!("emerald"))
     );
 
     let recolored = update_category(&mut user, &created.id.0, json!({"color": "#abc"})).await;
     assert_eq!(
-        (recolored.name.as_str(), recolored.color.as_str()),
-        ("Focus", "#abc")
+        (
+            recolored.encrypted_name.as_deref(),
+            recolored.color.as_str()
+        ),
+        (Some("renamed-ciphertext"), "#abc")
     );
 }
-
 #[tokio::test]
 async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
     let app = TestApp::spawn().await;
@@ -356,11 +295,9 @@ async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
         &mut user,
         &CreateCategoryRequest {
             color: "#123456".into(),
-            encrypted_name: Some(ciphertext.into()),
+            encrypted_name: ciphertext.into(),
             blind_index_tokens: Some(vec!["idx-1".into(), "idx-2".into()]),
-            encryption_state: Some("shadow_write".into()),
             encryption_key_version: Some(2),
-            ..Default::default()
         },
     )
     .await;
@@ -395,7 +332,7 @@ async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
         &mut user,
         &CreateCategoryRequest {
             color: "blue".into(),
-            encrypted_name: Some(ciphertext.into()),
+            encrypted_name: ciphertext.into(),
             ..Default::default()
         },
     )
@@ -414,109 +351,54 @@ async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
 }
 
 #[tokio::test]
-async fn uploading_a_ciphertext_name_blanks_the_stored_name() {
+async fn plaintext_names_are_refused_as_unknown_keys() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let created = create_category(&mut user, "Health", "blue").await;
-    add_encryption_device(&app.db, &user.id).await;
-
-    let updated = update_category(
-        &mut user,
-        &created.id.0,
-        json!({"encryptedName": "ciphertext", "blindIndexTokens": ["idx"], "encryptionKeyVersion": 1}),
-    )
-    .await;
-    assert_eq!(updated.name, "");
-    assert_eq!(updated.encrypted_name.as_deref(), Some("ciphertext"));
-    assert_eq!(updated.blind_index_tokens.as_deref(), Some(r#"["idx"]"#));
-    assert_eq!(updated.encryption_state, "encrypted");
-    assert_eq!(updated.color, "blue");
-    let row = category_row(&app.db, &created.id.0).await.expect("row");
-    assert_eq!(
-        (&row["name"], &row["encryption_state"]),
-        (&json!(""), &json!("encrypted"))
-    );
-}
-
-#[tokio::test]
-async fn plaintext_names_beside_ciphertext_are_rejected() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    let target = create_category(&mut user, "Target", "blue").await;
+    let target = create_category(&mut user, "blue").await;
+    let before = category_row(&app.db, &target.id.0).await;
     let created = user
         .post(
             "/api/categories",
             json!({"name": "Health", "encryptedName": "ciphertext", "color": "#123456"}),
         )
         .await;
-    expect_invalid(&created, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
-    let updated = user
-        .put(
-            &format!("/api/categories/{}", target.id),
-            json!({"name": "Health", "encryptedName": "ciphertext"}),
-        )
-        .await;
-    expect_invalid(&updated, PLAINTEXT_BESIDE_CIPHERTEXT, "name");
+    expect_unknown_field(&created, "name");
+    let path = format!("/api/categories/{}", target.id);
+    for body in [
+        json!({"name": "Health"}),
+        json!({"name": "Health", "encryptedName": "ciphertext"}),
+    ] {
+        expect_unknown_field(&user.put(&path, body).await, "name");
+    }
     assert_eq!(category_count(&app.db, &user.id).await, 1);
-    let row = category_row(&app.db, &target.id.0).await.expect("row");
-    assert_eq!(
-        (&row["name"], &row["encrypted_name"]),
-        (&json!("Target"), &json!(null))
-    );
+    assert_eq!(category_row(&app.db, &target.id.0).await, before);
 
-    let empty = user
-        .put(
-            &format!("/api/categories/{}", target.id),
-            json!({"encryptedName": ""}),
-        )
-        .await;
-    expect_field_error(
-        &empty,
-        "Encrypted category name cannot be empty",
-        "encryptedName",
-    );
-}
-
-#[tokio::test]
-async fn accounts_with_an_e2ee_device_must_encrypt_category_names() {
-    let app = TestApp::spawn().await;
-    let mut user = app.user().await;
-    let category = create_category(&mut user, "Before", "blue").await;
-    add_encryption_device(&app.db, &user.id).await;
-    let message = "Category name encryption requires an active encryption session.";
-
-    let created = user
-        .post(
-            "/api/categories",
-            json!({"name": "Health", "color": "blue"}),
-        )
-        .await;
-    expect_field_error(&created, message, "encryptedName");
-    let path = format!("/api/categories/{}", category.id);
-    // Even resending the current name counts as plaintext.
-    for name in ["After", "Before"] {
+    for blank in ["", "   "] {
         expect_field_error(
-            &user.put(&path, json!({"name": name})).await,
-            message,
+            &user.put(&path, json!({"encryptedName": blank})).await,
+            "Encrypted category name cannot be empty",
+            "encryptedName",
+        );
+        expect_field_error(
+            &user
+                .post(
+                    "/api/categories",
+                    json!({"encryptedName": blank, "color": "blue"}),
+                )
+                .await,
+            "Encrypted category name cannot be empty",
             "encryptedName",
         );
     }
-    assert_eq!(category_count(&app.db, &user.id).await, 1);
-
-    let recolored = update_category(&mut user, &category.id.0, json!({"color": "rose"})).await;
-    assert_eq!(
-        (recolored.name.as_str(), recolored.color.as_str()),
-        ("Before", "rose")
-    );
+    assert_eq!(category_row(&app.db, &target.id.0).await, before);
 }
-
 #[tokio::test]
 async fn delete_detaches_events_and_removes_the_category() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = create_calendar(&mut user, "Cal", "blue").await;
-    let category = create_category(&mut user, "Work", "blue").await;
-    let kept = create_category(&mut user, "Kept", "blue").await;
+    let calendar = create_calendar(&mut user, "blue").await;
+    let category = create_category(&mut user, "blue").await;
+    let kept = create_category(&mut user, "blue").await;
     let tagged = [
         insert_event(
             &app.db,
@@ -524,7 +406,7 @@ async fn delete_detaches_events_and_removes_the_category() {
             &calendar.id.0,
             EventRow {
                 category_id: Some(&category.id.0),
-                ..Default::default()
+                ..EventRow::sealed()
             },
         )
         .await,
@@ -534,7 +416,7 @@ async fn delete_detaches_events_and_removes_the_category() {
             &calendar.id.0,
             EventRow {
                 category_id: Some(&category.id.0),
-                ..Default::default()
+                ..EventRow::sealed()
             },
         )
         .await,
@@ -545,7 +427,7 @@ async fn delete_detaches_events_and_removes_the_category() {
         &calendar.id.0,
         EventRow {
             category_id: Some(&kept.id.0),
-            ..Default::default()
+            ..EventRow::sealed()
         },
     )
     .await;
@@ -580,7 +462,7 @@ async fn other_users_categories_behave_as_not_found() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let mut other = app.user().await;
-    let category = create_category(&mut owner, "Private", "blue").await;
+    let category = create_category(&mut owner, "blue").await;
     let before = category_row(&app.db, &category.id.0).await;
     let path = format!("/api/categories/{}", category.id);
 
@@ -590,14 +472,14 @@ async fn other_users_categories_behave_as_not_found() {
         "categoryId",
     );
     expect_field_error(
-        &other.put(&path, json!({"name": "Mine"})).await,
+        &other.put(&path, json!({"encryptedName": "ct"})).await,
         NOT_FOUND,
         "categoryId",
     );
     expect_field_error(&other.delete(&path).await, NOT_FOUND, "categoryId");
     expect_field_error(
         &owner
-            .put("/api/categories/no-such-category", json!({"name": "Focus"}))
+            .put("/api/categories/no-such-category", json!({"color": "rose"}))
             .await,
         NOT_FOUND,
         "categoryId",
@@ -618,13 +500,13 @@ async fn owner_ids_in_bodies_are_rejected() {
     let app = TestApp::spawn().await;
     let victim = app.user().await;
     let mut attacker = app.user().await;
-    let category = create_category(&mut attacker, "Mine", "blue").await;
+    let category = create_category(&mut attacker, "blue").await;
 
     expect_unknown_field(
         &attacker
             .post(
                 "/api/categories",
-                json!({"name": "Planted", "color": "blue", "userId": victim.id}),
+                json!({"encryptedName": "ct", "color": "blue", "userId": victim.id}),
             )
             .await,
         "userId",

@@ -4,8 +4,8 @@ use sea_orm::sea_query::{Expr, Func, Query};
 use sea_orm::{ColumnTrait, Condition, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter};
 
 use crate::db::entities::{
-    calendar_event, calendar_sharing, event_participant, invite, mail_directory_entry,
-    notification_log, session, user, verification,
+    calendar_event, event_participant, invite, mail_directory_entry, notification_log, session,
+    user, verification,
 };
 use crate::events::queries as events;
 use crate::instant;
@@ -52,14 +52,6 @@ pub async fn delete_user<C: ConnectionTrait>(
         .exec(db)
         .await?;
     release_participations(db, user_id, emails).await?;
-    calendar_sharing::Entity::delete_many()
-        .filter(
-            Condition::any()
-                .add(calendar_sharing::Column::SharedWith.eq(user_id))
-                .add(calendar_sharing::Column::SharedBy.eq(user_id)),
-        )
-        .exec(db)
-        .await?;
     notification_log::Entity::delete_many()
         .filter(notification_log::Column::UserId.eq(user_id))
         .exec(db)

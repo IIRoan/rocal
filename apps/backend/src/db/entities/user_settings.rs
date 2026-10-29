@@ -45,8 +45,6 @@ pub struct Model {
     pub show_declined_events: bool,
     pub created_at: TimeDateTime,
     pub updated_at: TimeDateTime,
-    #[sea_orm(column_type = "Text")]
-    pub event_encryption_mode: String,
     pub push_notifications: bool,
 }
 

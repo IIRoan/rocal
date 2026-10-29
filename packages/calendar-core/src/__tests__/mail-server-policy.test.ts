@@ -76,7 +76,7 @@ describe("resolveMailServerPolicy", () => {
         maxBlobUploadBytes: 100_000_000,
         maxAttachmentSizeBytes: 100_000_000,
         maxMessageSizeBytes: 150_000_000,
-        maxOutgoingAttachmentBytes: 100_000_000,
+        maxOutgoingAttachmentBytes: 50_000_000,
       },
       maxMailboxDepth: 8,
       maxMailboxNameLength: 120,
@@ -210,7 +210,7 @@ describe("MailBlobUploadRegistry", () => {
     expect(registry.get("original")?.blobId).toBe("third");
     expect(registry.get("second")?.blobId).toBe("third");
     expect(registry.get("third")?.uploadedAt).toBe(200);
-    expect(registry.listRegistered()).toHaveLength(1);
+    expect(registry.get("original")).toBe(registry.get("third"));
   });
 });
 

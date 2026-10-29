@@ -9,17 +9,13 @@ use base64::alphabet;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
 use rand::RngExt;
-use reqwest::Method;
-use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, USER_AGENT};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use solace_api_types::profiles::AvatarResponse;
 
 use super::queries;
-use super::service::{avatar_owner, public_image_url, uploaded_avatar_path};
-use crate::addresses;
+use super::service::uploaded_avatar_path;
 use crate::db::entities::user;
 use crate::error::AppError;
-use crate::integrations::safe_fetch::{SafeFetch, SafeRequest};
 use crate::integrations::storage::{
     self, AvatarStorage, StorageError, UPLOAD_SIZE_PX, VARIANT_SIZES,
 };
@@ -28,9 +24,6 @@ use crate::telemetry::redact_pii;
 
 /// Prisma's interactive-transaction timeout, which bounds how long a slow bucket holds the row lock.
 const TRANSACTION_TIMEOUT: Duration = Duration::from_secs(30);
-const EXTERNAL_MAX_BYTES: usize = 2 * 1024 * 1024;
-const EXTERNAL_TIMEOUT: Duration = Duration::from_secs(8);
-const EXTERNAL_MAX_REDIRECTS: usize = 3;
 
 /// `Buffer.from(image, "base64")`: whitespace, URL-safe letters and missing padding are tolerated; garbage decodes to nothing.
 const LENIENT_BASE64: GeneralPurpose = GeneralPurpose::new(
@@ -107,50 +100,6 @@ pub async fn stream_uploaded(
         return Ok(None);
     }
     read_uploaded(state, avatar_id, size).await
-}
-
-/// `streamAvatar`: the uploaded picture, else the external image fetched through safe fetch.
-pub async fn stream_by_email(
-    state: &AppState,
-    email: &str,
-    size: Option<u32>,
-) -> Result<Option<Picture>, AppError> {
-    if addresses::is_reserved_system_email(email, None) {
-        return Ok(None);
-    }
-    let Some(owner) = avatar_owner(state, email).await? else {
-        return Ok(None);
-    };
-    if let Some(avatar_id) = owner.avatar_id {
-        return read_uploaded(state, &avatar_id, size).await;
-    }
-    match public_image_url(owner.image.as_deref()) {
-        Some(url) => Ok(fetch_external(&state.safe_fetch, &url).await),
-        None => Ok(None),
-    }
-}
-
-/// A non-empty `image/*` answer within 2 MiB, 8 s and 3 redirects; any refusal or failure is no picture.
-async fn fetch_external(safe_fetch: &SafeFetch, url: &str) -> Option<Picture> {
-    let mut headers = HeaderMap::new();
-    headers.insert(USER_AGENT, HeaderValue::from_static("Solace/1.0"));
-    headers.insert(ACCEPT, HeaderValue::from_static("image/*"));
-    let request = SafeRequest {
-        method: Method::GET,
-        headers,
-        timeout: EXTERNAL_TIMEOUT,
-        max_bytes: EXTERNAL_MAX_BYTES,
-        max_redirects: EXTERNAL_MAX_REDIRECTS,
-    };
-    let response = safe_fetch.fetch(url, &request).await.ok()?;
-    let content_type = response.headers.get(CONTENT_TYPE)?.clone();
-    let is_image = content_type
-        .to_str()
-        .is_ok_and(|value| value.starts_with("image/"));
-    (response.status.is_success() && is_image && !response.body.is_empty()).then_some(Picture {
-        body: response.body,
-        content_type,
-    })
 }
 
 /// `deletePendingAvatar`: deletes the reserved or retired picture's objects, then frees the slot.
@@ -239,32 +188,21 @@ pub async fn upload(
     Ok(AvatarResponse { image: Some(path) })
 }
 
-/// `removeAvatar`.
+/// `removeAvatar`: the picture is detached in the transaction and its objects deleted after the commit.
 pub async fn remove(state: &AppState, user_id: &str) -> Result<AvatarResponse, AppError> {
-    update_user_image(state, user_id, None, None).await?;
-    Ok(AvatarResponse { image: None })
-}
-
-/// `updateUserImage`, also behind Better Auth's `update-user`: a new image detaches the uploaded picture, which is deleted after the commit.
-pub async fn update_user_image(
-    state: &AppState,
-    user_id: &str,
-    name: Option<String>,
-    image: Option<String>,
-) -> Result<(), AppError> {
     let retired = within_transaction_timeout(async {
         let transaction = state.db.begin().await?;
         let locked = queries::lock(&transaction, user_id).await?;
-        let retired = if image == locked.image {
-            queries::update_profile(&transaction, user_id, name, image, None).await?;
+        let retired = if locked.image.is_none() {
+            queries::update_profile(&transaction, user_id, None, None, None).await?;
             locked.pending_avatar_id.clone()
         } else {
             delete_pending(state, &transaction, &locked).await?;
             queries::update_profile(
                 &transaction,
                 user_id,
-                name,
-                image,
+                None,
+                None,
                 Some(locked.avatar_id.clone()),
             )
             .await?;
@@ -275,7 +213,7 @@ pub async fn update_user_image(
     })
     .await?;
     cleanup_pending(state, user_id, retired.as_deref()).await;
-    Ok(())
+    Ok(AvatarResponse { image: None })
 }
 
 /// `deleteCurrentAvatar`, for account deletion: every stored object of the user, under the row lock of `db`'s transaction.
@@ -297,17 +235,12 @@ pub(crate) mod tests {
     use std::collections::BTreeSet;
     use std::sync::atomic::Ordering;
 
-    use axum::Router;
-    use axum::http::{StatusCode, header};
-    use axum::response::IntoResponse;
-    use axum::routing::get;
     use image::DynamicImage;
     use sea_orm::{ConnectionTrait, Statement};
 
     use super::*;
     use crate::config::Config;
     use crate::db::scratch::ScratchDatabase;
-    use crate::integrations::safe_fetch::tests::{public_lookup, safe_fetch};
     use crate::integrations::storage::tests::{LocalBucket, config as bucket_config};
 
     const USER: &str = "avatar-test-user";
@@ -535,75 +468,14 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn a_failed_legacy_update_keeps_the_old_objects() {
-        let fixture = fixture().await;
-        fixture.fault("commit").await;
-        let changed = update_user_image(
-            &fixture.state,
-            USER,
-            Some("Renamed".into()),
-            Some("https://example.test/new.jpg".into()),
-        )
-        .await;
-        assert!(changed.is_err());
-        assert_eq!(fixture.row().await.0.as_deref(), Some(PREVIOUS));
-        assert_eq!(fixture.stored(), previous_only());
-    }
-
-    #[tokio::test]
-    async fn legacy_removal_keeps_the_cleanup_slot_when_storage_is_down() {
+    async fn removal_keeps_the_cleanup_slot_when_storage_is_down() {
         let fixture = fixture().await;
         fixture.fail_deletes(true);
-        update_user_image(&fixture.state, USER, None, None)
-            .await
-            .unwrap();
+        remove(&fixture.state, USER).await.unwrap();
         assert_eq!(fixture.row().await, (None, Some(PREVIOUS.into()), None));
         fixture.fail_deletes(false);
-        update_user_image(&fixture.state, USER, None, None)
-            .await
-            .unwrap();
+        remove(&fixture.state, USER).await.unwrap();
         assert_eq!(fixture.row().await, (None, None, None));
         assert!(fixture.stored().is_empty());
-    }
-
-    #[tokio::test]
-    async fn an_external_picture_streams_through_safe_fetch() {
-        let app = Router::new()
-            .route(
-                "/alice.png",
-                get(|| async { ([(header::CONTENT_TYPE, "image/png")], vec![1u8, 2, 3]) }),
-            )
-            .route(
-                "/page.html",
-                get(|| async { ([(header::CONTENT_TYPE, "text/html")], "<p>") }),
-            )
-            .route(
-                "/empty.png",
-                get(|| async { [(header::CONTENT_TYPE, "image/png")] }),
-            )
-            .fallback(|| async { StatusCode::NOT_FOUND.into_response() });
-        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
-            .await
-            .unwrap();
-        let port = listener.local_addr().unwrap().port();
-        tokio::spawn(async move { axum::serve(listener, app).await });
-        let fetch = safe_fetch(public_lookup());
-
-        let streamed = fetch_external(&fetch, &format!("http://cdn.test:{port}/alice.png"))
-            .await
-            .unwrap();
-        assert_eq!(streamed.body, [1, 2, 3]);
-        assert_eq!(streamed.content_type, "image/png");
-        for refused in [
-            format!("http://cdn.test:{port}/page.html"),
-            format!("http://cdn.test:{port}/empty.png"),
-            format!("http://cdn.test:{port}/missing.png"),
-            "http://10.0.0.1/alice.png".into(),
-        ] {
-            assert!(
-                fetch_external(&fetch, &refused).await.is_none(),
-                "{refused}"
-            );
-        }
     }
 }

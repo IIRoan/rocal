@@ -22,10 +22,6 @@ describe("QUERY_KEYS", () => {
       "eventNotifications",
       "evt-1",
     ]);
-    expect(QUERY_KEYS.calendarShareLink("cal-1")).toEqual([
-      "calendarShareLink",
-      "cal-1",
-    ]);
     expect(QUERY_KEYS.searchResults("party")).toEqual(["search", "party"]);
   });
 

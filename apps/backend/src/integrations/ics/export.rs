@@ -5,14 +5,13 @@ use std::sync::LazyLock;
 
 use icu_collator::options::{CollatorOptions, Strength};
 use icu_collator::{Collator, CollatorBorrowed};
-use regex_lite::Regex;
 use serde_json::Value;
 use time::PrimitiveDateTime;
 
 use super::build;
 use super::{
     Frequency, Participant, ParticipantRole, ParticipantStatus, RecurrenceRule, js,
-    normalize_email, pattern, truthy,
+    normalize_email, truthy,
 };
 use crate::http::zod::js_trim;
 
@@ -22,9 +21,6 @@ static BASE_COLLATOR: LazyLock<Option<CollatorBorrowed<'static>>> = LazyLock::ne
     options.strength = Some(Strength::Primary);
     Collator::try_new(Default::default(), options).ok()
 });
-
-static UNSAFE_FILENAME: LazyLock<Regex> = LazyLock::new(|| pattern(r"[^a-z0-9._-]+"));
-static DASH_RUNS: LazyLock<Regex> = LazyLock::new(|| pattern(r"-{2,}"));
 
 /// A stored event's columns that go into ICS.
 #[derive(Debug, Clone)]
@@ -216,25 +212,6 @@ pub fn to_build_event(event: &ExportEvent<'_>) -> Result<build::Event, InvalidUn
         recurrence_zone: None,
         excluded_dates: Vec::new(),
     })
-}
-
-/// `toSafeIcsFilename`: lowercase `[a-z0-9._-]`, ending in `.ics`.
-pub fn safe_filename(base: &str) -> String {
-    let trimmed = js_trim(base);
-    let lower = if trimmed.is_empty() {
-        "calendar".to_owned()
-    } else {
-        trimmed.to_lowercase()
-    };
-    let dashed = UNSAFE_FILENAME.replace_all(&lower, "-");
-    let collapsed = DASH_RUNS.replace_all(&dashed, "-");
-    let name = collapsed.trim_matches('-');
-    let name = if name.is_empty() { "calendar" } else { name };
-    if name.ends_with(".ics") {
-        name.to_owned()
-    } else {
-        format!("{name}.ics")
-    }
 }
 
 /// Orders two labels the way `localeCompare` with base sensitivity does.
@@ -451,16 +428,5 @@ mod tests {
                 std::fs::read_to_string(format!("{directory}/{name}.ics")).expect("golden");
             assert_eq!(actual, expected, "{name}");
         }
-    }
-
-    #[test]
-    fn filenames_are_safe() {
-        assert_eq!(safe_filename("  Team Calendar  "), "team-calendar.ics");
-        assert_eq!(safe_filename("Roadmap: Q1/Q2"), "roadmap-q1-q2.ics");
-        assert_eq!(safe_filename("already.ics"), "already.ics");
-        assert_eq!(safe_filename("   "), "calendar.ics");
-        assert_eq!(safe_filename("!!!"), "calendar.ics");
-        assert_eq!(compare_base("alice", "Bob"), Ordering::Less);
-        assert_eq!(compare_base("émile", "Emile"), Ordering::Equal);
     }
 }

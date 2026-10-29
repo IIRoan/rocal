@@ -12,8 +12,7 @@ use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
 use crate::http::schemas::{
-    default_view_schema, event_encryption_mode_schema, theme_schema, time_format_schema,
-    timezone_schema,
+    default_view_schema, theme_schema, time_format_schema, timezone_schema,
 };
 use crate::http::zod;
 use crate::request_schema;
@@ -32,7 +31,6 @@ request_schema!(UpdateSettingsRequest => zod::object([
     ("pushNotifications", zod::boolean().optional()),
     ("browserNotifications", zod::boolean().optional()),
     ("reminderSound", zod::boolean().optional()),
-    ("eventEncryptionMode", event_encryption_mode_schema().optional()),
     ("defaultEventDuration", zod::number().int().min(1).max(zod::I32_MAX).optional()),
     ("defaultCalendarId", zod::union(vec![zod::string(), zod::null()]).optional()),
     ("compactView", zod::boolean().optional()),

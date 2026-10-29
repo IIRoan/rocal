@@ -8,11 +8,10 @@ export interface EncryptableCalendarItem {
   externalId?: string | null;
   isSynced?: boolean | null;
   subscriptionId?: string | null;
-  forceFullEncryption?: boolean | null;
 }
 
 export type CalendarEncryptionKind = "event" | "calendar" | "category";
-export type EncryptionDisplayState = "encrypted" | "pending" | "plaintext";
+export type EncryptionDisplayState = "encrypted" | "plaintext";
 
 export const EVENT_ENCRYPTED_FIELDS = ["Title", "Description", "Location"];
 export const EVENT_READABLE_METADATA = [
@@ -21,21 +20,18 @@ export const EVENT_READABLE_METADATA = [
 ];
 export const EVENT_INVITATION_ENCRYPTION_HINT =
   "Invitations share readable event details with the server and recipients.";
-export const CALENDAR_ICS_SHARING_HINT =
-  "Anyone with the ICS link can read its contents. Sharing is unavailable while the calendar contains encrypted events.";
 export const MAIL_READABLE_METADATA =
   "Sender, recipients, subject, date and routing headers remain readable.";
 
 export function resolveEncryptionState(
   item: EncryptableCalendarItem,
 ): EncryptionDisplayState {
-  if (item.encryptionState === "encrypted") return "encrypted";
-  if (item.encryptionState === "shadow_write") return "pending";
-  if (item.encryptionState === "plaintext") return "plaintext";
-  // Ciphertext alone does not prove that a legacy plaintext copy was removed.
-  if (item.encryptedContent?.trim() || item.encryptedName?.trim())
-    return "pending";
-  return "plaintext";
+  if (item.encryptionState) {
+    return item.encryptionState === "encrypted" ? "encrypted" : "plaintext";
+  }
+  return item.encryptedContent?.trim() || item.encryptedName?.trim()
+    ? "encrypted"
+    : "plaintext";
 }
 
 export function getCalendarEncryptionNotice(
@@ -65,11 +61,9 @@ export function getCalendarEncryptionNotice(
       ? kind === "event"
         ? "Title, description and location are encrypted on your device."
         : `The ${kind} name is encrypted on your device.`
-      : state === "pending"
-        ? "An encrypted copy exists, but a readable copy may remain on the server."
-        : kind === "event"
-          ? "Event details are readable to the server."
-          : `The ${kind} name is readable to the server.`;
+      : kind === "event"
+        ? "Event details are readable to the server."
+        : `The ${kind} name is readable to the server.`;
 
   return {
     state,
@@ -78,15 +72,8 @@ export function getCalendarEncryptionNotice(
         ? kind === "event"
           ? "End-to-end encrypted"
           : "Name encrypted"
-        : state === "pending"
-          ? "Encryption pending"
-          : "Not encrypted",
-    shortLabel:
-      state === "encrypted"
-        ? "Encrypted"
-        : state === "pending"
-          ? "Pending"
-          : "Plaintext",
+        : "Not encrypted",
+    shortLabel: state === "encrypted" ? "Encrypted" : "Plaintext",
     description,
     protectedFields: state === "encrypted" ? fields : [],
     visibleFields: state === "encrypted" ? metadata : [...fields, ...metadata],
@@ -96,10 +83,6 @@ export function getCalendarEncryptionNotice(
         : "The original invitation email may also be readable to mail servers."
       : kind === "event" && state === "encrypted"
         ? EVENT_INVITATION_ENCRYPTION_HINT
-        : undefined,
-    policyNotice:
-      kind === "calendar" && item.forceFullEncryption
-        ? "Event encryption is required when saving; older plaintext events still need migration."
         : undefined,
   };
 }

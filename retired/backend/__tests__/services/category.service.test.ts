@@ -75,7 +75,7 @@ describe("CategoryService", () => {
       color: "#123456",
       encryptedName: "ciphertext",
       blindIndexTokens: ["idx-1", "idx-2"],
-      encryptionState: "shadow_write",
+      encryptionState: "encrypted",
       encryptionKeyVersion: 2,
     });
 

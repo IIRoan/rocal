@@ -93,11 +93,7 @@ function parseUserKeyVault(raw: string): UserKeyVault {
 // ---------------------------------------------------------------------------
 
 function base64ToBytes(value: string): Uint8Array {
-  // Accept both standard base64 and base64url encodings
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded =
-    base64.length % 4 === 0 ? base64 : base64 + "=".repeat(4 - (base64.length % 4));
-  const binary = atob(padded);
+  const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
@@ -295,48 +291,11 @@ export async function aesGcmEncrypt(
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Unlocks the vault with a backend-derived AES key, skipping the expensive argon2id pass. */
-export async function unlockEncryptedMailVaultWithDerivedKey(
-  encryptedVaultB64: string,
-  derivedKeyBase64: string,
-): Promise<UserKeyVault> {
-  log.debug("[vault-crypto] unlockEncryptedMailVaultWithDerivedKey: starting", {
-    vaultDataLength: encryptedVaultB64.length,
-  });
-
-  try {
-    const envelope = parseVaultEnvelope(
-      decodeUtf8(base64ToBytes(encryptedVaultB64)),
-    );
-
-    const keyBytes = base64ToBytes(derivedKeyBase64);
-    const ivBytes = base64ToBytes(envelope.ivB64);
-    const ciphertextWithTag = base64ToBytes(envelope.ciphertextB64);
-
-    log.debug("[vault-crypto] unlockEncryptedMailVaultWithDerivedKey: decrypting AES-GCM", {
-      keyLength: keyBytes.length,
-      ivLength: ivBytes.length,
-      ciphertextLength: ciphertextWithTag.length,
-    });
-
-    const plaintextBinary = await aesGcmDecrypt(keyBytes, ivBytes, ciphertextWithTag);
-    const vault = parseUserKeyVault(plaintextBinary);
-
-    log.debug("[vault-crypto] unlockEncryptedMailVaultWithDerivedKey: SUCCESS, email=%s", vault.email);
-    return vault;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log.debug("[vault-crypto] unlockEncryptedMailVaultWithDerivedKey: FAILED — %s", msg);
-    throw new Error(`Failed to decrypt mail vault with derived key: ${msg}`);
-  }
-}
-
 /** Web's `unlockEncryptedMailVault`, reimplemented with pure-JS crypto that runs under Hermes. */
 export async function unlockEncryptedMailVault(
   encryptedVaultB64: string,
   passphrase: string,
   kdfParams: MailVaultKdfParams,
-  onDerivedKey?: (keyB64: string) => void,
 ): Promise<UserKeyVault> {
   log.debug("[vault-crypto] unlockEncryptedMailVault: starting", {
     kdf: "argon2id",
@@ -352,7 +311,6 @@ export async function unlockEncryptedMailVault(
 
     // 2. Derive the AES-GCM key from the passphrase using pure-JS argon2id
     const keyBytes = await deriveVaultKeyBytes(passphrase, kdfParams);
-    onDerivedKey?.(bytesToBase64(keyBytes));
 
     // 3. Decode IV and ciphertext
     const ivBytes = base64ToBytes(envelope.ivB64);

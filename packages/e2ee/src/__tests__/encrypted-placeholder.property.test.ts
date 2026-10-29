@@ -63,10 +63,7 @@ const nonEncryptedEventArb: fc.Arbitrary<CalendarEvent> = fc.oneof(
       encryptedContent: fc.option(fc.string({ maxLength: 500 }), {
         nil: null,
       }),
-      encryptionState: fc.constantFrom(
-        "plaintext" as const,
-        "shadow_write" as const,
-      ),
+      encryptionState: fc.constant("plaintext" as const),
       calendarId: fc.string({ minLength: 1, maxLength: 36 }),
       userId: fc.string({ minLength: 1, maxLength: 36 }),
       start: dateArb,

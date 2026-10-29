@@ -122,6 +122,40 @@ fn series_request(uid: &str, organizer: &str, attendee: &str, master: bool) -> S
 }
 
 #[tokio::test]
+async fn accepting_a_mailed_series_seals_its_moved_occurrences_with_the_series() {
+    let app = TestApp::spawn().await;
+    let mut attendee = app.user().await;
+    calendar_id(&mut attendee, "Work").await;
+    let uid = format!("series-{}@example.com", hex(6));
+    let email = attendee.email.clone();
+    let mut request = import_request(
+        series_request(&uid, "organizer@example.com", &email, true),
+        Some("accepted"),
+    );
+    // Clients seal the invitation once, under the series UID.
+    request.encryption = Some(vec![InvitationEncryptionEntry {
+        external_id: uid.clone(),
+        encrypted_content: fake_envelope(),
+        blind_index_tokens: None,
+        encryption_key_version: None,
+    }]);
+
+    let result = import(&mut attendee, &request).await;
+    assert_eq!(result.errors, Vec::<String>::new());
+    assert!(result.events_created >= 2, "{result:?}");
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE external_id LIKE $1 || '%' AND (title <> '' OR encrypted_content IS NULL)",
+            &uid
+        )
+        .await,
+        0,
+        "the series and its moved occurrence are stored only as ciphertext"
+    );
+}
+
+#[tokio::test]
 async fn mailed_series_skip_their_excluded_and_overridden_occurrences() {
     let app = TestApp::spawn().await;
     let mut attendee = app.user().await;
@@ -373,7 +407,8 @@ async fn new_invitees_get_a_noreply_invitation_with_an_ics_request() {
         let ics = unfold(mail.ics.as_deref().expect("ics"));
         for line in [
             "METHOD:REQUEST".to_owned(),
-            "X-WR-CALNAME:Work".to_owned(),
+            // The encrypted calendar name never leaves the device.
+            "X-WR-CALNAME:Solace".to_owned(),
             format!("UID:{uid}"),
             "SUMMARY:Planning".to_owned(),
             "DESCRIPTION:Agenda\\nItems".to_owned(),
@@ -393,6 +428,22 @@ async fn new_invitees_get_a_noreply_invitation_with_an_ics_request() {
         }
     }
     assert_no_mail(&app, &owner.email).await;
+
+    let noreply = app
+        .stalwart_account_id("noreply")
+        .await
+        .expect("noreply account");
+    let kept = app
+        .stalwart_admin(
+            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+            json!([["Email/query", {"accountId": noreply, "filter": {"to": outsider}}, "q"]]),
+        )
+        .await;
+    assert_eq!(
+        kept["methodResponses"][0][1]["ids"],
+        json!([]),
+        "the noreply mailbox keeps no plaintext copy of the invitation"
+    );
 }
 
 #[tokio::test]
@@ -695,12 +746,8 @@ async fn participant_pictures_never_expose_remote_urls() {
     let mut owner = app.user().await;
     let attendee = app.user().await;
     let event = invite(&mut owner, &attendee.email).await;
-    let encoded = attendee.email.replace('@', "%40");
     for (image, expected) in [
-        (
-            Some("https://cdn.example.com/bee.png"),
-            Some(format!("/api/profiles/avatar?email={encoded}")),
-        ),
+        (Some("https://cdn.example.com/bee.png"), None),
         (Some("http://127.0.0.1/tracker.png"), None),
         (Some("javascript:alert(1)"), None),
         (
@@ -843,7 +890,7 @@ async fn accepting_moves_the_copy_to_the_default_calendar_and_replies() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let mut attendee = app.user().await;
-    calendar_id(&mut attendee, "Personal").await;
+    let personal = calendar_id(&mut attendee, "Personal").await;
     let event = invite(&mut owner, &attendee.email).await;
     let copy = staged_copy(&mut attendee, &owner, &event).await;
 
@@ -855,7 +902,7 @@ async fn accepting_moves_the_copy_to_the_default_calendar_and_replies() {
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
-    assert_eq!(accepted.calendar.name, "Personal");
+    assert_eq!(accepted.calendar.id.0, personal);
     let mut expected = vec![
         person(&owner.email, "organizer", "accepted"),
         person(&attendee.email, "attendee", "accepted"),
@@ -986,9 +1033,27 @@ async fn declining_keeps_a_hidden_tombstone_that_blocks_restaging() {
         .expect_status(200)
         .and_then(|r| r.dto()));
     assert!(people(&fetched).contains(&person(&attendee.email, "attendee", "declined")));
-    let summary_after = import(&mut attendee, &import_request(ics, Some("accepted"))).await;
+    let unsealed = import(
+        &mut attendee,
+        &import_request(ics.clone(), Some("accepted")),
+    )
+    .await;
     assert_eq!(
-        summary_after,
+        unsealed.errors,
+        [
+            "Decrypted mail invitation: This calendar requires encrypted event details; automatic server-side mail import is unavailable."
+        ],
+        "an accepted copy outside staging needs its sealed details"
+    );
+    let mut sealed = import_request(ics, Some("accepted"));
+    sealed.encryption = Some(vec![InvitationEncryptionEntry {
+        external_id: uid.clone(),
+        encrypted_content: fake_envelope(),
+        blind_index_tokens: None,
+        encryption_key_version: None,
+    }]);
+    assert_eq!(
+        import(&mut attendee, &sealed).await,
         summary(0, 1, &[]),
         "accepting again revives the copy"
     );
@@ -1222,7 +1287,6 @@ async fn assert_unreachable(user: &mut TestUser, event: &Event) {
     let path = format!("/api/events/{}", event.id);
     for response in [
         user.get(&path).await,
-        user.get(&format!("{path}/ics")).await,
         user.put(&path, json!({"color": "red"})).await,
         user.post(&format!("{path}/rsvp"), json!({"status": "accepted"}))
             .await,
@@ -1311,6 +1375,12 @@ async fn declining_from_mail_replies_and_records_a_tombstone() {
     let tombstone = lookup(&mut attendee, &uid).await.expect("tombstone");
     assert_eq!(tombstone.calendar.name, "Invitations");
     assert!(people(&tombstone).contains(&person(&attendee.email, "attendee", "declined")));
+    let stored = stored_content(&app.db, &tombstone.id.0).await;
+    assert_eq!(
+        (stored.title.as_str(), stored.description, stored.location),
+        ("", None, None),
+        "a declined invitation keeps none of its text"
+    );
     assert_eq!(
         import(&mut attendee, &import_request(ics.clone(), None)).await,
         summary(0, 0, &[])
@@ -1530,7 +1600,7 @@ async fn imports_with_ciphertext_store_no_plaintext() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let mut attendee = app.user().await;
-    calendar_id(&mut attendee, "Personal").await;
+    let personal = calendar_id(&mut attendee, "Personal").await;
     let event = invite(&mut owner, &attendee.email).await;
     let uid = event.external_id.clone().expect("uid");
     let ics = request_ics(&uid, "REQUEST", &owner.email, &attendee.email);
@@ -1563,7 +1633,7 @@ async fn imports_with_ciphertext_store_no_plaintext() {
         "the accepted copy is sealed in place"
     );
     let accepted = lookup(&mut attendee, &uid).await.expect("copy");
-    assert_eq!(accepted.calendar.name, "Personal");
+    assert_eq!(accepted.calendar.id.0, personal);
     assert!(people(&accepted).contains(&person(&attendee.email, "attendee", "accepted")));
 
     let sealed: Event = ok(attendee

@@ -9,7 +9,6 @@ import {
   EVENT_ENCRYPTED_FIELDS,
   EVENT_READABLE_METADATA,
   EVENT_INVITATION_ENCRYPTION_HINT,
-  CALENDAR_ICS_SHARING_HINT,
   MAIL_READABLE_METADATA,
 } from "@workspace/calendar-core";
 
@@ -73,10 +72,9 @@ export default function PrivacyPage() {
             </table>
           </div>
           <p className="mt-3">
-            Owned calendar and category names are encrypted separately. Colors,
-            settings, ownership and sharing information remain readable. Legacy
-            names and events may remain readable until a signed-in device
-            finishes migrating them.
+            The names of your calendars and categories are encrypted the same way,
+            including the calendars a new account starts with. Colors, settings
+            and which calendar an event belongs to remain readable.
           </p>
           <p className="mt-3">
             Reminder emails contain a generic notice; Solace resolves event
@@ -87,7 +85,7 @@ export default function PrivacyPage() {
 
         <div>
           <h2 className="text-base font-semibold text-foreground">
-            Invitations, subscriptions and sharing
+            Invitations and subscriptions
           </h2>
           <p className="mt-2">
             {EVENT_INVITATION_ENCRYPTION_HINT} Invitation content is handled by
@@ -96,12 +94,11 @@ export default function PrivacyPage() {
             readable.
           </p>
           <p className="mt-3">
-            Imported invitations can be read by the server before your device
-            encrypts the calendar copy. The original email is separate.
+            Invitations that arrive by email are read by the server to stage them
+            until your device encrypts your copy.
             Subscribed and public calendars are fetched by the server, so their
             feed names, URLs and event details are readable.
           </p>
-          <p className="mt-3">{CALENDAR_ICS_SHARING_HINT}</p>
         </div>
 
         <div id="mail-encryption">
@@ -116,10 +113,14 @@ export default function PrivacyPage() {
           </p>
           <p className="mt-3">{MAIL_READABLE_METADATA}</p>
           <p className="mt-3">
-            Storage encryption is an account setting, not proof that every
-            message is encrypted. Older mail, drafts and sent copies may be
-            readable. Solace disables automatic storage encryption for messages
-            appended by the client.
+            Drafts and the copies of mail you send are encrypted to your own key
+            on your device before they are saved. Mail you send to other
+            providers has to leave readable so its recipients can open it; the
+            server keeps only your encrypted copy, and attachments uploaded for
+            that mail are removed within about two hours. Emails Solace sends
+            for you, such as invitations and reminders, come from a no-reply
+            address that keeps no copy. Mail stored before these protections,
+            including older drafts and sent copies, may still be readable.
           </p>
           <p className="mt-3">
             When a sender encrypts with your OpenPGP public key before sending,
@@ -129,10 +130,8 @@ export default function PrivacyPage() {
             verification is a separate check.
           </p>
           <p className="mt-3">
-            New mail vaults use a random secret sealed to your account
-            encryption key. The server stores encrypted vault backups. Legacy
-            vaults without that seal may use a server-derived secret and need
-            migration. The backend can still authenticate to the mailbox, and
+            Mail vaults use a random secret sealed to your account encryption key.
+            The server stores only encrypted vault backups. The backend can still authenticate to the mailbox, and
             invitation processing reads readable mail content when available.
           </p>
         </div>
@@ -144,9 +143,10 @@ export default function PrivacyPage() {
           <p className="mt-2">
             Your password protects your encryption keys; it is not the mail
             vault secret. Email sign-in uses your email password. Passkey and
-            social sign-in use a separate encryption password. Changing that
-            password rewraps your existing keys rather than re-encrypting your
-            content. Passwords are stored only as salted hashes, and connections
+            social sign-in use a separate encryption password. Changing that password rewraps your existing keys rather than
+            re-encrypting your content. Changing your email password rewraps
+            them to the new one; after an email reset, the first sign-in asks
+            for your previous password once. Passwords are stored only as salted hashes, and connections
             to Solace use TLS.
           </p>
           <p className="mt-3">
@@ -188,8 +188,7 @@ export default function PrivacyPage() {
           </p>
           <ul className="mt-3 list-disc space-y-2 pl-5">
             <li>
-              App sessions last 14 days and renew during use. Expired sessions,
-              verification values and OAuth tokens are eligible for cleanup one
+              App sessions last 14 days and renew during use. Expired sessions and verification values are eligible for cleanup one
               day after expiry.
             </li>
             <li>
@@ -259,7 +258,7 @@ const DATA_USES: ReadonlyArray<readonly [string, string, string]> = [
     "Our agreement with you",
   ],
   [
-    "Calendars: encrypted event content, times, recurrence, sharing, participants and subscribed feeds",
+    "Calendars: encrypted event content, times, recurrence, participants and subscribed feeds",
     "Show, sync and share your calendars and send the reminders you set",
     "Our agreement with you",
   ],
@@ -517,8 +516,8 @@ function PrivacySubprocessors() {
         user agents.
       </p>
       <p className="mt-3">
-        Sending email, accepting invitations, sharing calendars or subscribing
-        to external feeds also communicates with the recipients, organizers or
+        Sending email, accepting invitations or subscribing to external feeds
+        also communicates with the recipients, organizers or
         feed providers you choose. Public bug reports you file are posted on
         GitHub; Solace does not send it any account data.
       </p>

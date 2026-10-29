@@ -20,15 +20,12 @@ pub async fn get(state: &AppState, user: &RouteUser) -> Result<UserSettings, App
     Ok(record(settings))
 }
 
-/// `SettingsService.update`: the mode is always stored as `full`, and sending one disables share links.
+/// `SettingsService.update`.
 pub async fn update(
     state: &AppState,
     user: &RouteUser,
-    mut request: UpdateSettingsRequest,
+    request: UpdateSettingsRequest,
 ) -> Result<UserSettings, AppError> {
-    if request.event_encryption_mode.is_some() {
-        request.event_encryption_mode = Some("full".into());
-    }
     if let (Some(start), Some(end)) = (request.working_hours_start, request.working_hours_end)
         && start >= end
     {
@@ -72,11 +69,7 @@ pub async fn update(
         }
     }
     let now = instant::now();
-    let settings = if request.event_encryption_mode.is_none() {
-        queries::upsert(&state.db, &user.id, request, now).await?
-    } else {
-        queries::upsert_closing_share_links(&state.db, &user.id, request, now).await?
-    };
+    let settings = queries::upsert(&state.db, &user.id, request, now).await?;
     Ok(record(settings))
 }
 
@@ -126,7 +119,6 @@ fn record(settings: user_settings::Model) -> UserSettings {
         push_notifications: settings.push_notifications,
         browser_notifications: settings.browser_notifications,
         reminder_sound: settings.reminder_sound,
-        event_encryption_mode: settings.event_encryption_mode,
         default_event_duration: settings.default_event_duration,
         default_calendar_id: settings.default_calendar_id.map(Into::into),
         compact_view: settings.compact_view,

@@ -28,21 +28,9 @@ fn batch_delete(name: &'static str, retention_days: i64, table: &str, filter: &s
 /// Every cleanup; pending notification jobs, leased ones included, are never selected.
 pub fn rules() -> Vec<Rule> {
     vec![
-        // Expired Better Auth sessions, verification values and OAuth tokens are unusable.
+        // Expired Better Auth sessions and verification values are unusable.
         batch_delete("session", 1, "session", "expires_at < $1"),
         batch_delete("verification", 1, "verification", "expires_at < $1"),
-        batch_delete(
-            "oauth_access_token",
-            1,
-            "oauth_access_token",
-            "expires_at < $1",
-        ),
-        batch_delete(
-            "oauth_refresh_token",
-            1,
-            "oauth_refresh_token",
-            "expires_at < $1",
-        ),
         // Accepted invites stay: they are the inviter's history.
         batch_delete(
             "invite_expired",
@@ -152,8 +140,6 @@ mod tests {
             [
                 ("session", 1),
                 ("verification", 1),
-                ("oauth_access_token", 1),
-                ("oauth_refresh_token", 1),
                 ("invite_expired", 30),
                 ("invite_revoked", 30),
                 ("invite_abandoned_claim", 30),

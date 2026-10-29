@@ -43,14 +43,6 @@ pub enum Relation {
     MailDirectoryEntry,
     #[sea_orm(has_many = "super::notification_job::Entity")]
     NotificationJob,
-    #[sea_orm(has_many = "super::oauth_access_token::Entity")]
-    OauthAccessToken,
-    #[sea_orm(has_many = "super::oauth_client::Entity")]
-    OauthClient,
-    #[sea_orm(has_many = "super::oauth_consent::Entity")]
-    OauthConsent,
-    #[sea_orm(has_many = "super::oauth_refresh_token::Entity")]
-    OauthRefreshToken,
     #[sea_orm(has_many = "super::passkey::Entity")]
     Passkey,
     #[sea_orm(has_many = "super::push_device::Entity")]
@@ -120,30 +112,6 @@ impl Related<super::mail_directory_entry::Entity> for Entity {
 impl Related<super::notification_job::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::NotificationJob.def()
-    }
-}
-
-impl Related<super::oauth_access_token::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::OauthAccessToken.def()
-    }
-}
-
-impl Related<super::oauth_client::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::OauthClient.def()
-    }
-}
-
-impl Related<super::oauth_consent::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::OauthConsent.def()
-    }
-}
-
-impl Related<super::oauth_refresh_token::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::OauthRefreshToken.def()
     }
 }
 

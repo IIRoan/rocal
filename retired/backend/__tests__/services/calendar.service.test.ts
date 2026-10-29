@@ -130,7 +130,7 @@ describe("CalendarService", () => {
       color: "#abcdef",
       encryptedName: "ciphertext",
       blindIndexTokens: ["idx-1"],
-      encryptionState: "shadow_write",
+      encryptionState: "encrypted",
       encryptionKeyVersion: 2,
       forceFullEncryption: true,
     });

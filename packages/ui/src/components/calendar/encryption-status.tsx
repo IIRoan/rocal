@@ -32,7 +32,6 @@ export function EncryptionStatusBadge({
     meta.description,
     `Server can read: ${meta.visibleFields.join("; ")}.`,
     meta.originWarning,
-    meta.policyNotice,
   ]
     .filter(Boolean)
     .join(" ");
@@ -89,11 +88,6 @@ export function EncryptionStatusBadge({
         {meta.originWarning ? (
           <p className="text-xs leading-snug text-muted-foreground">
             {meta.originWarning}
-          </p>
-        ) : null}
-        {meta.policyNotice ? (
-          <p className="text-xs leading-snug text-muted-foreground">
-            {meta.policyNotice}
           </p>
         ) : null}
       </PopoverContent>

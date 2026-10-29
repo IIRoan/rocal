@@ -230,7 +230,7 @@ fn new_ciphertext(updates: &RecurringUpdates) -> Option<&str> {
         .filter(|text| !js_trim(text).is_empty())
 }
 
-/// `resolveRecurringContentData`: new ciphertext replaces the content; otherwise the series' own content (and ciphertext) is carried over.
+/// New ciphertext replaces the content; otherwise the series' own content (and ciphertext) is carried over.
 fn apply_content(
     row: &mut calendar_event::ActiveModel,
     existing: &calendar_event::Model,
@@ -249,31 +249,9 @@ fn apply_content(
         row.encryption_key_version = Set(updates.encryption_key_version.unwrap_or(1));
         return Ok(());
     }
-    let edits_content =
-        updates.title.is_some() || updates.description.is_some() || updates.location.is_some();
-    if edits_content
-        && existing
-            .encrypted_content
-            .as_deref()
-            .is_some_and(|text| !text.is_empty())
-    {
-        return Err(AppError::field(
-            "Encrypted content payload is required when updating protected event fields.",
-            "encryptedContent",
-        ));
-    }
-    row.title = Set(updates
-        .title
-        .clone()
-        .unwrap_or_else(|| existing.title.clone()));
-    row.description = Set(updates
-        .description
-        .clone()
-        .or_else(|| existing.description.clone()));
-    row.location = Set(updates
-        .location
-        .clone()
-        .or_else(|| existing.location.clone()));
+    row.title = Set(existing.title.clone());
+    row.description = Set(existing.description.clone());
+    row.location = Set(existing.location.clone());
     row.encrypted_content = Set(existing.encrypted_content.clone());
     row.blind_index_tokens = Set(existing.blind_index_tokens.clone());
     row.encryption_state = Set(existing.encryption_state.clone());
@@ -348,11 +326,7 @@ fn series_update(
     if let Some(category_id) = &updates.category_id {
         row.category_id = Set(clearable_category(category_id));
     }
-    let edits_content = new_ciphertext(updates).is_some()
-        || updates.title.is_some()
-        || updates.description.is_some()
-        || updates.location.is_some();
-    if edits_content {
+    if new_ciphertext(updates).is_some() {
         apply_content(&mut row, existing, updates)?;
     }
     if let Some(start) = js_date(updates.start.as_deref()) {
@@ -450,15 +424,7 @@ async fn respond(
             .collect(),
         (None, None) => return Ok(event),
     };
-    let content = resolve_invitation_content(
-        row.encrypted_content
-            .as_deref()
-            .is_some_and(|text| !text.is_empty()),
-        updates.invitation_content.as_ref(),
-        Some(&row.title),
-        row.description.as_deref(),
-        row.location.as_deref(),
-    );
+    let content = resolve_invitation_content(updates.invitation_content.as_ref());
     let invitation = content
         .map(|content| invitation_event(&row, &content))
         .transpose()?;

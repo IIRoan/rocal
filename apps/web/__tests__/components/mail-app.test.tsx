@@ -228,6 +228,7 @@ jest.mock("@/hooks/use-compose-draft-autosave", () => ({
 }));
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
+  clearAuthPasswords: jest.fn(),
   peekCachedAuthPassword: jest.fn(),
 }));
 
@@ -267,6 +268,9 @@ const mockJmapClient = {
   getThreadMessages: jest.fn<() => Promise<any>>(),
   getIdentities: jest.fn<() => Promise<any>>(),
   sendMessage: jest.fn<() => Promise<any>>(),
+  uploadTextBlob: jest
+    .fn<() => Promise<any>>()
+    .mockResolvedValue({ blobId: "sealed-blob", size: 64, type: "text/plain" }),
   markAsRead: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   markAsUnread: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   moveToTrash: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
@@ -945,7 +949,9 @@ describe("MailApp", () => {
     await renderApp(true, true);
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+    await waitForExpectation(() =>
+      expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1),
+    );
     expect(mockWorkerClient.clear).toHaveBeenCalled();
     expect(mockCompleteAuthNavigation.mock.calls).toEqual([["/"]]);
     expect(container.textContent).not.toContain("Encrypted hello");
@@ -1751,7 +1757,14 @@ describe("MailApp", () => {
     });
 
     expect(mockApi.getRecipientKey).not.toHaveBeenCalled();
-    expect(mockWorkerClient.encryptForRecipients).not.toHaveBeenCalled();
+    // External mail is submitted in plaintext, but the stored Sent copy is sealed to the sender's own key only.
+    expect(mockWorkerClient.encryptForRecipients).toHaveBeenCalledWith({
+      plaintext: expect.stringContaining("Plaintext body"),
+      recipientPublicKeysArmored: ["public-key-armored"],
+    });
+    for (const [call] of mockWorkerClient.encryptForRecipients.mock.calls) {
+      expect(call.recipientPublicKeysArmored).toEqual(["public-key-armored"]);
+    }
     expect(mockJmapClient.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         apiUrl: "http://192.168.2.213:8080/jmap/",
@@ -1764,6 +1777,7 @@ describe("MailApp", () => {
         subject: "Hello",
         textBody: "Plaintext body",
         identityId: "identity-1",
+        sentCopyCiphertext: { blobId: "sealed-blob", size: 64, type: "text/plain" },
       }),
     );
   });

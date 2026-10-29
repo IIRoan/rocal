@@ -1,7 +1,7 @@
 import React, {
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -41,6 +41,12 @@ import { registerClearSession } from "../lib/session-clear";
 import { registerPasskeyStepUpRequired } from "../lib/passkey-step-up-required";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
 import { clearNotificationExtensionSecrets } from "../lib/notification-extension-store";
+import {
+  getAccountHasPasswordEnvelope,
+  setAccountHasPasswordEnvelope,
+} from "../lib/e2ee-session";
+import { clearStoredDevice } from "../lib/native-e2ee-provider";
+import { clearNativeTitleIndex } from "../lib/search/title-index-store";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
@@ -85,12 +91,22 @@ export type AuthMethod = "email-password" | "passkey" | "unknown";
 
 /** App-specific hooks into the shared auth flow; both apps run the same sign-in code. */
 export interface AuthLifecycle {
-  /** Runs after an email/password sign-in or sign-up succeeds; throwing aborts it. */
-  onPasswordAuthenticated?: (password: string) => Promise<void>;
-  /** Runs after server sign-out, before local session state is cleared. */
+  /** Wipes app data when the session ends: before clearing on sign-out, and after clearing when the server ended it. */
   onSignedOut?: () => Promise<void>;
 }
 type SignInResult = { requiresPasskeyStepUp: boolean };
+
+/** The device key opens the account key and the search index holds decrypted text, so both go with the session in both apps. */
+async function wipeSessionData(lifecycle: AuthLifecycle | undefined): Promise<void> {
+  // Without a known password envelope the device key may be the only way back into the account, so it stays.
+  const keepDeviceKey = getAccountHasPasswordEnvelope() !== true;
+  setAccountHasPasswordEnvelope(null);
+  await Promise.all([
+    keepDeviceKey ? Promise.resolve() : clearStoredDevice().catch(() => undefined),
+    clearNativeTitleIndex().catch(() => undefined),
+    lifecycle?.onSignedOut?.(),
+  ]);
+}
 
 export interface AuthContextValue {
   /** The currently authenticated user, or null. */
@@ -359,13 +375,19 @@ export function AuthProvider({
     resetAuthMethodHints();
   }, [resetAuthMethodHints]);
 
-  // Register the clear-session callback so the HTTP layer can terminate sessions on 401/403 without a React hook.
+  // A session the server ended (revoked, expired, 401/403) gets the sign-out wipe; a network failure keeps the device's data.
+  const endSession = useCallback(() => {
+    clearSession();
+    void wipeSessionData(lifecycleRef.current).catch(() => undefined);
+  }, [clearSession]);
+
+  // Register the end-session callback so the HTTP layer can terminate sessions on 401/403 without a React hook.
   useEffect(() => {
-    registerClearSession(clearSession);
+    registerClearSession(endSession);
     return () => {
       registerClearSession(() => {});
     };
-  }, [clearSession]);
+  }, [endSession]);
 
   useEffect(() => {
     registerPasskeyStepUpRequired(() => {
@@ -449,13 +471,6 @@ export function AuthProvider({
         authData = recoveredSession.data;
       }
 
-      try {
-        await lifecycleRef.current?.onPasswordAuthenticated?.(password);
-      } catch (error) {
-        resetAuthMethodHints();
-        throw error;
-      }
-
       const earlyToken =
         typeof (authData as { token?: unknown } | undefined)?.token === "string"
           ? (authData as { token: string }).token
@@ -513,7 +528,6 @@ export function AuthProvider({
 
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-up");
-        await lifecycleRef.current?.onPasswordAuthenticated?.(password);
         setRequiresPasskeyStepUp(false);
       } catch (error) {
         resetAuthMethodHints();
@@ -546,7 +560,7 @@ export function AuthProvider({
     } catch {
       // Best-effort — clear local state regardless.
     }
-    await lifecycleRef.current?.onSignedOut?.();
+    await wipeSessionData(lifecycleRef.current);
     clearSession();
   }, [clearSession]);
 
@@ -580,7 +594,8 @@ export function AuthProvider({
           loadId === sessionLoadIdRef.current &&
           !hasLiveSessionRef.current
         ) {
-          clearSession();
+          if (result?.error) clearSession();
+          else endSession();
         }
       } catch {
         if (!ignore && loadId === sessionLoadIdRef.current && !hasLiveSessionRef.current) {
@@ -595,7 +610,7 @@ export function AuthProvider({
     return () => {
       ignore = true;
     };
-  }, [applySessionData, clearSession, fetchAuthStatus]);
+  }, [applySessionData, clearSession, endSession, fetchAuthStatus]);
 
   const userId = user?.id ?? null;
   useEffect(() => {
@@ -625,7 +640,7 @@ export function AuthProvider({
         });
         if (cancelled || loadId !== sessionLoadIdRef.current || result?.error) return;
         if (result?.data?.user.id === userId) applySessionData(result.data);
-        else if (!result?.data) clearSession();
+        else if (!result?.data) endSession();
       } catch {
         // A network failure does not invalidate the existing session.
       } finally {
@@ -643,7 +658,7 @@ export function AuthProvider({
       clearInterval(timer);
       subscription.remove();
     };
-  }, [userId, isLoading, applySessionData, clearSession]);
+  }, [userId, isLoading, applySessionData, endSession]);
 
   const signInWithPasskey = useCallback(async () => {
     sessionLoadIdRef.current += 1;
@@ -795,7 +810,7 @@ export function AuthProvider({
 // ---------------------------------------------------------------------------
 
 export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
+  const ctx = use(AuthContext);
   if (!ctx) {
     throw new Error("useAuth must be used within an AuthProvider");
   }

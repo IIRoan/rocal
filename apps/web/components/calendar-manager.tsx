@@ -4,16 +4,9 @@ import React, { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { calendarApiService } from "@/lib/calendar-api-service";
-import {
-  CALENDAR_ICS_SHARING_HINT,
-  SUBSCRIPTIONS_QUERY_KEY,
-} from "@workspace/calendar-core";
-import {
-  getErrorMessage,
-  partitionCalendarsByKind,
-} from "@/lib/calendar-ui-helpers";
-import type { Calendar, CalendarShareLink } from "@/lib/types/calendar";
-import { toast } from "sonner";
+import { SUBSCRIPTIONS_QUERY_KEY } from "@workspace/calendar-core";
+import { partitionCalendarsByKind } from "@/lib/calendar-ui-helpers";
+import type { Calendar } from "@/lib/types/calendar";
 import {
   PRESET_COLORS,
   type PresetColor,
@@ -25,10 +18,7 @@ import {
   handleCalendarUpdate,
   handleCalendarDelete,
 } from "./command-palette/calendar-utils";
-import {
-  SettingToggleRow,
-  ToggleIndicator,
-} from "./command-palette/setting-toggle-row";
+import { SettingToggleRow } from "./command-palette/setting-toggle-row";
 import type { PaletteView } from "./command-palette/constants";
 import {
   EncryptionStatusBadge,
@@ -36,14 +26,6 @@ import {
   useCalendarContext,
 } from "@workspace/ui/components/calendar";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/ui/dialog";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -55,10 +37,6 @@ import {
   Loader2,
   ChevronRight,
   Globe,
-  Link2,
-  Copy,
-  RefreshCw,
-  AlertTriangle,
   ShieldCheck,
   Star,
   Eye,
@@ -104,12 +82,6 @@ export function CalendarManager({
     name?: string;
     color?: string;
   }>({});
-  const [shareLinkInfo, setShareLinkInfo] = useState<CalendarShareLink | null>(
-    null,
-  );
-  const [shareLinkLoading, setShareLinkLoading] = useState(false);
-  const [shareLinkError, setShareLinkError] = useState<string | null>(null);
-  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
 
   const goForward = (next: PaletteView) => {
     onNavigateTo(next);
@@ -119,95 +91,8 @@ export function CalendarManager({
     onBack();
   };
 
-  const loadShareLink = async (calendarId: string) => {
-    setShareLinkLoading(true);
-    setShareLinkError(null);
-    setShareLinkInfo(null);
-
-    try {
-      const shareInfo =
-        await calendarApiService.getCalendarShareLink(calendarId);
-      setShareLinkInfo(shareInfo);
-    } catch (error: unknown) {
-      setShareLinkError(getErrorMessage(error, "Failed to load share link"));
-    }
-    setShareLinkLoading(false);
-  };
-
-  const handleEnableShareLink = async (regenerate = false) => {
-    if (!editingCalendar?.id) return;
-
-    setShareLinkLoading(true);
-    setShareLinkError(null);
-
-    const createShareLink = async () => {
-      const shareInfo = await calendarApiService.enableCalendarShareLink(
-        editingCalendar.id,
-        { regenerate },
-      );
-      setShareLinkInfo(shareInfo);
-      toast.success(
-        regenerate ? "ICS share link regenerated" : "ICS share link enabled",
-      );
-    };
-    await createShareLink().catch((error: unknown) => {
-      const message = getErrorMessage(error, "Failed to enable share link");
-      setShareLinkError(message);
-      toast.error(message);
-    });
-    setShareLinkLoading(false);
-  };
-
-  const handleDisableShareLink = async () => {
-    if (!editingCalendar?.id) return;
-
-    setShareLinkLoading(true);
-    setShareLinkError(null);
-
-    try {
-      await calendarApiService.disableCalendarShareLink(editingCalendar.id);
-      setShareLinkInfo({
-        calendarId: editingCalendar.id,
-        calendarName: editingCalendar.name,
-        enabled: false,
-        shareUrl: null,
-      });
-      toast.success("ICS share link disabled");
-    } catch (error: unknown) {
-      const message = getErrorMessage(error, "Failed to disable share link");
-      setShareLinkError(message);
-      toast.error(message);
-    }
-    setShareLinkLoading(false);
-  };
-
-  const handleCopyShareLink = async () => {
-    if (!shareLinkInfo?.shareUrl) return;
-
-    try {
-      await navigator.clipboard.writeText(shareLinkInfo.shareUrl);
-      toast.success("ICS link copied to clipboard");
-    } catch {
-      toast.error("Unable to copy link automatically");
-    }
-  };
-
-  const handleToggleShareLink = async (enabled: boolean) => {
-    if (enabled) {
-      await handleEnableShareLink(false);
-      return;
-    }
-
-    await handleDisableShareLink();
-  };
-
   const handleToggleVisibility = (calendarId: string) => {
     toggleCalendarVisibility(calendarId);
-  };
-
-  const handleConfirmRegenerate = async () => {
-    setShowRegenerateConfirm(false);
-    await handleEnableShareLink(true);
   };
 
   if (currentView === "calendars") {
@@ -288,8 +173,6 @@ export function CalendarManager({
                       setCalendarColor(calendar.color);
                       setCalendarIsDefault(calendar.isDefault || false);
                       setCalendarValidationErrors({});
-                      setShowRegenerateConfirm(false);
-                      void loadShareLink(calendar.id);
                       goForward("calendar-edit");
                     }}
                     className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 transition-colors"
@@ -385,9 +268,7 @@ export function CalendarManager({
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          handleToggleVisibility(calendar.id)
-                        }
+                        onClick={() => handleToggleVisibility(calendar.id)}
                         aria-label={
                           isVisible
                             ? `Hide ${calendar.name}`
@@ -452,9 +333,7 @@ export function CalendarManager({
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          handleToggleVisibility(calendar.id)
-                        }
+                        onClick={() => handleToggleVisibility(calendar.id)}
                         aria-label={
                           isVisible
                             ? `Hide ${calendar.name}`
@@ -614,281 +493,167 @@ export function CalendarManager({
 
   if (currentView === "calendar-edit") {
     return (
-      <>
-        <div className="flex flex-col">
-          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-            <button
-              type="button"
-              onClick={() => goBack()}
-              className="p-1 rounded hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="size-4 text-muted-foreground" />
-            </button>
-            <span className="text-sm font-medium">Edit Calendar</span>
-            {editingCalendar && (
-              <EncryptionStatusBadge
-                item={editingCalendar}
-                kind="calendar"
-                hidePlaintext={false}
-                className="ml-auto"
-                showLabel
+      <div className="flex flex-col">
+        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+          <button
+            type="button"
+            onClick={() => goBack()}
+            className="p-1 rounded hover:bg-muted/50 transition-colors"
+          >
+            <ArrowLeft className="size-4 text-muted-foreground" />
+          </button>
+          <span className="text-sm font-medium">Edit Calendar</span>
+          {editingCalendar && (
+            <EncryptionStatusBadge
+              item={editingCalendar}
+              kind="calendar"
+              hidePlaintext={false}
+              className="ml-auto"
+              showLabel
+            />
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="px-4 pt-4 pb-3 space-y-3">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="calendar-name"
+                className="text-xs text-muted-foreground"
+              >
+                Name
+              </Label>
+              <Input
+                id="calendar-name"
+                value={calendarName}
+                onChange={(e) => {
+                  setCalendarName(e.target.value);
+                  if (calendarValidationErrors.name) {
+                    setCalendarValidationErrors((prev) => ({
+                      ...prev,
+                      name: undefined,
+                    }));
+                  }
+                }}
+                placeholder="Calendar name"
+                className={`h-8 text-sm ${calendarValidationErrors.name ? "border-destructive" : ""}`}
               />
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="px-4 pt-4 pb-3 space-y-3">
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="calendar-name"
-                  className="text-xs text-muted-foreground"
-                >
-                  Name
-                </Label>
-                <Input
-                  id="calendar-name"
-                  value={calendarName}
-                  onChange={(e) => {
-                    setCalendarName(e.target.value);
-                    if (calendarValidationErrors.name) {
-                      setCalendarValidationErrors((prev) => ({
-                        ...prev,
-                        name: undefined,
-                      }));
-                    }
-                  }}
-                  placeholder="Calendar name"
-                  className={`h-8 text-sm ${calendarValidationErrors.name ? "border-destructive" : ""}`}
-                />
-                {calendarValidationErrors.name && (
-                  <p className="text-xs text-destructive">
-                    {calendarValidationErrors.name}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Color</Label>
-                <div className="flex flex-wrap gap-2">
-                  {PRESET_COLORS.map((preset) => (
-                    <SimpleTooltip content={preset.label} key={preset.value}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCalendarColor(preset.value);
-                          if (calendarValidationErrors.color) {
-                            setCalendarValidationErrors((prev) => ({
-                              ...prev,
-                              color: undefined,
-                            }));
-                          }
-                        }}
-                        className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
-                          calendarColor === preset.value
-                            ? "border-foreground scale-110"
-                            : "border-transparent hover:scale-105"
-                        }`}
-                        style={{
-                          backgroundColor: getColorSwatchValue(preset.value),
-                        }}
-                        aria-label={preset.label}
-                      />
-                    </SimpleTooltip>
-                  ))}
-                </div>
-                {calendarValidationErrors.color && (
-                  <p className="text-xs text-destructive">
-                    {calendarValidationErrors.color}
-                  </p>
-                )}
-              </div>
+              {calendarValidationErrors.name && (
+                <p className="text-xs text-destructive">
+                  {calendarValidationErrors.name}
+                </p>
+              )}
             </div>
 
-            <div className="p-1 border-t border-border/50 mt-1">
-              <SettingToggleRow
-                checked={calendarIsDefault}
-                description="Use this calendar by default for new events."
-                icon={Star}
-                label="Default calendar"
-                onToggle={() => setCalendarIsDefault(!calendarIsDefault)}
-              />
-
-              <button
-                type="button"
-                role="switch"
-                aria-checked={!!shareLinkInfo?.enabled}
-                onClick={() => {
-                  if (shareLinkLoading) return;
-                  // handleToggleShareLink's callees report every failure via toast, so it never rejects.
-                  void handleToggleShareLink(!shareLinkInfo?.enabled).catch(
-                    () => undefined,
-                  );
-                }}
-                disabled={shareLinkLoading}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
-              >
-                <Link2 className="size-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm">ICS sharing</div>
-                  <div className="text-xs text-muted-foreground">
-                    {CALENDAR_ICS_SHARING_HINT}
-                  </div>
-                </div>
-                <ToggleIndicator checked={!!shareLinkInfo?.enabled} />
-              </button>
-
-              {shareLinkLoading ? (
-                <div className="px-3 py-2 text-xs text-muted-foreground">
-                  Updating sharing settings…
-                </div>
-              ) : shareLinkInfo?.enabled && shareLinkInfo.shareUrl ? (
-                <div className="px-3 pt-1 pb-2 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={shareLinkInfo.shareUrl}
-                      readOnly
-                      className="h-8 text-xs font-mono"
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_COLORS.map((preset) => (
+                  <SimpleTooltip content={preset.label} key={preset.value}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCalendarColor(preset.value);
+                        if (calendarValidationErrors.color) {
+                          setCalendarValidationErrors((prev) => ({
+                            ...prev,
+                            color: undefined,
+                          }));
+                        }
+                      }}
+                      className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
+                        calendarColor === preset.value
+                          ? "border-foreground scale-110"
+                          : "border-transparent hover:scale-105"
+                      }`}
+                      style={{
+                        backgroundColor: getColorSwatchValue(preset.value),
+                      }}
+                      aria-label={preset.label}
                     />
-                    <SimpleTooltip content="Copy link">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCopyShareLink}
-                        className="h-8 px-2"
-                        aria-label="Copy link"
-                      >
-                        <Copy className="size-3.5" />
-                      </Button>
-                    </SimpleTooltip>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setShowRegenerateConfirm(true)}
-                    className="h-7 text-xs text-muted-foreground hover:text-foreground -ml-1"
-                    disabled={shareLinkLoading}
-                  >
-                    <RefreshCw className="size-3.5 mr-1.5" />
-                    Regenerate URL
-                  </Button>
-                </div>
-              ) : null}
-
-              {shareLinkError && (
-                <p className="px-3 py-1 text-xs text-destructive">
-                  {shareLinkError}
+                  </SimpleTooltip>
+                ))}
+              </div>
+              {calendarValidationErrors.color && (
+                <p className="text-xs text-destructive">
+                  {calendarValidationErrors.color}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between shrink-0">
-            {editingCalendar && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  handleCalendarDelete(
-                    editingCalendar,
-                    calendarData,
-                    setCalendarSaving,
-                    () => goBack(),
-                  )
-                }
-                disabled={calendarSaving}
-                className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                {calendarSaving ? (
-                  <Loader2 className="size-3.5 animate-spin mr-1.5" />
-                ) : (
-                  <Trash2 className="size-3.5 mr-1.5" />
-                )}
-                Delete
-              </Button>
-            )}
-            <div className="ml-auto">
-              <Button
-                size="sm"
-                onClick={() =>
-                  handleCalendarUpdate(
-                    calendarName,
-                    calendarColor,
-                    calendarIsDefault,
-                    calendars,
-                    editingCalendar,
-                    calendarData,
-                    {
-                      setCalendarValidationErrors,
-                      setCalendarSaving,
-                      setEditingCalendar,
-                    },
-                    () => goBack(),
-                  )
-                }
-                disabled={calendarSaving || !calendarName.trim()}
-                className="h-8"
-              >
-                {calendarSaving ? (
-                  <>
-                    <Loader2 className="size-3.5 animate-spin mr-1.5" />
-                    Saving…
-                  </>
-                ) : (
-                  <>
-                    <Save className="size-3.5 mr-1.5" />
-                    Save
-                  </>
-                )}
-              </Button>
-            </div>
+          <div className="p-1 border-t border-border/50 mt-1">
+            <SettingToggleRow
+              checked={calendarIsDefault}
+              description="Use this calendar by default for new events."
+              icon={Star}
+              label="Default calendar"
+              onToggle={() => setCalendarIsDefault(!calendarIsDefault)}
+            />
           </div>
         </div>
 
-        <Dialog
-          open={showRegenerateConfirm}
-          onOpenChange={setShowRegenerateConfirm}
-        >
-          <DialogContent
-            showClose={false}
-            className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
-          >
-            <DialogHeader className="px-5 pt-5 pb-3">
-              <DialogTitle>Regenerate sharing URL?</DialogTitle>
-              <DialogDescription>
-                This creates a new private ICS URL for this calendar.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="px-5 pb-4">
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-                <p className="text-sm flex items-start gap-2">
-                  <AlertTriangle className="size-4 mt-0.5 text-destructive shrink-0" />
-                  The current URL stops working immediately. Everyone using it
-                  must subscribe again with the new URL.
-                </p>
-              </div>
-            </div>
-            <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowRegenerateConfirm(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  // handleEnableShareLink reports every failure via toast, so this never rejects.
-                  void handleConfirmRegenerate().catch(() => undefined);
-                }}
-                disabled={shareLinkLoading}
-              >
-                Confirm Regenerate
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </>
+        <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between shrink-0">
+          {editingCalendar && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                handleCalendarDelete(
+                  editingCalendar,
+                  calendarData,
+                  setCalendarSaving,
+                  () => goBack(),
+                )
+              }
+              disabled={calendarSaving}
+              className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              {calendarSaving ? (
+                <Loader2 className="size-3.5 animate-spin mr-1.5" />
+              ) : (
+                <Trash2 className="size-3.5 mr-1.5" />
+              )}
+              Delete
+            </Button>
+          )}
+          <div className="ml-auto">
+            <Button
+              size="sm"
+              onClick={() =>
+                handleCalendarUpdate(
+                  calendarName,
+                  calendarColor,
+                  calendarIsDefault,
+                  calendars,
+                  editingCalendar,
+                  calendarData,
+                  {
+                    setCalendarValidationErrors,
+                    setCalendarSaving,
+                    setEditingCalendar,
+                  },
+                  () => goBack(),
+                )
+              }
+              disabled={calendarSaving || !calendarName.trim()}
+              className="h-8"
+            >
+              {calendarSaving ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <Save className="size-3.5 mr-1.5" />
+                  Save
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 

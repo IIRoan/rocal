@@ -48,16 +48,12 @@ pub struct SubscribedCalendar {
     pub blind_index_tokens: Option<String>,
     pub encryption_state: String,
     pub encryption_key_version: i32,
-    pub force_full_encryption: bool,
     pub color: String,
     pub kind: String,
     pub is_public: bool,
     pub is_visible: bool,
     pub is_default: bool,
     pub is_sync_only: bool,
-    #[schema(required = true)]
-    pub ics_share_token: Option<String>,
-    pub ics_share_enabled: bool,
     #[schema(required = true)]
     pub stalwart_account_id: Option<String>,
     #[schema(required = true)]
@@ -139,14 +135,7 @@ pub struct SubscriptionSyncResult {
     pub errors: Option<Vec<String>>,
 }
 
-/// `POST /api/subscriptions/import-ics`: client-encrypted events, or the legacy raw ICS kept for shipped clients.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(untagged)]
-pub enum ImportIcsRequest {
-    Encrypted(EncryptedIcsImportRequest),
-    Legacy(LegacyIcsImportRequest),
-}
-
+/// `POST /api/subscriptions/import-ics`: events the client parsed and encrypted.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EncryptedIcsImportRequest {
@@ -189,28 +178,11 @@ pub struct EncryptedIcsEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LegacyIcsImportRequest {
-    pub calendar_id: CalendarId,
-    pub ics_content: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub file_name: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportIcsResponse {
     pub success: bool,
     pub events_created: i64,
     pub events_total: i64,
-    /// Legacy imports only.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub file_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub calendar_name: Option<String>,
     /// Per-event problems; absent when there were none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]

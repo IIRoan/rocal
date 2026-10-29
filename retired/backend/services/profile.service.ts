@@ -1,18 +1,17 @@
 import { randomBytes } from "node:crypto";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import {
-  buildSolaceProfileAvatarPath,
   buildSolaceUploadedAvatarPath,
   isReservedSystemEmail,
   normalizeParticipantEmail,
   normalizeSolaceProfileLookupEmails,
-  sanitizePublicImageUrl,
   solaceAvatarVariantSize,
   SOLACE_AVATAR_UPLOAD_SIZE_PX,
   type ProfileAvatarResponse,
   type SolaceProfile,
   type SolaceProfileLookupResponse,
 } from "@workspace/calendar-core";
+import { buildSolaceProfileAvatarPath, sanitizePublicImageUrl } from "../lib/profile-images";
 import type {
   IProfileService,
   ProfileAvatarImage,

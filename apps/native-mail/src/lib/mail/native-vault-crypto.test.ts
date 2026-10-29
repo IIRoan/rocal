@@ -10,7 +10,6 @@
 import {
   createEncryptedMailVault,
   unlockEncryptedMailVault,
-  unlockEncryptedMailVaultWithDerivedKey,
   aesGcmEncrypt,
   aesGcmDecrypt,
   deriveArgon2id,
@@ -321,27 +320,5 @@ describe("native-vault-crypto", () => {
       expect(tryNativeArgon2id(password, salt, FAST_KDF)).toBeNull();
       expect(deriveArgon2id(password, salt, FAST_KDF)).toHaveLength(32);
     });
-  });
-
-  describe("unlockEncryptedMailVaultWithDerivedKey", () => {
-    it("decrypts a vault sealed with a raw AES key", async () => {
-      const passphrase = "derived-key-path";
-      const { encryptedVaultB64, kdfParams } = await createEncryptedMailVault(
-        SAMPLE_VAULT,
-        passphrase,
-        FAST_KDF,
-      );
-      const derivedKey = deriveArgon2id(
-        new TextEncoder().encode(passphrase),
-        Uint8Array.from(atob(kdfParams.saltB64), (c) => c.charCodeAt(0)),
-        kdfParams,
-      );
-
-      const unlocked = await unlockEncryptedMailVaultWithDerivedKey(
-        encryptedVaultB64,
-        btoa(String.fromCharCode(...derivedKey)),
-      );
-      expect(unlocked.email).toBe(SAMPLE_VAULT.email);
-    }, 30_000);
   });
 });

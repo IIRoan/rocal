@@ -6,9 +6,8 @@ use solace_api_tests::client::ApiResponse;
 
 use crate::helpers::{Mode, TestApp, TestUser, ok};
 
-const PLAINTEXT_EVENT: &str =
-    "Plaintext event content must not be sent alongside encrypted content.";
-const PLAINTEXT_NAME: &str = "Plaintext names must not be sent alongside an encrypted name.";
+const PLAINTEXT_EVENT: &str = "Unrecognized key(s) in object: 'title'";
+const PLAINTEXT_NAME: &str = "Unrecognized key(s) in object: 'name'";
 
 /// An authenticated rejection must be a non-auth 4xx (validation-style), optionally naming `text`.
 fn expect_rejected(response: &ApiResponse, text: Option<&str>) {
@@ -29,7 +28,10 @@ fn expect_rejected(response: &ApiResponse, text: Option<&str>) {
 
 async fn first_calendar_id(user: &mut TestUser) -> String {
     let created = ok(user
-        .post("/api/calendars", json!({"name": "E2E", "color": "#3b82f6"}))
+        .post(
+            "/api/calendars",
+            json!({"encryptedName": "v1.e2e.ciphertext", "color": "#3b82f6"}),
+        )
         .await
         .expect_status(200)
         .and_then(|r| r.value()));
@@ -188,7 +190,10 @@ async fn unauthenticated_writes_are_refused() {
     let app = TestApp::spawn().await;
     let response = ok(app
         .anonymous()
-        .post("/api/calendars", json!({"name": "e2e", "color": "#3b82f6"}))
+        .post(
+            "/api/calendars",
+            json!({"encryptedName": "v1.e2e.ciphertext", "color": "#3b82f6"}),
+        )
         .await);
     assert_eq!(response.status.as_u16(), 401);
 }
@@ -241,7 +246,7 @@ async fn calendar_plaintext_name_alongside_ciphertext_is_rejected() {
 }
 
 #[tokio::test]
-async fn legacy_plaintext_display_title_is_accepted_but_never_stored() {
+async fn plaintext_display_title_is_rejected_and_never_echoed() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let response = user
@@ -250,11 +255,9 @@ async fn legacy_plaintext_display_title_is_accepted_but_never_stored() {
             json!({"notifications": [], "displayTitle": "plaintext title"}),
         )
         .await;
-    assert_ne!(
-        response.status.as_u16(),
-        400,
-        "legacy client rejected: {}",
-        response.text()
+    expect_rejected(
+        &response,
+        Some("Unrecognized key(s) in object: 'displayTitle'"),
     );
     assert!(
         !response.text().contains("plaintext title"),

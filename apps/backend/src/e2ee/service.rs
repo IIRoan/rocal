@@ -16,8 +16,6 @@ use crate::http::zod::js_trim;
 use crate::instant;
 use crate::state::AppState;
 
-/// `E2EE_ROLLOUT_STAGE` in `@workspace/calendar-core`.
-const ROLLOUT_STAGE: &str = "encrypted";
 const DEFAULT_PUBLIC_KEY_ALGORITHM: &str = "RSA-OAEP-256";
 const DEFAULT_WRAP_ALGORITHM: &str = "RSA-OAEP-256";
 const DEFAULT_PASSWORD_KDF_ALGORITHM: &str = "PBKDF2-SHA-256";
@@ -32,7 +30,6 @@ pub async fn bootstrap(state: &AppState, user: &RouteUser) -> Result<E2eeBootstr
     )?;
     Ok(E2eeBootstrap {
         enabled: true,
-        rollout_stage: ROLLOUT_STAGE.into(),
         algorithms: E2eeAlgorithms {
             content: "AES-GCM-256".into(),
             blind_index: "HMAC-SHA-256".into(),

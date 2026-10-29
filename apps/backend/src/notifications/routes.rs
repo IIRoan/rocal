@@ -3,7 +3,6 @@
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::Uri;
-use serde_json::Value;
 use solace_api_types::notifications::{
     EventNotifications, NotificationDeleteResult, NotificationUpdateResult,
     UpdateEventNotificationsRequest,
@@ -40,8 +39,6 @@ request_schema!(UpdateEventNotificationsRequest => {
             .max(20),
         ),
         ("encryptedDisplayTitle", title.nullable().optional()),
-        // Shipped binaries still send it; it is accepted and dropped, never stored or logged.
-        ("displayTitle", zod::string().max(255).nullish().transform(|_| Value::Null)),
     ])
     .strict()
 });

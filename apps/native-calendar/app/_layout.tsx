@@ -15,7 +15,6 @@ import {
   AuthenticatedChrome,
   NavigationGuard,
 } from "@workspace/native-core/providers/NavigationGuard";
-import { enforceFullEventEncryption } from "@workspace/native-core/lib/startup-crypto";
 import type { NotificationExtensionSecrets } from "@workspace/native-core/hooks/use-notification-extension-sync";
 import {
   NATIVE_ROOT_NON_GESTURE_SCREEN_OPTIONS,
@@ -49,7 +48,6 @@ function RootLayout() {
                     <CalendarViewProvider>
                       <NavigationGuard
                         homeRoute={CALENDAR_HOME_ROUTE}
-                        prepareSession={enforceFullEventEncryption}
                         pushTapHandler={CALENDAR_PUSH_TAP_HANDLER}
                         notificationExtensionSecrets={
                           NOTIFICATION_EXTENSION_SECRETS

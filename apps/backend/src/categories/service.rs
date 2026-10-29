@@ -10,8 +10,7 @@ use super::queries;
 use crate::auth::guard::RouteUser;
 use crate::db::entities::event_category;
 use crate::entity_metadata::{
-    NameInput, NamePersistence, assert_plaintext_name_allowed, assert_valid_entity_color,
-    resolve_name_persistence,
+    NameInput, NamePersistence, assert_valid_entity_color, resolve_name_persistence,
 };
 use crate::error::AppError;
 use crate::instant;
@@ -37,19 +36,9 @@ fn not_found() -> AppError {
     AppError::field("Category not found or access denied", "categoryId")
 }
 
-fn duplicate() -> AppError {
-    AppError::field("A category with this name already exists", "name")
-}
-
 fn apply_name(row: &mut event_category::ActiveModel, persistence: NamePersistence) {
     match persistence {
         NamePersistence::None => {}
-        NamePersistence::Plaintext(name) => {
-            row.name = Set(name);
-            row.encrypted_name = Set(None);
-            row.blind_index_tokens = Set(None);
-            row.encryption_state = Set("plaintext".into());
-        }
         NamePersistence::Encrypted {
             encrypted_name,
             blind_index_tokens,
@@ -86,22 +75,11 @@ pub async fn create(
 ) -> Result<Category, AppError> {
     let persistence = resolve_name_persistence(NameInput {
         entity_label: "Category",
-        name: request.name.as_deref(),
-        encrypted_name: request.encrypted_name.as_deref(),
+        encrypted_name: Some(&request.encrypted_name),
         blind_index_tokens: request.blind_index_tokens.as_deref(),
         encryption_key_version: request.encryption_key_version,
-        require_name: true,
     })?;
     assert_valid_entity_color(&request.color)?;
-    if let NamePersistence::Plaintext(name) = &persistence {
-        assert_plaintext_name_allowed(&state.db, &user.id, "Category").await?;
-        if queries::named(&state.db, &user.id, name, None)
-            .await?
-            .is_some()
-        {
-            return Err(duplicate());
-        }
-    }
     let mut row = event_category::ActiveModel {
         color: Set(request.color),
         user_id: Set(user.id.clone()),
@@ -119,27 +97,15 @@ pub async fn update(
 ) -> Result<Category, AppError> {
     let persistence = resolve_name_persistence(NameInput {
         entity_label: "Category",
-        name: request.name.as_deref(),
         encrypted_name: request.encrypted_name.as_deref(),
         blind_index_tokens: request.blind_index_tokens.as_deref(),
         encryption_key_version: request.encryption_key_version,
-        require_name: false,
     })?;
     let existing = queries::find(&state.db, &user.id, id)
         .await?
         .ok_or_else(not_found)?;
     if let Some(color) = &request.color {
         assert_valid_entity_color(color)?;
-    }
-    if let NamePersistence::Plaintext(name) = &persistence {
-        assert_plaintext_name_allowed(&state.db, &user.id, "Category").await?;
-        if *name != existing.name
-            && queries::named(&state.db, &user.id, name, Some(id))
-                .await?
-                .is_some()
-        {
-            return Err(duplicate());
-        }
     }
     let mut row = existing.into_active_model();
     apply_name(&mut row, persistence);

@@ -3,11 +3,13 @@ import {
   getErrorMessage,
   getSimpleLoginForward,
   resolveMessageReplyFrom,
+  sealMailForSelf,
   SIMPLELOGIN_DONE_KEYWORD,
   type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import {
+  createMailSealer,
   getPrimaryMailboxId,
   type ActiveMailboxState,
 } from "@/lib/mail/mail-app-helpers";
@@ -73,6 +75,10 @@ export function useSimpleLoginAliasAction({
         subject: action.target.subject,
         textBody: action.target.body,
         identityId: identity.id,
+        sentCopyCiphertext: await sealMailForSelf(
+          { text: action.target.body },
+          createMailSealer(activeMailbox),
+        ),
       });
     } catch (error) {
       log.error("Failed to run SimpleLogin action", error);

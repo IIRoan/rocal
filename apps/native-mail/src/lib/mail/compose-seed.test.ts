@@ -1,4 +1,10 @@
-import { planComposeSeed, type ComposeSeedInput } from "./compose-seed";
+import { buildDraftMethodCalls } from "@workspace/calendar-core";
+import {
+  decryptDraftFields,
+  planComposeSeed,
+  type ComposeSeedInput,
+} from "./compose-seed";
+import { decryptPgpMimeMessage } from "./mail-crypto";
 import type { MailRuntime } from "./mail-runtime";
 import type { JmapEmailMessage, JmapIdentity } from "./types";
 
@@ -91,6 +97,45 @@ describe("planComposeSeed", () => {
     expect(plan({})).toEqual({
       kind: "fields",
       fields: { to: "", cc: "", bcc: "", subject: "", body: "" },
+    });
+  });
+});
+
+describe("decryptDraftFields", () => {
+  const [[, emailSet]] = buildDraftMethodCalls({
+    draftsMailboxId: "drafts",
+    fromEmail: "me@example.com",
+    to: ["ann@example.com"],
+    subject: "Plans",
+    ciphertext: { blobId: "sealed-draft", size: 512 },
+  });
+  const sealed = (emailSet.create as Record<string, JmapEmailMessage>).draft1;
+  const draft: JmapEmailMessage = {
+    ...sealed,
+    id: "d1",
+    to: [{ email: "ann@example.com" }],
+  };
+
+  it("opens a stored PGP/MIME draft with its decrypted body", async () => {
+    (decryptPgpMimeMessage as jest.Mock).mockResolvedValueOnce({
+      plaintext: "Meet at nine",
+      html: "<p>Meet at nine</p>",
+    });
+    const runtime = {} as MailRuntime;
+
+    await expect(decryptDraftFields(runtime, draft)).resolves.toEqual({
+      fields: { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "Meet at nine" },
+      error: null,
+    });
+    expect(decryptPgpMimeMessage).toHaveBeenCalledWith(runtime, "d1", draft.bodyStructure);
+  });
+
+  it("still opens the headers with an error when the draft cannot be decrypted", async () => {
+    (decryptPgpMimeMessage as jest.Mock).mockRejectedValueOnce(new Error("No key"));
+
+    await expect(decryptDraftFields({} as MailRuntime, draft)).resolves.toEqual({
+      fields: { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "" },
+      error: "No key",
     });
   });
 });

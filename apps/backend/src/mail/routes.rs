@@ -48,7 +48,7 @@ request_schema!(MailBootstrapRequest => zod::object([
     ("encryptedVaultB64", zod::string().min(1).max(500_000)),
     ("kdf", zod::string().min(1).max(32)),
     ("kdfParams", kdf_params()),
-    ("wrappedSecret", zod::string().min(1).max(8_000).nullish()),
+    ("wrappedSecret", zod::string().min(1).max(8_000)),
     ("wrapAlgorithm", zod::string().min(1).max(64).nullish()),
 ]).strict());
 
@@ -57,7 +57,7 @@ request_schema!(MailVaultBackupRequest => zod::object([
     ("encryptedVaultB64", zod::string().min(1).max(500_000)),
     ("kdf", zod::string().min(1).max(32)),
     ("kdfParams", kdf_params()),
-    ("wrappedSecret", zod::string().min(1).max(8_000).nullish()),
+    ("wrappedSecret", zod::string().min(1).max(8_000).optional()),
     ("wrapAlgorithm", zod::string().min(1).max(64).nullish()),
 ]).strict());
 

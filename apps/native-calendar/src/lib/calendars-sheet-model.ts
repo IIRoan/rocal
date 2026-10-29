@@ -62,8 +62,7 @@ export function ownedCalendarDetail(calendar: Calendar): string | undefined {
   const parts: string[] = [];
   if (calendar.isDefault) parts.push("Default");
   const notice = getCalendarEncryptionNotice(calendar, "calendar");
-  if (notice.state !== "plaintext") parts.push(notice.label);
-  else if (calendar.forceFullEncryption) parts.push("Event encryption required");
+  if (notice.state === "encrypted") parts.push(notice.label);
   if (!calendar.isVisible) parts.push("Hidden");
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }

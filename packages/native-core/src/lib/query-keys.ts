@@ -21,8 +21,6 @@ export const QUERY_KEYS = {
   eventDetail: (id: string) => ["event", id] as const,
   searchResults: (query: string) => ["search", query] as const,
   eventNotifications: (eventId: string) => eventNotificationsQueryKey(eventId),
-  calendarShareLink: (calendarId: string) =>
-    ["calendarShareLink", calendarId] as const,
   mailConfig: () => ["mail", "config"] as const,
   mailAccount: () => ["mail", "account"] as const,
   mailRuntime: () => ["mail", "runtime"] as const,

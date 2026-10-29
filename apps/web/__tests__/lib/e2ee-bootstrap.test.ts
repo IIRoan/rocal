@@ -154,8 +154,6 @@ function createLocalDeviceRecord(userId: string) {
 
 function createRemoteBootstrap(userId: string): E2eeBootstrapResponse {
   return {
-    enabled: true,
-    rolloutStage: "shadow_write",
     algorithms: {
       content: "AES-GCM-256",
       blindIndex: "HMAC-SHA-256",

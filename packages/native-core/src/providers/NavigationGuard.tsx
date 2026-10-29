@@ -1,10 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useReducer, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./AuthProvider";
 import { useE2ee } from "./E2eeProvider";
 import { PushNotificationNavigation } from "./PushNotificationNavigation";
+import { E2eeUnlockSheet } from "../components/E2eeUnlockSheet";
 import { WorkspaceLoadingScreen } from "../components/WorkspaceLoadingScreen";
 import { calendarApiService } from "../lib/api";
 import { QUERY_KEYS } from "../lib/query-keys";
@@ -31,8 +32,8 @@ export interface NavigationGuardProps {
   children: ReactNode;
   /** The app's signed-in landing route. */
   homeRoute: string;
-  /** App-specific startup after the E2EE session is ready (encryption checks, mailbox unlock). */
-  prepareSession: (input: AuthenticatedSessionInput) => Promise<void>;
+  /** App-specific startup after the E2EE session is ready (mailbox unlock). */
+  prepareSession?: (input: AuthenticatedSessionInput) => Promise<void>;
   /** Seeds the cache from an encrypted on-device copy; resolving true skips the loading screen while startup runs behind the app. */
   restoreSession?: (
     input: Pick<
@@ -63,6 +64,8 @@ export function NavigationGuard({
   const [isPreparingStartupCrypto, setIsPreparingStartupCrypto] =
     useState(false);
   const [setupMessage, setSetupMessage] = useState(STARTUP_CRYPTO_INITIAL_PHASE);
+  // Bumped after the encryption password unlocks this device, so startup runs again with the account key.
+  const [startupRun, rerunStartup] = useReducer((run: number) => run + 1, 0);
   const [restoreResult, setRestoreResult] = useState<{
     userId: string;
     restored: boolean;
@@ -127,10 +130,10 @@ export function NavigationGuard({
         setRestoreResult({ userId: user.id, restored });
       }
 
-      await bootstrap(user.id, API_BASE_URL);
-      if (cancelled) return;
+      const needsPassword = await bootstrap(user.id, API_BASE_URL);
+      if (cancelled || needsPassword) return;
 
-      await prepareSession({
+      await prepareSession?.({
         queryClient,
         userId: user.id,
         email: user.email,
@@ -148,19 +151,13 @@ export function NavigationGuard({
       // repo-rules-allow async-promise-handling: resetPreSessionQueries is Promise.all of resetQueries, which never rejects.
       void resetPreSessionQueries(queryClient);
 
-      // Silent on failure; the next launch retries the remaining rows.
+      // Silent on failure; the next launch retries the seed.
       void calendarApiService
-        .backfillEncryptedNames()
-        .then((result) => {
-          if (cancelled) return;
-          if (result.calendars > 0) {
-            void queryClient.invalidateQueries({
+        .ensureDefaultCalendars()
+        .then(async (seeded) => {
+          if (seeded && !cancelled) {
+            await queryClient.invalidateQueries({
               queryKey: QUERY_KEYS.calendars(),
-            });
-          }
-          if (result.categories > 0) {
-            void queryClient.invalidateQueries({
-              queryKey: QUERY_KEYS.categories(),
             });
           }
         })
@@ -185,6 +182,7 @@ export function NavigationGuard({
     provider,
     queryClient,
     restoreSession,
+    startupRun,
   ]);
 
   const isStartupRunning = !isE2eeReady || isPreparingStartupCrypto;
@@ -210,6 +208,7 @@ export function NavigationGuard({
         active={isPreparingWorkspace}
         message={setupMessage}
       />
+      <E2eeUnlockSheet onUnlocked={rerunStartup} />
     </View>
   );
 }

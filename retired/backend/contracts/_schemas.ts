@@ -1,13 +1,13 @@
 import { z } from "zod";
 import {
-  PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
-  PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE,
   findPlaintextEventContentFields,
   hasEncryptedPayloadValue,
   type EventContentField,
 } from "@workspace/calendar-core";
 import { strictZodObject } from "../lib/validation";
 import { rowEncryptionStateSchema } from "../lib/encryption-state";
+import { PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE } from "../lib/entity-metadata";
+import { PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE } from "../lib/event-encryption";
 
 export const resourceIdParamsSchema = strictZodObject({
   id: z.string().min(1),

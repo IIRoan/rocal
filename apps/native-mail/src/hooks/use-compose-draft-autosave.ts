@@ -1,10 +1,15 @@
 import { useEffect, useEffectEvent, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { composeTextToHtml, hasComposeFormatting } from "@workspace/calendar-core";
+import {
+  composeTextToHtml,
+  hasComposeFormatting,
+  sealMailForSelf,
+} from "@workspace/calendar-core";
 import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
 import { createLogger } from "@workspace/logger";
 import { getPrimaryMailboxId } from "../lib/mail/mail-helpers";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
+import { createMailSealer } from "../lib/mail/outgoing-message-crypto";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 
 const log = createLogger("native-compose-draft-autosave");
@@ -101,6 +106,15 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
 
     const { runtime } = input;
     const persistDraft = async (): Promise<DraftSaveResult> => {
+      const ciphertext = await sealMailForSelf(
+        {
+          text: plainBody,
+          html: hasComposeFormatting(plainBody)
+            ? composeTextToHtml(plainBody)
+            : undefined,
+        },
+        await createMailSealer(runtime),
+      );
       const savedDraftId = await runtime.client.saveDraft(
         runtime.session,
         {
@@ -111,10 +125,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
           cc: ccAddresses.length ? ccAddresses : undefined,
           bcc: bccAddresses.length ? bccAddresses : undefined,
           subject: input.subject.trim() || "(No subject)",
-          textBody: plainBody,
-          htmlBody: hasComposeFormatting(plainBody)
-            ? composeTextToHtml(plainBody)
-            : undefined,
+          ciphertext,
           previousDraftId: previousDraftId ?? undefined,
         },
       );

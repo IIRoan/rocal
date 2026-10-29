@@ -46,14 +46,6 @@ export function useCalendarSubscriptions() {
   });
 }
 
-export function useCalendarShareLink(calendarId: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.calendarShareLink(calendarId),
-    queryFn: () => calendarApiService.getCalendarShareLink(calendarId),
-    enabled: calendarId.length > 0,
-  });
-}
-
 export function useCreateCalendar() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -76,7 +68,6 @@ export function useUpdateCalendar(calendarId: string) {
     onSuccess: () => {
       // Event colors and visibility are resolved from the calendars query on the client.
       invalidateCalendarData(queryClient, { settings: true, events: false });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendarShareLink(calendarId) });
       toast("Calendar saved");
     },
     onError: (error) => toast(getErrorMessage(error, "Failed to update calendar"), "error"),
@@ -95,39 +86,6 @@ export function useDeleteCalendar(calendarId: string) {
     },
     onError: (error) => toast(getErrorMessage(error, "Failed to delete calendar"), "error"),
   });
-}
-
-export function useCalendarShareLinkActions(calendarId: string) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendarShareLink(calendarId) });
-
-  const enable = useMutation({
-    mutationFn: (regenerate: boolean) =>
-      calendarApiService.enableCalendarShareLink(
-        calendarId,
-        regenerate ? { regenerate: true } : undefined,
-      ),
-    onSuccess: (_link, regenerate) => {
-      // repo-rules-allow async-promise-handling: invalidate wraps invalidateQueries, which never rejects.
-      void invalidate();
-      toast(regenerate ? "Share link regenerated" : "Share link enabled");
-    },
-    onError: (error) => toast(getErrorMessage(error, "Failed to enable calendar sharing"), "error"),
-  });
-
-  const disable = useMutation({
-    mutationFn: () => calendarApiService.disableCalendarShareLink(calendarId),
-    onSuccess: () => {
-      // repo-rules-allow async-promise-handling: invalidate wraps invalidateQueries, which never rejects.
-      void invalidate();
-      toast("Share link disabled");
-    },
-    onError: (error) => toast(getErrorMessage(error, "Failed to disable calendar sharing"), "error"),
-  });
-
-  return { enable, disable };
 }
 
 export function useSyncSubscription() {

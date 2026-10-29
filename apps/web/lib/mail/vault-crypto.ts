@@ -36,19 +36,12 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function base64ToBytes(value: string): Uint8Array {
-  // Accept standard base64 and base64url (server-derived AES keys are url-safe).
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded =
-    normalized.length % 4 === 0
-      ? normalized
-      : normalized + "=".repeat(4 - (normalized.length % 4));
-
   if (typeof atob === "function") {
-    const binary = atob(padded);
+    const binary = atob(value);
     return Uint8Array.from(binary, (char) => char.charCodeAt(0));
   }
 
-  return Uint8Array.from(Buffer.from(padded, "base64"));
+  return Uint8Array.from(Buffer.from(value, "base64"));
 }
 
 function encodeUtf8(value: string): Uint8Array {

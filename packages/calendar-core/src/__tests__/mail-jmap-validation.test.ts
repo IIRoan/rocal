@@ -46,6 +46,24 @@ describe("mail JMAP zod validation", () => {
     });
   });
 
+  it("reports the encrypted Sent copy as the stored message of a plaintext send", () => {
+    expect(
+      parseSendMessageResults({
+        emailSet: {
+          created: {
+            draft1: { id: "plain-1", threadId: "thread-1" },
+            sent1: { id: "copy-1", threadId: "thread-2" },
+          },
+        },
+        emailSubmissionSet: { created: { s1: { id: "submission-1" } } },
+      }),
+    ).toEqual({
+      emailId: "copy-1",
+      threadId: "thread-2",
+      submissionId: "submission-1",
+    });
+  });
+
   it("rejects send results without a submission id", () => {
     expect(() =>
       parseSendMessageResults({

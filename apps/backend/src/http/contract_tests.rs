@@ -30,9 +30,6 @@ fn sample(component: &str) -> Option<Value> {
         "RecurrenceRule" => Some(json!({"frequency": "daily", "interval": 1})),
         "EncryptedIcsImportRequest" => Some(json!({"calendarId": "c", "encryptedEvents": [event]})),
         "EncryptedIcsEvent" => Some(event),
-        "LegacyIcsImportRequest" => {
-            Some(json!({"calendarId": "c", "icsContent": "BEGIN:VCALENDAR"}))
-        }
         "ParticipantInput" => Some(json!({"email": "a@example.com"})),
         _ => None,
     }
@@ -316,7 +313,6 @@ fn checked() -> Vec<(String, Vec<String>)> {
         check::<categories::CreateCategoryRequest>(),
         check::<events::CreateEventRequest>(),
         check::<account::CreateInviteRequest>(),
-        check::<calendars::CreateShareLinkRequest>(),
         check::<subscriptions::CreateSubscriptionRequest>(),
         check::<events::DeclineInvitationRequest>(),
         check::<calendars::DeleteCalendarQuery>(),
@@ -324,11 +320,10 @@ fn checked() -> Vec<(String, Vec<String>)> {
         check::<subscriptions::DeleteSubscriptionQuery>(),
         check::<recurring::EditRecurringRequest>(),
         check::<account::EmailAvailabilityQuery>(),
-        check::<profiles::EmailAvatarQuery>(),
+        check::<subscriptions::EncryptedIcsImportRequest>(),
         check::<events::EventListQuery>(),
         check::<events::EventSearchCorpusQuery>(),
         check::<events::EventSearchQuery>(),
-        check::<subscriptions::ImportIcsRequest>(),
         check::<events::ImportInvitationRequest>(),
         check::<events::InvitationByExternalIdQuery>(),
         check::<account::InviteTokenQuery>(),
@@ -344,6 +339,7 @@ fn checked() -> Vec<(String, Vec<String>)> {
         check::<push_devices::RegisterPushDeviceRequest>(),
         check::<events::RsvpRequest>(),
         check::<events::SealEncryptionRequest>(),
+        check::<calendars::SeedDefaultCalendarsRequest>(),
         check::<push_devices::UnregisterPushDeviceRequest>(),
         check::<calendars::UpdateCalendarRequest>(),
         check::<categories::UpdateCategoryRequest>(),

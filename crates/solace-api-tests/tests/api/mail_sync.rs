@@ -6,8 +6,12 @@ use serde_json::{Value, json};
 use solace_api_tests::seed::{fake_envelope, fake_token};
 use solace_api_types::mail::{MailCalendarImportSummary, MailSyncResult};
 
+use crate::calendars::create_calendar;
+use crate::event_fixtures::{DEFAULT_CALENDARS, seed_default_calendars};
 use crate::helpers::{TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
 use crate::mail_support::{Mailbox, mailbox, method, row_json, sync};
+
+const SEAL_REQUIRED: &str = "Decrypted mail invitation: This calendar requires encrypted event details; automatic server-side mail import is unavailable.";
 
 async fn stored_states(app: &TestApp, account_id: &str) -> (String, String, Option<String>) {
     sqlx::query_as(
@@ -446,22 +450,13 @@ async fn mailed_invitations_are_staged_in_the_hidden_invitations_calendar() {
 async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let calendar = ok(user
-        .post(
-            "/api/calendars",
-            json!({"name": "Work", "color": "#3b82f6"}),
-        )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    let calendar_id = calendar["id"].as_str().expect("calendar id").to_owned();
+    let calendar_id = create_calendar(&mut user, "#3b82f6").await.id.0;
     ok(user
         .put("/api/settings", json!({"defaultCalendarId": calendar_id}))
         .await
         .expect_status(200));
     let uid = format!("{}@example.com", hex(8));
     let email = user.email.clone();
-    let import = json!({"icsContent": invitation_ics("REQUEST", &uid, "Decrypted invite", 0, &email), "status": "accepted"});
     // A declined invitation creates the hidden staging calendar, which accepted imports must never use.
     ok(user
         .post(
@@ -471,38 +466,12 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
         .await
         .expect_status(200));
 
-    // Calendars created under full encryption are force-encrypted, and server-side imports skip those.
-    let refused: MailCalendarImportSummary = ok(user
-        .post("/api/events/invitations/import-ics", import.clone())
-        .await
-        .expect_status(200)
-        .and_then(|r| r.dto()));
-    assert_eq!(
-        refused,
-        MailCalendarImportSummary {
-            messages_scanned: 1,
-            ics_parts_found: 1,
-            events_created: 0,
-            events_updated: 0,
-            events_deleted: 0,
-            errors: vec!["No writable calendar is available for ICS mail imports.".into()],
-        }
-    );
-    assert_eq!(
-        count(
-            &app.db,
-            "SELECT count(*) FROM calendar_event WHERE external_id = $1",
-            &uid
-        )
-        .await,
-        0
-    );
-
-    sqlx::query("UPDATE calendar SET force_full_encryption = false WHERE id = $1")
-        .bind(&calendar_id)
-        .execute(&app.db)
-        .await
-        .expect("a legacy hybrid calendar");
+    let ciphertext = fake_envelope();
+    let import = json!({
+        "icsContent": invitation_ics("REQUEST", &uid, "Decrypted invite", 0, &email),
+        "status": "accepted",
+        "encryption": [{"externalId": uid, "encryptedContent": ciphertext}],
+    });
     let summary: MailCalendarImportSummary = ok(user
         .post("/api/events/invitations/import-ics", import)
         .await
@@ -520,8 +489,12 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
         }
     );
     let event = row_json(&app.db, &event_sql().replace("::text", ""), &uid).await;
-    assert_eq!(event["title"], json!("Decrypted invite"));
-    assert_eq!(event["calendar"]["name"], json!("Work"));
+    assert_eq!(
+        (&event["title"], &event["encryptedContent"]),
+        (&json!(""), &json!(ciphertext))
+    );
+    assert_eq!(event["calendar"]["color"], json!("#3b82f6"));
+    assert_eq!(event["calendar"]["isDefault"], json!(false));
     assert_eq!(
         event["stalwartEventId"],
         Value::Null,
@@ -533,25 +506,17 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
         .expect("attendee");
     assert_eq!(attendee["status"], json!("accepted"));
 
-    let side = ok(user
-        .post(
-            "/api/calendars",
-            json!({"name": "Side", "color": "#22c55e"}),
-        )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.value()));
-    let side_id = side["id"].as_str().expect("calendar id").to_owned();
-    sqlx::query("UPDATE calendar SET force_full_encryption = false WHERE id = $1")
-        .bind(&side_id)
-        .execute(&app.db)
-        .await
-        .expect("a legacy hybrid calendar");
+    let side_id = create_calendar(&mut user, "#22c55e").await.id.0;
     let chosen_uid = format!("{}@example.com", hex(8));
     let chosen: MailCalendarImportSummary = ok(user
         .post(
             "/api/events/invitations/import-ics",
-            json!({"icsContent": invitation_ics("REQUEST", &chosen_uid, "Chosen calendar", 0, &email), "status": "accepted", "calendarId": side_id}),
+            json!({
+                "icsContent": invitation_ics("REQUEST", &chosen_uid, "Chosen calendar", 0, &email),
+                "status": "accepted",
+                "calendarId": side_id,
+                "encryption": [{"externalId": chosen_uid, "encryptedContent": fake_envelope()}],
+            }),
         )
         .await
         .expect_status(200)
@@ -559,12 +524,64 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
     assert_eq!(chosen.events_created, 1);
     let event = row_json(&app.db, &event_sql().replace("::text", ""), &chosen_uid).await;
     assert_eq!(
-        event["calendar"]["name"],
-        json!("Side"),
+        event["calendar"]["color"],
+        json!("#22c55e"),
         "an explicitly requested calendar wins over the default"
     );
 }
 
+#[tokio::test]
+async fn accepted_imports_without_a_sealed_copy_store_nothing() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    create_calendar(&mut user, "#3b82f6").await;
+    let email = user.email.clone();
+    let uid = format!("{}@example.com", hex(8));
+    let other_uid = format!("{}@example.com", hex(8));
+    let second = invitation_ics("REQUEST", &other_uid, "Secret planning", 0, &email);
+    let block = second
+        .find("BEGIN:VEVENT")
+        .zip(second.find("END:VCALENDAR"))
+        .map(|(from, to)| &second[from..to])
+        .expect("event block");
+    let two_events = invitation_ics("REQUEST", &uid, "Secret planning", 0, &email)
+        .replace("END:VCALENDAR", &format!("{block}END:VCALENDAR"));
+    for body in [
+        json!({"icsContent": invitation_ics("REQUEST", &uid, "Secret planning", 0, &email), "status": "accepted"}),
+        // Every event of the file needs its own sealed copy.
+        json!({
+            "icsContent": two_events,
+            "status": "tentative",
+            "encryption": [{"externalId": uid, "encryptedContent": fake_envelope()}],
+        }),
+    ] {
+        let summary: MailCalendarImportSummary = ok(user
+            .post("/api/events/invitations/import-ics", body)
+            .await
+            .expect_status(200)
+            .and_then(|r| r.dto()));
+        assert_eq!(
+            (
+                summary.events_created,
+                summary.events_updated,
+                summary.errors
+            ),
+            (0, 0, vec![SEAL_REQUIRED.to_owned()])
+        );
+    }
+    for external_id in [&uid, &other_uid] {
+        assert_eq!(
+            count(
+                &app.db,
+                "SELECT count(*) FROM calendar_event WHERE external_id = $1",
+                external_id
+            )
+            .await,
+            0,
+            "no plaintext copy is stored"
+        );
+    }
+}
 #[tokio::test]
 async fn client_encrypted_invitation_imports_store_only_ciphertext() {
     let app = TestApp::spawn().await;
@@ -573,16 +590,35 @@ async fn client_encrypted_invitation_imports_store_only_ciphertext() {
     let ciphertext = fake_envelope();
     let token = fake_token();
     let email = user.email.clone();
+    let body = json!({
+        "icsContent": invitation_ics("REQUEST", &uid, "Secret planning", 0, &email),
+        "status": "tentative",
+        "encryption": [{"externalId": uid, "encryptedContent": ciphertext, "blindIndexTokens": [token], "encryptionKeyVersion": 1}],
+    });
 
-    let summary: MailCalendarImportSummary = ok(user
-        .post(
-            "/api/events/invitations/import-ics",
-            json!({
-                "icsContent": invitation_ics("REQUEST", &uid, "Secret planning", 0, &email),
-                "status": "tentative",
-                "encryption": [{"externalId": uid, "encryptedContent": ciphertext, "blindIndexTokens": [token], "encryptionKeyVersion": 1}],
-            }),
+    let without_calendars: MailCalendarImportSummary = ok(user
+        .post("/api/events/invitations/import-ics", body.clone())
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(
+        without_calendars.errors,
+        ["No writable calendar is available for ICS mail imports."],
+        "the server never creates a plaintext calendar"
+    );
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar WHERE user_id = $1",
+            &user.id
         )
+        .await,
+        0
+    );
+
+    seed_default_calendars(&mut user).await;
+    let summary: MailCalendarImportSummary = ok(user
+        .post("/api/events/invitations/import-ics", body)
         .await
         .expect_status(200)
         .and_then(|r| r.dto()));
@@ -607,12 +643,11 @@ async fn client_encrypted_invitation_imports_store_only_ciphertext() {
         )
     );
     assert_eq!(
-        event["calendar"]["name"],
-        json!("Personal"),
-        "a first calendar is created"
+        (&event["calendar"]["color"], &event["calendar"]["isDefault"]),
+        (&json!(DEFAULT_CALENDARS[0].1), &json!(true)),
+        "the default seeded calendar takes it"
     );
 }
-
 #[tokio::test]
 async fn a_declined_invitation_is_kept_as_a_hidden_tombstone_that_mail_does_not_revive() {
     let app = TestApp::spawn().await;
@@ -662,8 +697,8 @@ async fn a_declined_invitation_is_kept_as_a_hidden_tombstone_that_mail_does_not_
     let after = row_json(&app.db, &event_sql().replace("::text", ""), &uid).await;
     assert_eq!(
         after["title"],
-        json!("Unwanted sync"),
-        "a declined invitation is not updated from mail"
+        json!(""),
+        "a declined invitation keeps no text and is not updated from mail"
     );
     assert_eq!(me(&after), Some(json!("declined")));
 }

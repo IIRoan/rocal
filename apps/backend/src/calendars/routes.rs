@@ -4,7 +4,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use solace_api_types::calendars::{
     Calendar, CalendarDeleteResult, CalendarList, CreateCalendarRequest, DeleteCalendarQuery,
-    UpdateCalendarRequest,
+    SeedDefaultCalendarsRequest, UpdateCalendarRequest,
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -14,33 +14,33 @@ use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidQuery};
 use crate::http::schemas::{
-    calendar_color_schema, calendar_delete_action_schema, encryption_shadow_fields,
-    refine_encrypted_name_body,
+    calendar_color_schema, calendar_delete_action_schema, encrypted_name_fields,
 };
 use crate::http::zod;
 use crate::request_schema;
 use crate::state::AppState;
 
 request_schema!(CreateCalendarRequest => zod::object([
-    ("name", zod::string().max(100).optional()),
     ("color", calendar_color_schema()),
     ("isDefault", zod::boolean().optional()),
 ])
-.extend(encryption_shadow_fields())
-.extend([("forceFullEncryption", zod::boolean().optional())])
-.strict()
-.super_refine(refine_encrypted_name_body("Calendar", true)));
+.extend(encrypted_name_fields())
+.extend([("encryptedName", zod::string())])
+.strict());
+
+request_schema!(SeedDefaultCalendarsRequest => zod::object([(
+    "calendars",
+    zod::array(CreateCalendarRequest::schema().clone()).min(1).max(3),
+)])
+.strict());
 
 request_schema!(UpdateCalendarRequest => zod::object([
-    ("name", zod::string().max(100).optional()),
     ("color", calendar_color_schema().optional()),
     ("isVisible", zod::boolean().optional()),
     ("isDefault", zod::boolean().optional()),
 ])
-.extend(encryption_shadow_fields())
-.extend([("forceFullEncryption", zod::boolean().optional())])
-.strict()
-.super_refine(refine_encrypted_name_body("Calendar", false)));
+.extend(encrypted_name_fields())
+.strict());
 
 request_schema!(DeleteCalendarQuery => zod::object([
     ("action", calendar_delete_action_schema().optional()),
@@ -51,10 +51,11 @@ request_schema!(DeleteCalendarQuery => zod::object([
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(list, create))
+        .routes(routes!(seed_defaults))
         .routes(routes!(update, delete))
 }
 
-/// The caller's calendars, default first, then by name; the first call creates the defaults.
+/// The caller's calendars, default first, then by name.
 #[utoipa::path(get, path = "/api/calendars", operation_id = "listCalendars", tag = "Calendars", responses((status = 200, body = CalendarList)))]
 #[tracing::instrument(skip_all)]
 pub async fn list(
@@ -72,6 +73,17 @@ pub async fn create(
     ValidJson(body): ValidJson<CreateCalendarRequest>,
 ) -> Result<Json<Calendar>, AppError> {
     Ok(Json(service::create(&state, &user, body).await?))
+}
+
+/// Stores the client-encrypted starting calendars when the caller owns none yet; answers the caller's calendars either way.
+#[utoipa::path(post, path = "/api/calendars/defaults", operation_id = "seedDefaultCalendars", tag = "Calendars", request_body = SeedDefaultCalendarsRequest, responses((status = 200, body = CalendarList)))]
+#[tracing::instrument(skip_all)]
+pub async fn seed_defaults(
+    State(state): State<AppState>,
+    user: RouteUser,
+    ValidJson(body): ValidJson<SeedDefaultCalendarsRequest>,
+) -> Result<Json<CalendarList>, AppError> {
+    Ok(Json(service::seed_defaults(&state, &user, body).await?))
 }
 
 #[utoipa::path(put, path = "/api/calendars/{id}", operation_id = "updateCalendar", tag = "Calendars", params(("id" = String, Path)), request_body = UpdateCalendarRequest, responses((status = 200, body = Calendar)))]

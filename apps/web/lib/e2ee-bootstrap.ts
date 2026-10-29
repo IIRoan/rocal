@@ -338,10 +338,9 @@ async function bootstrapUser(
   }
 
   clearActiveE2eeSession();
-  log.info(
-    "E2EE shadow-write bootstrap exists on another device; password migration is required.",
-    { userId },
-  );
+  log.info("E2EE devices exist without a password envelope; this device cannot unlock.", {
+    userId,
+  });
 
   return createAttempt(false, remoteBootstrap);
 }
@@ -418,7 +417,7 @@ export function ensureE2eeBootstrap(
       }
 
       clearActiveE2eeSession();
-      log.warn("Failed to initialize E2EE shadow-write bootstrap", {
+      log.warn("Failed to initialize E2EE bootstrap", {
         userId,
         error,
       });

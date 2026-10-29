@@ -1,48 +1,11 @@
-/** Persists the login password and derived keys in expo-secure-store so the vault can unlock after a restart. */
+/** Caches the unlocked PGP key in expo-secure-store and removes secrets that older versions stored there. */
 import * as SecureStore from "expo-secure-store";
 import { createLogger } from "@workspace/logger";
 import { SECURE_STORE_KEYS } from "@workspace/native-core/lib/constants";
 
 const log = createLogger("native:mail-password-cache");
 
-/** Saves the login password so the vault can unlock on later launches; called after sign-in and sign-up. */
-export async function saveMailVaultPassword(password: string): Promise<void> {
-  if (!password) {
-    log.debug("[mail-password-cache] saveMailVaultPassword: skipped — empty password");
-    return;
-  }
-  try {
-    await SecureStore.setItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_PASSWORD, password);
-    log.debug("[mail-password-cache] saveMailVaultPassword: saved to SecureStore (length=%d)", password.length);
-  } catch (err) {
-    // Non-fatal: the app still works, but mail vault may require re-auth
-    log.warn(
-      "[mail-password-cache] saveMailVaultPassword: failed to persist password:",
-      err instanceof Error ? err.message : String(err),
-    );
-  }
-}
-
-/** Loads the persisted login password, or `null` when nothing is stored. */
-export async function loadMailVaultPassword(): Promise<string | null> {
-  try {
-    const value = await SecureStore.getItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_PASSWORD);
-    if (value) {
-      log.debug("[mail-password-cache] loadMailVaultPassword: found stored password (length=%d)", value.length);
-    } else {
-      log.debug("[mail-password-cache] loadMailVaultPassword: no password stored");
-    }
-    return value;
-  } catch (err) {
-    log.warn(
-      "[mail-password-cache] loadMailVaultPassword: failed to read from SecureStore:",
-      err instanceof Error ? err.message : String(err),
-    );
-    return null;
-  }
-}
-
-/** Clears the persisted login password; called on sign-out. */
+/** Removes the login password older versions stored; called at session start and on sign-out. */
 export async function clearMailVaultPassword(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_PASSWORD);
@@ -55,44 +18,7 @@ export async function clearMailVaultPassword(): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Derived vault key (pre-computed argon2id output)
-// ---------------------------------------------------------------------------
-
-/** Caches the backend-computed argon2id vault key so Hermes never reruns argon2id on later sessions. */
-export async function saveDerivedVaultKey(derivedKeyB64: string): Promise<void> {
-  if (!derivedKeyB64) return;
-  try {
-    await SecureStore.setItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_DERIVED_KEY, derivedKeyB64);
-    log.debug("[mail-password-cache] saveDerivedVaultKey: saved to SecureStore");
-  } catch (err) {
-    log.warn(
-      "[mail-password-cache] saveDerivedVaultKey: failed to persist:",
-      err instanceof Error ? err.message : String(err),
-    );
-  }
-}
-
-/** Loads the cached vault decryption key, or `null` when absent. */
-export async function loadDerivedVaultKey(): Promise<string | null> {
-  try {
-    const value = await SecureStore.getItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_DERIVED_KEY);
-    if (value) {
-      log.debug("[mail-password-cache] loadDerivedVaultKey: found cached derived key");
-    } else {
-      log.debug("[mail-password-cache] loadDerivedVaultKey: no cached derived key");
-    }
-    return value;
-  } catch (err) {
-    log.warn(
-      "[mail-password-cache] loadDerivedVaultKey: failed to read:",
-      err instanceof Error ? err.message : String(err),
-    );
-    return null;
-  }
-}
-
-/** Clears the cached derived vault key; called on sign-out. */
+/** Removes the derived vault key older versions stored; called at session start and on sign-out. */
 export async function clearDerivedVaultKey(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_DERIVED_KEY);

@@ -59,7 +59,7 @@ describe("e2ee payload helpers", () => {
     mockCreateBlindIndexTokens.mockResolvedValue(["idx-1", "idx-2"]);
   });
 
-  it("returns the original event request when no active session exists", async () => {
+  it("refuses to send plaintext content when no active session exists", async () => {
     mockGetActiveE2eeSession.mockReturnValue(null);
     const request = {
       title: "Secret event",
@@ -68,12 +68,23 @@ describe("e2ee payload helpers", () => {
       calendarId: "cal-1",
     };
 
-    await expect(attachEventEncryptionShadow(request)).resolves.toBe(request);
+    await expect(attachEventEncryptionShadow(request)).rejects.toThrow(
+      "Encryption is not ready",
+    );
+    await expect(
+      attachCalendarEncryptionShadow({ name: "Therapy", color: "blue" }),
+    ).rejects.toThrow("Encryption is not ready");
+    await expect(
+      attachEventEncryptionShadow({ start: request.start, end: request.end }),
+    ).resolves.toEqual({ start: request.start, end: request.end });
+    await expect(
+      attachCalendarEncryptionShadow({ isVisible: false }),
+    ).resolves.toEqual({ isVisible: false });
     expect(mockEncryptJsonPayload).not.toHaveBeenCalled();
     expect(mockCreateBlindIndexTokens).not.toHaveBeenCalled();
   });
 
-  it("skips event encryption when the title is blank", async () => {
+  it("skips event encryption and drops the blank title", async () => {
     const request = {
       title: "   ",
       start: "2026-05-01T10:00:00.000Z",
@@ -81,7 +92,11 @@ describe("e2ee payload helpers", () => {
       calendarId: "cal-1",
     };
 
-    await expect(attachEventEncryptionShadow(request)).resolves.toBe(request);
+    await expect(attachEventEncryptionShadow(request)).resolves.toEqual({
+      start: request.start,
+      end: request.end,
+      calendarId: request.calendarId,
+    });
     expect(mockEncryptJsonPayload).not.toHaveBeenCalled();
   });
 

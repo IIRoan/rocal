@@ -143,17 +143,6 @@ export class MailCryptoWorkerClient {
     });
   }
 
-  reEncryptPrivateKey(input: {
-    privateKeyArmored: string;
-    oldPassphrase: string;
-    newPassphrase: string;
-  }): Promise<{ privateKeyArmored: string }> {
-    return this.call<{ privateKeyArmored: string }>(
-      "REENCRYPT_PRIVATE_KEY",
-      input,
-    );
-  }
-
   generateKeyPair(input: {
     name: string;
     email: string;

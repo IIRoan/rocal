@@ -12,7 +12,7 @@ cargo test -p solace-notifications                         # needs `cargo xtask 
 
 ## Push and reminder mail content
 
-The worker never sees reminder titles or mail sender/subject. `notification_job.payload` holds opaque refs only (`kind`, `eventId`, `minutesBefore`, `emailFallback`, `inboundCount`, `emailId`, `accountId`; legacy `title`/`subject`/`fromName` keys are tolerated and ignored).
+The worker never sees reminder titles or mail sender/subject. `notification_job.payload` holds opaque refs only (`kind`, `eventId`, `minutesBefore`, `emailFallback`, `inboundCount`, `emailId`, `accountId`); a payload with any other key is refused.
 
 - Reminder email: generic ("You have an event at 3:04 PM. Open Solace to view the details."), no title/location/description/calendar names.
 - No duplicate reminders: email is skipped when the reminder push goes out and the account email is the user's own Solace mailbox; that push carries `emailFallback`, so if it ends skipped (e.g. the device was unregistered) the email is queued instead. Reminder mail is sent from noreply with a `solace-reminder.…@<noreply domain>` Message-ID so the Stalwart webhook doesn't also send a `new_mail` push for it; both must match, since either header alone is forgeable (`REMINDER_MESSAGE_ID_PREFIX` in `apps/backend/src/mail/webhook.rs`, which the worker imports).
@@ -36,7 +36,6 @@ Hourly (`:17`), the worker deletes ephemeral rows in batches of 500 (`DELETE ...
 | Table                                        | Deleted when                                                     |
 | -------------------------------------------- | ---------------------------------------------------------------- |
 | `session`, `verification`                    | `expires_at` older than 1 day                                    |
-| `oauth_access_token`, `oauth_refresh_token`  | `expires_at` older than 1 day                                    |
 | `invite`                                     | pending past `expires_at` + 30d; revoked/abandoned claim after 30d; accepted invites are kept (inviter's history) |
 | `notification_job`                           | `sent` after 7d; any other non-pending status after 30d (pending/leased never touched) |
 | `notification_log`                           | `created_at` older than 30 days                                  |

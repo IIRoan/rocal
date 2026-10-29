@@ -211,8 +211,13 @@ export function useCommandPaletteController({
     currentPassword: string;
     newPassword: string;
   }) => {
+    if (!sessionUserId) {
+      throw new Error("Your session is unavailable. Please try again.");
+    }
+
     dispatchBusy({ type: "setChangingPassword", value: true });
     const result = await persistPasswordChange({
+      sessionUserId,
       currentPassword,
       newPassword,
     });
@@ -227,8 +232,13 @@ export function useCommandPaletteController({
   }: {
     newPassword: string;
   }) => {
+    if (!sessionUserId) {
+      throw new Error("Your session is unavailable. Please try again.");
+    }
+
     dispatchBusy({ type: "setSettingPassword", value: true });
     const result = await persistPasswordSet({
+      sessionUserId,
       newPassword,
       refetchAccounts: accountsQuery.refetch,
     });

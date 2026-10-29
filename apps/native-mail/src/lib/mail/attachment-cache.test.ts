@@ -1,7 +1,19 @@
+import * as FileSystem from "expo-file-system/legacy";
+import { clearAttachmentCache, writeAttachmentToCache } from "./attachment-cache";
 import {
   buildAttachmentCachePath,
   inferAttachmentMimeType,
 } from "./attachment-path";
+
+jest.mock("expo-file-system/legacy", () => ({
+  cacheDirectory: "file:///cache/",
+  EncodingType: { Base64: "base64" },
+  makeDirectoryAsync: jest.fn(async () => undefined),
+  writeAsStringAsync: jest.fn(async () => undefined),
+  deleteAsync: jest.fn(async () => undefined),
+}));
+jest.mock("expo-sharing", () => ({}));
+jest.mock("react-native", () => ({ Linking: {}, Platform: { OS: "ios" } }));
 
 describe("attachment path helpers", () => {
   it("infers png mime type from file name when server type is missing", () => {
@@ -35,5 +47,20 @@ describe("attachment path helpers", () => {
     expect(
       buildAttachmentCachePath("key", "a./x", "application/zip", "/cache/"),
     ).toBe("/cache/a._x-key.bin");
+  });
+});
+
+describe("attachment cache", () => {
+  it("keeps decrypted attachments only in the folder that sign-out wipes", async () => {
+    const cached = await writeAttachmentToCache({
+      attachment: { name: "report.pdf", type: "application/pdf", content: new Uint8Array([1, 2]) },
+      cacheKey: "b1",
+    });
+    expect(cached.uri).toBe("file:///cache/mail-attachments/report-b1.pdf");
+
+    await clearAttachmentCache();
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith("file:///cache/mail-attachments/", {
+      idempotent: true,
+    });
   });
 });

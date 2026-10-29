@@ -20,12 +20,15 @@ import {
   resolveEncryptionInternalDomain,
   resolveMailboxMessagesPageSize,
   resolveMessageReplyFrom,
+  sealMailForSelf,
   shouldEncryptOutgoingMail,
   SIMPLELOGIN_DONE_KEYWORD,
+  type JmapAttachmentInput,
+  type JmapPgpMimeCiphertext,
   type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
-import type { JmapAttachmentInput } from "./jmap-client";
+import { createMailSealer } from "./outgoing-message-crypto";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
 import {
   flattenMailboxMessagesCache,
@@ -631,6 +634,8 @@ export interface ComposeMessageInput {
   identityId?: string | null;
   previousDraftId?: string | null;
   attachments?: JmapAttachmentInput[];
+  pgpMimeCiphertext?: JmapPgpMimeCiphertext;
+  sentCopyCiphertext: JmapPgpMimeCiphertext | null;
 }
 
 /** Identity plus drafts/sent mailboxes for sending, or `null` when the runtime is not ready or has no usable identity. */
@@ -723,6 +728,10 @@ export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
           subject: action.target.subject,
           textBody: action.target.body,
           identityId: context.identityId,
+          sentCopyCiphertext: await sealMailForSelf(
+            { text: action.target.body },
+            await createMailSealer(runtime),
+          ),
         });
       }
       await runtime.client
@@ -779,6 +788,8 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
         identityId: context.identityId,
         previousDraftId: input.previousDraftId ?? undefined,
         attachments: input.attachments,
+        pgpMimeCiphertext: input.pgpMimeCiphertext,
+        sentCopyCiphertext: input.sentCopyCiphertext,
       });
     },
     onSuccess: (_data, variables) => {

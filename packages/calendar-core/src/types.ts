@@ -1,11 +1,8 @@
 import type {
-  CalendarShareLinkResponse,
   CalendarKind,
-  CreateCalendarShareLinkRequest,
   CalendarSubscriptionSummary,
   CalendarSubscriptionSyncResponse,
   CreateCalendarSubscriptionRequest,
-  DisableCalendarShareLinkResponse,
   DeleteCalendarSubscriptionResponse,
   ImportIcsRequest,
   ImportIcsResponse,
@@ -103,17 +100,14 @@ export type EventColor =
 
 import type {
   EncryptionState,
-  EventEncryptionMode,
   EventParticipantInput,
   EventParticipantRole,
   EventParticipantStatus,
 } from "./route-schemas";
-import type { E2eeRolloutStage } from "./content-encryption";
 import type { TimeFormat } from "./time-format";
 
 export type {
   EncryptionState,
-  EventEncryptionMode,
   EventParticipantRole,
   EventParticipantStatus,
   EventParticipantInput,
@@ -122,7 +116,6 @@ export type {
 export interface NameEncryptionShadowRequest {
   encryptedName?: string;
   blindIndexTokens?: string[];
-  encryptionState?: EncryptionState;
   encryptionKeyVersion?: number;
 }
 
@@ -139,7 +132,6 @@ export interface Calendar {
   blindIndexTokens?: string[] | null;
   encryptionState?: EncryptionState;
   encryptionKeyVersion?: number;
-  forceFullEncryption?: boolean;
   color: EventColor;
   kind: CalendarKind;
   isPublic: boolean;
@@ -358,7 +350,7 @@ export interface EventsResponse {
   calendars: Calendar[];
 }
 
-/** Client shape before encryption; the wire schema in backend contracts accepts ciphertext-only bodies, so title/name are optional there. */
+/** Client shape before encryption; on the wire `EventWireRequest` carries ciphertext in place of title, description and location. */
 export interface CreateEventRequest extends EventContentEncryptionShadowRequest {
   title: string;
   description?: string;
@@ -379,7 +371,6 @@ export interface CreateCalendarRequest extends NameEncryptionShadowRequest {
   name: string;
   color: EventColor;
   isDefault?: boolean;
-  forceFullEncryption?: boolean;
 }
 
 export interface UpdateCalendarRequest extends Partial<CreateCalendarRequest> {
@@ -433,7 +424,6 @@ export interface UserSettings {
   pushNotifications: boolean;
   browserNotifications: boolean;
   reminderSound: boolean;
-  eventEncryptionMode: EventEncryptionMode;
   defaultEventDuration: number;
   defaultCalendarId?: string | null;
   compactView: boolean;
@@ -520,11 +510,6 @@ export type DeleteSubscriptionResponse = DeleteCalendarSubscriptionResponse;
 export type SyncSubscriptionResponse = CalendarSubscriptionSyncResponse;
 export type ImportICSRequest = ImportIcsRequest;
 export type ImportICSResponse = ImportIcsResponse;
-export type CalendarShareLink = CalendarShareLinkResponse;
-export type CreateCalendarShareLinkRequestPayload =
-  CreateCalendarShareLinkRequest;
-export type DisableCalendarShareLinkResponsePayload =
-  DisableCalendarShareLinkResponse;
 
 export interface E2eeDeviceRecord {
   id: string;
@@ -572,8 +557,6 @@ export interface E2eeBootstrapCalendar {
 }
 
 export interface E2eeBootstrapResponse {
-  enabled: boolean;
-  rolloutStage: E2eeRolloutStage;
   algorithms: {
     content: "AES-GCM-256";
     blindIndex: "HMAC-SHA-256";

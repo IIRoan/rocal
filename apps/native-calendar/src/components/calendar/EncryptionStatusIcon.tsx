@@ -15,12 +15,7 @@ export function EncryptionStatusIcon({
   size?: number;
 }) {
   const meta = getCalendarEncryptionNotice(item);
-  const icon =
-    meta.state === "encrypted"
-      ? "shield"
-      : meta.state === "pending"
-        ? "alert-triangle"
-        : "unlock";
+  const icon = meta.state === "encrypted" ? "shield" : "unlock";
   const explanation = [
     meta.description,
     `Server can read: ${meta.visibleFields.join("; ")}.`,

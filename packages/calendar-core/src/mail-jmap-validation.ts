@@ -56,16 +56,19 @@ export function parseJmapBlobUploadResponse(
   };
 }
 
+const jmapCreatedEmailSchema = z
+  .object({
+    id: z.string().optional(),
+    threadId: z.string().nullable().optional(),
+  })
+  .optional();
+
 const jmapCreatedEmailResultSchema = z
   .object({
     created: z
       .object({
-        draft1: z
-          .object({
-            id: z.string().optional(),
-            threadId: z.string().nullable().optional(),
-          })
-          .optional(),
+        draft1: jmapCreatedEmailSchema,
+        sent1: jmapCreatedEmailSchema,
       })
       .optional(),
   })
@@ -129,10 +132,14 @@ export function parseSendMessageResults(input: {
     );
   }
 
+  // The superRefines reject created results without ids, so created/draft1/s1 all exist here.
+  const draft = email.data.created!.draft1!;
+  const copy = email.data.created?.sent1;
+  // A plaintext submission is destroyed once sent, so its self-encrypted Sent copy is the stored message.
+  const stored = copy?.id?.trim() ? copy : draft;
   return {
-    // The superRefines reject created results without ids, so created/draft1/s1 all exist here.
-    emailId: email.data.created!.draft1!.id!.trim(),
-    threadId: email.data.created!.draft1!.threadId ?? null, // Same superRefine guarantee as the emailId line above.
+    emailId: (stored.id ?? "").trim(),
+    threadId: stored.threadId ?? null,
     submissionId: submission.data.created!.s1!.id!.trim(), // Same superRefine guarantee as the emailId line above.
   };
 }

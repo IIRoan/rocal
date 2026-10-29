@@ -1,14 +1,17 @@
 import {
-  PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
   findPlaintextEventContentFields,
   hasEncryptedPayloadValue,
   type EventContentField,
-  type EventEncryptionMode,
   type EventInvitationContent,
 } from "@workspace/calendar-core";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import type { RowEncryptionState } from "./encryption-state";
 import { ValidationError } from "./errors";
+
+type EventEncryptionMode = "hybrid" | "full";
+
+export const PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE =
+  "Plaintext event content must not be sent alongside encrypted content.";
 
 export type ResolvedEventPersistencePolicy = {
   encryptionState: RowEncryptionState;

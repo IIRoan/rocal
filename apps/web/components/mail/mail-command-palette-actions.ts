@@ -55,12 +55,18 @@ export async function runMailAccountDeletion(input: {
 }
 
 export async function runMailPasswordChange(input: {
+  sessionUserId: string | null;
   currentPassword: string;
   newPassword: string;
   setBusy: (value: boolean) => void;
 }): Promise<void> {
+  if (!input.sessionUserId) {
+    throw new Error("Your session is unavailable. Please try again.");
+  }
+
   input.setBusy(true);
   const result = await persistPasswordChange({
+    sessionUserId: input.sessionUserId,
     currentPassword: input.currentPassword,
     newPassword: input.newPassword,
   });
@@ -71,12 +77,18 @@ export async function runMailPasswordChange(input: {
 }
 
 export async function runMailPasswordSet(input: {
+  sessionUserId: string | null;
   newPassword: string;
   refetchAccounts?: () => Promise<unknown>;
   setBusy: (value: boolean) => void;
 }): Promise<void> {
+  if (!input.sessionUserId) {
+    throw new Error("Your session is unavailable. Please try again.");
+  }
+
   input.setBusy(true);
   const result = await persistPasswordSet({
+    sessionUserId: input.sessionUserId,
     newPassword: input.newPassword,
     refetchAccounts: input.refetchAccounts,
   });

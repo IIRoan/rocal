@@ -531,10 +531,6 @@ export class MailBlobUploadRegistry {
     Object.assign(existing, next);
     this.byBlobId.set(next.blobId, existing);
   }
-
-  listRegistered(): RegisteredBlobUpload[] {
-    return [...new Set(this.byBlobId.values())];
-  }
 }
 
 export function isBlobUploadExpired(

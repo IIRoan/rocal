@@ -20,9 +20,6 @@ pub struct Model {
     pub user_id: String,
     pub created_at: TimeDateTime,
     pub updated_at: TimeDateTime,
-    #[sea_orm(column_type = "Text", nullable, unique)]
-    pub ics_share_token: Option<String>,
-    pub ics_share_enabled: bool,
     pub is_sync_only: bool,
     #[sea_orm(column_type = "Text")]
     pub kind: String,
@@ -34,7 +31,6 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub encryption_state: String,
     pub encryption_key_version: i32,
-    pub force_full_encryption: bool,
     #[sea_orm(column_type = "Text", nullable)]
     pub stalwart_account_id: Option<String>,
     #[sea_orm(
@@ -50,8 +46,6 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::calendar_event::Entity")]
     CalendarEvent,
-    #[sea_orm(has_many = "super::calendar_sharing::Entity")]
-    CalendarSharing,
     #[sea_orm(has_many = "super::calendar_subscription::Entity")]
     CalendarSubscription,
     #[sea_orm(
@@ -67,12 +61,6 @@ pub enum Relation {
 impl Related<super::calendar_event::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::CalendarEvent.def()
-    }
-}
-
-impl Related<super::calendar_sharing::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::CalendarSharing.def()
     }
 }
 

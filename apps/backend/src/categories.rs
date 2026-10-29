@@ -1,4 +1,4 @@
-//! Event categories: lightweight labels on events, with encrypted or plaintext names.
+//! Event categories: lightweight labels on events, with client-encrypted names.
 
 pub mod queries;
 pub mod routes;

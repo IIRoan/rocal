@@ -11,13 +11,6 @@ use crate::entity_metadata::{
     CALENDAR_COLORS, has_encrypted_payload_value, is_valid_calendar_color,
 };
 
-pub const PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE: &str =
-    "Plaintext names must not be sent alongside an encrypted name.";
-
-pub fn encryption_state_schema() -> Schema {
-    zod::enumeration(&["plaintext", "shadow_write", "encrypted"])
-}
-
 pub fn calendar_color_schema() -> Schema {
     let message = format!(
         "Color must be one of: {} or a valid hex color (e.g., #FF0000)",
@@ -34,40 +27,16 @@ pub fn calendar_delete_action_schema() -> Schema {
     zod::enumeration(&["delete_events", "move_events"])
 }
 
-/// `encryptionShadowFieldsSchema.shape`: `encryptionState` is accepted from older clients and ignored.
-pub fn encryption_shadow_fields() -> [(&'static str, Schema); 4] {
+/// The encrypted name and its search tokens.
+pub fn encrypted_name_fields() -> [(&'static str, Schema); 3] {
     [
         ("encryptedName", zod::string().optional()),
         ("blindIndexTokens", zod::array(zod::string()).optional()),
-        ("encryptionState", encryption_state_schema().optional()),
         (
             "encryptionKeyVersion",
             zod::number().int().gte(1.0).max(zod::I32_MAX).optional(),
         ),
     ]
-}
-
-/// `refineEncryptedNameBody`: no plaintext name beside its ciphertext, and a name of either kind when required.
-pub fn refine_encrypted_name_body(
-    entity_label: &'static str,
-    require_name: bool,
-) -> impl Fn(&Value, &mut RefineCtx<'_>) + Send + Sync + 'static {
-    move |body, ctx| {
-        let has_ciphertext = has_encrypted_payload_value(body.get("encryptedName"));
-        let has_plaintext_name = body
-            .get("name")
-            .and_then(Value::as_str)
-            .is_some_and(|name| !zod::js_trim(name).is_empty());
-        if has_ciphertext && has_plaintext_name {
-            ctx.add_issue(PLAINTEXT_NAME_WITH_CIPHERTEXT_MESSAGE, &["name"]);
-        }
-        if require_name && !has_ciphertext && !has_plaintext_name {
-            ctx.add_issue(
-                format!("{entity_label} name is required."),
-                &["encryptedName"],
-            );
-        }
-    }
 }
 
 pub fn rsvp_status_schema() -> Schema {
@@ -108,39 +77,18 @@ pub fn event_content_encryption_fields() -> [(&'static str, Schema); 3] {
     ]
 }
 
-/// `refineEncryptedEventContentBody`: no plaintext content beside ciphertext, a title without it, invitation copies only for encrypted invites.
-pub fn refine_encrypted_event_content_body(
-    require_title: bool,
-) -> impl Fn(&Value, &mut RefineCtx<'_>) + Send + Sync + 'static {
-    move |body, ctx| {
-        let text = |name: &str| {
-            body.get(name)
-                .and_then(Value::as_str)
-                .is_some_and(|v| !zod::js_trim(v).is_empty())
-        };
-        let has_ciphertext = has_encrypted_payload_value(body.get("encryptedContent"));
-        if has_ciphertext {
-            for field in ["title", "description", "location"] {
-                if text(field) {
-                    ctx.add_issue(
-                        crate::events::encryption::PLAINTEXT_EVENT_CONTENT_WITH_CIPHERTEXT_MESSAGE,
-                        &[field],
-                    );
-                }
-            }
-        } else if require_title && !text("title") {
-            ctx.add_issue("Title is required and cannot be empty", &["title"]);
-        }
-        let has_participants = body
-            .get("participants")
-            .and_then(Value::as_array)
-            .is_some_and(|participants| !participants.is_empty());
-        if body.get("invitationContent").is_some() && (!has_ciphertext || !has_participants) {
-            ctx.add_issue(
-                "Invitation content is only accepted with encrypted content and participants.",
-                &["invitationContent"],
-            );
-        }
+/// The transient invitation copy only travels with new ciphertext and participants to mail it to.
+pub fn refine_invitation_content_body(body: &Value, ctx: &mut RefineCtx<'_>) {
+    let has_ciphertext = has_encrypted_payload_value(body.get("encryptedContent"));
+    let has_participants = body
+        .get("participants")
+        .and_then(Value::as_array)
+        .is_some_and(|participants| !participants.is_empty());
+    if body.get("invitationContent").is_some() && (!has_ciphertext || !has_participants) {
+        ctx.add_issue(
+            "Invitation content is only accepted with encrypted content and participants.",
+            &["invitationContent"],
+        );
     }
 }
 
@@ -171,11 +119,6 @@ pub fn recurrence_scope_schema() -> Schema {
 /// `invitationImportStatusSchema`.
 pub fn invitation_import_status_schema() -> Schema {
     zod::enumeration(&["accepted", "tentative"])
-}
-
-/// `eventEncryptionModeSchema`.
-pub fn event_encryption_mode_schema() -> Schema {
-    zod::enumeration(&["hybrid", "full"])
 }
 
 /// `themeSchema`.

@@ -694,62 +694,44 @@ async fn content_edits_need_ciphertext_and_store_no_plaintext() {
     let series = weekly_series(&mut owner, &calendar).await;
     let before = row_snapshot(&app.db, "calendar_event", &series.id.0).await;
 
-    for scope in ["all", "this_only"] {
+    // Plaintext keys fail the schema, so no scope (not even a split) writes anything.
+    for (scope, updates) in [
+        ("all", json!({"title": "Plain"})),
+        ("this_only", json!({"title": "Plain"})),
+        ("this_and_future", json!({"title": "Plain"})),
+        (
+            "all",
+            json!({"location": "Room", "encryptedContent": fake_envelope()}),
+        ),
+        ("all", json!({"description": ""})),
+    ] {
+        let field = updates
+            .as_object()
+            .and_then(|fields| fields.keys().find(|key| *key != "encryptedContent"))
+            .cloned()
+            .expect("plaintext key");
         let error = ok(owner
             .put(
                 &format!("/api/recurring/event/{}", series.id),
-                json!({"editScope": scope, "occurrenceDate": "2099-03-09T09:00:00.000Z", "updates": {"title": "Plain"}}),
+                json!({"editScope": scope, "occurrenceDate": "2099-03-30T09:00:00.000Z", "updates": updates}),
             )
             .await
             .expect_error(
                 400,
                 "Validation Error",
-                "Encrypted content payload is required when updating protected event fields.",
+                &format!("Unrecognized key(s) in object: '{field}'"),
             ));
         assert_eq!(
-            error["details"],
-            json!({"field": "encryptedContent"}),
+            error["details"]["issues"][0]["path"],
+            json!("updates"),
             "{scope}"
         );
     }
-    let error = ok(owner
-        .put(
-            &format!("/api/recurring/event/{}", series.id),
-            json!({"editScope": "all", "updates": {"location": "Room", "encryptedContent": fake_envelope()}}),
-        )
-        .await
-        .expect_error(
-            400,
-            "Validation Error",
-            "Plaintext event content must not be sent alongside encrypted content.",
-        ));
-    assert_eq!(
-        error["details"]["issues"][0]["path"],
-        json!("updates.location")
-    );
     assert_eq!(
         row_snapshot(&app.db, "calendar_event", &series.id.0).await,
         before
     );
     assert_eq!(exceptions(&app, &series.id.0).await, []);
-
-    let error = ok(owner
-        .put(
-            &format!("/api/recurring/event/{}", series.id),
-            json!({"editScope": "this_and_future", "occurrenceDate": "2099-03-30T09:00:00.000Z", "updates": {"title": "Plain"}}),
-        )
-        .await
-        .expect_error(
-            400,
-            "Validation Error",
-            "Encrypted content payload is required when updating protected event fields.",
-        ));
-    assert_eq!(error["details"], json!({"field": "encryptedContent"}));
-    assert_eq!(
-        stored_rule(&app, &series.id.0).await.as_deref(),
-        Some(r#"{"frequency":"weekly","interval":1,"count":5,"until":"2099-03-29T09:00:00.000Z"}"#),
-        "the split is written before the content check refuses the new half"
-    );
     assert_eq!(
         count(
             &app.db,
@@ -1129,7 +1111,7 @@ async fn edits_cannot_target_other_users_or_read_only_calendars() {
         ),
     )
     .await;
-    assert_eq!(moved.calendar.name, "Family");
+    assert_eq!(moved.calendar.id.0, family);
 }
 
 #[tokio::test]

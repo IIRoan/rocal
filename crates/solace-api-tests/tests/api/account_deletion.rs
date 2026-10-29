@@ -13,9 +13,7 @@ use solace_api_types::account::{
     AuthStatus, DeleteAccountResponse, EmailAvailability, EmailAvailabilityCode, SignupConfig,
 };
 use solace_api_types::events::ParticipantInput;
-use solace_api_types::subscriptions::{
-    EncryptedIcsEvent, EncryptedIcsImportRequest, ImportIcsRequest,
-};
+use solace_api_types::subscriptions::{EncryptedIcsEvent, EncryptedIcsImportRequest};
 use sqlx::PgPool;
 
 use crate::helpers::{
@@ -142,9 +140,12 @@ fn session_token_only(agent: &Agent) -> Agent {
     stripped
 }
 
-async fn owned_calendar(user: &mut TestUser, name: &str) -> String {
+async fn owned_calendar(user: &mut TestUser) -> String {
     let created = ok(user
-        .post("/api/calendars", json!({"name": name, "color": "#3b82f6"}))
+        .post(
+            "/api/calendars",
+            json!({"encryptedName": fake_envelope(), "color": "#3b82f6"}),
+        )
         .await
         .expect_status(200)
         .and_then(|r| r.value()));
@@ -173,10 +174,10 @@ async fn import(user: &mut TestUser, calendar_id: &str, events: Vec<EncryptedIcs
     ok(user
         .post(
             "/api/subscriptions/import-ics",
-            json_body(&ImportIcsRequest::Encrypted(EncryptedIcsImportRequest {
+            json_body(&EncryptedIcsImportRequest {
                 calendar_id: calendar_id.to_owned().into(),
                 encrypted_events: events,
-            })),
+            }),
         )
         .await
         .expect_status(200));
@@ -209,7 +210,7 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
         )
         .await
         .expect_status(200));
-    let calendar = owned_calendar(user, "Work").await;
+    let calendar = owned_calendar(user).await;
     ok(user
         .post(
             "/api/categories",
@@ -331,32 +332,6 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
         .await
         .expect_status(200));
     let suffix = hex(8);
-    let client = format!("suiteclient{suffix}");
-    exec(
-        db,
-        "INSERT INTO oauth_client (id, client_id, user_id, redirect_uris, created_at, updated_at) \
-         VALUES ($1, $1, $2, '{}', now(), now())",
-        &[&client, &user.id],
-    )
-    .await;
-    exec(
-        db,
-        "INSERT INTO oauth_consent (id, client_id, user_id, created_at, updated_at) VALUES ($1, $2, $3, now(), now())",
-        &[&format!("suiteconsent{suffix}"), &client, &user.id],
-    )
-    .await;
-    exec(
-        db,
-        "INSERT INTO oauth_refresh_token (id, token, client_id, user_id, expires_at) VALUES ($1, $1, $2, $3, now() + interval '1 day')",
-        &[&format!("suiterefresh{suffix}"), &client, &user.id],
-    )
-    .await;
-    exec(
-        db,
-        "INSERT INTO oauth_access_token (id, token, client_id, user_id, expires_at) VALUES ($1, $1, $2, $3, now() + interval '1 hour')",
-        &[&format!("suiteaccess{suffix}"), &client, &user.id],
-    )
-    .await;
     exec(
         db,
         "INSERT INTO notification_log (id, event_id, user_id, notification_type, minutes_before, sent_at, status) \
@@ -451,7 +426,7 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         .await
         .expect("avatar id");
 
-    let bystander_calendar = owned_calendar(&mut bystander, "Home").await;
+    let bystander_calendar = owned_calendar(&mut bystander).await;
     import(
         &mut bystander,
         &bystander_calendar,
@@ -484,15 +459,7 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         )
         .await
         .expect_status(200));
-    let (victim_calendar,): (String,) =
-        sqlx::query_as("SELECT id FROM calendar WHERE user_id = $1 AND name = 'Work'")
-            .bind(&victim.id)
-            .fetch_one(&app.db)
-            .await
-            .expect("victim calendar");
     let participant = format!("suitepart{}", hex(8));
-    let shared_out = format!("suiteshare{}", hex(8));
-    let shared_in = format!("suiteshare{}", hex(8));
     exec(
         &app.db,
         "INSERT INTO event_participant (id, event_id, user_id, email, display_name, status, role, created_at, updated_at) \
@@ -519,18 +486,6 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
     )
     .await;
     let participants = [participant.clone(), organizer.clone(), typed.clone()];
-    exec(
-        &app.db,
-        "INSERT INTO calendar_sharing (id, calendar_id, shared_with, shared_by, created_at, updated_at) VALUES ($1, $2, $3, $4, now(), now())",
-        &[&shared_out, &victim_calendar, &bystander.id, &victim.id],
-    )
-    .await;
-    exec(
-        &app.db,
-        "INSERT INTO calendar_sharing (id, calendar_id, shared_with, shared_by, created_at, updated_at) VALUES ($1, $2, $3, $4, now(), now())",
-        &[&shared_in, &bystander_calendar, &victim.id, &bystander.id],
-    )
-    .await;
 
     ok(app
         .anonymous()
@@ -565,7 +520,6 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         "account",
         "calendar",
         "calendar_event",
-        "calendar_sharing",
         "calendar_subscription",
         "calendar_sync_log",
         "event_category",
@@ -577,10 +531,6 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         "mail_vault_backup",
         "notification_job",
         "notification_log",
-        "oauth_access_token",
-        "oauth_client",
-        "oauth_consent",
-        "oauth_refresh_token",
         "passkey",
         "push_device",
         "recurrence_exception",
@@ -678,13 +628,6 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
 
     let mut bystander_after = rows_mentioning(&app.db, &bystander_needles).await;
     let mut expected_bystander = bystander_before.clone();
-    for share in [&shared_out, &shared_in] {
-        assert!(
-            expected_bystander
-                .remove(&("calendar_sharing".to_owned(), Some(share.clone())))
-                .is_some()
-        );
-    }
     for id in &participants {
         let key = ("event_participant".to_owned(), Some(id.clone()));
         assert!(bystander_after.remove(&key).is_some());

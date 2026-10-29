@@ -1,14 +1,12 @@
 import type { PrismaClient } from "../generated/prisma/index.js";
 import type {
+  CalendarShareLinkResponse,
+  DisableCalendarShareLinkResponse,
   ICalendarSharingService,
   ShareLinkInput,
   CreateShareLinkInput,
 } from "../contracts/calendar-sharing.contract";
-import {
-  type CalendarShareLinkResponse,
-  type DisableCalendarShareLinkResponse,
-  buildIcsCalendar,
-} from "@workspace/calendar-ics";
+import { buildIcsCalendar } from "@workspace/calendar-ics";
 import { resolveTimezone } from "@workspace/calendar-core";
 import { NotFoundError, ValidationError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
