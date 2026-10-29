@@ -47,6 +47,7 @@ import {
   recoverableStoredDeviceId,
 } from "../lib/native-e2ee-provider";
 import { clearNativeTitleIndex } from "../lib/search/title-index-store";
+import { queryClient } from "./QueryProvider";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
@@ -418,6 +419,8 @@ export function AuthProvider({
     setFallbackSessionToken(null);
     pendingAuthPasswordRef.current = null;
     dispatch({ type: "cleared" });
+    // The cache holds decrypted events, mail and the search corpus, so none of it outlives the session.
+    queryClient.clear();
   }, []);
 
   // A session the server ended (revoked, expired, 401/403) gets the sign-out wipe; a network failure keeps the device's data.

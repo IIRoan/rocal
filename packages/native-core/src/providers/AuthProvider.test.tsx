@@ -15,6 +15,7 @@ import {
   setFallbackSessionToken,
 } from "../lib/session-token-fallback";
 import { AuthProvider, useAuth } from "./AuthProvider";
+import { queryClient } from "./QueryProvider";
 
 jest.mock("react-native", () => ({
   AppState: { currentState: "active", addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
@@ -446,6 +447,20 @@ describe("AuthProvider", () => {
     expect(mockClearRecoverableStoredDevice).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
+  });
+
+  it("drops the decrypted query cache when the session ends", async () => {
+    await renderProvider();
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    queryClient.setQueryData(["decrypted-for-test"], { title: "Dentist" });
+
+    await act(async () => {
+      await getAuth().signOut();
+    });
+
+    expect(queryClient.getQueryData(["decrypted-for-test"])).toBeUndefined();
   });
 
   it("keeps the sign-out notice for the sign-in screen until the next sign-in", async () => {
