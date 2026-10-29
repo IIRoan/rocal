@@ -1,5 +1,6 @@
 //! Better Auth's internal adapter over the existing tables: users, credential accounts, sessions, verifications and passkeys.
 
+use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, ModelTrait,
     QueryFilter, QueryOrder, Set,
@@ -41,6 +42,23 @@ pub async fn set_password<C: ConnectionTrait>(
     let mut updated = credential.into_active_model();
     updated.password = Set(Some(hash));
     updated.update(db).await.map(|_| ())
+}
+
+/// Replaces `legacy` only while it is still stored, so a password changed since it was read is never undone.
+pub async fn upgrade_password<C: ConnectionTrait>(
+    db: &C,
+    account_id: &str,
+    legacy: &str,
+    hash: String,
+) -> Result<(), sea_orm::DbErr> {
+    account::Entity::update_many()
+        .col_expr(account::Column::Password, Expr::value(hash))
+        .col_expr(account::Column::UpdatedAt, Expr::value(instant::now()))
+        .filter(account::Column::Id.eq(account_id))
+        .filter(account::Column::Password.eq(legacy))
+        .exec(db)
+        .await
+        .map(|_| ())
 }
 
 pub async fn find_user_by_email<C: ConnectionTrait>(

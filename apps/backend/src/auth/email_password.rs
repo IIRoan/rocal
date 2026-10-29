@@ -179,7 +179,9 @@ async fn password_sign_in(
             rehash: Some(rehash),
         } => {
             // The password is proven either way, and the next raw sign-in retries the upgrade.
-            if let Err(error) = store::set_password(&state.db, account, rehash).await {
+            if let Err(error) =
+                store::upgrade_password(&state.db, &account.id, &stored, rehash).await
+            {
                 tracing::warn!(error = %crate::telemetry::redact_pii(&error.to_string()), "Could not upgrade a legacy password hash");
             }
         }

@@ -224,6 +224,64 @@ async fn a_legacy_hash_takes_the_raw_password_once_then_the_auth_key() {
 }
 
 #[tokio::test]
+async fn a_legacy_upgrade_never_undoes_a_password_changed_meanwhile() {
+    const SET_PASSWORD: &str =
+        "UPDATE account SET password = $1 WHERE user_id = $2 AND provider_id = 'credential'";
+    let app = TestApp::spawn().await;
+    let user = app.user().await;
+    let (legacy_password, legacy_hash) = legacy_credential();
+    sqlx::query(SET_PASSWORD)
+        .bind(&legacy_hash)
+        .bind(&user.id)
+        .execute(&app.db)
+        .await
+        .expect("legacy hash");
+    let changed = format!("ak1:changed-{}", hex(8));
+    let (db, user_id, new_hash) = (&app.db, &user.id, &changed);
+    // Holding the credential row parks the sign-in's upgrade until this "password change" commits.
+    let change = async move {
+        let mut lock = db.begin().await.expect("transaction");
+        let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+            .fetch_one(&mut *lock)
+            .await
+            .expect("backend pid");
+        sqlx::query(
+            "SELECT 1 FROM account WHERE user_id = $1 AND provider_id = 'credential' FOR UPDATE",
+        )
+        .bind(user_id)
+        .execute(&mut *lock)
+        .await
+        .expect("row lock");
+        let blocked = "SELECT count(*) FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))";
+        for attempt in 0.. {
+            let waiting: i64 = sqlx::query_scalar(blocked)
+                .bind(pid)
+                .fetch_one(db)
+                .await
+                .expect("blocked queries");
+            if waiting > 0 {
+                break;
+            }
+            assert!(attempt < 400, "the sign-in never reached its upgrade");
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+        sqlx::query(SET_PASSWORD)
+            .bind(new_hash)
+            .bind(user_id)
+            .execute(&mut *lock)
+            .await
+            .expect("changed hash");
+        lock.commit().await.expect("commit");
+    };
+    let (status, ()) = tokio::join!(sign_in_status(&app, &user.email, &legacy_password), change);
+    assert_eq!(
+        status, 200,
+        "the raw password was valid when it was checked"
+    );
+    assert_eq!(password_hash(&app, &user).await, changed);
+}
+
+#[tokio::test]
 async fn change_password_takes_auth_keys_salted_with_the_account_email() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
