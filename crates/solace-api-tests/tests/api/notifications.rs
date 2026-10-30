@@ -15,7 +15,7 @@ use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unkno
 
 const NOT_FOUND: &str = "Event not found or access denied";
 
-fn title_ciphertext() -> String {
+pub fn title_ciphertext() -> String {
     format!(
         "v1.{}.{}",
         "oKGio6Slpqeoqaqr", "RzKqGz6RlCIjsse98Z5olLmi5f7PQ06_sfA4TvGmoA"
@@ -32,7 +32,7 @@ fn setting(kind: &str, minutes: i32, enabled: bool) -> NotificationSetting {
 }
 
 /// A well-formed lead ciphertext; `tail` tells two apart.
-fn lead_ciphertext(tail: char) -> String {
+pub fn lead_ciphertext(tail: char) -> String {
     format!("v1.oKGio6Slpqeoqaqr.MmK59G4HT1NBZhymzgPpv9C{tail}")
 }
 

@@ -26,6 +26,7 @@ import {
 } from "@/lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
+  markFreshSignIn,
   setEncPasswordCookie,
 } from "@/lib/enc-password-cookie";
 import {
@@ -655,6 +656,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     storePendingAuthPassword(submittedPassword);
     try {
       await setEncPasswordCookie(submittedPassword);
+      markFreshSignIn();
     } catch (cookieError) {
       log.warn("Failed to persist encrypted password cookie after auth", {
         error: cookieError,

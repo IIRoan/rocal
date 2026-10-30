@@ -4,13 +4,13 @@ use axum::Json;
 use axum::extract::{Path, State};
 use solace_api_types::SuccessMessage;
 use solace_api_types::e2ee::{
-    E2eeBootstrap, EncryptionDevice, PasswordEnvelope, PasswordEnvelopeRequest,
+    E2eeBootstrap, EncryptionDevice, EncryptionUpgrades, PasswordEnvelope, PasswordEnvelopeRequest,
     RegisterDeviceRequest, ResetSnapshot,
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use super::service;
+use super::{service, upgrades};
 use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
@@ -46,6 +46,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(bootstrap))
         .routes(routes!(reset_snapshot))
+        .routes(routes!(encryption_upgrades))
         .routes(routes!(register_device))
         .routes(routes!(delete_device))
         .routes(routes!(store_password_envelope))
@@ -59,6 +60,16 @@ pub async fn bootstrap(
     user: RouteUser,
 ) -> Result<Json<E2eeBootstrap>, AppError> {
     Ok(Json(service::bootstrap(&state, &user).await?))
+}
+
+/// Opaque ids of what the caller still stores in an older form, which the client re-seals in the background after unlock.
+#[utoipa::path(get, path = "/api/e2ee/upgrades", operation_id = "getEncryptionUpgrades", tag = "E2EE", responses((status = 200, body = EncryptionUpgrades)))]
+#[tracing::instrument(skip_all)]
+pub async fn encryption_upgrades(
+    State(state): State<AppState>,
+    user: RouteUser,
+) -> Result<Json<EncryptionUpgrades>, AppError> {
+    Ok(Json(upgrades::report(&state, &user).await?))
 }
 
 /// Raw owned calendars, active categories and unsynced events, so a client can re-wrap them on password reset.

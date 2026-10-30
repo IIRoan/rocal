@@ -594,6 +594,26 @@
         }
       }
     },
+    "/api/e2ee/upgrades": {
+      "get": {
+        "tags": [
+          "E2EE"
+        ],
+        "summary": "Opaque ids of what the caller still stores in an older form, which the client re-seals in the background after unlock.",
+        "operationId": "getEncryptionUpgrades",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncryptionUpgrades"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events": {
       "get": {
         "tags": [
@@ -1054,7 +1074,7 @@
         "tags": [
           "Events"
         ],
-        "summary": "Stores ciphertext for an imported invitation without changing its schedule.",
+        "summary": "Stores ciphertext for an imported invitation, or re-seals a sealed event over the ciphertext it read, without changing its schedule.",
         "operationId": "sealEventEncryption",
         "parameters": [
           {
@@ -1085,6 +1105,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The stored ciphertext is not the expected one"
           }
         }
       }
@@ -1688,6 +1711,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotificationDeleteResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/event/{eventId}/sealed": {
+      "put": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Seals what the event's pending reminders lack, without rescheduling them, as a client upgrading stored encryption does.",
+        "operationId": "sealEventReminders",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SealEventRemindersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SealedReminders"
                 }
               }
             }
@@ -3831,6 +3894,41 @@
           },
           "updatedAt": {
             "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "EncryptionUpgrades": {
+        "type": "object",
+        "description": "What the caller's account still stores in an older form, which the client re-seals in the background after unlock.",
+        "required": [
+          "eventsWithReadableAttributes",
+          "eventsWithUnsealedReminders",
+          "readableInvitations",
+          "unsealedSettings"
+        ],
+        "properties": {
+          "eventsWithReadableAttributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventId"
+            },
+            "description": "Sealed events whose colour or category still sits in a readable column."
+          },
+          "eventsWithUnsealedReminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventId"
+            },
+            "description": "Events whose pending reminders lack a sealed title or lead."
+          },
+          "readableInvitations": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Invitation copies the server still stores readable."
+          },
+          "unsealedSettings": {
+            "type": "boolean",
+            "description": "Whether the app preferences are still stored readable."
           }
         }
       },
@@ -6763,9 +6861,64 @@
           "encryptionKeyVersion": {
             "type": "integer",
             "format": "int32"
+          },
+          "expectedEncryptedContent": {
+            "type": "string",
+            "description": "The ciphertext a re-seal of an already sealed event replaces; it moves colour and category inside, and a different stored one answers 409."
           }
         },
         "additionalProperties": false
+      },
+      "SealEventRemindersRequest": {
+        "type": "object",
+        "description": "Seals what an event's pending reminders lack, without rescheduling them.",
+        "required": [
+          "leads"
+        ],
+        "properties": {
+          "encryptedDisplayTitle": {
+            "type": "string",
+            "description": "`v1.<iv>.<ciphertext>` under the notification key; omitted keeps the stored one."
+          },
+          "leads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SealedReminderLead"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SealedReminderLead": {
+        "type": "object",
+        "required": [
+          "minutesBefore",
+          "encryptedLead"
+        ],
+        "properties": {
+          "encryptedLead": {
+            "type": "string",
+            "description": "`minutes_before` sealed under the notification key."
+          },
+          "minutesBefore": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SealedReminders": {
+        "type": "object",
+        "required": [
+          "updated"
+        ],
+        "properties": {
+          "updated": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pending reminders that took a sealed title or lead."
+          }
+        }
       },
       "SearchEvent": {
         "type": "object",

@@ -293,6 +293,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/e2ee/upgrades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Opaque ids of what the caller still stores in an older form, which the client re-seals in the background after unlock. */
+        get: operations["getEncryptionUpgrades"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -455,7 +472,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Stores ciphertext for an imported invitation without changing its schedule. */
+        /** Stores ciphertext for an imported invitation, or re-seals a sealed event over the ciphertext it read, without changing its schedule. */
         post: operations["sealEventEncryption"];
         delete?: never;
         options?: never;
@@ -732,6 +749,23 @@ export interface paths {
         put: operations["setEventNotifications"];
         post?: never;
         delete: operations["deleteEventNotifications"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/event/{eventId}/sealed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Seals what the event's pending reminders lack, without rescheduling them, as a client upgrading stored encryption does. */
+        put: operations["sealEventReminders"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1407,6 +1441,20 @@ export interface components {
             timezone: string | null;
             title: string;
             updatedAt: components["schemas"]["Timestamp"];
+        };
+        /** @description What the caller's account still stores in an older form, which the client re-seals in the background after unlock. */
+        EncryptionUpgrades: {
+            /** @description Sealed events whose colour or category still sits in a readable column. */
+            eventsWithReadableAttributes: components["schemas"]["EventId"][];
+            /** @description Events whose pending reminders lack a sealed title or lead. */
+            eventsWithUnsealedReminders: components["schemas"]["EventId"][];
+            /**
+             * Format: int64
+             * @description Invitation copies the server still stores readable.
+             */
+            readableInvitations: number;
+            /** @description Whether the app preferences are still stored readable. */
+            unsealedSettings: boolean;
         };
         /** @description The `lib/errors.ts` envelope; `requestId` is absent on the auth guard's 401/403. */
         ErrorResponse: {
@@ -2193,6 +2241,27 @@ export interface components {
             encryptedContent: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
+            /** @description The ciphertext a re-seal of an already sealed event replaces; it moves colour and category inside, and a different stored one answers 409. */
+            expectedEncryptedContent?: string;
+        };
+        /** @description Seals what an event's pending reminders lack, without rescheduling them. */
+        SealEventRemindersRequest: {
+            /** @description `v1.<iv>.<ciphertext>` under the notification key; omitted keeps the stored one. */
+            encryptedDisplayTitle?: string;
+            leads: components["schemas"]["SealedReminderLead"][];
+        };
+        SealedReminderLead: {
+            /** @description `minutes_before` sealed under the notification key. */
+            encryptedLead: string;
+            /** Format: int32 */
+            minutesBefore: number;
+        };
+        SealedReminders: {
+            /**
+             * Format: int64
+             * @description Pending reminders that took a sealed title or lead.
+             */
+            updated: number;
         };
         /** @description A search hit: a subset of the row with trimmed calendar and category. */
         SearchEvent: {
@@ -2931,6 +3000,25 @@ export interface operations {
             };
         };
     };
+    getEncryptionUpgrades: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncryptionUpgrades"];
+                };
+            };
+        };
+    };
     listEvents: {
         parameters: {
             query: {
@@ -3231,6 +3319,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Event"];
                 };
+            };
+            /** @description The stored ciphertext is not the expected one */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -3739,6 +3834,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationDeleteResult"];
+                };
+            };
+        };
+    };
+    sealEventReminders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SealEventRemindersRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SealedReminders"];
                 };
             };
         };

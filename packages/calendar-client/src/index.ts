@@ -21,10 +21,8 @@ export type {
   DeleteRecurringEventInput,
   EditRecurringEventInput,
 } from "./recurring-event-persistence";
-export {
-  loadEventSearchCorpus,
-  sealReadableInvitations,
-} from "./event-search-corpus";
+export { loadEventSearchCorpus } from "./event-search-corpus";
+export { upgradeStoredEncryption } from "./encryption-upgrade";
 export { respondToMailInvitation } from "./mail-invitation-response";
 export type {
   MailInvitationResponse,

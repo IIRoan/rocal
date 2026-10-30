@@ -5,6 +5,20 @@ use utoipa::ToSchema;
 
 use crate::common::{CalendarId, CategoryId, EventId, Timestamp, UserId};
 
+/// What the caller's account still stores in an older form, which the client re-seals in the background after unlock.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EncryptionUpgrades {
+    /// Sealed events whose colour or category still sits in a readable column.
+    pub events_with_readable_attributes: Vec<EventId>,
+    /// Events whose pending reminders lack a sealed title or lead.
+    pub events_with_unsealed_reminders: Vec<EventId>,
+    /// Invitation copies the server still stores readable.
+    pub readable_invitations: i64,
+    /// Whether the app preferences are still stored readable.
+    pub unsealed_settings: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct E2eeBootstrap {

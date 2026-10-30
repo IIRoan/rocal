@@ -67,6 +67,12 @@ export interface E2eeProvider {
     eventId: string,
     minutesBefore: number,
   ): Promise<string | undefined>;
+
+  /** An event title sealed for the iPhone extension; undefined without a session or a title. */
+  encryptNotificationTitle(
+    eventId: string,
+    title: string,
+  ): Promise<string | undefined>;
 }
 
 /** Pre-session provider: content-free writes pass, plaintext content throws instead of leaving the device. */
@@ -128,6 +134,13 @@ export class NoopE2eeProvider implements E2eeProvider {
   async encryptNotificationLead(
     _eventId: string,
     _minutesBefore: number,
+  ): Promise<string | undefined> {
+    return undefined;
+  }
+
+  async encryptNotificationTitle(
+    _eventId: string,
+    _title: string,
   ): Promise<string | undefined> {
     return undefined;
   }

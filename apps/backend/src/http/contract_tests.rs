@@ -339,6 +339,7 @@ fn checked() -> Vec<(String, Vec<String>)> {
         check::<push_devices::RegisterPushDeviceRequest>(),
         check::<events::RsvpRequest>(),
         check::<events::SealEncryptionRequest>(),
+        check::<notifications::SealEventRemindersRequest>(),
         check::<calendars::SeedDefaultCalendarsRequest>(),
         check::<push_devices::UnregisterPushDeviceRequest>(),
         check::<calendars::UpdateCalendarRequest>(),

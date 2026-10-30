@@ -3,5 +3,6 @@
 mod queries;
 pub mod routes;
 pub mod service;
+pub mod upgrades;
 
 pub use routes::routes;

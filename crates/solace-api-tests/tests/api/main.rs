@@ -13,6 +13,7 @@ mod e2e_security;
 mod e2ee;
 mod edges;
 mod encrypted_blobs;
+mod encryption_upgrades;
 mod event_fixtures;
 mod events;
 mod events_import;

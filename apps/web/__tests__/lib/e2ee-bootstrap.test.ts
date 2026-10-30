@@ -39,6 +39,7 @@ jest.mock("../../lib/e2ee-crypto", () => ({
 jest.mock("../../lib/e2ee-password-cache", () => ({
   clearPendingAuthPassword: jest.fn(),
   peekAuthPassword: jest.fn(),
+  peekPendingAuthPassword: jest.fn(),
 }));
 
 import { e2eeApiService } from "../../lib/e2ee-api-service";
@@ -75,6 +76,7 @@ import {
 import {
   clearPendingAuthPassword,
   peekAuthPassword,
+  peekPendingAuthPassword,
 } from "../../lib/e2ee-password-cache";
 import type { E2eeBootstrapResponse } from "../../lib/types/calendar";
 
@@ -147,6 +149,8 @@ const mockClearPendingAuthPassword =
 const mockPeekAuthPassword = peekAuthPassword as jest.MockedFunction<
   typeof peekAuthPassword
 >;
+const mockPeekPendingAuthPassword =
+  peekPendingAuthPassword as jest.MockedFunction<typeof peekPendingAuthPassword>;
 
 function createLocalDeviceRecord(userId: string) {
   return {
@@ -457,6 +461,30 @@ describe("e2ee bootstrap guards", () => {
 
     expect(result.passwordUnlockFailed).toBeUndefined();
     expect(result.bootstrap).toBeNull();
+  });
+
+  it("uploads a new account's envelope before its first device, so an interrupted start cannot strand the keys", async () => {
+    mockPeekPendingAuthPassword.mockReturnValue("fresh-sign-in");
+    mockGetStoredE2eeDevice.mockResolvedValue(null);
+    mockGetBootstrap.mockResolvedValue({
+      ...createRemoteBootstrap("user-1"),
+      devices: [],
+      passwordEnvelope: null,
+    });
+
+    await expect(ensureE2eeBootstrap("user-1")).resolves.toEqual(
+      expect.objectContaining({ activated: true }),
+    );
+
+    expect(mockCreatePasswordEnvelope).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "fresh-sign-in",
+    );
+    expect(mockUpsertPasswordEnvelope.mock.invocationCallOrder[0]).toBeLessThan(
+      mockUpsertDevice.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(mockClearPendingAuthPassword).toHaveBeenCalled();
   });
 
   it("stores a password envelope for the active session", async () => {

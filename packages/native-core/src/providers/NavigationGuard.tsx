@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { createLogger } from "@workspace/logger";
-import { sealReadableInvitations } from "@workspace/calendar-client";
+import { upgradeStoredEncryption } from "@workspace/calendar-client";
 import {
   SIGN_IN_TO_UNLOCK_NOTICE,
   UNLOCK_FAILED_NOTICE,
@@ -218,19 +218,16 @@ export function NavigationGuard({
           }
         })
         .catch(() => undefined);
-      void calendarApiService
-        .ensureSealedUserSettings()
-        .then(async (sealed) => {
-          if (sealed && !cancelled) {
+      // What the server reports is still stored in an older form is re-sealed now; anything that fails waits for the next launch.
+      void upgradeStoredEncryption(calendarApiService)
+        .then(async (settingsSealed) => {
+          if (settingsSealed && !cancelled) {
             await queryClient.invalidateQueries({
               queryKey: QUERY_KEYS.settings(),
             });
           }
         })
         .catch(() => undefined);
-
-      // Invitation copies the server still stores readable are sealed now; any that fail wait for the next launch.
-      void sealReadableInvitations(calendarApiService).catch(() => undefined);
     })()
       .catch((error: unknown) => {
         log.warn("Session startup failed", {

@@ -10,7 +10,7 @@ import {
   SETTINGS_QUERY_KEY,
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
-import { sealReadableInvitations } from "@workspace/calendar-client";
+import { upgradeStoredEncryption } from "@workspace/calendar-client";
 import { lockWithoutDeviceKeys, type E2eeLock } from "@workspace/e2ee";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useSession } from "@/lib/auth-client";
@@ -55,10 +55,10 @@ async function ensureDefaultCalendars(
   }
 }
 
-async function ensureSealedSettings(
+async function upgradeEncryption(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
-  if (await calendarApiService.ensureSealedUserSettings()) {
+  if (await upgradeStoredEncryption(calendarApiService)) {
     await queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEY });
   }
 }
@@ -66,10 +66,9 @@ async function ensureSealedSettings(
 async function refreshEncryptedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
-  // Failures are swallowed on purpose: seeding and sealing retry on the next bootstrap.
+  // Failures are swallowed on purpose: seeding and re-sealing retry on the next bootstrap.
   void ensureDefaultCalendars(queryClient).catch(() => undefined);
-  void ensureSealedSettings(queryClient).catch(() => undefined);
-  void sealReadableInvitations(calendarApiService).catch(() => undefined);
+  void upgradeEncryption(queryClient).catch(() => undefined);
 
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY }),

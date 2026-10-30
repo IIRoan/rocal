@@ -248,6 +248,24 @@ pub async fn update<C: ConnectionTrait>(
     row.update(db).await
 }
 
+/// New ciphertext with colour and category inside it, stored only while the owner's row still holds `expected`.
+pub async fn reseal_if_unchanged<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+    id: &str,
+    expected: &str,
+    row: calendar_event::ActiveModel,
+) -> Result<Option<calendar_event::Model>, sea_orm::DbErr> {
+    let updated = calendar_event::Entity::update_many()
+        .set(row)
+        .filter(calendar_event::Column::Id.eq(id))
+        .filter(calendar_event::Column::UserId.eq(user_id))
+        .filter(calendar_event::Column::EncryptedContent.eq(expected))
+        .exec_with_returning(db)
+        .await?;
+    Ok(updated.into_iter().next())
+}
+
 pub async fn delete_participants<C: ConnectionTrait>(
     db: &C,
     ids: Vec<String>,

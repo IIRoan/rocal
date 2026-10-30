@@ -502,6 +502,10 @@ pub struct SealEncryptionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
+    /// The ciphertext a re-seal of an already sealed event replaces; it moves colour and category inside, and a different stored one answers 409.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub expected_encrypted_content: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

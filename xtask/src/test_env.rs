@@ -35,7 +35,8 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     }
 }
 
-async fn up() -> anyhow::Result<()> {
+/// Starts whichever local service is not running, then waits until all three answer.
+pub async fn up() -> anyhow::Result<()> {
     if !container_running(POSTGRES_CONTAINER)? {
         podman(&[
             "run",
@@ -45,6 +46,9 @@ async fn up() -> anyhow::Result<()> {
             POSTGRES_CONTAINER,
             "-p",
             &format!("127.0.0.1:{LOCAL_POSTGRES_PORT}:5432"),
+            // A named volume keeps the dev database of `cargo xtask dev` across restarts.
+            "-v",
+            "solace-test-pg:/var/lib/postgresql",
             "-e",
             &format!("POSTGRES_USER={LOCAL_POSTGRES_USER}"),
             "-e",

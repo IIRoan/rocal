@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, RelationTrait,
+    QueryOrder, QuerySelect, RelationTrait, Set,
 };
 
 use crate::db::entities::{calendar_event, event_notification};
@@ -110,4 +110,36 @@ pub async fn insert(
         row.insert(db).await?;
     }
     Ok(())
+}
+
+/// Sets the sealed title and each matching lead on the event's unsent reminders; returns how many rows changed.
+pub async fn seal_pending(
+    db: &DatabaseTransaction,
+    event_id: &str,
+    title: Option<&str>,
+    leads: &HashMap<i32, String>,
+) -> Result<u64, sea_orm::DbErr> {
+    let pending = event_notification::Entity::find()
+        .filter(event_notification::Column::EventId.eq(event_id))
+        .filter(event_notification::Column::IsSent.eq(false))
+        .all(db)
+        .await?;
+    let mut updated = 0;
+    for row in pending {
+        let lead = leads.get(&row.minutes_before).cloned();
+        if title.is_none() && lead.is_none() {
+            continue;
+        }
+        let mut active = event_notification::ActiveModel::from(row);
+        if let Some(title) = title {
+            active.encrypted_display_title = Set(Some(title.to_owned()));
+        }
+        if let Some(lead) = lead {
+            active.encrypted_lead = Set(Some(lead));
+        }
+        active.updated_at = Set(instant::now());
+        active.update(db).await?;
+        updated += 1;
+    }
+    Ok(updated)
 }

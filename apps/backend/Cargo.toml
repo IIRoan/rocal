@@ -19,6 +19,7 @@ icu_collator.workspace = true
 image.workspace = true
 jiff.workspace = true
 percent-encoding.workspace = true
+openssl-sys.workspace = true
 pbkdf2.workspace = true
 pgp.workspace = true
 rand.workspace = true

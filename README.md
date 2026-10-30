@@ -48,6 +48,8 @@ bun run dev:backend
 bun run dev:notifications
 ```
 
+The API and the worker run against local podman services (Postgres 18, a test Stalwart and an S3 mock) and a `solace_test_dev` database that survives restarts; `cargo xtask dev backend` starts the services and creates the database the first time. Values that differ locally, such as a tunnel's URLs, go in `apps/backend/.env`.
+
 ## Testing and TDD
 
 Run the full test suite:
