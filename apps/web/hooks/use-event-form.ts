@@ -20,6 +20,7 @@ import {
   pickerDateToAllDayUtcRange,
   resolveSubmittedCategoryId,
   resolveTimezone,
+  storedEventId,
   type RecurrenceDeleteScope,
   type RecurrenceEditScope,
 } from "@workspace/calendar-core";
@@ -241,7 +242,8 @@ async function fetchEmailNotifications(
   eventId: string,
 ): Promise<EventNotification[] | null> {
   const response = await queryClient.fetchQuery({
-    queryKey: eventNotificationsQueryKey(eventId),
+    // Occurrences share their series' reminders, so a save through one occurrence refreshes them all.
+    queryKey: eventNotificationsQueryKey(storedEventId(eventId)),
     queryFn: () => calendarApiService.getEventNotifications(eventId),
     staleTime: 1000 * 60 * 5,
   });
@@ -756,7 +758,12 @@ export function useEventForm({
         };
 
         queryClient.setQueriesData<CalendarEvent[]>(
-          { queryKey: EVENTS_QUERY_KEY },
+          {
+            queryKey: EVENTS_QUERY_KEY,
+            // Writing data clears an invalidation, so a range the save invalidated and nothing shows keeps it and refetches when shown.
+            predicate: (query) =>
+              !query.state.isInvalidated || query.getObserversCount() > 0,
+          },
           (oldEvents) => {
             // The "events" prefix also holds the mail reader's single-event detail.
             if (!Array.isArray(oldEvents)) {

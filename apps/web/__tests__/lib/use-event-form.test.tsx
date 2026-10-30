@@ -463,6 +463,55 @@ describe("useEventForm reminder hydration", () => {
     expect(latestFormRef.current?.showNotifications).toBe(false);
   });
 
+  it("leaves a range the save invalidated stale, so it refetches when shown", async () => {
+    const futureEvent = {
+      ...baseEvent,
+      end: new Date("2099-04-24T17:30:00.000Z"),
+      start: new Date("2099-04-24T16:45:00.000Z"),
+    };
+    const shownMonth = ["events", "2099-04"] as const;
+    const invalidatedMonth = ["events", "2099-05"] as const;
+    queryClient.setQueryData(shownMonth, [futureEvent]);
+    queryClient.setQueryData(invalidatedMonth, [futureEvent]);
+    const calendarData = {
+      createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
+      editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(),
+      updateEvent: jest.fn(async (_eventId: string, event: any) => {
+        await queryClient.invalidateQueries({
+          queryKey: invalidatedMonth,
+          refetchType: "none",
+        });
+        return {
+          ...futureEvent,
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end),
+        };
+      }),
+    };
+    mockGetEventNotifications.mockResolvedValueOnce({
+      data: { notifications: [] },
+      success: true,
+    } as any);
+
+    await act(async () => {
+      await latestFormRef.current!.loadEventData(futureEvent as any);
+    });
+    act(() => {
+      latestFormRef.current!.setEventTitle("Renamed");
+    });
+    await act(async () => {
+      await latestFormRef.current!.handleEventSave(calendarData);
+    });
+
+    expect(queryClient.getQueryState(invalidatedMonth)?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryData<any[]>(shownMonth)).toEqual([
+      expect.objectContaining({ id: "event-1", title: "Renamed" }),
+    ]);
+  });
+
   it("clears selected reminders when the reminder option is disabled", async () => {
     mockGetEventNotifications.mockResolvedValue({
       data: {

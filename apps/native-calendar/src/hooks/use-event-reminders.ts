@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getReminderMinutes } from "@workspace/calendar-core";
+import { getReminderMinutes, storedEventId } from "@workspace/calendar-core";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 
@@ -16,7 +16,8 @@ export function useEventReminders(
     [fallbackReminder],
   );
   const { data, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.eventNotifications(eventId ?? ""),
+    // Occurrences share their series' reminders, so a save through one occurrence refreshes them all.
+    queryKey: QUERY_KEYS.eventNotifications(storedEventId(eventId ?? "")),
     // Why: `enabled` below guarantees eventId is set whenever this runs.
     queryFn: () => calendarApiService.getEventNotifications(eventId!),
     enabled: enabled && !!eventId,

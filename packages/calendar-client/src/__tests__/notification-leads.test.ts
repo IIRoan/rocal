@@ -47,3 +47,19 @@ describe("updateEventNotifications", () => {
     });
   });
 });
+
+describe("getEventNotifications", () => {
+  it("reads a generated occurrence's reminders from its series row", async () => {
+    const client = new HttpClient({ baseURL: "https://api.test", retries: 0 });
+    const get = jest.spyOn(client, "get").mockResolvedValue({} as never);
+    const api = new CalendarApiService(client, new NoopE2eeProvider());
+
+    await api.getEventNotifications("evt_1_2026-11-06T17:00:00.000Z");
+    await api.getEventNotifications("evt_2");
+
+    expect(get.mock.calls.map(([path]) => path)).toEqual([
+      "/api/notifications/event/evt_1",
+      "/api/notifications/event/evt_2",
+    ]);
+  });
+});
