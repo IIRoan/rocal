@@ -71,7 +71,7 @@ function SearchResultRow({
       type="button"
       onClick={() => onSelect(result)}
       className={cn(
-        "flex w-full items-start gap-2 px-3 py-2 text-left transition-colors focus:outline-none",
+        "flex w-full items-start gap-2 px-3 py-2 text-left transition-colors outline-none focus-visible:bg-accent/50",
         isSelected ? "bg-accent/50" : "hover:bg-accent/35",
       )}
     >

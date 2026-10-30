@@ -81,7 +81,7 @@ export function EventSearchResults({
             data-index={globalIndex}
             type="button"
             onClick={() => onSelect(event)}
-            className={`flex items-center gap-3 p-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
+            className={`flex items-center gap-3 p-2 w-full rounded-md text-left outline-none focus-visible:bg-accent/50 transition-colors group ${
               isSelected ? "bg-accent/50" : "hover:bg-accent/50"
             }`}
           >
@@ -101,7 +101,11 @@ export function EventSearchResults({
             {event.location && (
               <MapPin className="size-3 text-muted-foreground/50 shrink-0" />
             )}
-            <CalendarIcon className="size-3.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <CalendarIcon
+              className={`size-3.5 text-muted-foreground/40 shrink-0 transition-opacity ${
+                isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+              }`}
+            />
           </button>
         );
       })}

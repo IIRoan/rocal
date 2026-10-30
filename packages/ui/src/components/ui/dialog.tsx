@@ -108,7 +108,8 @@ function DialogContent({
         data-slot="dialog-content"
         data-variant={variant}
         className={cn(
-          "bg-background fixed z-50 overflow-hidden border shadow-lg duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          // repo-rules-allow wcag-visible-focus: the surface only takes focus as a fallback when a view swaps; its controls carry the focus style.
+          "bg-background fixed z-50 overflow-hidden border shadow-lg outline-none duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
           radius,
           sizeDefaults,
           positionClasses,
