@@ -50,6 +50,8 @@ cuid = { version = "2", default-features = false, features = ["v1"] }
 subtle = "2"
 # Passkeys: WebAuthn ceremonies over the stored COSE keys; pinned because its expert API may change in minor versions. Needs OpenSSL.
 webauthn-rs-core = "=0.5.5"
+# Compiles the OpenSSL webauthn-rs-core links, so no build needs system headers; the Dockerfiles set OPENSSL_NO_VENDOR and link Debian's.
+openssl-sys = { version = "0.9", features = ["vendored"] }
 # The CBOR crate webauthn-rs-core reads COSE keys with.
 serde_cbor_2 = "0.13"
 anyhow = "1"

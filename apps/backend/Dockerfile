@@ -14,7 +14,8 @@ COPY xtask xtask
 # The ICS reader compiles in the Windows zone table shared with the on-device import.
 COPY packages/calendar-ics/src/windows-zones.json packages/calendar-ics/src/windows-zones.json
 ENV RUSTFLAGS="-C target-cpu=x86-64-v3"
-RUN OPENSSL_STATIC=1 \
+RUN OPENSSL_NO_VENDOR=1 \
+    OPENSSL_STATIC=1 \
     OPENSSL_LIB_DIR="$(pkg-config --variable=libdir openssl)" \
     OPENSSL_INCLUDE_DIR="$(pkg-config --variable=includedir openssl)" \
     cargo build --release --locked -p solace-server \
