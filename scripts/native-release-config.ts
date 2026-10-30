@@ -10,6 +10,7 @@ export function resolveNativeReleaseProfile(input: {
   defaultBranch: string;
   requested?: string;
   allowProduction: boolean;
+  dryRun?: boolean;
 }): NativeReleaseProfile {
   let profile: string | undefined;
   if (input.event === "pull_request") profile = "development";
@@ -22,7 +23,8 @@ export function resolveNativeReleaseProfile(input: {
     throw new Error("Choose a supported native release profile");
   }
   if (profile === "production" || profile === "testflight") {
-    if (!input.allowProduction || input.event !== "workflow_dispatch" || input.branch !== input.defaultBranch) {
+    // A dry run publishes nothing, so it may test a store build from any branch.
+    if (!input.allowProduction || input.event !== "workflow_dispatch" || (input.branch !== input.defaultBranch && !input.dryRun)) {
       throw new Error("Production releases require an explicit dispatch from the default branch");
     }
     return profile;

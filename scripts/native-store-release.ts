@@ -69,36 +69,3 @@ export function prepareStoreRelease(
     },
   };
 }
-
-export function selectStoreBuild(
-  value: unknown,
-  expected: unknown,
-  commit: string,
-) {
-  const builds = Array.isArray(value) ? value : [value];
-  if (builds.length !== 1) throw new Error("Expected exactly one EAS build");
-  const build = object(builds[0]);
-  const release = object(expected);
-  if (
-    build.status !== "FINISHED" ||
-    build.platform !== "IOS" ||
-    build.distribution !== "STORE" ||
-    build.isForIosSimulator !== false ||
-    object(build.app).id !== release.projectId ||
-    object(build.updateChannel).name !== release.channel ||
-    build.buildProfile !== release.buildProfile ||
-    build.appIdentifier !== release.appIdentifier ||
-    build.appVersion !== release.appVersion ||
-    !/^[a-f0-9]{40}$/.test(commit) ||
-    build.gitCommitHash !== commit
-  ) {
-    throw new Error("EAS build does not match the requested store release");
-  }
-  if (
-    typeof build.id !== "string" ||
-    !/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(build.id)
-  ) {
-    throw new Error("Invalid EAS build ID");
-  }
-  return { ...release, id: build.id, gitCommitHash: commit };
-}

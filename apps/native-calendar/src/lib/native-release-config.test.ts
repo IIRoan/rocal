@@ -28,10 +28,18 @@ describe("native build and update routing", () => {
     expect(resolveNativeReleaseProfile({ ...input, defaultBranch: "master" })).toBe(expected);
   });
 
+  it.each(["testflight", "production"])("builds %s from a branch only as a dry run", (requested) => {
+    const input = { event: "workflow_dispatch", branch: "feature", defaultBranch: "master", requested, allowProduction: true };
+    expect(resolveNativeReleaseProfile({ ...input, dryRun: true })).toBe(requested);
+    expect(() => resolveNativeReleaseProfile({ ...input, dryRun: false })).toThrow();
+  });
+
   it.each([
     { event: "workflow_dispatch", branch: "feature", requested: "production", allowProduction: true },
     { event: "workflow_dispatch", branch: "feature", requested: "testflight", allowProduction: true },
     { event: "workflow_dispatch", branch: "master", requested: "production", allowProduction: false },
+    { event: "workflow_dispatch", branch: "master", requested: "testflight", allowProduction: false, dryRun: true },
+    { event: "push", branch: "feature", requested: "testflight", allowProduction: true, dryRun: true },
     { event: "workflow_dispatch", branch: "master", requested: "unknown", allowProduction: true },
     { event: "push", branch: "feature", allowProduction: true },
   ])("rejects unsupported or unsafe release requests: %p", (input) => {
