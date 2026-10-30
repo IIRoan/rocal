@@ -10,7 +10,7 @@ import { NavigationGuard } from "./NavigationGuard";
 
 const mockQueryClient = { invalidateQueries: jest.fn(async () => undefined) };
 const mockSignOut = jest.fn(async (_notice?: string) => undefined);
-const mockEnsureSealedUserSettings = jest.fn(async () => true);
+const mockUpgradeStoredEncryption = jest.fn(async () => true);
 let mockBootstrap = jest.fn(() => new Promise<string | null>(() => undefined));
 let mockAuth: {
   isAuthenticated: boolean;
@@ -58,17 +58,15 @@ jest.mock("../components/WorkspaceLoadingScreen", () => ({
   }) => (active ? <p role="status">{message}</p> : null),
 }));
 
-const mockSealReadableInvitations = jest.fn(() => Promise.resolve());
 jest.mock("@workspace/calendar-client", () => ({
   ...jest.requireActual<object>("@workspace/calendar-client"),
-  sealReadableInvitations: () => mockSealReadableInvitations(),
+  upgradeStoredEncryption: () => mockUpgradeStoredEncryption(),
 }));
 
 jest.mock("../lib/api", () => ({
   calendarApiService: {
     setE2eeProvider: () => undefined,
     ensureDefaultCalendars: () => Promise.resolve(false),
-    ensureSealedUserSettings: () => mockEnsureSealedUserSettings(),
   },
 }));
 jest.mock("../lib/session-query-reset", () => ({
@@ -119,7 +117,7 @@ const renderGuard = async () => {
 
 beforeEach(() => {
   mockSignOut.mockClear();
-  mockSealReadableInvitations.mockClear();
+  mockUpgradeStoredEncryption.mockClear();
   mockBootstrap = jest.fn(() => new Promise<string | null>(() => undefined));
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -155,10 +153,10 @@ it.each([
   });
 
   expect(mockSignOut).toHaveBeenCalledWith(notice);
-  expect(mockSealReadableInvitations).not.toHaveBeenCalled();
+  expect(mockUpgradeStoredEncryption).not.toHaveBeenCalled();
 });
 
-it("keeps a session whose startup unlocked and seals invitation copies still readable", async () => {
+it("keeps a session whose startup unlocked and re-seals what is still stored in an older form", async () => {
   mockBootstrap = jest.fn(() => Promise.resolve(null));
   signIn("unlocked");
   await renderGuard();
@@ -168,10 +166,10 @@ it("keeps a session whose startup unlocked and seals invitation copies still rea
 
   expect(mockBootstrap).toHaveBeenCalled();
   expect(mockSignOut).not.toHaveBeenCalled();
-  expect(mockSealReadableInvitations).toHaveBeenCalledTimes(1);
+  expect(mockUpgradeStoredEncryption).toHaveBeenCalledTimes(1);
 });
 
-it("seals plaintext app preferences once the session unlocks and refetches settings", async () => {
+it("refetches settings once the upgrade sealed them", async () => {
   mockBootstrap = jest.fn(() => Promise.resolve(null));
   signIn("sealing");
   await renderGuard();
@@ -179,7 +177,7 @@ it("seals plaintext app preferences once the session unlocks and refetches setti
     await Promise.resolve();
   });
 
-  expect(mockEnsureSealedUserSettings).toHaveBeenCalled();
+  expect(mockUpgradeStoredEncryption).toHaveBeenCalled();
   expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
     queryKey: ["settings"],
   });

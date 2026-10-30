@@ -38,6 +38,32 @@ pub struct NotificationSetting {
     pub encrypted_lead: Option<String>,
 }
 
+/// Seals what an event's pending reminders lack, without rescheduling them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SealEventRemindersRequest {
+    /// `v1.<iv>.<ciphertext>` under the notification key; omitted keeps the stored one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub encrypted_display_title: Option<String>,
+    pub leads: Vec<SealedReminderLead>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SealedReminderLead {
+    pub minutes_before: i32,
+    /// `minutes_before` sealed under the notification key.
+    pub encrypted_lead: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SealedReminders {
+    /// Pending reminders that took a sealed title or lead.
+    pub updated: i64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventNotifications {

@@ -1,12 +1,13 @@
 //! `NotificationService`: an event's reminder settings, scheduled in its zone and mirrored into its `reminder` column.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use sea_orm::{Set, TransactionTrait};
 use solace_api_types::notifications::{
     CreatedNotification, EventNotification, EventNotificationList, EventNotifications,
     NotificationDeleteData, NotificationDeleteResult, NotificationSetting, NotificationUpdateData,
-    NotificationUpdateDetails, NotificationUpdateResult, SkippedNotification,
+    NotificationUpdateDetails, NotificationUpdateResult, SealEventRemindersRequest,
+    SealedReminders, SkippedNotification,
 };
 
 use super::{calculator, queries};
@@ -64,6 +65,35 @@ pub async fn get(
             count: i64::try_from(notifications.len()).unwrap_or(i64::MAX),
             notifications: notifications.into_iter().map(dto).collect(),
         },
+    })
+}
+
+/// Fills the sealed title and leads of the event's pending reminders; their schedule and ids stay as they are.
+pub async fn seal(
+    state: &AppState,
+    user: &RouteUser,
+    event_id: &str,
+    request: SealEventRemindersRequest,
+) -> Result<SealedReminders, AppError> {
+    if owned_event(state, user, event_id).await?.is_none() {
+        return Ok(SealedReminders { updated: 0 });
+    }
+    let leads: HashMap<i32, String> = request
+        .leads
+        .into_iter()
+        .map(|lead| (lead.minutes_before, lead.encrypted_lead))
+        .collect();
+    let transaction = state.db.begin().await?;
+    let updated = queries::seal_pending(
+        &transaction,
+        event_id,
+        request.encrypted_display_title.as_deref(),
+        &leads,
+    )
+    .await?;
+    transaction.commit().await?;
+    Ok(SealedReminders {
+        updated: i64::try_from(updated).unwrap_or(i64::MAX),
     })
 }
 

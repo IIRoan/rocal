@@ -29,7 +29,7 @@ import type {
 import type { PasswordEnvelopeRequest } from "@workspace/calendar-client";
 import { createLogger } from "@workspace/logger";
 import { createNativeCryptoProvider } from "./native-crypto-provider";
-import { encryptReminderLead } from "./notification-title-crypto";
+import { encryptReminderLead, encryptReminderTitle } from "./notification-title-crypto";
 import { SECURE_STORE_KEYS } from "./constants";
 import { getE2eeApiUrl } from "./e2ee-api-url";
 import { getAuthHeaders } from "./api";
@@ -460,6 +460,17 @@ export function createNativeE2eeProvider({
       return session
         ? encryptReminderLead(session.accountKey, eventId, minutesBefore)
         : undefined;
+    },
+
+    async encryptNotificationTitle(
+      eventId: string,
+      title: string,
+    ): Promise<string | undefined> {
+      const session = await waitForSession();
+      const sealed = session
+        ? await encryptReminderTitle(session.accountKey, eventId, title)
+        : null;
+      return sealed ?? undefined;
     },
   };
   return provider;

@@ -97,6 +97,7 @@ request_schema!(SealEncryptionRequest => zod::object([
     ("encryptedContent", zod::string().min(1)),
     ("blindIndexTokens", zod::array(zod::string().min(1)).optional()),
     ("encryptionKeyVersion", zod::number().int().gte(1.0).max(zod::I32_MAX).optional()),
+    ("expectedEncryptedContent", zod::string().min(1).optional()),
 ])
 .strict());
 
@@ -212,8 +213,8 @@ pub async fn rsvp(
     Ok(Json(rsvp::answer(&state, &user, &id, &body).await?))
 }
 
-/// Stores ciphertext for an imported invitation without changing its schedule.
-#[utoipa::path(post, path = "/api/events/{id}/seal-encryption", operation_id = "sealEventEncryption", tag = "Events", params(("id" = String, Path)), request_body = SealEncryptionRequest, responses((status = 200, body = Event)))]
+/// Stores ciphertext for an imported invitation, or re-seals a sealed event over the ciphertext it read, without changing its schedule.
+#[utoipa::path(post, path = "/api/events/{id}/seal-encryption", operation_id = "sealEventEncryption", tag = "Events", params(("id" = String, Path)), request_body = SealEncryptionRequest, responses((status = 200, body = Event), (status = 409, description = "The stored ciphertext is not the expected one")))]
 #[tracing::instrument(skip_all)]
 pub async fn seal(
     State(state): State<AppState>,

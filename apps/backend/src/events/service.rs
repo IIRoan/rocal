@@ -971,7 +971,10 @@ pub async fn seal(
         ));
     }
     if existing.encryption_state == "encrypted" {
-        return view::one(&state.db, &existing).await;
+        let Some(expected) = request.expected_encrypted_content.clone() else {
+            return view::one(&state.db, &existing).await;
+        };
+        return reseal(state, user, id, &expected, request).await;
     }
     let mut row = existing.into_active_model();
     clear_plaintext(&mut row);
@@ -981,6 +984,35 @@ pub async fn seal(
     }
     row.encryption_key_version = Set(request.encryption_key_version.unwrap_or(1));
     let updated = queries::update(&state.db, row).await?;
+    view::one(&state.db, &updated).await
+}
+
+/// Moves a sealed event's colour and category into new ciphertext, over the ciphertext the client read so a newer edit is never lost.
+async fn reseal(
+    state: &AppState,
+    user: &RouteUser,
+    id: &str,
+    expected: &str,
+    request: SealEncryptionRequest,
+) -> Result<Event, AppError> {
+    let mut row = calendar_event::ActiveModel {
+        encrypted_content: Set(Some(request.encrypted_content)),
+        color: Set(None),
+        category_id: Set(None),
+        updated_at: Set(instant::now()),
+        ..Default::default()
+    };
+    if let Some(tokens) = &request.blind_index_tokens {
+        row.blind_index_tokens = Set(Some(tokens_json(tokens)?));
+    }
+    if let Some(version) = request.encryption_key_version {
+        row.encryption_key_version = Set(version);
+    }
+    let updated = queries::reseal_if_unchanged(&state.db, &user.id, id, expected, row)
+        .await?
+        .ok_or_else(|| {
+            AppError::Conflict("The event changed on another device. Try again.".into())
+        })?;
     view::one(&state.db, &updated).await
 }
 

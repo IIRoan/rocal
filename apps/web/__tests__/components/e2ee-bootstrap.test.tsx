@@ -24,15 +24,14 @@ jest.mock("@/lib/auth-client", () => ({
   useSession: jest.fn(),
 }));
 
-const mockSealReadableInvitations = jest.fn(async () => undefined);
+const mockUpgradeStoredEncryption = jest.fn(async () => false);
 jest.mock("@workspace/calendar-client", () => ({
-  sealReadableInvitations: () => mockSealReadableInvitations(),
+  upgradeStoredEncryption: () => mockUpgradeStoredEncryption(),
 }));
 
 jest.mock("@/lib/calendar-api-service", () => ({
   calendarApiService: {
     ensureDefaultCalendars: jest.fn(async () => false),
-    ensureSealedUserSettings: jest.fn(async () => false),
   },
 }));
 
@@ -91,7 +90,6 @@ import {
 } from "@/lib/enc-password-cookie";
 import { signOutAndClearLocalState } from "@/lib/auth-local-state";
 import { beginAuthNavigation } from "@/lib/auth-navigation";
-import { calendarApiService } from "@/lib/calendar-api-service";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -244,7 +242,7 @@ describe("E2eeBootstrap component", () => {
       expect.objectContaining({ passwordEnvelope: expect.anything() }),
     );
     expect(mockSignOut).not.toHaveBeenCalled();
-    expect(mockSealReadableInvitations).toHaveBeenCalledTimes(1);
+    expect(mockUpgradeStoredEncryption).toHaveBeenCalledTimes(1);
   });
 
   it("leaves the native passkey bridge's short-lived session alone", async () => {
@@ -264,7 +262,7 @@ describe("E2eeBootstrap component", () => {
 
     expect(mockUnlockE2eeWithPassword).not.toHaveBeenCalled();
     expectSignedOutWith("sign-in-again");
-    expect(mockSealReadableInvitations).not.toHaveBeenCalled();
+    expect(mockUpgradeStoredEncryption).not.toHaveBeenCalled();
   });
 
   it("signs out with the support notice when the sign-in password does not open the envelope", async () => {
@@ -364,10 +362,10 @@ describe("E2eeBootstrap component", () => {
     expect(mockStorePasswordEnvelope).not.toHaveBeenCalled();
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(container.innerHTML).toBe("");
-    expect(mockSealReadableInvitations).toHaveBeenCalledTimes(1);
+    expect(mockUpgradeStoredEncryption).toHaveBeenCalledTimes(1);
   });
 
-  it("seals plaintext app preferences once this browser unlocks", async () => {
+  it("re-seals what is still stored in an older form once this browser unlocks", async () => {
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: true,
       bootstrap: createBootstrap(),
@@ -375,7 +373,7 @@ describe("E2eeBootstrap component", () => {
 
     await renderComponent();
 
-    expect(calendarApiService.ensureSealedUserSettings).toHaveBeenCalled();
+    expect(mockUpgradeStoredEncryption).toHaveBeenCalledTimes(1);
   });
 
   it("stores the missing envelope in one upload with a password the server just accepted", async () => {

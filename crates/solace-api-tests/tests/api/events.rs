@@ -2108,6 +2108,7 @@ async fn sealing_replaces_plaintext_with_ciphertext() {
                 encrypted_content: ciphertext.clone(),
                 blind_index_tokens: Some(vec!["seal-token".into()]),
                 encryption_key_version: None,
+                expected_encrypted_content: None,
             }),
         )
         .await

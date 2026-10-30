@@ -526,6 +526,50 @@ export class CalendarApiService {
     }
   }
 
+  /** Ids of what this account still stores in an older form, for `upgradeStoredEncryption`. */
+  async getEncryptionUpgrades(): Promise<ApiResponse<"EncryptionUpgrades">> {
+    try {
+      return await this.client.get<Schema<"EncryptionUpgrades">>(
+        "/api/e2ee/upgrades",
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to load encryption upgrades");
+    }
+  }
+
+  /** Seals an event's readable colour and category into new ciphertext; false when it cannot be opened here. */
+  async resealEventAttributes(id: string): Promise<boolean> {
+    if (!(await this.e2ee.hasActiveSession())) return false;
+    const path = `/api/events/${encodeURIComponent(id)}`;
+    const stored = (await this.client.get<Schema<"Event">>(path)) as CalendarEvent;
+    if (typeof stored.encryptedContent !== "string") return false;
+    // An event this device cannot open is left as it is, so its title is never overwritten.
+    const opened = await this.e2ee
+      .hydrateEncryptedEvent(stored)
+      .catch(() => null);
+    if (!opened?.title.trim()) return false;
+    const shadow = await this.e2ee.attachEventEncryptionShadow({
+      title: opened.title,
+      description: opened.description ?? "",
+      location: opened.location ?? "",
+      color: opened.color ?? "",
+      categoryId: opened.categoryId ?? "",
+    } as UpdateEventRequest);
+    if (!shadow.encryptedContent) return false;
+    // The server stores it only over the ciphertext read here, so an edit made meanwhile wins.
+    await this.client.post<Schema<"Event">>(`${path}/seal-encryption`, {
+      encryptedContent: shadow.encryptedContent,
+      ...(shadow.blindIndexTokens
+        ? { blindIndexTokens: shadow.blindIndexTokens }
+        : {}),
+      ...(shadow.encryptionKeyVersion
+        ? { encryptionKeyVersion: shadow.encryptionKeyVersion }
+        : {}),
+      expectedEncryptedContent: stored.encryptedContent,
+    } satisfies Schema<"SealEncryptionRequest">);
+    return true;
+  }
+
   async respondToInvitation(
     id: string,
     status: "accepted" | "declined" | "tentative",
@@ -1301,6 +1345,51 @@ export class CalendarApiService {
     } catch (error) {
       throw this.transformError(error, "Failed to update event notifications");
     }
+  }
+
+  /** Seals the title and leads an event's pending reminders lack, without rescheduling them; false when nothing could be sealed. */
+  async sealPendingReminders(eventId: string): Promise<boolean> {
+    if (!(await this.e2ee.hasActiveSession())) return false;
+    const [{ data }, stored] = await Promise.all([
+      this.getEventNotifications(eventId),
+      this.client.get<Schema<"Event">>(
+        `/api/events/${encodeURIComponent(eventId)}`,
+      ),
+    ]);
+    const opened = await this.e2ee
+      .hydrateEncryptedEvent(stored as CalendarEvent)
+      .catch(() => null);
+    const pending = [
+      ...new Set(
+        data.notifications
+          .filter((notification) => !notification.isSent)
+          .map((notification) => notification.minutesBefore),
+      ),
+    ];
+    const leads = (
+      await Promise.all(
+        pending.map(async (minutesBefore) => {
+          const encryptedLead = await this.e2ee.encryptNotificationLead(
+            eventId,
+            minutesBefore,
+          );
+          return encryptedLead ? { minutesBefore, encryptedLead } : null;
+        }),
+      )
+    ).filter((lead) => lead !== null);
+    const title = opened?.title.trim();
+    const encryptedDisplayTitle = title
+      ? await this.e2ee.encryptNotificationTitle(eventId, title)
+      : undefined;
+    if (leads.length === 0 && !encryptedDisplayTitle) return false;
+    await this.client.put<Schema<"SealedReminders">>(
+      `/api/notifications/event/${encodeURIComponent(eventId)}/sealed`,
+      {
+        leads,
+        ...(encryptedDisplayTitle ? { encryptedDisplayTitle } : {}),
+      } satisfies Schema<"SealEventRemindersRequest">,
+    );
+    return true;
   }
 
   async registerPushDevice(

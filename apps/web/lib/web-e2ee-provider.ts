@@ -25,7 +25,7 @@ import {
   encryptJsonPayload,
   parseEncryptedJsonPayload,
 } from "./e2ee-crypto";
-import { encryptReminderLead } from "./e2ee-notification-title";
+import { encryptReminderLead, encryptReminderTitle } from "./e2ee-notification-title";
 import {
   attachCalendarEncryptionShadow,
   attachCategoryEncryptionShadow,
@@ -147,6 +147,13 @@ export class WebE2eeProvider implements E2eeProvider {
     minutesBefore: number,
   ): Promise<string | undefined> {
     return encryptReminderLead(eventId, minutesBefore);
+  }
+
+  async encryptNotificationTitle(
+    eventId: string,
+    title: string,
+  ): Promise<string | undefined> {
+    return (await encryptReminderTitle(eventId, title)) ?? undefined;
   }
 
 }
