@@ -10,6 +10,7 @@ const profile = resolveNativeReleaseProfile({
   defaultBranch: process.env.DEFAULT_BRANCH ?? "",
   requested: process.env.INPUT_PROFILE,
   allowProduction: process.env.ALLOW_PRODUCTION === "true",
+  dryRun: process.env.DRY_RUN === "true",
 });
 const selectedApp = process.env.INPUT_APP || "all";
 const apps = Object.entries(settings.apps).filter(([app]) => selectedApp === "all" || selectedApp === app);

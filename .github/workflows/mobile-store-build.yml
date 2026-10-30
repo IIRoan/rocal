@@ -16,13 +16,14 @@ on:
       submit:
         description: Upload the completed builds to TestFlight (requires configured App Store Connect credentials)
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
 
+# Per ref, so a branch dry run never replaces a pending default-branch release.
 concurrency:
-  group: ios-store-${{ inputs.app }}
+  group: ios-store-${{ github.ref_name }}-${{ inputs.app }}
   cancel-in-progress: false
 
 jobs:
@@ -43,6 +44,8 @@ jobs:
           INPUT_PROFILE: ${{ inputs.profile }}
           INPUT_APP: ${{ inputs.app }}
           ALLOW_PRODUCTION: "true"
+          # Only the default branch uploads; other branches may build without submitting.
+          DRY_RUN: ${{ !inputs.submit }}
         run: bun ./scripts/native-release-metadata.ts
 
   checks:
@@ -51,7 +54,7 @@ jobs:
 
   build:
     needs: [meta, checks]
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -78,25 +81,23 @@ jobs:
           eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
       - name: Build signed App Store binary
-        id: store
         env:
           PROFILE: ${{ needs.meta.outputs.profile }}
           APP: ${{ matrix.app }}
-          SOURCE_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           umask 077
           eas config --platform ios --profile "$PROFILE" --json > "$RUNNER_TEMP/eas-config.json"
           bun ../../scripts/native-store-metadata.ts prepare "$APP" "$PROFILE" "$RUNNER_TEMP/eas-config.json" "$RUNNER_TEMP/release"
-          eas build --platform ios --profile "$PROFILE" --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
-          bun ../../scripts/native-store-metadata.ts reference "$RUNNER_TEMP/eas-build.json" "$RUNNER_TEMP/release" "$SOURCE_COMMIT"
+          # Signing credentials and the remote build number come from EAS; the archive is built on this runner.
+          eas build --platform ios --profile "$PROFILE" --local --non-interactive --output "$RUNNER_TEMP/solace.ipa" 2>&1 | sed -E -f "$GITHUB_WORKSPACE/scripts/eas-build-log.sed"
       - uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
         with:
           name: ${{ matrix.app }}-ios-store-build
           path: ${{ runner.temp }}/release/*.json
           if-no-files-found: error
-      - name: Upload the selected build to TestFlight
+      - name: Upload the build to TestFlight
         if: inputs.submit
-        env:
-          BUILD_ID: ${{ steps.store.outputs.build_id }}
-        run: eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --wait
+        run: |
+          set -o pipefail
+          eas submit --platform ios --profile production --path "$RUNNER_TEMP/solace.ipa" --non-interactive --wait 2>&1 | sed -E -f "$GITHUB_WORKSPACE/scripts/eas-build-log.sed"

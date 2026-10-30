@@ -13,6 +13,7 @@ on:
       - "babel.config.cts"
       - "scripts/native-*.ts"
       - "scripts/eas-build-profile.ts"
+      - "scripts/eas-build-log.sed"
       - ".github/workflows/native-checks.yml"
       - ".github/workflows/mobile-internal-build.yml"
   push:
@@ -26,6 +27,7 @@ on:
       - "babel.config.cts"
       - "scripts/native-*.ts"
       - "scripts/eas-build-profile.ts"
+      - "scripts/eas-build-log.sed"
       - ".github/workflows/native-checks.yml"
       - ".github/workflows/mobile-internal-build.yml"
   workflow_dispatch:
@@ -109,19 +111,12 @@ jobs:
           APP_VARIANT: ${{ matrix.app_variant }}
         run: |
           set -o pipefail
-          # Strip device UDIDs, team ids and certificate serials from the public build log.
           eas build \
             --platform ios \
             --profile "$PROFILE" \
             --local \
             --non-interactive \
-            --output "$RUNNER_TEMP/solace.ipa" 2>&1 | sed -E \
-              -e 's/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}/[redacted udid]/g' \
-              -e 's/\b[0-9A-Fa-f]{40}\b/[redacted udid]/g' \
-              -e 's/(Apple Team( ID)?[[:space:]]*[:=]?[[:space:]]*)[^[:space:])]+/\1[redacted]/g' \
-              -e 's/^([[:space:]]*(Serial Number|Developer Portal ID)[[:space:]]+).*/\1[redacted]/' \
-              -e 's/^([[:space:]]*-[[:space:]]+).*\(UDID:.*/\1[redacted device]/' \
-              -e 's/^([[:space:]]*Provisioned devices[[:space:]]+).*/\1[redacted]/'
+            --output "$RUNNER_TEMP/solace.ipa" 2>&1 | sed -E -f "$GITHUB_WORKSPACE/scripts/eas-build-log.sed"
 
       - name: Publish iOS artifact to R2
         env:
