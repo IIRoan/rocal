@@ -24,10 +24,12 @@ if (typeof globalThis.TextEncoder === "undefined") {
 }
 
 const mockStoreRememberedAuthPassword = jest.fn();
+const mockStorePendingAuthPassword = jest.fn();
 const mockClearAuthPasswords = jest.fn();
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
   storeRememberedAuthPassword: mockStoreRememberedAuthPassword,
+  storePendingAuthPassword: mockStorePendingAuthPassword,
   clearAuthPasswords: mockClearAuthPasswords,
 }));
 
@@ -48,9 +50,11 @@ beforeEach(async () => {
 
   // Clean slate: remove device key and cookie
   localStorage.clear();
+  sessionStorage.clear();
   document.cookie =
     "solace_enc_pw=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   mockStoreRememberedAuthPassword.mockReset();
+  mockStorePendingAuthPassword.mockReset();
   mockClearAuthPasswords.mockReset();
 });
 
@@ -115,7 +119,7 @@ describe("enc-password-cookie", () => {
       // fresh module instance via resetModules.
     });
 
-    it("restores the password as remembered, never as a fresh sign-in", async () => {
+    it("restores the password as remembered on a load that does not follow a sign-in", async () => {
       await setEncPasswordCookie("session-password");
 
       // Grab the cookie and device key written above, then reset module state
@@ -135,6 +139,32 @@ describe("enc-password-cookie", () => {
       expect(mockStoreRememberedAuthPassword).toHaveBeenCalledWith(
         "session-password",
       );
+    });
+
+    it("gives only the load right after a sign-in in this tab the password as that sign-in's", async () => {
+      await setEncPasswordCookie("fresh-password");
+      const mod1 = await import("../../lib/enc-password-cookie");
+      mod1.markFreshSignIn();
+      // The login page itself must not use the mark up before it navigates.
+      await mod1.initEncPasswordFromCookie();
+      const cookieValue = document.cookie;
+      const deviceKey = localStorage.getItem("solace:enc-device-key");
+
+      const reload = async () => {
+        jest.resetModules();
+        const mod = await import("../../lib/enc-password-cookie");
+        document.cookie = cookieValue;
+        if (deviceKey) localStorage.setItem("solace:enc-device-key", deviceKey);
+        await mod.initEncPasswordFromCookie();
+      };
+
+      await reload();
+      expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("fresh-password");
+      expect(mockStoreRememberedAuthPassword).not.toHaveBeenCalled();
+
+      await reload();
+      expect(mockStorePendingAuthPassword).toHaveBeenCalledTimes(1);
+      expect(mockStoreRememberedAuthPassword).toHaveBeenCalledWith("fresh-password");
     });
 
     it("is a no-op when memory cache is already populated", async () => {

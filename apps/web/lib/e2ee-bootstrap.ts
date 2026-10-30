@@ -30,6 +30,7 @@ import {
 import {
   clearPendingAuthPassword,
   peekAuthPassword,
+  peekPendingAuthPassword,
 } from "./e2ee-password-cache";
 import type { E2eeBootstrapResponse, E2eeDeviceRecord } from "./types/calendar";
 
@@ -199,10 +200,20 @@ async function createInitialDevice(
     generateAccountKey(),
     generateBlindIndexKey(),
   ]);
+  // The envelope goes up before the first device, so an interrupted start never leaves keys no sign-in can open.
+  const signInPassword = peekPendingAuthPassword();
+  const envelope = signInPassword
+    ? await createPasswordEnvelope(accountKey, blindIndexKey, signInPassword)
+    : null;
+  if (envelope) {
+    await e2eeApiService.upsertPasswordEnvelope(envelope);
+    clearPendingAuthPassword();
+  }
   const remoteRecord = await provisionLocalDevice(
     userId,
     accountKey,
     blindIndexKey,
+    envelope?.kdfSalt,
   );
 
   if (!isBootstrapCurrent(userId, generation)) {

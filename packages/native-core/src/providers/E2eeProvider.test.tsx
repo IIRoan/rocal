@@ -448,7 +448,7 @@ describe("E2eeProvider", () => {
     );
   });
 
-  it("clears the pending auth password when auto-storing the envelope fails", async () => {
+  it("registers no device and keeps the password for a retry when the first envelope cannot be stored", async () => {
     peekPendingAuthPassword.mockReturnValue("secret-password");
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
@@ -482,7 +482,10 @@ describe("E2eeProvider", () => {
     await flushBootstrap();
 
     expect(getE2ee().isReady).toBe(true);
-    expect(clearPendingAuthPassword).toHaveBeenCalled();
+    expect(clearPendingAuthPassword).not.toHaveBeenCalled();
+    expect(
+      mockFetch.mock.calls.some(([url]) => String(url).endsWith("/api/e2ee/device")),
+    ).toBe(false);
   });
 
   it("auto-saves a password envelope for first-device email sign-in", async () => {
@@ -529,6 +532,13 @@ describe("E2eeProvider", () => {
         method: "PUT",
       }),
     );
+    const writes = mockFetch.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.endsWith("/password") || url.endsWith("/device"));
+    expect(writes).toEqual([
+      "https://api.solace.test/api/e2ee/password",
+      "https://api.solace.test/api/e2ee/device",
+    ]);
     expect(clearPendingAuthPassword).toHaveBeenCalled();
   });
 

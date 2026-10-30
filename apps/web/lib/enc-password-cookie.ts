@@ -1,12 +1,15 @@
 /** The password is stored AES-GCM encrypted in a cookie; its key lives in localStorage and both clear on sign-out. */
 
 import {
+  storePendingAuthPassword,
   storeRememberedAuthPassword,
   clearAuthPasswords,
 } from "./e2ee-password-cache";
 
 const COOKIE_NAME = "solace_enc_pw";
 const DEVICE_KEY_STORAGE_KEY = "solace:enc-device-key";
+/** A marker only; the password itself stays in the encrypted cookie. */
+const FRESH_SIGN_IN_KEY = "solace:enc-fresh-sign-in";
 
 let _memoryPassword: string | null = null;
 
@@ -108,6 +111,25 @@ export async function setEncPasswordCookie(password: string): Promise<void> {
   writeCookie(btoa(String.fromCharCode(...combined)));
 }
 
+/** The next page load in this tab follows a password sign-in, so it may wrap the account keys with that password. */
+export function markFreshSignIn(): void {
+  try {
+    sessionStorage.setItem(FRESH_SIGN_IN_KEY, "1");
+  } catch {
+    // Without session storage the next load only remembers the password, as before.
+  }
+}
+
+function consumeFreshSignIn(): boolean {
+  try {
+    const fresh = sessionStorage.getItem(FRESH_SIGN_IN_KEY) === "1";
+    sessionStorage.removeItem(FRESH_SIGN_IN_KEY);
+    return fresh;
+  } catch {
+    return false;
+  }
+}
+
 /** Synchronous in-memory read; returns null until initEncPasswordFromCookie() resolves. */
 export function peekEncPassword(): string | null {
   return _memoryPassword;
@@ -117,6 +139,7 @@ export function peekEncPassword(): string | null {
 export async function initEncPasswordFromCookie(): Promise<void> {
   if (typeof window === "undefined") return;
   if (_memoryPassword !== null) return;
+  const fresh = consumeFreshSignIn();
 
   const cookieValue = readCookie();
   if (!cookieValue) return;
@@ -136,8 +159,12 @@ export async function initEncPasswordFromCookie(): Promise<void> {
     );
     const password = new TextDecoder().decode(decrypted);
     _memoryPassword = password;
-    // Kept as remembered, not as a fresh sign-in: the password may have changed on another device since.
-    storeRememberedAuthPassword(password);
+    // Only the load right after a sign-in in this tab gets it as that sign-in; later it may have changed on another device.
+    if (fresh) {
+      storePendingAuthPassword(password);
+    } else {
+      storeRememberedAuthPassword(password);
+    }
   } catch {
     // Cookie or device key is corrupt/mismatched — clean up.
     clearEncPasswordCookie();

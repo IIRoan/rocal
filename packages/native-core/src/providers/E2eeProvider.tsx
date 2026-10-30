@@ -289,13 +289,25 @@ export function E2eeProvider({
 
         const accountKey = await e2ee.generateAccountKey();
         const blindIndexKey = await e2ee.generateBlindIndexKey();
+        // The envelope goes up before the first device, so an interrupted start never leaves keys no sign-in can open.
+        const firstEnvelope = pendingPassword
+          ? await e2ee.createPasswordEnvelope(
+              accountKey,
+              blindIndexKey,
+              pendingPassword,
+            )
+          : null;
+        if (firstEnvelope) {
+          await uploadPasswordEnvelopeToApi(apiBaseUrl, firstEnvelope);
+          clearPendingAuthPassword();
+        }
         const nextSession = await registerDeviceForSession({
           e2ee,
           userId,
           apiBaseUrl,
           accountKey,
           blindIndexKey,
-          envelopeSalt: null,
+          envelopeSalt: firstEnvelope?.kdfSalt ?? null,
         });
 
         if (isStale()) {
@@ -304,26 +316,6 @@ export function E2eeProvider({
 
         sessionRef.current = nextSession;
         setActiveE2eeSession(nextSession);
-
-        if (pendingPassword) {
-          try {
-            await storePasswordEnvelopeForActiveSession({
-              e2ee,
-              userId,
-              apiBaseUrl,
-              password: pendingPassword,
-            });
-          } catch (error) {
-            log.warn("Failed to auto-store E2EE password envelope", {
-              userId,
-              error,
-            });
-          } finally {
-            // Drop the sign-in password even when the envelope write failed.
-            clearPendingAuthPassword();
-          }
-        }
-
         return null;
       } catch (error) {
         if (!isStale()) {
