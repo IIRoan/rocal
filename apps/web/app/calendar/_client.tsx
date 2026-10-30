@@ -182,6 +182,7 @@ function SidebarWithContext() {
       onCreateEvent={openNewEventEditor}
       getCachedEventsForRange={calendarData.getCachedEventsForRange}
       prefetchRange={calendarData.prefetchRange}
+      weekStartDay={settings?.weekStartDay}
     />
   );
 }

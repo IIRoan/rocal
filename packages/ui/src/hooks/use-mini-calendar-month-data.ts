@@ -36,6 +36,7 @@ interface UseMiniCalendarMonthDataOptions {
   getCachedEventsForRange?: (range: DateRange) => CalendarEvent[] | undefined;
   prefetchRange?: (range: DateRange) => void;
   rangeChangeDebounceMs?: number;
+  weekStartDay?: number;
 }
 
 export function useMiniCalendarMonthData({
@@ -45,14 +46,17 @@ export function useMiniCalendarMonthData({
   getCachedEventsForRange,
   prefetchRange,
   rangeChangeDebounceMs = 120,
+  weekStartDay = 1,
 }: UseMiniCalendarMonthDataOptions) {
   const grid = useMemo(() => {
     const monthStart = startOfMonth(calendarMonth);
-    const start = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const start = startOfWeek(monthStart, {
+      weekStartsOn: (weekStartDay % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
     const end = addDays(start, 41); // Always render 6 rows (42 days)
     const days = eachDayOfInterval({ start, end });
     return { start, end, days };
-  }, [calendarMonth]);
+  }, [calendarMonth, weekStartDay]);
 
   const monthKey = getCalendarMonthKey(calendarMonth);
 

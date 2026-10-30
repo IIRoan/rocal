@@ -263,6 +263,7 @@ export function MobileCalendarWrapper({
         onSidebarOpenChange={setIsSidebarOpen}
         prefetchRange={prefetchRange}
         user={user}
+        weekStartDay={props.weekStartDay}
       />
     </div>
   );

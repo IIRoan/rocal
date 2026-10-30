@@ -3,46 +3,21 @@ import { Pressable, Text, View, type TextStyle } from "react-native";
 import { Feather } from "@expo/vector-icons";
 // repo-rules-allow timezone-safe-calendar-code: format() renders the picker's local month-grid navigation state, never event instants.
 import { format } from "date-fns";
+import { getWeekdayLabels } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
-
-const CALENDAR_DAY_HEADERS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-
-interface GridCell {
-  key: string;
-  day: number | null;
-}
-
-function buildMonthWeeks(startOffset: number, daysInMonth: number) {
-  const cells: GridCell[] = [];
-  for (let blank = 0; blank < startOffset; blank++) {
-    cells.push({ key: `lead-${blank}`, day: null });
-  }
-  for (let day = 1; day <= daysInMonth; day++) {
-    cells.push({ key: `day-${day}`, day });
-  }
-  for (let blank = 0; cells.length % 7 !== 0; blank++) {
-    cells.push({ key: `trail-${blank}`, day: null });
-  }
-  const weeks: { key: string; cells: GridCell[] }[] = [];
-  for (let start = 0; start < cells.length; start += 7) {
-    const week = cells.slice(start, start + 7);
-    weeks.push({
-      key: `week-${start / 7}`,
-      cells: week,
-    });
-  }
-  return weeks;
-}
+import { buildCalendarGridWeeks } from "./calendar-grid-utils";
 
 export function CalendarGrid({
   selectedDate,
   onSelect,
   minDate,
+  weekStartDay,
   theme,
 }: {
   selectedDate: Date;
   onSelect: (date: Date) => void;
   minDate?: Date;
+  weekStartDay: number;
   theme: ThemeTokens;
 }) {
   const [viewMonth, setViewMonth] = useState(
@@ -52,11 +27,8 @@ export function CalendarGrid({
   const year = viewMonth.getFullYear();
   const month = viewMonth.getMonth();
 
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const startOffset = (firstDay + 6) % 7;
-
-  const weeks = buildMonthWeeks(startOffset, daysInMonth);
+  const weeks = buildCalendarGridWeeks(viewMonth, weekStartDay);
+  const dayHeaders = getWeekdayLabels(weekStartDay, "EEEEEE");
 
   const prevMonth = () => setViewMonth(new Date(year, month - 1, 1));
   const nextMonth = () => setViewMonth(new Date(year, month + 1, 1));
@@ -134,7 +106,7 @@ export function CalendarGrid({
       </View>
 
       <View style={{ flexDirection: "row" }}>
-        {CALENDAR_DAY_HEADERS.map((d) => (
+        {dayHeaders.map((d) => (
           <View
             key={d}
             style={{ flex: 1, alignItems: "center", paddingVertical: 4 }}
@@ -162,7 +134,10 @@ export function CalendarGrid({
             const todayDay = isToday(day);
             return (
               <Pressable
-                key={day}
+                key={key}
+                accessibilityRole="button"
+                accessibilityLabel={`${format(new Date(year, month, day), "MMMM d, yyyy")}${todayDay ? ", today" : ""}`}
+                accessibilityState={{ selected }}
                 style={{
                   flex: 1,
                   alignItems: "center",

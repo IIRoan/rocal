@@ -31,7 +31,10 @@ interface SidebarCalendarProps {
   onDateSelect?: (date: Date) => void;
   className?: string;
   isMobile?: boolean;
+  weekStartDay?: number;
 }
+
+const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
 export function SidebarCalendar({
   getCachedEventsForRange,
@@ -39,6 +42,7 @@ export function SidebarCalendar({
   onDateSelect,
   className,
   isMobile = false,
+  weekStartDay = 1,
 }: SidebarCalendarProps) {
   const { currentDate, setCurrentDate, calendars, getVisibleCalendars } =
     useCalendarContext();
@@ -64,13 +68,16 @@ export function SidebarCalendar({
     }
   }, [currentDate, setCurrentDate]);
 
-  const weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+  const weekdayLabels = WEEKDAY_LABELS.map(
+    (_, index) => WEEKDAY_LABELS[(weekStartDay + index) % 7],
+  );
   const { grid, dayEventsMap, monthKey, toDayKey } = useMiniCalendarMonthData({
     calendarMonth,
     calendars,
     visibleCalendarIds,
     getCachedEventsForRange,
     prefetchRange,
+    weekStartDay,
   });
 
   const goToPreviousMonth = () => {
