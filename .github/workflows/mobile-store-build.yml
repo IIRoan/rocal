@@ -21,8 +21,9 @@ on:
 permissions:
   contents: read
 
+# Per ref, so a branch dry run never replaces a pending default-branch release.
 concurrency:
-  group: ios-store-${{ inputs.app }}
+  group: ios-store-${{ github.ref_name }}-${{ inputs.app }}
   cancel-in-progress: false
 
 jobs:

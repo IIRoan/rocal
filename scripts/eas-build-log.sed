@@ -1,4 +1,4 @@
-# Strip device UDIDs, team ids and certificate serials from public EAS build logs.
+# Strip device UDIDs, team ids and certificate serials/fingerprints from public EAS build logs.
 s/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}/[redacted udid]/g
 s/[0-9A-Fa-f]{40}/[redacted udid]/g
 s/(common name = [^(]*\()[^)]*/\1[redacted]/

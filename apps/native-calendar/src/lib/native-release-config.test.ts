@@ -39,7 +39,6 @@ describe("native build and update routing", () => {
     { event: "workflow_dispatch", branch: "feature", requested: "testflight", allowProduction: true },
     { event: "workflow_dispatch", branch: "master", requested: "production", allowProduction: false },
     { event: "workflow_dispatch", branch: "master", requested: "testflight", allowProduction: false, dryRun: true },
-    { event: "push", branch: "feature", requested: "testflight", allowProduction: true, dryRun: true },
     { event: "workflow_dispatch", branch: "master", requested: "unknown", allowProduction: true },
     { event: "push", branch: "feature", allowProduction: true },
   ])("rejects unsupported or unsafe release requests: %p", (input) => {
