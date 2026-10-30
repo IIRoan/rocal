@@ -358,6 +358,25 @@ describe("readCachedEventsForRange", () => {
     expect(seeded?.updatedAt).toBe(1_000);
   });
 
+  it("marks the seed stale when a source range was invalidated by a save", async () => {
+    const client = new QueryClient();
+    client.setQueryData(monthA, makeEventResponse([inRange]), {
+      updatedAt: Date.now(),
+    });
+    client.setQueryData(monthB, makeEventResponse([inRange]), {
+      updatedAt: Date.now(),
+    });
+    await client.invalidateQueries({ queryKey: monthA });
+
+    const seeded = readCachedEventsForRange(
+      client,
+      new Date("2024-03-28T00:00:00.000Z"),
+      new Date("2024-04-20T00:00:00.000Z"),
+    );
+
+    expect(seeded?.updatedAt).toBe(0);
+  });
+
   it("returns undefined when loaded ranges leave a gap", () => {
     const client = new QueryClient();
     client.setQueryData(monthA, makeEventResponse([inRange]));

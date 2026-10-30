@@ -54,7 +54,7 @@ function NavigationResultButton({
       data-index={resultIndex}
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-3 p-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left focus:outline-none transition-colors group ${
+      className={`flex items-center gap-3 p-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left outline-none focus-visible:bg-accent/50 transition-colors group ${
         isSelected ? "bg-accent/50" : "hover:bg-accent/50"
       }`}
     >
@@ -65,7 +65,11 @@ function NavigationResultButton({
       <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
         {description}
       </span>
-      <ChevronRight className="size-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <ChevronRight
+        className={`size-4 text-muted-foreground/40 shrink-0 transition-opacity ${
+          isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+        }`}
+      />
     </button>
   );
 }
@@ -124,7 +128,7 @@ export function CommandPaletteMainSearchView({
           }
           value={searchQuery}
           {...searchInputInteractionProps}
-          className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
+          className="-ml-2 flex-1 h-8 rounded-md border-0 bg-transparent px-2 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-accent/40 focus-visible:ring-0"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"

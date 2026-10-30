@@ -9,7 +9,6 @@ import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { Button } from "@workspace/ui/components/ui/button";
 import {
   AlertCircle,
-  ArrowLeft,
   Check,
   ChevronRight,
   FileText,
@@ -19,6 +18,7 @@ import {
 
 import { useImportIcs } from "@/hooks/use-import-ics";
 import type { Calendar } from "@/lib/types/calendar";
+import { PaletteViewHeader } from "./command-palette/palette-ui";
 
 type PickedIcsFile = { name: string; content: string };
 
@@ -83,19 +83,7 @@ export function IcsImportPanel({ calendars, onBack }: IcsImportPanelProps) {
 
   return (
     <>
-      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={onBack}
-          aria-label="Back"
-        >
-          <ArrowLeft className="size-4 text-muted-foreground" />
-        </Button>
-        <FileText className="size-4 text-muted-foreground shrink-0" />
-        <span className="text-sm font-medium">Import .ics File</span>
-      </div>
+      <PaletteViewHeader title="Import .ics File" onBack={onBack} />
 
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="px-4 py-2 text-xs font-medium text-muted-foreground">

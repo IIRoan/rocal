@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Globe, Clock, Check, Search } from "lucide-react";
+import { Globe, Clock, Search } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import { stopEventPropagation } from "@/lib/event-propagation";
 import {
@@ -20,8 +20,6 @@ const TIME_FORMAT_OPTIONS = [
   { value: "12h", label: "12 Hour (1:00 PM)" },
   { value: "24h", label: "24 Hour (13:00)" },
 ] as const;
-
-const selectedCheck = <Check className="size-4 shrink-0 text-foreground" />;
 
 interface TimeRegionSettingsProps {
   localSettings: UserSettings;
@@ -83,9 +81,7 @@ export function TimeRegionSettings({
               icon={Clock}
               label={format.label}
               onClick={() => updateSetting("timeFormat", format.value)}
-              trailing={
-                localSettings.timeFormat === format.value ? selectedCheck : null
-              }
+              checked={localSettings.timeFormat === format.value}
             />
           ))}
         </PaletteSection>
@@ -104,7 +100,7 @@ export function TimeRegionSettings({
         label={tz.label}
         description={tz.value}
         onClick={() => handleTimezoneSelect(tz.value, options)}
-        trailing={localSettings.timezone === tz.value ? selectedCheck : null}
+        checked={localSettings.timezone === tz.value}
       />
     );
 

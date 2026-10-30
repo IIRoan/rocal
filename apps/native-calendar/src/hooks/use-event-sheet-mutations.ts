@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getErrorMessage,
+  storedEventId,
   type CalendarEvent,
   type RecentContactContext,
   type RecentContactUsageInput,
@@ -159,9 +160,13 @@ export function useUpdateEventMutation(input: {
           queryKey: QUERY_KEYS.eventDetail(eventId),
         });
         queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.eventNotifications(eventId),
+          queryKey: QUERY_KEYS.eventNotifications(storedEventId(eventId)),
         });
       }
+      // A recurring edit saves the reminders on the row it returns, such as the series every occurrence reads.
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.eventNotifications(savedEvent.id),
+      });
       const entries = extractRecentContactEntries(
         request.participants,
         userEmail,

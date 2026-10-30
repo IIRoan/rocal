@@ -1,6 +1,7 @@
 import { View } from "react-native";
 import type { TimeFormat } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
+import { useUserWeekStartDay } from "@workspace/native-core/hooks/use-user-week-start-day";
 import {
   SheetActions,
   SheetPrimaryButton,
@@ -46,6 +47,7 @@ export function EventFormDateTimeSheet({
   onEndTime: (time: Date) => void;
 }) {
   const { theme } = useTheme();
+  const weekStartDay = useUserWeekStartDay();
   const isStart = target === "start-date" || target === "start-time";
   const isDate = target === "start-date" || target === "end-date";
   return (
@@ -64,6 +66,7 @@ export function EventFormDateTimeSheet({
             selectedDate={isStart ? startWallClock : endWallClock}
             onSelect={isStart ? onStartDate : onEndDate}
             minDate={isStart ? undefined : startWallClock}
+            weekStartDay={weekStartDay ?? 1}
             theme={theme}
           />
         ) : (

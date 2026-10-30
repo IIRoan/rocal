@@ -4,7 +4,7 @@ import type {
   CSSProperties,
   ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -121,6 +121,7 @@ export function PaletteNavRow({
   muted = false,
   index,
   isSelected = false,
+  checked,
 }: {
   icon?: ComponentType<{ className?: string; style?: CSSProperties }>;
   iconColor?: string;
@@ -133,6 +134,8 @@ export function PaletteNavRow({
   muted?: boolean;
   index?: number;
   isSelected?: boolean;
+  /** Set on option rows, so assistive tech hears which option is on and not only sees the check. */
+  checked?: boolean;
 }) {
   return (
     <button
@@ -141,6 +144,7 @@ export function PaletteNavRow({
       disabled={disabled}
       data-index={index}
       aria-current={isSelected ? "true" : undefined}
+      aria-pressed={checked}
       className={cn(PALETTE_ROW_CLASS, "group", isSelected && "bg-muted")}
     >
       {Icon ? (
@@ -165,7 +169,9 @@ export function PaletteNavRow({
           </span>
         ) : null}
       </span>
-      {trailing === undefined ? (
+      {checked !== undefined ? (
+        checked && <Check className="size-4 shrink-0 text-foreground" />
+      ) : trailing === undefined ? (
         <ChevronRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground" />
       ) : (
         trailing

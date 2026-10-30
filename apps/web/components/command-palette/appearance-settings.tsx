@@ -1,5 +1,5 @@
 import React from "react";
-import { Sun, Moon, Monitor, Layout, Check } from "lucide-react";
+import { Sun, Moon, Monitor, Layout } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { UserSettings } from "@/lib/types/calendar";
 import { CALENDAR_VIEWS } from "@workspace/ui/components/calendar";
@@ -20,8 +20,6 @@ const THEME_OPTIONS = [
   { value: "system", icon: Monitor, label: "System Theme" },
 ] as const;
 
-const selectedCheck = <Check className="size-4 shrink-0 text-foreground" />;
-
 export function AppearanceSettings({
   localSettings,
   updateSetting,
@@ -41,7 +39,7 @@ export function AppearanceSettings({
             icon={item.icon}
             label={item.label}
             onClick={() => setTheme(item.value)}
-            trailing={currentTheme === item.value ? selectedCheck : null}
+            checked={currentTheme === item.value}
           />
         ))}
       </PaletteSection>
@@ -56,7 +54,7 @@ export function AppearanceSettings({
               </span>
             }
             onClick={() => updateSetting("defaultView", view)}
-            trailing={localSettings.defaultView === view ? selectedCheck : null}
+            checked={localSettings.defaultView === view}
           />
         ))}
       </PaletteSection>

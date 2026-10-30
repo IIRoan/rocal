@@ -39,6 +39,7 @@ import {
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { PRESET_COLORS } from "./command-palette/navigation-config";
 import type { PaletteView } from "./command-palette/constants";
+import { PaletteViewHeader } from "./command-palette/palette-ui";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { SubscriptionFeedUrlInfo } from "./subscription-feed-url-info";
 import { IcsImportPanel } from "./ics-import-panel";
@@ -49,16 +50,15 @@ import {
   Loader2,
   AlertCircle,
   AlertTriangle,
-  ArrowLeft,
   Globe,
   Link2,
   Eye,
   EyeOff,
   ChevronRight,
-  Rss,
   Search,
   Copy,
   FileText,
+  CircleX,
 } from "lucide-react";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
@@ -443,19 +443,7 @@ export function SubscriptionManagement({
     >
       {currentView === "subscriptions" && (
         <>
-          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="p-1 rounded hover:bg-muted/50 transition-colors"
-              >
-                <ArrowLeft className="size-4 text-muted-foreground" />
-              </button>
-            )}
-            <Rss className="size-4 text-muted-foreground shrink-0" />
-            <span className="text-sm font-medium">Subscriptions</span>
-          </div>
+          <PaletteViewHeader title="Subscriptions" onBack={goBackToMain} />
 
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
@@ -619,17 +607,7 @@ export function SubscriptionManagement({
 
       {currentView === "subscriptions-add-feed" && (
         <>
-          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-            <button
-              type="button"
-              onClick={goBackToMain}
-              className="p-1 rounded hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="size-4 text-muted-foreground" />
-            </button>
-            <Link2 className="size-4 text-muted-foreground shrink-0" />
-            <span className="text-sm font-medium">Add External Feed</span>
-          </div>
+          <PaletteViewHeader title="Add External Feed" onBack={goBackToMain} />
 
           <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
             <div className="space-y-1.5">
@@ -732,17 +710,7 @@ export function SubscriptionManagement({
 
       {currentView === "subscriptions-holidays" && (
         <>
-          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-            <button
-              type="button"
-              onClick={goBackToMain}
-              className="p-1 rounded hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="size-4 text-muted-foreground" />
-            </button>
-            <Globe className="size-4 text-muted-foreground shrink-0" />
-            <span className="text-sm font-medium">Holiday Calendars</span>
-          </div>
+          <PaletteViewHeader title="Holiday Calendars" onBack={goBackToMain} />
 
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
             <Search className="size-3.5 text-muted-foreground/50 shrink-0" />
@@ -750,22 +718,17 @@ export function SubscriptionManagement({
               value={holidaySearch}
               onChange={(e) => setHolidaySearch(e.target.value)}
               placeholder="Search country or language..."
-              className="h-7 border-0 bg-transparent ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
+              className="-ml-2 h-7 rounded-md border-0 bg-transparent px-2 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-accent/40 focus-visible:ring-0"
               autoComplete="off"
             />
             {holidaySearch && (
               <button
                 type="button"
+                aria-label="Clear search"
                 onClick={() => setHolidaySearch("")}
-                className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                className="cursor-pointer text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               >
-                <svg
-                  className="size-3.5"
-                  viewBox="0 0 16 16"
-                  fill="currentColor"
-                >
-                  <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z" />
-                </svg>
+                <CircleX className="size-3.5" />
               </button>
             )}
           </div>
@@ -839,26 +802,18 @@ export function SubscriptionManagement({
 
       {currentView === "subscriptions-edit" && editTargetCalendarId && (
         <>
-          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-            <button
-              type="button"
-              onClick={goBackToMain}
-              className="p-1 rounded hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="size-4 text-muted-foreground" />
-            </button>
-            <span className="text-sm font-medium">
-              {isHolidayCalendar ? "Holiday Calendar" : "External Calendar"}
-            </span>
-            {editingSubscriptionData && !isHolidayCalendar && (
-              <div className="ml-auto">
-                {getStatusBadge(
-                  editingSubscriptionData.lastSyncStatus,
-                  editingSubscriptionData.lastErrorMessage ?? undefined,
-                )}
-              </div>
-            )}
-          </div>
+          <PaletteViewHeader
+            title={isHolidayCalendar ? "Holiday Calendar" : "External Calendar"}
+            onBack={goBackToMain}
+            actions={
+              editingSubscriptionData && !isHolidayCalendar
+                ? getStatusBadge(
+                    editingSubscriptionData.lastSyncStatus,
+                    editingSubscriptionData.lastErrorMessage ?? undefined,
+                  )
+                : undefined
+            }
+          />
 
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="px-4 py-2 text-xs font-medium text-muted-foreground">

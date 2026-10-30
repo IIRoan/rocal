@@ -56,6 +56,7 @@ function DateChip({
   onSelect,
   open,
   value,
+  weekStartsOn,
 }: {
   align: "start" | "end";
   desktop?: boolean;
@@ -66,6 +67,7 @@ function DateChip({
   onSelect: (date: Date) => void;
   open: boolean;
   value: Date;
+  weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
 }) {
   const trigger = (
     <button
@@ -80,7 +82,8 @@ function DateChip({
     <CalendarUI
       mode="single"
       selected={value}
-      weekStartsOn={1}
+      defaultMonth={value}
+      weekStartsOn={weekStartsOn}
       disabled={disabled}
       onSelect={(date) => {
         if (date) {
@@ -209,6 +212,14 @@ export function EventEditorDateTimeFields({
 }) {
   const [customRepeatOpen, setCustomRepeatOpen] = useState(false);
   const timeFormat = resolveTimeFormat(localSettings?.timeFormat);
+  const weekStartsOn = ((localSettings?.weekStartDay ?? 1) % 7) as
+    | 0
+    | 1
+    | 2
+    | 3
+    | 4
+    | 5
+    | 6;
   const sameDay =
     formatPickerDate(eventForm.eventStartDate, "yyyy-MM-dd") ===
     formatPickerDate(eventForm.eventEndDate, "yyyy-MM-dd");
@@ -236,6 +247,7 @@ export function EventEditorDateTimeFields({
             eventForm.setStartDateOpen(nextOpen);
           }}
           value={eventForm.eventStartDate}
+          weekStartsOn={weekStartsOn}
           onSelect={(date) => {
             eventForm.setEventStartDate(date);
             if (date > eventForm.eventEndDate) {
@@ -282,6 +294,7 @@ export function EventEditorDateTimeFields({
             eventForm.setEndDateOpen(nextOpen);
           }}
           value={eventForm.eventEndDate}
+          weekStartsOn={weekStartsOn}
           disabled={(date) => date < eventForm.eventStartDate}
           onSelect={(date) => {
             eventForm.setEventEndDate(date);

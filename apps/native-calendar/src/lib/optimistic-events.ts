@@ -293,7 +293,9 @@ export function readCachedEventsForRange(
       if (!data || !range || range.end <= start || range.start >= end) {
         return [];
       }
-      const updatedAt = queryClient.getQueryState(queryKey)?.dataUpdatedAt ?? 0;
+      const state = queryClient.getQueryState(queryKey);
+      // An invalidated source counts as never loaded, so a range seeded right after a save still refetches.
+      const updatedAt = state?.isInvalidated ? 0 : (state?.dataUpdatedAt ?? 0);
       return [{ range, data, updatedAt }];
     })
     .sort((a, b) => a.range.start.getTime() - b.range.start.getTime());

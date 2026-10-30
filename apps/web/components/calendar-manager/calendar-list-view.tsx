@@ -63,7 +63,7 @@ function CalendarRow({
         className={`flex items-center gap-3 px-3 py-2 flex-1 min-w-0 ${ROW_BUTTON_CLASS}`}
       >
         <div
-          className="size-3.5 rounded-sm shrink-0"
+          className="size-3 rounded-full shrink-0"
           style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
         />
         <div className="flex-1 min-w-0">
@@ -86,7 +86,7 @@ function CalendarRow({
         aria-label={
           isVisible ? `Hide ${calendar.name}` : `Show ${calendar.name}`
         }
-        className="shrink-0 size-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
+        className="shrink-0 size-11 sm:size-8 flex items-center justify-center rounded-md cursor-pointer text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
       >
         {isVisible ? (
           <Eye className="size-3.5" strokeWidth={2} />

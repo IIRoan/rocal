@@ -21,6 +21,7 @@ import {
   readUserSettingsPreferences,
   splitUserSettingsUpdate,
   type UserSettingsPreferences,
+  storedEventId,
 } from "@workspace/calendar-core";
 import type {
   CalendarEvent,
@@ -1308,8 +1309,9 @@ export class CalendarApiService {
     eventId: string,
   ): Promise<ApiResponse<"EventNotifications">> {
     try {
+      // A generated occurrence has no reminders of its own, and an editor saving its series writes back what this returns.
       return await this.client.get<Schema<"EventNotifications">>(
-        `/api/notifications/event/${encodeURIComponent(eventId)}`,
+        `/api/notifications/event/${encodeURIComponent(storedEventId(eventId))}`,
       );
     } catch (error) {
       throw this.transformError(error, "Failed to get event notifications");

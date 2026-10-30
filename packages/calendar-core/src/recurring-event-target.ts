@@ -22,6 +22,12 @@ export interface RecurringEventTarget {
 const OCCURRENCE_ID_SUFFIX =
   /_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)$/;
 
+/** The stored row behind an event id: a generated occurrence's series row, otherwise the id itself. */
+export function storedEventId(id: string): string {
+  const occurrenceMatch = id.match(OCCURRENCE_ID_SUFFIX);
+  return occurrenceMatch ? id.slice(0, -occurrenceMatch[0].length) : id;
+}
+
 function toIsoInstant(value: Date | string): string {
   return (value instanceof Date ? value : new Date(value)).toISOString();
 }

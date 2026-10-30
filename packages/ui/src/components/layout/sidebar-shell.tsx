@@ -48,7 +48,8 @@ export function SidebarShell({
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  const appName = activeApp === "mail" ? "Solace Mail" : "Solace Calendar";
+  // The full product name does not fit beside the header buttons; the tab title carries "Solace".
+  const appName = activeApp === "mail" ? "Mail" : "Calendar";
   const brand = user ? (
     <NavUser
       user={user}

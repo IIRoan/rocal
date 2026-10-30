@@ -25,6 +25,7 @@ export function MobileCalendarOverlays({
   onSidebarOpenChange,
   prefetchRange,
   user,
+  weekStartDay,
 }: {
   getCachedEventsForRange?: (range: {
     start: Date;
@@ -42,6 +43,7 @@ export function MobileCalendarOverlays({
   onSidebarOpenChange: (open: boolean) => void;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   user?: User;
+  weekStartDay?: number;
 }) {
   return (
     <>
@@ -67,6 +69,7 @@ export function MobileCalendarOverlays({
               prefetchRange={prefetchRange}
               onDateSelect={onCloseQuickNav}
               isMobile={true}
+              weekStartDay={weekStartDay}
             />
           </div>
         </DrawerContent>
@@ -96,6 +99,7 @@ export function MobileCalendarOverlays({
               getCachedEventsForRange={getCachedEventsForRange}
               prefetchRange={prefetchRange}
               isMobile={true}
+              weekStartDay={weekStartDay}
             />
           </SidebarProvider>
         </SheetContent>
