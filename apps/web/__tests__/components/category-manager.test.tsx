@@ -14,6 +14,7 @@ import type { EventCategory } from "@workspace/calendar-core";
 
 jest.mock("../../hooks/use-categories", () => ({
   useCategories: jest.fn(),
+  useCategoryUsageCounts: jest.fn(),
   useCreateCategory: jest.fn(),
   useUpdateCategory: jest.fn(),
   useDeleteCategory: jest.fn(),
@@ -27,6 +28,7 @@ jest.mock("lucide-react", () => new Proxy({}, { get: () => () => null }));
 
 import {
   useCategories,
+  useCategoryUsageCounts,
   useCreateCategory,
   useDeleteCategory,
   useUpdateCategory,
@@ -38,6 +40,7 @@ import { CategoryManager } from "../../components/category-manager";
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockUseCategories = jest.mocked(useCategories);
+const mockUseCategoryUsageCounts = jest.mocked(useCategoryUsageCounts);
 const mockUseCreateCategory = jest.mocked(useCreateCategory);
 const mockUseUpdateCategory = jest.mocked(useUpdateCategory);
 const mockUseDeleteCategory = jest.mocked(useDeleteCategory);
@@ -96,6 +99,7 @@ describe("CategoryManager", () => {
     mockUseCreateCategory.mockReturnValue(mutationMock());
     mockUseUpdateCategory.mockReturnValue(mutationMock());
     mockUseDeleteCategory.mockReturnValue(mutationMock());
+    mockUseCategoryUsageCounts.mockReturnValue({ data: undefined } as any);
   });
 
   afterEach(() => {
@@ -169,6 +173,7 @@ describe("CategoryManager", () => {
 
   it("lists categories with usage and navigates to edit", async () => {
     const onNavigateTo = jest.fn();
+    mockUseCategoryUsageCounts.mockReturnValue({ data: { "cat-1": 5 } } as any);
     mockUseCategories.mockReturnValue({
       data: [category({ usageCount: 3 })],
       isLoading: false,
@@ -185,7 +190,7 @@ describe("CategoryManager", () => {
     });
 
     expect(container.textContent).toContain("Work");
-    expect(container.textContent).toContain("3 events");
+    expect(container.textContent).toContain("5 events");
 
     await click(findButton("Work"));
     expect(onNavigateTo).toHaveBeenCalledWith("category-edit");

@@ -23,11 +23,11 @@ if (typeof globalThis.TextEncoder === "undefined") {
   (globalThis as any).TextDecoder = TextDecoder;
 }
 
-const mockStorePendingAuthPassword = jest.fn();
+const mockStoreRememberedAuthPassword = jest.fn();
 const mockClearAuthPasswords = jest.fn();
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
-  storePendingAuthPassword: mockStorePendingAuthPassword,
+  storeRememberedAuthPassword: mockStoreRememberedAuthPassword,
   clearAuthPasswords: mockClearAuthPasswords,
 }));
 
@@ -50,7 +50,7 @@ beforeEach(async () => {
   localStorage.clear();
   document.cookie =
     "solace_enc_pw=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-  mockStorePendingAuthPassword.mockReset();
+  mockStoreRememberedAuthPassword.mockReset();
   mockClearAuthPasswords.mockReset();
 });
 
@@ -92,7 +92,7 @@ describe("enc-password-cookie", () => {
     it("is a no-op when no cookie is present", async () => {
       await initEncPasswordFromCookie();
       expect(peekEncPassword()).toBeNull();
-      expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
+      expect(mockStoreRememberedAuthPassword).not.toHaveBeenCalled();
     });
 
     it("is a no-op when cookie exists but device key is missing", async () => {
@@ -115,7 +115,7 @@ describe("enc-password-cookie", () => {
       // fresh module instance via resetModules.
     });
 
-    it("restores the password and populates the shared auth-password memory cache", async () => {
+    it("restores the password as remembered, never as a fresh sign-in", async () => {
       await setEncPasswordCookie("session-password");
 
       // Grab the cookie and device key written above, then reset module state
@@ -132,7 +132,7 @@ describe("enc-password-cookie", () => {
       await mod2.initEncPasswordFromCookie();
 
       expect(mod2.peekEncPassword()).toBe("session-password");
-      expect(mockStorePendingAuthPassword).toHaveBeenCalledWith(
+      expect(mockStoreRememberedAuthPassword).toHaveBeenCalledWith(
         "session-password",
       );
     });
@@ -140,9 +140,9 @@ describe("enc-password-cookie", () => {
     it("is a no-op when memory cache is already populated", async () => {
       await setEncPasswordCookie("cached");
       // Memory is set — calling init again should not decrypt again
-      const callsBefore = mockStorePendingAuthPassword.mock.calls.length;
+      const callsBefore = mockStoreRememberedAuthPassword.mock.calls.length;
       await initEncPasswordFromCookie();
-      expect(mockStorePendingAuthPassword.mock.calls.length).toBe(callsBefore);
+      expect(mockStoreRememberedAuthPassword.mock.calls.length).toBe(callsBefore);
     });
 
     it("clears the cookie when decryption fails (corrupt data)", async () => {

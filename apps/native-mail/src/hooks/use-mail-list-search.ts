@@ -39,21 +39,26 @@ export function useMailListSearch({
   }
 
   const fieldSearchActive = hasMailSearchFieldValues(fieldSearch.fields);
-  const fieldSearchFilter = fieldSearchActive && mailboxId
-    ? buildMailboxFieldSearchFilter(
-        mailboxId,
-        fieldSearch.fields,
+  const fieldSearchInput = fieldSearchActive && mailboxId
+    ? {
+        filter: buildMailboxFieldSearchFilter(
+          mailboxId,
+          fieldSearch.fields,
+          listFilters,
+          {
+            timezone,
+            now: new Date(),
+          },
+        ),
+        fields: fieldSearch.fields,
         listFilters,
-        {
-          timezone,
-          now: new Date(),
-        },
-      )
+        timezone,
+      }
     : null;
   const fieldSearchQuery = useMailboxFieldSearch(
     runtime,
     mailboxId,
-    fieldSearchFilter,
+    fieldSearchInput,
     fieldSearch.revision,
   );
   const searchMessages = fieldSearchActive

@@ -22,7 +22,7 @@ import {
   isLikelyIcsFeedUrl,
   normalizeSubscriptionFeedUrl,
 } from "@workspace/calendar-ics";
-import { z } from "zod";
+import { z } from "@workspace/calendar-core/zod";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
@@ -74,9 +74,9 @@ const customSubscriptionSchema = z.object({
     .string()
     .trim()
     .min(1, "Calendar URL is required")
-    .url("Please enter a valid URL")
+    .pipe(z.url({ error: "Please enter a valid URL" }))
     .refine((value) => isLikelyIcsFeedUrl(value), {
-      message: "URL should point to a calendar feed",
+      error: "URL should point to a calendar feed",
     }),
   color: z.string().trim().refine(isValidColor, "Please select a valid color"),
 });

@@ -34,12 +34,6 @@ export function validateCategoryName(
   return duplicate ? "A category with this name already exists" : undefined;
 }
 
-export function categoryUsageDetail(category: EventCategory): string | undefined {
-  const count = category.usageCount ?? 0;
-  if (count === 0) return undefined;
-  return count === 1 ? "1 event" : `${count} events`;
-}
-
 export function buildOptimisticCategory(
   request: CreateCategoryRequest,
   tempId: string,

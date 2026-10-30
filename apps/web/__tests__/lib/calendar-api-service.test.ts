@@ -89,7 +89,13 @@ describe("CalendarApiService encryption wrappers", () => {
   });
 
   it("puts attached event payloads on update", async () => {
-    const request = { title: "Event" };
+    const request = {
+      title: "Event",
+      description: "",
+      location: "",
+      color: "blue",
+      categoryId: "",
+    };
     const payload = { ...request, encryptedContent: "ciphertext" };
     mockE2ee.attachEventEncryptionShadow.mockResolvedValue(payload);
     client.put.mockResolvedValue({ id: "event-1" } as never);
@@ -196,44 +202,51 @@ describe("CalendarApiService encryption wrappers", () => {
     );
   });
 
-  it("adds blind-index search tokens and decrypts search results", async () => {
-    client.get.mockResolvedValue({
-      events: [
-        {
-          id: "event-1",
-          title: "",
-          encryptedContent: JSON.stringify({
-            iv: "iv",
-            ciphertext: "ciphertext",
-          }),
-          blindIndexTokens: ["idx-1"],
-          encryptionState: "encrypted",
-          start: new Date("2026-05-01T10:00:00.000Z"),
-          end: new Date("2026-05-01T11:00:00.000Z"),
-          calendarId: "cal-1",
-          userId: "user-1",
-          createdAt: new Date("2026-04-01T10:00:00.000Z"),
-          updatedAt: new Date("2026-04-01T10:00:00.000Z"),
-        },
-      ],
-      total: 1,
-    } as never);
+  it("seals an invitation copy answered from the calendar, as the mail card does", async () => {
+    const staged = {
+      id: "event-1",
+      title: "Planning",
+      externalId: "uid-1",
+      isSynced: false,
+      subscriptionId: null,
+      encryptionState: "plaintext",
+      encryptedContent: null,
+      start: new Date("2026-05-01T10:00:00.000Z"),
+      end: new Date("2026-05-01T11:00:00.000Z"),
+      calendarId: "cal-1",
+      userId: "user-1",
+      createdAt: new Date("2026-04-01T10:00:00.000Z"),
+      updatedAt: new Date("2026-04-01T10:00:00.000Z"),
+    };
+    client.post
+      .mockResolvedValueOnce(staged as never)
+      .mockResolvedValueOnce({
+        ...staged,
+        title: "",
+        encryptionState: "encrypted",
+        encryptedContent: "sealed",
+      } as never);
+    mockE2ee.attachEventEncryptionShadow.mockResolvedValueOnce({
+      encryptedContent: "sealed",
+    });
 
-    const result = await service.searchEvents({ q: "secret event" });
+    await service.respondToInvitation("event-1", "accepted");
 
-    expect(mockE2ee.createBlindIndexTokens).toHaveBeenCalledWith(
-      "secret event",
+    expect(client.post).toHaveBeenNthCalledWith(
+      2,
+      "/api/events/event-1/seal-encryption",
+      { encryptedContent: "sealed" },
     );
+  });
+
+  it("lists readable invitation copies through the corpus with no search words", async () => {
+    client.get.mockResolvedValue({ events: [], total: 0, nextOffset: null } as never);
+
+    await service.getEventSearchCorpus({ readableInvitations: true, limit: 100 });
+
     expect(client.get).toHaveBeenCalledWith(
-      "/api/events/search?q=secret+event&blindIndexTokens=idx-1%2Cidx-2",
+      "/api/events/search-corpus?limit=100&readableInvitations=true",
       { signal: undefined },
-    );
-    expect(result.events[0]).toEqual(
-      expect.objectContaining({
-        title: "Decrypted event",
-        encryptedContent: null,
-        blindIndexTokens: null,
-      }),
     );
   });
 

@@ -1,5 +1,6 @@
 import {
   deriveNotificationKeyBytes,
+  encryptNotificationLead,
   encryptNotificationTitle,
   importNotificationKey,
   type CryptoProvider,
@@ -56,5 +57,22 @@ export async function encryptReminderTitle(
     await notificationKeyFor(session.accountKey),
     eventId,
     title,
+  );
+}
+
+/** The reminder's lead sealed for the iPhone extension, or `undefined` (cannot encrypt) to keep a stored one. */
+export async function encryptReminderLead(
+  eventId: string,
+  minutesBefore: number,
+): Promise<string | undefined> {
+  const session = await getEncryptionSession();
+  if (!session) {
+    return undefined;
+  }
+  return encryptNotificationLead(
+    webCrypto(),
+    await notificationKeyFor(session.accountKey),
+    eventId,
+    minutesBefore,
   );
 }

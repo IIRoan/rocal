@@ -220,7 +220,10 @@ async fn assert_targets_owned(
             .await?
             .ok_or_else(|| AppError::validation(NOT_FOUND))?,
     };
-    if let Some(id) = updates.category_id.as_deref().filter(|id| !id.is_empty())
+    if let Some(id) = updates
+        .category_id
+        .as_deref()
+        .filter(|id| !seals_attributes(updates) && !id.is_empty())
         && events::active_category(&state.db, user_id, id)
             .await?
             .is_none()
@@ -235,6 +238,18 @@ async fn assert_targets_owned(
 
 fn new_ciphertext(updates: &RecurringUpdates) -> Option<&str> {
     non_blank(updates.encrypted_content.as_deref())
+}
+
+/// New ciphertext that carries colour and category replaces their plaintext copies.
+fn seals_attributes(updates: &RecurringUpdates) -> bool {
+    updates.attributes_encrypted == Some(true) && new_ciphertext(updates).is_some()
+}
+
+fn clear_sealed_attributes(row: &mut calendar_event::ActiveModel, updates: &RecurringUpdates) {
+    if seals_attributes(updates) {
+        row.color = Set(None);
+        row.category_id = Set(None);
+    }
 }
 
 /// New ciphertext replaces the content; otherwise the series' own content (and ciphertext) is carried over.
@@ -299,6 +314,7 @@ fn child_row(
         Some(id) => clearable_category(id),
         None => existing.category_id.clone(),
     });
+    clear_sealed_attributes(&mut row, updates);
     row.user_id = Set(existing.user_id.clone());
     row.parent_event_id = Set(Some(parent_event_id.to_owned()));
     row.start = Set(column(start)?);
@@ -336,6 +352,7 @@ fn series_update(
     if new_ciphertext(updates).is_some() {
         apply_content(&mut row, existing, updates)?;
     }
+    clear_sealed_attributes(&mut row, updates);
     if let Some(start) = js_date(updates.start.as_deref()) {
         row.start = Set(column(start)?);
     }

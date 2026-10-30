@@ -29,6 +29,9 @@ pub struct UserSettings {
     pub compact_view: bool,
     pub show_week_numbers: bool,
     pub show_declined_events: bool,
+    /// App-only preferences sealed on the device; while set, their fields above hold the defaults.
+    #[schema(required = true)]
+    pub encrypted_preferences: Option<String>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -97,4 +100,15 @@ pub struct UpdateSettingsRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub show_declined_events: Option<bool>,
+    /// Replaces the sealed preferences; their plaintext fields go back to the defaults and any sent with it are ignored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub encrypted_preferences: Option<String>,
+    /// The sealed preferences this change was merged onto (`null` for none); a different stored value refuses the write with 409.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "::serde_with::rust::double_option"
+    )]
+    pub expected_encrypted_preferences: Option<Option<String>>,
 }

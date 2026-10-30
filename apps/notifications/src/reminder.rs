@@ -11,35 +11,6 @@ const TEMPLATE: &str = include_str!("event_reminder.html");
 const TITLE: &str = "Event reminder";
 const LOGO_URL: &str = "https://solace.onl/favicon-192x192.png";
 
-/// "15 minutes", "1 hour 5 minutes" or "starting now".
-fn lead(minutes: i64) -> String {
-    let unit = |count: i64, one: &str, many: &str| {
-        if count == 1 {
-            format!("1 {one}")
-        } else {
-            format!("{count} {many}")
-        }
-    };
-    match (minutes / 60, minutes % 60) {
-        _ if minutes <= 0 => "starting now".into(),
-        (0, rest) => unit(rest, "minute", "minutes"),
-        (hours, 0) => unit(hours, "hour", "hours"),
-        (hours, rest) => format!(
-            "{} {}",
-            unit(hours, "hour", "hours"),
-            unit(rest, "minute", "minutes")
-        ),
-    }
-}
-
-pub fn subject(minutes: i64) -> String {
-    if minutes <= 0 {
-        format!("{TITLE} starting now")
-    } else {
-        format!("{TITLE} in {}", lead(minutes))
-    }
-}
-
 /// "Your event starts in 1h 5m" and its shorter forms.
 fn reminder_text(minutes: i64) -> String {
     match (minutes / 60, minutes % 60) {
@@ -180,12 +151,13 @@ impl Content {
 }
 
 /// The reminder mail, its Message-ID tagged so the Stalwart webhook does not also push it as new mail.
-pub fn message(content: &Content, minutes: i64, from: &str) -> Message {
+pub fn message(content: &Content, from: &str) -> Message {
     let domain = from
         .rsplit_once('@')
         .map_or("", |(_, domain)| domain.trim());
     Message {
-        subject: subject(minutes),
+        // The subject stays readable in the mailbox, so it names nothing; the lead time is in the body.
+        subject: TITLE.into(),
         text: content.text(),
         html: content.html(),
         attachments: Vec::new(),
@@ -208,7 +180,6 @@ mod tests {
             all_day,
             user_email: "ann@example.com".into(),
             timezone: timezone.into(),
-            time_format: "24h".into(),
         }
     }
 
@@ -218,14 +189,6 @@ mod tests {
 
     #[test]
     fn lead_times_read_naturally() {
-        assert_eq!(subject(0), "Event reminder starting now");
-        assert_eq!(subject(-5), "Event reminder starting now");
-        assert_eq!(subject(1), "Event reminder in 1 minute");
-        assert_eq!(subject(45), "Event reminder in 45 minutes");
-        assert_eq!(subject(60), "Event reminder in 1 hour");
-        assert_eq!(subject(120), "Event reminder in 2 hours");
-        assert_eq!(subject(61), "Event reminder in 1 hour 1 minute");
-        assert_eq!(subject(125), "Event reminder in 2 hours 5 minutes");
         assert_eq!(reminder_text(0), "Your event is starting now");
         assert_eq!(reminder_text(1), "Your event starts in 1 minute");
         assert_eq!(reminder_text(60), "Your event starts in 1 hour");
@@ -383,13 +346,15 @@ mod tests {
         let reminder = reminder("2026-07-15T13:30:00Z", "2026-07-15T14:30:00Z", "UTC", false);
         let mail = message(
             &content(&reminder, 15, "evt1", &settings()),
-            15,
             "noreply@solace.onl",
         );
         let id = mail.message_id.unwrap();
         assert!(id.starts_with("solace-reminder."));
         assert!(id.ends_with("@solace.onl"));
-        assert_eq!(mail.subject, "Event reminder in 15 minutes");
+        assert_eq!(
+            mail.subject, "Event reminder",
+            "the readable subject carries no lead time"
+        );
         assert!(!mail.html.contains("ciphertext") && !mail.text.contains("ciphertext"));
     }
 }

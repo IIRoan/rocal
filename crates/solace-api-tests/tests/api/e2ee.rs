@@ -223,7 +223,7 @@ async fn device_key_material_is_stored_byte_for_byte() {
     assert_eq!(
         device_row(&app, &user, "phone-1").await,
         (
-            Some("Work laptop".into()),
+            None,
             body.public_key.clone(),
             "RSA-OAEP-256".into(),
             body.wrapped_account_key.clone(),
@@ -305,7 +305,10 @@ async fn device_registration_trims_values_and_applies_defaults() {
         },
     )
     .await;
-    assert_eq!(labelled.device_label.as_deref(), Some("Laptop"));
+    assert_eq!(
+        labelled.device_label, None,
+        "a label sent by an older client is not kept"
+    );
 }
 
 #[tokio::test]
@@ -519,9 +522,8 @@ async fn device_fields_are_validated() {
     )
     .await;
     assert_eq!(
-        longest.device_label.map(|label| label.chars().count()),
-        Some(60),
-        "limits count UTF-16 code units"
+        longest.device_label, None,
+        "limits count UTF-16 code units, and an accepted label is still not kept"
     );
 }
 

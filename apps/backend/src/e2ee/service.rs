@@ -7,7 +7,10 @@ use solace_api_types::e2ee::{
     ResetSnapshot,
 };
 
-use super::queries::{self, DeviceKeys, EventRow, PasswordKeys};
+pub use super::queries::PasswordKeys;
+use sea_orm::ConnectionTrait;
+
+use super::queries::{self, DeviceKeys, EventRow};
 use crate::auth::guard::RouteUser;
 use crate::db::entities::{
     calendar, event_category, user_encryption_device, user_encryption_password,
@@ -109,12 +112,8 @@ pub async fn register_device(
         request.key_version,
     )?;
     let keys = DeviceKeys {
-        device_label: request
-            .device_label
-            .as_deref()
-            .map(js_trim)
-            .filter(|label| !label.is_empty())
-            .map(str::to_owned),
+        // Older clients still send a label such as "iPhone"; nothing shows it, so it is not kept.
+        device_label: None,
         public_key,
         public_key_algorithm: trimmed_or(
             request.public_key_algorithm.as_deref(),
@@ -151,6 +150,35 @@ pub async fn store_password_envelope(
     user: &RouteUser,
     request: PasswordEnvelopeRequest,
 ) -> Result<PasswordEnvelope, AppError> {
+    let keys = password_keys(request)?;
+    let envelope = queries::upsert_password_envelope(&state.db, &user.id, keys).await?;
+    tracing::info!(envelope_id = %envelope.id, "E2EE password envelope stored");
+    Ok(password_record(envelope))
+}
+
+/// Whether the account's keys are wrapped with its password, which a password change must then rewrap.
+pub async fn has_password_envelope(
+    state: &AppState,
+    user_id: &str,
+) -> Result<bool, sea_orm::DbErr> {
+    Ok(queries::password_envelope(&state.db, user_id)
+        .await?
+        .is_some())
+}
+
+/// Stores `keys` on `db`, which a password change passes as the transaction that also writes the new hash.
+pub async fn store_password_keys<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+    keys: PasswordKeys,
+) -> Result<(), sea_orm::DbErr> {
+    let envelope = queries::upsert_password_envelope(db, user_id, keys).await?;
+    tracing::info!(envelope_id = %envelope.id, "E2EE password envelope stored");
+    Ok(())
+}
+
+/// An envelope as stored, trimmed and with defaults filled in; a password change writes it in its own transaction.
+pub fn password_keys(request: PasswordEnvelopeRequest) -> Result<PasswordKeys, AppError> {
     let kdf_algorithm = trimmed_or(
         request.kdf_algorithm.as_deref(),
         DEFAULT_PASSWORD_KDF_ALGORITHM,
@@ -170,7 +198,7 @@ pub async fn store_password_envelope(
         &request.wrapped_search_key,
         request.key_version,
     )?;
-    let keys = PasswordKeys {
+    Ok(PasswordKeys {
         kdf_algorithm,
         kdf_salt,
         kdf_iterations,
@@ -181,10 +209,7 @@ pub async fn store_password_envelope(
             DEFAULT_PASSWORD_WRAP_ALGORITHM,
         ),
         key_version,
-    };
-    let envelope = queries::upsert_password_envelope(&state.db, &user.id, keys).await?;
-    tracing::info!(envelope_id = %envelope.id, "E2EE password envelope stored");
-    Ok(password_record(envelope))
+    })
 }
 
 /// Blind-index tokens are stored as a JSON array; anything unreadable is an empty list.

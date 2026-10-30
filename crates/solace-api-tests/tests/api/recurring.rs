@@ -15,7 +15,7 @@ use crate::event_fixtures::{
     stored_content, to_json, unfold,
 };
 use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
+    TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
 };
 
 const WEEKLY_FIVE: &str = r#"{"frequency":"weekly","interval":1,"count":5}"#;
@@ -1066,6 +1066,39 @@ async fn series_and_occurrence_categories_follow_the_edit() {
 }
 
 #[tokio::test]
+async fn sealed_edits_drop_the_plaintext_colour_and_category() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let mut request = encrypted_event(&calendar, SERIES_START, SERIES_END);
+    request.recurrence = Some(WEEKLY_FIVE.into());
+    request.color = Some("red".into());
+    let series = create_event(&mut owner, &request).await;
+    let sealed = || RecurringUpdates {
+        encrypted_content: Some(fake_envelope()),
+        attributes_encrypted: Some(true),
+        color: Some("blue".into()),
+        category_id: Some("not-a-category".into()),
+        ..RecurringUpdates::default()
+    };
+
+    let occurrence = edit(
+        &mut owner,
+        &series.id.0,
+        &edit_request("this_only", Some("2099-03-09T09:00:00.000Z"), sealed()),
+    )
+    .await;
+    assert_eq!((&occurrence.color, &occurrence.category_id), (&None, &None));
+    let whole = edit(
+        &mut owner,
+        &series.id.0,
+        &edit_request("all", None, sealed()),
+    )
+    .await;
+    assert_eq!((&whole.color, &whole.category_id), (&None, &None));
+}
+
+#[tokio::test]
 async fn edits_cannot_target_other_users_or_read_only_calendars() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
@@ -1714,12 +1747,8 @@ async fn single_bulk_and_calendar_deletes_take_the_series_exceptions() {
             .await,
             0
         );
-        let left = exceptions(&app, series).await.len();
-        match app.backend {
-            // recurrence_exception has no foreign key, and TypeScript leaves it behind.
-            Backend::TypeScript => assert_eq!(left, 1, "{series}"),
-            Backend::Rust => assert_eq!(left, 0, "{series}"),
-        }
+        // recurrence_exception has no foreign key, so the delete removes it explicitly.
+        assert_eq!(exceptions(&app, series).await.len(), 0, "{series}");
     }
 }
 

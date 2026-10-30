@@ -6,7 +6,6 @@ A calendar and mail monorepo: web frontend, native Calendar and Mail apps, API b
 
 - **apps/web** - Next.js frontend with shadcn/ui components
 - **apps/backend** - The Rust API (axum + SeaORM) serving `api.solace.onl`; DTOs, the API suite and tooling live in `crates/` and `xtask/` (see [plans/001-rust-backend-migration.md](plans/001-rust-backend-migration.md))
-- **retired/backend** - The previous Elysia.js API, no longer deployed; the Prisma migrations still live here until plan 001 step 7 deletes it
 - **apps/native-calendar** - Expo app "Solace Calendar". See [apps/native-calendar/README.md](apps/native-calendar/README.md).
 - **apps/native-mail** - Expo app "Solace Mail". See [apps/native-mail/README.md](apps/native-mail/README.md).
 - **apps/notifications** - Rust worker for scheduled reminder email and APNs notifications
@@ -25,7 +24,7 @@ A calendar and mail monorepo: web frontend, native Calendar and Mail apps, API b
 - Notifications: Rust, Stalwart JMAP (noreply identity), APNs
 - Mail server: Stalwart (JMAP) on Railway, inbound/outbound via VPS tunnels
 - Authentication: Better Auth's protocol and tables, served by the Rust API, with passkey support
-- Database: PostgreSQL; Prisma migrations until plan 001 step 7
+- Database: PostgreSQL; SeaORM migrations in `apps/backend/src/db/migrations`, applied by the API and the worker at startup
 
 ## Development
 
@@ -57,19 +56,26 @@ Run the full test suite:
 bun run test
 ```
 
-Run backend-only tests while refactoring service code:
+Run the API's unit tests, then the black-box API suite against the local test environment:
 
 ```bash
 bun run test:backend
-cd retired/backend
-bun run test __tests__/services/category.service.test.ts
+cargo xtask test-env up && cargo xtask test-env template
+cargo test -p solace-api-tests --test api
 ```
 
-Cleanup direction for backend work:
+## Database migrations
 
-- Write or update service-level characterization tests before moving validation or persistence logic.
-- Keep routes as thin adapters and move reusable normalization and validation into small `retired/backend/lib` domain helpers.
-- Refactor one domain at a time so route contracts remain stable while service internals get simpler.
+Migrations are Rust files in `apps/backend/src/db/migrations`, run by SeaORM's migrator. The API and the notifications worker apply any pending ones at startup under a Postgres advisory lock, so a deploy brings the database up to date by itself; `seaql_migrations` records what ran.
+
+```bash
+cargo xtask migrate new add_event_colour   # scaffold and register a migration, then write its `up`
+cargo xtask migrate up                     # apply it to the test template
+cargo xtask entities                       # regenerate the SeaORM entities from the migrated schema
+cargo xtask migrate status                 # applied and pending migrations of a test database
+```
+
+`cargo xtask check` fails when the entities differ from the migrations. Never edit a migration that has shipped; add a new one.
 
 ## Building
 
@@ -96,5 +102,5 @@ bun run build:android
 
 Notes:
 
-- Backend auth/cors supports extra origins through `TRUSTED_ORIGINS` (see `retired/backend/.env.example`).
+- Backend auth/cors supports extra origins through `TRUSTED_ORIGINS` (see `apps/backend/.env.example`).
 - The native app uses secure storage for auth state and the same backend API as the web app.

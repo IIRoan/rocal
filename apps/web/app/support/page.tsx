@@ -25,9 +25,9 @@ const answers = [
       "Each app works on its own. Solace Calendar manages events and reminders. Solace Mail manages your inbox and opens calendar events in Solace Calendar when it is installed. You can also use your account on the web.",
   },
   {
-    question: "Why does resetting my login not unlock encrypted content?",
+    question: "What if I forget my password?",
     answer:
-      "Signing in and unlocking encrypted content are separate. A login reset cannot recover your encryption keys. Keep your encryption password safe; an already unlocked device may let you change it while preserving your keys.",
+      "Your password signs you in and opens your encrypted data on every device. Solace does not reset passwords from the sign-in screen, so email support from a different address. Without your password, no one, including Solace, can open your encrypted content.",
   },
   {
     question: "How do I change notification permissions?",
@@ -37,7 +37,7 @@ const answers = [
   {
     question: "How do I delete my account?",
     answer:
-      "In either app, open the account drawer, choose Account, then Delete account. On the web, open the command palette and choose Account. Complete the security check and confirm deletion. This removes the account, its calendars, mailbox and profile picture. Messages already delivered to others and addresses kept by other event organizers remain with them.",
+      "In either app, open the account drawer, choose Account, then Delete account. On the web, open the command palette and choose Account. Confirm the deletion. This removes the account, its calendars, mailbox and profile picture. Messages already delivered to others and addresses kept by other event organizers remain with them.",
   },
 ];
 

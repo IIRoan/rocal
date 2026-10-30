@@ -4,7 +4,6 @@ import type {
   E2eeBootstrapResponse,
   E2eeDeviceRecord,
   E2eePasswordRecord,
-  E2eeResetSnapshotResponse,
   UpsertE2eeDeviceRequest,
   UpsertE2eePasswordRequest,
 } from "./types/calendar";
@@ -14,12 +13,6 @@ export class E2eeApiService {
 
   async getBootstrap(): Promise<E2eeBootstrapResponse> {
     return this.client.get<E2eeBootstrapResponse>("/api/e2ee/bootstrap");
-  }
-
-  async getResetSnapshot(): Promise<E2eeResetSnapshotResponse> {
-    return this.client.get<E2eeResetSnapshotResponse>(
-      "/api/e2ee/reset-snapshot",
-    );
   }
 
   async upsertDevice(

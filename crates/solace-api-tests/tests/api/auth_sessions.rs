@@ -9,8 +9,8 @@ use solace_api_types::auth::{
 use solace_api_tests::client::ResponseResult;
 
 use crate::helpers::{
-    Backend, Mode, TestApp, TestUser, auth_error, count, expect_unauthorized, hex, ok,
-    set_cookies_named, signed_cookie_token,
+    Mode, TestApp, TestUser, auth_error, count, expect_unauthorized, hex, ok, set_cookies_named,
+    signed_cookie_token,
 };
 
 const INVITE_REQUIRED: &str =
@@ -445,11 +445,7 @@ async fn an_expired_session_is_deleted_and_its_cookies_expired() {
         0
     );
     let me: MeResponse = ok(user.get("/api/me").await.dto());
-    match app.backend {
-        // The original agent still holds session_data, which TypeScript trusts for five minutes.
-        Backend::TypeScript => assert_eq!(me.user.map(|u| u.id.0), Some(user.id.clone())),
-        Backend::Rust => assert_eq!(me.user, None),
-    }
+    assert_eq!(me.user, None);
 }
 
 #[tokio::test]
@@ -734,19 +730,8 @@ async fn revoked_sessions_stop_working_on_app_routes() {
         .await
         .expect_status(200));
 
-    let response = ok(second.get("/api/settings").await);
-    match app.backend {
-        // Better Auth's five-minute session_data cookie cache keeps answering for a revoked session.
-        Backend::TypeScript => assert_eq!(response.status.as_u16(), 200),
-        // Rust reads the session row on every request.
-        Backend::Rust => expect_unauthorized(&response),
-    }
-    let mut without_cache = app.anonymous();
-    let data = app.auth_cookie("session_data");
-    for (name, value) in second.cookies().iter().filter(|(name, _)| *name != data) {
-        without_cache.set_cookie(name, value);
-    }
-    expect_unauthorized(&ok(without_cache.get("/api/settings").await));
+    // The session row is read on every request.
+    expect_unauthorized(&ok(second.get("/api/settings").await));
 }
 
 #[tokio::test]
@@ -780,16 +765,14 @@ async fn session_cookies_carry_the_documented_attributes() {
             );
         }
     }
-    if app.backend == Backend::Rust {
-        // Production's legacy host-scoped clears name session_data too; only a cache that is set would be wrong.
-        assert!(
-            set_cookies_named(&response, &app.auth_cookie("session_data"))
-                .iter()
-                .all(|c| c.contains("Max-Age=0")),
-            "Rust has no session_data cookie cache: {:?}",
-            response.set_cookies()
-        );
-    }
+    // Production's legacy host-scoped clears name session_data too; only a cache that is set would be wrong.
+    assert!(
+        set_cookies_named(&response, &app.auth_cookie("session_data"))
+            .iter()
+            .all(|c| c.contains("Max-Age=0")),
+        "no session_data cookie cache: {:?}",
+        response.set_cookies()
+    );
 }
 
 #[tokio::test]
@@ -920,13 +903,6 @@ async fn app_routes_forward_every_renewal_cookie() {
     let renewed = set_cookies_named(&response, &app.session_cookie());
     assert_eq!(renewed.len(), 1, "{:?}", response.set_cookies());
     assert!(renewed[0].contains("Max-Age=1209600"));
-    if app.backend == Backend::TypeScript {
-        assert!(
-            response.set_cookies().len() >= 2,
-            "the renewed token and the refreshed cookie cache both arrive: {:?}",
-            response.set_cookies()
-        );
-    }
 }
 
 #[tokio::test]

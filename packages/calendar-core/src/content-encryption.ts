@@ -1,5 +1,5 @@
 import type { Schema } from "@workspace/api-contracts";
-import { z } from "zod";
+import { z } from "./zod";
 import type {
   CreateCalendarRequest,
   CreateCategoryRequest,
@@ -40,7 +40,13 @@ export function eventContentAad(
   return `event-content:v${keyVersion}`;
 }
 
-const EVENT_CONTENT_FIELDS = ["title", "description", "location"] as const;
+export const EVENT_CONTENT_FIELDS = [
+  "title",
+  "description",
+  "location",
+  "color",
+  "categoryId",
+] as const;
 export type EventContentField = (typeof EVENT_CONTENT_FIELDS)[number];
 
 function hasText(value: unknown): boolean {

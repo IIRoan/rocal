@@ -2,10 +2,11 @@
 
 use serde_json::{Map, Value};
 
-const ALLOWED: [&str; 7] = [
+const ALLOWED: [&str; 8] = [
     "kind",
     "eventId",
     "minutesBefore",
+    "dueAt",
     "inboundCount",
     "emailId",
     "accountId",
@@ -18,6 +19,8 @@ pub struct Payload {
     pub kind: String,
     pub event_id: String,
     pub minutes_before: Option<i64>,
+    /// When the reminder was due, in Unix seconds, so a late push still shows when the event starts.
+    pub due_at: Option<i64>,
     pub inbound_count: Option<i64>,
     pub email_id: String,
     pub account_id: String,
@@ -40,6 +43,7 @@ pub fn parse(raw: &str) -> Option<Payload> {
         kind: text(&map, "kind")?,
         event_id: text(&map, "eventId")?,
         minutes_before: number(&map, "minutesBefore")?,
+        due_at: number(&map, "dueAt")?,
         inbound_count: number(&map, "inboundCount")?,
         email_id: text(&map, "emailId")?,
         account_id: text(&map, "accountId")?,

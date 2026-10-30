@@ -1,7 +1,6 @@
 import type {
   UnifiedMailSearchResult,
   UnifiedSearchEncryptionStatus,
-  UnifiedSearchResult,
 } from "@workspace/calendar-core";
 import {
   normalizeSearchText as normalizeSearchTextImpl,
@@ -9,7 +8,6 @@ import {
   sortMailMessagesBySearchRelevance as sortMailMessagesBySearchRelevanceImpl,
   tokenizeSearchQuery as tokenizeSearchQueryImpl,
 } from "@workspace/calendar-core";
-import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 import { classifyMessageEncryption } from "@/lib/mail/message-security";
 
@@ -67,28 +65,4 @@ export function searchMailMessages(
   });
 
   return results.sort((left, right) => right.score - left.score).slice(0, limit);
-}
-
-export function toCalendarSearchResult(
-  event: CalendarEvent,
-  index: number,
-): UnifiedSearchResult<JmapEmailMessage> {
-  const encryptionStatus: UnifiedSearchEncryptionStatus =
-    event.encryptionState === "encrypted" ? "encrypted-indexed" : "plaintext";
-
-  return {
-    id: `calendar:${event.id}`,
-    source: "calendar",
-    eventId: event.id,
-    title: event.title,
-    snippet: event.location ?? event.description ?? undefined,
-    timestamp:
-      event.start instanceof Date
-        ? event.start.toISOString()
-        : new Date(event.start).toISOString(),
-    score: 100 - index,
-    encryptionStatus,
-    matchedFields: ["calendar"],
-    event,
-  };
 }

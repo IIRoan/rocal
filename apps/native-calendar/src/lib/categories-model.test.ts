@@ -1,8 +1,7 @@
-import type { EventCategory } from "@workspace/calendar-core";
+import { categoryUsageDetail, type EventCategory } from "@workspace/calendar-core";
 import {
   CATEGORY_NAME_MAX_LENGTH,
   buildOptimisticCategory,
-  categoryUsageDetail,
   insertCategory,
   patchCategory,
   removeCategory,
@@ -63,9 +62,10 @@ describe("validateCategoryName", () => {
 
 describe("categoryUsageDetail", () => {
   it("describes how many events use a category", () => {
-    expect(categoryUsageDetail(category({ usageCount: 0 }))).toBeUndefined();
-    expect(categoryUsageDetail(category({ usageCount: 1 }))).toBe("1 event");
-    expect(categoryUsageDetail(category({ usageCount: 4 }))).toBe("4 events");
+    expect(categoryUsageDetail(0)).toBeUndefined();
+    expect(categoryUsageDetail(undefined)).toBeUndefined();
+    expect(categoryUsageDetail(1)).toBe("1 event");
+    expect(categoryUsageDetail(4)).toBe("4 events");
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CalendarEvent, EventSearchHit } from "@workspace/calendar-core";
+import type { CalendarEvent } from "@workspace/calendar-core";
 import { mergePaletteSearchResults } from "./palette-search";
 
 const event = (overrides: Partial<CalendarEvent> = {}): CalendarEvent => ({
@@ -44,8 +44,8 @@ describe("mergePaletteSearchResults", () => {
     expect(results[0]?.encryptionStatus).toBe("encrypted-indexed");
   });
 
-  it("keeps a live event hit when the same id is already in the title index", () => {
-    const live = event({ title: "Board offsite" });
+  it("keeps the full in-memory event over the index stub for the same id", () => {
+    const live = event({ title: "Board offsite", allDay: true });
     const results = mergePaletteSearchResults({
       titleDocuments: [
         {
@@ -62,32 +62,24 @@ describe("mergePaletteSearchResults", () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0]?.id).toBe("calendar:event-old");
+    expect(results[0]?.event).toBe(live);
   });
 
-  it("keeps a server hit's event without its trimmed calendar and category labels", () => {
-    const label = {
-      id: "cal-1",
-      name: "Work",
-      color: "blue",
-      encryptedName: null,
-      encryptionKeyVersion: 1,
-    };
-    const hit: EventSearchHit = {
-      ...event({ title: "Board offsite", location: "Lisbon" }),
-      calendar: label,
-      category: { ...label, id: "cat-1", name: "Focus" },
-    };
-    const [result] = mergePaletteSearchResults({
+  it("matches descriptions and locations of in-memory events on the device", () => {
+    const results = mergePaletteSearchResults({
       titleDocuments: [],
-      query: "offsite",
-      events: [hit],
+      query: "lisbon",
+      events: [
+        event({ id: "trip", title: "Trip", location: "Lisbon" }),
+        event({ id: "review", title: "Review", description: "Budget for Lisbon" }),
+        event({ id: "other", title: "Standup" }),
+      ],
       limit: 8,
     });
 
-    expect(result?.snippet).toBe("Lisbon");
-    expect(result?.event).not.toHaveProperty("calendar");
-    expect(result?.event).not.toHaveProperty("category");
-    expect(result?.event.calendarId).toBe("cal-1");
+    expect(results.map((result) => result.eventId).sort()).toEqual([
+      "review",
+      "trip",
+    ]);
   });
 });

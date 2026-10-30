@@ -8,9 +8,11 @@ use axum::response::Response;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use solace_api_types::auth::{AuthUser, StatusFlag};
+use solace_api_types::e2ee::PasswordEnvelopeRequest;
 
 use super::api::{ApiError, codes, json, validate};
 use super::email_password::{check_auth_key_email, check_new_password};
+use super::guard;
 use super::hooks::{self, Reply};
 use super::password::{self, Verdict};
 use super::pipeline::AuthBody;
@@ -18,7 +20,10 @@ use super::session;
 use super::sessions::require_session;
 use super::store;
 use crate::db::entities::user;
+use crate::e2ee;
 use crate::email;
+use crate::error::AppError;
+use crate::http::extract::RequestSchema;
 use crate::http::zod::{self, Schema};
 use crate::state::AppState;
 
@@ -29,6 +34,7 @@ struct ChangePasswordBody {
     current_password: String,
     revoke_other_sessions: Option<bool>,
     email: Option<String>,
+    password_envelope: Option<PasswordEnvelopeRequest>,
 }
 
 static CHANGE_PASSWORD: LazyLock<Schema> = LazyLock::new(|| {
@@ -37,6 +43,10 @@ static CHANGE_PASSWORD: LazyLock<Schema> = LazyLock::new(|| {
         ("currentPassword", zod::string()),
         ("revokeOtherSessions", zod::boolean().optional()),
         ("email", zod::string().optional()),
+        (
+            "passwordEnvelope",
+            PasswordEnvelopeRequest::schema().clone().optional(),
+        ),
     ])
 });
 
@@ -91,6 +101,18 @@ pub async fn change_password(
     let outcome = async {
         let body: ChangePasswordBody = validate(&CHANGE_PASSWORD, body.as_ref(), "body")?;
         let active = require_session(&state, &headers, &mut cookies).await?;
+        // A new envelope decides which keys new devices open, so it needs the same passkey step-up as `PUT /api/e2ee/password`.
+        if body.password_envelope.is_some() {
+            guard::step_up(&state, &headers, &active)
+                .await
+                .map_err(|error| match error {
+                    AppError::StepUpRequired => codes::passkey_step_up_required(),
+                    _ => ApiError::internal(),
+                })?;
+        } else if e2ee::service::has_password_envelope(&state, &active.user.id).await? {
+            // Without the rewrapped envelope the new password could no longer open the keys on a new device.
+            return Err(codes::password_envelope_required());
+        }
         check_new_password(&body.new_password)?;
         check_auth_key_email(
             &body.new_password,
@@ -100,6 +122,14 @@ pub async fn change_password(
         if crate::http::zod::js_length(&body.current_password) > password::MAX_LENGTH {
             return Err(codes::password_too_long());
         }
+        // The envelope is wrapped with the new password; storing them together keeps every sign-in able to open it.
+        let envelope = body
+            .password_envelope
+            .map(e2ee::service::password_keys)
+            .transpose()
+            .map_err(|_| {
+                ApiError::message(StatusCode::BAD_REQUEST, "Invalid encryption envelope")
+            })?;
         let credential = store::credential_account(&state.db, &active.user.id).await?;
         let Some((credential, stored)) =
             credential.and_then(|a| a.password.clone().map(|p| (a, p)))
@@ -114,7 +144,8 @@ pub async fn change_password(
                 .await
                 .map_err(|_| ApiError::internal())?,
         )?;
-        store::set_password(&state.db, credential, new_hash).await?;
+        let envelope_stored = envelope.is_some();
+        store::change_password(&state.db, credential, new_hash, envelope).await?;
         let mut token = None;
         if body.revoke_other_sessions == Some(true) {
             store::delete_user_sessions(&state.db, &active.user.id).await?;
@@ -124,7 +155,10 @@ pub async fn change_password(
         }
         notify_password_updated(&state, &active.user).await;
         let user: AuthUser = session::user_dto(&active.user);
-        Ok(json(&json!({"token": token, "user": user})))
+        // Clients fall back to `PUT /api/e2ee/password` when an API that predates the envelope leaves this out.
+        Ok(json(
+            &json!({"token": token, "user": user, "envelopeStored": envelope_stored}),
+        ))
     }
     .await;
     hooks::after_sign_in_or_out(&state, &headers, hooks::with_cookies(outcome, cookies))

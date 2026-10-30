@@ -5,7 +5,9 @@ use solace_api_tests::seed::fake_envelope;
 use solace_api_types::SuccessMessage;
 use solace_api_types::settings::UserSettings;
 
-use crate::helpers::{Backend, TestApp, count, expect_unauthorized, expect_unknown_field, hex, ok};
+use crate::helpers::{
+    TestApp, count, expect_invalid, expect_unauthorized, expect_unknown_field, hex, ok,
+};
 
 #[tokio::test]
 async fn anonymous_callers_are_refused() {
@@ -82,7 +84,7 @@ async fn first_read_creates_the_defaults() {
     assert_eq!(again, settings, "a second read returns the same row");
 }
 
-/// Rust creates the row idempotently; TypeScript's find-then-create can answer the losers of the race 409.
+/// The row is created idempotently, so no read loses the race.
 #[tokio::test]
 async fn concurrent_first_reads_all_get_the_same_defaults() {
     let app = TestApp::spawn().await;
@@ -92,20 +94,16 @@ async fn concurrent_first_reads_all_get_the_same_defaults() {
         let mut agent = user.agent.clone();
         reads.spawn(async move { agent.get("/api/settings").await });
     }
-    let responses: Vec<_> = reads.join_all().await.into_iter().map(ok).collect();
-
-    let mut created = Vec::new();
-    for response in &responses {
-        match (app.backend, response.status.as_u16()) {
-            (_, 200) => created.push(ok(response.dto::<UserSettings>())),
-            (Backend::TypeScript, 409) => {}
-            (_, status) => panic!("{status}: {}", response.text()),
-        }
-    }
-    assert!(!created.is_empty());
-    if app.backend == Backend::Rust {
-        assert_eq!(created.len(), 10);
-    }
+    let created: Vec<UserSettings> = reads
+        .join_all()
+        .await
+        .into_iter()
+        .map(|response| {
+            ok(response
+                .and_then(|r| r.expect_status(200))
+                .and_then(|r| r.dto()))
+        })
+        .collect();
     assert!(created.iter().all(|settings| *settings == created[0]));
     assert_eq!(
         count(
@@ -177,29 +175,19 @@ async fn updates_are_stored_and_returned() {
     );
 }
 
-/// Web and native offer the 3-day view as the default; TypeScript's schema still rejects it.
+/// Web and native offer the 3-day view as the default.
 #[tokio::test]
 async fn the_three_day_view_can_be_the_default_view() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let response = user
+    let updated: UserSettings = ok(user
         .put("/api/settings", json!({"defaultView": "3day"}))
-        .await;
-    match app.backend {
-        Backend::TypeScript => {
-            ok(response.expect_error(
-                400,
-                "Validation Error",
-                "Invalid enum value. Expected 'month' | 'week' | 'day' | 'agenda', received '3day'",
-            ));
-        }
-        Backend::Rust => {
-            let updated: UserSettings = ok(response.expect_status(200).and_then(|r| r.dto()));
-            assert_eq!(updated.default_view, "3day");
-            let read: UserSettings = ok(user.get("/api/settings").await.dto());
-            assert_eq!(read.default_view, "3day");
-        }
-    }
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(updated.default_view, "3day");
+    let read: UserSettings = ok(user.get("/api/settings").await.dto());
+    assert_eq!(read.default_view, "3day");
 }
 
 #[tokio::test]
@@ -229,11 +217,6 @@ async fn the_pacific_new_alias_is_a_valid_timezone() {
 async fn invalid_values_are_rejected_with_the_zod_message() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let views = match app.backend {
-        Backend::TypeScript => "'month' | 'week' | 'day' | 'agenda'",
-        Backend::Rust => "'month' | 'week' | '3day' | 'day' | 'agenda'",
-    };
-    let view_message = format!("Invalid enum value. Expected {views}, received 'year'");
     let cases = [
         (
             json!({"theme": "x"}),
@@ -242,7 +225,7 @@ async fn invalid_values_are_rejected_with_the_zod_message() {
         ),
         (
             json!({"defaultView": "year"}),
-            view_message.as_str(),
+            "Invalid enum value. Expected 'month' | 'week' | '3day' | 'day' | 'agenda', received 'year'",
             "defaultView",
         ),
         (
@@ -505,4 +488,145 @@ async fn read_only_and_staging_calendars_cannot_be_the_default() {
             "{name}"
         );
     }
+}
+
+#[tokio::test]
+async fn sealed_preferences_replace_their_plaintext_copies() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    ok(user
+        .put(
+            "/api/settings",
+            json!({"theme": "dark", "weekStartDay": 0, "workingDays": "[1,2]", "showWeekNumbers": true, "timezone": "Europe/Amsterdam"}),
+        )
+        .await
+        .expect_status(200));
+    let sealed = fake_envelope();
+
+    let settings: UserSettings = ok(user
+        .put(
+            "/api/settings",
+            json!({"encryptedPreferences": sealed, "theme": "system", "timeFormat": "12h"}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+
+    assert_eq!(
+        settings.encrypted_preferences.as_deref(),
+        Some(sealed.as_str())
+    );
+    assert_eq!(
+        (
+            settings.theme.as_str(),
+            settings.week_start_day,
+            settings.working_days.as_str()
+        ),
+        ("light", 1, "[1,2,3,4,5]"),
+        "the moved fields fall back to the defaults, ignoring any sent alongside"
+    );
+    assert!(!settings.show_week_numbers);
+    assert_eq!(
+        (settings.timezone.as_str(), settings.time_format.as_str()),
+        ("Europe/Amsterdam", "12h"),
+        "the fields the server reads stay readable"
+    );
+    let read: UserSettings = ok(user.get("/api/settings").await.dto());
+    assert_eq!(read.encrypted_preferences.as_deref(), Some(sealed.as_str()));
+}
+
+#[tokio::test]
+async fn shipped_clients_can_still_write_plaintext_preferences() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let sealed = fake_envelope();
+    ok(user
+        .put("/api/settings", json!({"encryptedPreferences": sealed}))
+        .await
+        .expect_status(200));
+
+    let settings: UserSettings = ok(user
+        .put(
+            "/api/settings",
+            json!({"theme": "dark", "compactView": true}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+
+    assert_eq!(
+        (settings.theme.as_str(), settings.compact_view),
+        ("dark", true)
+    );
+    assert_eq!(
+        settings.encrypted_preferences.as_deref(),
+        Some(sealed.as_str())
+    );
+}
+
+#[tokio::test]
+async fn sealed_preferences_must_be_a_bounded_string() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    for (body, message) in [
+        (
+            json!({"encryptedPreferences": ""}),
+            "String must contain at least 1 character(s)",
+        ),
+        (
+            json!({"encryptedPreferences": "x".repeat(16_385)}),
+            "String must contain at most 16384 character(s)",
+        ),
+        (
+            json!({"encryptedPreferences": null}),
+            "Expected string, received null",
+        ),
+    ] {
+        expect_invalid(
+            &user.put("/api/settings", body).await,
+            message,
+            "encryptedPreferences",
+        );
+    }
+    let settings: UserSettings = ok(user.get("/api/settings").await.dto());
+    assert_eq!(settings.encrypted_preferences, None);
+}
+
+#[tokio::test]
+async fn a_sealed_write_based_on_stale_preferences_is_refused() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let first = fake_envelope();
+    ok(user
+        .put(
+            "/api/settings",
+            json!({"encryptedPreferences": first, "expectedEncryptedPreferences": null}),
+        )
+        .await
+        .expect_status(200));
+
+    let newer = fake_envelope();
+    ok(user
+        .put(
+            "/api/settings",
+            json!({"encryptedPreferences": newer, "expectedEncryptedPreferences": first}),
+        )
+        .await
+        .expect_status(200));
+
+    for stale in [json!(first), json!(null)] {
+        let refused = user
+            .put(
+                "/api/settings",
+                json!({"encryptedPreferences": fake_envelope(), "expectedEncryptedPreferences": stale}),
+            )
+            .await;
+        assert_eq!(refused.status.as_u16(), 409, "{}", refused.text());
+    }
+    let settings: UserSettings = ok(user.get("/api/settings").await.dto());
+    assert_eq!(
+        settings.encrypted_preferences.as_deref(),
+        Some(newer.as_str()),
+        "a device that merged onto older preferences never replaces newer ones"
+    );
 }

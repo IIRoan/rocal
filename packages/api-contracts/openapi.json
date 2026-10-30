@@ -892,6 +892,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "readableInvitations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -3062,6 +3070,10 @@
           "allDay": {
             "type": "boolean"
           },
+          "attributesEncrypted": {
+            "type": "boolean",
+            "description": "Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared."
+          },
           "blindIndexTokens": {
             "type": "array",
             "items": {
@@ -4532,6 +4544,13 @@
             ],
             "format": "int64"
           },
+          "readableInvitations": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Only invitation copies still stored readable, declined ones included, for the device to seal."
+          },
           "updatedAfter": {
             "type": [
               "string",
@@ -5778,6 +5797,13 @@
           "isEnabled"
         ],
         "properties": {
+          "encryptedLead": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`minutes_before` sealed under the notification key, so a push shows the start time without carrying it; omitted keeps a stored one."
+          },
           "isEnabled": {
             "type": "boolean"
           },
@@ -6532,6 +6558,10 @@
         "properties": {
           "allDay": {
             "type": "boolean"
+          },
+          "attributesEncrypted": {
+            "type": "boolean",
+            "description": "Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared."
           },
           "blindIndexTokens": {
             "type": "array",
@@ -7357,6 +7387,10 @@
           "allDay": {
             "type": "boolean"
           },
+          "attributesEncrypted": {
+            "type": "boolean",
+            "description": "Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared."
+          },
           "blindIndexTokens": {
             "type": "array",
             "items": {
@@ -7445,6 +7479,17 @@
           },
           "emailNotifications": {
             "type": "boolean"
+          },
+          "encryptedPreferences": {
+            "type": "string",
+            "description": "Replaces the sealed preferences; their plaintext fields go back to the defaults and any sent with it are ignored."
+          },
+          "expectedEncryptedPreferences": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sealed preferences this change was merged onto (`null` for none); a different stored value refuses the write with 409."
           },
           "pushNotifications": {
             "type": "boolean"
@@ -7548,6 +7593,7 @@
           "compactView",
           "showWeekNumbers",
           "showDeclinedEvents",
+          "encryptedPreferences",
           "createdAt",
           "updatedAt"
         ],
@@ -7580,6 +7626,13 @@
           },
           "emailNotifications": {
             "type": "boolean"
+          },
+          "encryptedPreferences": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "App-only preferences sealed on the device; while set, their fields above hold the defaults."
           },
           "id": {
             "type": "string"

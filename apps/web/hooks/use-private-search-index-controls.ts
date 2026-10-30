@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { clearLocalSearchIndexDatabase } from "@/lib/search/local-index-store";
+import { PRIVATE_CONTENT_INDEX_ENABLED_KEY } from "@/lib/search/private-index-flags";
 
-const ENABLED_KEY = "search:private-content-index-enabled";
+const ENABLED_KEY = PRIVATE_CONTENT_INDEX_ENABLED_KEY;
 const PAUSED_KEY = "search:private-content-index-paused";
 const CONSENT_KEY = "search:private-content-index-consent";
 export const PRIVATE_SEARCH_INDEX_CHANGE_EVENT =

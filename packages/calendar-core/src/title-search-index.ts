@@ -20,6 +20,7 @@ export type TitleIndexMailSource = {
   subject?: string | null;
   preview?: string | null;
   from?: Array<{ name?: string | null; email?: string | null }> | null;
+  to?: Array<{ name?: string | null; email?: string | null }> | null;
   receivedAt?: string | null;
   threadId?: string | null;
   mailboxIds?: Record<string, boolean> | null;
@@ -37,6 +38,7 @@ export type TitleIndexDocument = {
   threadId?: string;
   mailboxIds?: string[];
   from?: string;
+  to?: string;
   /** Decrypted message text excerpt; an empty string means indexed with nothing to match. */
   body?: string;
   encryptionStatus: UnifiedSearchEncryptionStatus;
@@ -63,6 +65,15 @@ function formatMailFromLabel(
   if (!first) return undefined;
   if (first.name && first.email) return `${first.name} <${first.email}>`;
   return first.name ?? first.email ?? undefined;
+}
+
+function formatMailRecipients(
+  to: TitleIndexMailSource["to"],
+): string | undefined {
+  const labels = (to ?? []).flatMap((recipient) =>
+    [recipient.name, recipient.email].filter((part): part is string => Boolean(part)),
+  );
+  return labels.length > 0 ? labels.join(" ") : undefined;
 }
 
 function toIsoTimestamp(value: Date | string | undefined): string | undefined {
@@ -147,6 +158,7 @@ export function mailToTitleIndexDocument(
     threadId: message.threadId ?? undefined,
     mailboxIds: Object.keys(message.mailboxIds ?? {}),
     from,
+    to: formatMailRecipients(message.to),
     encryptionStatus: "plaintext",
   };
 }
@@ -181,6 +193,14 @@ export function scoreTitleIndexDocument(
     if (fromScore > 0) {
       matchedFields.push("from");
       score += fromScore;
+    }
+  }
+
+  if (document.to) {
+    const toScore = scoreText(document.to, queryTokens, phrase, 3);
+    if (toScore > 0) {
+      matchedFields.push("to");
+      score += toScore;
     }
   }
 
@@ -223,6 +243,26 @@ export function searchTitleIndex(
       );
     })
     .slice(0, Math.max(limit, 0));
+}
+
+/** Scores decrypted events in memory like index documents, descriptions included, so search words never leave the device. */
+export function searchCalendarEvents(
+  events: CalendarEvent[],
+  query: string,
+  limit: number,
+): UnifiedCalendarSearchResult[] {
+  const eventsById = new Map(events.map((event) => [event.id, event]));
+  const documents = events.flatMap((event) => {
+    const document = eventToTitleIndexDocument(event);
+    const description = event.description?.trim();
+    if (!document) return [];
+    return [description ? { ...document, body: description } : document];
+  });
+  return searchTitleIndex(documents, query, limit).flatMap((hit) => {
+    const result = titleHitToUnifiedResult(hit);
+    const event = eventsById.get(hit.document.eventId ?? "");
+    return result.source === "calendar" && event ? [{ ...result, event }] : [];
+  });
 }
 
 function stubCalendarEvent(document: TitleIndexDocument): CalendarEvent {

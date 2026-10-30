@@ -2,7 +2,7 @@
 
 import { useId, useReducer } from "react";
 import { getErrorMessage } from "@workspace/calendar-core";
-import { Lock, RotateCcw } from "lucide-react";
+import { Lock } from "lucide-react";
 import { InlineMessage } from "./account-settings-inline-message";
 import {
   initialSecurityUiState,
@@ -18,27 +18,17 @@ import { PALETTE_INPUT_CLASS } from "./palette-styles";
 
 interface PasswordSectionProps {
   hasPasswordAccount: boolean;
-  hasOAuthAccount: boolean;
   changingPassword: boolean;
-  settingPassword: boolean;
-  resettingEncryptionPassword: boolean;
   handleChangePassword: (v: {
     currentPassword: string;
     newPassword: string;
   }) => Promise<void>;
-  handleSetPassword?: (v: { newPassword: string }) => Promise<void>;
-  handleResetEncryptionPassword?: (v: { newPassword: string }) => Promise<void>;
 }
 
 export function PasswordSection({
   hasPasswordAccount,
-  hasOAuthAccount,
   changingPassword,
-  settingPassword,
-  resettingEncryptionPassword,
   handleChangePassword,
-  handleSetPassword,
-  handleResetEncryptionPassword,
 }: PasswordSectionProps) {
   const fieldId = useId();
   const [security, dispatch] = useReducer(
@@ -55,9 +45,7 @@ export function PasswordSection({
   const setMsg = (message: typeof msg) =>
     dispatch({ type: "setMessage", message });
 
-  const hasOAuthOnlyAccess = hasOAuthAccount && !hasPasswordAccount;
-  const isBusy =
-    changingPassword || settingPassword || resettingEncryptionPassword;
+  const isBusy = changingPassword;
   const isFormOpen = activeForm !== null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,7 +55,7 @@ export function PasswordSection({
       setMsg({ kind: "error", text: "Enter a new password." });
       return;
     }
-    if (activeForm === "change-password" && !currentPwd.trim()) {
+    if (!currentPwd.trim()) {
       setMsg({ kind: "error", text: "Enter your current password." });
       return;
     }
@@ -75,18 +63,11 @@ export function PasswordSection({
       setMsg({ kind: "error", text: "Passwords do not match." });
       return;
     }
-    const submit =
-      (activeForm === "change-password"
-        ? () =>
-            handleChangePassword({
-              currentPassword: currentPwd,
-              newPassword: newPwd,
-            })
-        : activeForm === "set-password"
-          ? handleSetPassword
-          : handleResetEncryptionPassword) ?? (async () => {});
     try {
-      await submit({ newPassword: newPwd });
+      await handleChangePassword({
+        currentPassword: currentPwd,
+        newPassword: newPwd,
+      });
       setMsg({ kind: "success", text: "Password updated." });
       dispatch({ type: "finishForm" });
     } catch (err) {
@@ -97,17 +78,10 @@ export function PasswordSection({
     }
   };
 
-  if (!hasPasswordAccount && !hasOAuthOnlyAccess && !hasOAuthAccount)
-    return null;
+  if (!hasPasswordAccount) return null;
 
-  const newLabel =
-    activeForm === "reset-encryption"
-      ? "New encryption password"
-      : "New password";
-  const confirmLabel =
-    activeForm === "reset-encryption"
-      ? "Confirm new encryption password"
-      : "Confirm new password";
+  const newLabel = "New password";
+  const confirmLabel = "Confirm new password";
 
   return (
     <div>
@@ -117,44 +91,14 @@ export function PasswordSection({
         </div>
       ) : null}
       {!isFormOpen ? (
-        <>
-          {hasPasswordAccount ? (
-            <PaletteNavRow
-              icon={Lock}
-              label="Change Password"
-              description="Update your email sign-in password"
-              trailing={null}
-              onClick={() =>
-                dispatch({ type: "openForm", form: "change-password" })
-              }
-              disabled={isBusy}
-            />
-          ) : null}
-          {hasOAuthOnlyAccess ? (
-            <PaletteNavRow
-              icon={Lock}
-              label="Set Email Password"
-              description="Add an email sign-in password"
-              trailing={null}
-              onClick={() =>
-                dispatch({ type: "openForm", form: "set-password" })
-              }
-              disabled={isBusy}
-            />
-          ) : null}
-          {hasOAuthAccount ? (
-            <PaletteNavRow
-              icon={RotateCcw}
-              label="Reset Encryption Password"
-              description="Replace the password for OAuth / passkey sign-in keys"
-              trailing={null}
-              onClick={() =>
-                dispatch({ type: "openForm", form: "reset-encryption" })
-              }
-              disabled={isBusy}
-            />
-          ) : null}
-        </>
+        <PaletteNavRow
+          icon={Lock}
+          label="Change Password"
+          description="Update your email sign-in password"
+          trailing={null}
+          onClick={() => dispatch({ type: "openForm", form: "change-password" })}
+          disabled={isBusy}
+        />
       ) : (
         <form onSubmit={(e) => void handleSubmit(e)}>
           {msg ? (
@@ -162,29 +106,24 @@ export function PasswordSection({
               <InlineMessage msg={msg} />
             </div>
           ) : null}
-          {activeForm === "change-password" ? (
-            <PaletteField
-              label="Current password"
-              htmlFor={`${fieldId}-current`}
-            >
-              <input
-                id={`${fieldId}-current`}
-                aria-label="Current password"
-                type="password"
-                value={currentPwd}
-                onChange={(e) =>
-                  dispatch({
-                    type: "setField",
-                    field: "currentPassword",
-                    value: e.target.value,
-                  })
-                }
-                autoComplete="current-password"
-                disabled={isBusy}
-                className={PALETTE_INPUT_CLASS}
-              />
-            </PaletteField>
-          ) : null}
+          <PaletteField label="Current password" htmlFor={`${fieldId}-current`}>
+            <input
+              id={`${fieldId}-current`}
+              aria-label="Current password"
+              type="password"
+              value={currentPwd}
+              onChange={(e) =>
+                dispatch({
+                  type: "setField",
+                  field: "currentPassword",
+                  value: e.target.value,
+                })
+              }
+              autoComplete="current-password"
+              disabled={isBusy}
+              className={PALETTE_INPUT_CLASS}
+            />
+          </PaletteField>
           <PaletteField label={newLabel} htmlFor={`${fieldId}-new`}>
             <input
               id={`${fieldId}-new`}
@@ -230,11 +169,7 @@ export function PasswordSection({
               Cancel
             </PaletteButton>
             <PaletteButton type="submit" variant="primary" loading={isBusy}>
-              {activeForm === "change-password"
-                ? "Update Password"
-                : activeForm === "set-password"
-                  ? "Set Password"
-                  : "Reset Password"}
+              Update Password
             </PaletteButton>
           </PaletteFormActions>
         </form>

@@ -255,7 +255,7 @@ async fn wait_until_up(client: &reqwest::Client, base: &str) -> anyhow::Result<(
     bail!("the release server did not come up")
 }
 
-/// A user and session written the way the TypeScript backend writes them, and its signed cookie.
+/// A user and session written straight to the database, and its signed cookie.
 async fn session_cookie(env: &TestEnv, database_url: &str, port: u16) -> anyhow::Result<String> {
     let mut db = PgConnection::connect(database_url).await?;
     let suffix = std::process::id();

@@ -225,7 +225,7 @@ describe("AccountSettings", () => {
     });
 
     expect(container.textContent).toContain(
-      "Update your email sign-in password. Solace also uses it for encryption after email sign-in.",
+      "Update your sign-in password. It also unlocks your encrypted data.",
     );
   });
 
@@ -285,11 +285,11 @@ describe("AccountSettings", () => {
       newPassword: "new-password",
     });
     expect(container.textContent).toContain(
-      "Your email sign-in password has been updated. After email sign-in, Solace will also use it to protect your encryption keys.",
+      "Your password has been updated. It also unlocks your encrypted data when you sign in.",
     );
   });
 
-  it("shows OAuth-specific account actions and explainer copy", async () => {
+  it("offers no password action to an account without an email password", async () => {
     await act(async () => {
       root.render(
         <AccountSettings
@@ -302,87 +302,15 @@ describe("AccountSettings", () => {
           accountEmail="roan@example.com"
           sessionLoading={false}
           hasPasswordAccount={false}
-          hasOAuthAccount={true}
           changingPassword={false}
           handleChangePassword={async () => {}}
-          handleSetPassword={async () => {}}
-          handleResetEncryptionPassword={async () => {}}
         />,
       );
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain(
-      "OAuth and passkey sign-in use a separate encryption password.",
-    );
-    expect(container.textContent).toContain("Set Email Password");
-    expect(container.textContent).toContain("Reset Encryption Password");
+    expect(container.textContent).not.toContain("Set Email Password");
     expect(container.textContent).not.toContain("Change Password");
-  });
-
-  it("submits the OAuth-only set-password flow with separate explainer copy", async () => {
-    const handleSetPassword = jest.fn<() => Promise<void>>(
-      async () => undefined,
-    );
-
-    await act(async () => {
-      root.render(
-        <AccountSettings
-          goBack={() => {}}
-          saving={false}
-          handleReset={() => {}}
-          deletingAccount={false}
-          handleDeleteAccount={() => {}}
-          accountName="Roan"
-          accountEmail="roan@example.com"
-          sessionLoading={false}
-          hasPasswordAccount={false}
-          hasOAuthAccount={true}
-          changingPassword={false}
-          handleChangePassword={async () => {}}
-          handleSetPassword={handleSetPassword}
-          handleResetEncryptionPassword={async () => {}}
-        />,
-      );
-      await Promise.resolve();
-    });
-
-    const openSetPasswordButton = Array.from(
-      container.querySelectorAll("button"),
-    ).find((element) => element.textContent?.includes("Set Email Password"));
-
-    await act(async () => {
-      openSetPasswordButton?.click();
-      await Promise.resolve();
-    });
-
-    expect(container.textContent).toContain(
-      "This gives you an email/password sign-in option without changing the separate encryption password used by OAuth or passkey sign-in.",
-    );
-
-    const inputs = Array.from(container.querySelectorAll("input"));
-    expect(inputs).toHaveLength(2);
-
-    await act(async () => {
-      setInputValue(inputs[0] as HTMLInputElement, "new-password");
-      setInputValue(inputs[1] as HTMLInputElement, "new-password");
-      await Promise.resolve();
-    });
-
-    const submitButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Set Password"),
-    );
-
-    await act(async () => {
-      submitButton?.click();
-      await Promise.resolve();
-    });
-
-    expect(handleSetPassword).toHaveBeenCalledWith({
-      newPassword: "new-password",
-    });
-    expect(container.textContent).toContain(
-      "An email sign-in password has been added to your account. OAuth and passkey sign-in still use your separate encryption password unless you reset it below.",
-    );
+    expect(container.textContent).not.toContain("separate encryption password");
   });
 });

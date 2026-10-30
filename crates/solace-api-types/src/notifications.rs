@@ -33,6 +33,9 @@ pub struct NotificationSetting {
     pub notification_type: String,
     pub minutes_before: i32,
     pub is_enabled: bool,
+    /// `minutes_before` sealed under the notification key, so a push shows the start time without carrying it; omitted keeps a stored one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encrypted_lead: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

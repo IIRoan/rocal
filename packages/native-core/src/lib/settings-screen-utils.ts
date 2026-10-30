@@ -1,6 +1,5 @@
 export type SettingsAccountActionKey =
   | "change-password"
-  | "set-password"
   | "change-profile-picture"
   | "reset-preferences"
   | "sign-out"
@@ -20,15 +19,6 @@ const CHANGE_PASSWORD_ACTION: SettingsAccountAction = {
   label: "Change Password",
   description:
     "Update your email sign-in password. Solace also uses it for encryption after email sign-in.",
-  destructive: false,
-};
-
-const SET_PASSWORD_ACTION: SettingsAccountAction = {
-  key: "set-password",
-  icon: "lock",
-  label: "Set Email Password",
-  description:
-    "Add an email sign-in password without changing your existing encrypted data.",
   destructive: false,
 };
 
@@ -73,21 +63,13 @@ const DELETE_ACCOUNT_ACTION: SettingsAccountAction = {
 export function getSettingsAccountActions({
   canSignOut,
   hasPasswordAccount,
-  hasOAuthAccount,
   hasProfilePicture = false,
 }: {
   canSignOut: boolean;
   hasPasswordAccount: boolean;
-  hasOAuthAccount: boolean;
   hasProfilePicture?: boolean;
 }): SettingsAccountAction[] {
-  const authActions: SettingsAccountAction[] = [];
-
-  if (hasPasswordAccount) {
-    authActions.push(CHANGE_PASSWORD_ACTION);
-  } else if (hasOAuthAccount) {
-    authActions.push(SET_PASSWORD_ACTION);
-  }
+  const authActions = hasPasswordAccount ? [CHANGE_PASSWORD_ACTION] : [];
 
   return canSignOut
     ? [

@@ -15,6 +15,7 @@ import {
   setFallbackSessionToken,
 } from "../lib/session-token-fallback";
 import { AuthProvider, useAuth } from "./AuthProvider";
+import { queryClient } from "./QueryProvider";
 
 jest.mock("react-native", () => ({
   AppState: { currentState: "active", addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
@@ -446,6 +447,55 @@ describe("AuthProvider", () => {
     expect(mockClearRecoverableStoredDevice).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
+  });
+
+  it("drops the decrypted query cache when the session ends", async () => {
+    await renderProvider();
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    queryClient.setQueryData(["decrypted-for-test"], { title: "Dentist" });
+
+    await act(async () => {
+      await getAuth().signOut();
+    });
+
+    expect(queryClient.getQueryData(["decrypted-for-test"])).toBeUndefined();
+  });
+
+  it("ends the session with its notice even when a cleanup step fails", async () => {
+    await renderProvider();
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    mockOnSignedOut.mockRejectedValueOnce(new Error("cleanup failed"));
+
+    await act(async () => {
+      await expect(getAuth().signOut("Sign in again.")).rejects.toThrow(
+        "cleanup failed",
+      );
+    });
+
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().signInNotice).toBe("Sign in again.");
+  });
+
+  it("keeps the sign-out notice for the sign-in screen until the next sign-in", async () => {
+    await renderProvider();
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    await act(async () => {
+      await getAuth().signOut("Sign in again.");
+    });
+    await flushPromises();
+    expect(getAuth().signInNotice).toBe("Sign in again.");
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    expect(getAuth().signInNotice).toBeNull();
   });
 
   it("authenticates logout requests with the fallback token when the cookie jar is empty", async () => {

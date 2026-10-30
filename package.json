@@ -5,33 +5,31 @@
   "packageManager": "bun@1.4.4",
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "retired/*"
+    "packages/*"
   ],
   "scripts": {
-    "build": "cd retired/backend && bun run build && cd ../../apps/web && bun run build && cargo build --release -p solace-notifications",
-    "build:backend": "cd retired/backend && bun run build",
-    "start:backend": "cd retired/backend && ./server",
+    "build": "cd apps/web && bun run build && cargo build --release -p solace-server -p solace-notifications",
+    "build:backend": "cargo build --release -p solace-server",
+    "start:backend": "./target/release/solace-server",
     "build:web": "cd apps/web && bun run build",
     "build:notifications": "cargo build --release -p solace-notifications",
     "start:notifications": "./target/release/solace-notifications",
-    "dev": "cd retired/backend && bun run dev & cd apps/web && bun run dev & cargo run -p solace-notifications",
+    "dev": "cargo run -p solace-server & cd apps/web && bun run dev & cargo run -p solace-notifications",
     "dev:web": "cd apps/web && bun run dev",
-    "dev:backend": "cd retired/backend && bun run dev",
+    "dev:backend": "cargo run -p solace-server",
     "dev:calendar": "cd apps/native-calendar && bun run dev",
     "dev:mail": "cd apps/native-mail && bun run dev",
     "dev:mobile": "bun run ./scripts/dev-mobile.ts",
     "cloudflared": "bun run ./scripts/cloudflared.ts",
     "dev:notifications": "cargo run -p solace-notifications",
-    "lint": "bun run check:rules && cd retired/backend && bun run lint && cd ../../apps/web && bun run lint && cd ../native-calendar && bun run lint && cd ../native-mail && bun run lint && cd ../../packages/native-core && bun run lint",
+    "lint": "bun run check:rules && cd apps/web && bun run lint && cd ../native-calendar && bun run lint && cd ../native-mail && bun run lint && cd ../../packages/native-core && bun run lint",
     "check:rules": "bun run scripts/check-repo-rules.ts",
     "lint:react-doctor": "bun run --cwd apps/web lint:react-doctor && bun run --cwd packages/ui lint:react-doctor",
-    "typecheck": "cd retired/backend && bun run typecheck && cd ../../apps/web && bun run typecheck",
+    "typecheck": "cd apps/web && bun run typecheck",
     "typecheck:native": "cd packages/native-core && bun run typecheck && cd ../../apps/native-calendar && bun run typecheck && cd ../native-mail && bun run typecheck",
     "test": "bun run scripts/run-tests.ts",
     "test:coverage": "bun run scripts/run-tests.ts --coverage",
-    "test:backend": "cd retired/backend && bun run test",
-    "test:backend:coverage": "cd retired/backend && bun run test:coverage",
+    "test:backend": "cargo test -p solace-server",
     "test:ui": "cd packages/ui && bun run test",
     "test:ui:coverage": "cd packages/ui && bun run test:coverage",
     "test:native": "cd packages/native-core && bun run test && cd ../../apps/native-calendar && bun run test && cd ../native-mail && bun run test",
@@ -65,9 +63,6 @@
     "react-native": "0.86.3",
     "expo-constants": "~57.0.22",
     "expo-file-system": "~57.0.7",
-    "@prisma/config": {
-      "deepmerge-ts": "8.0.2"
-    },
     "eslint-plugin-sonarjs": {
       "minimatch": "10.2.6"
     },

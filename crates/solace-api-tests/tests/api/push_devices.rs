@@ -8,8 +8,8 @@ use solace_api_types::push_devices::{
 };
 
 use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_invalid, expect_unauthorized, expect_unknown_field,
-    hex, json_body, ok,
+    TestApp, TestUser, count, expect_invalid, expect_unauthorized, expect_unknown_field, hex,
+    json_body, ok,
 };
 
 const NO_DEVICE: &str =
@@ -567,16 +567,8 @@ async fn the_test_push_is_rate_limited_per_user_and_path() {
         .post("/api/push/test", json!({}))
         .await
         .expect_status(200));
+    // A query string does not start a fresh budget.
     let again = user.post("/api/push/test?again=1", json!({})).await;
-    match app.backend {
-        // TypeScript keys on the full request URL, so a query string starts a fresh budget.
-        Backend::TypeScript => {
-            ok(again.expect_status(200));
-            assert_eq!(job_count(&app, &user).await, 6);
-        }
-        Backend::Rust => {
-            assert_eq!(again.status.as_u16(), 429, "{}", again.text());
-            assert_eq!(job_count(&app, &user).await, 5);
-        }
-    }
+    assert_eq!(again.status.as_u16(), 429, "{}", again.text());
+    assert_eq!(job_count(&app, &user).await, 5);
 }

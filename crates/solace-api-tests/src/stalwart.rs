@@ -1,4 +1,4 @@
-//! The test Stalwart's provisioning key: the registry-scoped API key both backends provision with.
+//! The test Stalwart's provisioning key: the registry-scoped API key the backend provisions with.
 
 use serde_json::{Value, json};
 

@@ -1,6 +1,7 @@
 import {
   CALENDARS_QUERY_KEY,
   CATEGORIES_QUERY_KEY,
+  CATEGORY_USAGE_QUERY_KEY,
   EVENTS_QUERY_KEY,
   INVITES_QUERY_KEY,
   PUSH_DEVICES_QUERY_KEY,
@@ -15,6 +16,7 @@ export const QUERY_KEYS = {
   events: (start: string, end: string) => ["events", start, end] as const,
   calendars: () => CALENDARS_QUERY_KEY,
   categories: () => CATEGORIES_QUERY_KEY,
+  categoryUsage: () => CATEGORY_USAGE_QUERY_KEY,
   settings: () => SETTINGS_QUERY_KEY,
   subscriptions: () => SUBSCRIPTIONS_QUERY_KEY,
   authAccounts: (userId: string | null) => authAccountsQueryKey(userId),
@@ -43,8 +45,7 @@ export const QUERY_KEYS = {
     ["mail", "messages", mailboxId, "search", revision] as const,
   signupConfig: () => ["account", "signupConfig"] as const,
   inviteValidation: (token: string) => ["inviteValidation", token] as const,
-  paletteEventSearch: (query: string) =>
-    ["command-palette-search", "events", query] as const,
+  paletteEventCorpus: () => ["command-palette-search", "events"] as const,
   paletteMailSearch: (mailboxId: string | null, query: string) =>
     ["command-palette-search", "mail", mailboxId, query] as const,
 } as const;

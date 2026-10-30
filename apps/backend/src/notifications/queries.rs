@@ -1,5 +1,7 @@
 //! Reminder rows of an owner's event, and the event's `reminder` column they mirror.
 
+use std::collections::HashMap;
+
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
@@ -52,6 +54,21 @@ pub async fn latest_display_title<C: ConnectionTrait>(
         .one(db)
         .await?
         .and_then(|row| row.encrypted_display_title))
+}
+
+/// Sealed leads by `minutes_before`, which a save from a client that cannot seal keeps.
+pub async fn stored_leads<C: ConnectionTrait>(
+    db: &C,
+    event_id: &str,
+) -> Result<HashMap<i32, String>, sea_orm::DbErr> {
+    Ok(event_notification::Entity::find()
+        .filter(event_notification::Column::EventId.eq(event_id))
+        .filter(event_notification::Column::EncryptedLead.is_not_null())
+        .all(db)
+        .await?
+        .into_iter()
+        .filter_map(|row| Some((row.minutes_before, row.encrypted_lead?)))
+        .collect())
 }
 
 /// `reconcileEventReminderField`: the event's `reminder` follows its earliest enabled email reminder.

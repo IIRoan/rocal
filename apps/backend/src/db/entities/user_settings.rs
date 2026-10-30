@@ -46,6 +46,8 @@ pub struct Model {
     pub created_at: TimeDateTime,
     pub updated_at: TimeDateTime,
     pub push_notifications: bool,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub encrypted_preferences: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

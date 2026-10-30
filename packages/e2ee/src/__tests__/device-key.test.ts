@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { webcrypto } from "node:crypto";
 import type { CryptoProvider } from "../crypto-provider";
-import { resolveDeviceEnvelopeSalt } from "../device-key";
+import { lockWithoutDeviceKeys, resolveDeviceEnvelopeSalt } from "../device-key";
 import { createE2eeModule } from "../e2ee-module";
 
 // Node's WebCrypto matches the provider at runtime; only the DOM-shaped declarations differ.
@@ -90,5 +90,28 @@ describe("resolveDeviceEnvelopeSalt", () => {
         accountKey,
       }),
     ).resolves.toBeNull();
+  });
+});
+
+describe("lockWithoutDeviceKeys", () => {
+  const base = { hasEnvelope: true, hasOtherDevices: true, opened: false };
+
+  it("keeps a device whose envelope opened", () => {
+    expect(lockWithoutDeviceKeys({ ...base, password: "sign-in", opened: true })).toBeNull();
+  });
+
+  it("asks for a sign-in when no password, or only a remembered one, was at hand", () => {
+    expect(lockWithoutDeviceKeys({ ...base, password: "none" })).toBe("sign-in-again");
+    expect(lockWithoutDeviceKeys({ ...base, password: "remembered" })).toBe("sign-in-again");
+  });
+
+  it("reports an envelope the password the server just accepted cannot open", () => {
+    expect(lockWithoutDeviceKeys({ ...base, password: "sign-in" })).toBe("cannot-open");
+  });
+
+  it("reports keys that live only on other devices, and lets a new account mint", () => {
+    const noEnvelope = { ...base, hasEnvelope: false, password: "sign-in" as const };
+    expect(lockWithoutDeviceKeys(noEnvelope)).toBe("cannot-open");
+    expect(lockWithoutDeviceKeys({ ...noEnvelope, hasOtherDevices: false })).toBeNull();
   });
 });

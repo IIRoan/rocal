@@ -6,7 +6,6 @@ describe("Settings screen account actions", () => {
       getSettingsAccountActions({
         canSignOut: true,
         hasPasswordAccount: true,
-        hasOAuthAccount: false,
       }),
     ).toEqual([
       {
@@ -48,31 +47,11 @@ describe("Settings screen account actions", () => {
     ]);
   });
 
-  it("shows set-password for OAuth-only accounts", () => {
-    expect(
-      getSettingsAccountActions({
-        canSignOut: true,
-        hasPasswordAccount: false,
-        hasOAuthAccount: true,
-      }).map((action) => ({
-        key: action.key,
-        label: action.label,
-      })),
-    ).toEqual([
-      { key: "set-password", label: "Set Email Password" },
-      { key: "change-profile-picture", label: "Add Profile Picture" },
-      { key: "reset-preferences", label: "Reset Preferences" },
-      { key: "sign-out", label: "Sign Out" },
-      { key: "delete-account", label: "Delete Account" },
-    ]);
-  });
-
   it("offers changing instead of adding once a profile picture shows", () => {
     expect(
       getSettingsAccountActions({
         canSignOut: true,
         hasPasswordAccount: true,
-        hasOAuthAccount: false,
         hasProfilePicture: true,
       }).find((action) => action.key === "change-profile-picture"),
     ).toMatchObject({
@@ -86,7 +65,6 @@ describe("Settings screen account actions", () => {
       getSettingsAccountActions({
         canSignOut: false,
         hasPasswordAccount: false,
-        hasOAuthAccount: false,
       }).map((action) => action.key),
     ).toEqual(["reset-preferences"]);
   });
@@ -96,7 +74,6 @@ describe("Settings screen account actions", () => {
       getSettingsAccountActions({
         canSignOut: true,
         hasPasswordAccount: true,
-        hasOAuthAccount: true,
       }).map((action) => action.key),
     ).toEqual([
       "change-password",
@@ -111,14 +88,13 @@ describe("Settings screen account actions", () => {
     expect(
       getSettingsAccountActions({
         canSignOut: true,
-        hasPasswordAccount: false,
-        hasOAuthAccount: true,
+        hasPasswordAccount: true,
       }).map((action) => ({
         key: action.key,
         destructive: action.destructive,
       })),
     ).toEqual([
-      { key: "set-password", destructive: false },
+      { key: "change-password", destructive: false },
       { key: "change-profile-picture", destructive: false },
       { key: "reset-preferences", destructive: true },
       { key: "sign-out", destructive: true },

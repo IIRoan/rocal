@@ -34,6 +34,7 @@ request_schema!(UpdateEventNotificationsRequest => {
                     ("notificationType", zod::enumeration(&["browser", "email"])),
                     ("minutesBefore", zod::number().int().gte(0.0).lte(43_200.0)),
                     ("isEnabled", zod::boolean()),
+                    ("encryptedLead", title.clone().nullish()),
                 ])
                 .strict(),
             )

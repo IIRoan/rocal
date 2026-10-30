@@ -1,5 +1,7 @@
 export { HttpClient } from "./http-client";
 export { createAuthKeyFetch } from "./auth-key-fetch";
+export { changePasswordWithEnvelope } from "./password-change";
+export type { PasswordEnvelopeRequest } from "./password-change";
 export { createMailAccessTokenManager } from "./mail-access-token";
 export type { MailAccessToken } from "./mail-access-token";
 export type {
@@ -19,6 +21,10 @@ export type {
   DeleteRecurringEventInput,
   EditRecurringEventInput,
 } from "./recurring-event-persistence";
+export {
+  loadEventSearchCorpus,
+  sealReadableInvitations,
+} from "./event-search-corpus";
 export { respondToMailInvitation } from "./mail-invitation-response";
 export type {
   MailInvitationResponse,

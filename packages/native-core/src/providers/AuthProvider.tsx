@@ -47,6 +47,7 @@ import {
   recoverableStoredDeviceId,
 } from "../lib/native-e2ee-provider";
 import { clearNativeTitleIndex } from "../lib/search/title-index-store";
+import { queryClient } from "./QueryProvider";
 
 const AUTH_STATUS_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
@@ -176,8 +177,10 @@ export interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<SignInResult>;
   /** Create a new account. */
   signUp: (name: string, email: string, password: string) => Promise<void>;
-  /** Sign out and clear the session. */
-  signOut: () => Promise<void>;
+  /** Sign out and clear the session; a notice is shown on the sign-in screen until the next sign-in. */
+  signOut: (notice?: string) => Promise<void>;
+  /** Why the last session ended, when the app ended it. */
+  signInNotice: string | null;
   /** Authenticate using platform biometrics (passkey). */
   signInWithPasskey: () => Promise<void>;
   /** Verify a registered passkey after email/password sign-in. */
@@ -212,6 +215,7 @@ export function AuthProvider({
     dispatch,
   ] = useReducer(authReducer, SIGNED_OUT);
   const [isLoading, setIsLoading] = useState(true);
+  const [signInNotice, setSignInNotice] = useState<string | null>(null);
   const pendingAuthPasswordRef = useRef<string | null>(null);
   const sessionLoadIdRef = useRef(0);
   const hasLiveSessionRef = useRef(false);
@@ -415,6 +419,8 @@ export function AuthProvider({
     setFallbackSessionToken(null);
     pendingAuthPasswordRef.current = null;
     dispatch({ type: "cleared" });
+    // The cache holds decrypted events, mail and the search corpus, so none of it outlives the session.
+    queryClient.clear();
   }, []);
 
   // A session the server ended (revoked, expired, 401/403) gets the sign-out wipe; a network failure keeps the device's data.
@@ -475,6 +481,7 @@ export function AuthProvider({
 
   const signIn = useCallback(
     async (email: string, password: string) => {
+      setSignInNotice(null);
       setEmailPasswordAuthHints(password);
       sessionLoadIdRef.current += 1;
       let authData: unknown;
@@ -553,6 +560,7 @@ export function AuthProvider({
 
   const signUp = useCallback(
     async (name: string, email: string, password: string) => {
+      setSignInNotice(null);
       sessionLoadIdRef.current += 1;
       setEmailPasswordAuthHints(password);
       const result = await authClient.signUp.email({
@@ -583,28 +591,33 @@ export function AuthProvider({
     ],
   );
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (notice?: string) => {
     sessionLoadIdRef.current += 1;
     hasLiveSessionRef.current = false;
     // Capture before clearing the fallback so logout requests still authenticate when the jar is empty.
     const logoutHeaders = getAuthHeaders();
     setFallbackSessionToken(null);
-    await Promise.all([
-      unregisterNativePushDevice(logoutHeaders),
-      deleteRecoverableDeviceRow(logoutHeaders).catch(() => undefined),
-      clearNotificationExtensionSecrets(),
-    ]);
-    try {
-      await authClient.signOut(
-        logoutHeaders.cookie
-          ? { fetchOptions: { headers: { cookie: logoutHeaders.cookie } } }
-          : undefined,
-      );
-    } catch {
-      // Best-effort — clear local state regardless.
-    }
-    await wipeSessionData(lifecycleRef.current);
-    clearSession();
+    const leave = async () => {
+      await Promise.all([
+        unregisterNativePushDevice(logoutHeaders),
+        deleteRecoverableDeviceRow(logoutHeaders).catch(() => undefined),
+        clearNotificationExtensionSecrets(),
+      ]);
+      await authClient
+        .signOut(
+          logoutHeaders.cookie
+            ? { fetchOptions: { headers: { cookie: logoutHeaders.cookie } } }
+            : undefined,
+        )
+        // Best-effort — local state is cleared regardless.
+        .catch(() => undefined);
+      await wipeSessionData(lifecycleRef.current);
+    };
+    // A failing cleanup step still ends the session, so the app is never left signed in without its keys.
+    await leave().finally(() => {
+      clearSession();
+      setSignInNotice(notice ?? null);
+    });
   }, [clearSession]);
 
   useEffect(() => {
@@ -814,6 +827,7 @@ export function AuthProvider({
       signIn,
       signUp,
       signOut,
+      signInNotice,
       signInWithPasskey,
       completePasskeyStepUp,
       registerPasskey,
@@ -832,6 +846,7 @@ export function AuthProvider({
       signIn,
       signUp,
       signOut,
+      signInNotice,
       signInWithPasskey,
       completePasskeyStepUp,
       registerPasskey,

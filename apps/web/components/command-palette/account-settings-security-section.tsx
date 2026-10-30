@@ -4,7 +4,6 @@ import { useReducer } from "react";
 
 import { InlineMessage } from "./account-settings-inline-message";
 import { AccountSecurityActions } from "./account-settings-security-actions";
-import type { SecurityAccessKind } from "./account-settings-types";
 import { AccountSecurityForm } from "./account-settings-security-form";
 import {
   initialSecurityUiState,
@@ -15,26 +14,14 @@ import { PaletteSection } from "./palette-ui";
 export function AccountSecuritySection({
   isBusy,
   hasPasswordAccount,
-  hasOAuthAccount,
   changingPassword,
-  settingPassword,
-  resettingEncryptionPassword,
   handleChangePassword,
-  handleSetPassword,
-  handleResetEncryptionPassword,
 }: {
   isBusy: boolean;
   hasPasswordAccount: boolean;
-  hasOAuthAccount: boolean;
   changingPassword: boolean;
-  settingPassword: boolean;
-  resettingEncryptionPassword: boolean;
   handleChangePassword: (values: {
     currentPassword: string;
-    newPassword: string;
-  }) => Promise<void>;
-  handleSetPassword?: (values: { newPassword: string }) => Promise<void>;
-  handleResetEncryptionPassword?: (values: {
     newPassword: string;
   }) => Promise<void>;
 }) {
@@ -44,16 +31,6 @@ export function AccountSecuritySection({
   );
 
   const isAnySecurityFormOpen = security.activeForm !== null;
-  const securityFormBusy =
-    changingPassword || settingPassword || resettingEncryptionPassword;
-  const accessKind: SecurityAccessKind =
-    hasOAuthAccount && hasPasswordAccount
-      ? "oauth-and-password"
-      : hasOAuthAccount
-        ? "oauth-only"
-        : hasPasswordAccount
-          ? "password"
-          : "none";
 
   return (
     <PaletteSection label="Security">
@@ -63,7 +40,7 @@ export function AccountSecuritySection({
         </div>
       ) : null}
       <AccountSecurityActions
-        accessKind={accessKind}
+        hasPasswordAccount={hasPasswordAccount}
         busy={isBusy}
         formOpen={isAnySecurityFormOpen}
         onOpenForm={(form) => dispatch({ type: "openForm", form })}
@@ -72,12 +49,8 @@ export function AccountSecuritySection({
         security={security}
         dispatch={dispatch}
         activeForm={security.activeForm}
-        submission={{ busy: securityFormBusy }}
-        handlers={{
-          handleChangePassword,
-          handleSetPassword,
-          handleResetEncryptionPassword,
-        }}
+        submission={{ busy: changingPassword }}
+        handleChangePassword={handleChangePassword}
       />
     </PaletteSection>
   );

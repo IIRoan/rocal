@@ -36,10 +36,9 @@ export function validateCategoryName(
 }
 
 export function categoryUsageDetail(
-  category: EventCategory,
+  count: number | undefined,
 ): string | undefined {
-  const count = category.usageCount ?? 0;
-  if (count === 0) return undefined;
+  if (!count) return undefined;
   return count === 1 ? "1 event" : `${count} events`;
 }
 

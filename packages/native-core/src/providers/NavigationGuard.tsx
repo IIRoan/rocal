@@ -3,10 +3,14 @@ import { View } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { createLogger } from "@workspace/logger";
+import { sealReadableInvitations } from "@workspace/calendar-client";
+import {
+  SIGN_IN_TO_UNLOCK_NOTICE,
+  UNLOCK_FAILED_NOTICE,
+} from "@workspace/calendar-core/product-info";
 import { useAuth } from "./AuthProvider";
 import { useE2ee } from "./E2eeProvider";
 import { PushNotificationNavigation } from "./PushNotificationNavigation";
-import { E2eeUnlockSheet } from "../components/E2eeUnlockSheet";
 import { WorkspaceLoadingScreen } from "../components/WorkspaceLoadingScreen";
 import { calendarApiService } from "../lib/api";
 import { QUERY_KEYS } from "../lib/query-keys";
@@ -105,7 +109,7 @@ export function NavigationGuard({
   pushTapHandler,
   notificationExtensionSecrets,
 }: NavigationGuardProps) {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, signOut } = useAuth();
   const { isReady: isE2eeReady, bootstrap, clearSession, provider } = useE2ee();
   useNotificationExtensionSync(notificationExtensionSecrets);
   useAccountTimezoneSeed(isAuthenticated && Boolean(user));
@@ -121,8 +125,6 @@ export function NavigationGuard({
   if (startup.userId !== sessionUserId) {
     dispatchStartup({ type: "reset", userId: sessionUserId });
   }
-  // Bumped after the encryption password unlocks this device, so startup runs again with the account key.
-  const [startupRun, rerunStartup] = useReducer((run: number) => run + 1, 0);
   const isRestorePending =
     Boolean(restoreSession) &&
     sessionUserId !== null &&
@@ -175,8 +177,17 @@ export function NavigationGuard({
         dispatchStartup({ type: "restored", userId: user.id, restored });
       }
 
-      const needsPassword = await bootstrap(user.id, API_BASE_URL);
-      if (cancelled || needsPassword) return;
+      const lock = await bootstrap(user.id, API_BASE_URL);
+      if (cancelled) return;
+      // A signed-in session always holds the account key; one that cannot open it ends instead of asking for a password.
+      if (lock) {
+        await signOut(
+          lock === "cannot-open"
+            ? UNLOCK_FAILED_NOTICE
+            : SIGN_IN_TO_UNLOCK_NOTICE,
+        );
+        return;
+      }
 
       await prepareSession?.({
         queryClient,
@@ -196,7 +207,7 @@ export function NavigationGuard({
       // repo-rules-allow async-promise-handling: resetPreSessionQueries is Promise.all of resetQueries, which never rejects.
       void resetPreSessionQueries(queryClient);
 
-      // Silent on failure; the next launch retries the seed.
+      // Silent on failure; the next launch retries the seed and the sealing.
       void calendarApiService
         .ensureDefaultCalendars()
         .then(async (seeded) => {
@@ -207,6 +218,19 @@ export function NavigationGuard({
           }
         })
         .catch(() => undefined);
+      void calendarApiService
+        .ensureSealedUserSettings()
+        .then(async (sealed) => {
+          if (sealed && !cancelled) {
+            await queryClient.invalidateQueries({
+              queryKey: QUERY_KEYS.settings(),
+            });
+          }
+        })
+        .catch(() => undefined);
+
+      // Invitation copies the server still stores readable are sealed now; any that fail wait for the next launch.
+      void sealReadableInvitations(calendarApiService).catch(() => undefined);
     })()
       .catch((error: unknown) => {
         log.warn("Session startup failed", {
@@ -231,7 +255,7 @@ export function NavigationGuard({
     provider,
     queryClient,
     restoreSession,
-    startupRun,
+    signOut,
   ]);
 
   const isStartupRunning = !isE2eeReady || startup.isPreparing;
@@ -257,7 +281,6 @@ export function NavigationGuard({
         active={isPreparingWorkspace}
         message={startup.message}
       />
-      <E2eeUnlockSheet onUnlocked={rerunStartup} />
     </View>
   );
 }

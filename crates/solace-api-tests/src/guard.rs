@@ -74,7 +74,7 @@ pub fn check_database_url(name: &'static str, value: &str) -> Result<(), GuardEr
 }
 
 /// A secret minted for the test environment.
-pub fn check_secret(name: &'static str, value: &str) -> Result<(), GuardError> {
+pub fn check_minted(name: &'static str, value: &str) -> Result<(), GuardError> {
     if value.starts_with(TEST_SECRET_PREFIX) && value.len() > TEST_SECRET_PREFIX.len() {
         Ok(())
     } else {
@@ -171,9 +171,9 @@ mod tests {
 
     #[test]
     fn secrets_buckets_and_domains_must_be_test_ones() {
-        assert_eq!(check_secret("S", "solace-test-abc"), Ok(()));
-        assert!(check_secret("S", "solace-test-").is_err());
-        assert!(check_secret("S", "f00dbabe").is_err());
+        assert_eq!(check_minted("S", "solace-test-abc"), Ok(()));
+        assert!(check_minted("S", "solace-test-").is_err());
+        assert!(check_minted("S", "f00dbabe").is_err());
         assert_eq!(check_bucket("B", "solace-test-avatars-x1y2"), Ok(()));
         assert!(check_bucket("B", "profile-pictures-abc").is_err());
         assert_eq!(check_mail_domain("D", "solace.test"), Ok(()));

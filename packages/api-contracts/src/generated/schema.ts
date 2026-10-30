@@ -1211,6 +1211,8 @@ export interface components {
         };
         CreateEventRequest: {
             allDay?: boolean;
+            /** @description Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared. */
+            attributesEncrypted?: boolean;
             blindIndexTokens?: string[];
             calendarId: components["schemas"]["CalendarId"];
             categoryId?: components["schemas"]["CategoryId"];
@@ -1572,6 +1574,8 @@ export interface components {
             limit?: number | null;
             /** Format: int64 */
             offset?: number | null;
+            /** @description Only invitation copies still stored readable, declined ones included, for the device to seal. */
+            readableInvitations?: boolean | null;
             updatedAfter?: string | null;
         };
         /** @description `GET /api/events/search`: plaintext `q`, or comma-separated blind-index tokens for encrypted events. */
@@ -1910,6 +1914,8 @@ export interface components {
         };
         NotificationId: string;
         NotificationSetting: {
+            /** @description `minutes_before` sealed under the notification key, so a push shows the start time without carrying it; omitted keeps a stored one. */
+            encryptedLead?: string | null;
             isEnabled: boolean;
             /** Format: int32 */
             minutesBefore: number;
@@ -2125,6 +2131,8 @@ export interface components {
         };
         RecurringUpdates: {
             allDay?: boolean;
+            /** @description Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared. */
+            attributesEncrypted?: boolean;
             blindIndexTokens?: string[];
             calendarId?: components["schemas"]["CalendarId"];
             /** @description An empty id clears the category. */
@@ -2356,6 +2364,8 @@ export interface components {
         };
         UpdateEventRequest: {
             allDay?: boolean;
+            /** @description Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared. */
+            attributesEncrypted?: boolean;
             blindIndexTokens?: string[];
             calendarId?: components["schemas"]["CalendarId"];
             /** @description An empty id clears the category. */
@@ -2383,6 +2393,10 @@ export interface components {
             /** @description `month`, `week`, `3day`, `day` or `agenda`. */
             defaultView?: string;
             emailNotifications?: boolean;
+            /** @description Replaces the sealed preferences; their plaintext fields go back to the defaults and any sent with it are ignored. */
+            encryptedPreferences?: string;
+            /** @description The sealed preferences this change was merged onto (`null` for none); a different stored value refuses the write with 409. */
+            expectedEncryptedPreferences?: string | null;
             pushNotifications?: boolean;
             reminderSound?: boolean;
             showDeclinedEvents?: boolean;
@@ -2429,6 +2443,8 @@ export interface components {
             defaultEventDuration: number;
             defaultView: string;
             emailNotifications: boolean;
+            /** @description App-only preferences sealed on the device; while set, their fields above hold the defaults. */
+            encryptedPreferences: string | null;
             id: string;
             pushNotifications: boolean;
             reminderSound: boolean;
@@ -3083,6 +3099,7 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 updatedAfter?: string;
+                readableInvitations?: boolean;
             };
             header?: never;
             path?: never;

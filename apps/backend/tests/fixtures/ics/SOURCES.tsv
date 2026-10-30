@@ -6,4 +6,4 @@ live--thunderbird-dutch-holidays	https://www.thunderbird.net/media/caldata/autog
 node-ical--	https://github.com/jens-maus/node-ical/tree/master/test/fixtures (real-world bug reports: Exchange, Outlook Web App, Google, Apple, Zimbra, SabreDAV, Meetup, TripIt)	Apache-2.0	2026-10-14
 icalendar--	https://github.com/collective/icalendar/tree/main/src/icalendar/tests/calendars	BSD-2-Clause	2026-10-14
 synthetic--	written for this port to pin node-ical quirks the samples above do not reach	-	2026-10-14
-*.parsed.json, builder/*.ics, export/*.ics	generate.ts against the TypeScript backend under Bun 1.4.3 (Vercel's runtime), host TZ=UTC	-	2026-10-14
+*.parsed.json, builder/*.ics, export/*.ics	the TypeScript backend's parser and exporter (deleted with it) under Bun 1.4.3, host TZ=UTC	-	2026-10-14

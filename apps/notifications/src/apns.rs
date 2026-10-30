@@ -54,30 +54,29 @@ pub struct Notification {
     pub email_id: String,
     pub account_id: String,
     pub encrypted_title: String,
+    pub encrypted_lead: String,
+    /// When the reminder was due; Apple sees about that anyway, and the extension adds the sealed lead to it.
+    pub due_at: i64,
 }
 
-/// A generic reminder; `starts_at` is a preformatted clock time, not content.
+/// A generic reminder: the title and lead travel sealed, so the visible text names no time.
 pub fn event_reminder(
-    minutes_before: i64,
     event_id: &str,
     encrypted_title: &str,
-    starts_at: &str,
+    encrypted_lead: &str,
+    due_at: i64,
 ) -> Notification {
-    let body = match (starts_at.trim(), minutes_before) {
-        (clock, _) if !clock.is_empty() => format!("Starts at {clock}"),
-        (_, minutes) if minutes <= 0 => "Starting now".into(),
-        (_, 1) => "Starts in 1 minute".into(),
-        (_, minutes) => format!("Starts in {minutes} minutes"),
-    };
     Notification {
         kind: Kind::EventReminder,
         title: "Event reminder",
-        body,
+        body: "You have an upcoming event".into(),
         collapse_id: collapse_id("event:", event_id),
         event_id: event_id.to_owned(),
         email_id: String::new(),
         account_id: String::new(),
         encrypted_title: encrypted_title.trim().to_owned(),
+        encrypted_lead: encrypted_lead.trim().to_owned(),
+        due_at,
     }
 }
 
@@ -97,6 +96,8 @@ pub fn new_mail(count: i64, email_id: &str, account_id: &str) -> Notification {
         email_id: email_id.to_owned(),
         account_id: account_id.trim().to_owned(),
         encrypted_title: String::new(),
+        encrypted_lead: String::new(),
+        due_at: 0,
     }
 }
 
@@ -133,6 +134,10 @@ pub fn payload(notification: &Notification) -> Value {
             }
             if !notification.encrypted_title.is_empty() {
                 payload["enc"] = json!(notification.encrypted_title);
+            }
+            if !notification.encrypted_lead.is_empty() {
+                payload["encl"] = json!(notification.encrypted_lead);
+                payload["due"] = json!(notification.due_at);
             }
         }
         Kind::NewMail => {
@@ -316,26 +321,30 @@ mod tests {
 
     #[test]
     fn reminders_are_generic_and_carry_only_ciphertext() {
-        let reminder = event_reminder(15, "evt1", " v1.iv.ct ", "15:30");
+        let reminder = event_reminder("evt1", " v1.iv.ct ", " v1.iv.lead ", 1_700_000_000);
         let body = payload(&reminder);
         assert_eq!(
             body["aps"]["alert"],
-            json!({"title": "Event reminder", "body": "Starts at 15:30"})
+            json!({"title": "Event reminder", "body": "You have an upcoming event"})
         );
         assert_eq!(body["aps"]["mutable-content"], json!(1));
         assert_eq!(body["aps"]["thread-id"], json!("event:evt1"));
         assert_eq!(body["type"], json!("event_reminder"));
         assert_eq!(body["eventId"], json!("evt1"));
         assert_eq!(body["enc"], json!("v1.iv.ct"));
+        assert_eq!(body["encl"], json!("v1.iv.lead"));
+        assert_eq!(body["due"], json!(1_700_000_000));
         assert_eq!(body["body"], json!({"t": "event", "eid": "evt1"}));
     }
 
     #[test]
-    fn reminders_fall_back_to_the_lead_time() {
-        assert_eq!(event_reminder(15, "e", "", "").body, "Starts in 15 minutes");
-        assert_eq!(event_reminder(1, "e", "", " ").body, "Starts in 1 minute");
-        assert_eq!(event_reminder(0, "e", "", "").body, "Starting now");
-        assert_eq!(payload(&event_reminder(0, "e", "", "")).get("enc"), None);
+    fn reminders_without_ciphertext_name_no_time() {
+        let reminder = event_reminder("e", "", "", 1_700_000_000);
+        assert_eq!(reminder.body, "You have an upcoming event");
+        let body = payload(&reminder);
+        assert_eq!(body.get("enc"), None);
+        assert_eq!(body.get("encl"), None);
+        assert_eq!(body.get("due"), None);
     }
 
     #[test]
@@ -364,11 +373,11 @@ mod tests {
 
     #[test]
     fn oversized_ciphertext_is_dropped_not_the_push() {
-        let reminder = event_reminder(5, "e1", &"c".repeat(MAX_PAYLOAD_BYTES), "");
+        let reminder = event_reminder("e1", &"c".repeat(MAX_PAYLOAD_BYTES), "", 0);
         let body: Value = serde_json::from_slice(&encode(&reminder).unwrap()).unwrap();
         assert_eq!(body.get("enc"), None);
         assert_eq!(body["eventId"], json!("e1"));
-        let small = event_reminder(5, "e1", "ct", "");
+        let small = event_reminder("e1", "ct", "", 0);
         let body: Value = serde_json::from_slice(&encode(&small).unwrap()).unwrap();
         assert_eq!(body["enc"], json!("ct"));
     }
@@ -421,7 +430,7 @@ mod tests {
         })
         .await;
         let delivery = apns
-            .send(&DEVICE, &event_reminder(5, "e1", "", ""))
+            .send(&DEVICE, &event_reminder("e1", "", "", 0))
             .await
             .unwrap();
         assert!(delivery.unregistered);

@@ -92,7 +92,7 @@ function buildPasswordUpdatedHtml(): string {
       If you made this change, no further action is needed &mdash; you&rsquo;re all set.
     </p>
     <p class="email-body" style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
-      After you sign in with email and password, Solace will also use this password to protect your encryption keys. GitHub and passkey sign-in keep using a separate encryption password.
+      Solace also uses this password to protect your encryption keys on every device.
     </p>
     <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:fit-content;line-height:100%;padding:24px 0 0">
       <tbody><tr><td align="center" valign="middle">

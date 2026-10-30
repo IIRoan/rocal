@@ -100,6 +100,7 @@ pub async fn set(
         Some(title) => title,
         None => queries::latest_display_title(&state.db, event_id).await?,
     };
+    let stored_leads = queries::stored_leads(&state.db, event_id).await?;
     let now = instant::now();
     let in_past = event.start <= now;
     let mut created = Vec::new();
@@ -144,6 +145,10 @@ pub async fn set(
             is_enabled: Set(true),
             is_sent: Set(false),
             encrypted_display_title: Set(display_title.clone()),
+            encrypted_lead: Set(setting
+                .encrypted_lead
+                .clone()
+                .or_else(|| stored_leads.get(&setting.minutes_before).cloned())),
             created_at: Set(now),
             updated_at: Set(now),
         });

@@ -23,64 +23,17 @@ export const CALENDAR_VIEWS: readonly CalendarView[] = [
 
 export const AgendaDaysToShow = 30;
 
-/** A calendar or category as a search hit embeds it: only what labels the hit. */
-export type EventSearchLabel = Pick<
-  Calendar,
-  "id" | "name" | "color" | "encryptedName" | "encryptionKeyVersion"
->;
-
-/** A search hit (`SearchEvent`): a subset of the event row with trimmed calendar and category labels instead of full rows. */
-export interface EventSearchHit
-  extends Pick<
-    CalendarEvent,
-    | "id"
-    | "title"
-    | "description"
-    | "encryptedContent"
-    | "blindIndexTokens"
-    | "encryptionState"
-    | "encryptionKeyVersion"
-    | "start"
-    | "end"
-    | "timezone"
-    | "allDay"
-    | "location"
-    | "color"
-    | "calendarId"
-    | "categoryId"
-    | "userId"
-    | "createdAt"
-    | "updatedAt"
-    | "recurrence"
-    | "participants"
-  > {
-  calendar?: EventSearchLabel | null;
-  category?: EventSearchLabel | null;
-}
-
-export interface EventSearchResult {
-  events: EventSearchHit[];
-  total: number;
-}
-
 export interface EventSearchCorpusResult {
   events: CalendarEvent[];
   total: number;
   nextOffset: number | null;
 }
 
-export interface EventSearchParams {
-  q: string;
-  limit?: number;
-  offset?: number;
-  startDate?: string;
-  endDate?: string;
-}
-
 export interface EventSearchCorpusParams {
   limit?: number;
   offset?: number;
   updatedAfter?: string;
+  readableInvitations?: boolean;
 }
 
 export type EventColor =
@@ -123,6 +76,8 @@ export interface EventContentEncryptionShadowRequest {
   encryptedContent?: string;
   blindIndexTokens?: string[];
   encryptionKeyVersion?: number;
+  /** Colour and category travel inside `encryptedContent`, so the server clears its plaintext copies. */
+  attributesEncrypted?: boolean;
 }
 
 export interface Calendar {
@@ -350,7 +305,7 @@ export interface EventsResponse {
   calendars: Calendar[];
 }
 
-/** Client shape before encryption; on the wire `EventWireRequest` carries ciphertext in place of title, description and location. */
+/** Client shape before encryption; on the wire `EventWireRequest` carries ciphertext in place of title, description, location, colour and category. */
 export interface CreateEventRequest extends EventContentEncryptionShadowRequest {
   title: string;
   description?: string;
@@ -566,63 +521,6 @@ export interface E2eeBootstrapResponse {
   devices: E2eeDeviceRecord[];
   passwordEnvelope: E2eePasswordRecord | null;
   calendars: E2eeBootstrapCalendar[];
-}
-
-export interface E2eeResetSnapshotCalendar {
-  id: string;
-  name: string;
-  encryptedName?: string | null;
-  blindIndexTokens?: string[] | null;
-  encryptionState?: EncryptionState;
-  encryptionKeyVersion?: number;
-  color: EventColor;
-  kind: CalendarKind;
-  isDefault: boolean;
-  isVisible: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface E2eeResetSnapshotCategory {
-  id: string;
-  name: string;
-  encryptedName?: string | null;
-  blindIndexTokens?: string[] | null;
-  encryptionState?: EncryptionState;
-  encryptionKeyVersion?: number;
-  color: string;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface E2eeResetSnapshotEvent {
-  id: string;
-  title: string;
-  description?: string | null;
-  encryptedContent?: string | null;
-  blindIndexTokens?: string[] | null;
-  encryptionState?: EncryptionState;
-  encryptionKeyVersion?: number;
-  start: Date;
-  end: Date;
-  timezone?: string | null;
-  allDay: boolean;
-  location?: string | null;
-  color?: string | null;
-  calendarId: string;
-  categoryId?: string | null;
-  reminder?: number | null;
-  recurrence?: string | null;
-  parentEventId?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface E2eeResetSnapshotResponse {
-  calendars: E2eeResetSnapshotCalendar[];
-  categories: E2eeResetSnapshotCategory[];
-  events: E2eeResetSnapshotEvent[];
 }
 
 export interface UpsertE2eeDeviceRequest {

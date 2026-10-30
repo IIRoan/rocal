@@ -11,8 +11,10 @@ import {
   hydrateEncryptedName,
   parseEncryptedJsonPayload,
   shouldEncryptEventContent,
+  withoutPlaintextEventContent,
   type E2eeSessionKeys,
 } from "../payloads";
+import { withDecryptedEventContent } from "../hydration";
 import { NoopE2eeProvider } from "../provider";
 
 const e2ee = createE2eeModule(webcrypto as unknown as CryptoProvider);
@@ -51,19 +53,22 @@ describe("encryptEventContentRequest", () => {
       location: "Clinic",
       start: "2026-06-01T09:00:00.000Z",
       end: "2026-06-01T10:00:00.000Z",
+      color: "rose",
       calendarId: "calendar-1",
+      categoryId: "category-1",
     });
 
-    expect(wire).not.toHaveProperty("title");
-    expect(wire).not.toHaveProperty("description");
-    expect(wire).not.toHaveProperty("location");
+    for (const field of ["title", "description", "location", "color", "categoryId"]) {
+      expect(wire).not.toHaveProperty(field);
+    }
     expect(wire).not.toHaveProperty("invitationContent");
-    expect(JSON.stringify(wire)).not.toMatch(/Therapy|Session notes|Clinic/);
+    expect(JSON.stringify(wire)).not.toMatch(/Therapy|Session notes|Clinic|rose|category-1/);
     expect(wire.blindIndexTokens?.length).toBeGreaterThan(0);
     expect(wire).toMatchObject({
       start: "2026-06-01T09:00:00.000Z",
       calendarId: "calendar-1",
       encryptionKeyVersion: 1,
+      attributesEncrypted: true,
     });
 
     const decrypted = await e2ee.decryptJsonPayload(
@@ -75,7 +80,47 @@ describe("encryptEventContentRequest", () => {
       title: "Therapy",
       description: "Session notes",
       location: "Clinic",
+      color: "rose",
+      categoryId: "category-1",
     });
+  });
+
+  it("refuses a colour or category change without a session", () => {
+    expect(() => withoutPlaintextEventContent({ color: "rose" })).toThrow(
+      ENCRYPTION_NOT_READY_MESSAGE,
+    );
+    expect(() => withoutPlaintextEventContent({ categoryId: "category-1" })).toThrow(
+      ENCRYPTION_NOT_READY_MESSAGE,
+    );
+    expect(withoutPlaintextEventContent({ start: "2026-06-01T09:00:00.000Z" })).toEqual({
+      start: "2026-06-01T09:00:00.000Z",
+    });
+  });
+
+  it("restores colour and category from the ciphertext unless an older app left a plaintext copy", () => {
+    const event = {
+      id: "event-1",
+      title: "",
+      start: new Date("2026-06-01T09:00:00.000Z"),
+      end: new Date("2026-06-01T10:00:00.000Z"),
+      calendarId: "calendar-1",
+      userId: "user-1",
+      createdAt: new Date("2026-05-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-05-01T00:00:00.000Z"),
+    };
+    const content = { title: "Therapy", color: "rose", categoryId: "category-1" };
+
+    expect(withDecryptedEventContent(event, content)).toMatchObject({
+      title: "Therapy",
+      color: "rose",
+      categoryId: "category-1",
+    });
+    expect(
+      withDecryptedEventContent({ ...event, color: "teal", categoryId: "category-2" }, content),
+    ).toMatchObject({ color: "teal", categoryId: "category-2" });
+    expect(
+      withDecryptedEventContent({ ...event, color: "teal" }, { title: "Therapy" }),
+    ).toMatchObject({ color: "teal", categoryId: undefined });
   });
 
   it("attaches a transient invitation copy only when attendees are invited", async () => {

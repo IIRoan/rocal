@@ -64,20 +64,8 @@
         ]
       },
       {
-        "files": ["**/lib/notification-calculator.ts"],
-        "rules": ["react-doctor/js-hoist-intl"]
-      },
-      {
         "files": ["**/app/settings/index.tsx"],
         "rules": ["react-doctor/js-tosorted-immutable"]
-      },
-      {
-        "files": [
-          "**/services/event.service.ts",
-          "**/services/event-participant.service.ts",
-          "**/services/mail-sync.service.ts"
-        ],
-        "rules": ["react-doctor/async-await-in-loop"]
       },
       {
         "files": ["**/components/mail/message-list/message-list-virtualized.tsx"],

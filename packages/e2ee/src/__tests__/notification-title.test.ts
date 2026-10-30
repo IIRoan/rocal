@@ -7,8 +7,10 @@ import type { CryptoProvider } from "../crypto-provider";
 import { bytesToBase64Url } from "../e2ee-module";
 import {
   NOTIFICATION_KEY_INFO,
+  decryptNotificationLead,
   decryptNotificationTitle,
   deriveNotificationKeyBytes,
+  encryptNotificationLead,
   encryptNotificationTitle,
   importNotificationKey,
   normalizeNotificationTitle,
@@ -22,6 +24,8 @@ const VECTOR = {
   title: "Dentist — 3pm",
   notificationKey: "cNL8JZgoDs-eREw6AXrJgoOK9W5TprVEGl7ciJ7hTGg",
   wire: "v1.oKGio6Slpqeoqaqr.RzKqGz6RlCIjsse98Z5olLmi5f7PQ06_sfA4TvGmoA",
+  leadMinutes: 15,
+  leadWire: "v1.oKGio6Slpqeoqaqr.MmK59G4HT1NBZhymzgPpv9Cs",
 };
 
 const nodeCrypto = webcrypto as unknown as CryptoProvider;
@@ -83,6 +87,35 @@ describe("notification title encryption", () => {
     await expect(
       decryptNotificationTitle(nodeCrypto, key, VECTOR.eventId, VECTOR.wire),
     ).resolves.toBe(VECTOR.title);
+  });
+
+  it("seals a reminder's lead minutes so only the lead purpose opens them", async () => {
+    const accountKey = await importAccountKey(VECTOR.accountKey);
+    const key = await importNotificationKey(
+      nodeCrypto,
+      await deriveNotificationKeyBytes(nodeCrypto, accountKey),
+    );
+    const wire = await encryptNotificationLead(
+      fixedIvCrypto(VECTOR.iv),
+      key,
+      VECTOR.eventId,
+      VECTOR.leadMinutes,
+    );
+
+    expect(wire).toBe(VECTOR.leadWire);
+    expect(encryptedNotificationTitleSchema.safeParse(wire).success).toBe(true);
+    await expect(
+      decryptNotificationLead(nodeCrypto, key, VECTOR.eventId, wire),
+    ).resolves.toBe(VECTOR.leadMinutes);
+    await expect(
+      decryptNotificationTitle(nodeCrypto, key, VECTOR.eventId, wire),
+    ).rejects.toThrow();
+    await expect(
+      decryptNotificationLead(nodeCrypto, key, VECTOR.eventId, VECTOR.wire),
+    ).rejects.toThrow();
+    await expect(
+      decryptNotificationLead(nodeCrypto, key, "evt_other", wire),
+    ).rejects.toThrow();
   });
 
   it("binds the ciphertext to the event id", async () => {

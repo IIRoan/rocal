@@ -153,6 +153,10 @@ pub struct RecurringUpdates {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub invitation_content: Option<InvitationContent>,
+    /// Colour and category travel inside `encryptedContent`, so the stored plaintext copies are cleared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub attributes_encrypted: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub encrypted_content: Option<String>,

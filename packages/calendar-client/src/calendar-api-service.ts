@@ -7,6 +7,7 @@ import {
 } from "@workspace/e2ee";
 import {
   DEFAULT_CALENDARS,
+  EVENT_CONTENT_FIELDS,
   partitionCalendarsByKind,
   validateEventData as coreValidateEventData,
   validateCategoryData as coreValidateCategoryData,
@@ -15,6 +16,11 @@ import {
   type InvitationImportEncryptionPayload,
   encryptedIcsImportEventSchema,
   type EncryptedIcsImportEvent,
+  USER_SETTINGS_PREFERENCES_AAD,
+  pickUserSettingsPreferences,
+  readUserSettingsPreferences,
+  splitUserSettingsUpdate,
+  type UserSettingsPreferences,
 } from "@workspace/calendar-core";
 import type {
   CalendarEvent,
@@ -52,8 +58,6 @@ import type {
   SyncSubscriptionResponse,
   ImportICSRequest,
   ImportICSResponse,
-  EventSearchResult,
-  EventSearchParams,
   EventSearchCorpusResult,
   EventSearchCorpusParams,
   SolaceProfileLookupRequest,
@@ -63,12 +67,46 @@ import type {
 } from "@workspace/calendar-core";
 
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
+const SETTINGS_WRITE_RETRIES = 2;
+
+/** The API answers 409 when sealed preferences changed since the write read them. */
+function isConflict(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "statusCode" in error &&
+    error.statusCode === 409
+  );
+}
+
+/** New ciphertext replaces every content field, so an update that sets only some of them needs the stored rest. */
+function needsStoredContent(request: UpdateEventRequest): boolean {
+  const set = EVENT_CONTENT_FIELDS.filter(
+    (field) => request[field] !== undefined,
+  ).length;
+  return set > 0 && set < EVENT_CONTENT_FIELDS.length;
+}
+
+function withStoredContent(
+  request: UpdateEventRequest,
+  stored: CalendarEvent,
+): UpdateEventRequest {
+  return {
+    ...request,
+    title: request.title ?? stored.title,
+    description: request.description ?? stored.description ?? undefined,
+    location: request.location ?? stored.location ?? undefined,
+    color: request.color ?? stored.color ?? undefined,
+    categoryId: request.categoryId ?? stored.categoryId ?? undefined,
+  };
+}
 
 // `as` casts from API types only narrow free-text fields (kind, encryptionState, role, status) to calendar-core's literal unions.
 export class CalendarApiService {
   private client: HttpClient;
   private e2ee: E2eeProvider;
   private defaultCalendarsSeed: Promise<boolean> | null = null;
+  private settingsWrites: Promise<unknown> = Promise.resolve();
 
   constructor(client: HttpClient, e2eeProvider?: E2eeProvider) {
     this.client = client;
@@ -500,43 +538,35 @@ export class CalendarApiService {
       if ("deleted" in response) {
         return response;
       }
-      return await this.hydrateEncryptedEvent(response as CalendarEvent);
+      // Answering keeps the copy, so it is sealed here for every caller, as the mail card does.
+      return await this.sealImportedInvitationIfNeeded(
+        await this.hydrateEncryptedEvent(response as CalendarEvent),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to respond to invitation");
     }
   }
 
-  async searchEvents(
-    params: EventSearchParams,
+  private fetchEventSearchCorpus(
+    params: EventSearchCorpusParams,
     signal?: AbortSignal,
-  ): Promise<EventSearchResult> {
-    try {
-      const searchParams = new URLSearchParams({ q: params.q });
-
-      const blindIndexTokens = await this.e2ee.createBlindIndexTokens(params.q);
-      if (blindIndexTokens.length > 0) {
-        searchParams.set("blindIndexTokens", blindIndexTokens.join(","));
-      }
-
-      if (params.limit != null) searchParams.set("limit", String(params.limit));
-      if (params.offset != null) searchParams.set("offset", String(params.offset));
-      if (params.startDate) searchParams.set("startDate", params.startDate);
-      if (params.endDate) searchParams.set("endDate", params.endDate);
-
-      const response = await this.client.get<Schema<"EventSearchResults">>(
-        `/api/events/search?${searchParams.toString()}`,
-        { signal },
-      );
-      return {
-        ...response,
-        // Hydration rewrites only content and label-name fields, so the trimmed `SearchLabel`s pass through it as `EventSearchHit` labels.
-        events: await this.hydrateEncryptedEvents(
-          response.events as CalendarEvent[],
-        ),
-      };
-    } catch (error) {
-      throw this.transformError(error, "Failed to search events");
+  ) {
+    const searchParams = new URLSearchParams();
+    if (params.limit != null) searchParams.set("limit", String(params.limit));
+    if (params.offset != null) searchParams.set("offset", String(params.offset));
+    if (params.updatedAfter) {
+      searchParams.set("updatedAfter", params.updatedAfter);
     }
+    if (params.readableInvitations) {
+      searchParams.set("readableInvitations", "true");
+    }
+
+    const query = searchParams.toString();
+    return this.client.get<Schema<"EventSearchCorpus">>(
+      // repo-rules-allow api-path-ids: appends a URLSearchParams query string, not a path segment.
+      `/api/events/search-corpus${query ? `?${query}` : ""}`,
+      { signal },
+    );
   }
 
   async getEventSearchCorpus(
@@ -544,19 +574,7 @@ export class CalendarApiService {
     signal?: AbortSignal,
   ): Promise<EventSearchCorpusResult> {
     try {
-      const searchParams = new URLSearchParams();
-      if (params.limit != null) searchParams.set("limit", String(params.limit));
-      if (params.offset != null) searchParams.set("offset", String(params.offset));
-      if (params.updatedAfter) {
-        searchParams.set("updatedAfter", params.updatedAfter);
-      }
-
-      const query = searchParams.toString();
-      const response = await this.client.get<Schema<"EventSearchCorpus">>(
-        // repo-rules-allow api-path-ids: appends a URLSearchParams query string, not a path segment.
-        `/api/events/search-corpus${query ? `?${query}` : ""}`,
-        { signal },
-      );
+      const response = await this.fetchEventSearchCorpus(params, signal);
 
       return {
         ...response,
@@ -570,6 +588,22 @@ export class CalendarApiService {
         "Failed to load event search corpus",
       );
     }
+  }
+
+  /** Events per category id, counted on this device because the category travels inside the ciphertext. */
+  async getCategoryUsageCounts(
+    signal?: AbortSignal,
+  ): Promise<Record<string, number>> {
+    const counts: Record<string, number> = {};
+    let offset = 0;
+    do {
+      const page = await this.getEventSearchCorpus({ limit: 200, offset }, signal);
+      for (const { categoryId } of page.events) {
+        if (categoryId) counts[categoryId] = (counts[categoryId] ?? 0) + 1;
+      }
+      offset = page.nextOffset ?? -1;
+    } while (offset >= 0 && !signal?.aborted);
+    return counts;
   }
 
   async createEvent(
@@ -594,7 +628,11 @@ export class CalendarApiService {
     event: UpdateEventRequest,
   ): Promise<WithOperationWarnings<CalendarEvent>> {
     try {
-      const payload = await this.e2ee.attachEventEncryptionShadow(event);
+      const payload = await this.e2ee.attachEventEncryptionShadow(
+        needsStoredContent(event)
+          ? withStoredContent(event, await this.getEvent(id))
+          : event,
+      );
       const response = await this.client.put<Schema<"Event">>(
         `/api/events/${encodeURIComponent(id)}`,
         payload satisfies Schema<"UpdateEventRequest">,
@@ -733,8 +771,36 @@ export class CalendarApiService {
     }
   }
 
+  /** The server clears only its own column, so the events that seal this category are re-sealed without it before it goes. */
+  private async removeSealedCategory(id: string): Promise<void> {
+    const assigned: CalendarEvent[] = [];
+    let offset = 0;
+    do {
+      const page = await this.fetchEventSearchCorpus({ limit: 200, offset });
+      for (const event of page.events as CalendarEvent[]) {
+        if (event.encryptionState !== "encrypted") continue;
+        // Without the column the category read back is the sealed one, and an event that does not open is left as it is.
+        const opened = await this.e2ee
+          .hydrateEncryptedEvent({ ...event, categoryId: null })
+          .catch(() => null);
+        if (opened?.categoryId === id) assigned.push(opened);
+      }
+      offset = page.nextOffset ?? -1;
+    } while (offset >= 0);
+    for (const event of assigned) {
+      await this.updateEvent(event.id, {
+        title: event.title,
+        description: event.description ?? "",
+        location: event.location ?? "",
+        color: event.color ?? "",
+        categoryId: "",
+      });
+    }
+  }
+
   async deleteCategory(id: string): Promise<DeleteResponse> {
     try {
+      await this.removeSealedCategory(id);
       return await this.client.delete<Schema<"SuccessMessage">>(
         `/api/categories/${encodeURIComponent(id)}`,
       );
@@ -747,9 +813,9 @@ export class CalendarApiService {
 
   async getUserSettings(): Promise<UserSettings> {
     try {
-      return (await this.client.get<Schema<"UserSettings">>(
-        "/api/settings",
-      )) as UserSettings;
+      return await this.openUserSettings(
+        await this.client.get<Schema<"UserSettings">>("/api/settings"),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to fetch user settings");
     }
@@ -758,14 +824,105 @@ export class CalendarApiService {
   async updateUserSettings(
     settings: UpdateSettingsRequest,
   ): Promise<UserSettings> {
+    // One write at a time on this device, so two quick changes never merge onto the same preferences.
+    const write = this.settingsWrites.then(() => this.writeUserSettings(settings));
+    this.settingsWrites = write.catch(() => undefined);
+    return write;
+  }
+
+  private async writeUserSettings(
+    settings: UpdateSettingsRequest,
+    attempt = 0,
+  ): Promise<UserSettings> {
     try {
-      return (await this.client.put<Schema<"UserSettings">>(
-        "/api/settings",
-        settings satisfies Schema<"UpdateSettingsRequest">,
-      )) as UserSettings;
+      const { readable, preferences } = splitUserSettingsUpdate(settings);
+      if (!preferences) {
+        return await this.openUserSettings(
+          await this.client.put<Schema<"UserSettings">>("/api/settings", readable),
+        );
+      }
+      const current = await this.client.get<Schema<"UserSettings">>("/api/settings");
+      return await this.openUserSettings(
+        await this.client.put<Schema<"UserSettings">>("/api/settings", {
+          ...readable,
+          encryptedPreferences: await this.sealUserSettings(current, preferences),
+          expectedEncryptedPreferences: current.encryptedPreferences ?? null,
+        } satisfies Schema<"UpdateSettingsRequest">),
+      );
     } catch (error) {
+      // Another device replaced the preferences first, so the change merges onto its version instead.
+      if (attempt < SETTINGS_WRITE_RETRIES && isConflict(error)) {
+        return this.writeUserSettings(settings, attempt + 1);
+      }
       throw this.transformError(error, "Failed to update user settings");
     }
+  }
+
+  /** Seals preferences a server still holds in plaintext; true when it moved them. */
+  async ensureSealedUserSettings(): Promise<boolean> {
+    const run = this.settingsWrites.then(() => this.sealPlaintextUserSettings());
+    this.settingsWrites = run.catch(() => undefined);
+    return run;
+  }
+
+  private async sealPlaintextUserSettings(): Promise<boolean> {
+    if (!(await this.e2ee.hasActiveSession())) {
+      return false;
+    }
+    const settings = await this.client.get<Schema<"UserSettings">>("/api/settings");
+    if (settings.encryptedPreferences) {
+      return false;
+    }
+    // A device that sealed them first wins; its preferences are the newer ones.
+    return this.client
+      .put<Schema<"UserSettings">>("/api/settings", {
+        encryptedPreferences: await this.e2ee.encryptJson(
+          pickUserSettingsPreferences(settings as UserSettings),
+          USER_SETTINGS_PREFERENCES_AAD,
+        ),
+        expectedEncryptedPreferences: null,
+      })
+      .then(
+        () => true,
+        (error: unknown) => {
+          if (isConflict(error)) return false;
+          throw error;
+        },
+      );
+  }
+
+  private async openUserSettings({
+    encryptedPreferences,
+    ...settings
+  }: ApiResponse<"UserSettings">): Promise<UserSettings> {
+    const opened = encryptedPreferences
+      ? await this.e2ee.decryptJson(encryptedPreferences, USER_SETTINGS_PREFERENCES_AAD)
+      : null;
+    return { ...(settings as UserSettings), ...readUserSettingsPreferences(opened) };
+  }
+
+  /** The whole blob is replaced, so changes merge onto the current preferences; one that cannot be opened is never overwritten. */
+  private async sealUserSettings(
+    current: ApiResponse<"UserSettings">,
+    changes: Partial<UserSettingsPreferences>,
+  ): Promise<string> {
+    const opened = current.encryptedPreferences
+      ? await this.e2ee.decryptJson(
+          current.encryptedPreferences,
+          USER_SETTINGS_PREFERENCES_AAD,
+        )
+      : {};
+    if (opened === null) {
+      throw new Error("Your settings could not be unlocked on this device.");
+    }
+    return this.e2ee.encryptJson(
+      {
+        ...pickUserSettingsPreferences(current as UserSettings),
+        ...readUserSettingsPreferences(opened),
+        ...changes,
+      },
+      USER_SETTINGS_PREFERENCES_AAD,
+    );
   }
 
   async resetUserSettings(): Promise<Schema<"SuccessMessage">> {
@@ -935,7 +1092,9 @@ export class CalendarApiService {
   ): Promise<CalendarEvent> {
     try {
       const updates = await this.e2ee.attachEventEncryptionShadow(
-        request.updates,
+        needsStoredContent(request.updates)
+          ? withStoredContent(request.updates, await this.getEvent(id))
+          : request.updates,
       );
       const response = await this.client.put<Schema<"Event">>(
         `/api/recurring/event/${encodeURIComponent(id)}`,
@@ -1119,10 +1278,21 @@ export class CalendarApiService {
     options?: Pick<CreateNotificationRequest, "encryptedDisplayTitle">,
   ): Promise<Schema<"NotificationUpdateResult">> {
     try {
+      // Sealed here so every caller's reminders can show their start on iPhone without the push carrying it.
+      const sealed = await Promise.all(
+        notifications.map(async (setting) => {
+          const encryptedLead = await this.e2ee
+            .encryptNotificationLead(eventId, setting.minutesBefore)
+            .catch(() => undefined);
+          return encryptedLead === undefined
+            ? setting
+            : { ...setting, encryptedLead };
+        }),
+      );
       return await this.client.put<Schema<"NotificationUpdateResult">>(
         `/api/notifications/event/${encodeURIComponent(eventId)}`,
         {
-          notifications,
+          notifications: sealed,
           ...(options?.encryptedDisplayTitle !== undefined
             ? { encryptedDisplayTitle: options.encryptedDisplayTitle }
             : {}),

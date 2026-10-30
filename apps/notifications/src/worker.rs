@@ -242,7 +242,7 @@ impl Worker {
         }
         let minutes = job.minutes_before();
         let content = reminder::content(&reminder, minutes, event_id, &self.settings);
-        let message = reminder::message(&content, minutes, &mailer.config.from);
+        let message = reminder::message(&content, &mailer.config.from);
         let id = mailer::send(
             &self.http,
             &mailer.gate,
@@ -289,14 +289,21 @@ impl Worker {
                 notification
             }
             "event_reminder" => {
-                let (title, clock) = if event_id.is_empty() || test {
+                let (title, lead) = if event_id.is_empty() || test {
                     (String::new(), String::new())
                 } else {
                     let reminder = jobs::load_reminder(&self.db, event_id, &job.user_id).await?;
-                    let clock = jobs::start_clock(&reminder);
-                    (reminder.encrypted_title, clock)
+                    let lead =
+                        jobs::load_lead(&self.db, event_id, &job.user_id, job.minutes_before())
+                            .await?;
+                    (reminder.encrypted_title, lead)
                 };
-                apns::event_reminder(job.minutes_before(), event_id, &title, &clock)
+                // The scheduled instant, not now: a late or retried push must not show the event later than it starts.
+                let due_at = job
+                    .payload
+                    .due_at
+                    .unwrap_or_else(|| jiff::Timestamp::now().as_second());
+                apns::event_reminder(event_id, &title, &lead, due_at)
             }
             _ => return self.skip(job, "unknown kind").await,
         };
@@ -468,7 +475,8 @@ impl Worker {
                 "no registered iOS devices for this account; open Solace Calendar or Solace Mail while signed in".into()
             });
         }
-        let mut notification = apns::event_reminder(15, "manual-test", "", "");
+        let mut notification =
+            apns::event_reminder("manual-test", "", "", jiff::Timestamp::now().as_second());
         notification.collapse_id = format!("test:{user_id}");
         let mut sent = 0;
         let mut last_error = None;
@@ -502,10 +510,9 @@ pub async fn send_test_email(settings: &Settings, recipient: &str) -> Result<(),
         all_day: false,
         user_email: recipient.into(),
         timezone: "Europe/Amsterdam".into(),
-        time_format: "24h".into(),
     };
     let content = reminder::content(&sample, 30, "manual-test-event", settings);
-    let mut message = reminder::message(&content, 30, &config.from);
+    let mut message = reminder::message(&content, &config.from);
     message.message_id = None;
     let id = mailer::send(&reqwest::Client::new(), &gate, &config, recipient, &message)
         .await

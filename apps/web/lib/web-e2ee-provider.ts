@@ -16,9 +16,16 @@ import type {
 import {
   hydrateEncryptedEventWithoutSession,
   hydrateEncryptedName,
-  ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+  withDecryptedEventContent,
+  type DecryptedEventContent,
 } from "@workspace/e2ee";
-import { createBlindIndexTokens, decryptJsonPayload } from "./e2ee-crypto";
+import {
+  createBlindIndexTokens,
+  decryptJsonPayload,
+  encryptJsonPayload,
+  parseEncryptedJsonPayload,
+} from "./e2ee-crypto";
+import { encryptReminderLead } from "./e2ee-notification-title";
 import {
   attachCalendarEncryptionShadow,
   attachCategoryEncryptionShadow,
@@ -89,21 +96,13 @@ export class WebE2eeProvider implements E2eeProvider {
 
     try {
       const payload = JSON.parse(event.encryptedContent);
-      const decrypted = await decryptJsonPayload<{
-        title: string;
-        description?: string | null;
-        location?: string | null;
-      }>(session.accountKey, payload, "event-content:v1");
+      const decrypted = await decryptJsonPayload<DecryptedEventContent>(
+        session.accountKey,
+        payload,
+        "event-content:v1",
+      );
 
-      return {
-        ...event,
-        title:
-          decrypted.title?.trim() ||
-          event.title?.trim() ||
-          ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
-        description: decrypted.description ?? null,
-        location: decrypted.location ?? null,
-      };
+      return withDecryptedEventContent(event, decrypted);
     } catch {
       return hydrateEncryptedEventWithoutSession(event);
     }
@@ -124,4 +123,30 @@ export class WebE2eeProvider implements E2eeProvider {
     }
     return createBlindIndexTokens(session.blindIndexKey, value);
   }
+
+  async encryptJson(value: unknown, aad: string): Promise<string> {
+    const session = await getE2eeSession();
+    if (!session) {
+      throw new Error("Encrypted data is not unlocked on this device.");
+    }
+    return JSON.stringify(await encryptJsonPayload(session.accountKey, value, aad));
+  }
+
+  async decryptJson(encrypted: string, aad: string): Promise<unknown> {
+    const session = await getE2eeSession();
+    const payload = parseEncryptedJsonPayload(encrypted);
+    if (!session || !payload) {
+      return null;
+    }
+    return decryptJsonPayload<unknown>(session.accountKey, payload, aad).catch(
+      () => null,
+    );
+  }
+  async encryptNotificationLead(
+    eventId: string,
+    minutesBefore: number,
+  ): Promise<string | undefined> {
+    return encryptReminderLead(eventId, minutesBefore);
+  }
+
 }

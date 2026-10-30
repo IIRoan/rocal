@@ -36,9 +36,9 @@ export default function PrivacyPage() {
             Calendar encryption
           </h2>
           <p className="mt-2">
-            Solace encrypts event titles, descriptions and locations on your
-            device before saving them. Enabling reminders does not make these
-            fields readable to the server.
+            Solace encrypts event titles, descriptions, locations, colors and
+            categories on your device before saving them. Enabling reminders
+            does not make these fields readable to the server.
           </p>
           <div className="mt-3 overflow-hidden rounded-lg border border-border/50">
             <table className="w-full text-xs">
@@ -73,13 +73,18 @@ export default function PrivacyPage() {
           </div>
           <p className="mt-3">
             The names of your calendars and categories are encrypted the same way,
-            including the calendars a new account starts with. Colors, settings
-            and which calendar an event belongs to remain readable.
+            including the calendars a new account starts with. Calendar colors
+            and which calendar an event belongs to remain readable. Events saved
+            by older app versions keep a readable color and category until they
+            are next saved. Calendar search runs on your device, so your search
+            words are not sent to Solace.
           </p>
           <p className="mt-3">
-            Reminder emails contain a generic notice; Solace resolves event
-            details on your device when you open the message. iPhone alerts can
-            show a title decrypted on the device when its keys are available.
+            Reminder emails show only the event&apos;s date and time, and their
+            subject names neither; Solace resolves event details on your device
+            when you open the message. iPhone alerts carry the event title and
+            the reminder&apos;s lead time encrypted, so Apple sees neither; your
+            iPhone decrypts them to show the event and when it starts.
           </p>
         </div>
 
@@ -94,8 +99,9 @@ export default function PrivacyPage() {
             readable.
           </p>
           <p className="mt-3">
-            Invitations that arrive by email are read by the server to stage them
-            until your device encrypts your copy.
+            Invitations that arrive by email are read by the server and stay
+            readable until one of your devices opens Solace, which encrypts your
+            copy; a declined invitation keeps no readable text.
             Subscribed and public calendars are fetched by the server, so their
             feed names, URLs and event details are readable.
           </p>
@@ -111,13 +117,25 @@ export default function PrivacyPage() {
             the server before encryption. Transport encryption between mail
             servers is separate from end-to-end encryption.
           </p>
-          <p className="mt-3">{MAIL_READABLE_METADATA}</p>
+          <p className="mt-3">
+            {MAIL_READABLE_METADATA} Names of folders you create, and your label
+            names, are encrypted on your device. Built-in folder names, read and
+            flag status, which labels a message has, and message sizes are
+            readable to the mail server. With the on-device search index switched
+            on, Mail searches on your device and does not send your search words
+            to the server; with it off, the words you search for are sent to the
+            mail server. Remote images stay blocked until you allow them;
+            loading them lets the sender&apos;s servers see your IP address and
+            when you opened the message.
+          </p>
           <p className="mt-3">
             Drafts and the copies of mail you send are encrypted to your own key
             on your device before they are saved. Mail you send to other
             providers has to leave readable so its recipients can open it; the
             server keeps only your encrypted copy, and attachments uploaded for
-            that mail are removed within about two hours. Emails Solace sends
+            that mail are removed within about two hours. The outgoing message
+            waits in the mail queues until it is delivered, for at most about
+            five days. Emails Solace sends
             for you, such as invitations and reminders, come from a no-reply
             address that keeps no copy. Mail stored before these protections,
             including older drafts and sent copies, may still be readable.
@@ -141,21 +159,19 @@ export default function PrivacyPage() {
             Protecting your keys
           </h2>
           <p className="mt-2">
-            Your password protects your encryption keys; it is not the mail
-            vault secret. Email sign-in uses your email password. Passkey
-            sign-in uses a separate encryption password. Changing that password rewraps your existing keys rather than
-            re-encrypting your content. Changing your email password rewraps
-            them to the new one. Up-to-date Solace apps never send your
-            password: they send a key derived from it on your device, and
-            Solace stores only a salted hash of that key. Connections to Solace
-            use TLS.
+            Your sign-in password also protects your encryption keys; it is not
+            the mail vault secret. Signing in on a device opens your keys there,
+            and changing your password rewraps your existing keys to the new one
+            in the same step rather than re-encrypting your content. Up-to-date
+            Solace apps never send your password: they send a key derived from
+            it on your device, and Solace stores only a salted hash of that key.
+            Connections to Solace use TLS.
           </p>
           <p className="mt-3">
             Keep your password safe. Solace does not reset passwords from the
             sign-in screen; if you forget yours, email support from a different
             address. Without your password, no one, including Solace, can open
-            your encrypted content. An already unlocked device may let you set a
-            new encryption password while preserving your keys.
+            your encrypted content.
           </p>
         </div>
 
@@ -164,9 +180,12 @@ export default function PrivacyPage() {
             Other data
           </h2>
           <p className="mt-2">
-            Contacts and mail settings are encrypted on your device before
-            syncing. Account details needed for sign-in and delivery, and
-            uploaded profile pictures, are not end-to-end encrypted.
+            Contacts, mail settings and app preferences such as theme and working
+            hours are encrypted on your device before syncing. Your time zone,
+            time format, notification switches and default calendar stay
+            readable so reminders and invitations work. Account details needed
+            for sign-in and delivery, and uploaded profile pictures, are not
+            end-to-end encrypted.
           </p>
           <p className="mt-3">
             Solace does not use your data for advertising, resale or profiling.
@@ -208,6 +227,11 @@ export default function PrivacyPage() {
               Push device registrations are eligible for cleanup after 180 days
               without activity. Active apps renew their registration.
             </li>
+            <li>
+              Mail in Trash is deleted after 30 days. The mail server keeps
+              delivery traces, which include IP and email addresses, for 30
+              days and records of sent messages for three days.
+            </li>
           </ul>
           <p className="mt-3">
             Cleanup runs hourly in bounded batches, so these windows describe
@@ -219,7 +243,7 @@ export default function PrivacyPage() {
           <p className="mt-3">
             To delete your account, open the account drawer in either app,
             choose Account, then Delete account. On the web, open the command
-            palette and choose Account. After the security check, Solace removes
+            palette and choose Account. After you confirm, Solace removes
             the mailbox, profile pictures and account-owned application records.
             Other organizers may retain participant addresses, and recipients
             retain messages already delivered to them.
@@ -271,7 +295,7 @@ const DATA_USES: ReadonlyArray<readonly [string, string, string]> = [
     "Our agreement with you",
   ],
   [
-    "Contacts and settings, encrypted on your device",
+    "Contacts, mail settings and app preferences such as theme and working hours, encrypted on your device; time zone, time format, notification switches and default calendar",
     "Keep your contacts and preferences in sync",
     "Our agreement with you",
   ],
@@ -286,8 +310,8 @@ const DATA_USES: ReadonlyArray<readonly [string, string, string]> = [
     "Your consent, which you can withdraw in Settings",
   ],
   [
-    "Keyed hash of your IP address and request IDs",
-    "Limit repeated sign-in attempts and keep the service secure",
+    "IP address and request IDs; sign-in limits keep only a keyed hash of the IP address",
+    "Limit repeated requests and keep the service secure",
     "Legitimate interest in security",
   ],
   [
@@ -306,7 +330,7 @@ function PrivacyOverview() {
       >
         Overview
       </h2>
-      <p className="mt-2">Last updated 28 October 2026.</p>
+      <p className="mt-2">Last updated 29 October 2026.</p>
       <p className="mt-3">
         This policy covers the Solace website and the Solace Calendar and
         Solace Mail apps. Solace is run by Roan van Westerop, the controller
@@ -370,9 +394,12 @@ function PrivacyDataUse() {
       </div>
       <p className="mt-3">
         Solace does not make automated decisions about you that have legal
-        or similarly significant effects. The website uses only cookies
-        needed for sign-in and security, with no tracking or advertising
-        cookies; the apps keep their session in the device&apos;s secure
+        or similarly significant effects. The website&apos;s cookies keep you
+        signed in, protect sign-in and remember interface choices such as the
+        sidebar. One holds your password, encrypted with a key that only that
+        browser has, for up to 30 days so it can open your encrypted data
+        again; signing out removes it. There are no tracking or advertising
+        cookies. The apps keep their session in the device&apos;s secure
         storage.
       </p>
     </section>
@@ -415,8 +442,8 @@ function PrivacyRights({ contact }: { contact: string | null }) {
         only by invitation.
       </p>
       <p className="mt-3">
-        When this policy changes, the date at the top changes. Solace tells you
-        in the apps or by email before significant changes apply.
+        When this policy changes, the date at the top changes. Solace emails
+        you before significant changes apply.
       </p>
       <p className="mt-3">
         The{" "}
@@ -443,7 +470,7 @@ const SUBPROCESSORS: ReadonlyArray<readonly [string, string, string]> = [
   [
     "Webdock.io ApS",
     "Denmark",
-    "Runs the relay server that sends and receives internet mail",
+    "Runs the relay server that sends and receives internet mail; its connection and delivery logs include IP and email addresses",
   ],
   ["Vercel Inc.", "United States", "Serves the website"],
   [

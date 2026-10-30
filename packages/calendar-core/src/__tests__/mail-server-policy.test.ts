@@ -108,13 +108,14 @@ describe("mailbox policy validation", () => {
   const policy = resolveMailServerPolicy({
     emailSettings: {
       maxMailboxDepth: 3,
-      maxMailboxNameLength: 10,
+      maxMailboxNameLength: 80,
       maxMailboxes: 2,
     },
   });
 
-  it("rejects names that exceed length or depth", () => {
-    expect(validateMailboxName("a".repeat(11), policy)).toMatch(/10 characters/);
+  it("rejects names whose sealed form exceeds the length, or that exceed the depth", () => {
+    expect(validateMailboxName("a".repeat(25), policy)).toBeNull();
+    expect(validateMailboxName("a".repeat(26), policy)).toMatch(/25 characters/);
     expect(validateMailboxName("a/b/c/d", policy)).toMatch(/depth/);
     expect(resolveMailboxNameDepth("one/two/three")).toBe(3);
   });

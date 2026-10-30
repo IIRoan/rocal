@@ -25,20 +25,12 @@ pub enum Mode {
     Production,
 }
 
-/// Which implementation runs (`TEST_BACKEND`), only for the differences the plan mandates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Backend {
-    TypeScript,
-    Rust,
-}
-
 pub struct TestApp {
     pub base_url: String,
     /// The backend's own idea of its URL (`BACKEND_URL`), which it puts in links it hands out.
     pub public_api_url: String,
     pub origin: String,
     pub mode: Mode,
-    pub backend: Backend,
     pub env: TestEnv,
     /// The backend's own database, for state checks.
     pub db: PgPool,
@@ -107,7 +99,7 @@ async fn in_process(
     (base_url, database_url, scratch)
 }
 
-/// Serves the Rust backend on a random port with the same settings the TypeScript backend gets.
+/// Serves the Rust backend on a random port with the suite's backend settings.
 async fn serve_rust(
     env: &TestEnv,
     mode: Mode,
@@ -157,76 +149,35 @@ pub struct TestUser {
 }
 
 impl TestApp {
-    /// Configuration cases need an isolated Rust server even when the suite targets another backend.
+    /// Configuration cases need an isolated in-process server even when the suite targets `API_BASE_URL`.
     pub async fn spawn_with_config(configure: impl FnOnce(&mut Config)) -> Self {
         let env = TestEnv::from_env().expect("test environment");
         let mode = mode();
         let (base_url, database_url, scratch) = in_process(&env, mode, configure).await;
-        Self::connect(
-            env,
-            mode,
-            base_url,
-            Backend::Rust,
-            &database_url,
-            Some(scratch),
-        )
-        .await
+        Self::connect(env, mode, base_url, &database_url, Some(scratch)).await
     }
 
     /// The Rust server in-process on a random port with a fresh database, or `API_BASE_URL` (whose database is `TEST_DATABASE_URL`).
     pub async fn spawn() -> Self {
         let env = TestEnv::from_env().expect("test environment");
         let mode = mode();
-        let (base_url, backend, database_url, scratch) = match std::env::var("API_BASE_URL") {
+        let (base_url, database_url, scratch) = match std::env::var("API_BASE_URL") {
             Ok(base_url) => {
                 guard::check_service_url("API_BASE_URL", &base_url).expect("API_BASE_URL");
-                let backend = match std::env::var("TEST_BACKEND").as_deref() {
-                    Ok("rust") => Backend::Rust,
-                    _ => Backend::TypeScript,
-                };
-                (base_url, backend, env.database_url.clone(), None)
+                (base_url, env.database_url.clone(), None)
             }
             Err(_) => {
                 let (base_url, database_url, scratch) = in_process(&env, mode, |_| {}).await;
-                (base_url, Backend::Rust, database_url, Some(scratch))
+                (base_url, database_url, Some(scratch))
             }
         };
-        Self::connect(env, mode, base_url, backend, &database_url, scratch).await
-    }
-
-    /// The TypeScript backend at `INTEROP_TS_URL` and the Rust server in-process on its database (`TEST_DATABASE_URL`); `None` when unset.
-    pub async fn interop() -> Option<(Self, Self)> {
-        let ts_url = std::env::var("INTEROP_TS_URL").ok()?;
-        guard::check_service_url("INTEROP_TS_URL", &ts_url).expect("INTEROP_TS_URL");
-        let env = TestEnv::from_env().expect("test environment");
-        let mode = mode();
-        let database_url = env.database_url.clone();
-        // Step 5's rollback drill points at the deployed server instead of an in-process one.
-        let rust_url = match std::env::var("INTEROP_RUST_URL") {
-            Ok(url) => {
-                guard::check_service_url("INTEROP_RUST_URL", &url).expect("INTEROP_RUST_URL");
-                url
-            }
-            Err(_) => serve_rust(&env, mode, &database_url, |_| {}).await,
-        };
-        let ts = Self::connect(
-            env.clone(),
-            mode,
-            ts_url,
-            Backend::TypeScript,
-            &database_url,
-            None,
-        )
-        .await;
-        let rust = Self::connect(env, mode, rust_url, Backend::Rust, &database_url, None).await;
-        Some((ts, rust))
+        Self::connect(env, mode, base_url, &database_url, scratch).await
     }
 
     async fn connect(
         env: TestEnv,
         mode: Mode,
         base_url: String,
-        backend: Backend,
         database_url: &str,
         scratch: Option<ScratchDatabase>,
     ) -> Self {
@@ -264,7 +215,6 @@ impl TestApp {
             public_api_url,
             origin,
             mode,
-            backend,
             env,
             db,
             root_user_id,

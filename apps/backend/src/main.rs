@@ -1,4 +1,4 @@
-//! Boots the API: typed config, telemetry, a small Tokio runtime, the pool, and graceful shutdown on SIGTERM.
+//! Boots the API: typed config, telemetry, a small Tokio runtime, the pool and its migrations, and graceful shutdown on SIGTERM.
 
 #[global_allocator]
 static ALLOCATOR: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -25,6 +25,7 @@ async fn run(config: Config) -> anyhow::Result<()> {
     let db = db::connect(&config.database_url, config.database_pool_size)
         .await
         .context("connect to the database")?;
+    db::migrate(&db).await.context("apply the migrations")?;
     let port = config.port;
     let state = AppState::new(config, db)?;
     // Dual-stack: the production Railway environment's private DNS resolves to IPv6 only.

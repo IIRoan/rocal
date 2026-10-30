@@ -1,4 +1,4 @@
-//! Typed configuration from the same environment variables as `retired/backend/lib/env.ts`, parsed once at boot.
+//! Typed configuration from the environment, parsed once at boot.
 
 use thiserror::Error;
 

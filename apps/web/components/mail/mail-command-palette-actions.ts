@@ -5,9 +5,7 @@ import type { UpdateSettingsRequest, UserSettings } from "@/lib/types/calendar";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 import {
   persistAccountDeletion,
-  persistEncryptionPasswordReset,
   persistPasswordChange,
-  persistPasswordSet,
   persistProfileUpdate,
   persistSettingsUpdate,
 } from "../command-palette/command-palette-actions";
@@ -70,48 +68,6 @@ export async function runMailPasswordChange(input: {
     sessionUserId: input.sessionUserId,
     email: input.sessionEmail,
     currentPassword: input.currentPassword,
-    newPassword: input.newPassword,
-  });
-  input.setBusy(false);
-  if (result.ok === false) {
-    throw result.error;
-  }
-}
-
-export async function runMailPasswordSet(input: {
-  sessionUserId: string | null;
-  newPassword: string;
-  refetchAccounts?: () => Promise<unknown>;
-  setBusy: (value: boolean) => void;
-}): Promise<void> {
-  if (!input.sessionUserId) {
-    throw new Error("Your session is unavailable. Please try again.");
-  }
-
-  input.setBusy(true);
-  const result = await persistPasswordSet({
-    sessionUserId: input.sessionUserId,
-    newPassword: input.newPassword,
-    refetchAccounts: input.refetchAccounts,
-  });
-  input.setBusy(false);
-  if (result.ok === false) {
-    throw result.error;
-  }
-}
-
-export async function runMailEncryptionPasswordReset(input: {
-  sessionUserId: string | null;
-  newPassword: string;
-  setBusy: (value: boolean) => void;
-}): Promise<void> {
-  if (!input.sessionUserId) {
-    throw new Error("Your session is unavailable. Please try again.");
-  }
-
-  input.setBusy(true);
-  const result = await persistEncryptionPasswordReset({
-    sessionUserId: input.sessionUserId,
     newPassword: input.newPassword,
   });
   input.setBusy(false);

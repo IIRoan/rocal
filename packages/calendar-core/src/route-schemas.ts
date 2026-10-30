@@ -1,5 +1,5 @@
 import type { Schema } from "@workspace/api-contracts";
-import { z } from "zod";
+import { z } from "./zod";
 import { CALENDAR_COLORS, isValidCalendarColor } from "./color-utils";
 import { isReservedSystemEmail } from "./mail-addresses";
 
@@ -41,7 +41,7 @@ export const timezoneSchema = z.string().refine(
       return false;
     }
   },
-  { message: "Invalid timezone identifier" },
+  { error: "Invalid timezone identifier" },
 );
 
 export const recurrenceRuleObjectSchema = z
@@ -78,7 +78,7 @@ export const eventParticipantInputSchema = z
       .regex(PARTICIPANT_EMAIL_REGEX)
       .refine(
         (email) => !isReservedSystemEmail(email),
-        { message: "Cannot invite system or administrative email addresses" },
+        { error: "Cannot invite system or administrative email addresses" },
       ),
     displayName: z.string().max(120).optional(),
     role: eventParticipantRoleSchema.optional(),
@@ -92,9 +92,9 @@ export type EventParticipantInput = z.infer<typeof eventParticipantInputSchema> 
 export const encryptedIcsImportEventSchema = z.object({
   externalId: z.string().min(1).max(128),
   seriesExternalId: z.string().min(1).max(128).optional(),
-  occurrenceDate: z.string().datetime().optional(),
-  excludedDates: z.array(z.string().datetime()).max(1000).default([]),
-  start: z.string().datetime(), end: z.string().datetime(),
+  occurrenceDate: z.iso.datetime().optional(),
+  excludedDates: z.array(z.iso.datetime()).max(1000).default([]),
+  start: z.iso.datetime(), end: z.iso.datetime(),
   allDay: z.boolean(), timezone: timezoneSchema,
   recurrence: z.string().optional(),
   encryptedContent: z.string().min(1),
@@ -102,11 +102,11 @@ export const encryptedIcsImportEventSchema = z.object({
   encryptionKeyVersion: z.number().int().min(1).optional(),
   participants: z.array(eventParticipantInputSchema).optional(),
 }).strict().superRefine((event, ctx) => {
-  if (Boolean(event.seriesExternalId) !== Boolean(event.occurrenceDate)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "An override requires a series and occurrence date" });
-  if (new Date(event.end) <= new Date(event.start)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "End must follow start" });
+  if (Boolean(event.seriesExternalId) !== Boolean(event.occurrenceDate)) ctx.addIssue({ code: "custom", message: "An override requires a series and occurrence date" });
+  if (new Date(event.end) <= new Date(event.start)) ctx.addIssue({ code: "custom", message: "End must follow start" });
   if (event.recurrence) {
     try { recurrenceRuleObjectSchema.parse(JSON.parse(event.recurrence)); }
-    catch { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid recurrence rule" }); }
+    catch { ctx.addIssue({ code: "custom", message: "Invalid recurrence rule" }); }
   }
 });
 export type EncryptedIcsImportEvent = z.infer<typeof encryptedIcsImportEventSchema> &
@@ -140,7 +140,7 @@ const calendarColorMessage = `Color must be one of: ${CALENDAR_COLORS.join(", ")
 
 export const calendarColorSchema = z
   .string()
-  .refine(isValidCalendarColor, { message: calendarColorMessage });
+  .refine(isValidCalendarColor, { error: calendarColorMessage });
 
 export const optionalCalendarColorSchema = calendarColorSchema.optional();
 

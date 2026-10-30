@@ -9,10 +9,6 @@ interface ChangePasswordValues {
   newPassword: string;
 }
 
-interface PasswordOnlyValues {
-  newPassword: string;
-}
-
 interface UpdateProfileValues {
   image: string | null;
 }
@@ -28,13 +24,8 @@ interface AccountSettingsProps {
   accountImage?: string | null;
   sessionLoading?: boolean;
   hasPasswordAccount?: boolean;
-  hasOAuthAccount?: boolean;
   changingPassword: boolean;
-  settingPassword?: boolean;
-  resettingEncryptionPassword?: boolean;
   handleChangePassword: (values: ChangePasswordValues) => Promise<void>;
-  handleSetPassword?: (values: PasswordOnlyValues) => Promise<void>;
-  handleResetEncryptionPassword?: (values: PasswordOnlyValues) => Promise<void>;
   updatingProfile?: boolean;
   handleUpdateProfile?: (values: UpdateProfileValues) => Promise<void>;
   onOpenInvites?: () => void;
@@ -52,25 +43,14 @@ export function AccountSettings({
   accountImage,
   sessionLoading = false,
   hasPasswordAccount = true,
-  hasOAuthAccount = false,
   changingPassword,
-  settingPassword = false,
-  resettingEncryptionPassword = false,
   handleChangePassword,
-  handleSetPassword,
-  handleResetEncryptionPassword,
   updatingProfile = false,
   handleUpdateProfile,
   onOpenInvites,
   onOpenSecurity,
 }: AccountSettingsProps) {
-  const isBusy =
-    saving ||
-    deletingAccount ||
-    changingPassword ||
-    settingPassword ||
-    resettingEncryptionPassword ||
-    updatingProfile;
+  const isBusy = saving || deletingAccount || changingPassword || updatingProfile;
 
   const displayName = accountName?.trim() || null;
   const displayEmail = accountEmail?.trim() || null;
@@ -90,13 +70,8 @@ export function AccountSettings({
         <AccountSecuritySection
           isBusy={isBusy}
           hasPasswordAccount={hasPasswordAccount}
-          hasOAuthAccount={hasOAuthAccount}
           changingPassword={changingPassword}
-          settingPassword={settingPassword}
-          resettingEncryptionPassword={resettingEncryptionPassword}
           handleChangePassword={handleChangePassword}
-          handleSetPassword={handleSetPassword}
-          handleResetEncryptionPassword={handleResetEncryptionPassword}
         />
       ) : null}
 

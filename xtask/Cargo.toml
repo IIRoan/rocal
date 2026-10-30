@@ -8,7 +8,9 @@ publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+jiff.workspace = true
 reqwest.workspace = true
+sea-orm-migration.workspace = true
 serde_json.workspace = true
 solace-api-tests.workspace = true
 solace-server.workspace = true

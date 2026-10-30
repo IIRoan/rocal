@@ -30,6 +30,8 @@ http-body = "1"
 tower = { version = "0.5", features = ["util"] }
 # One pool for everything, over SQLx; `time` because SeaORM has no jiff support.
 sea-orm = { version = "=2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-json"] }
+# The schema migrations the API applies at startup; SeaORM's own, without its CLI.
+sea-orm-migration = { version = "=2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 # Routes and their OpenAPI entries registered together.
 utoipa-axum = "0.3"
 tracing = "0.1"

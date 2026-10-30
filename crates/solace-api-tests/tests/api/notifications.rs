@@ -11,9 +11,7 @@ use crate::event_fixtures::{
     insert_plaintext_event, insert_staging_calendar, iso_from_now, row_snapshot, to_json,
 };
 use crate::events::overdue_schedule_shape;
-use crate::helpers::{
-    Backend, TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok,
-};
+use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, ok};
 
 const NOT_FOUND: &str = "Event not found or access denied";
 
@@ -29,7 +27,25 @@ fn setting(kind: &str, minutes: i32, enabled: bool) -> NotificationSetting {
         notification_type: kind.into(),
         minutes_before: minutes,
         is_enabled: enabled,
+        encrypted_lead: None,
     }
+}
+
+/// A well-formed lead ciphertext; `tail` tells two apart.
+fn lead_ciphertext(tail: char) -> String {
+    format!("v1.oKGio6Slpqeoqaqr.MmK59G4HT1NBZhymzgPpv9C{tail}")
+}
+
+/// Stored sealed leads as (minutes, ciphertext), by minutes.
+async fn leads(app: &TestApp, event: &str) -> Vec<(i32, Option<String>)> {
+    sqlx::query_as(
+        "SELECT minutes_before, encrypted_lead FROM event_notification \
+         WHERE event_id = $1 ORDER BY minutes_before",
+    )
+    .bind(event)
+    .fetch_all(&app.db)
+    .await
+    .expect("leads")
 }
 
 fn update(settings: Vec<NotificationSetting>) -> UpdateEventNotificationsRequest {
@@ -406,6 +422,71 @@ async fn the_title_ciphertext_is_stored_kept_and_cleared() {
 }
 
 #[tokio::test]
+async fn sealed_leads_are_stored_per_schedule_and_survive_a_move() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let event = upcoming_event(&mut owner).await;
+    let (early, late) = (lead_ciphertext('a'), lead_ciphertext('b'));
+    put(
+        &mut owner,
+        &event,
+        json!({"notifications": [
+            {"notificationType": "email", "minutesBefore": 15, "isEnabled": true, "encryptedLead": early},
+            {"notificationType": "email", "minutesBefore": 60, "isEnabled": true, "encryptedLead": late},
+        ]}),
+    )
+    .await;
+    assert_eq!(
+        leads(&app, &event).await,
+        [(15, Some(early.clone())), (60, Some(late.clone()))]
+    );
+
+    put(
+        &mut owner,
+        &event,
+        to_json(&update(vec![
+            setting("email", 15, true),
+            setting("email", 30, true),
+        ])),
+    )
+    .await;
+    assert_eq!(
+        leads(&app, &event).await,
+        [(15, Some(early.clone())), (30, None)],
+        "a client that cannot seal keeps the lead of a schedule it resends"
+    );
+
+    let start = iso_from_now(&app.db, 3 * 24 * 3600).await;
+    let end = iso_from_now(&app.db, 3 * 24 * 3600 + 3600).await;
+    ok(owner
+        .put(
+            &format!("/api/events/{event}"),
+            json!({"start": start, "end": end}),
+        )
+        .await
+        .expect_status(200));
+    assert_eq!(
+        leads(&app, &event).await,
+        [(15, Some(early.clone())), (30, None)],
+        "moving the event rebuilds its schedules with their leads"
+    );
+
+    let readable = owner
+        .put(
+            &format!("/api/notifications/event/{event}"),
+            json!({"notifications": [
+                {"notificationType": "email", "minutesBefore": 15, "isEnabled": true, "encryptedLead": "15"},
+            ]}),
+        )
+        .await;
+    assert_eq!(
+        readable.status.as_u16(),
+        400,
+        "a lead is only ever ciphertext"
+    );
+}
+
+#[tokio::test]
 async fn title_ciphertext_and_settings_are_validated() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
@@ -597,49 +678,27 @@ async fn an_overdue_schedule_fires_on_the_next_minute() {
         to_json(&update(vec![setting("email", 30, true)])),
     )
     .await;
-    let before = row_snapshot(&app.db, "calendar_event", &event).await;
 
-    let response = owner
+    let result: NotificationUpdateResult = ok(owner
         .put(
             &format!("/api/notifications/event/{event}"),
             to_json(&update(vec![setting("email", 1440, true)])),
         )
-        .await;
-    match app.backend {
-        // TypeScript clamps to the current minute, which breaks chk_notification_time_future and fails the whole transaction.
-        Backend::TypeScript => {
-            let error = ok(response.expect_error(
-                500,
-                "Internal Server Error",
-                "An unexpected error occurred. If this keeps happening, contact support and include the request id.",
-            ));
-            assert!(error["requestId"].is_string());
-            assert_eq!(
-                schedules(&app, &event).await,
-                [("email".to_owned(), 30, None)]
-            );
-            assert_eq!(
-                row_snapshot(&app.db, "calendar_event", &event).await,
-                before
-            );
-        }
-        Backend::Rust => {
-            let result: NotificationUpdateResult =
-                ok(response.expect_status(200).and_then(|r| r.dto()));
-            let data = result.data.expect("data");
-            assert_eq!((data.created, data.skipped), (1, 0));
-            assert_eq!(data.details.created_notifications[0].minutes_before, 1440);
-            assert_eq!(
-                schedules(&app, &event).await,
-                [("email".to_owned(), 1440, None)]
-            );
-            assert_eq!(reminder(&app, &event).await, Some(1440));
-            assert_eq!(
-                overdue_schedule_shape(&app, &event).await,
-                (true, true, true, true)
-            );
-        }
-    }
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    let data = result.data.expect("data");
+    assert_eq!((data.created, data.skipped), (1, 0));
+    assert_eq!(data.details.created_notifications[0].minutes_before, 1440);
+    assert_eq!(
+        schedules(&app, &event).await,
+        [("email".to_owned(), 1440, None)]
+    );
+    assert_eq!(reminder(&app, &event).await, Some(1440));
+    assert_eq!(
+        overdue_schedule_shape(&app, &event).await,
+        (true, true, true, true)
+    );
 }
 
 #[tokio::test]

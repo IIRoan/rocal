@@ -1,7 +1,10 @@
 import { createAuthClient } from "better-auth/react";
 import { expoClient } from "@better-auth/expo/client";
 import { passkeyClient } from "@better-auth/passkey/client";
-import { createAuthKeyFetch } from "@workspace/calendar-client";
+import {
+  createAuthKeyFetch,
+  type PasswordEnvelopeRequest,
+} from "@workspace/calendar-client";
 import { createE2eeModule } from "@workspace/e2ee";
 import { API_BASE_URL, APP_SCHEME, AUTH_STORAGE_PREFIX } from "./constants";
 import { createNativeCryptoProvider } from "./native-crypto-provider";
@@ -32,12 +35,13 @@ const baseAuthClient = createAuthClient({
   ],
 });
 
-// Better Auth types the body without `email`, which salts both auth keys so the API can refuse a key derived for another address.
+// Better Auth types the body without `email`, which salts both auth keys, or the envelope the API stores with the new password.
 export const authClient = baseAuthClient as typeof baseAuthClient & {
   changePassword: (opts: {
     currentPassword: string;
     newPassword: string;
     email: string;
+    passwordEnvelope: PasswordEnvelopeRequest;
     revokeOtherSessions?: boolean;
   }) => Promise<{ data: unknown; error: { message?: string } | null }>;
 };

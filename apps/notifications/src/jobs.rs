@@ -241,7 +241,6 @@ pub struct Reminder {
     pub all_day: bool,
     pub user_email: String,
     pub timezone: String,
-    pub time_format: String,
 }
 
 /// `encrypted_display_title` is read through `to_jsonb`, so this also runs before the migration that adds it.
@@ -256,7 +255,7 @@ const LOAD_REMINDER: &str = r#"
             LIMIT 1
         ),
         ce.start, ce."end", ce.all_day,
-        u.email, COALESCE(us.timezone, 'UTC'), COALESCE(us."timeFormat", '24h')
+        u.email, COALESCE(us.timezone, 'UTC')
     FROM calendar_event ce
     INNER JOIN "user" u ON u.id = ce.user_id
     LEFT JOIN user_settings us ON us.user_id = u.id
@@ -270,7 +269,6 @@ type ReminderRow = (
     bool,
     String,
     String,
-    String,
 );
 
 pub async fn load_reminder(
@@ -278,7 +276,7 @@ pub async fn load_reminder(
     event_id: &str,
     user_id: &str,
 ) -> Result<Reminder, sqlx::Error> {
-    let (title, start, end, all_day, user_email, timezone, time_format): ReminderRow =
+    let (title, start, end, all_day, user_email, timezone): ReminderRow =
         sqlx::query_as(LOAD_REMINDER)
             .bind(event_id)
             .bind(user_id)
@@ -291,8 +289,34 @@ pub async fn load_reminder(
         all_day,
         user_email,
         timezone,
-        time_format,
     })
+}
+
+/// `encrypted_lead` is read through `to_jsonb`, so this also runs before the migration that adds it.
+const LOAD_LEAD: &str = r#"
+    SELECT to_jsonb(en) ->> 'encrypted_lead'
+    FROM event_notification en
+    INNER JOIN calendar_event ce ON ce.id = en.event_id
+    WHERE en.event_id = $1 AND ce.user_id = $2 AND en.minutes_before = $3
+      AND to_jsonb(en) ->> 'encrypted_lead' IS NOT NULL
+    ORDER BY en.updated_at DESC
+    LIMIT 1
+"#;
+
+/// The sealed lead of the job's reminder, or empty when no client sealed one.
+pub async fn load_lead(
+    db: &PgPool,
+    event_id: &str,
+    user_id: &str,
+    minutes_before: i64,
+) -> Result<String, sqlx::Error> {
+    let lead: Option<Option<String>> = sqlx::query_scalar(LOAD_LEAD)
+        .bind(event_id)
+        .bind(user_id)
+        .bind(i32::try_from(minutes_before).unwrap_or(-1))
+        .fetch_optional(db)
+        .await?;
+    Ok(lead.flatten().unwrap_or_default().trim().to_owned())
 }
 
 /// A `TIMESTAMP(3)` column, which holds UTC.
@@ -303,23 +327,6 @@ pub fn utc(value: PrimitiveDateTime) -> Timestamp {
 /// The user's zone, or UTC when it is unset or unknown.
 pub fn zone(name: &str) -> TimeZone {
     TimeZone::get(name).unwrap_or(TimeZone::UTC)
-}
-
-/// The start in the user's zone and 12/24-hour format, or empty for all-day events.
-pub fn start_clock(reminder: &Reminder) -> String {
-    if reminder.all_day {
-        return String::new();
-    }
-    let format = if reminder.time_format == "12h" {
-        "%-I:%M %p"
-    } else {
-        "%H:%M"
-    };
-    reminder
-        .start
-        .to_zoned(zone(&reminder.timezone))
-        .strftime(format)
-        .to_string()
 }
 
 #[cfg(test)]
@@ -335,35 +342,13 @@ mod tests {
         );
     }
 
-    fn reminder(time_format: &str, timezone: &str, all_day: bool) -> Reminder {
-        Reminder {
-            encrypted_title: String::new(),
-            start: "2026-07-15T13:30:00Z".parse().unwrap(),
-            end: "2026-07-15T14:30:00Z".parse().unwrap(),
-            all_day,
-            user_email: String::new(),
-            timezone: timezone.into(),
-            time_format: time_format.into(),
-        }
-    }
-
-    #[test]
-    fn start_clocks_follow_the_users_zone_and_format() {
-        assert_eq!(
-            start_clock(&reminder("24h", "Europe/Amsterdam", false)),
-            "15:30"
-        );
-        assert_eq!(
-            start_clock(&reminder("12h", "America/New_York", false)),
-            "9:30 AM"
-        );
-        assert_eq!(start_clock(&reminder("24h", "Not/AZone", false)), "13:30");
-        assert_eq!(start_clock(&reminder("24h", "UTC", true)), "");
-    }
-
     #[test]
     fn the_reminder_query_reads_ciphertext_only() {
         assert!(LOAD_REMINDER.contains("encrypted_display_title"));
+        assert!(
+            LOAD_LEAD.contains("ce.user_id = $2"),
+            "the lead is read only for the job's owner"
+        );
         for content in ["ce.title", "ce.description", "ce.location", "ce.encrypted"] {
             assert!(!LOAD_REMINDER.contains(content), "{content}");
         }

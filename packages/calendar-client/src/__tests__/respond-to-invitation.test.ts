@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 
+import { NoopE2eeProvider } from "@workspace/e2ee";
 import { CalendarApiService } from "../calendar-api-service";
 import { HttpClient } from "../http-client";
 
@@ -44,6 +45,35 @@ describe("CalendarApiService.respondToInvitation", () => {
     expect("deleted" in result).toBe(false);
     expect(result).toMatchObject({ id: "evt-1", title: "Standup" });
     expect((result as { start: Date }).start).toBeInstanceOf(Date);
+  });
+
+  it("seals the readable copy it answered, so no caller leaves it readable", async () => {
+    const staged = {
+      id: "evt-1",
+      title: "Planning",
+      externalId: "uid-1",
+      isSynced: false,
+      encryptionState: "plaintext",
+      start: "2026-08-24T09:00:00.000Z",
+      end: "2026-08-24T09:30:00.000Z",
+    };
+    const fetchMock = jest.fn(async (_input: RequestInfo | URL) =>
+      jsonOk(fetchMock.mock.calls.length === 1 ? staged : { ...staged, title: "", encryptionState: "encrypted" }),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+    const e2ee = new NoopE2eeProvider();
+    e2ee.hasActiveSession = async () => true;
+    e2ee.attachEventEncryptionShadow = async (request) => ({ ...request, encryptedContent: "sealed" });
+
+    await new CalendarApiService(
+      new HttpClient({ baseURL: "http://api.test", retries: 0 }),
+      e2ee,
+    ).respondToInvitation("evt-1", "accepted");
+
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
+      "http://api.test/api/events/evt-1/rsvp",
+      "http://api.test/api/events/evt-1/seal-encryption",
+    ]);
   });
 
   it("returns { deleted: true } when declining removes the event", async () => {

@@ -25,9 +25,12 @@ import {
   SIMPLELOGIN_DONE_KEYWORD,
   type JmapAttachmentInput,
   type JmapPgpMimeCiphertext,
+  type MailListFilters,
+  type MailSearchFieldValues,
   type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
+import { searchMailboxLocally } from "../search/local-mail-search";
 import { createMailSealer } from "./outgoing-message-crypto";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
 import {
@@ -178,27 +181,38 @@ export function useMailboxMessages(
 }
 
 /** Server-side field search; `revision` stands in for the query in the cache key so no search text lands in it. */
+export interface MailboxFieldSearch {
+  filter: Record<string, unknown>;
+  fields: MailSearchFieldValues;
+  listFilters: MailListFilters;
+  timezone?: string;
+}
+
 export function useMailboxFieldSearch(
   runtime: MailRuntime | undefined,
   mailboxId: string | null,
-  filter: Record<string, unknown> | null,
+  search: MailboxFieldSearch | null,
   revision: number,
 ) {
   const pageSize = 40;
   return useInfiniteQuery({
     initialPageParam: 0,
     queryKey: QUERY_KEYS.mailSearchMessages(mailboxId, revision),
-    enabled: Boolean(runtime && mailboxId && filter),
+    enabled: Boolean(runtime && mailboxId && search),
     staleTime: 30_000,
     queryFn: async ({ pageParam }) => {
-      if (!runtime || !mailboxId || !filter) {
+      if (!runtime || !mailboxId || !search) {
         throw new Error("Your mailbox is not connected.");
+      }
+      const local = await searchMailboxLocally({ runtime, mailboxId, ...search });
+      if (local) {
+        return { messages: sortMessagesByDate(local), total: local.length, position: 0 };
       }
       const { messages, total } =
         await runtime.client.searchMailboxMessagesWithFilter(
           runtime.session,
           mailboxId,
-          filter,
+          search.filter,
           pageSize,
           pageParam,
         );

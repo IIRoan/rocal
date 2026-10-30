@@ -1,5 +1,6 @@
 "use client";
 
+import type { E2eeLock } from "@workspace/e2ee";
 import { LOGIN_PATH } from "@/lib/app-routes";
 
 const PASSKEY_BRIDGE_PATH = "/passkey/native";
@@ -38,6 +39,15 @@ export function completeAuthNavigation(href: string) {
   beginAuthNavigation(href)?.();
 }
 
+export function isPasskeyBridgePath(
+  pathname: string | null | undefined,
+): boolean {
+  return (
+    pathname === PASSKEY_BRIDGE_PATH ||
+    Boolean(pathname?.startsWith(`${PASSKEY_BRIDGE_PATH}/`))
+  );
+}
+
 export function isPasskeyStepUpExemptPath(
   pathname: string | null | undefined,
 ): boolean {
@@ -47,8 +57,7 @@ export function isPasskeyStepUpExemptPath(
   return (
     pathname === LOGIN_PATH ||
     pathname.startsWith(`${LOGIN_PATH}/`) ||
-    pathname === PASSKEY_BRIDGE_PATH ||
-    pathname.startsWith(`${PASSKEY_BRIDGE_PATH}/`)
+    isPasskeyBridgePath(pathname)
   );
 }
 
@@ -60,6 +69,11 @@ export function buildPasskeyStepUpLoginHref(currentPath: string): string {
   }
   params.set("stepUp", "1");
   return `${LOGIN_PATH}?${params.toString()}`;
+}
+
+/** The login page shows the notice matching why a session that could not open the account key ended. */
+export function buildE2eeLockLoginHref(reason: E2eeLock): string {
+  return `${LOGIN_PATH}?e2ee=${reason}`;
 }
 
 export function redirectToPasskeyStepUpLogin(): void {

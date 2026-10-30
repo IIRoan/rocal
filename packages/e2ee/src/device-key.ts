@@ -28,3 +28,21 @@ export async function resolveDeviceEnvelopeSalt(
     () => null,
   );
 }
+
+/** Why a signed-in device cannot open the account key; the session then ends instead of asking for a password. */
+export type E2eeLock = "sign-in-again" | "cannot-open";
+
+/** Where the password tried on the envelope came from; only one the server just accepted shows the envelope is stale. */
+export type UnlockPassword = "sign-in" | "remembered" | "none";
+
+/** The lock for a device without usable keys of its own; null when it may stay (unlocked, or a new account that may mint keys). */
+export function lockWithoutDeviceKeys(input: {
+  hasEnvelope: boolean;
+  hasOtherDevices: boolean;
+  password: UnlockPassword;
+  opened: boolean;
+}): E2eeLock | null {
+  if (input.opened) return null;
+  if (!input.hasEnvelope) return input.hasOtherDevices ? "cannot-open" : null;
+  return input.password === "sign-in" ? "cannot-open" : "sign-in-again";
+}

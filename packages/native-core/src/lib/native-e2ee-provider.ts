@@ -4,9 +4,11 @@ import {
   encryptNameRequest,
   hydrateEncryptedEventWithoutSession,
   hydrateEncryptedName,
+  parseEncryptedJsonPayload,
+  withDecryptedEventContent,
   withoutPlaintextEventContent,
   withoutPlaintextName,
-  ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+  type DecryptedEventContent,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
 } from "@workspace/e2ee";
@@ -24,8 +26,10 @@ import type {
   UpdateCategoryRequest,
   UpdateEventRequest,
 } from "@workspace/calendar-core";
+import type { PasswordEnvelopeRequest } from "@workspace/calendar-client";
 import { createLogger } from "@workspace/logger";
 import { createNativeCryptoProvider } from "./native-crypto-provider";
+import { encryptReminderLead } from "./notification-title-crypto";
 import { SECURE_STORE_KEYS } from "./constants";
 import { getE2eeApiUrl } from "./e2ee-api-url";
 import { getAuthHeaders } from "./api";
@@ -245,12 +249,21 @@ export async function putPasswordEnvelope({
   apiBaseUrl: string;
   password: string;
 }): Promise<void> {
-  const envelope = await e2ee.createPasswordEnvelope(
-    session.accountKey,
-    session.blindIndexKey,
-    password,
+  await uploadPasswordEnvelope(
+    apiBaseUrl,
+    await e2ee.createPasswordEnvelope(
+      session.accountKey,
+      session.blindIndexKey,
+      password,
+    ),
   );
+}
 
+/** Stores an envelope already wrapped with the password, and remembers its salt as this device's. */
+export async function uploadPasswordEnvelope(
+  apiBaseUrl: string,
+  envelope: PasswordEnvelopeRequest,
+): Promise<void> {
   // repo-rules-allow client-api-boundary: E2EE password-envelope endpoint; @workspace/calendar-client does not expose it.
   const response = await fetch(getE2eeApiUrl(apiBaseUrl, "/password"), {
     method: "PUT",
@@ -378,21 +391,13 @@ export function createNativeE2eeProvider({
         }
 
         const payload = JSON.parse(event.encryptedContent);
-        const decrypted = await e2ee.decryptJsonPayload<{
-          title: string;
-          description?: string | null;
-          location?: string | null;
-        }>(session.accountKey, payload, "event-content:v1");
+        const decrypted = await e2ee.decryptJsonPayload<DecryptedEventContent>(
+          session.accountKey,
+          payload,
+          "event-content:v1",
+        );
 
-        return {
-          ...event,
-          title:
-            decrypted.title?.trim() ||
-            event.title?.trim() ||
-            ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
-          description: decrypted.description ?? null,
-          location: decrypted.location ?? null,
-        };
+        return withDecryptedEventContent(event, decrypted);
       } catch {
         return hydrateEncryptedEventWithoutSession(event);
       }
@@ -422,6 +427,39 @@ export function createNativeE2eeProvider({
       } catch {
         return [];
       }
+    },
+
+    async encryptJson(value: unknown, aad: string): Promise<string> {
+      return encryptWith(
+        "settings",
+        async (e2ee, session) =>
+          JSON.stringify(await e2ee.encryptJsonPayload(session.accountKey, value, aad)),
+        () => {
+          throw new Error("Encrypted data is not unlocked on this device.");
+        },
+      );
+    },
+
+    async decryptJson(encrypted: string, aad: string): Promise<unknown> {
+      const session = await waitForSession();
+      const e2ee = session ? await getModule() : null;
+      const payload = parseEncryptedJsonPayload(encrypted);
+      if (!session || !e2ee || !payload) {
+        return null;
+      }
+      return e2ee
+        .decryptJsonPayload<unknown>(session.accountKey, payload, aad)
+        .catch(() => null);
+    },
+
+    async encryptNotificationLead(
+      eventId: string,
+      minutesBefore: number,
+    ): Promise<string | undefined> {
+      const session = await waitForSession();
+      return session
+        ? encryptReminderLead(session.accountKey, eventId, minutesBefore)
+        : undefined;
     },
   };
   return provider;

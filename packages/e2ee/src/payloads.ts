@@ -52,14 +52,21 @@ function hasOwn(value: object, key: string): boolean {
 export const ENCRYPTION_NOT_READY_MESSAGE =
   "Encryption is not ready on this device. Sign in again to unlock your encrypted data, then retry.";
 
-/** Without a session only content-free writes (visibility, color, time moves) may leave the device. */
+/** Without a session only content-free writes (visibility, time moves) may leave the device. */
 export function withoutPlaintextEventContent<
   T extends CreateEventRequest | UpdateEventRequest,
 >(request: T): EventWireRequest<T> {
   if (findPlaintextEventContentFields(request).length > 0) {
     throw new Error(ENCRYPTION_NOT_READY_MESSAGE);
   }
-  const { title: _title, description: _description, location: _location, ...wire } = request;
+  const {
+    title: _title,
+    description: _description,
+    location: _location,
+    color: _color,
+    categoryId: _categoryId,
+    ...wire
+  } = request;
   return wire;
 }
 
@@ -74,7 +81,7 @@ export function withoutPlaintextName<T extends NameRequest>(
   return wire;
 }
 
-/** Ciphertext covers all three fields, so a request without a title must keep the stored one. */
+/** Ciphertext covers every content field, so a request without a title must keep the stored one. */
 export function shouldEncryptEventContent(request: object): boolean {
   if (!hasOwn(request, "title")) {
     return false;
@@ -99,20 +106,30 @@ export async function encryptEventContentRequest<
   const title = trimToNull(request.title) ?? "";
   const description = trimToNull(request.description);
   const location = trimToNull(request.location);
+  const color = trimToNull(request.color);
+  const categoryId = trimToNull(request.categoryId);
 
   const encryptedContent = JSON.stringify(
     await e2ee.encryptJsonPayload(
       keys.accountKey,
-      { title, description, location },
+      { title, description, location, color, categoryId },
       eventContentAad(keyVersion),
     ),
   );
+  // Colour and category stay out of the tokens, so they cannot link events to each other.
   const blindIndexTokens = await e2ee.createBlindIndexTokens(
     keys.blindIndexKey,
     [title, description, location].filter(Boolean).join(" "),
   );
 
-  const { title: _title, description: _description, location: _location, ...wire } = request;
+  const {
+    title: _title,
+    description: _description,
+    location: _location,
+    color: _color,
+    categoryId: _categoryId,
+    ...wire
+  } = request;
 
   const invitesAttendees = (request.participants ?? []).some(
     (participant) => participant.role !== "organizer",
@@ -131,6 +148,7 @@ export async function encryptEventContentRequest<
     encryptedContent,
     blindIndexTokens,
     encryptionKeyVersion: keyVersion,
+    attributesEncrypted: true,
     ...(invitationContent ? { invitationContent } : {}),
   };
 }

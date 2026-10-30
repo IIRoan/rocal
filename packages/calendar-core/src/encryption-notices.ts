@@ -13,7 +13,13 @@ export interface EncryptableCalendarItem {
 export type CalendarEncryptionKind = "event" | "calendar" | "category";
 export type EncryptionDisplayState = "encrypted" | "plaintext";
 
-export const EVENT_ENCRYPTED_FIELDS = ["Title", "Description", "Location"];
+export const EVENT_ENCRYPTED_FIELDS = [
+  "Title",
+  "Description",
+  "Location",
+  "Color",
+  "Category",
+];
 export const EVENT_READABLE_METADATA = [
   "Dates, times, timezone & all-day status",
   "Recurrence, reminders, participants & other metadata",

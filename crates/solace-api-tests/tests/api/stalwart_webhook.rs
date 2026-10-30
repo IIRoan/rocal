@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use solace_api_tests::client::ApiResponse;
 use solace_api_types::mail::StalwartWebhookResult;
 
-use crate::helpers::{Backend, TestApp, hex, ok};
+use crate::helpers::{TestApp, hex, ok};
 use crate::mail_support::{
     Mailbox, mailbox, method, post_signed, post_webhook, post_webhook_from, row_json,
     webhook_signature,
@@ -344,11 +344,7 @@ async fn a_redelivered_message_is_pushed_again_only_after_its_push_was_skipped()
         "a sent push is not repeated"
     );
     set_job_status(&app, &owner, "skipped").await;
-    let after_skip = deliver(&app, &owner, &delivery).await;
-    match app.backend {
-        Backend::TypeScript => assert_eq!(after_skip, ["601"]),
-        Backend::Rust => assert_eq!(after_skip, ["601", "601"]),
-    }
+    assert_eq!(deliver(&app, &owner, &delivery).await, ["601", "601"]);
 }
 
 #[tokio::test]

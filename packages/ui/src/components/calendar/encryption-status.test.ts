@@ -26,7 +26,13 @@ describe("calendar encryption notices", () => {
 
   it("discloses reminders, timezone and participants for encrypted events", () => {
     const meta = getEncryptionStatusMeta({ encryptionState: "encrypted" });
-    expect(meta.protectedFields).toEqual(["Title", "Description", "Location"]);
+    expect(meta.protectedFields).toEqual([
+      "Title",
+      "Description",
+      "Location",
+      "Color",
+      "Category",
+    ]);
     expect(meta.visibleFields.join(" ")).toMatch(/timezone/i);
     expect(meta.visibleFields.join(" ")).toMatch(/reminders/i);
     expect(meta.visibleFields.join(" ")).toMatch(/participants/i);

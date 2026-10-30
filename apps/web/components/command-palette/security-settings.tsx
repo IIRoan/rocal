@@ -21,16 +21,11 @@ interface SecuritySettingsProps {
   goBack: () => void;
   goForward: (view: string) => void;
   hasPasswordAccount?: boolean;
-  hasOAuthAccount?: boolean;
   changingPassword?: boolean;
-  settingPassword?: boolean;
-  resettingEncryptionPassword?: boolean;
   handleChangePassword?: (v: {
     currentPassword: string;
     newPassword: string;
   }) => Promise<void>;
-  handleSetPassword?: (v: { newPassword: string }) => Promise<void>;
-  handleResetEncryptionPassword?: (v: { newPassword: string }) => Promise<void>;
 }
 
 export function SecuritySettings({
@@ -38,16 +33,10 @@ export function SecuritySettings({
   goBack,
   goForward,
   hasPasswordAccount = false,
-  hasOAuthAccount = false,
   changingPassword = false,
-  settingPassword = false,
-  resettingEncryptionPassword = false,
   handleChangePassword,
-  handleSetPassword,
-  handleResetEncryptionPassword,
 }: SecuritySettingsProps) {
   const privateSearchIndex = usePrivateSearchIndexControls();
-  const showPasswordSection = hasPasswordAccount || hasOAuthAccount;
 
   return (
     <PaletteView title="Security" onBack={goBack}>
@@ -87,17 +76,12 @@ export function SecuritySettings({
         />
       </PaletteSection>
 
-      {showPasswordSection && handleChangePassword ? (
+      {hasPasswordAccount && handleChangePassword ? (
         <PaletteSection label="Password">
           <PasswordSection
             hasPasswordAccount={hasPasswordAccount}
-            hasOAuthAccount={hasOAuthAccount}
             changingPassword={changingPassword}
-            settingPassword={settingPassword}
-            resettingEncryptionPassword={resettingEncryptionPassword}
             handleChangePassword={handleChangePassword}
-            handleSetPassword={handleSetPassword}
-            handleResetEncryptionPassword={handleResetEncryptionPassword}
           />
         </PaletteSection>
       ) : null}

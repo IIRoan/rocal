@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useReducer, useRef, type MutableRefObject } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
+import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CALENDARS_QUERY_KEY,
@@ -9,6 +10,8 @@ import {
   SETTINGS_QUERY_KEY,
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
+import { sealReadableInvitations } from "@workspace/calendar-client";
+import { lockWithoutDeviceKeys, type E2eeLock } from "@workspace/e2ee";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useSession } from "@/lib/auth-client";
 import {
@@ -17,31 +20,23 @@ import {
   storePasswordEnvelopeForActiveSession,
   unlockE2eeWithPassword,
 } from "@/lib/e2ee-bootstrap";
-import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
 import {
   clearAuthPasswords,
-  peekAuthPassword,
+  peekCachedAuthPassword,
+  peekPendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
   initEncPasswordFromCookie,
-  setEncPasswordCookie,
 } from "@/lib/enc-password-cookie";
 import { signOutAndClearLocalState } from "@/lib/auth-local-state";
-import { E2eeBootstrapDialog } from "./e2ee-bootstrap-dialog";
 import {
-  e2eeGateReducer,
-  initialE2eeGateState,
-  type GateMode,
-} from "./e2ee-bootstrap-gate-state";
+  beginAuthNavigation,
+  buildE2eeLockLoginHref,
+  isPasskeyBridgePath,
+} from "@/lib/auth-navigation";
 
 const log = createLogger("e2ee-bootstrap");
-const PASSWORD_SETUP_RETRY_ATTEMPTS = 4;
-
-type BootstrapGateState = {
-  mode: GateMode;
-  isSubmitting: boolean;
-};
 
 function clearCalendarQueries(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -60,192 +55,89 @@ async function ensureDefaultCalendars(
   }
 }
 
+async function ensureSealedSettings(
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  if (await calendarApiService.ensureSealedUserSettings()) {
+    await queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEY });
+  }
+}
+
 async function refreshEncryptedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
-  // Failures are swallowed on purpose: seeding retries on the next bootstrap.
+  // Failures are swallowed on purpose: seeding and sealing retry on the next bootstrap.
   void ensureDefaultCalendars(queryClient).catch(() => undefined);
+  void ensureSealedSettings(queryClient).catch(() => undefined);
+  void sealReadableInvitations(calendarApiService).catch(() => undefined);
 
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY }),
     queryClient.invalidateQueries({ queryKey: CALENDARS_QUERY_KEY }),
     queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY }),
+    queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEY }),
   ]);
 }
 
-async function attemptEncryptionPasswordSetup(
-  userId: string,
-  password: string,
-  attempt = 0,
-): Promise<boolean> {
-  if (attempt >= PASSWORD_SETUP_RETRY_ATTEMPTS) {
-    return false;
-  }
-
-  const stored = await resetEncryptionPasswordForActiveSession(
-    userId,
-    password,
-  );
-
-  if (stored) {
-    return true;
-  }
-
-  if (attempt + 1 < PASSWORD_SETUP_RETRY_ATTEMPTS) {
-    await Promise.resolve();
-  }
-
-  return attemptEncryptionPasswordSetup(userId, password, attempt + 1);
-}
-
-async function resolveBootstrapGateState(input: {
+/** Resolves the lock that ends this session, null when it may stay; network failures never lock. */
+async function resolveBootstrapLock(input: {
   userId: string;
   result: Awaited<ReturnType<typeof ensureE2eeBootstrap>>;
+  queryClient: ReturnType<typeof useQueryClient>;
   isCancelled: () => boolean;
-}): Promise<BootstrapGateState | null> {
-  const { userId, result, isCancelled } = input;
+}): Promise<E2eeLock | null> {
+  const { userId, result, queryClient, isCancelled } = input;
+  const bootstrap = result.bootstrap;
 
-  if (isCancelled()) {
+  if (isCancelled() || !bootstrap) {
     return null;
   }
 
-  if (!result.bootstrap) {
-    return { mode: "hidden", isSubmitting: false };
-  }
-
-  if (result.activated && !result.bootstrap.passwordEnvelope) {
-    const pendingPassword = peekAuthPassword();
-
-    if (pendingPassword) {
-      const stored = await attemptEncryptionPasswordSetup(
-        userId,
-        pendingPassword,
-      );
-
-      if (isCancelled()) {
-        return null;
-      }
-
-      if (stored) {
-        return { mode: "hidden", isSubmitting: false };
-      }
-    }
-
-    return { mode: "setup", isSubmitting: false };
-  }
-
+  const signInPassword = peekPendingAuthPassword();
   if (result.activated) {
-    return { mode: "hidden", isSubmitting: false };
-  }
-
-  if (result.bootstrap.passwordEnvelope) {
-    if (result.passwordUnlockFailed) {
-      return { mode: "unlock", isSubmitting: false };
+    // A browser holding the only keys stays signed in; only a password the server just accepted may wrap them.
+    if (!bootstrap.passwordEnvelope && signInPassword) {
+      await storePasswordEnvelopeForActiveSession(userId, signInPassword).catch(
+        (error: unknown) => {
+          log.warn("Failed to store the missing encryption envelope", {
+            userId,
+            error,
+          });
+        },
+      );
     }
+    return null;
+  }
 
-    const pendingPassword = peekAuthPassword();
-    if (pendingPassword) {
-      const unlocked = await unlockE2eeWithPassword(userId, pendingPassword);
-
-      if (isCancelled()) {
-        return null;
-      }
-
-      if (unlocked) {
-        return { mode: "hidden", isSubmitting: false };
-      }
+  const password = signInPassword ?? peekCachedAuthPassword();
+  let opened = false;
+  if (bootstrap.passwordEnvelope && password && !result.passwordUnlockFailed) {
+    // The sign-in password can arrive after the bootstrap ran.
+    const unlocked = await unlockE2eeWithPassword(userId, password, bootstrap);
+    if (isCancelled() || (!unlocked.activated && !unlocked.passwordUnlockFailed)) {
+      return null;
     }
-
-    // Password sign-ins stash the password before the session exists, so only a passkey sign-in lands here without one.
-    return { mode: "unlock", isSubmitting: false };
+    opened = unlocked.activated;
+    if (opened) {
+      await refreshEncryptedQueries(queryClient);
+    }
   }
 
-  return { mode: "hidden", isSubmitting: false };
+  return lockWithoutDeviceKeys({
+    hasEnvelope: Boolean(bootstrap.passwordEnvelope),
+    hasOtherDevices: bootstrap.devices.length > 0,
+    password: signInPassword ? "sign-in" : password ? "remembered" : "none",
+    opened,
+  });
 }
 
-async function runEncryptionPasswordSetup(input: {
-  userId: string;
-  password: string;
-  confirmPassword: string;
-  queryClient: ReturnType<typeof useQueryClient>;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { userId, password, confirmPassword, queryClient } = input;
-
-  if (password.length < 8) {
-    return {
-      ok: false,
-      error: "Use at least 8 characters for your encryption password.",
-    };
-  }
-
-  if (password !== confirmPassword) {
-    return { ok: false, error: "Passwords do not match." };
-  }
-
-  const stored = await resetEncryptionPasswordForActiveSession(userId, password);
-
-  if (!stored) {
-    log.warn("Failed to refresh encrypted data for password setup", { userId });
-    return {
-      ok: false,
-      error: "Could not save your encryption password and refresh encrypted data.",
-    };
-  }
-
-  await setEncPasswordCookie(password);
-  await refreshEncryptedQueries(queryClient);
-  return { ok: true };
-}
-
-async function runEncryptionPasswordUnlock(input: {
-  userId: string;
-  password: string;
-  queryClient: ReturnType<typeof useQueryClient>;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { userId, password, queryClient } = input;
-
-  if (!password) {
-    return { ok: false, error: "Enter your password." };
-  }
-
-  // After a reset the sign-in password no longer opens the envelope; once the previous one does, the envelope follows it.
-  const signInPassword = peekAuthPassword() ?? password;
-  const unlocked = await unlockE2eeWithPassword(userId, password);
-
-  if (!unlocked) {
-    log.warn("Failed to unlock E2EE password envelope", { userId });
-    return {
-      ok: false,
-      error:
-        "That password didn't match. If you recently changed your email sign-in password, use your previous one here.",
-    };
-  }
-
-  if (signInPassword !== password) {
-    await storePasswordEnvelopeForActiveSession(userId, signInPassword).catch(
-      (error: unknown) => {
-        log.warn("Failed to re-wrap the encryption envelope", { userId, error });
-      },
-    );
-  }
-  await setEncPasswordCookie(signInPassword);
-  await refreshEncryptedQueries(queryClient);
-  return { ok: true };
-}
-
-async function runEncryptionGateSignOut(
-  userId: string | undefined,
-): Promise<void> {
-  try {
-    await signOutAndClearLocalState();
-  } catch (signOutError) {
-    log.warn("Failed to sign out from encryption gate", {
-      userId,
-      error: signOutError,
-    });
-  }
-
-  window.location.href = "/";
+/** Signed in means unlocked: a session that cannot open the account key ends, and the login page says why. */
+function endLockedSession(reason: E2eeLock): void {
+  const finishNavigation = beginAuthNavigation(buildE2eeLockLoginHref(reason));
+  if (!finishNavigation) return;
+  void signOutAndClearLocalState()
+    .then(finishNavigation)
+    .catch(finishNavigation);
 }
 
 async function runBootstrapCycle(input: {
@@ -254,25 +146,18 @@ async function runBootstrapCycle(input: {
   runId: number;
   bootstrapRunIdRef: MutableRefObject<number>;
   isCancelled: () => boolean;
-  onGateResolved: (gate: BootstrapGateState) => void;
 }): Promise<void> {
-  const {
-    userId,
-    queryClient,
-    runId,
-    bootstrapRunIdRef,
-    isCancelled,
-    onGateResolved,
-  } = input;
+  const { userId, queryClient, runId, bootstrapRunIdRef, isCancelled } = input;
+  const isStale = () => isCancelled() || runId !== bootstrapRunIdRef.current;
 
   await initEncPasswordFromCookie();
-  if (isCancelled() || runId !== bootstrapRunIdRef.current) {
+  if (isStale()) {
     return;
   }
 
   try {
     const result = await ensureE2eeBootstrap(userId);
-    if (isCancelled() || runId !== bootstrapRunIdRef.current) {
+    if (isStale()) {
       return;
     }
 
@@ -280,19 +165,18 @@ async function runBootstrapCycle(input: {
       await refreshEncryptedQueries(queryClient);
     }
 
-    const nextGate = await resolveBootstrapGateState({
+    const lock = await resolveBootstrapLock({
       userId,
       result,
-      isCancelled: () => isCancelled() || runId !== bootstrapRunIdRef.current,
+      queryClient,
+      isCancelled: isStale,
     });
 
-    if (!nextGate) {
-      return;
+    if (lock && !isStale()) {
+      endLockedSession(lock);
     }
-
-    onGateResolved(nextGate);
   } catch (bootstrapError) {
-    if (isCancelled() || runId !== bootstrapRunIdRef.current) {
+    if (isStale()) {
       return;
     }
 
@@ -307,12 +191,13 @@ export function E2eeBootstrap() {
   const queryClient = useQueryClient();
   const { data: session, isPending } = useSession();
   const userId = session?.user?.id;
+  // The native passkey bridge holds a short-lived browser session for the app, which must not be unlocked or ended here.
+  const isPasskeyBridge = isPasskeyBridgePath(usePathname());
   const previousUserIdRef = useRef<string | null>(null);
   const bootstrapRunIdRef = useRef(0);
-  const [gate, dispatchGate] = useReducer(e2eeGateReducer, initialE2eeGateState);
 
   useEffect(() => {
-    if (isPending) {
+    if (isPending || isPasskeyBridge) {
       return;
     }
 
@@ -320,9 +205,6 @@ export function E2eeBootstrap() {
 
     if (!userId) {
       resetE2eeBootstrap();
-      queueMicrotask(() => {
-        dispatchGate({ type: "reset" });
-      });
 
       if (previousUserId) {
         clearAuthPasswords();
@@ -344,105 +226,18 @@ export function E2eeBootstrap() {
     const runId = ++bootstrapRunIdRef.current;
     let isCancelled = false;
 
-    queueMicrotask(() => {
-      if (!isCancelled && runId === bootstrapRunIdRef.current) {
-        dispatchGate({ type: "clear-error" });
-      }
-    });
-
     void runBootstrapCycle({
       userId,
       queryClient,
       runId,
       bootstrapRunIdRef,
       isCancelled: () => isCancelled,
-      onGateResolved: (nextGate) => {
-        dispatchGate({
-          type: "set-from-bootstrap",
-          mode: nextGate.mode,
-          isSubmitting: nextGate.isSubmitting,
-        });
-      },
     });
 
     return () => {
       isCancelled = true;
     };
-  }, [isPending, queryClient, userId]);
+  }, [isPasskeyBridge, isPending, queryClient, userId]);
 
-  async function handleGateSubmit() {
-    if (!userId) {
-      return;
-    }
-
-    dispatchGate({ type: "start-submit" });
-    const isUnlock = gate.mode === "unlock";
-    const run = isUnlock
-      ? runEncryptionPasswordUnlock({
-          userId,
-          password: gate.password,
-          queryClient,
-        })
-      : runEncryptionPasswordSetup({
-          userId,
-          password: gate.password,
-          confirmPassword: gate.confirmPassword,
-          queryClient,
-        });
-    const outcome = await run.catch((error: unknown) => {
-      log.warn("Failed to finish the encryption password gate", {
-        userId,
-        error,
-      });
-      return {
-        ok: false as const,
-        error: isUnlock
-          ? "Could not unlock encryption. Please try again."
-          : "Could not set your encryption password. Please try again.",
-      };
-    });
-
-    dispatchGate(
-      outcome.ok === false
-        ? { type: "set-error", error: outcome.error }
-        : { type: "success-hide" },
-    );
-    dispatchGate({ type: "end-submit" });
-  }
-
-  async function handleSignOut() {
-    dispatchGate({ type: "start-submit" });
-    await runEncryptionGateSignOut(userId);
-  }
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (gate.isSubmitting) {
-      return;
-    }
-    void handleGateSubmit().catch((error) => {
-      log.error("Encryption setup failed", error);
-    });
-  };
-
-  if (gate.mode === "hidden") {
-    return null;
-  }
-
-  return (
-    <E2eeBootstrapDialog
-      gate={gate}
-      onPasswordChange={(password) =>
-        dispatchGate({ type: "set-password", password })
-      }
-      onConfirmPasswordChange={(confirmPassword) =>
-        dispatchGate({ type: "set-confirm-password", confirmPassword })
-      }
-      onSubmit={handleSubmit}
-      onSignOut={() => {
-        // runEncryptionGateSignOut logs its own failures, so this promise never rejects.
-        void handleSignOut().catch(() => undefined);
-      }}
-    />
-  );
+  return null;
 }

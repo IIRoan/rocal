@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { TitleIndexDocument } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
+import { PRIVATE_CONTENT_INDEX_ENABLED_KEY } from "@/lib/search/private-index-flags";
 import { useSession } from "@/lib/auth-client";
 import { PRIVATE_SEARCH_INDEX_CHANGE_EVENT } from "@/hooks/use-private-search-index-controls";
 import {
@@ -20,7 +21,7 @@ import {
   rebuildPrivateTitleIndex,
 } from "@/lib/search/private-title-index";
 
-const ENABLED_KEY = "search:private-content-index-enabled";
+const ENABLED_KEY = PRIVATE_CONTENT_INDEX_ENABLED_KEY;
 const PAUSED_KEY = "search:private-content-index-paused";
 const log = createLogger("private-title-index");
 const REINDEX_INTERVAL_MS = 15 * 60 * 1000;

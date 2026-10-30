@@ -478,6 +478,8 @@ This happens only with explicit go-ahead.
 
 ### 7. Delete TypeScript and clean up
 
+**Progress (2026-10-29):** `retired/backend`, its Prisma schema, the `api-contract` lint rules, `cargo xtask ts-backend`, the Jest-destination check and the suite's TypeScript and interop modes are deleted. Migrations moved to `sea-orm-migration` in `apps/backend/src/db/migrations`: `m20260928_150000_prisma_baseline` is the schema of the 53 Prisma migrations (recorded without running on a database whose `_prisma_migrations` reached the 53rd, as production's has), and the four later ones are Rust migrations. The API and the worker apply pending migrations at startup under an advisory lock. Open below: the privacy gaps, the scoped provisioner key, passkey step-up, and the review follow-ups.
+
 - Remove `retired/backend`, Prisma and the Better Auth server packages (the Vercel API project is already gone). Keep the frontend, shared-package, and Go tests.
 - Move migrations to `sea-orm-migration`, baselined at migration 53, keeping the `_prisma_migrations` history.
 - Fix the known privacy gaps, delete them from AGENTS §2, and remove the exception.

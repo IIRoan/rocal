@@ -43,6 +43,13 @@ function invalidateCategories(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: QUERY_KEYS.categories() });
 }
 
+export function useCategoryUsageCounts() {
+  return useQuery({
+    queryKey: QUERY_KEYS.categoryUsage(),
+    queryFn: ({ signal }) => calendarApiService.getCategoryUsageCounts(signal),
+  });
+}
+
 export function useCategories(enabled = true) {
   return useQuery({
     queryKey: QUERY_KEYS.categories(),

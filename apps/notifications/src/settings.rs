@@ -178,15 +178,11 @@ fn is_shared_backend_env(path: &Path) -> bool {
             .is_some_and(|name| name == "backend")
 }
 
-/// `.env` here and in each parent, plus a `backend/.env` or `retired/backend/.env` beside them.
+/// `.env` here and in each parent, plus a `backend/.env` beside them (the API's, from `apps/`).
 fn discover_env_files(start: &Path) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = Vec::new();
     for dir in start.ancestors().take(8) {
-        for candidate in [
-            dir.join(".env"),
-            dir.join("backend/.env"),
-            dir.join("retired/backend/.env"),
-        ] {
+        for candidate in [dir.join(".env"), dir.join("backend/.env")] {
             if candidate.is_file() && !files.contains(&candidate) {
                 files.push(candidate);
             }
@@ -203,7 +199,7 @@ mod tests {
     fn env_files_are_found_up_the_tree_local_first() {
         let root = std::env::temp_dir().join(format!("solace-notif-env-{}", rand::random::<u64>()));
         let worker = root.join("apps/notifications");
-        let backend = root.join("retired/backend");
+        let backend = root.join("apps/backend");
         std::fs::create_dir_all(&worker).unwrap();
         std::fs::create_dir_all(&backend).unwrap();
         std::fs::write(backend.join(".env"), "DATABASE_URL=backend\nPORT=4001\n").unwrap();

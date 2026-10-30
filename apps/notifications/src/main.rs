@@ -80,6 +80,12 @@ async fn main() -> anyhow::Result<()> {
     }
     let port = settings.port().map_err(anyhow::Error::msg)?;
     let db = connect(&settings).await?;
+    // Either service may start first after a deploy, so each brings the schema up to date before using it.
+    solace_server::db::migrate(&sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(
+        db.clone(),
+    ))
+    .await
+    .context("apply the migrations")?;
     let worker = Arc::new(Worker::new(db.clone(), settings));
     let (stop, stopped) = watch::channel(false);
     let ticker = tokio::spawn(run_ticks(worker.clone(), stopped.clone()));

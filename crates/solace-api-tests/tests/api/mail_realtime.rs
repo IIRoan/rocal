@@ -117,7 +117,7 @@ async fn mailbox_changes_are_announced_to_the_owner_only() {
     let bystander = mailbox(&app).await;
     let account = owner.account_id().to_owned();
 
-    // The local Bun server drops a stream after 10 s without writes, so each attempt gets a fresh pair of streams.
+    // Each attempt opens a fresh pair of streams, so a stream that never sees the change is retried.
     for _attempt in 0..8 {
         let mut owner_stream = EventStream::open(&app, &owner.user).await;
         let mut bystander_stream = EventStream::open(&app, &bystander.user).await;

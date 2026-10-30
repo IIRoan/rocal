@@ -60,7 +60,6 @@ final class NotificationService: UNNotificationServiceExtension {
   private func resolveEventReminder(userInfo: [AnyHashable: Any]) {
     guard
       let eventId = userInfo["eventId"] as? String,
-      let wire = userInfo["enc"] as? String,
       let keyString = SharedKeychain.read(SharedKeychain.notificationKey),
       let keyData = Base64URL.decode(keyString),
       keyData.count == 32
@@ -68,17 +67,61 @@ final class NotificationService: UNNotificationServiceExtension {
       complete(nil)
       return
     }
-
-    do {
-      let title = try NotificationTitleCipher.open(
-        wire, eventId: eventId, key: SymmetricKey(data: keyData))
-      complete { content in
+    let key = SymmetricKey(data: keyData)
+    let title = (userInfo["enc"] as? String).flatMap {
+      try? NotificationTitleCipher.open($0, aad: "notification-title:v1:\(eventId)", key: key)
+    }
+    if title == nil && userInfo["enc"] != nil {
+      os_log("reminder title could not be decrypted", log: log, type: .error)
+    }
+    let startsAt = Self.startText(userInfo: userInfo, eventId: eventId, key: key)
+    complete { content in
+      if let title = title {
         content.title = title
       }
-    } catch {
-      os_log("reminder title could not be decrypted", log: log, type: .error)
-      complete(nil)
+      if let startsAt = startsAt {
+        content.body = startsAt
+      }
     }
+  }
+
+  /// The start time from the reminder's due instant plus the sealed lead, so the visible push never carries it.
+  private static func startText(
+    userInfo: [AnyHashable: Any], eventId: String, key: SymmetricKey
+  ) -> String? {
+    guard
+      let wire = userInfo["encl"] as? String,
+      let due = (userInfo["due"] as? NSNumber)?.doubleValue,
+      let plain = try? NotificationTitleCipher.open(
+        wire, aad: "notification-lead:v1:\(eventId)", key: key),
+      let minutes = Int(plain), minutes >= 0
+    else {
+      return nil
+    }
+    if minutes == 0 {
+      return "Starting now"
+    }
+    let start = Date(timeIntervalSince1970: due + Double(minutes) * 60)
+    // The account's zone and 12/24-hour choice, so the time reads as it does in the app; the device's otherwise.
+    let format = SharedKeychain.read(SharedKeychain.reminderFormat).flatMap(ReminderFormat.init(json:))
+    let zone = format?.timeZone ?? .current
+    let clock = DateFormatter()
+    clock.timeZone = zone
+    if let template = format?.clockTemplate {
+      clock.setLocalizedDateFormatFromTemplate(template)
+    } else {
+      clock.timeStyle = .short
+    }
+    var calendar = Calendar.current
+    calendar.timeZone = zone
+    if calendar.isDateInToday(start) {
+      return "Starts at \(clock.string(from: start))"
+    }
+    let day = DateFormatter()
+    day.timeZone = zone
+    day.doesRelativeDateFormatting = true
+    day.dateStyle = .medium
+    return "Starts \(day.string(from: start)) at \(clock.string(from: start))"
   }
 
   private func resolveNewMail(userInfo: [AnyHashable: Any]) {
@@ -130,13 +173,13 @@ final class NotificationService: UNNotificationServiceExtension {
   }
 }
 
-/// Mirrors packages/e2ee/src/notification-title.ts: "v1."+b64url(iv12)+"."+b64url(ct||tag), AES-256-GCM.
+/// Mirrors packages/e2ee/src/notification-title.ts: "v1."+b64url(iv12)+"."+b64url(ct||tag), AES-256-GCM, AAD naming the purpose.
 enum NotificationTitleCipher {
   enum Failure: Error {
     case malformed
   }
 
-  static func open(_ wire: String, eventId: String, key: SymmetricKey) throws -> String {
+  static func open(_ wire: String, aad: String, key: SymmetricKey) throws -> String {
     let parts = wire.split(separator: ".", omittingEmptySubsequences: false)
     guard
       parts.count == 3, parts[0] == "v1",
@@ -150,11 +193,11 @@ enum NotificationTitleCipher {
       ciphertext: Data(sealed.prefix(sealed.count - 16)),
       tag: Data(sealed.suffix(16)))
     let plaintext = try AES.GCM.open(
-      box, using: key, authenticating: Data("notification-title:v1:\(eventId)".utf8))
-    guard let title = String(data: plaintext, encoding: .utf8), !title.isEmpty else {
+      box, using: key, authenticating: Data(aad.utf8))
+    guard let value = String(data: plaintext, encoding: .utf8), !value.isEmpty else {
       throw Failure.malformed
     }
-    return title
+    return value
   }
 }
 
@@ -174,6 +217,7 @@ enum Base64URL {
 enum SharedKeychain {
   static let notificationKey = "notification_key"
   static let mailAuth = "mail_auth"
+  static let reminderFormat = "reminder_format"
 
   /// Mirrors expo-secure-store: service "<service>:no-auth", account = key bytes, access group = App Group.
   static func read(_ key: String) -> String? {
@@ -200,6 +244,27 @@ enum SharedKeychain {
       return nil
     }
     return String(data: data, encoding: .utf8)
+  }
+}
+
+/// Mirrors writeNotificationExtensionReminderFormat in packages/native-core/src/lib/notification-extension-store.ts.
+struct ReminderFormat {
+  let timeZone: TimeZone?
+  let clockTemplate: String?
+
+  init?(json: String) {
+    guard
+      let data = json.data(using: .utf8),
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return nil
+    }
+    self.timeZone = (object["timeZone"] as? String).flatMap { TimeZone(identifier: $0) }
+    switch object["timeFormat"] as? String {
+    case "12h": self.clockTemplate = "hmma"
+    case "24h": self.clockTemplate = "HHmm"
+    default: self.clockTemplate = nil
+    }
   }
 }
 

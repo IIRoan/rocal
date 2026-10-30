@@ -82,7 +82,7 @@ export async function respondToMailInvitation(
     };
   }
   return {
-    event: await api.sealImportedInvitationIfNeeded(result as CalendarEvent),
+    event: result as CalendarEvent,
     declined: false,
     message: answeredMessage(status),
   };
