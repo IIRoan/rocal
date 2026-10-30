@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/ui/select";
-import { Calendar, Check, BookOpen } from "lucide-react";
+import { Calendar, BookOpen } from "lucide-react";
 import { partitionCalendarsByKind } from "@workspace/calendar-core";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
@@ -19,8 +19,6 @@ import {
   PaletteSection,
   PaletteView,
 } from "./palette-ui";
-
-const selectedCheck = <Check className="size-4 shrink-0 text-foreground" />;
 
 const SELECT_TRIGGER_CLASS = "h-8 rounded-lg bg-muted text-[15px] shadow-none";
 
@@ -143,9 +141,7 @@ export function CalendarDefaultsSettings({
             icon={Calendar}
             label={day.label}
             onClick={() => toggleWorkingDay(day.value)}
-            trailing={
-              workingDaysList.includes(day.value) ? selectedCheck : null
-            }
+            checked={workingDaysList.includes(day.value)}
           />
         ))}
       </PaletteSection>
