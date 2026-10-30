@@ -392,22 +392,23 @@
   --color-rose-400: var(--event-rose);
 }
 
+/* Mixed in oklab, since oklch drags the hue toward the grey's hue 0; the text stays above 4.5:1 for any picked colour. */
 .event-hex-adaptive {
   background-color: color-mix(
-    in oklch,
+    in oklab,
     var(--event-hex-color) 25%,
     oklch(0.96 0.005 0)
   );
-  color: color-mix(in oklch, var(--event-hex-color) 85%, oklch(0.15 0 0));
+  color: color-mix(in oklab, var(--event-hex-color) 40%, oklch(0.15 0 0));
 }
 
 .dark .event-hex-adaptive {
   background-color: color-mix(
-    in oklch,
+    in oklab,
     var(--event-hex-color) 40%,
     oklch(0.18 0 0)
   );
-  color: color-mix(in oklch, var(--event-hex-color) 30%, oklch(0.95 0 0));
+  color: color-mix(in oklab, var(--event-hex-color) 30%, oklch(0.95 0 0));
 }
 
 @layer base {
