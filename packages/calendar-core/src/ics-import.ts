@@ -31,8 +31,13 @@ function eventZone(component: IcsComponent, fallback: string): IcsEventZone {
     start instanceof ICAL.Time &&
     !start.isDate &&
     start.zone === ICAL.Timezone.utcTimezone
-  )
-    return { timezone: "UTC", readIn: "UTC" };
+  ) {
+    // A UTC series stays in UTC so its occurrences never shift across DST; a single event shows in the calendar's zone.
+    const single =
+      !component.hasProperty(DEFERRED_RRULE) &&
+      !component.hasProperty("recurrence-id");
+    return { timezone: single ? timezoneSchema.parse(fallback) : "UTC", readIn: "UTC" };
+  }
   const tzid = component.getFirstProperty("dtstart")?.getParameter("tzid");
   const zone = resolveIcsEventZone(
     typeof tzid === "string" ? tzid : fallback,

@@ -257,6 +257,8 @@ export type PaletteView =
   | "timezone"
   | "notifications"
   | "calendar-defaults"
+  | "special"
+  | "riftbound"
   | "account"
   | "security"
   | "passkeys"

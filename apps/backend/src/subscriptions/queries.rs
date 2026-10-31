@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use sea_orm::prelude::TimeDateTime;
-use sea_orm::sea_query::{Condition, Expr, OnConflict};
+use sea_orm::sea_query::{Condition, Expr, LockType, OnConflict};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, Statement, TransactionTrait,
@@ -484,6 +484,18 @@ pub async fn replace_exceptions<C: ConnectionTrait>(
         .await?;
     }
     Ok(())
+}
+
+pub async fn lock_import_calendar<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+    calendar_id: &str,
+) -> Result<Option<calendar::Model>, sea_orm::DbErr> {
+    calendar::Entity::find_by_id(calendar_id)
+        .filter(calendar::Column::UserId.eq(user_id))
+        .lock(LockType::NoKeyUpdate)
+        .one(db)
+        .await
 }
 
 /// A non-feed event of the owner's calendar with this external id; `series` also requires a recurrence.

@@ -21,9 +21,12 @@ export function useNativeUserSettings() {
   });
 
   const updateSettingsMutation = useMutation({
-    mutationFn: (update: UpdateSettingsRequest) =>
-      calendarApiService.updateUserSettings(update),
-    onMutate: async (update) => {
+    mutationFn: (input: {
+      update: UpdateSettingsRequest;
+      isCurrent?: () => boolean;
+    }) => calendarApiService.updateUserSettings(input.update, input.isCurrent),
+    onMutate: async ({ update, isCurrent }) => {
+      if (isCurrent && !isCurrent()) return { previous: undefined };
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.settings() });
       const previous = queryClient.getQueryData<UserSettings>(
         QUERY_KEYS.settings(),
@@ -31,7 +34,9 @@ export function useNativeUserSettings() {
       if (previous) {
         queryClient.setQueryData<UserSettings>(QUERY_KEYS.settings(), {
           ...previous,
-          ...update,
+          ...Object.fromEntries(
+            Object.entries(update).filter(([key]) => key !== "riftbound"),
+          ),
         });
       }
       const keys = Object.keys(update);
@@ -42,12 +47,14 @@ export function useNativeUserSettings() {
       });
       return { previous };
     },
-    onError: (_err, _update, context) => {
+    onError: (_err, input, context) => {
+      if (input.isCurrent && !input.isCurrent()) return;
       if (context?.previous) {
         queryClient.setQueryData(QUERY_KEYS.settings(), context.previous);
       }
     },
-    onSettled: (_data, _error, update) => {
+    onSettled: (_data, _error, { update, isCurrent }) => {
+      if (isCurrent && !isCurrent()) return;
       const keys = Object.keys(update);
       setPendingKeys((prev) => {
         const next = new Set(prev);
@@ -73,7 +80,7 @@ export function useNativeUserSettings() {
 
   const updateSetting = useCallback(
     (update: UpdateSettingsRequest) => {
-      updateSettingsMutation.mutate(update);
+      updateSettingsMutation.mutate({ update });
     },
     [updateSettingsMutation],
   );
@@ -85,6 +92,8 @@ export function useNativeUserSettings() {
     error: query.error,
     pendingKeys,
     updateSetting,
+    saveSetting: (update: UpdateSettingsRequest, isCurrent?: () => boolean) =>
+      updateSettingsMutation.mutateAsync({ update, isCurrent }),
     resetSettingsMutation,
   };
 }

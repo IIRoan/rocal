@@ -113,6 +113,7 @@ export type EncryptedIcsImportEvent = z.infer<typeof encryptedIcsImportEventSche
   Schema<"EncryptedIcsEvent">;
 export const encryptedIcsImportBodySchema = z.object({
   calendarId: z.string().min(1),
+  skipExisting: z.boolean().optional(),
   encryptedEvents: z.array(encryptedIcsImportEventSchema).min(1).max(100),
 }).strict();
 

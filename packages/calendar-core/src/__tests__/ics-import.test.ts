@@ -205,4 +205,21 @@ END:VEVENT`),
       timezone: "UTC",
     });
   });
+
+  it("shows a single UTC event in the calendar's zone without moving its instant", () => {
+    const result = parseIcsImport(
+      wrap(`BEGIN:VEVENT
+UID:single
+DTSTART:20260328T090000Z
+DTEND:20260328T100000Z
+SUMMARY:Single meeting
+END:VEVENT`),
+      "Europe/Amsterdam",
+    );
+    expect(result.events[0]).toMatchObject({
+      timezone: "Europe/Amsterdam",
+      start: "2026-03-28T09:00:00.000Z",
+      end: "2026-03-28T10:00:00.000Z",
+    });
+  });
 });

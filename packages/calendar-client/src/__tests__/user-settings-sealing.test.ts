@@ -3,6 +3,7 @@ import { NoopE2eeProvider } from "@workspace/e2ee";
 
 import { CalendarApiService } from "../calendar-api-service";
 import { HttpClient } from "../http-client";
+import { DEFAULT_RIFTBOUND_PREFERENCES } from "@workspace/calendar-core/riftbound-settings";
 
 class SealingProvider extends NoopE2eeProvider {
   constructor(private readonly opens = true) {
@@ -91,6 +92,30 @@ describe("sealed user settings", () => {
       String(body.encryptedPreferences).replace("sealed(user-settings:v1):", ""),
     ) as Record<string, unknown>;
     expect(blob).toMatchObject({ theme: "dark", showWeekNumbers: true, weekStartDay: 0 });
+  });
+
+  it("seals the Riot ID and frequent stores instead of sending readable integration settings", async () => {
+    const riftbound = { ...DEFAULT_RIFTBOUND_PREFERENCES, riotId: "Fixture User#EU" };
+    const { put, service } = setup({});
+    await service.updateUserSettings({ riftbound });
+    expect(put.mock.calls[0]?.[1]).not.toHaveProperty("riftbound");
+    expect(put.mock.calls[0]?.[1]).toMatchObject({
+      encryptedPreferences: expect.stringContaining('"riftbound"'),
+    });
+    const opened = setup({ encryptedPreferences: sealed({ riftbound }) });
+    expect((await opened.service.getUserSettings()).riftbound).toEqual(riftbound);
+  });
+
+  it("does not send sealed settings after its account scope expires during encryption", async () => {
+    let current = true;
+    const provider = new SealingProvider();
+    jest.spyOn(provider, "encryptJson").mockImplementation(async () => {
+      current = false;
+      return "opaque-ciphertext";
+    });
+    const { put, service } = setup({}, provider);
+    await expect(service.updateUserSettings({ riftbound: DEFAULT_RIFTBOUND_PREFERENCES }, () => current)).rejects.toBeDefined();
+    expect(put).not.toHaveBeenCalled();
   });
 
   it("leaves readable-only updates as they were", async () => {

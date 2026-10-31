@@ -2215,6 +2215,67 @@
         }
       }
     },
+    "/api/riftbound/events": {
+      "post": {
+        "tags": [
+          "Riftbound"
+        ],
+        "operationId": "listRiftboundEvents",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiftboundEventsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RiftboundPublicEvent"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/riftbound/stores/resolve": {
+      "post": {
+        "tags": [
+          "Riftbound"
+        ],
+        "operationId": "resolveRiftboundStore",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRiftboundStoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiftboundStore"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [
@@ -3584,6 +3645,9 @@
             "items": {
               "$ref": "#/components/schemas/EncryptedIcsEvent"
             }
+          },
+          "skipExisting": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -6802,6 +6866,94 @@
             "items": {
               "$ref": "#/components/schemas/EncryptionEvent"
             }
+          }
+        }
+      },
+      "ResolveRiftboundStoreRequest": {
+        "type": "object",
+        "required": [
+          "eventId"
+        ],
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "RiftboundEventsRequest": {
+        "type": "object",
+        "required": [
+          "storeIds",
+          "includeRegistrations"
+        ],
+        "properties": {
+          "includeRegistrations": {
+            "type": "boolean"
+          },
+          "storeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "RiftboundPublicEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "storeId",
+          "title",
+          "start",
+          "location",
+          "registeredRiotIdHashes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "registeredRiotIdHashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "start": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "storeId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "RiftboundStore": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "address"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },

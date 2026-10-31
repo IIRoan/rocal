@@ -384,6 +384,8 @@ export interface UserSettings {
   compactView: boolean;
   showWeekNumbers: boolean;
   showDeclinedEvents: boolean;
+  riftbound?: import("./riftbound-settings").RiftboundPreferences;
+  riftboundImportedIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }

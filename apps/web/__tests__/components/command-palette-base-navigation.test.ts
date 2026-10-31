@@ -5,6 +5,7 @@ import {
   getRootBaseSettingsNavigationItems,
 } from "../../components/command-palette/base-navigation";
 import { NAVIGATION_ITEMS, SEARCH_INDEX } from "../../components/command-palette/navigation-config";
+import { buildInitialHistory } from "../../components/command-palette/command-palette-nav";
 
 describe("base command palette navigation", () => {
   it("defines shared settings used by app-specific palettes", () => {
@@ -32,6 +33,21 @@ describe("base command palette navigation", () => {
     expect(SEARCH_INDEX.map((item) => item.id)).toEqual(
       expect.arrayContaining(["email-notifications", "app-notifications"]),
     );
+  });
+
+  it("keeps Riftbound inside Special, while search still finds it directly", () => {
+    const ids = NAVIGATION_ITEMS.map((item) => item.id);
+    expect(ids).toContain("special");
+    expect(ids).not.toContain("riftbound");
+    expect(SEARCH_INDEX.find((item) => item.id === "riftbound")).toMatchObject({
+      parent: "special",
+      parentLabel: "Special",
+    });
+    expect(buildInitialHistory("riftbound")).toEqual([
+      "main",
+      "special",
+      "riftbound",
+    ]);
   });
 
   it("lets app-specific palettes reuse base settings with contextual descriptions", () => {

@@ -79,6 +79,22 @@ describe("encrypted ICS import", () => {
     });
   });
 
+  it("does not upload ciphertext after the import scope expires during encryption", async () => {
+    let current = true;
+    class CancellingProvider extends EncryptingProvider {
+      async attachEventEncryptionShadow<T extends CreateEventRequest | UpdateEventRequest>(request: T) {
+        const result = await super.attachEventEncryptionShadow(request);
+        current = false;
+        return result;
+      }
+    }
+    const fetcher = jest.fn<typeof fetch>();
+    globalThis.fetch = fetcher;
+    const service = new CalendarApiService(new HttpClient({ baseURL: "https://api.test", retries: 0 }), new CancellingProvider());
+    await expect(service.importICS({ calendarId: "cal", icsContent, timezone: "UTC" }, () => current)).rejects.toBeDefined();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("fails before uploading when the account key is unavailable", async () => {
     const fetcher = jest.fn<typeof fetch>();
     globalThis.fetch = fetcher;

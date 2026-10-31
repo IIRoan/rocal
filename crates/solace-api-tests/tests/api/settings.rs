@@ -574,8 +574,8 @@ async fn sealed_preferences_must_be_a_bounded_string() {
             "String must contain at least 1 character(s)",
         ),
         (
-            json!({"encryptedPreferences": "x".repeat(16_385)}),
-            "String must contain at most 16384 character(s)",
+            json!({"encryptedPreferences": "x".repeat(65_537)}),
+            "String must contain at most 65536 character(s)",
         ),
         (
             json!({"encryptedPreferences": null}),
@@ -590,6 +590,12 @@ async fn sealed_preferences_must_be_a_bounded_string() {
     }
     let settings: UserSettings = ok(user.get("/api/settings").await.dto());
     assert_eq!(settings.encrypted_preferences, None);
+    // Riftbound stores and the imported-ID ledger need more room than the first 16384-character cap.
+    let large = "x".repeat(65_536);
+    ok(user
+        .put("/api/settings", json!({"encryptedPreferences": large}))
+        .await
+        .expect_status(200));
 }
 
 #[tokio::test]

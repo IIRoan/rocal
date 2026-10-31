@@ -94,6 +94,27 @@ describe("palette page transitions", () => {
     expect(container.querySelector("[style*='height']")).toBeNull();
   });
 
+  it("fills the mobile drawer without making its content the scroll container", () => {
+    act(() =>
+      root.render(
+        <TransitionContainer fill>
+          <p>Settings</p>
+        </TransitionContainer>,
+      ),
+    );
+    expect(container.firstElementChild?.classList.contains("flex-1")).toBe(
+      true,
+    );
+    expect(container.firstElementChild?.classList.contains("min-h-0")).toBe(
+      true,
+    );
+    expect(
+      container.firstElementChild?.firstElementChild?.classList.contains(
+        "h-full",
+      ),
+    ).toBe(true);
+  });
+
   it("keeps live updates and input state without restarting the page animation", () => {
     showPage("main", 1);
     showPage("settings", 2);

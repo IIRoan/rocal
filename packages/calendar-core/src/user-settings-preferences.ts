@@ -1,4 +1,8 @@
 import { z } from "./zod";
+import {
+  riftboundImportedIdsSchema,
+  riftboundPreferencesSchema,
+} from "./riftbound-settings";
 import { themeSchema } from "./route-schemas";
 import type { UpdateSettingsRequest, UserSettings } from "./types";
 
@@ -16,6 +20,8 @@ export const SEALED_USER_SETTINGS_FIELDS = [
   "compactView",
   "showWeekNumbers",
   "showDeclinedEvents",
+  "riftbound",
+  "riftboundImportedIds",
 ] as const satisfies ReadonlyArray<keyof UserSettings>;
 
 export type UserSettingsPreferences = Pick<
@@ -54,6 +60,8 @@ const preferenceSchemas = {
   compactView: z.boolean(),
   showWeekNumbers: z.boolean(),
   showDeclinedEvents: z.boolean(),
+  riftbound: riftboundPreferencesSchema,
+  riftboundImportedIds: riftboundImportedIdsSchema,
 } satisfies Record<keyof UserSettingsPreferences, z.ZodTypeAny>;
 
 function isSealedField(key: string): key is keyof UserSettingsPreferences {

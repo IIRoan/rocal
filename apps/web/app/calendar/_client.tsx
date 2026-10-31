@@ -41,6 +41,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { useRecurringMovePrompt } from "@/hooks/use-recurring-move-prompt";
 import { RecurringScopeModal } from "@/components/command-palette/recurring-scope-modal";
+import { RiftboundCalendarSync } from "@/components/riftbound-calendar-sync";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
 import { resolveAvatarUrl } from "@/lib/profile-picture";
@@ -355,6 +356,7 @@ export function CalendarShell({ children }: { children: ReactNode }) {
             <CalendarDataProvider>
               <CalendarProviderWrapper>
                 <CalendarDateSync />
+                <RiftboundCalendarSync />
                 <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
                   <Suspense fallback={null}>
                     <CalendarUrlSyncWrapper />

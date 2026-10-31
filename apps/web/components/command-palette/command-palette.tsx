@@ -137,6 +137,7 @@ export function CommandPalette({
     <>
       <TransitionContainer
         viewKey={c.currentView}
+        fill={c.isMobile}
         navigationDepth={c.chrome.navHistory.length}
       >
         <CommandPaletteViewContent
@@ -184,7 +185,7 @@ export function CommandPalette({
           <DrawerContent
             responsive
             responsiveHeight="90svh"
-            className="bg-popover border-border/50 flex flex-col overflow-hidden p-0"
+            className="bg-popover border-border/50 flex flex-col overflow-hidden p-0 [--palette-view-height:100%] [--palette-view-max-height:100%]"
           >
             <VisuallyHidden>
               <DrawerTitle>{c.title}</DrawerTitle>

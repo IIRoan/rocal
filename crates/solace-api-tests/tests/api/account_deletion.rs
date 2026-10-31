@@ -177,6 +177,7 @@ async fn import(user: &mut TestUser, calendar_id: &str, events: Vec<EncryptedIcs
             json_body(&EncryptedIcsImportRequest {
                 calendar_id: calendar_id.to_owned().into(),
                 encrypted_events: events,
+                skip_existing: false,
             }),
         )
         .await

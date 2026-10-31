@@ -33,6 +33,7 @@ import { NativeMonthCalendar } from "../../src/components/calendar/NativeMonthCa
 import { useCalendarViewNavigation } from "../../src/components/calendar/use-calendar-view-navigation";
 import { NativeAgendaView } from "../../src/components/calendar/NativeAgendaView";
 import type { KitEventMove } from "../../src/components/calendar/calendar-kit-adapter";
+import { useNativeRiftboundAutoSync } from "../../src/hooks/use-riftbound";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 
 export default function CalendarScreen() {
@@ -60,6 +61,7 @@ export default function CalendarScreen() {
   const { data: settings, isPending: settingsPending } =
     useCalendarScreenSettings();
   const settingsLoading = settingsPending && !settings;
+  useNativeRiftboundAutoSync(settings?.riftbound);
   const resolvedTimezone = resolveTimezone(settings?.timezone);
   const {
     timelineRef,

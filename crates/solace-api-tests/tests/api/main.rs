@@ -31,6 +31,7 @@ mod passkeys;
 mod profiles;
 mod push_devices;
 mod recurring;
+mod riftbound;
 mod settings;
 mod stalwart_webhook;
 mod subscriptions;

@@ -78,6 +78,12 @@ describe("sanitizeContext", () => {
     ).toEqual({ email: "hashed" });
   });
 
+  it("omits Riftbound identities and preferences", () => {
+    expect(sanitizeContext({ riotId: TOKEN, riftbound: TOKEN, registeredRiotIdHashes: [TOKEN] })).toEqual({
+      riotId: "[omitted]", riftbound: "[omitted]", registeredRiotIdHashes: "[omitted]",
+    });
+  });
+
   it("survives cyclic objects", () => {
     const cyclic: Record<string, unknown> = { id: "x" };
     cyclic.self = cyclic;

@@ -26,6 +26,7 @@ pub mod profiles;
 pub mod push_devices;
 pub mod recent_contacts;
 pub mod recurring;
+pub mod riftbound;
 pub mod settings;
 pub mod state;
 pub mod subscriptions;
@@ -72,6 +73,7 @@ fn api() -> OpenApiRouter<AppState> {
         .merge(events::routes())
         .merge(notifications::routes())
         .merge(subscriptions::routes())
+        .merge(riftbound::routes())
         .merge(invitations::routes())
         .merge(recurring::routes())
         .merge(mail::routes())
