@@ -141,6 +141,8 @@ pub struct SubscriptionSyncResult {
 pub struct EncryptedIcsImportRequest {
     pub calendar_id: CalendarId,
     pub encrypted_events: Vec<EncryptedIcsEvent>,
+    #[serde(default)]
+    pub skip_existing: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

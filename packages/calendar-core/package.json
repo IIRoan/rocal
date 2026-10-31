@@ -30,6 +30,8 @@
     "./mail-html": "./src/mail-html.ts",
     "./mail-pgp-layers": "./src/mail-pgp-layers.ts",
     "./event-ics-export": "./src/event-ics-export.ts",
-    "./ics-import": "./src/ics-import.ts"
+    "./ics-import": "./src/ics-import.ts",
+    "./riftbound": "./src/riftbound.ts",
+    "./riftbound-settings": "./src/riftbound-settings.ts"
   }
 }

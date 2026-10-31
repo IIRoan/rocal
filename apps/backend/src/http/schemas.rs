@@ -270,6 +270,7 @@ pub fn encrypted_ics_import_event_schema() -> Schema {
 pub fn encrypted_ics_import_body_schema() -> Schema {
     zod::object([
         ("calendarId", zod::string().min(1)),
+        ("skipExisting", zod::boolean().optional()),
         (
             "encryptedEvents",
             zod::array(encrypted_ics_import_event_schema())

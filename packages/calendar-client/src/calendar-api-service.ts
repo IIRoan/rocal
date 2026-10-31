@@ -67,6 +67,9 @@ import type {
   ProfileAvatarResponse,
 } from "@workspace/calendar-core";
 
+import { buildRiftboundIcs, parseRiftboundEventUrl } from "@workspace/calendar-core/riftbound";
+import { riftboundPreferencesSchema, riftboundStoreSchema, selectRiftboundEvents, type RiftboundPreferences, type RiftboundPublicEvent } from "@workspace/calendar-core/riftbound-settings";
+
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
 const SETTINGS_WRITE_RETRIES = 2;
 
@@ -106,6 +109,8 @@ function withStoredContent(
 export class CalendarApiService {
   private client: HttpClient;
   private e2ee: E2eeProvider;
+  private providerGeneration = 0;
+  private riftboundImport: Promise<{ eventsCreated: number; failedEvents: number; events: RiftboundPublicEvent[] }> | null = null;
   private defaultCalendarsSeed: Promise<boolean> | null = null;
   private settingsWrites: Promise<unknown> = Promise.resolve();
 
@@ -116,6 +121,7 @@ export class CalendarApiService {
 
   /** Replace the E2EE provider at runtime (e.g. after auth bootstrap). */
   setE2eeProvider(provider: E2eeProvider): void {
+    this.providerGeneration += 1;
     this.e2ee = provider;
   }
 
@@ -868,9 +874,12 @@ export class CalendarApiService {
 
   async updateUserSettings(
     settings: UpdateSettingsRequest,
+    isCurrent: () => boolean = () => true,
   ): Promise<UserSettings> {
+    const generation = this.providerGeneration;
+    const current = () => isCurrent() && generation === this.providerGeneration;
     // One write at a time on this device, so two quick changes never merge onto the same preferences.
-    const write = this.settingsWrites.then(() => this.writeUserSettings(settings));
+    const write = this.settingsWrites.then(() => this.writeUserSettings(settings, 0, current));
     this.settingsWrites = write.catch(() => undefined);
     return write;
   }
@@ -878,8 +887,10 @@ export class CalendarApiService {
   private async writeUserSettings(
     settings: UpdateSettingsRequest,
     attempt = 0,
+    isCurrent: () => boolean = () => true,
   ): Promise<UserSettings> {
     try {
+      if (!isCurrent()) throw new Error("Settings update was cancelled.");
       const { readable, preferences } = splitUserSettingsUpdate(settings);
       if (!preferences) {
         return await this.openUserSettings(
@@ -887,17 +898,19 @@ export class CalendarApiService {
         );
       }
       const current = await this.client.get<Schema<"UserSettings">>("/api/settings");
+      const encryptedPreferences = await this.sealUserSettings(current, preferences);
+      if (!isCurrent()) throw new Error("Settings update was cancelled.");
       return await this.openUserSettings(
         await this.client.put<Schema<"UserSettings">>("/api/settings", {
           ...readable,
-          encryptedPreferences: await this.sealUserSettings(current, preferences),
+          encryptedPreferences,
           expectedEncryptedPreferences: current.encryptedPreferences ?? null,
         } satisfies Schema<"UpdateSettingsRequest">),
       );
     } catch (error) {
       // Another device replaced the preferences first, so the change merges onto its version instead.
       if (attempt < SETTINGS_WRITE_RETRIES && isConflict(error)) {
-        return this.writeUserSettings(settings, attempt + 1);
+        return this.writeUserSettings(settings, attempt + 1, isCurrent);
       }
       throw this.transformError(error, "Failed to update user settings");
     }
@@ -1173,8 +1186,11 @@ export class CalendarApiService {
 
   // ─── ICS Import ──────────────────────────────────────────────────────────────
 
-  async importICS(request: ImportICSRequest): Promise<ImportICSResponse> {
+  async importICS(request: ImportICSRequest, isCurrent: () => boolean = () => true, skipExisting = false): Promise<ImportICSResponse> {
+    const generation = this.providerGeneration;
+    const checkCurrent = () => { if (!isCurrent() || generation !== this.providerGeneration) throw new Error("Calendar import was cancelled."); };
     try {
+      checkCurrent();
       if (!(await this.e2ee.hasActiveSession())) throw new Error("Unlock your account before importing a calendar");
       if (request.icsContent.length > 15 * 1024 * 1024) throw new Error("Calendar file is too large");
       const { parseIcsImport } = await import("@workspace/calendar-core/ics-import");
@@ -1183,6 +1199,7 @@ export class CalendarApiService {
       if (!parsed.events.length) throw new Error("No supported events found in calendar file");
       const encryptedEvents: EncryptedIcsImportEvent[] = [];
       for (const event of parsed.events) {
+        checkCurrent();
         const { sourceUid, occurrenceDate, excludedDates, ...content } = event;
         const payload = await this.e2ee.attachEventEncryptionShadow({ ...content, calendarId: request.calendarId });
         const externalId = await this.icsImportId(JSON.stringify([sourceUid, occurrenceDate ?? null]));
@@ -1201,8 +1218,10 @@ export class CalendarApiService {
       let eventsCreated = 0;
       const errors = [...parsed.errors];
       for (let offset = 0; offset < encryptedEvents.length; offset += 100) {
+        checkCurrent();
         const result = await this.client.post<Schema<"ImportIcsResponse">>("/api/subscriptions/import-ics", {
           calendarId: request.calendarId, encryptedEvents: encryptedEvents.slice(offset, offset + 100),
+          ...(skipExisting ? { skipExisting: true } : {}),
         } satisfies Schema<"EncryptedIcsImportRequest">);
         eventsCreated += result.eventsCreated;
         errors.push(...(result.errors ?? []));
@@ -1214,6 +1233,45 @@ export class CalendarApiService {
     } catch (error) {
       throw this.transformError(error, "Failed to import ICS file");
     }
+  }
+
+  async resolveRiftboundStore(eventUrl: string): Promise<Schema<"RiftboundStore">> {
+    const eventId = parseRiftboundEventUrl(eventUrl);
+    const result = await this.client.post<Schema<"RiftboundStore">>("/api/riftbound/stores/resolve", { eventId } satisfies Schema<"ResolveRiftboundStoreRequest">, { timeout: 45_000 });
+    return riftboundStoreSchema.parse(result) as Schema<"RiftboundStore">;
+  }
+
+  async syncRiftboundEvents(preferences: RiftboundPreferences, identityHash: string, isCurrent: () => boolean = () => true): Promise<{ eventsCreated: number; failedEvents: number; events: RiftboundPublicEvent[] }> {
+    const generation = this.providerGeneration;
+    const current = () => isCurrent() && generation === this.providerGeneration;
+    const previous = this.riftboundImport;
+    const run = async () => {
+      if (previous) await previous.catch(() => {});
+      const config = riftboundPreferencesSchema.parse(preferences);
+      if (!config.enabled) return { eventsCreated: 0, failedEvents: 0, events: [] };
+      if (!current() || !(await this.e2ee.hasActiveSession())) throw new Error("Unlock your account before syncing Riftbound.");
+      const data = await this.client.post<Schema<"RiftboundPublicEvent">[]>("/api/riftbound/events", { storeIds: config.stores.map((store) => store.id), includeRegistrations: config.registeredOnly } satisfies Schema<"RiftboundEventsRequest">, { timeout: 65_000 });
+      if (!current()) throw new Error("Riftbound sync was cancelled.");
+      const events = selectRiftboundEvents(data.map(({ start, ...event }) => {
+        const at = new Date(start);
+        return { ...event, start: Number.isNaN(at.getTime()) ? "" : at.toISOString() };
+      }), config, identityHash);
+      const settings = await this.getUserSettings();
+      const recorded = new Set(settings.riftboundImportedIds ?? []);
+      const fresh = events.filter((event) => !recorded.has(event.id));
+      const imported = fresh.length
+        ? await this.importICS({ calendarId: config.calendarId, timezone: settings.timezone, icsContent: buildRiftboundIcs(fresh.map(({ id, title, start, location }) => ({ id, title, start, location })), config.durationMinutes) }, current, true)
+        : null;
+      const failedEvents = imported?.errors?.length ?? 0;
+      // Oldest IDs drop first past 200; after a partial failure or lost write the server's duplicate check still applies.
+      if (fresh.length && !failedEvents) {
+        await this.updateUserSettings({ riftboundImportedIds: [...recorded, ...fresh.map((event) => event.id)].slice(-200) }, current).catch(() => undefined);
+      }
+      return { eventsCreated: imported?.eventsCreated ?? 0, failedEvents, events };
+    };
+    const promise = run();
+    this.riftboundImport = promise;
+    try { return await promise; } finally { if (this.riftboundImport === promise) this.riftboundImport = null; }
   }
 
   private async icsImportId(value: string): Promise<string> {

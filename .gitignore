@@ -57,5 +57,8 @@ apps/stalwart/.local-certs/
 # Untracked third-party Bulwark (AGPL) reference; never commit.
 webmail/
 
+# Explicit local Riftbound calendar exports
+/.local/riftbound-poc/
+
 # Rust build output
 /target

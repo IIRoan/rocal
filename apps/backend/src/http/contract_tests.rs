@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 use serde_json::{Value, json};
 use solace_api_types::{
     account, calendars, categories, e2ee, events, mail, mail_settings, notifications, profiles,
-    push_devices, recent_contacts, recurring, settings, subscriptions,
+    push_devices, recent_contacts, recurring, riftbound, settings, subscriptions,
 };
 use utoipa::{PartialSchema, ToSchema};
 
@@ -333,6 +333,8 @@ fn checked() -> Vec<(String, Vec<String>)> {
         check::<e2ee::PasswordEnvelopeRequest>(),
         check::<recurring::PreviewRecurrenceRequest>(),
         check::<profiles::ProfileLookupRequest>(),
+        check::<riftbound::ResolveRiftboundStoreRequest>(),
+        check::<riftbound::RiftboundEventsRequest>(),
         check::<mail_settings::PutMailSettingsRequest>(),
         check::<recent_contacts::PutRecentContactsRequest>(),
         check::<e2ee::RegisterDeviceRequest>(),

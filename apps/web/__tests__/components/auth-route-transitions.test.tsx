@@ -119,6 +119,9 @@ jest.mock("@/components/calendar-data-provider", () => ({
   CalendarDateSync: () => null,
   useSharedCalendarData: () => ({ calendars: [], events: [] }),
 }));
+jest.mock("@/components/riftbound-calendar-sync", () => ({
+  RiftboundCalendarSync: () => null,
+}));
 jest.mock("@/components/calendar-provider-wrapper", () => ({
   CalendarProviderWrapper: MockContainer,
 }));

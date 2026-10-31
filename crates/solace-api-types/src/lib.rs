@@ -15,6 +15,7 @@ pub mod profiles;
 pub mod push_devices;
 pub mod recent_contacts;
 pub mod recurring;
+pub mod riftbound;
 pub mod settings;
 pub mod subscriptions;
 
@@ -153,6 +154,10 @@ pub use common::{ErrorResponse, SuccessMessage, Timestamp};
     profiles::AvatarSizeQuery,
     profiles::UploadAvatarRequest,
     profiles::AvatarResponse,
+    riftbound::ResolveRiftboundStoreRequest,
+    riftbound::RiftboundEventsRequest,
+    riftbound::RiftboundStore,
+    riftbound::RiftboundPublicEvent,
     push_devices::RegisterPushDeviceRequest,
     push_devices::UnregisterPushDeviceRequest,
     push_devices::PushDeviceRegistration,

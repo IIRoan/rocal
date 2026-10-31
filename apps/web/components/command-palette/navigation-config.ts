@@ -212,6 +212,7 @@ export const NAVIGATION_ITEMS = [
     ],
     parent: null,
   },
+  { id: "riftbound", label: "Riftbound", icon: Calendar, description: "Import events from your frequent Riftbound stores", targetView: "riftbound", keywords: ["riftbound", "riot", "stores", "tournaments"], parent: null },
   ...BASE_SETTINGS_NAVIGATION_ITEMS.slice(3),
 ];
 

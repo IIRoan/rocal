@@ -1485,6 +1485,7 @@ fn encrypted_import(calendar_id: &str, events: Vec<EncryptedIcsEvent>) -> Value 
     json_body(&EncryptedIcsImportRequest {
         calendar_id: calendar_id.to_owned().into(),
         encrypted_events: events,
+        skip_existing: false,
     })
 }
 

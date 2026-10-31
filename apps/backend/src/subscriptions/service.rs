@@ -644,12 +644,11 @@ pub(crate) async fn link_series<C: ConnectionTrait>(
 
 /// The caller's calendar an import writes into: it must be their own and not managed by a feed.
 async fn import_target(
-    state: &AppState,
+    db: &impl ConnectionTrait,
     user: &RouteUser,
     calendar_id: &str,
 ) -> Result<calendar::Model, AppError> {
-    let Some(calendar) = crate::calendars::queries::find(&state.db, &user.id, calendar_id).await?
-    else {
+    let Some(calendar) = queries::lock_import_calendar(db, &user.id, calendar_id).await? else {
         return Err(AppError::NotFound(CALENDAR_NOT_FOUND.into()));
     };
     if !crate::events::service::is_writable(&calendar) {
@@ -675,10 +674,11 @@ pub async fn import_ics(
     request: EncryptedIcsImportRequest,
 ) -> Result<ImportIcsResponse, AppError> {
     let calendar_id = request.calendar_id.0.as_str();
-    import_target(state, user, calendar_id).await?;
     let mut entries: Vec<_> = request.encrypted_events.iter().collect();
     entries.sort_by_key(|entry| entry.series_external_id.is_some());
     let transaction = state.db.begin().await?;
+    // A calendar lock prevents duplicate keyed IDs when multiple devices import together.
+    import_target(&transaction, user, calendar_id).await?;
     let mut created = 0;
     let mut errors = Vec::new();
     for entry in entries {
@@ -691,7 +691,9 @@ pub async fn import_ics(
         )
         .await?;
         if existing.is_some() {
-            errors.push("An event already exists in this calendar.".to_owned());
+            if !request.skip_existing {
+                errors.push("An event already exists in this calendar.".to_owned());
+            }
             continue;
         }
         let parent = match entry.series_external_id.as_deref() {

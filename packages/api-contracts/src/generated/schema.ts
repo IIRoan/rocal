@@ -963,6 +963,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/riftbound/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["listRiftboundEvents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/riftbound/stores/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resolveRiftboundStore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -1370,6 +1402,7 @@ export interface components {
         EncryptedIcsImportRequest: {
             calendarId: components["schemas"]["CalendarId"];
             encryptedEvents: components["schemas"]["EncryptedIcsEvent"][];
+            skipExisting?: boolean;
         };
         EncryptionCalendar: {
             /** @description Parsed from the stored JSON; unreadable values become an empty list. */
@@ -2225,6 +2258,26 @@ export interface components {
             calendars: components["schemas"]["EncryptionCalendar"][];
             categories: components["schemas"]["EncryptionCategory"][];
             events: components["schemas"]["EncryptionEvent"][];
+        };
+        ResolveRiftboundStoreRequest: {
+            eventId: string;
+        };
+        RiftboundEventsRequest: {
+            includeRegistrations: boolean;
+            storeIds: string[];
+        };
+        RiftboundPublicEvent: {
+            id: string;
+            location: string;
+            registeredRiotIdHashes: string[];
+            start: components["schemas"]["Timestamp"];
+            storeId: string;
+            title: string;
+        };
+        RiftboundStore: {
+            address: string;
+            id: string;
+            name: string;
         };
         RsvpDeleted: {
             /** @enum {boolean} */
@@ -4214,6 +4267,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecurrenceValidation"];
+                };
+            };
+        };
+    };
+    listRiftboundEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RiftboundEventsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiftboundPublicEvent"][];
+                };
+            };
+        };
+    };
+    resolveRiftboundStore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveRiftboundStoreRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiftboundStore"];
                 };
             };
         };

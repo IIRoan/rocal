@@ -244,6 +244,10 @@
         "fast-check": "^4.7.0",
         "typescript": "^5.9.3",
       },
+      "peerDependencies": {
+        "@tanstack/react-query": "^5.90.0",
+        "react": "^19.2.3",
+      },
     },
     "packages/calendar-core": {
       "name": "@workspace/calendar-core",

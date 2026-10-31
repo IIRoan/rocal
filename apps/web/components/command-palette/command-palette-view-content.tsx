@@ -12,6 +12,7 @@ import { CategoryManager } from "../category-manager";
 import { AppearanceSettings } from "./appearance-settings";
 import { NotificationSettings } from "./notification-settings";
 import { TimeRegionSettings } from "./time-region-settings";
+import { RiftboundSettings } from "./riftbound-settings";
 import { CalendarDefaultsSettings } from "./calendar-defaults-settings";
 import { AccountSettings } from "./account-settings";
 import { SecuritySettings } from "./security-settings";
@@ -131,6 +132,8 @@ export function CommandPaletteViewContent({
       />
     );
   }
+
+  if (currentView === "riftbound") return <RiftboundSettings goBack={goBack} />;
 
   if (currentView === "calendar-defaults") {
     return (

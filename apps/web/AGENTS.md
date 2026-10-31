@@ -1,5 +1,7 @@
 Auth uses rolling 14-day app and passkey sessions; Better Auth checks hourly and on focus/reconnect, with renewal cookies forwarded by the API.
 
+Calendar’s Riftbound palette settings also ship in native Calendar’s account drawer. Preferences stay sealed; `/api/riftbound` returns public store/events and registered-identity hashes, never accepts a Riot ID or login. Matching and encryption run on-device for the past 30 days and upcoming events while Calendar is open; the existing ICS import skips duplicates for Riftbound and a sealed ledger of imported IDs keeps deleted copies gone; existing imports are not automatically edited or deleted. Registered-only matching is opt-in because imported times can reveal the Riot ID to the server.
+
 Public `/privacy` and `/support` pages share their routes/contact configuration with native help settings and store metadata through `packages/calendar-core/src/product-info.json`.
 
 The public `/.well-known/apple-app-site-association` route authorizes native passkeys for the two release bundle IDs from `packages/native-core/expo-apps.json`, under the environment’s `SOLACE_APPLE_TEAM_ID`. It returns 404 when the team is unset or invalid; configure it on the website used by each native build’s associated domain.

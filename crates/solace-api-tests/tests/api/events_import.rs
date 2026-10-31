@@ -35,6 +35,7 @@ fn body(calendar: &str, events: Vec<EncryptedIcsEvent>) -> Value {
     to_json(&EncryptedIcsImportRequest {
         calendar_id: calendar.to_owned().into(),
         encrypted_events: events,
+        skip_existing: false,
     })
 }
 
