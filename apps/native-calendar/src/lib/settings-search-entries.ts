@@ -4,7 +4,7 @@ import { VIEW_OPTIONS } from "./calendar-view-options";
 
 /** Settings inside the calendar-only pages of the account drawer. */
 export const CALENDAR_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
-  { pageId: "riftbound", label: "Riftbound", location: "Calendar · Riftbound", keywords: "riot id frequent stores tournaments registered events" },
+  { pageId: "riftbound", label: "Riftbound", location: "Special · Riftbound", keywords: "riot id frequent stores tournaments registered events" },
   ...VIEW_OPTIONS.map((option) => ({
     pageId: "appearance",
     label: option.label,

@@ -1,4 +1,4 @@
-import React, { type ComponentType, type ReactNode } from "react";
+import React from "react";
 import {
   Select,
   SelectContent,
@@ -14,13 +14,12 @@ import { WORKING_DAYS } from "./constants";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { toast } from "sonner";
 import {
-  PaletteIconBox,
   PaletteNavRow,
   PaletteSection,
+  PaletteSelectRow,
   PaletteView,
 } from "./palette-ui";
-
-const SELECT_TRIGGER_CLASS = "h-8 rounded-lg bg-muted text-[15px] shadow-none";
+import { PALETTE_COMPACT_SELECT_CLASS } from "./palette-styles";
 
 interface CalendarDefaultsSettingsProps {
   localSettings: UserSettings;
@@ -75,12 +74,12 @@ export function CalendarDefaultsSettings({
   return (
     <PaletteView title="Calendar Defaults" onBack={goBack}>
       <PaletteSection>
-        <SelectRow icon={BookOpen} label="Default calendar">
+        <PaletteSelectRow icon={BookOpen} label="Default calendar">
           <Select
             value={defaultCalendar?.id}
             onValueChange={handleDefaultCalendarChange}
           >
-            <SelectTrigger className={`w-[140px] ${SELECT_TRIGGER_CLASS}`}>
+            <SelectTrigger className={`w-[140px] ${PALETTE_COMPACT_SELECT_CLASS}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -91,16 +90,16 @@ export function CalendarDefaultsSettings({
               ))}
             </SelectContent>
           </Select>
-        </SelectRow>
+        </PaletteSelectRow>
 
-        <SelectRow icon={Calendar} label="Default view">
+        <PaletteSelectRow icon={Calendar} label="Default view">
           <Select
             value={localSettings.defaultView}
             onValueChange={(value) =>
               updateSetting("defaultView", value as CalendarView)
             }
           >
-            <SelectTrigger className={`w-[120px] ${SELECT_TRIGGER_CLASS}`}>
+            <SelectTrigger className={`w-[120px] ${PALETTE_COMPACT_SELECT_CLASS}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -111,16 +110,16 @@ export function CalendarDefaultsSettings({
               <SelectItem value="agenda">Agenda</SelectItem>
             </SelectContent>
           </Select>
-        </SelectRow>
+        </PaletteSelectRow>
 
-        <SelectRow icon={Calendar} label="First day of week">
+        <PaletteSelectRow icon={Calendar} label="First day of week">
           <Select
             value={String(localSettings.weekStartDay)}
             onValueChange={(value) =>
               updateSetting("weekStartDay", Number(value))
             }
           >
-            <SelectTrigger className={`w-[120px] ${SELECT_TRIGGER_CLASS}`}>
+            <SelectTrigger className={`w-[120px] ${PALETTE_COMPACT_SELECT_CLASS}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -131,7 +130,7 @@ export function CalendarDefaultsSettings({
               ))}
             </SelectContent>
           </Select>
-        </SelectRow>
+        </PaletteSelectRow>
       </PaletteSection>
 
       <PaletteSection label="Working Days">
@@ -146,27 +145,5 @@ export function CalendarDefaultsSettings({
         ))}
       </PaletteSection>
     </PaletteView>
-  );
-}
-
-function SelectRow({
-  icon: Icon,
-  label,
-  children,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex min-h-11 items-center gap-3 px-2 py-1.5 sm:min-h-9">
-      <PaletteIconBox>
-        <Icon className="size-4" />
-      </PaletteIconBox>
-      <span className="flex-1 text-[15px] leading-[130%] text-foreground">
-        {label}
-      </span>
-      {children}
-    </div>
   );
 }

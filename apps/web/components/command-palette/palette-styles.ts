@@ -9,5 +9,9 @@ export const PALETTE_VIEW_STYLE: CSSProperties = {
 export const PALETTE_ROW_CLASS =
   "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted disabled:pointer-events-none disabled:opacity-40 md:min-h-9";
 
+/** Compact select on the right of a settings row. */
+export const PALETTE_COMPACT_SELECT_CLASS =
+  "h-8 cursor-pointer rounded-lg bg-muted text-[15px] shadow-none";
+
 export const PALETTE_INPUT_CLASS =
   "h-11 min-w-0 w-full rounded-lg border-0 bg-muted px-3 text-base text-foreground shadow-none outline-none transition-shadow placeholder:text-muted-foreground/60 focus:border-0 focus:shadow-none focus:ring-2 focus:ring-ring/25 disabled:opacity-50 md:h-9 md:text-[15px]";

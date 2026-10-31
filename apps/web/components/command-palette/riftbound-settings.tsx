@@ -1,23 +1,48 @@
 "use client";
 
-import { useState } from "react";
-import { Calendar, Check, Gamepad2, X } from "lucide-react";
-import { Input } from "@workspace/ui/components/ui/input";
+import {
+  CalendarDays,
+  CalendarPlus,
+  Clock,
+  Loader2,
+  MapPin,
+  Plus,
+  RefreshCw,
+  UserCheck,
+  X,
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/ui/select";
+import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
+import { cn } from "@workspace/ui/lib/utils";
 import {
   partitionCalendarsByKind,
   type UserSettings,
 } from "@workspace/calendar-core";
+import {
+  RIFTBOUND_SETTINGS_COPY as COPY,
+  riftboundDurationOptions,
+} from "@workspace/calendar-core/riftbound-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useSettings } from "@/hooks/use-settings";
 import { useWebRiftboundForm } from "@/hooks/use-riftbound";
 import {
   PaletteButton,
-  PaletteField,
+  PaletteEmptyState,
+  PaletteIconBox,
   PaletteSection,
-  PaletteSelect,
+  PaletteSelectRow,
   PaletteView,
 } from "./palette-ui";
-import { PALETTE_INPUT_CLASS } from "./palette-styles";
+import {
+  PALETTE_COMPACT_SELECT_CLASS,
+  PALETTE_INPUT_CLASS,
+} from "./palette-styles";
 import { SettingToggleRow } from "./setting-toggle-row";
 
 export function RiftboundSettings({ goBack }: { goBack: () => void }) {
@@ -25,17 +50,20 @@ export function RiftboundSettings({ goBack }: { goBack: () => void }) {
   if (loading)
     return (
       <PaletteView title="Riftbound" onBack={goBack}>
-        <p role="status" className="p-3 text-muted-foreground">
-          Loading Riftbound settings…
-        </p>
+        <output
+          aria-label="Loading Riftbound settings"
+          className="flex items-center justify-center py-8"
+        >
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </output>
       </PaletteView>
     );
   if (!settings || error)
     return (
       <PaletteView title="Riftbound" onBack={goBack}>
-        <p role="alert" className="p-3 text-destructive">
-          Riftbound settings could not be loaded.
-        </p>
+        <PaletteEmptyState>
+          <span role="alert">Riftbound settings could not be loaded.</span>
+        </PaletteEmptyState>
       </PaletteView>
     );
   return (
@@ -62,7 +90,6 @@ function RiftboundForm({
     saveSettings({ riftbound }, isCurrent),
   );
   const { draft, setDraft } = form;
-  const [duration, setDuration] = useState(String(draft.durationMinutes));
   const owned = partitionCalendarsByKind(calendars ?? []).ownedCalendars;
   const syncing = form.sync.isPending || form.backgroundPending;
   const canAddStore =
@@ -72,157 +99,143 @@ function RiftboundForm({
       title="Riftbound"
       onBack={goBack}
       footer={
-        <div className="space-y-2">
-          <div
-            className="space-y-1 text-[13px] leading-snug"
-            aria-live="polite"
+        <div className="flex items-center gap-2">
+          <p
+            role={form.status?.tone === "error" ? "alert" : "status"}
+            className={cn(
+              "min-w-0 flex-1 text-[13px] leading-[130%]",
+              form.status?.tone === "error"
+                ? "text-destructive"
+                : "text-muted-foreground",
+            )}
           >
-            {form.sync.data?.failedEvents ? (
-              <p role="alert" className="text-destructive">
-                Some events could not be imported. Sync again to retry.
-              </p>
-            ) : null}
-            {form.save.isError ? (
-              <p role="alert" className="text-destructive">
-                {form.save.error.message}
-              </p>
-            ) : form.save.isSuccess && !form.dirty ? (
-              <p className="text-muted-foreground">Settings saved.</p>
-            ) : null}
-            {form.sync.isError || form.backgroundError ? (
-              <p role="alert" className="text-destructive">
-                Riftbound could not be synced. Try again; existing events were
-                not removed.
-              </p>
-            ) : form.sync.data ? (
-              <p className="text-muted-foreground tabular-nums">
-                {form.sync.data.events.length} matching events;{" "}
-                {form.sync.data.eventsCreated} newly added.
-              </p>
-            ) : null}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <PaletteButton
-              variant="primary"
-              className="h-11"
-              loading={form.save.isPending}
-              disabled={form.sync.isPending}
-              onClick={() => form.save.mutate()}
-            >
-              {form.save.isPending ? "Saving…" : "Save settings"}
-            </PaletteButton>
-            <PaletteButton
-              className="h-11"
-              loading={syncing}
-              disabled={form.dirty || !draft.enabled || form.save.isPending}
-              onClick={() => form.sync.mutate()}
-            >
-              {!syncing ? <Calendar className="size-4" /> : null}
-              {syncing ? "Syncing…" : "Sync now"}
-            </PaletteButton>
-          </div>
+            {form.status?.text}
+          </p>
+          <PaletteButton
+            loading={syncing}
+            disabled={form.dirty || !draft.enabled || form.save.isPending}
+            onClick={() => form.sync.mutate()}
+          >
+            {syncing ? null : <RefreshCw className="size-3.5" />}
+            Sync now
+          </PaletteButton>
+          <PaletteButton
+            variant="primary"
+            loading={form.save.isPending}
+            disabled={!form.dirty || form.sync.isPending}
+            onClick={() => form.save.mutate()}
+          >
+            Save
+          </PaletteButton>
         </div>
       }
     >
       <PaletteSection>
         <SettingToggleRow
-          icon={Gamepad2}
-          label="Import Riftbound events"
-          description="Past 30 days and upcoming. Every 15 minutes while open. No Riot login."
+          icon={CalendarPlus}
+          label={COPY.importLabel}
+          description={COPY.importDescription}
           checked={draft.enabled}
           onToggle={() => setDraft({ ...draft, enabled: !draft.enabled })}
         />
         <SettingToggleRow
-          icon={Check}
-          label="Only events I’m registered for"
-          description="Imported event times can let Solace match you to a public roster. Waitlists don’t count."
+          icon={UserCheck}
+          label={COPY.registeredLabel}
+          description={COPY.registeredDescription}
           checked={draft.registeredOnly}
           onToggle={() =>
             setDraft({ ...draft, registeredOnly: !draft.registeredOnly })
           }
         />
+        <p className="px-2 pt-1 pb-2 text-[13px] leading-[130%] text-muted-foreground">
+          {COPY.registeredNote}
+        </p>
       </PaletteSection>
-      <PaletteField
-        label="Riot ID"
-        htmlFor="riftbound-riot-id"
-        hint="Exact roster name, including spaces and #TAG. Kept encrypted."
-      >
-        <Input
-          id="riftbound-riot-id"
-          className={PALETTE_INPUT_CLASS}
-          value={draft.riotId}
-          maxLength={100}
-          autoComplete="off"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="Player Name#TAG"
-          onChange={(event) =>
-            setDraft({ ...draft, riotId: event.target.value })
-          }
-        />
-      </PaletteField>
-      <PaletteSection label="Frequent stores">
-        <PaletteField
-          label="Play Riftbound event link"
-          htmlFor="riftbound-store-link"
-          hint="Add up to 10 stores. Only public events near each venue are available."
-        >
-          <form
-            className="flex min-w-0 items-center gap-2"
-            action={() => {
-              if (canAddStore) form.store.mutate(form.eventUrl);
-            }}
-          >
-            <Input
-              id="riftbound-store-link"
+      {draft.registeredOnly ? (
+        <PaletteSection label="Riot ID">
+          <p className="px-2 pb-1 text-[13px] leading-[130%] text-muted-foreground">
+            {COPY.riotIdHint}
+          </p>
+          <div className="px-2 pt-1 pb-2">
+            <input
+              id="riftbound-riot-id"
+              aria-label="Riot ID"
               className={PALETTE_INPUT_CLASS}
-              value={form.eventUrl}
-              onChange={(event) => form.setEventUrl(event.target.value)}
-              placeholder="Paste an event link"
-              type="url"
+              value={draft.riotId}
+              maxLength={100}
+              autoComplete="off"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
+              placeholder="Player Name#TAG"
+              onChange={(event) =>
+                setDraft({ ...draft, riotId: event.target.value })
+              }
             />
-            <PaletteButton
-              type="submit"
-              className="h-11 md:h-9"
-              loading={form.store.isPending}
-              disabled={!canAddStore}
-            >
-              {form.store.isPending ? "Finding…" : "Add store"}
-            </PaletteButton>
-          </form>
-        </PaletteField>
+          </div>
+        </PaletteSection>
+      ) : null}
+      <PaletteSection label="Frequent Stores">
+        <p className="px-2 pb-1 text-[13px] leading-[130%] text-muted-foreground">
+          {COPY.storesHint}
+        </p>
+        <form
+          className="flex min-w-0 items-center gap-2 px-2 pt-1 pb-2"
+          action={() => {
+            if (canAddStore) form.store.mutate(form.eventUrl);
+          }}
+        >
+          <input
+            id="riftbound-store-link"
+            aria-label="Play Riftbound event link"
+            className={PALETTE_INPUT_CLASS}
+            value={form.eventUrl}
+            onChange={(event) => form.setEventUrl(event.target.value)}
+            placeholder="Paste a Play Riftbound event link"
+            type="url"
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <PaletteButton
+            type="submit"
+            variant="primary"
+            className="h-11 md:h-9"
+            loading={form.store.isPending}
+            disabled={!canAddStore}
+          >
+            {form.store.isPending ? null : <Plus className="size-4" />}
+            Add
+          </PaletteButton>
+        </form>
         {form.store.isError ? (
-          <p role="alert" className="px-2 pb-2 text-[13px] text-destructive">
-            The store could not be resolved. Check the public event link and try
-            again.
+          <p
+            role="alert"
+            className="px-2 pb-2 text-[13px] leading-[130%] text-destructive"
+          >
+            {COPY.storeError}
           </p>
         ) : null}
-        {!draft.stores.length ? (
-          <p className="px-2 pb-2 text-[13px] text-muted-foreground">
-            No frequent stores added.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border/60 px-2">
-            {draft.stores.map((store) => (
-              <li
-                key={store.id}
-                className="flex min-w-0 items-center gap-2 py-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] leading-snug">
-                    {store.name}
-                  </p>
-                  <p className="break-words text-[13px] leading-snug text-muted-foreground">
+        {draft.stores.length ? (
+          draft.stores.map((store) => (
+            <div key={store.id} className="flex items-center gap-3 p-2">
+              <PaletteIconBox>
+                <MapPin className="size-4" />
+              </PaletteIconBox>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] leading-[130%] text-foreground">
+                  {store.name}
+                </p>
+                {store.address ? (
+                  <p className="truncate text-[13px] leading-[130%] text-muted-foreground">
                     {store.address}
                   </p>
-                </div>
-                <PaletteButton
-                  variant="ghost"
-                  className="size-11 p-0"
+                ) : null}
+              </div>
+              <SimpleTooltip content="Remove store">
+                <button
+                  type="button"
                   aria-label={`Remove ${store.name}`}
                   onClick={() =>
                     setDraft({
@@ -232,56 +245,67 @@ function RiftboundForm({
                       ),
                     })
                   }
+                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring/25 md:size-8"
                 >
                   <X className="size-4" />
-                </PaletteButton>
-              </li>
-            ))}
-          </ul>
+                </button>
+              </SimpleTooltip>
+            </div>
+          ))
+        ) : (
+          <PaletteEmptyState>{COPY.noStores}</PaletteEmptyState>
         )}
       </PaletteSection>
       <PaletteSection label="Calendar">
-        <div className="grid min-w-0 grid-cols-1 md:grid-cols-[minmax(0,1fr)_8rem]">
-          <PaletteField
-            label="Destination calendar"
-            htmlFor="riftbound-calendar"
+        <PaletteSelectRow icon={CalendarDays} label="Destination calendar">
+          <Select
+            value={draft.calendarId}
+            disabled={!owned.length}
+            onValueChange={(calendarId) => setDraft({ ...draft, calendarId })}
           >
-            <PaletteSelect
+            <SelectTrigger
               id="riftbound-calendar"
-              label="Destination calendar"
-              value={draft.calendarId}
-              placeholder="Choose a calendar"
-              options={owned.map((calendar) => ({
-                value: calendar.id,
-                label: calendar.name,
-              }))}
-              onValueChange={(calendarId) => setDraft({ ...draft, calendarId })}
-            />
-          </PaletteField>
-          <PaletteField label="Duration (minutes)" htmlFor="riftbound-duration">
-            <Input
+              aria-label="Destination calendar"
+              className={`w-[140px] ${PALETTE_COMPACT_SELECT_CLASS}`}
+            >
+              <SelectValue placeholder="Choose" />
+            </SelectTrigger>
+            <SelectContent>
+              {owned.map((calendar) => (
+                <SelectItem key={calendar.id} value={calendar.id}>
+                  {calendar.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </PaletteSelectRow>
+        <PaletteSelectRow icon={Clock} label="Event length">
+          <Select
+            value={String(draft.durationMinutes)}
+            onValueChange={(value) =>
+              setDraft({ ...draft, durationMinutes: Number(value) })
+            }
+          >
+            <SelectTrigger
               id="riftbound-duration"
-              className={PALETTE_INPUT_CLASS}
-              inputMode="numeric"
-              value={duration}
-              onChange={(event) => {
-                setDuration(event.target.value);
-                setDraft({
-                  ...draft,
-                  durationMinutes: Number(event.target.value),
-                });
-              }}
-            />
-          </PaletteField>
-        </div>
-        {!owned.length ? (
-          <p className="px-2 text-[13px] text-muted-foreground">
-            Create a calendar before enabling Riftbound.
-          </p>
-        ) : null}
-        <p className="px-2 pb-2 text-[13px] leading-snug text-muted-foreground">
-          Riftbound end times can be inaccurate, so imports use this duration.
-          Existing imports are not automatically edited or deleted.
+              aria-label="Event length"
+              className={`w-[140px] ${PALETTE_COMPACT_SELECT_CLASS}`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {riftboundDurationOptions(draft.durationMinutes).map((option) => (
+                <SelectItem key={option.value} value={String(option.value)}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </PaletteSelectRow>
+        <p className="px-2 pt-1 pb-2 text-[13px] leading-[130%] text-muted-foreground">
+          {owned.length
+            ? COPY.durationHint
+            : `${COPY.noCalendars} ${COPY.durationHint}`}
         </p>
       </PaletteSection>
     </PaletteView>

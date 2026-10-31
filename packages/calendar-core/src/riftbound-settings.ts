@@ -1,5 +1,6 @@
 import { z } from "./zod";
 import type { Schema } from "@workspace/api-contracts";
+import { formatReminderShort } from "./event-editor-options";
 
 const plainText = z
   .string()
@@ -65,6 +66,32 @@ export const DEFAULT_RIFTBOUND_PREFERENCES: RiftboundPreferences = {
   registeredOnly: false,
   durationMinutes: 240,
 };
+
+/** Copy both platforms show for the Riftbound settings. */
+export const RIFTBOUND_SETTINGS_COPY = {
+  importLabel: "Import Riftbound events",
+  importDescription:
+    "Past 30 days and upcoming, every 15 minutes while Calendar is open. No Riot login.",
+  registeredLabel: "Only events I’m registered for",
+  registeredDescription: "Waitlists don’t count.",
+  registeredNote:
+    "Solace sees imported event times, so it could match you to a public roster and learn your Riot ID.",
+  riotIdHint: "Your exact roster name, including spaces and #TAG. Kept encrypted.",
+  storesHint:
+    "Paste any public Play Riftbound event link. Up to 10 stores; only public events near each venue are found.",
+  storeError: "The store could not be found. Check the event link and try again.",
+  noStores: "No stores yet.",
+  noCalendars: "Create a calendar before enabling Riftbound.",
+  durationHint:
+    "Riftbound end times are often wrong, so imports use this length. Existing imports are never edited or deleted.",
+} as const;
+
+/** Event lengths offered for imports; a saved length outside the list stays selectable. */
+export function riftboundDurationOptions(current: number) {
+  return [...new Set([120, 180, 240, 360, 480, current])]
+    .sort((a, b) => a - b)
+    .map((minutes) => ({ value: minutes, label: formatReminderShort(minutes) }));
+}
 
 export function riftboundSyncMutationKey(scope: string | null) {
   return ["riftbound-sync", scope] as const;

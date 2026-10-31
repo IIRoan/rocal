@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   DEFAULT_RIFTBOUND_PREFERENCES,
   normalizeRiftboundRiotId,
+  riftboundDurationOptions,
   riftboundPreferencesSchema,
   riftboundQueryAffected,
   selectRiftboundEvents,
@@ -152,4 +153,17 @@ it("invalidates affected month grids and native ranges, never unrelated queries"
     ),
   ).toBe(false);
   expect(riftboundQueryAffected(["mail"], [event], 240)).toBe(false);
+});
+
+it("offers preset event lengths and keeps a saved custom length selectable", () => {
+  expect(riftboundDurationOptions(240).map(({ label }) => label)).toEqual([
+    "2 hours",
+    "3 hours",
+    "4 hours",
+    "6 hours",
+    "8 hours",
+  ]);
+  expect(riftboundDurationOptions(90).map(({ value }) => value)).toEqual([
+    90, 120, 180, 240, 360, 480,
+  ]);
 });

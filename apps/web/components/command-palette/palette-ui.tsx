@@ -234,6 +234,29 @@ export function PaletteField({
   );
 }
 
+/** Settings row with a compact control on the right, as in Calendar Defaults. */
+export function PaletteSelectRow({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex min-h-11 items-center gap-3 px-2 py-1.5 md:min-h-9">
+      <PaletteIconBox>
+        <Icon className="size-4" />
+      </PaletteIconBox>
+      <span className="min-w-0 flex-1 text-[15px] leading-[130%] text-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
 export type PaletteSelectOption<T extends string> = { value: T; label: string };
 
 export function PaletteSelect<T extends string>({
@@ -243,7 +266,6 @@ export function PaletteSelect<T extends string>({
   options,
   onValueChange,
   disabled,
-  placeholder = "Choose an option",
 }: {
   id: string;
   label: string;
@@ -251,7 +273,6 @@ export function PaletteSelect<T extends string>({
   options: readonly PaletteSelectOption<T>[];
   onValueChange: (value: T) => void;
   disabled?: boolean;
-  placeholder?: string;
 }) {
   const selectedOption = options.find((option) => option.value === value);
   return (
@@ -268,9 +289,7 @@ export function PaletteSelect<T extends string>({
         aria-label={label}
         className={cn(PALETTE_INPUT_CLASS, "cursor-pointer")}
       >
-        <SelectValue placeholder={placeholder}>
-          {selectedOption?.label}
-        </SelectValue>
+        <SelectValue>{selectedOption?.label}</SelectValue>
       </SelectTrigger>
       <SelectContent
         sideOffset={4}

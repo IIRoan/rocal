@@ -13,6 +13,7 @@ import { SHARED_SETTINGS_SEARCH_ENTRIES } from "@workspace/native-core/lib/setti
 import { CALENDAR_SETTINGS_SEARCH_ENTRIES } from "../lib/settings-search-entries";
 import { CalendarsSheetContent } from "./calendars/CalendarsSheet";
 import { RiftboundSettingsContent } from "./settings/sections/RiftboundSettingsContent";
+import { SpecialSettingsContent } from "./settings/sections/SpecialSettingsContent";
 import { CalendarSettingsContent } from "./settings/sections/CalendarSettingsContent";
 import { CalendarAppearanceSettingsContent } from "./settings/sections/CalendarAppearanceSettingsContent";
 import {
@@ -23,6 +24,7 @@ import {
 const LABELS: Readonly<Record<string, string | undefined>> = {
   [CALENDARS_ROOT_PAGE]: "Calendars",
   calendar: "Calendar settings",
+  special: "Special",
   riftbound: "Riftbound",
 };
 
@@ -30,7 +32,7 @@ const CALENDAR_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
   groups: buildAccountSheetGroups(
     accountSheetGroupDefs({
       title: "Calendar",
-      ids: [CALENDARS_ROOT_PAGE, "calendar", "riftbound"],
+      ids: [CALENDARS_ROOT_PAGE, "calendar", "special"],
     }),
     LABELS,
   ),
@@ -42,13 +44,15 @@ const CALENDAR_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
     ...SHARED_SETTINGS_SHEET_PAGES,
     appearance: CalendarAppearanceSettingsContent,
     calendar: CalendarSettingsContent,
+    special: SpecialSettingsContent,
     riftbound: RiftboundSettingsContent,
   },
   icons: {
     ...SETTINGS_HUB_ICONS,
     [CALENDARS_ROOT_PAGE]: "calendar",
     calendar: "settings",
-    riftbound: "calendar",
+    special: "star",
+    riftbound: "award",
   },
   labels: LABELS,
   customPages: {

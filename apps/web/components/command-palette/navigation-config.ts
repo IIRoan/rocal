@@ -20,6 +20,8 @@ import {
   Square,
   List,
   Tag,
+  Star,
+  Trophy,
 } from "lucide-react";
 import {
   APP_NOTIFICATION_SETTING,
@@ -38,6 +40,8 @@ export const VIEW_LABELS: Record<string, string> = {
   "time-region": "Time & Region",
   notifications: "Notifications",
   "calendar-defaults": "Calendar Defaults",
+  special: "Special",
+  riftbound: "Riftbound",
   account: "Account",
   security: "Security",
   passkeys: "Passkeys",
@@ -212,7 +216,15 @@ export const NAVIGATION_ITEMS = [
     ],
     parent: null,
   },
-  { id: "riftbound", label: "Riftbound", icon: Calendar, description: "Import events from your frequent Riftbound stores", targetView: "riftbound", keywords: ["riftbound", "riot", "stores", "tournaments"], parent: null },
+  {
+    id: "special",
+    label: "Special",
+    icon: Star,
+    description: "Riftbound event imports",
+    targetView: "special",
+    keywords: ["special", "riftbound", "integrations"],
+    parent: null,
+  },
   ...BASE_SETTINGS_NAVIGATION_ITEMS.slice(3),
 ];
 
@@ -220,6 +232,16 @@ export const NAVIGATION_ITEMS = [
 export const SEARCH_INDEX = [
   // Main navigation items
   ...NAVIGATION_ITEMS,
+  {
+    id: "riftbound",
+    label: "Riftbound",
+    icon: Trophy,
+    description: "Import events from your frequent stores",
+    targetView: "riftbound",
+    keywords: ["riftbound", "riot", "stores", "tournaments"],
+    parent: "special",
+    parentLabel: "Special",
+  },
   {
     id: "categories",
     label: "Categories",

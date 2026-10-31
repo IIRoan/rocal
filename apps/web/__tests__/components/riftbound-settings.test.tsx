@@ -8,9 +8,14 @@ import { RiftboundSettings } from "@/components/command-palette/riftbound-settin
 jest.mock("lucide-react", () => {
   const Icon = () => null;
   return {
-    Calendar: Icon,
+    CalendarDays: Icon,
+    CalendarPlus: Icon,
+    Clock: Icon,
     Check: Icon,
-    Gamepad2: Icon,
+    MapPin: Icon,
+    Plus: Icon,
+    RefreshCw: Icon,
+    UserCheck: Icon,
     X: Icon,
     ChevronLeft: Icon,
     ChevronRight: Icon,
@@ -34,6 +39,8 @@ let mockLoading = false;
 let mockError: string | null = null;
 let mockDirty = false;
 let mockEnabled = false;
+let mockRegistered = false;
+let mockStatus: { tone: "error" | "muted"; text: string } | null = null;
 
 jest.mock("@/hooks/use-settings", () => ({
   useSettings: () => ({
@@ -48,7 +55,12 @@ jest.mock("@/components/calendar-data-provider", () => ({
 }));
 jest.mock("@/hooks/use-riftbound", () => ({
   useWebRiftboundForm: () => ({
-    draft: { ...mockDefaults, enabled: mockEnabled, stores: [mockStore] },
+    draft: {
+      ...mockDefaults,
+      enabled: mockEnabled,
+      registeredOnly: mockRegistered,
+      stores: [mockStore],
+    },
     setDraft: mockSetDraft,
     eventUrl: "https://playriftbound.com/en-US/events/123",
     setEventUrl: jest.fn(),
@@ -61,6 +73,7 @@ jest.mock("@/hooks/use-riftbound", () => ({
       isSuccess: false,
     },
     sync: { mutate: mockSync, isPending: false, isError: false },
+    status: mockStatus,
   }),
 }));
 
@@ -73,6 +86,8 @@ beforeEach(() => {
   mockError = null;
   mockDirty = false;
   mockEnabled = false;
+  mockRegistered = false;
+  mockStatus = null;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -102,7 +117,7 @@ it("has an opt-in registered-only choice that discloses roster matching, and res
   expect(mockSetDraft).toHaveBeenCalledWith(
     expect.objectContaining({ registeredOnly: true }),
   );
-  act(() => button("Add store").click());
+  act(() => button("Add").click());
   expect(mockAddStore).toHaveBeenCalledWith(
     "https://playriftbound.com/en-US/events/123",
   );
@@ -125,22 +140,32 @@ it("submits the store link from the mobile keyboard", () => {
   );
 });
 
-it("requires saved, enabled settings before manual sync", () => {
+it("syncs only saved, enabled settings, and saves only changes", () => {
   render();
   expect(button("Sync now").disabled).toBe(true);
+  expect(button("Save").disabled).toBe(true);
   mockEnabled = true;
   mockDirty = true;
   render();
   expect(button("Sync now").disabled).toBe(true);
+  act(() => button("Save").click());
+  expect(mockSave).toHaveBeenCalled();
   mockDirty = false;
   render();
   act(() => button("Sync now").click());
   expect(mockSync).toHaveBeenCalled();
-  act(() => button("Save settings").click());
-  expect(mockSave).toHaveBeenCalled();
 });
 
-it("offers a remove action and explains exact names and import retention", () => {
+it("asks for the Riot ID only for registered-only matching", () => {
+  render();
+  expect(container.querySelector("#riftbound-riot-id")).toBeNull();
+  mockRegistered = true;
+  render();
+  expect(container.querySelector("#riftbound-riot-id")).not.toBeNull();
+  expect(container.textContent).toContain("including spaces");
+});
+
+it("offers a remove action, preset event lengths, and explains import retention", () => {
   render();
   const remove = container.querySelector<HTMLButtonElement>(
     '[aria-label="Remove Fixture shop"]',
@@ -149,9 +174,16 @@ it("offers a remove action and explains exact names and import retention", () =>
   expect(mockSetDraft).toHaveBeenCalledWith(
     expect.objectContaining({ stores: [] }),
   );
-  expect(container.textContent).toContain("including spaces");
-  expect(container.textContent).toContain(
-    "not automatically edited or deleted",
+  expect(container.textContent).toContain("4 hours");
+  expect(container.textContent).toContain("never edited or deleted");
+});
+
+it("shows one footer status line, announcing errors as alerts", () => {
+  mockStatus = { tone: "error", text: "Fixture sync failure" };
+  render();
+  const footer = container.querySelector('[data-slot="palette-footer"]');
+  expect(footer?.querySelector('[role="alert"]')?.textContent).toBe(
+    "Fixture sync failure",
   );
 });
 
@@ -159,25 +191,25 @@ it("keeps the actions outside the scrollable fields on short screens", () => {
   render();
   const body = container.querySelector('[data-slot="palette-body"]');
   const footer = container.querySelector('[data-slot="palette-footer"]');
-  expect(body?.contains(container.querySelector("#riftbound-riot-id"))).toBe(
-    true,
-  );
-  expect(body?.contains(button("Save settings"))).toBe(false);
-  expect(footer?.contains(button("Save settings"))).toBe(true);
+  expect(
+    body?.contains(container.querySelector("#riftbound-store-link")),
+  ).toBe(true);
+  expect(body?.contains(button("Save"))).toBe(false);
+  expect(footer?.contains(button("Save"))).toBe(true);
   expect(footer?.contains(button("Sync now"))).toBe(true);
 });
 
 it("renders loading and error states without displaying the form", () => {
   mockLoading = true;
   render();
-  expect(container.querySelector('[role="status"]')?.textContent).toContain(
-    "Loading",
-  );
+  expect(
+    container.querySelector("output")?.getAttribute("aria-label"),
+  ).toContain("Loading");
   mockLoading = false;
   mockError = "failed";
   render();
   expect(container.querySelector('[role="alert"]')?.textContent).toContain(
     "could not be loaded",
   );
-  expect(container.querySelector("#riftbound-riot-id")).toBeNull();
+  expect(container.querySelector("#riftbound-store-link")).toBeNull();
 });

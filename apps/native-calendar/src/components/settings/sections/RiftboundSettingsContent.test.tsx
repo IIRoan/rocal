@@ -12,11 +12,29 @@ const mockStore = {
   name: "Fixture shop",
   address: "Venue",
 };
-const mockDraft = { ...mockDefaults, enabled: true, stores: [mockStore] };
+let mockDirty = false;
+let mockDraft = { ...mockDefaults, enabled: true, stores: [mockStore] };
 
 jest.mock("react-native", () => ({
   StyleSheet: { create: (styles: object) => styles, hairlineWidth: 1 },
   View: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  Pressable: ({
+    accessibilityLabel,
+    onPress,
+    children,
+  }: {
+    accessibilityLabel: string;
+    onPress: () => void;
+    children?: ReactNode;
+  }) => (
+    <button aria-label={accessibilityLabel} onClick={onPress}>
+      {children}
+    </button>
+  ),
+}));
+jest.mock("@expo/vector-icons", () => ({ Feather: () => null }));
+jest.mock("@workspace/native-core/components/mail/mail-ui", () => ({
+  useMailSkin: () => ({ selected: "transparent" }),
 }));
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ bottom: 34 }),
@@ -41,25 +59,17 @@ jest.mock("../../../hooks/use-riftbound", () => ({
     setDraft: mockSetDraft,
     eventUrl: "",
     setEventUrl: jest.fn(),
-    dirty: false,
+    dirty: mockDirty,
     store: { mutate: jest.fn() },
     save: { mutate: mockSave },
     sync: { mutate: mockSync },
+    status: null,
   }),
 }));
 jest.mock("@workspace/native-core/components/settings/SettingsPage", () => ({
   SettingsPage: ({ children }: { children?: ReactNode }) => (
     <section>{children}</section>
   ),
-}));
-jest.mock("@workspace/native-core/components/layout/HeaderIconButton", () => ({
-  HeaderIconButton: ({
-    accessibilityLabel,
-    onPress,
-  }: {
-    accessibilityLabel: string;
-    onPress: () => void;
-  }) => <button aria-label={accessibilityLabel} onClick={onPress} />,
 }));
 jest.mock("@workspace/native-core/components/sheet/SheetSections", () => {
   const Slot = ({ children }: { children?: ReactNode }) => (
@@ -70,7 +80,18 @@ jest.mock("@workspace/native-core/components/sheet/SheetSections", () => {
       <div data-scroll>{children}</div>
     ),
     SheetGroup: Slot,
-    SheetSection: Slot,
+    SheetSection: ({
+      title,
+      children,
+    }: {
+      title?: string;
+      children?: ReactNode;
+    }) => (
+      <div>
+        {title ? <h3>{title}</h3> : null}
+        {children}
+      </div>
+    ),
     SheetButton: ({
       label,
       onPress,
@@ -87,12 +108,14 @@ jest.mock("@workspace/native-core/components/sheet/SheetSections", () => {
     SheetItem: ({
       label,
       trailing,
+      onPress,
     }: {
       label: string;
       trailing?: ReactNode;
+      onPress?: () => void;
     }) => (
-      <div data-store-row>
-        <span>{label}</span>
+      <div data-row={label}>
+        <span onClick={onPress}>{label}</span>
         {trailing}
       </div>
     ),
@@ -105,38 +128,41 @@ jest.mock("@workspace/native-core/components/sheet/SheetSections", () => {
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let root: Root, container: HTMLDivElement;
+function render() {
+  act(() => root.render(<RiftboundSettingsContent />));
+}
+function button(label: string) {
+  return [...container.querySelectorAll("button")].find(
+    (item) => item.textContent === label,
+  );
+}
 beforeEach(() => {
   jest.clearAllMocks();
+  mockDirty = false;
+  mockDraft = { ...mockDefaults, enabled: true, stores: [mockStore] };
   container = document.createElement("div");
   root = createRoot(container);
-  act(() => root.render(<RiftboundSettingsContent />));
+  render();
 });
 afterEach(() => {
   act(() => root.unmount());
 });
 
-it("keeps Save and Sync available outside the scrolling drawer content", () => {
+it("keeps Save and Sync outside the scrolling drawer, saving only changes", () => {
   const scroll = container.querySelector("[data-scroll]");
-  const save = [...container.querySelectorAll("button")].find(
-    (button) => button.textContent === "Save settings",
-  );
-  const sync = [...container.querySelectorAll("button")].find(
-    (button) => button.textContent === "Sync now",
-  );
-  expect(save).toBeDefined();
-  expect(sync).toBeDefined();
-  expect(scroll?.contains(save ?? null)).toBe(false);
-  expect(scroll?.contains(sync ?? null)).toBe(false);
-  act(() => {
-    save?.click();
-    sync?.click();
-  });
-  expect(mockSave).toHaveBeenCalled();
+  expect(scroll?.contains(button("Save") ?? null)).toBe(false);
+  expect(scroll?.contains(button("Sync now") ?? null)).toBe(false);
+  expect(button("Save")?.disabled).toBe(true);
+  act(() => button("Sync now")?.click());
   expect(mockSync).toHaveBeenCalled();
+  mockDirty = true;
+  render();
+  act(() => button("Save")?.click());
+  expect(mockSave).toHaveBeenCalled();
 });
 
 it("removes a store only through its named remove button", () => {
-  const row = container.querySelector("[data-store-row]");
+  const row = container.querySelector('[data-row="Fixture shop"]');
   act(() => row?.querySelector("span")?.click());
   expect(mockSetDraft).not.toHaveBeenCalled();
   act(() =>
@@ -144,7 +170,27 @@ it("removes a store only through its named remove button", () => {
       .querySelector<HTMLButtonElement>('[aria-label="Remove Fixture shop"]')
       ?.click(),
   );
+  const update = mockSetDraft.mock.calls[0]?.[0] as (
+    draft: typeof mockDraft,
+  ) => typeof mockDraft;
+  expect(update(mockDraft).stores).toEqual([]);
+});
+
+it("asks for the Riot ID only for registered-only matching", () => {
+  expect(container.textContent).not.toContain("Riot ID");
+  mockDraft = { ...mockDraft, registeredOnly: true };
+  render();
+  expect(container.textContent).toContain("Riot ID");
+});
+
+it("offers preset event lengths instead of a free-form number", () => {
+  act(() =>
+    container
+      .querySelector('[data-row="6 hours"]')
+      ?.querySelector("span")
+      ?.click(),
+  );
   expect(mockSetDraft).toHaveBeenCalledWith(
-    expect.objectContaining({ stores: [] }),
+    expect.objectContaining({ durationMinutes: 360 }),
   );
 });

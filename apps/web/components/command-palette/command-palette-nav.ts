@@ -6,7 +6,8 @@ const PARENT_CHAINS: Partial<Record<PaletteView, PaletteView[]>> = {
   timezone: ["main", "time-region"],
   notifications: ["main"],
   "calendar-defaults": ["main"],
-  riftbound: ["main"],
+  special: ["main"],
+  riftbound: ["main", "special"],
   account: ["main"],
   security: ["main"],
   passkeys: ["main", "security"],
@@ -49,6 +50,8 @@ export function getDialogTitle(currentView: PaletteView): string {
       return "Timezone Selection";
     case "calendar-defaults":
       return "Calendar Defaults";
+    case "special":
+      return "Special";
     case "riftbound":
       return "Riftbound";
     case "account":

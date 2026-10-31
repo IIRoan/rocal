@@ -122,6 +122,19 @@ export function useRiftboundForm(options: {
   for (const state of states) {
     if (!latest || state.id > latest.id) latest = state;
   }
+  const backgroundError = latest?.status === "error" && draft.enabled && !dirty;
+  // One footer line on both platforms: the most urgent problem, else the latest result.
+  const status: { tone: "error" | "muted"; text: string } | null = save.isError
+    ? { tone: "error", text: save.error.message }
+    : sync.isError || backgroundError
+      ? { tone: "error", text: "Riftbound could not be synced. Existing events were not removed." }
+      : sync.data?.failedEvents
+        ? { tone: "error", text: "Some events could not be imported. Sync again to retry." }
+        : sync.data
+          ? { tone: "muted", text: `${sync.data.events.length} matching, ${sync.data.eventsCreated} added.` }
+          : save.isSuccess && !dirty
+            ? { tone: "muted", text: "Saved." }
+            : null;
   return {
     draft,
     setDraft,
@@ -132,7 +145,7 @@ export function useRiftboundForm(options: {
     sync,
     dirty,
     backgroundPending: latest?.status === "pending",
-    backgroundError: latest?.status === "error" && draft.enabled && !dirty,
+    status,
   };
 }
 

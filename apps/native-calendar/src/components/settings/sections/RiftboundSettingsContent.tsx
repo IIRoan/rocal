@@ -1,13 +1,22 @@
-import React, { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import React, { useCallback, useMemo } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HeaderIconButton } from "@workspace/native-core/components/layout/HeaderIconButton";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   partitionCalendarsByKind,
   type UserSettings,
 } from "@workspace/calendar-core";
+import {
+  RIFTBOUND_SETTINGS_COPY as COPY,
+  riftboundDurationOptions,
+  type RiftboundStore,
+} from "@workspace/calendar-core/riftbound-settings";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
+import {
+  useMailSkin,
+  type MailSkin,
+} from "@workspace/native-core/components/mail/mail-ui";
 import { useNativeUserSettings } from "@workspace/native-core/hooks/use-native-user-settings";
 import { SettingsPage } from "@workspace/native-core/components/settings/SettingsPage";
 import {
@@ -29,13 +38,16 @@ export function RiftboundSettingsContent() {
   if (isLoading)
     return (
       <SettingsPage title="Riftbound">
-        <SheetCenteredState loading message="Loading Riftbound settings…" />
+        <SheetCenteredState loading message="Loading settings…" />
       </SettingsPage>
     );
   if (!settings || isError)
     return (
       <SettingsPage title="Riftbound">
-        <SheetMessage text="Riftbound settings could not be loaded." />
+        <SheetCenteredState
+          tone="destructive"
+          message="Riftbound settings could not be loaded."
+        />
       </SettingsPage>
     );
   return (
@@ -60,29 +72,43 @@ function RiftboundForm({
   ) => Promise<void>;
 }) {
   const { theme } = useTheme();
+  const skin = useMailSkin();
   const insets = useSafeAreaInsets();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
   const { data: calendars = [] } = useSettingsCalendars();
   const form = useNativeRiftboundForm(settings.riftbound, saveSettings);
   const { draft, setDraft } = form;
-  const [duration, setDuration] = useState(String(draft.durationMinutes));
+  const removeStore = useCallback(
+    (id: string) =>
+      setDraft((previous) => ({
+        ...previous,
+        stores: previous.stores.filter((store) => store.id !== id),
+      })),
+    [setDraft],
+  );
   const owned = partitionCalendarsByKind(calendars).ownedCalendars;
+  const syncing = form.sync.isPending || form.backgroundPending;
   const canAddStore =
     !!form.eventUrl.trim() && !form.store.isPending && draft.stores.length < 10;
+  const addStore = () => {
+    if (canAddStore) form.store.mutate(form.eventUrl);
+  };
   return (
     <SettingsPage title="Riftbound">
       <SheetScroll>
-        <SheetSection>
+        <SheetSection footer={COPY.registeredNote}>
           <SheetGroup>
             <SheetSwitchItem
-              label="Import Riftbound events"
-              detail="Past 30 days and upcoming. Every 15 minutes while open. No Riot login."
+              icon="calendar"
+              label={COPY.importLabel}
+              detail={COPY.importDescription}
               value={draft.enabled}
               onValueChange={(enabled) => setDraft({ ...draft, enabled })}
             />
             <SheetSwitchItem
-              label="Only events I’m registered for"
-              detail="Imported event times can let Solace match you to a public roster. Waitlists don’t count."
+              icon="user-check"
+              label={COPY.registeredLabel}
+              detail={COPY.registeredDescription}
               value={draft.registeredOnly}
               onValueChange={(registeredOnly) =>
                 setDraft({ ...draft, registeredOnly })
@@ -90,26 +116,24 @@ function RiftboundForm({
             />
           </SheetGroup>
         </SheetSection>
-        <SheetSection
-          title="Riot ID"
-          footer="Exact roster name, including spaces and #TAG. Kept encrypted."
-        >
-          <SheetGroup>
-            <SheetTextField
-              accessibilityLabel="Riot ID"
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={100}
-              value={draft.riotId}
-              onChangeText={(riotId) => setDraft({ ...draft, riotId })}
-              placeholder="Player Name#TAG"
-            />
-          </SheetGroup>
-        </SheetSection>
-        <SheetSection
-          title="Frequent stores"
-          footer="Add up to 10 stores using any public event link. Only public events near each venue are available."
-        >
+
+        {draft.registeredOnly ? (
+          <SheetSection title="Riot ID" footer={COPY.riotIdHint}>
+            <SheetGroup>
+              <SheetTextField
+                accessibilityLabel="Riot ID"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={100}
+                value={draft.riotId}
+                onChangeText={(riotId) => setDraft({ ...draft, riotId })}
+                placeholder="Player Name#TAG"
+              />
+            </SheetGroup>
+          </SheetSection>
+        ) : null}
+
+        <SheetSection title="Add a store" footer={COPY.storesHint}>
           <SheetGroup>
             <SheetTextField
               accessibilityLabel="Play Riftbound event link"
@@ -117,86 +141,78 @@ function RiftboundForm({
               autoCorrect={false}
               keyboardType="url"
               returnKeyType="go"
-              onSubmitEditing={() => {
-                if (canAddStore) form.store.mutate(form.eventUrl);
-              }}
+              onSubmitEditing={addStore}
               value={form.eventUrl}
               onChangeText={form.setEventUrl}
-              placeholder="Paste a Play Riftbound event link"
+              placeholder="Paste an event link"
             />
           </SheetGroup>
-          <SheetButton
-            label="Add store"
-            variant="secondary"
-            pending={form.store.isPending}
-            disabled={!canAddStore}
-            onPress={() => form.store.mutate(form.eventUrl)}
-          />
-          {form.store.isError ? (
-            <SheetMessage text="The store could not be resolved. Check the public event link and try again." />
-          ) : null}
-          {!draft.stores.length ? (
-            <SheetMessage text="No frequent stores added." />
-          ) : (
+        </SheetSection>
+        {form.store.isError ? (
+          <SheetMessage tone="destructive" text={COPY.storeError} />
+        ) : null}
+        <SheetButton
+          label="Add store"
+          icon="plus"
+          variant="secondary"
+          pending={form.store.isPending}
+          disabled={!canAddStore}
+          onPress={addStore}
+        />
+
+        <SheetSection title="Frequent stores">
+          {draft.stores.length ? (
             <SheetGroup>
               {draft.stores.map((store) => (
-                <View key={store.id} style={styles.storeRow}>
-                  <View style={styles.storeCopy}>
-                    <SheetItem label={store.name} detail={store.address} />
-                  </View>
-                  <HeaderIconButton
-                    name="x"
-                    accessibilityLabel={`Remove ${store.name}`}
-                    onPress={() =>
-                      setDraft({
-                        ...draft,
-                        stores: draft.stores.filter(
-                          (item) => item.id !== store.id,
-                        ),
-                      })
-                    }
-                  />
-                </View>
+                <StoreRow key={store.id} store={store} onRemove={removeStore} />
               ))}
             </SheetGroup>
-          )}
-        </SheetSection>
-        <SheetSection title="Destination calendar">
-          {!owned.length ? (
-            <SheetMessage text="Create a calendar before enabling Riftbound." />
           ) : (
-            <SheetGroup>
-              {owned.map((calendar) => (
-                <SheetItem
-                  key={calendar.id}
-                  label={calendar.name}
-                  checked={draft.calendarId === calendar.id}
-                  accessibilityRole="radio"
-                  accessibilityState={{
-                    checked: draft.calendarId === calendar.id,
-                  }}
-                  onPress={() =>
-                    setDraft({ ...draft, calendarId: calendar.id })
-                  }
-                />
-              ))}
-            </SheetGroup>
+            <SheetMessage text={COPY.noStores} />
           )}
         </SheetSection>
-        <SheetSection
-          title="Event duration (minutes)"
-          footer="Riftbound end times can be inaccurate, so imports use this duration. Existing imports are not automatically edited or deleted."
-        >
+
+        <SheetSection title="Destination calendar">
+          {owned.length ? (
+            <SheetGroup>
+              {owned.map((calendar) => {
+                const selected = draft.calendarId === calendar.id;
+                return (
+                  <SheetItem
+                    key={calendar.id}
+                    label={calendar.name}
+                    checked={selected}
+                    onPress={() =>
+                      setDraft({ ...draft, calendarId: calendar.id })
+                    }
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  />
+                );
+              })}
+            </SheetGroup>
+          ) : (
+            <SheetMessage text={COPY.noCalendars} />
+          )}
+        </SheetSection>
+
+        <SheetSection title="Event length" footer={COPY.durationHint}>
           <SheetGroup>
-            <SheetTextField
-              accessibilityLabel="Event duration in minutes"
-              keyboardType="number-pad"
-              value={duration}
-              onChangeText={(value) => {
-                setDuration(value);
-                setDraft({ ...draft, durationMinutes: Number(value) });
-              }}
-            />
+            {riftboundDurationOptions(draft.durationMinutes).map((option) => {
+              const selected = draft.durationMinutes === option.value;
+              return (
+                <SheetItem
+                  key={option.value}
+                  label={option.label}
+                  checked={selected}
+                  onPress={() =>
+                    setDraft({ ...draft, durationMinutes: option.value })
+                  }
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                />
+              );
+            })}
           </SheetGroup>
         </SheetSection>
       </SheetScroll>
@@ -206,43 +222,29 @@ function RiftboundForm({
           { paddingBottom: Math.max(insets.bottom, theme.spacing["3"]) },
         ]}
       >
-        {form.save.isError ? (
-          <SheetMessage tone="destructive" text={form.save.error.message} />
-        ) : form.save.isSuccess && !form.dirty ? (
-          <SheetMessage text="Settings saved." />
-        ) : null}
-        {form.sync.data?.failedEvents ? (
+        {form.status ? (
           <SheetMessage
-            tone="destructive"
-            text="Some events could not be imported. Sync again to retry."
-          />
-        ) : null}
-        {form.sync.isError || form.backgroundError ? (
-          <SheetMessage
-            tone="destructive"
-            text="Riftbound could not be synced. Try again; existing events were not removed."
-          />
-        ) : form.sync.data ? (
-          <SheetMessage
-            text={`${form.sync.data.events.length} matching events; ${form.sync.data.eventsCreated} newly added.`}
+            tone={form.status.tone === "error" ? "destructive" : "muted"}
+            text={form.status.text}
           />
         ) : null}
         <View style={styles.actions}>
           <View style={styles.action}>
             <SheetButton
-              label="Save settings"
-              pending={form.save.isPending}
-              disabled={form.sync.isPending}
-              onPress={() => form.save.mutate()}
+              label="Sync now"
+              icon="refresh-cw"
+              variant="secondary"
+              pending={syncing}
+              disabled={form.dirty || !draft.enabled || form.save.isPending}
+              onPress={() => form.sync.mutate()}
             />
           </View>
           <View style={styles.action}>
             <SheetButton
-              label="Sync now"
-              variant="secondary"
-              pending={form.sync.isPending || form.backgroundPending}
-              disabled={form.dirty || !draft.enabled || form.save.isPending}
-              onPress={() => form.sync.mutate()}
+              label="Save"
+              pending={form.save.isPending}
+              disabled={!form.dirty || form.sync.isPending}
+              onPress={() => form.save.mutate()}
             />
           </View>
         </View>
@@ -251,7 +253,43 @@ function RiftboundForm({
   );
 }
 
-const createStyles = (theme: ThemeTokens) =>
+function StoreRow({
+  store,
+  onRemove,
+}: {
+  store: RiftboundStore;
+  onRemove: (id: string) => void;
+}) {
+  const { theme } = useTheme();
+  const skin = useMailSkin();
+  const styles = useMemo(() => createStyles(theme, skin), [theme, skin]);
+  const removeButton = useMemo(
+    () => (
+      <Pressable
+        onPress={() => onRemove(store.id)}
+        style={({ pressed }) => [
+          styles.iconButton,
+          pressed && styles.iconButtonPressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Remove ${store.name}`}
+      >
+        <Feather name="x" size={16} color={theme.colors.destructive} />
+      </Pressable>
+    ),
+    [onRemove, store.id, store.name, styles, theme.colors.destructive],
+  );
+  return (
+    <SheetItem
+      icon="map-pin"
+      label={store.name}
+      detail={store.address || undefined}
+      trailing={removeButton}
+    />
+  );
+}
+
+const createStyles = (theme: ThemeTokens, skin: MailSkin) =>
   StyleSheet.create({
     footer: {
       gap: theme.spacing.sm,
@@ -263,10 +301,12 @@ const createStyles = (theme: ThemeTokens) =>
     },
     actions: { flexDirection: "row", gap: theme.spacing.sm },
     action: { flex: 1 },
-    storeRow: {
-      flexDirection: "row",
+    iconButton: {
+      width: 44,
+      height: 44,
       alignItems: "center",
-      paddingRight: theme.spacing["2"],
+      justifyContent: "center",
+      borderRadius: theme.borderRadius.md,
     },
-    storeCopy: { flex: 1, minWidth: 0 },
+    iconButtonPressed: { backgroundColor: skin.selected },
   });
