@@ -32,6 +32,7 @@ import {
 } from "@workspace/native-core/components/sheet/SheetSections";
 import { useSettingsCalendars } from "../../../hooks/use-calendar-settings";
 import { useNativeRiftboundForm } from "../../../hooks/use-riftbound";
+import { resolveCalendarSwatchColor } from "../../../lib/calendar-color-utils";
 
 export function RiftboundSettingsContent() {
   const { settings, isLoading, isError, saveSetting } = useNativeUserSettings();
@@ -181,6 +182,7 @@ function RiftboundForm({
                   <SheetItem
                     key={calendar.id}
                     label={calendar.name}
+                    swatch={resolveCalendarSwatchColor(calendar.color, theme)}
                     checked={selected}
                     onPress={() =>
                       setDraft({ ...draft, calendarId: calendar.id })
