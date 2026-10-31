@@ -81,6 +81,9 @@ webmail/
 # Rust build output
 /target
 
+# Explicit local Riftbound calendar exports
+/.local/riftbound-poc/
+
 
 # .easignore replaces nested .gitignore files, including native credential exclusions.
 .git
