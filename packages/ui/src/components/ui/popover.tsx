@@ -38,6 +38,9 @@ function PopoverContent({
           "bg-popover text-popover-foreground z-50 w-72 max-w-[calc(100dvw-1rem)] rounded-md border p-4 shadow-md outline-hidden",
           className,
         )}
+        // A parent dialog's scroll lock cancels wheel and touch scrolling in portals outside its content.
+        onWheel={(event) => event.stopPropagation()}
+        onTouchMove={(event) => event.stopPropagation()}
         {...props}
       >
         {props.children}
