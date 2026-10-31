@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@workspace/ui/components/ui/select";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
+import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   partitionCalendarsByKind,
@@ -273,7 +274,16 @@ function RiftboundForm({
             <SelectContent>
               {owned.map((calendar) => (
                 <SelectItem key={calendar.id} value={calendar.id}>
-                  {calendar.name}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor: getColorSwatchValue(calendar.color),
+                      }}
+                    />
+                    <span className="truncate">{calendar.name}</span>
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
