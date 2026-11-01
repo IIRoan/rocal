@@ -20,21 +20,31 @@ jobs:
         working-directory: apps/native-mail
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      # Flow-only changes reuse the last simulator build; the key covers everything that goes into the app.
+      - id: app
+        uses: chainguard-actions/actions-cache/restore@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0
+        with:
+          path: ${{ runner.temp }}/build/Build/Products/Release-iphonesimulator
+          key: mail-simulator-app-v1-${{ hashFiles('bun.lock', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/src/**', 'packages/native-core/plugins/**', 'apps/native-mail/app/**', 'apps/native-mail/src/**', 'apps/native-mail/assets/**', 'apps/native-mail/*.json', 'apps/native-mail/*.ts', 'apps/native-mail/*.js', 'apps/native-mail/*.cts') }}
       - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
         with:
           node-version-file: .node-version
       - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
-      - run: bun install --frozen-lockfile
+      - if: steps.app.outputs.cache-hit != 'true'
+        run: bun install --frozen-lockfile
         working-directory: .
       - id: eas
+        if: steps.app.outputs.cache-hit != 'true'
         run: echo "version=$(node -p "require('../../packages/native-core/expo-apps.json').easCliVersion")" >> "$GITHUB_OUTPUT"
-      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
+      - if: steps.app.outputs.cache-hit != 'true'
+        uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
         with:
           eas-version: ${{ steps.eas.outputs.version }}
           token: ${{ secrets.EXPO_TOKEN }}
       - name: Build the production app for the iOS Simulator
+        if: steps.app.outputs.cache-hit != 'true'
         env:
           APP_VARIANT: production
           SOLACE_ENV_SOURCE: eas
@@ -50,6 +60,11 @@ jobs:
               -configuration Release -sdk iphonesimulator -destination "generic/platform=iOS Simulator" \
               -derivedDataPath "$RUNNER_TEMP/build" CODE_SIGNING_ALLOWED=NO -quiet
           ' --non-interactive
+      - if: steps.app.outputs.cache-hit != 'true'
+        uses: chainguard-actions/actions-cache/save@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0
+        with:
+          path: ${{ runner.temp }}/build/Build/Products/Release-iphonesimulator
+          key: ${{ steps.app.outputs.cache-primary-key }}
       - name: Boot a 6.9-inch iPhone with a clean status bar
         id: sim
         run: |
