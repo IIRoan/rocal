@@ -72,11 +72,17 @@ jobs:
           EMAIL: ${{ secrets.APP_REVIEW_EMAIL }}
           PASSWORD: ${{ secrets.APP_REVIEW_PASSWORD }}
           DEVICE: ${{ steps.sim.outputs.device }}
+          MAESTRO_CLI_NO_ANALYTICS: "1"
+          # The XCTest driver can take minutes to start on a freshly booted CI simulator.
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/screenshots"
           cd "$RUNNER_TEMP/screenshots"
-          maestro --device "$DEVICE" test --env EMAIL="$EMAIL" --env PASSWORD="$PASSWORD" --test-output-dir "$RUNNER_TEMP/maestro-output" "$GITHUB_WORKSPACE/apps/native-mail/.maestro/app-store-screenshots.yaml"
+          for attempt in 1 2 3; do
+            maestro --device "$DEVICE" test --env EMAIL="$EMAIL" --env PASSWORD="$PASSWORD" --test-output-dir "$RUNNER_TEMP/maestro-output/$attempt" "$GITHUB_WORKSPACE/apps/native-mail/.maestro/app-store-screenshots.yaml" && exit 0
+          done
+          exit 1
       - if: always()
         working-directory: .
         run: for f in "$RUNNER_TEMP"/screenshots/*.png; do [ -e "$f" ] && sips -g pixelWidth -g pixelHeight "$f"; done; true
