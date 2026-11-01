@@ -38,7 +38,6 @@ jest.mock("../../lib/e2ee-crypto", () => ({
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
   clearPendingAuthPassword: jest.fn(),
-  peekAuthPassword: jest.fn(),
   peekPendingAuthPassword: jest.fn(),
 }));
 
@@ -72,10 +71,10 @@ import {
   ensureE2eeBootstrap,
   resetE2eeBootstrap,
   storePasswordEnvelopeForActiveSession,
+  unlockWithSignInPassword,
 } from "../../lib/e2ee-bootstrap";
 import {
   clearPendingAuthPassword,
-  peekAuthPassword,
   peekPendingAuthPassword,
 } from "../../lib/e2ee-password-cache";
 import type { E2eeBootstrapResponse } from "../../lib/types/calendar";
@@ -146,9 +145,6 @@ const mockClearPendingAuthPassword =
   clearPendingAuthPassword as jest.MockedFunction<
     typeof clearPendingAuthPassword
   >;
-const mockPeekAuthPassword = peekAuthPassword as jest.MockedFunction<
-  typeof peekAuthPassword
->;
 const mockPeekPendingAuthPassword =
   peekPendingAuthPassword as jest.MockedFunction<typeof peekPendingAuthPassword>;
 
@@ -230,7 +226,7 @@ describe("e2ee bootstrap guards", () => {
     mockExportWrappingPublicKey.mockResolvedValue("public-key");
     mockGenerateDeviceId.mockReturnValue("generated-device");
     mockWrapSymmetricKey.mockResolvedValue("wrapped-key");
-    mockPeekAuthPassword.mockReturnValue(null);
+    mockPeekPendingAuthPassword.mockReturnValue(null);
     mockGetActiveE2eeSession.mockReturnValue(null);
     mockCreatePasswordEnvelope.mockResolvedValue({
       kdfAlgorithm: "PBKDF2-SHA-256",
@@ -287,7 +283,7 @@ describe("e2ee bootstrap guards", () => {
     ["the envelope holds the device's account key", true, "salt-1"],
     ["the device minted a second account key", false, null],
   ])("verifies a restored device key with the sign-in password when %s", async (_case, sameKey, salt) => {
-    mockPeekAuthPassword.mockReturnValue("correct horse battery staple");
+    mockPeekPendingAuthPassword.mockReturnValue("correct horse battery staple");
     if (sameKey) {
       mockDecryptJsonPayload.mockResolvedValue(true);
     } else {
@@ -362,7 +358,7 @@ describe("e2ee bootstrap guards", () => {
 
   it("unlocks with a pending auth password when a password envelope exists", async () => {
     mockGetStoredE2eeDevice.mockResolvedValueOnce(null);
-    mockPeekAuthPassword.mockReturnValueOnce(
+    mockPeekPendingAuthPassword.mockReturnValueOnce(
       "correct horse battery staple",
     );
     mockGetBootstrap.mockResolvedValue({
@@ -401,7 +397,7 @@ describe("e2ee bootstrap guards", () => {
 
   it("does not mint a new device when the sign-in password fails to unwrap", async () => {
     mockGetStoredE2eeDevice.mockResolvedValueOnce(null);
-    mockPeekAuthPassword.mockReturnValueOnce("wrong-password");
+    mockPeekPendingAuthPassword.mockReturnValueOnce("wrong-password");
     mockUnwrapPasswordEnvelope.mockRejectedValueOnce(
       new Error("decryption failed"),
     );
@@ -437,7 +433,7 @@ describe("e2ee bootstrap guards", () => {
 
   it("does not report a wrong password when only the device upload fails", async () => {
     mockGetStoredE2eeDevice.mockResolvedValueOnce(null);
-    mockPeekAuthPassword.mockReturnValueOnce("correct horse battery staple");
+    mockPeekPendingAuthPassword.mockReturnValueOnce("correct horse battery staple");
     mockUpsertDevice.mockRejectedValueOnce(new Error("offline"));
     mockGetBootstrap.mockResolvedValue({
       ...createRemoteBootstrap("user-1"),
@@ -517,5 +513,113 @@ describe("e2ee bootstrap guards", () => {
       "salt-1",
     );
     expect(mockClearPendingAuthPassword).toHaveBeenCalled();
+  });
+});
+
+describe("unlockWithSignInPassword", () => {
+  beforeEach(() => {
+    resetE2eeBootstrap();
+    jest.clearAllMocks();
+    mockIsWebCryptoAvailable.mockReturnValue(true);
+    mockGetStoredE2eeDevice.mockResolvedValue(null);
+    mockGetActiveE2eeSession.mockReturnValue(null);
+    mockPeekPendingAuthPassword.mockReturnValue("correct horse battery staple");
+    mockUnwrapPasswordEnvelope.mockResolvedValue({
+      accountKey: {} as CryptoKey,
+      blindIndexKey: {} as CryptoKey,
+    });
+    mockGenerateWrappingKeyPair.mockResolvedValue({
+      publicKey: {} as CryptoKey,
+      privateKey: {} as CryptoKey,
+    } as CryptoKeyPair);
+    mockExportWrappingPublicKey.mockResolvedValue("public-key");
+    mockWrapSymmetricKey.mockResolvedValue("wrapped-key");
+    mockGenerateDeviceId.mockReturnValue("generated-device");
+    mockPutStoredE2eeDevice.mockResolvedValue(undefined);
+    const remoteDevice = createRemoteBootstrap("user-1").devices[0];
+    mockUpsertDevice.mockImplementation(async (input) => {
+      if (!remoteDevice) throw new Error("The fixture has a device.");
+      return { ...remoteDevice, deviceId: input.deviceId };
+    });
+    mockCreatePasswordEnvelope.mockResolvedValue({
+      kdfAlgorithm: "PBKDF2-SHA-256",
+      kdfSalt: "salt-2",
+      kdfIterations: 310000,
+      wrappedAccountKey: "wrapped-account",
+      wrappedSearchKey: "wrapped-search",
+      wrapAlgorithm: "AES-GCM-256",
+      keyVersion: 1,
+    });
+    mockRememberStoredDeviceEnvelopeSalt.mockResolvedValue(undefined);
+  });
+
+  it("does nothing without a sign-in password", async () => {
+    mockPeekPendingAuthPassword.mockReturnValue(null);
+
+    await expect(unlockWithSignInPassword("user-1")).resolves.toBeNull();
+    expect(mockGetBootstrap).not.toHaveBeenCalled();
+  });
+
+  it("opens the envelope and stores a device key before the login page navigates away", async () => {
+    mockGetBootstrap.mockResolvedValue({
+      ...createRemoteBootstrap("other-device"),
+      passwordEnvelope,
+    });
+
+    await expect(unlockWithSignInPassword("user-1")).resolves.toBeNull();
+
+    expect(mockUnwrapPasswordEnvelope).toHaveBeenCalledWith(
+      "correct horse battery staple",
+      passwordEnvelope,
+    );
+    expect(mockPutStoredE2eeDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-1", deviceId: "generated-device" }),
+    );
+    expect(mockSetActiveE2eeSession).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-1" }),
+    );
+  });
+
+  it("reports an envelope the password the server just accepted cannot open", async () => {
+    mockUnwrapPasswordEnvelope.mockRejectedValue(new Error("OperationError"));
+    mockGetBootstrap.mockResolvedValue({
+      ...createRemoteBootstrap("other-device"),
+      passwordEnvelope,
+    });
+
+    await expect(unlockWithSignInPassword("user-1")).resolves.toBe("cannot-open");
+    expect(mockPutStoredE2eeDevice).not.toHaveBeenCalled();
+  });
+
+  it("wraps the keys of a browser that holds the only copy with the sign-in password", async () => {
+    mockGetStoredE2eeDevice.mockResolvedValue(createLocalDeviceRecord("user-1"));
+    mockUnwrapAccountKey.mockResolvedValue({} as CryptoKey);
+    mockUnwrapBlindIndexKey.mockResolvedValue({} as CryptoKey);
+    mockGetBootstrap.mockResolvedValue({
+      ...createRemoteBootstrap("user-1"),
+      passwordEnvelope: null,
+    });
+    mockGetActiveE2eeSession.mockReturnValue({
+      userId: "user-1",
+      deviceId: "device-user-1",
+      accountKey: {} as CryptoKey,
+      blindIndexKey: {} as CryptoKey,
+      activatedAt: new Date("2026-04-22T10:00:00.000Z"),
+    });
+
+    await expect(unlockWithSignInPassword("user-1")).resolves.toBeNull();
+
+    expect(mockCreatePasswordEnvelope).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "correct horse battery staple",
+    );
+    expect(mockUpsertPasswordEnvelope).toHaveBeenCalled();
+  });
+
+  it("never locks on a network failure", async () => {
+    mockGetBootstrap.mockRejectedValue(new Error("offline"));
+
+    await expect(unlockWithSignInPassword("user-1")).resolves.toBeNull();
   });
 });

@@ -1,82 +1,36 @@
-const PENDING_AUTH_PASSWORD_KEY = "solace:e2ee:pending-auth-password";
-const CACHED_AUTH_PASSWORD_KEY = "solace:e2ee:cached-auth-password";
+const LEGACY_PASSWORD_COOKIE = "solace_enc_pw";
+const LEGACY_PASSWORD_KEY_STORAGE_KEY = "solace:enc-device-key";
+const LEGACY_FRESH_SIGN_IN_KEY = "solace:enc-fresh-sign-in";
 
-/** In-memory only; persisted unlock stays in the encrypted cookie, never web storage. */
-const authPasswordMemory = new Map<string, string>();
-
-function removeAuthPasswordKey(key: string): void {
-  authPasswordMemory.delete(key);
-}
+/** Memory only and never persisted: the login page opens the keys with it before it navigates away. */
+let pendingAuthPassword: string | null = null;
 
 export function storePendingAuthPassword(password: string): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
   const trimmed = password.trim();
-
-  if (!trimmed) {
-    clearAuthPasswords();
-    return;
-  }
-
-  authPasswordMemory.set(PENDING_AUTH_PASSWORD_KEY, trimmed);
-  authPasswordMemory.set(CACHED_AUTH_PASSWORD_KEY, trimmed);
-}
-
-/** A password this browser kept from an earlier sign-in; it may be stale, so it never shows the envelope is wrong. */
-export function storeRememberedAuthPassword(password: string): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const trimmed = password.trim();
-  if (trimmed) {
-    authPasswordMemory.set(CACHED_AUTH_PASSWORD_KEY, trimmed);
-  }
+  pendingAuthPassword = trimmed || null;
 }
 
 export function peekPendingAuthPassword(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return authPasswordMemory.get(PENDING_AUTH_PASSWORD_KEY) ?? null;
-}
-
-export function peekCachedAuthPassword(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return authPasswordMemory.get(CACHED_AUTH_PASSWORD_KEY) ?? null;
-}
-
-export function peekAuthPassword(): string | null {
-  return peekPendingAuthPassword() ?? peekCachedAuthPassword();
+  return pendingAuthPassword;
 }
 
 export function clearPendingAuthPassword(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  removeAuthPasswordKey(PENDING_AUTH_PASSWORD_KEY);
-}
-
-export function clearCachedAuthPassword(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  removeAuthPasswordKey(CACHED_AUTH_PASSWORD_KEY);
+  pendingAuthPassword = null;
 }
 
 export function clearAuthPasswords(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
+  pendingAuthPassword = null;
+  clearLegacyRememberedPassword();
+}
 
-  removeAuthPasswordKey(PENDING_AUTH_PASSWORD_KEY);
-  removeAuthPasswordKey(CACHED_AUTH_PASSWORD_KEY);
+/** Earlier builds kept the sign-in password for 30 days in a cookie, encrypted under a key stored beside it. */
+export function clearLegacyRememberedPassword(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${LEGACY_PASSWORD_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict`;
+  try {
+    localStorage.removeItem(LEGACY_PASSWORD_KEY_STORAGE_KEY);
+    sessionStorage.removeItem(LEGACY_FRESH_SIGN_IN_KEY);
+  } catch {
+    // Blocked storage holds nothing to remove.
+  }
 }

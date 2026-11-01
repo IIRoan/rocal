@@ -21,7 +21,6 @@ const mockGetSession = jest.fn<() => Promise<unknown>>();
 const mockRememberSalt = jest.fn<
   (userId: string, deviceId: string, salt: string | null) => Promise<void>
 >();
-const mockSetCookie = jest.fn<(password: string) => Promise<void>>();
 
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
@@ -44,9 +43,6 @@ jest.mock("@/lib/e2ee-payloads", () => ({
 jest.mock("@/lib/e2ee-storage", () => ({
   rememberStoredDeviceEnvelopeSalt: (userId: string, deviceId: string, salt: string | null) =>
     mockRememberSalt(userId, deviceId, salt),
-}));
-jest.mock("@/lib/enc-password-cookie", () => ({
-  setEncPasswordCookie: (password: string) => mockSetCookie(password),
 }));
 jest.mock("@/lib/calendar-api-service", () => ({ calendarApiService: {} }));
 jest.mock("@workspace/logger", () => ({
@@ -73,7 +69,6 @@ describe("persistPasswordChange", () => {
     });
     mockCreateEnvelope.mockResolvedValue({ kdfSalt: "new-salt" });
     mockRememberSalt.mockResolvedValue(undefined);
-    mockSetCookie.mockResolvedValue(undefined);
     mockUploadEnvelope.mockResolvedValue({});
   });
 
@@ -98,7 +93,6 @@ describe("persistPasswordChange", () => {
     });
     expect(mockUploadEnvelope).not.toHaveBeenCalled();
     expect(mockRememberSalt).toHaveBeenCalledWith("user-1", "device-1", "new-salt");
-    expect(mockSetCookie).toHaveBeenCalledWith("new-pw");
   });
 
   it("uploads the envelope on its own when an older API changed only the password", async () => {
@@ -116,7 +110,6 @@ describe("persistPasswordChange", () => {
 
     expect(result.ok).toBe(false);
     expect(mockRememberSalt).not.toHaveBeenCalled();
-    expect(mockSetCookie).not.toHaveBeenCalled();
   });
 
   it("refuses to change the password without open encryption keys", async () => {

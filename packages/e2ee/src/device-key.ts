@@ -32,8 +32,8 @@ export async function resolveDeviceEnvelopeSalt(
 /** Why a signed-in device cannot open the account key; the session then ends instead of asking for a password. */
 export type E2eeLock = "sign-in-again" | "cannot-open";
 
-/** Where the password tried on the envelope came from; only one the server just accepted shows the envelope is stale. */
-export type UnlockPassword = "sign-in" | "remembered" | "none";
+/** Whether the server just accepted a password tried on the envelope; only that one shows the envelope is stale. */
+export type UnlockPassword = "sign-in" | "none";
 
 /** The lock for a device without usable keys of its own; null when it may stay (unlocked, or a new account that may mint keys). */
 export function lockWithoutDeviceKeys(input: {

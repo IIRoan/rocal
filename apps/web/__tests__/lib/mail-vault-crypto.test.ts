@@ -60,12 +60,18 @@ describe("mail vault crypto", () => {
       parallelism: 1,
     });
     const keyBytes = await deriveVaultKeyBytes(passphrase, encrypted.kdfParams);
-    const derivedKeyB64 = Buffer.from(keyBytes).toString("base64");
+    const derivedKey = await crypto.subtle.importKey(
+      "raw",
+      new Uint8Array(keyBytes),
+      { name: "AES-GCM" },
+      false,
+      ["decrypt"],
+    );
 
     await expect(
       unlockEncryptedMailVaultWithDerivedKey(
         encrypted.encryptedVaultB64,
-        derivedKeyB64,
+        derivedKey,
       ),
     ).resolves.toEqual(
       expect.objectContaining({
@@ -73,6 +79,30 @@ describe("mail vault crypto", () => {
         encryptedPrivateKeyArmored: "private-key-armored",
       }),
     );
+  });
+
+  it("hands the derived key to the cache only as a non-extractable key", async () => {
+    const passphrase = "correct horse battery staple";
+    const encrypted = await createEncryptedMailVault(sampleVault, passphrase, {
+      memoryKiB: 8192,
+      iterations: 2,
+      parallelism: 1,
+    });
+    const cached: CryptoKey[] = [];
+
+    await unlockEncryptedMailVault(
+      encrypted.encryptedVaultB64,
+      passphrase,
+      encrypted.kdfParams,
+      (key) => cached.push(key),
+    );
+
+    expect(cached).toHaveLength(1);
+    expect(cached[0]?.extractable).toBe(false);
+    await expect(crypto.subtle.exportKey("raw", cached[0] as CryptoKey)).rejects.toThrow();
+    await expect(
+      unlockEncryptedMailVaultWithDerivedKey(encrypted.encryptedVaultB64, cached[0] as CryptoKey),
+    ).resolves.toEqual(expect.objectContaining({ email: "alice@solace.onl" }));
   });
 
   it("rejects invalid vault passwords", async () => {

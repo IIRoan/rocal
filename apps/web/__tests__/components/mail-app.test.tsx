@@ -206,9 +206,14 @@ jest.mock("../../lib/mail/api-service", () => ({
   },
 }));
 
+const mockE2eeSession = { unlocked: true, listeners: new Set<() => void>() };
 jest.mock("@/lib/e2ee-session", () => ({
   getActiveE2eeSession: () => null,
-  hasActiveE2eeSession: () => false,
+  hasActiveE2eeSession: () => mockE2eeSession.unlocked,
+  subscribeActiveE2eeSession: (listener: () => void) => {
+    mockE2eeSession.listeners.add(listener);
+    return () => mockE2eeSession.listeners.delete(listener);
+  },
 }));
 
 jest.mock("@/hooks/use-recent-contacts", () => ({
@@ -229,12 +234,7 @@ jest.mock("@/hooks/use-compose-draft-autosave", () => ({
 
 jest.mock("../../lib/e2ee-password-cache", () => ({
   clearAuthPasswords: jest.fn(),
-  peekCachedAuthPassword: jest.fn(),
-}));
-
-jest.mock("../../lib/enc-password-cookie", () => ({
-  clearEncPasswordCookie: jest.fn(),
-  initEncPasswordFromCookie: jest.fn(),
+  clearLegacyRememberedPassword: jest.fn(),
 }));
 
 jest.mock("postal-mime", () => ({
@@ -248,7 +248,9 @@ jest.mock("../../lib/mail/vault-secret", () => ({
   generateVaultSecret: () => "sealed-secret",
   wrapVaultSecret: async (secret: string) => `wrapped:${secret}`,
   unwrapVaultSecret: async (wrapped: string) =>
-    typeof wrapped === "string" ? wrapped.replace(/^wrapped:/, "") : null,
+    mockE2eeSession.unlocked && typeof wrapped === "string"
+      ? wrapped.replace(/^wrapped:/, "")
+      : null,
 }));
 
 jest.mock("../../lib/mail/vault-crypto", () => ({
@@ -490,11 +492,7 @@ import { RouteTransitionProvider } from "@/components/route-transition-provider"
 import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { authSessionDataFixture } from "../mocks/auth-session";
 import { authClient, useSession } from "@/lib/auth-client";
-import { peekCachedAuthPassword } from "../../lib/e2ee-password-cache";
-import {
-  clearEncPasswordCookie,
-  initEncPasswordFromCookie,
-} from "../../lib/enc-password-cookie";
+import { clearAuthPasswords } from "../../lib/e2ee-password-cache";
 import { mailDemoApiService } from "../../lib/mail/api-service";
 import { clearMailOpenPrefetch } from "../../lib/mail/mail-open-prefetch";
 import {
@@ -509,9 +507,7 @@ const mockUseSession = jest.mocked(useSession);
 const mockGetSession = jest.mocked(authClient.getSession);
 const mockSignOut = jest.mocked(authClient.signOut);
 const mockCompleteAuthNavigation = jest.mocked(completeAuthNavigation);
-const mockPeekCachedAuthPassword = jest.mocked(peekCachedAuthPassword);
-const mockInitEncPasswordFromCookie = jest.mocked(initEncPasswordFromCookie);
-const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
+const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
 const mockApi = jest.mocked(mailDemoApiService);
 const mockCreateEncryptedMailVault = jest.mocked(createEncryptedMailVault);
 const mockUnlockEncryptedMailVault = jest.mocked(unlockEncryptedMailVault);
@@ -646,9 +642,8 @@ describe("MailApp", () => {
     } as const;
     mockUseSession.mockReturnValue(sessionPayload as any);
     mockGetSession.mockResolvedValue(sessionPayload as any);
-    mockPeekCachedAuthPassword.mockReturnValue(null);
-    mockInitEncPasswordFromCookie.mockResolvedValue(undefined);
-    mockClearEncPasswordCookie.mockReset();
+    mockE2eeSession.unlocked = true;
+    mockClearAuthPasswords.mockReset();
 
     mockApi.getConfig.mockResolvedValue({
       defaultDomain: "solace.onl",
@@ -920,7 +915,6 @@ describe("MailApp", () => {
   it("completes Mail logout and clears the mailbox without restarting auth navigation", async () => {
     enableRealRouteTransitions();
     window.history.replaceState(null, "", "/mail?mbox=inbox");
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockSignOut.mockResolvedValue({ data: { success: true }, error: null });
     await renderApp(true, true);
     await waitForExpectation(() =>
@@ -940,7 +934,7 @@ describe("MailApp", () => {
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     await waitForExpectation(() =>
-      expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1),
+      expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1),
     );
     expect(mockWorkerClient.clear).toHaveBeenCalled();
     expect(mockCompleteAuthNavigation.mock.calls).toEqual([["/"]]);
@@ -956,7 +950,6 @@ describe("MailApp", () => {
       displayName: "Alice Example",
       provisioned: false,
     });
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
 
@@ -1017,7 +1010,6 @@ describe("MailApp", () => {
       displayName: "Alice Example",
       provisioned: false,
     });
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockApi.bootstrapAccountMailbox
       .mockRejectedValueOnce({
         statusCode: 500,
@@ -1049,7 +1041,6 @@ describe("MailApp", () => {
       displayName: "Alice Example",
       provisioned: false,
     });
-    mockPeekCachedAuthPassword.mockReturnValue(null);
 
     await renderApp();
 
@@ -1066,7 +1057,6 @@ describe("MailApp", () => {
   });
 
   it("signs in with JMAP credentials, unlocks the vault, and renders inbox messages", async () => {
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
 
@@ -1092,7 +1082,6 @@ describe("MailApp", () => {
   });
 
   it("automatically opens a provisioned mailbox when the auth password is still cached", async () => {
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
 
@@ -1567,7 +1556,6 @@ describe("MailApp", () => {
 
   it("shows the loading skeleton instead of the migration prompt while auto-opening with the cached auth password", async () => {
     let resolveUnlock: ((value: any) => void) | null = null;
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockUnlockEncryptedMailVault.mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -1611,7 +1599,6 @@ describe("MailApp", () => {
   });
 
   it("loads messages for the selected mailbox folder", async () => {
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockImplementation(
       async (...args: any[]) => {
@@ -1674,7 +1661,6 @@ describe("MailApp", () => {
   });
 
   it("sends plaintext mail without looking up recipient keys", async () => {
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [
@@ -1839,7 +1825,6 @@ describe("MailApp", () => {
   });
 
   it("encrypts internal mail before sending it through the JMAP proxy", async () => {
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [
@@ -1927,7 +1912,6 @@ describe("MailApp", () => {
   });
 
   it("adds a sent quick reply into the active conversation immediately", async () => {
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [
         {
@@ -1999,7 +1983,6 @@ describe("MailApp", () => {
         autoSelectReplyIdentity: false,
       }),
     );
-    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [
         {
@@ -2095,48 +2078,29 @@ describe("MailApp", () => {
     });
   });
 
-  it("calls initEncPasswordFromCookie on mount", async () => {
+  it("retries opening the mailbox once the account keys unlock", async () => {
+    mockE2eeSession.unlocked = false;
+
     await renderApp();
-    expect(mockInitEncPasswordFromCookie).toHaveBeenCalled();
-  });
-
-  it("auto-opens the mailbox once async boot finishes after mount", async () => {
-    let resolveCookieInit: (() => void) | null = null;
-    mockInitEncPasswordFromCookie.mockImplementation(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveCookieInit = () => {
-            mockPeekCachedAuthPassword.mockReturnValue(
-              "StrongMailboxPassword!42",
-            );
-            resolve();
-          };
-        }),
-    );
+    expect(mockUnlockEncryptedMailVault).not.toHaveBeenCalled();
 
     await act(async () => {
-      root.render(
-        <QueryClientProvider client={queryClient}>
-          <MailApp />
-        </QueryClientProvider>,
+      mockE2eeSession.unlocked = true;
+      for (const listener of mockE2eeSession.listeners) listener();
+      await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
+        "vault-b64",
+        "sealed-secret",
+        expect.any(Object),
+        expect.any(Function),
       );
-      await Promise.resolve();
-      await Promise.resolve();
     });
-
-    await act(async () => {
-      resolveCookieInit?.();
-      await Promise.resolve();
-      await Promise.resolve();
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
     });
-
-    expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
-      "vault-b64",
-      "sealed-secret",
-      expect.any(Object),
-      expect.any(Function),
-    );
-    expect(container.textContent).toContain("Encrypted hello");
   });
 
 });

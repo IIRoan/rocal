@@ -22,15 +22,13 @@ import { Label } from "@workspace/ui/components/ui/label";
 import { accountApiService, inviteApiService } from "@/lib/api-clients";
 import {
   clearPendingAuthPassword,
+  peekPendingAuthPassword,
   storePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
-import {
-  clearEncPasswordCookie,
-  markFreshSignIn,
-  setEncPasswordCookie,
-} from "@/lib/enc-password-cookie";
+import { unlockWithSignInPassword } from "@/lib/e2ee-bootstrap";
 import {
   clearOrphanedClientAuthArtifacts,
+  endLockedSession,
   reconcileAuthSession,
 } from "@/lib/auth-local-state";
 import { isPasskeyAuthCancelled } from "@/lib/native-passkey-bridge";
@@ -81,6 +79,16 @@ async function findAuthenticatedSessionForEmail(normalizedEmail: string) {
   } catch {
     return null;
   }
+}
+
+/** The sign-in password lives only in this page's memory, so the keys are opened with it before the reload forgets it. */
+async function unlockBeforeLeaving() {
+  if (!peekPendingAuthPassword()) return null;
+  const session = await authClient.getSession({
+    query: { disableCookieCache: true },
+  });
+  const userId = session?.data?.user?.id;
+  return userId ? unlockWithSignInPassword(userId) : null;
 }
 
 type AuthStatusResult = Awaited<
@@ -266,6 +274,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
   const titleRef = useRef<HTMLDivElement>(null);
   const hasAutoPromptedStepUpRef = useRef(false);
+  const isLeavingRef = useRef(false);
 
   const {
     data: session,
@@ -400,13 +409,32 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
   }, [inviteToken, isSignUp]);
 
   function redirectAfterAuth() {
-    if (isAuthNavigationPending()) return;
+    if (isAuthNavigationPending() || isLeavingRef.current) return;
+    isLeavingRef.current = true;
     const target = getRedirectTarget();
     router.startRouteTransition({
       messageContext: "AUTH_FLOW",
       minimumVisibleMs: 120,
     });
-    completeAuthNavigation(target.href);
+    unlockBeforeLeaving()
+      .catch((error: unknown) => {
+        log.warn("Could not open the encryption keys before leaving sign-in", {
+          error,
+        });
+        return null;
+      })
+      .then((lock) => {
+        clearPendingAuthPassword();
+        if (lock) {
+          endLockedSession(lock);
+          return;
+        }
+        completeAuthNavigation(target.href);
+      })
+      .catch((error: unknown) => {
+        isLeavingRef.current = false;
+        log.error("Failed to leave the sign-in page", { error });
+      });
   }
 
   async function refreshAuthStatus() {
@@ -654,14 +682,6 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
   async function finalizePasswordAuth(submittedPassword: string) {
     storePendingAuthPassword(submittedPassword);
-    try {
-      await setEncPasswordCookie(submittedPassword);
-      markFreshSignIn();
-    } catch (cookieError) {
-      log.warn("Failed to persist encrypted password cookie after auth", {
-        error: cookieError,
-      });
-    }
 
     // The credential response is authoritative. Auth status is a non-destructive follow-up used only to decide whether passkey step-up is required; a delayed or unavailable status endpoint must not undo login.
     const authStatus = await waitForSettledAuthStatusForLogin({

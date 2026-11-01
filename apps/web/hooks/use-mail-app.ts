@@ -5,6 +5,7 @@ import {
   useEffectEvent,
   useState,
   useRef,
+  useSyncExternalStore,
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -49,9 +50,11 @@ import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { useMailRealtime } from "@/hooks/use-mail-realtime";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { useSimpleLoginAliasAction } from "@/hooks/use-simplelogin-alias-action";
-import { peekCachedAuthPassword } from "@/lib/e2ee-password-cache";
+import {
+  hasActiveE2eeSession,
+  subscribeActiveE2eeSession,
+} from "@/lib/e2ee-session";
 import { resolveAvatarUrl } from "@/lib/profile-picture";
-import { initEncPasswordFromCookie } from "@/lib/enc-password-cookie";
 import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
@@ -204,10 +207,10 @@ async function unlockMailVaultBackup(
       backup.encryptedVaultB64,
       sealedSecret,
       backup.kdfParams,
-      (keyB64) => {
+      (key) => {
         if (!accountUserId) return;
         void Promise.resolve(
-          putStoredDerivedVaultKey(accountUserId, keyB64),
+          putStoredDerivedVaultKey(accountUserId, key),
         ).catch(() => undefined);
       },
     ));
@@ -309,8 +312,10 @@ export function useMailApp() {
   >(null);
   const recordedContactMessageRef = useRef<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  const [cachedAuthPassword, setCachedAuthPassword] = useState<string | null>(
-    () => (typeof window !== "undefined" ? peekCachedAuthPassword() : null),
+  const encryptionUnlocked = useSyncExternalStore(
+    subscribeActiveE2eeSession,
+    hasActiveE2eeSession,
+    () => false,
   );
   const accountEmail = session?.user?.email?.trim().toLowerCase() ?? "";
   const accountDisplayName = session?.user?.name?.trim() ?? "";
@@ -337,25 +342,13 @@ export function useMailApp() {
     isMailboxStatusLoadingQuery && accountStatusEnabled;
 
   const mailboxEmail = mailboxStatus?.email ?? accountEmail;
-  const mailboxOpenEpoch = `${accountUserId}:${mailboxStatus?.provisioned ? "1" : "0"}:${cachedAuthPassword ? "1" : "0"}`;
+  const mailboxOpenEpoch = `${accountUserId}:${mailboxStatus?.provisioned ? "1" : "0"}:${encryptionUnlocked ? "1" : "0"}`;
   const hasAttemptedMailboxOpen =
     attemptedMailboxOpenEpoch === mailboxOpenEpoch;
 
   useEffect(() => {
     activeMailboxRef.current = activeMailbox;
   }, [activeMailbox]);
-
-  // Init password from encrypted cookie (cross-tab / post-refresh)
-  useEffect(() => {
-    void initEncPasswordFromCookie()
-      .then(() => {
-        const pw = peekCachedAuthPassword();
-        if (pw) setCachedAuthPassword(pw);
-      })
-      .catch((error) => {
-        log.warn("Failed to restore the encrypted password cookie", error);
-      });
-  }, []);
 
   const hasSession = Boolean(session?.user);
   const redirectToLogin = useEffectEvent(() => {
@@ -413,11 +406,12 @@ export function useMailApp() {
     hasAttemptedAutoOpenRef.current = false;
   }, [accountUserId, mailboxStatus?.provisioned]);
 
+  // The vault secret is sealed to the account key, so a mailbox that could not open retries once the keys unlock.
   useEffect(() => {
-    if (cachedAuthPassword && !activeMailbox && !loginPassword) {
+    if (encryptionUnlocked && !activeMailbox && !loginPassword) {
       hasAttemptedAutoOpenRef.current = false;
     }
-  }, [activeMailbox, cachedAuthPassword, loginPassword]);
+  }, [activeMailbox, encryptionUnlocked, loginPassword]);
 
   // Warm mail token + JMAP discovery + vault key as soon as session/config exist.
   useEffect(() => {
