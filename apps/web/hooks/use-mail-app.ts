@@ -2160,6 +2160,7 @@ export function useMailApp() {
           draftsMailboxId,
           sentMailboxId,
           fromEmail,
+          fromName: identity?.name ?? null,
           to: recipients,
           subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
           textBody,
