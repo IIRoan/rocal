@@ -78,6 +78,16 @@ export function formatChannelLabel(
   return "LOCAL";
 }
 
+/** Store and TestFlight builds never name their release branch. */
+export function visibleChannelLabel(
+  channel: string | null | undefined,
+  appVariant: AppVariant | null | undefined,
+): string | null {
+  return appVariant === "development"
+    ? formatChannelLabel(channel, appVariant)
+    : null;
+}
+
 export function formatUpdateId(id: string | null | undefined): string {
   if (!id) return "embedded";
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -196,18 +206,19 @@ export function checkStatusDetail(
   enabled: boolean,
   phase: AppUpdatePhase,
   checkStatus: AppUpdateCheckStatus,
-  channelLabel: string,
+  channelLabel: string | null,
   errorMessage: string | null,
 ): string | null {
   if (!enabled) {
     return "Tap for why this binary is not using EAS Updates.";
   }
   if (phase !== "idle") return null;
+  const onChannel = channelLabel ? ` on ${channelLabel}` : "";
   if (checkStatus === "checking") {
-    return `Looking for a newer bundle on ${channelLabel}.`;
+    return `Looking for a newer bundle${onChannel}.`;
   }
   if (checkStatus === "current") {
-    return errorMessage?.trim() || `Nothing newer on ${channelLabel}.`;
+    return errorMessage?.trim() || `Nothing newer${onChannel}.`;
   }
   if (checkStatus === "failed") {
     return errorMessage?.trim() || "The update server did not respond.";
@@ -229,13 +240,13 @@ export function updateDiagnosticsTitle(info: AppUpdateRuntimeInfo): string {
 }
 
 export function updateDiagnosticsBody(info: AppUpdateRuntimeInfo): string {
-  const channel = formatChannelLabel(info.channel, info.appVariant);
+  const channel = visibleChannelLabel(info.channel, info.appVariant);
   const lines = [
     info.appVariant === "development"
       ? `This binary is ${info.appName}${info.bundleId ? ` (\`${info.bundleId}\`)` : ""}.`
       : `This is the production ${info.appName} binary.`,
     "",
-    `Channel: ${channel}`,
+    ...(channel ? [`Channel: ${channel}`] : []),
     `Runtime: ${info.runtimeVersion?.trim() || "unknown"}`,
     `Update: ${formatUpdateId(info.updateId)}`,
     `Published: ${info.createdAt ? formatUpdateStamp(info.createdAt) : jsSourceLabel(info)}`,
@@ -301,15 +312,17 @@ export type AppUpdatePhaseCopy = {
 
 export function copyForPhase(
   phase: AppUpdatePhase,
-  channelLabel: string,
+  channelLabel: string | null,
   errorMessage: string | null,
 ): AppUpdatePhaseCopy {
   switch (phase) {
     case "available":
       return {
-        kicker: `Channel ${channelLabel}`,
+        kicker: channelLabel ? `Channel ${channelLabel}` : "Available",
         title: "Update available",
-        body: "A newer Solace bundle is waiting on this channel. Install it, then restart to apply.",
+        body: channelLabel
+          ? "A newer Solace bundle is waiting on this channel. Install it, then restart to apply."
+          : "A newer Solace bundle is ready. Install it, then restart to apply.",
         primary: "Install update",
         secondary: "Later",
       };

@@ -114,7 +114,8 @@ function createNativeExpoConfig(app, environment = process.env) {
     plugins: [
       "expo-router",
       ...(isDev ? [["expo-dev-client", { addGeneratedScheme: true }]] : []),
-      "expo-secure-store",
+      // No Face ID use (passkeys use the system prompt); drops Expo's generic purpose string, which App Review rejects.
+      ["expo-secure-store", { faceIDPermission: false }],
       "expo-notifications",
       [
         "expo-splash-screen",

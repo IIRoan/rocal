@@ -217,6 +217,7 @@ function RiftboundForm({
             })}
           </SheetGroup>
         </SheetSection>
+        <SheetMessage text={COPY.riotDisclaimer} />
       </SheetScroll>
       <View
         style={[

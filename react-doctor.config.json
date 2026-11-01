@@ -20,7 +20,8 @@
       {
         "files": [
           "**/components/mail/AttachmentPreviewModal.tsx",
-          "**/components/BlobatarAvatar.tsx"
+          "**/components/BlobatarAvatar.tsx",
+          "**/components/settings/AppUpdateScreen.tsx"
         ],
         "rules": ["react-doctor/rn-prefer-expo-image"]
       },

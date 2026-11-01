@@ -15,7 +15,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { useAppUpdate } from "../../providers/AppUpdateProvider";
 import {
   copyForPhase,
-  formatChannelLabel,
+  visibleChannelLabel,
   formatDownloadPercent,
   type AppUpdatePhase,
 } from "../../lib/app-update";
@@ -24,7 +24,7 @@ const logoSource = require("../../assets/logo.png");
 
 export type AppUpdateDispatchProps = {
   phase: AppUpdatePhase;
-  channelLabel: string;
+  channelLabel: string | null;
   downloadProgress?: number;
   errorMessage?: string | null;
   onPrimary?: () => void;
@@ -165,7 +165,7 @@ export function AppUpdateScreen() {
     >
       <AppUpdateDispatch
         phase={phase}
-        channelLabel={formatChannelLabel(channel, runtime.appVariant)}
+        channelLabel={visibleChannelLabel(channel, runtime.appVariant)}
         downloadProgress={downloadProgress}
         errorMessage={errorMessage}
         onPrimary={onPrimary}

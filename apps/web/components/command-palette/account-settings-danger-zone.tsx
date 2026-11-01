@@ -60,7 +60,7 @@ export function AccountDangerZone({
 
       <AnimatedCollapse isOpen={dangerZone.showDeleteConfirm}>
         <ConfirmPanel
-          message="This permanently deletes your account, calendars, events, categories, subscriptions, passkeys, and settings. This cannot be undone."
+          message="This permanently deletes your account, mailbox and all its mail, calendars, events, categories, subscriptions, passkeys, and settings. This cannot be undone."
           onCancel={() => dispatch({ type: "closeDeleteConfirm" })}
         >
           <PaletteButton

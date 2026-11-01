@@ -317,6 +317,9 @@ function RiftboundForm({
             ? COPY.durationHint
             : `${COPY.noCalendars} ${COPY.durationHint}`}
         </p>
+        <p className="px-2 pt-1 pb-2 text-[13px] leading-[130%] text-muted-foreground">
+          {COPY.riotDisclaimer}
+        </p>
       </PaletteSection>
     </PaletteView>
   );
