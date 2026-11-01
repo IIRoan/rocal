@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: app-store-screenshots-${{ github.ref_name }}
-  cancel-in-progress: true
-
 jobs:
   mail:
     runs-on: macos-latest
