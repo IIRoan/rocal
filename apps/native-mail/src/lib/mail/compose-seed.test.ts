@@ -93,6 +93,22 @@ describe("planComposeSeed", () => {
     expect(plan({ params: { mode: "draft" }, sourceMessage: encrypted, runtime: undefined })).toBeNull();
   });
 
+  it("decrypts an encrypted message before quoting it in a reply or forward", () => {
+    const encrypted = {
+      ...source,
+      bodyValues: { "1": { value: "-----BEGIN PGP MESSAGE-----\nabc\n-----END PGP MESSAGE-----" } },
+    };
+    for (const mode of ["reply", "reply-all", "forward"] as const) {
+      expect(plan({ params: { mode }, sourceMessage: encrypted })).toEqual({ kind: "decrypt-source" });
+      expect(plan({ params: { mode }, sourceMessage: encrypted, runtime: undefined })).toBeNull();
+    }
+
+    const reply = plan({ params: { mode: "reply" }, sourceMessage: encrypted, sourcePlaintext: "See you there" });
+    const body = reply?.kind === "fields" ? reply.fields.body : "";
+    expect(body).toContain("Ann wrote:\n> See you there");
+    expect(body).not.toContain("BEGIN PGP");
+  });
+
   it("opens a blank message for other requests", () => {
     expect(plan({})).toEqual({
       kind: "fields",

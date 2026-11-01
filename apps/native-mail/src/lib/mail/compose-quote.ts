@@ -36,17 +36,22 @@ function getReplyRecipients(
   }).join(", ");
 }
 
+function messageText(message: JmapEmailMessage): string {
+  const bodies = extractMessageBodies(message);
+  return bodies.text?.trim() || stripHtmlToText(bodies.html);
+}
+
 export function buildReplyBody(
   message: JmapEmailMessage,
   dateOptions: QuotedDateOptions,
+  plaintext?: string,
 ): string {
   const sender =
     message.from?.[0]?.name?.trim() ||
     message.from?.[0]?.email?.trim() ||
     "Unknown sender";
   const receivedAt = formatQuotedMailDate(message.receivedAt, dateOptions);
-  const bodies = extractMessageBodies(message);
-  const source = bodies.text?.trim() || stripHtmlToText(bodies.html);
+  const source = plaintext?.trim() ?? messageText(message);
   const quoted = source
     .split(/\r?\n/)
     .map((line) => `> ${line}`)
@@ -58,9 +63,9 @@ export function buildReplyBody(
 export function buildForwardBody(
   message: JmapEmailMessage,
   dateOptions: QuotedDateOptions,
+  plaintext?: string,
 ): string {
-  const bodies = extractMessageBodies(message);
-  const textBody = bodies.text?.trim() || stripHtmlToText(bodies.html);
+  const textBody = plaintext?.trim() ?? messageText(message);
   const from = getReplyRecipients(message) || "Unknown sender";
   const to = (message.to ?? [])
     .map((entry) => entry.email?.trim())
