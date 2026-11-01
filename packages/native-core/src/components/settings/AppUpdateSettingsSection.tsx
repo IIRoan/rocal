@@ -20,7 +20,6 @@ import { SHOW_DEBUG_TOOLS } from "../../lib/constants";
 import {
   actionLabel,
   checkStatusDetail,
-  formatChannelLabel,
   formatUpdateId,
   formatUpdateStamp,
   getExpoUpdatesUrl,
@@ -29,6 +28,7 @@ import {
   updateAccessoryIcon,
   updateDiagnosticsBody,
   updateDiagnosticsTitle,
+  visibleChannelLabel,
 } from "../../lib/app-update";
 
 export function AppUpdateSettingsSection() {
@@ -45,7 +45,7 @@ export function AppUpdateSettingsSection() {
     restart,
     runtime,
   } = useAppUpdate();
-  const channel = formatChannelLabel(runtime.channel, runtime.appVariant);
+  const channel = visibleChannelLabel(runtime.channel, runtime.appVariant);
   const label = actionLabel(enabled, action, checkStatus);
   const detail = checkStatusDetail(
     enabled,
@@ -105,21 +105,23 @@ export function AppUpdateSettingsSection() {
         style={({ pressed }) => [styles.metrics, pressed && styles.rowPressed]}
         accessibilityRole="button"
         accessibilityLabel={
-          isDevBuild ? `${runtime.appName} update details` : "Update channel details"
+          isDevBuild ? `${runtime.appName} update details` : "Update details"
         }
       >
-        <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Channel</Text>
-          <Text style={styles.channel} numberOfLines={1}>
-            {channel}
-          </Text>
-          {isDevBuild ? (
-            <Text style={styles.stamp} numberOfLines={1}>
-              {runtime.appName}
-            </Text>
-          ) : null}
-        </View>
-        <View style={styles.divider} />
+        {channel ? (
+          <>
+            <View style={styles.metric}>
+              <Text style={styles.metricLabel}>Channel</Text>
+              <Text style={styles.channel} numberOfLines={1}>
+                {channel}
+              </Text>
+              <Text style={styles.stamp} numberOfLines={1}>
+                {runtime.appName}
+              </Text>
+            </View>
+            <View style={styles.divider} />
+          </>
+        ) : null}
         <View style={styles.metric}>
           <Text style={styles.metricLabel}>Bundle</Text>
           <Text style={styles.updateId} numberOfLines={1}>
@@ -136,7 +138,7 @@ export function AppUpdateSettingsSection() {
         detail={
           detail ??
           (enabled
-            ? `Looks for a newer bundle on ${channel}.`
+            ? `Looks for a newer bundle${channel ? ` on ${channel}` : ""}.`
             : "Updates are off in this session.")
         }
         accessory={updateAccessoryIcon(enabled, action, checkStatus)}

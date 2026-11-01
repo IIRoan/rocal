@@ -84,6 +84,9 @@ export const RIFTBOUND_SETTINGS_COPY = {
   noCalendars: "Create a calendar before enabling Riftbound.",
   durationHint:
     "Riftbound end times are often wrong, so imports use this length. Existing imports are never edited or deleted.",
+  // Riot's required notice for unofficial products that use its names (App Review 5.2.1).
+  riotDisclaimer:
+    "Solace isn’t endorsed by Riot Games and doesn’t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 } as const;
 
 /** Event lengths offered for imports; a saved length outside the list stays selectable. */

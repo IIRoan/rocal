@@ -41,7 +41,7 @@ describe("Settings screen account actions", () => {
         key: "delete-account",
         icon: "trash-2",
         label: "Delete Account",
-        description: "Permanently delete your account and all calendar data.",
+        description: "Permanently delete your account, mailbox and calendar data.",
         destructive: true,
       },
     ]);

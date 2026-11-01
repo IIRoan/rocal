@@ -226,7 +226,7 @@ export function AccountSettingsContent() {
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
       "Delete account?",
-      "This permanently deletes your account, calendars, events, categories, subscriptions, passkeys, and settings. This action cannot be undone.",
+      "This permanently deletes your account, mailbox and all its mail, calendars, events, categories, subscriptions, passkeys, and settings. This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {

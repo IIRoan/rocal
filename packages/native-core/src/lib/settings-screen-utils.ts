@@ -56,7 +56,7 @@ const DELETE_ACCOUNT_ACTION: SettingsAccountAction = {
   key: "delete-account",
   icon: "trash-2",
   label: "Delete Account",
-  description: "Permanently delete your account and all calendar data.",
+  description: "Permanently delete your account, mailbox and calendar data.",
   destructive: true,
 };
 

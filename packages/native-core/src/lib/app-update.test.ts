@@ -18,6 +18,7 @@ import {
   updateAccessoryIcon,
   updateDiagnosticsBody,
   updateDiagnosticsTitle,
+  visibleChannelLabel,
   type AppUpdateRuntimeInfo,
   type AppUpdateSnapshot,
 } from "./app-update";
@@ -193,6 +194,49 @@ describe("checkStatusDetail", () => {
     expect(checkStatusDetail(false, "idle", "idle", "DEVELOPMENT", null)).toBe(
       "Tap for why this binary is not using EAS Updates.",
     );
+  });
+});
+
+describe("store builds hide the release channel", () => {
+  const storeBuild: AppUpdateRuntimeInfo = {
+    appVariant: "production",
+    appName: "Solace Calendar",
+    bundleId: "onl.solace.calendar",
+    updatesEnabled: true,
+    channel: "master",
+    runtimeVersion: "1.0.4",
+    updateId: null,
+    createdAt: null,
+    isEmbeddedLaunch: true,
+    executionEnvironment: "standalone",
+  };
+
+  it.each(["production", "preview"] as const)(
+    "names no channel in %s builds",
+    (appVariant) => {
+      expect(visibleChannelLabel("testing", appVariant)).toBeNull();
+      expect(
+        updateDiagnosticsBody({ ...storeBuild, appVariant }),
+      ).not.toMatch(/channel|master/i);
+    },
+  );
+
+  it("keeps the channel in development builds", () => {
+    expect(visibleChannelLabel("development", "development")).toBe(
+      "DEVELOPMENT",
+    );
+  });
+
+  it("words check results and the update prompt without a channel", () => {
+    expect(checkStatusDetail(true, "idle", "checking", null, null)).toBe(
+      "Looking for a newer bundle.",
+    );
+    expect(checkStatusDetail(true, "idle", "current", null, null)).toBe(
+      "Nothing newer.",
+    );
+    const copy = copyForPhase("available", null, null);
+    expect(copy.kicker).toBe("Available");
+    expect(`${copy.kicker} ${copy.body}`).not.toMatch(/channel/i);
   });
 });
 

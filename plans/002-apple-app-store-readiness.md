@@ -47,7 +47,7 @@ The old project is still `@astralgrove/solace`, UUID `1047b680-b99f-4671-9824-23
 - [x] Create or verify separate App Store Connect app records for `onl.solace.calendar` (Apple ID `6828036308`) and `onl.solace.mail` (`6828036995`).
 - [x] Set each app's `submit.production.ios.ascAppId` in its `eas.json`.
 - [x] Provision App Store distribution profiles/certificates for both main apps and their notification extensions; verified through EAS after the owner’s interactive setup.
-- [ ] Configure EAS-managed submission credentials/API keys and link the App Store Connect app records.
+- [x] Configure EAS-managed submission credentials/API keys and link the App Store Connect app records: the 2026-10-30 store run (`41075415976`, macOS 26 image) found the API key set up and submitted both apps for Apple processing.
 - [ ] Verify signing for both main apps and their `.NotificationService` extensions, App Groups, push notifications and associated domains.
 - [ ] Complete required Apple agreements, age ratings, launch territories and EU trader declarations.
 
@@ -62,7 +62,7 @@ Live EAS inspection on 2026-10-28 found stored credentials for the current main-
 - [x] Implement a public `/support` page with account/recovery/deletion help and public bug reporting; derive both native links from the build’s configured website.
 - [x] Confirm `support@solace.onl` with the owner and set `supportEmail` once in `packages/calendar-core/src/product-info.json`.
 - [x] Provision the support address as an enabled alias on the owner’s existing mailbox. Verify admin readback and public SMTP recipient acceptance (250), resetting without sending a message; save private before/after metadata and a rollback patch outside Git.
-- [ ] Deploy the public pages and verify support/privacy links from signed-out web and installed apps.
+- [ ] Deploy the public pages and verify support/privacy links from signed-out web and installed apps. Deployed: `https://solace.onl/privacy` and `/support` return 200 (2026-11-01); installed-app links remain.
 - [x] Prepare the source-based data-processing inventory below for both apps.
 - [ ] Confirm App Privacy classifications against the release archives, deployed providers and Apple’s definitions, and publish both app records. Answers are entered but unpublished in both records: contact info, user ID, device ID (push token), photos (avatar), other user content and, for Mail, emails are linked to the user and used only for app functionality; nothing is used for tracking. Error reporting was removed, so neither app declares diagnostics.
 - [x] Add explicit no-tracking manifests for both main apps and the shared notification extension, retain Expo/React Native SDK reason aggregation, and test the extension plugin against a generated Xcode project.
@@ -83,7 +83,7 @@ Live EAS inspection on 2026-10-28 found stored credentials for the current main-
 - [ ] Test OTA installation, deferred installation and rollback on compatible release binaries.
 - [x] Confirm live EAS service values resolve the production API and website and `webcredentials` origin for both store profiles. API health is 200.
 - [x] Implement the public passkey-association route from shared bundle identifiers and an environment-specific `SOLACE_APPLE_TEAM_ID`; return 404 when the team is absent/invalid.
-- [ ] Deploy and verify the website’s passkey association file; its configured `/.well-known/apple-app-site-association` URL returned 404 during preparation. Verify associated-domain authorization using the actual Apple team and both app IDs before device testing.
+- [ ] Deploy and verify the website’s passkey association file. Deployed: on 2026-11-01 `https://solace.onl/.well-known/apple-app-site-association` returns `application/json` authorizing `HXJACWP87H.onl.solace.calendar` and `HXJACWP87H.onl.solace.mail`; passkey sign-in on a device remains.
 - [x] Retain internal development/preview builds, add testing, and provide a separate manually dispatched iOS App Store workflow with optional TestFlight submission and App Store Connect ID preflight.
 
 ## 5. Reviewer access and onboarding
@@ -250,3 +250,14 @@ Draft reviewer explanation: “Solace currently uses invitation-only account cre
 - Both inspected upload copies contain 1002 files and compress to approximately 11.12 MiB, versus the owner’s reported 996 MB archive. A frozen Bun 1.4.4 install from the filtered copy succeeds, generates the retired Prisma client, and preserves the lockfile. Direct metadata-upload probes with the new file list succeed on both the installed EAS CLI 22.0.0 and the repository-pinned 24.6.0; these probes do not establish the exact cause of the earlier HTTP 400.
 
 - Both iOS JavaScript bundles export successfully from the filtered upload copy after its frozen install, including Mail’s React Compiler transform. This validates bundling inputs; it is not a new signed native build or installed-device test.
+
+### Review-guideline audit (2026-11-01)
+
+Audit of both apps' resolved production config (`expo config --type introspect`, Expo's real `template.tgz`) and in-app flows against the App Review Guidelines, on `chore/app-store-submission-audit`.
+
+- Fixed: `expo-secure-store` injected Expo's generic `NSFaceIDUsageDescription` (“Allow $(PRODUCT_NAME) to access your Face ID biometric data.”). Neither app uses Face ID (passkeys use the system prompt), so `faceIDPermission: false` drops it (5.1.1(ii)). Shared native version bumped to `1.0.4` for the Info.plist change.
+- Fixed: Riftbound settings named Riot Games' game with no notice; both platforms now show Riot's standard unofficial-product disclaimer (5.2.1).
+- Fixed: account-deletion copy on web and native now says the mailbox and its mail are deleted, matching `account::service::delete` (5.1.1(v)).
+- Verified compliant: resolved Info.plist has only the photo-library purpose string (profile picture only, matches use), no camera/microphone/Face ID, no `UIBackgroundModes`; ATS keeps `NSAllowsArbitraryLoads: false`; the dev launcher's Bonjour/local-network keys are stripped by its Release build phase; App icons are 1024×1024 without alpha; `OpenSSL-Universal ~> 3.6.2000` ships a signed privacy manifest (ITMS-91061/91065); the extension uses no required-reason API; store builds register APNs as `production`; listing title/subtitle/keyword/description lengths fit Apple's limits; account deletion is in-app (4 taps) and calls `DELETE /api/account`; no third-party login (4.8 n/a), no purchase/pricing links (3.1.1), push is optional with only the system prompt, Mail→Calendar falls back to a toast when Calendar is absent (4.2.3), Mail has Report spam / Not spam, Mail HTML renders sanitized without scripts.
+- Fixed: TestFlight and App Store builds no longer name their release channel (`MASTER`/`TESTING`) in Settings → App → Updates, its diagnostics or the update prompt (`visibleChannelLabel` in native-core `lib/app-update.ts`); development builds keep it.
+- Owner decision: Riftbound's read of public `playriftbound.com/api/gql` data is a minor use and stays (5.2.2 accepted).
