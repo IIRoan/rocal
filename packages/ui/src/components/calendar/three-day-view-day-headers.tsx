@@ -26,7 +26,7 @@ export function ThreeDayViewDayHeaders({
         THREE_DAY_GRID_COLS,
       )}
     >
-      <div className="flex items-end justify-end pb-1.5 pr-1.5 text-[9px] text-muted-foreground/40">
+      <div className="flex items-end justify-end pb-1.5 pr-1.5 text-[11px] text-muted-foreground/70">
         {formatInTimeZone(currentDate, timezone, "zzz")}
       </div>
 
@@ -47,7 +47,7 @@ export function ThreeDayViewDayHeaders({
           >
             <span
               className={cn(
-                "block text-[10px] font-medium uppercase leading-none",
+                "block text-[11px] font-medium uppercase leading-none tracking-wide",
                 isSelected ? "text-primary/70" : "text-muted-foreground",
               )}
             >

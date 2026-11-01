@@ -106,7 +106,7 @@ export function DayView({
         <div className="border-border/70 bg-muted/50 border-t shrink-0 overflow-hidden [scrollbar-gutter:stable]">
           <div className="grid grid-cols-[3rem_1fr] sm:grid-cols-[4rem_1fr]">
             <div className="relative">
-              <span className="text-muted-foreground/70 absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] sm:pe-4 sm:text-xs">
+              <span className="text-muted-foreground/70 absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[11px] sm:pe-4 sm:text-xs">
                 All day
               </span>
             </div>
@@ -147,7 +147,7 @@ export function DayView({
                         {event.title}
                       </span>
                       {spanLabel ? (
-                        <span className="shrink-0 text-[10px] font-normal tabular-nums opacity-80">
+                        <span className="shrink-0 text-[11px] font-normal tabular-nums opacity-80">
                           {spanLabel}
                         </span>
                       ) : null}
@@ -168,7 +168,7 @@ export function DayView({
               className="border-border/70 relative h-[var(--week-cells-height)] border-b last:border-b-0"
             >
               {hourValue > StartHour && (
-                <span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-16 max-w-full items-center justify-end pe-2 text-[10px] sm:pe-4 sm:text-xs">
+                <span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-16 max-w-full items-center justify-end pe-2 text-[11px] tabular-nums sm:pe-4 sm:text-xs">
                   {formatWeekHourLabel(hourValue, timeFormat)}
                 </span>
               )}

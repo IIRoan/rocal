@@ -62,7 +62,7 @@ export function ThreeDayViewTimeGrid({
           >
             <span
               className={cn(
-                "absolute left-0 flex h-6 w-full items-center justify-end bg-background pe-1 text-[9px] text-muted-foreground/70 sm:text-[10px]",
+                "absolute left-0 flex h-6 w-full items-center justify-end bg-background pe-1 text-[11px] tabular-nums text-muted-foreground/70",
                 hourValue === 0 ? "top-0" : "-top-3",
               )}
             >

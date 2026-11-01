@@ -20,7 +20,7 @@ export function MessageListLabelChips({
           <span
             key={label.id}
             title={label.name}
-            className="inline-flex max-w-[5.5rem] items-center gap-0.5 rounded px-1 py-px text-[10px] font-medium leading-none"
+            className="inline-flex max-w-[5.5rem] items-center gap-0.5 rounded px-1 py-px text-[11px] font-medium leading-none"
             style={{
               color: displayColor,
               backgroundColor: `color-mix(in srgb, ${displayColor} 10%, transparent)`,
@@ -36,7 +36,7 @@ export function MessageListLabelChips({
         );
       })}
       {overflow > 0 ? (
-        <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
           +{overflow}
         </span>
       ) : null}

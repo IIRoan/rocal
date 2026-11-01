@@ -106,7 +106,7 @@ export function HomePageClient() {
           data-hero-copy
           className="mx-auto grid w-full max-w-6xl gap-6 px-6 pt-8 pb-12 sm:px-8 sm:pt-12 sm:pb-14 lg:grid-cols-[1.6fr_1fr] lg:items-end lg:gap-16 lg:px-10 lg:pt-14 lg:pb-16"
         >
-          <h1 className="max-w-3xl font-display text-[clamp(2.5rem,5.4vw,5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-foreground">
+          <h1 className="max-w-3xl text-[clamp(2.5rem,5.4vw,5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-foreground">
             Calendar and mail, without the noise.
           </h1>
           <div className="flex min-w-0 flex-col items-start gap-6">
@@ -151,7 +151,7 @@ export function HomePageClient() {
               <h2 className="text-lg font-semibold tracking-tight text-foreground">
                 {pillar.title}
               </h2>
-              <p className="mt-3 max-w-md text-sm leading-7 text-pretty text-muted-foreground">
+              <p className="mt-3 max-w-md text-sm leading-6 text-pretty text-muted-foreground">
                 {pillar.body}
               </p>
             </li>

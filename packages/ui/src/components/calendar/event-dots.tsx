@@ -101,7 +101,7 @@ export function EventDots({
                     key={event.id || index}
                     className={cn(
                       "flex-1 min-w-0 flex items-center px-1.5 border-r border-background/10 last:border-r-0",
-                      "text-[10px] sm:text-[13px]",
+                      "text-[11px] sm:text-xs",
                       "leading-tight",
                       index === 0 && "rounded-l",
                       index === 1 && "rounded-r",
@@ -127,7 +127,7 @@ export function EventDots({
                   <div
                     className={cn(
                       "flex items-center justify-center min-w-[30px] rounded-r",
-                      "text-[8px] sm:text-[10px] font-bold",
+                      "text-[11px] font-semibold tabular-nums",
                       "px-1.5",
                       "bg-muted/20 hover:bg-muted/30",
                       "text-foreground",

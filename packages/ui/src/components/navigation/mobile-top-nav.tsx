@@ -85,12 +85,12 @@ export function MobileTopNav({
         const end = addDays(currentDate, 1);
         if (isSameMonth(start, end)) {
           return {
-            main: `${format(start, "MMM d")} - ${format(end, "d, yyyy")}`,
+            main: `${format(start, "MMM d")} – ${format(end, "d, yyyy")}`,
             sub: "3 Days",
           };
         } else {
           return {
-            main: `${format(start, "MMM d")} - ${format(end, "MMM d")}`,
+            main: `${format(start, "MMM d")} – ${format(end, "MMM d")}`,
             sub: format(end, "yyyy"),
           };
         }
@@ -102,7 +102,7 @@ export function MobileTopNav({
           resolveTimezone(timezone),
         );
         return {
-          main: `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`,
+          main: `${format(weekStart, "MMM d")} – ${format(weekEnd, "MMM d, yyyy")}`,
           sub: `Week ${format(currentDate, "w")}`,
         };
       }
@@ -120,7 +120,7 @@ export function MobileTopNav({
           };
         } else {
           return {
-            main: `${format(currentDate, "MMM")} - ${format(agendaEnd, "MMM yyyy")}`,
+            main: `${format(currentDate, "MMM")} – ${format(agendaEnd, "MMM yyyy")}`,
             sub: `${AgendaDaysToShow} days`,
           };
         }
@@ -132,7 +132,7 @@ export function MobileTopNav({
             resolveTimezone(timezone),
           );
         return {
-          main: `${format(defaultWeekStart, "MMM d")} - ${format(defaultWeekEnd, "MMM d, yyyy")}`,
+          main: `${format(defaultWeekStart, "MMM d")} – ${format(defaultWeekEnd, "MMM d, yyyy")}`,
           sub: `Week ${format(currentDate, "w")}`,
         };
       }
@@ -200,7 +200,7 @@ export function MobileTopNav({
             type="button"
             variant="ghost"
             onClick={onOpenQuickNav}
-            className="h-auto min-w-0 flex-1 rounded-2xl px-3 py-2 text-left hover:bg-accent/50 active:bg-accent/70"
+            className="h-auto min-w-0 flex-1 flex-col items-stretch gap-0 rounded-2xl px-3 py-1 text-left hover:bg-accent/50 active:bg-accent/70"
             aria-label="Open calendar quick navigation"
           >
             <div className="truncate text-sm font-medium">{displayText.main}</div>

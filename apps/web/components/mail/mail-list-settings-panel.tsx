@@ -31,7 +31,7 @@ const UNDO_DURATION_OPTIONS = [
 ] as const;
 
 const KEY_CAP_CLASS =
-  "rounded bg-muted px-1.5 font-mono text-[11px] text-muted-foreground";
+  "rounded bg-muted px-1.5 text-[11px] font-medium text-muted-foreground";
 
 export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
   const { settings, updateSettings } = useMailListSettings();

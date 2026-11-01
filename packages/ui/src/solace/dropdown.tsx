@@ -30,7 +30,7 @@ const MENU_SURFACE_CLASS = cn(
 );
 
 const ITEM_CLASS =
-  "group/item flex h-8 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2 text-left text-[15px] leading-[130%] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-cell-hover)] focus-visible:bg-[var(--bg-cell-hover)] data-[highlighted]:bg-[var(--bg-cell-hover)] data-[state=open]:bg-[var(--bg-cell-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-40";
+  "group/item flex h-8 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2 text-left text-sm leading-[130%] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-cell-hover)] focus-visible:bg-[var(--bg-cell-hover)] data-[highlighted]:bg-[var(--bg-cell-hover)] data-[state=open]:bg-[var(--bg-cell-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-40";
 
 const DESTRUCTIVE_ITEM_CLASS =
   "text-[var(--text-destructive)] data-[highlighted]:bg-[var(--cta-destructive-hover)]";
@@ -242,7 +242,7 @@ export function DropdownSection({
   const Primitive = PRIMITIVES[React.use(MenuKindContext)];
   return (
     <Primitive.Group className="flex flex-col gap-px">
-      <Primitive.Label className="px-2 pt-1.5 pb-1 text-[13px] font-[470] text-[var(--text-tertiary)]">
+      <Primitive.Label className="px-2 pt-1.5 pb-1 text-xs font-medium text-[var(--text-tertiary)]">
         {label}
       </Primitive.Label>
       {children}
@@ -301,4 +301,4 @@ export function DropdownPanel({
 
 /** Row styling for plain buttons inside a `DropdownPanel`. */
 export const DROPDOWN_PANEL_ROW_CLASS =
-  "flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-[15px] leading-[130%] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-cell-hover)] focus-visible:bg-[var(--bg-cell-hover)] disabled:pointer-events-none disabled:opacity-40";
+  "flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm leading-[130%] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-cell-hover)] focus-visible:bg-[var(--bg-cell-hover)] disabled:pointer-events-none disabled:opacity-40";

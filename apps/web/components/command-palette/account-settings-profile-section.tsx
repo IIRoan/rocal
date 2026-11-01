@@ -135,7 +135,7 @@ export function AccountProfileSection({
             </div>
           ) : (
             <>
-              <p className="truncate text-[15px] font-[470] text-foreground">
+              <p className="truncate text-[15px] font-medium text-foreground">
                 {displayName ?? displayEmail ?? "Solace account"}
               </p>
               {displayEmail ? (

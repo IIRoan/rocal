@@ -1,13 +1,7 @@
 "use client";
 
 import React, { useMemo, useEffect, useRef } from "react";
-import {
-  addHours,
-  eachHourOfInterval,
-  format,
-  getHours,
-  startOfDay,
-} from "date-fns";
+import { addHours, eachHourOfInterval, getHours, startOfDay } from "date-fns";
 import {
   eventOverlapsZonedCalendarDay,
   getZonedDateParts,
@@ -26,6 +20,7 @@ import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator"
 import { cn } from "../../lib/utils";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { layoutTimelineEvents } from "./timeline-layout";
+import { formatWeekHourLabel } from "./week-view-hours";
 
 const MobileStartHour = 0;
 const MobileEndHour = 23;
@@ -162,8 +157,8 @@ export function MobileDayView({
               className="relative"
               style={{ height: MobileCellHeight }}
             >
-              <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
-                {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
+              <span className="absolute top-0 right-1 -translate-y-1/2 bg-background px-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                {formatWeekHourLabel(getHours(hour), timeFormat)}
               </span>
             </div>
           ))}

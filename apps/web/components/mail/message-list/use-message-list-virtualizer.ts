@@ -6,7 +6,7 @@ import type { LabelDef } from "@/lib/mail/types";
 import {
   getRowHeight,
   ROW_HEIGHT_DESKTOP,
-  ROW_HEIGHT_MOBILE,
+  ROW_HEIGHT_NARROW,
   SCROLL_LOAD_THRESHOLD,
   type MessageListThreadRow,
 } from "./message-list-utils";
@@ -31,7 +31,7 @@ function estimateThreadRowSize(
   sizing: VirtualizerSizing,
 ): number {
   const row = threadRows[index];
-  if (!row) return sizing.isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
+  if (!row) return sizing.isMobile ? ROW_HEIGHT_NARROW : ROW_HEIGHT_DESKTOP;
   return getRowHeight(
     row.latestMessage,
     sizing.labels,

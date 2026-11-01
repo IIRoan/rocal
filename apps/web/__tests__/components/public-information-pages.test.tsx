@@ -29,6 +29,9 @@ jest.mock("../../components/command-palette/palette-ui", () => ({
     children: React.ReactNode;
   }) => <section aria-label={label}>{children}</section>,
   PaletteNavRow: () => <button />,
+  PaletteIconBox: ({ children }: { children: React.ReactNode }) => (
+    <span>{children}</span>
+  ),
 }));
 
 function render(element: React.ReactNode) {

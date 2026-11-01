@@ -200,7 +200,7 @@ export function MonthDayCell({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-[1.02] mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[10px] transition-[color,background-color,scale] duration-200 outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs"
+                  className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-[1.02] mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[11px] transition-[color,background-color,scale] duration-200 outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span>

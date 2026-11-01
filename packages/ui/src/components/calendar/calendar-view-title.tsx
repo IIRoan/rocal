@@ -41,7 +41,7 @@ export function CalendarViewTitle({
     return (
       <>
         <span className="font-bold">{format(start, "MMM")}</span>
-        <span className="text-muted-foreground"> - </span>
+        <span className="text-muted-foreground"> – </span>
         <span className="font-bold">{format(end, "MMM")}</span>
         <span className="text-muted-foreground"> {format(end, "yyyy")}</span>
       </>
@@ -58,7 +58,7 @@ export function CalendarViewTitle({
           {format(currentDate, "MMMM d, yyyy")}
         </span>
         <span className="max-md:hidden">
-          {format(currentDate, "EEE MMMM d, yyyy")}
+          {format(currentDate, "EEE, MMMM d, yyyy")}
         </span>
       </>
     );
@@ -99,7 +99,7 @@ export function CalendarViewTitle({
     return (
       <>
         <span className="font-bold">{format(start, "MMM")}</span>
-        <span className="text-muted-foreground"> - </span>
+        <span className="text-muted-foreground"> – </span>
         <span className="font-bold">{format(end, "MMM")}</span>
         <span className="text-muted-foreground"> {format(end, "yyyy")}</span>
       </>
@@ -134,7 +134,7 @@ export function MobileCalendarViewTitle({
       return format(start, "MMMM yyyy");
     }
 
-    return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`;
+    return `${format(start, "MMM")} – ${format(end, "MMM yyyy")}`;
   }
 
   if (view === "day") {
@@ -147,7 +147,7 @@ export function MobileCalendarViewTitle({
           {format(currentDate, "MMMM d, yyyy")}
         </span>
         <span className="max-md:hidden">
-          {format(currentDate, "EEE MMMM d, yyyy")}
+          {format(currentDate, "EEE, MMMM d, yyyy")}
         </span>
       </>
     );
@@ -157,10 +157,10 @@ export function MobileCalendarViewTitle({
     const start = addDays(currentDate, -1);
     const end = addDays(currentDate, 1);
     if (isSameMonth(start, end)) {
-      return `${format(start, "MMM d")} - ${format(end, "d, yyyy")}`;
+      return `${format(start, "MMM d")} – ${format(end, "d, yyyy")}`;
     }
 
-    return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
+    return `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}`;
   }
 
   if (view === "agenda") {
@@ -171,7 +171,7 @@ export function MobileCalendarViewTitle({
       return format(start, "MMMM yyyy");
     }
 
-    return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`;
+    return `${format(start, "MMM")} – ${format(end, "MMM yyyy")}`;
   }
 
   return format(currentDate, "MMMM yyyy");

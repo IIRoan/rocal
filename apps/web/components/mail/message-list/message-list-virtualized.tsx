@@ -13,7 +13,7 @@ import type {
 import {
   getRowHeight,
   ROW_HEIGHT_DESKTOP,
-  ROW_HEIGHT_MOBILE,
+  ROW_HEIGHT_NARROW,
   SCROLL_LOAD_THRESHOLD,
   type MessageListThreadRow,
 } from "./message-list-utils";
@@ -59,7 +59,7 @@ export function MessageListVirtualized({
 
   const estimateRowSize = (index: number) => {
     const row = threadRows[index];
-    if (!row) return isMobile ? ROW_HEIGHT_MOBILE : ROW_HEIGHT_DESKTOP;
+    if (!row) return isMobile ? ROW_HEIGHT_NARROW : ROW_HEIGHT_DESKTOP;
     return getRowHeight(
       row.latestMessage,
       labels,

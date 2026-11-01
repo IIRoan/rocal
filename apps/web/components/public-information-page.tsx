@@ -32,17 +32,17 @@ export function PublicInformationPage({
             <ThemeToggle />
           </div>
           <div className="mb-8">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
               {eyebrow}
             </p>
             <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
               {title}
             </h1>
-            <p className="mt-2 text-sm leading-7 text-muted-foreground">
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {description}
             </p>
           </div>
-          <div className="flex flex-col gap-8 text-sm leading-7 text-muted-foreground">
+          <div className="flex flex-col gap-8 text-sm leading-6 text-muted-foreground">
             {children}
           </div>
           <nav

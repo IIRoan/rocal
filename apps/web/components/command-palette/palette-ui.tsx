@@ -41,7 +41,7 @@ export function PaletteViewHeader({
       >
         <ChevronLeft className="size-4" strokeWidth={2} />
       </button>
-      <span className="min-w-0 flex-1 truncate text-[15px] font-[470] text-foreground">
+      <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-foreground">
         {title}
       </span>
       {actions ? (
@@ -114,7 +114,7 @@ export function PaletteSectionLabel({
   return (
     <div
       className={cn(
-        "px-2 pt-2 pb-1 text-[13px] font-[470] text-muted-foreground",
+        "px-2 pt-2 pb-1 text-[13px] font-medium text-muted-foreground",
         className,
       )}
     >
@@ -220,7 +220,7 @@ export function PaletteField({
     <div className="flex flex-col gap-1.5 p-2">
       <label
         htmlFor={htmlFor}
-        className="text-[13px] font-[470] text-muted-foreground"
+        className="text-[13px] font-medium text-muted-foreground"
       >
         {label}
       </label>
@@ -335,7 +335,7 @@ export function PaletteButton({
       type="button"
       disabled={disabled || loading}
       className={cn(
-        "inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-[470] outline-none transition-[background-color,opacity,color] focus-visible:ring-2 focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-40 md:min-h-8 md:min-w-8",
+        "inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium outline-none transition-[background-color,opacity,color] focus-visible:ring-2 focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-40 md:min-h-8 md:min-w-8",
         BUTTON_VARIANT[variant],
         className,
       )}

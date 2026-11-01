@@ -146,9 +146,9 @@ const ORIGIN: Record<WarmTooltipSide, string> = {
   right: 'left center'
 };
 const SIZES: Record<WarmTooltipSize, { font: number; px: number; py: number }> = {
-  sm: { font: 11.5, px: 8, py: 5 },
+  sm: { font: 11, px: 8, py: 5 },
   md: { font: 12, px: 12, py: 6 },
-  lg: { font: 13.5, px: 12, py: 7 }
+  lg: { font: 13, px: 12, py: 7 }
 };
 const MARGIN = 8;
 const HOLD_SLOP = 10;

@@ -27,7 +27,7 @@ export default function PrivacyPage() {
       description="Solace Calendar and Solace Mail help you manage your time and communication without advertising, profiling or data sales. This page explains the data the service handles and the limits of its encryption."
       currentPath={PRODUCT_ROUTES.privacy}
     >
-      <div className="flex flex-col gap-8 text-sm leading-7 text-muted-foreground">
+      <div className="flex flex-col gap-8 text-sm leading-6 text-muted-foreground">
         <PrivacyOverview />
         <PrivacyDataUse />
 
@@ -41,7 +41,7 @@ export default function PrivacyPage() {
             does not make these fields readable to the server.
           </p>
           <div className="mt-3 overflow-hidden rounded-lg border border-border/50">
-            <table className="w-full text-xs">
+            <table className="w-full text-[13px] leading-5">
               <caption className="sr-only">
                 Encrypted event content and readable metadata
               </caption>
@@ -359,7 +359,7 @@ function PrivacyDataUse() {
         with.
       </p>
       <div className="mt-3 overflow-x-auto rounded-lg border border-border/50">
-        <table className="w-full text-xs">
+        <table className="w-full text-[13px] leading-5">
           <caption className="sr-only">
             Personal data, purposes and legal bases
           </caption>
@@ -500,7 +500,7 @@ function PrivacySubprocessors() {
         connection metadata needed for routing and security.
       </p>
       <div className="mt-3 overflow-x-auto rounded-lg border border-border/50">
-        <table className="w-full text-xs">
+        <table className="w-full text-[13px] leading-5">
           <caption className="sr-only">Subprocessors</caption>
           <thead>
             <tr className="text-left text-foreground">

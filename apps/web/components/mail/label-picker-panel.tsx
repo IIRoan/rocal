@@ -257,7 +257,7 @@ export function LabelPickerPanel({
 
       {onCreateLabel ? (
         <div className="p-2 space-y-2">
-          <div className="text-[13px] font-[470] text-muted-foreground/80 px-1">
+          <div className="text-[13px] font-medium text-muted-foreground/80 px-1">
             New label
           </div>
           <input

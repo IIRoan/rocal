@@ -4,6 +4,7 @@ import { Input } from "@workspace/ui/components/ui/input";
 import { ChevronRight, Search } from "lucide-react";
 
 import type { UseCommandPaletteSearchResult } from "@/hooks/use-command-palette-search";
+import { PaletteSectionLabel } from "./palette-ui";
 import { UnifiedSearchResults } from "./unified-search-results";
 
 type CommandPaletteMainSearchViewProps = {
@@ -61,8 +62,8 @@ function NavigationResultButton({
       <div className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">
         <Icon className="h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground" />
       </div>
-      <span className="text-sm flex-1 truncate">{label}</span>
-      <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
+      <span className="text-[15px] leading-[130%] flex-1 truncate">{label}</span>
+      <span className="text-[13px] leading-[130%] text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
         {description}
       </span>
       <ChevronRight
@@ -128,7 +129,7 @@ export function CommandPaletteMainSearchView({
           }
           value={searchQuery}
           {...searchInputInteractionProps}
-          className="-ml-2 flex-1 h-8 rounded-md border-0 bg-transparent px-2 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-accent/40 focus-visible:ring-0"
+          className="-ml-2 flex-1 h-8 rounded-md border-0 bg-transparent px-2 text-[15px] placeholder:text-muted-foreground/60 focus-visible:bg-accent/40 focus-visible:ring-0"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
@@ -208,11 +209,7 @@ export function CommandPaletteMainSearchView({
             ) : visibleNavigationItems.length > 0 ? (
               <div className="px-2">
                 {showEventSearch && searchResults.length > 0 && (
-                  <div className="px-2 pt-1 pb-1">
-                    <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">
-                      Settings
-                    </span>
-                  </div>
+                  <PaletteSectionLabel>Settings</PaletteSectionLabel>
                 )}
                 {visibleNavigationItems.map((item, index) => {
                   const globalIndex = totalSearchResults + index;

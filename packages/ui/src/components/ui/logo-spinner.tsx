@@ -174,7 +174,7 @@ export function LogoSpinner({
       {showText && (
         <p
           className={cn(
-            "text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground transition-opacity duration-300",
+            "text-xs font-medium uppercase tracking-widest text-muted-foreground transition-opacity duration-300",
             isTransitioning && enableCycling && !text
               ? "opacity-50"
               : "opacity-100",
@@ -244,13 +244,13 @@ function LoadingBoard({
     <div className="relative flex h-full flex-col justify-between overflow-hidden p-8 sm:p-14">
       <div className="relative flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Logo className="h-4 w-4 text-primary" fill="currentColor" />
-          <span className="text-[9px] font-semibold uppercase tracking-[0.5em] text-muted-foreground/40">
+          <Logo className="size-4 text-primary" fill="currentColor" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.5em] text-muted-foreground/40">
             Solace
           </span>
         </div>
         <span
-          className="text-[9px] font-semibold uppercase tracking-[0.4em] text-muted-foreground/30"
+          className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted-foreground/30"
           suppressHydrationWarning
         >
           {dayName}
@@ -285,7 +285,7 @@ function LoadingBoard({
       <div className="relative">
         <p
           className={cn(
-            "mb-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/40 transition-opacity duration-300",
+            "mb-3 text-[11px] font-medium uppercase tracking-widest text-muted-foreground/40 transition-opacity duration-300",
             isTransitioning && enableCycling && !message
               ? "opacity-20"
               : "opacity-100",

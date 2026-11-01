@@ -70,17 +70,17 @@ function CommandPaletteShortcutsFooter() {
     <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between shrink-0">
       <span>
         Type{" "}
-        <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+        <kbd className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">
           &gt;
         </kbd>{" "}
         for commands
       </span>
       <span className="hidden sm:flex items-center gap-2">
-        <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+        <kbd className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">
           ↑↓
         </kbd>{" "}
         to navigate
-        <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+        <kbd className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">
           ↵
         </kbd>{" "}
         to select

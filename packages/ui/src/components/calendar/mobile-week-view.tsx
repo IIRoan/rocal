@@ -32,6 +32,7 @@ import { Drawer, DrawerContent, DrawerShell, DrawerTitle } from "../ui/drawer";
 import { resolveInlineColorValue } from "./utils";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { layoutTimelineEvents } from "./timeline-layout";
+import { formatWeekHourLabel } from "./week-view-hours";
 
 const MobileStartHour = 0;
 const MobileEndHour = 23;
@@ -179,6 +180,7 @@ export function MobileWeekView({
 
   return (
     <div className="flex flex-col h-full min-h-full">
+      <MobileWeekDayHeaders days={days} timezone={resolvedTimezone} />
       <div className="relative">
         <div className="flex">
           <div className="w-11 flex-shrink-0 border-r border-border/50 bg-background">
@@ -188,9 +190,11 @@ export function MobileWeekView({
                 className="relative"
                 style={{ height: MobileCellHeight }}
               >
-                <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
-                  {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
-                </span>
+                {index > 0 && (
+                  <span className="absolute top-0 right-1 -translate-y-1/2 bg-background px-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                    {formatWeekHourLabel(getHours(hour), timeFormat)}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -284,85 +288,156 @@ export function MobileWeekView({
             </div>
           ))}
 
-          <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-            <DrawerContent
-              responsive
-              responsiveHeight="70dvh"
-              className="overflow-hidden"
-            >
-              <DrawerTitle className="sr-only">Select Event</DrawerTitle>
-              <DrawerShell
-                header={
-                  <div className="px-5 py-3 border-b border-border/40">
-                    <span className="text-base font-semibold">
-                      Select Event
-                    </span>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {drawerEvents[0] &&
-                        formatInUserTimezone(
-                          new Date(drawerEvents[0].start),
-                          resolvedTimezone,
-                          "EEEE, MMMM d",
-                        )}
-                    </p>
-                  </div>
-                }
-              >
-                <div className="overflow-y-auto px-2 py-2 pb-6">
-                  {drawerEvents.map((event) => {
-                    const eventStart = new Date(event.start);
-                    const eventEnd = new Date(event.end);
-                    return (
-                      <button
-                        key={event.id}
-                        className="w-full text-left flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer"
-                        onClick={() => {
-                          onEventSelect(event);
-                          setDrawerOpen(false);
-                          setDrawerEvents([]);
-                        }}
-                      >
-                        <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{
-                              backgroundColor: resolveInlineColorValue(
-                                event.color || "blue",
-                              ),
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div
-                            className={cn(
-                              "text-sm font-medium truncate",
-                              isCancelledCalendarEvent(event) &&
-                                "line-through opacity-70",
-                            )}
-                          >
-                            {event.title || "Untitled Event"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {event.allDay
-                              ? "All day"
-                              : formatClockTimeRange(
-                                  eventStart,
-                                  eventEnd,
-                                  resolvedTimezone,
-                                  timeFormat,
-                                )}
-                            {event.location && ` · ${event.location}`}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </DrawerShell>
-            </DrawerContent>
-          </Drawer>
+          <OverlappingEventsDrawer
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+            events={drawerEvents}
+            timezone={resolvedTimezone}
+            timeFormat={timeFormat}
+            onSelect={(event) => {
+              onEventSelect(event);
+              setDrawerOpen(false);
+              setDrawerEvents([]);
+            }}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+function MobileWeekDayHeaders({
+  days,
+  timezone,
+}: {
+  days: Date[];
+  timezone: string;
+}) {
+  return (
+    <div className="sticky top-0 z-20 flex border-b border-border/50 bg-background">
+      <div className="w-11 flex-shrink-0 border-r border-border/50" />
+      {days.map((day) => {
+        const today = isTodayInTimezone(day, timezone);
+        return (
+          <div
+            key={day.toString()}
+            className={cn(
+              "flex-1 min-w-0 border-r border-border/50 py-1.5 text-center last:border-r-0",
+              today && "bg-primary/5",
+            )}
+          >
+            <span
+              className={cn(
+                "block text-[11px] font-medium uppercase leading-none tracking-wide",
+                today ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              {format(day, "EEE")}
+            </span>
+            <span
+              className={cn(
+                "mt-1 block text-sm font-semibold leading-none tabular-nums",
+                today ? "text-primary" : "text-foreground",
+              )}
+            >
+              {format(day, "d")}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function OverlappingEventsDrawer({
+  open,
+  onOpenChange,
+  events,
+  timezone,
+  timeFormat,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  events: CalendarEvent[];
+  timezone: string;
+  timeFormat: TimeFormat;
+  onSelect: (event: CalendarEvent) => void;
+}) {
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent
+        responsive
+        responsiveHeight="70dvh"
+        className="overflow-hidden"
+      >
+        <DrawerTitle className="sr-only">Select Event</DrawerTitle>
+        <DrawerShell
+          header={
+            <div className="px-5 py-3 border-b border-border/40">
+              <span className="text-base font-semibold">
+                Select Event
+              </span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {events[0] &&
+                  formatInUserTimezone(
+                    new Date(events[0].start),
+                    timezone,
+                    "EEEE, MMMM d",
+                  )}
+              </p>
+            </div>
+          }
+        >
+          <div className="overflow-y-auto p-2 pb-6">
+            {events.map((event) => {
+              const eventStart = new Date(event.start);
+              const eventEnd = new Date(event.end);
+              return (
+                <button
+                  key={event.id}
+                  type="button"
+                  className="w-full text-left flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer"
+                  onClick={() => onSelect(event)}
+                >
+                  <div className="flex items-center justify-center size-6 shrink-0">
+                    <div
+                      className="size-3 rounded-full"
+                      style={{
+                        backgroundColor: resolveInlineColorValue(
+                          event.color || "blue",
+                        ),
+                      }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={cn(
+                        "text-sm font-medium truncate",
+                        isCancelledCalendarEvent(event) &&
+                          "line-through opacity-70",
+                      )}
+                    >
+                      {event.title || "Untitled Event"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {event.allDay
+                        ? "All day"
+                        : formatClockTimeRange(
+                            eventStart,
+                            eventEnd,
+                            timezone,
+                            timeFormat,
+                          )}
+                      {event.location && ` · ${event.location}`}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </DrawerShell>
+      </DrawerContent>
+    </Drawer>
   );
 }

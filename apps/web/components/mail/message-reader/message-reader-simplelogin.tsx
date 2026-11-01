@@ -108,7 +108,7 @@ export function MessageReaderSimpleLoginLine({
           </button>
         }
       >
-        <p className="px-3 pt-3 pb-2 text-[15px] font-[470] text-[var(--text-primary)]">
+        <p className="px-3 pt-3 pb-2 text-[15px] font-medium text-[var(--text-primary)]">
           SimpleLogin
         </p>
         <PanelSection title="Alias" footer={notice.detail}>
@@ -190,7 +190,7 @@ function PanelSection({
   return (
     <div className="flex flex-col gap-px border-t border-[var(--border-tertiary)] p-1">
       {title ? (
-        <p className="px-2 pt-1.5 pb-1 text-[13px] font-[470] text-[var(--text-tertiary)]">
+        <p className="px-2 pt-1.5 pb-1 text-[13px] font-medium text-[var(--text-tertiary)]">
           {title}
         </p>
       ) : null}

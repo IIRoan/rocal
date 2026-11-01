@@ -139,7 +139,7 @@ export function MessageListBulkBar({
             </DropdownSection>
           </Dropdown>
         ) : null}
-        <span className="ml-auto font-mono text-[11px] uppercase tracking-wide text-[var(--text-disabled)]">
+        <span className="ml-auto text-xs tabular-nums text-[var(--text-disabled)]">
           {selectedCount} selected
         </span>
       </div>

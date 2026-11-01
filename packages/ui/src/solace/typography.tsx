@@ -58,7 +58,8 @@ function typographyClassName({
     capitalize && "capitalize",
     uppercase && "uppercase",
     clickable && "cursor-pointer",
-    mono && "font-mono",
+    // Tabular figures keep times aligned without dropping to a system monospace face.
+    mono && "tabular-nums",
     className,
   );
 }

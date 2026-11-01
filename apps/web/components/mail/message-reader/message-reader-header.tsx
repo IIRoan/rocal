@@ -45,7 +45,7 @@ export function MessageReaderHeader({
         <SenderAvatar
           email={senderEmail}
           name={enrichedSender.name ?? undefined}
-          className={isMobile ? "size-7 text-[10px]" : undefined}
+          className={isMobile ? "size-7 text-[11px]" : undefined}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-center justify-between gap-2">
@@ -56,10 +56,7 @@ export function MessageReaderHeader({
                     name={enrichedSender.name}
                     email={enrichedSender.email}
                     showInlineAddress={Boolean(enrichedSender.name?.trim())}
-                    className={cn(
-                      "truncate font-medium",
-                      isMobile ? "text-xs" : "text-[13px]",
-                    )}
+                    className="truncate text-sm font-medium"
                   />
                   <MailIdentityBadge
                     message={message}
@@ -71,23 +68,13 @@ export function MessageReaderHeader({
                   />
                 </>
               ) : (
-                <span
-                  className={cn(
-                    "truncate font-medium",
-                    isMobile ? "text-xs" : "text-[13px]",
-                  )}
-                >
+                <span className="truncate text-sm font-medium">
                   Unknown sender
                 </span>
               )}
             </div>
             {message.receivedAt && (
-              <span
-                className={cn(
-                  "shrink-0 text-muted-foreground",
-                  isMobile ? "text-[10px]" : "text-[11px]",
-                )}
-              >
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                 {formatDateTimeLabel(
                   new Date(message.receivedAt),
                   resolveTimezone(timezone),
@@ -97,14 +84,7 @@ export function MessageReaderHeader({
             )}
           </div>
           {message.to && message.to.length > 0 && (
-            <div
-              className={cn(
-                "min-w-0 text-muted-foreground",
-                isMobile
-                  ? "flex items-center gap-1 text-[11px]"
-                  : "flex items-center gap-1 text-xs",
-              )}
-            >
+            <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
               <span>To:</span>
               <RecipientPopoverList
                 recipients={message.to}
@@ -115,14 +95,7 @@ export function MessageReaderHeader({
             </div>
           )}
           {message.cc && message.cc.length > 0 && (
-            <div
-              className={cn(
-                "min-w-0 text-muted-foreground",
-                isMobile
-                  ? "flex items-center gap-1 text-[11px]"
-                  : "flex items-center gap-1 text-xs",
-              )}
-            >
+            <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
               <span>CC:</span>
               <RecipientPopoverList
                 recipients={message.cc}

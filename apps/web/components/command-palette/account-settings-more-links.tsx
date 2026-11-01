@@ -2,7 +2,7 @@ import { HelpCircle, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { PRODUCT_ROUTES } from "@workspace/calendar-core/product-info";
 
-import { PaletteNavRow, PaletteSection } from "./palette-ui";
+import { PaletteIconBox, PaletteNavRow, PaletteSection } from "./palette-ui";
 import { PALETTE_ROW_CLASS } from "./palette-styles";
 
 export function AccountMoreLinks({
@@ -45,11 +45,12 @@ export function AccountMoreLinks({
           rel="noopener noreferrer"
           className={PALETTE_ROW_CLASS}
         >
-          <HelpCircle
-            className="size-4 shrink-0 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <span>Support</span>
+          <PaletteIconBox>
+            <HelpCircle className="size-4" aria-hidden="true" />
+          </PaletteIconBox>
+          <span className="flex-1 truncate text-[15px] leading-[130%] text-foreground">
+            Support
+          </span>
         </Link>
         <Link
           href={PRODUCT_ROUTES.privacy}
@@ -57,11 +58,12 @@ export function AccountMoreLinks({
           rel="noopener noreferrer"
           className={PALETTE_ROW_CLASS}
         >
-          <Shield
-            className="size-4 shrink-0 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <span>Privacy policy</span>
+          <PaletteIconBox>
+            <Shield className="size-4" aria-hidden="true" />
+          </PaletteIconBox>
+          <span className="flex-1 truncate text-[15px] leading-[130%] text-foreground">
+            Privacy policy
+          </span>
         </Link>
       </PaletteSection>
     </>

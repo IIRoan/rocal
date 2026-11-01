@@ -122,7 +122,7 @@ export function MessageReaderHeaderAttachments({
                       canPreview || canDownload
                         ? "cursor-pointer"
                         : "cursor-default",
-                      isMobile ? "h-5 gap-1 px-1.5 text-[10px]" : "",
+                      isMobile ? "h-5 gap-1 px-1.5 text-[11px]" : "",
                     )}
                   >
                     {canPreview ? (
@@ -200,7 +200,7 @@ export function MessageReaderHeaderAttachments({
                         aria-label={`Download ${name}`}
                         className={cn(
                           "cursor-pointer px-1.5",
-                          isMobile ? "h-5 text-[10px]" : "",
+                          isMobile ? "h-5 text-[11px]" : "",
                         )}
                       >
                         <Download />
