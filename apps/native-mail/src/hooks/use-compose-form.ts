@@ -9,6 +9,7 @@ import {
 } from "../lib/mail/compose-form";
 import {
   decryptDraftFields,
+  decryptMessagePlaintext,
   planComposeSeed,
   type ComposeSeedInput,
 } from "../lib/mail/compose-seed";
@@ -42,18 +43,38 @@ export function useComposeForm({ onClose, ...seedInput }: ComposeFormInput) {
     },
   );
 
+  // A reply or forward whose source can't be decrypted still opens, with an empty quote instead of ciphertext.
+  const finishSourceDecrypt = useEffectEvent((sourcePlaintext: string) => {
+    const plan = planComposeSeed({
+      ...seedInput,
+      sourcePlaintext,
+      dateOptions: { timeFormat, timezone },
+    });
+    dispatch({ type: "decrypted", fields: plan?.kind === "fields" ? plan.fields : null });
+  });
+
+  const isDraft = seedInput.params.mode === "draft";
   useEffect(() => {
     if (!form.decrypting || !runtime || !sourceMessage) return;
     let cancelled = false;
-    void decryptDraftFields(runtime, sourceMessage)
-      .then(({ fields, error: decryptError }) => {
-        if (!cancelled) finishDraftDecrypt(fields, decryptError);
-      })
-      .catch(() => undefined);
+    if (isDraft) {
+      void decryptDraftFields(runtime, sourceMessage)
+        .then(({ fields, error: decryptError }) => {
+          if (!cancelled) finishDraftDecrypt(fields, decryptError);
+        })
+        .catch(() => undefined);
+    } else {
+      void decryptMessagePlaintext(runtime, sourceMessage)
+        .catch(() => "")
+        .then((plaintext) => {
+          if (!cancelled) finishSourceDecrypt(plaintext);
+        })
+        .catch(() => undefined);
+    }
     return () => {
       cancelled = true;
     };
-  }, [form.decrypting, runtime, sourceMessage]);
+  }, [form.decrypting, isDraft, runtime, sourceMessage]);
 
   return [form, dispatch] as const;
 }
