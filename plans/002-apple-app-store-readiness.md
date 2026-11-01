@@ -88,10 +88,10 @@ Live EAS inspection on 2026-10-28 found stored credentials for the current main-
 
 ## 5. Reviewer access and onboarding
 
-- [ ] Prepare a dedicated reviewer account through a normally accepted invite, with mailbox provisioning and E2EE setup completed.
+- [x] Prepare a dedicated reviewer account through a normally accepted invite, with mailbox provisioning and E2EE setup completed: `appreview@solace.onl` (Avery Collins), 2026-11-01, from an operator-issued invite row; sign-up, E2EE and mailbox ran through the normal web flow. Credentials are in the App Store Connect review record and the `APP_REVIEW_*` repository secrets.
 - [x] Prepare a synthetic calendar fixture and review walkthrough below, with sample mail instructions that use the normal send flow.
-- [ ] Load the samples into the dedicated reviewer account and verify its credentials with the selected binaries.
-- [ ] Ensure reviewer access does not depend on the operator's personal passkey or device.
+- [ ] Load the samples into the dedicated reviewer account and verify its credentials with the selected binaries. Mail samples are loaded: synthetic senders `maya.lindqvist@solace.onl` and `jonas.weber@solace.onl` (invited from the review account) sent five encrypted messages plus a reply thread and a calendar invitation. Binary sign-in is verified by the screenshot workflow.
+- [x] Ensure reviewer access does not depend on the operator's personal passkey or device: the account has no passkey and unlocks from its password envelope on a fresh simulator.
 - [x] Explain invite-only onboarding and the relationship between Calendar and Mail in draft review notes and separate listing copy; verify the final App Store Connect notes before submission.
 - [ ] Confirm backend and support availability throughout review.
 
@@ -129,7 +129,7 @@ Existing development/preview profiles use `distribution: internal`; their QR/ad-
 ## 8. Listings, review and launch
 
 - [x] Prepare separate names, subtitles, descriptions, keywords and configured support/privacy URLs as EAS Metadata drafts from shared identity/listing/product files.
-- [ ] Confirm publisher/copyright, primary/secondary categories, age ratings and launch territories; capture the required iPhone screenshots with synthetic data.
+- [ ] Confirm publisher/copyright, primary/secondary categories, age ratings and launch territories; capture the required iPhone screenshots with synthetic data. Mail (2026-11-01): copyright `2026 Roan Van Westerop`, Productivity/Business, 4+ (only Messaging and Chat), free, 174 territories without France, manual release, build 9 attached. Screenshots come from `.github/workflows/app-store-screenshots.yml` (real production app on a 6.9" simulator, Maestro flow in `apps/native-mail/.maestro/`).
 - [x] Generate reviewable `store.config.draft.json` files in the store workflow without pushing metadata or defaulting legal/age-rating answers.
 - [ ] Review the generated metadata and publish approved listing fields through EAS Metadata or App Store Connect; finish unsupported fields/screenshots in App Store Connect.
 - [ ] Select the exact tested builds, complete declarations and reviewer instructions, and submit both apps for App Review.

@@ -1,0 +1,10 @@
+# Types TEXT one character per command; Maestro's bulk typing drops everything after the first character in these fields.
+appId: onl.solace.mail
+---
+- evalScript: ${output.typed = 0}
+- repeat:
+    while:
+      true: ${output.typed < TEXT.length}
+    commands:
+      - inputText: ${TEXT.charAt(output.typed)}
+      - evalScript: ${output.typed = output.typed + 1}
