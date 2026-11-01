@@ -14,13 +14,13 @@ appId: onl.solace.mail
     file: type-slowly.yaml
     env:
       TEXT: ${EMAIL}
-- tapOn: "Password"
+# Return moves focus to the password field, and Return there signs in; "Password" also matches the field's label.
+- pressKey: Enter
 - runFlow:
     file: type-slowly.yaml
     env:
       TEXT: ${PASSWORD}
-- tapOn: "Welcome back"
-- tapOn: "Sign in"
+- pressKey: Enter
 - runFlow:
     when:
       visible: "Allow"
