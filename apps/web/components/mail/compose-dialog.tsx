@@ -918,7 +918,7 @@ export function ComposeForm({
           </SimpleTooltip>
         </div>
         <span className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground/40">
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">
             ⌘↵
           </kbd>
           to send

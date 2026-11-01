@@ -90,7 +90,7 @@ export function RecipientPopover({
       <div className="flex items-center gap-3 p-3">
         <SenderAvatar email={email} name={name ?? undefined} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-[470] text-[var(--text-primary)]">
+          <div className="truncate text-[15px] font-medium text-[var(--text-primary)]">
             {displayName}
           </div>
           {displayName !== email ? (
@@ -154,7 +154,6 @@ export function RecipientPopoverList({
               name={enriched.name}
               email={enriched.email}
               showInlineAddress={isMe || Boolean(enriched.name?.trim())}
-              className="text-sm"
             />
           </span>
         );

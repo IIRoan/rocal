@@ -19,7 +19,7 @@ export function WeekViewDayHeaders({
   return (
     <div className="z-40 bg-background shrink-0">
       <div className="hidden w-full grid-cols-[3rem_repeat(7,minmax(0,1fr))] items-center justify-between pt-3 sm:grid border-b border-border/40">
-        <div className="caption text-right text-muted-foreground/40 text-[9px] pr-1.5">
+        <div className="caption text-right text-muted-foreground/70 text-[11px] pr-1.5">
           {formatInTimeZone(currentDate, timezone, "zzz")}
         </div>
         {days.map((day) => (
@@ -42,7 +42,7 @@ export function WeekViewDayHeaders({
       </div>
 
       <div className="sm:hidden grid grid-cols-[2.5rem_repeat(7,minmax(0,1fr))] border-b border-border/40 pt-2">
-        <div className="flex items-center justify-end text-[8px] font-medium text-muted-foreground/40 pr-1">
+        <div className="flex items-center justify-end text-[10px] font-medium text-muted-foreground/70 pr-1">
           {formatInTimeZone(currentDate, timezone, "zzz")}
         </div>
         {days.map((day) => (
@@ -52,7 +52,7 @@ export function WeekViewDayHeaders({
           >
             <span
               className={cn(
-                "text-[10px] font-medium uppercase",
+                "text-[11px] font-medium uppercase",
                 isTodayInTimezone(day, timezone)
                   ? "rounded-md bg-primary px-1.5 py-0.5 font-medium text-primary-foreground"
                   : "",

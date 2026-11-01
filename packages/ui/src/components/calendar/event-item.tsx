@@ -211,7 +211,7 @@ export function EventItem({
           isDragging={dragging}
           onClick={onClick}
           className={cn(
-            "mt-[var(--event-gap)] h-[var(--event-height)] items-center text-[10px] sm:text-[13px]",
+            "mt-[var(--event-gap)] h-[var(--event-height)] items-center text-[11px] sm:text-xs",
             className,
           )}
           currentTime={currentTime}
@@ -274,11 +274,11 @@ export function EventItem({
                 ? "flex-col justify-start gap-0.5"
                 : "items-center",
             isCompact
-              ? "text-[8px] leading-none"
+              ? "text-[11px] leading-none"
               : isSmall
-                ? "text-[10px] leading-tight"
+                ? "text-[11px] leading-tight"
                 : view === "week"
-                  ? "text-[11px] leading-tight sm:text-[12.5px] sm:leading-snug"
+                  ? "text-[11px] leading-tight sm:text-xs sm:leading-snug"
                   : "text-[13px] leading-snug",
             className,
           )}
@@ -293,7 +293,7 @@ export function EventItem({
               <div className="flex items-center gap-1 w-full min-w-0">
                 <span
                   className={cn(
-                    "font-semibold flex-1 min-w-0 truncate tracking-tight",
+                    "font-semibold flex-1 min-w-0 truncate",
                     isCancelledCalendarEvent(event) && "line-through opacity-70",
                   )}
                   title={event.title}
@@ -313,7 +313,7 @@ export function EventItem({
             <div className="flex items-baseline gap-1.5 w-full min-w-0 overflow-hidden">
               <span
                 className={cn(
-                  "flex-1 min-w-0 truncate whitespace-nowrap tracking-tight",
+                  "flex-1 min-w-0 truncate whitespace-nowrap",
                   isCompact ? "font-medium" : "font-semibold",
                   isCancelledCalendarEvent(event) && "line-through opacity-70",
                 )}
@@ -322,7 +322,7 @@ export function EventItem({
                 {event.title}
               </span>
               {!isCompact && showTime && !event.allDay && (
-                <span className="shrink-0 text-[10px] font-normal tabular-nums opacity-70 whitespace-nowrap">
+                <span className="shrink-0 text-[11px] font-normal tabular-nums opacity-70 whitespace-nowrap">
                   {startLabel}
                 </span>
               )}

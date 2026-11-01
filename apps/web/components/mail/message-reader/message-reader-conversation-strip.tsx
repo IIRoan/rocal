@@ -236,7 +236,7 @@ function ThreadMessageRow({
         <SenderAvatar
           email={senderEmail}
           name={senderName}
-          className="size-5 shrink-0 text-[9px]"
+          className="size-5 shrink-0 text-[11px]"
         />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-baseline gap-1.5">
@@ -255,7 +255,7 @@ function ThreadMessageRow({
             </span>
           </div>
         </div>
-        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
           {formatMessageDate(threadMessage.receivedAt, timeFormat, timezone)}
         </span>
       </button>

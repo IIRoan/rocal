@@ -4,10 +4,8 @@ import { getAllMessageLabels } from "@/lib/mail/mail-labels";
 import type { LabelDef } from "@/lib/mail/types";
 import { formatAddress } from "../mail-helpers";
 
-export const ROW_HEIGHT_MOBILE = 101;
 export const ROW_HEIGHT_DESKTOP = 56;
 export const ROW_HEIGHT_DESKTOP_COMFORTABLE = 72;
-export const ROW_HEIGHT_MOBILE_COMFORTABLE = 101;
 export const ROW_HEIGHT_WITH_LABELS = 56;
 export const ROW_HEIGHT_WITH_LABELS_COMFORTABLE = 72;
 export const ROW_HEIGHT_NARROW = 76;
@@ -29,14 +27,10 @@ export function getRowHeight(
   showLabelChips: boolean = true,
   narrow: boolean = false,
 ): number {
-  if (isMobile) {
-    return density === "comfortable"
-      ? ROW_HEIGHT_MOBILE_COMFORTABLE
-      : ROW_HEIGHT_MOBILE;
-  }
   const hasLabels =
     showLabelChips && getAllMessageLabels(message, labels).length > 0;
-  if (narrow) {
+  // Phones render the same stacked row as the narrow desktop list.
+  if (isMobile || narrow) {
     return hasLabels ? ROW_HEIGHT_NARROW_WITH_LABELS : ROW_HEIGHT_NARROW;
   }
   if (density === "comfortable") {

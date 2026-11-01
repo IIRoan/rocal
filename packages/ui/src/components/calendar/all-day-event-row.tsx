@@ -50,7 +50,7 @@ export function AllDayEventRow({
         style={{ gridColumn: 1, gridRow: `1 / span ${rows}` }}
       >
         <div className="flex min-h-[24px] flex-1 flex-col items-center justify-center">
-          <span className="text-[9px] leading-none text-muted-foreground/40">
+          <span className="text-[11px] leading-none text-muted-foreground/70">
             all-day
           </span>
         </div>
@@ -90,7 +90,7 @@ export function AllDayEventRow({
               isFirstDay={!placement.continuesBefore}
               isLastDay={!placement.continuesAfter}
               connectAcrossCells={false}
-              className="mt-0 h-[22px] min-h-[20px] sm:min-h-[20px] items-center text-[10px]"
+              className="mt-0 h-[22px] min-h-[20px] sm:min-h-[20px] items-center text-[11px] sm:text-xs"
               timezone={timezone}
               timeFormat={timeFormat}
               onEdit={handlers.onEventEdit}
@@ -107,7 +107,7 @@ export function AllDayEventRow({
                 ) : null}
                 <span
                   className={cn(
-                    "min-w-0 flex-1 truncate font-semibold leading-tight tracking-tight",
+                    "min-w-0 flex-1 truncate font-semibold leading-tight",
                     isCancelledCalendarEvent(event) && "line-through opacity-70",
                   )}
                 >
@@ -116,7 +116,7 @@ export function AllDayEventRow({
                 {spanLabel ? (
                   <span
                     className={cn(
-                      "text-[10px] font-normal tabular-nums leading-none opacity-80",
+                      "text-[11px] font-normal tabular-nums leading-none opacity-80",
                       placement.span > 1 ? "shrink-0" : "min-w-0 truncate",
                     )}
                   >

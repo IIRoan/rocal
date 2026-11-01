@@ -31,6 +31,22 @@ interface AdvancedSearchPanelProps {
 const ADDABLE_FIELDS = SEARCH_FILTER_FIELDS.filter((f) => f.type !== "boolean");
 const QUICK_BOOLEAN_FIELDS = SEARCH_FILTER_FIELDS.filter((f) => f.type === "boolean");
 
+/** Drops `field` where it equals `value`, then any condition left without an active value. */
+function removeConditionField(
+  conditions: MailSearchFilterCondition[],
+  field: keyof MailSearchFilterCondition,
+  value: string | boolean,
+): MailSearchFilterCondition[] {
+  return conditions.flatMap((condition) => {
+    const next = { ...condition };
+    if (next[field] === value) delete next[field];
+    const active = Object.values(next).some(
+      (entry) => entry !== undefined && entry !== false && entry !== "",
+    );
+    return active ? [next] : [];
+  });
+}
+
 export function AdvancedSearchPanel({
   filters,
   onFiltersChange,
@@ -47,9 +63,11 @@ export function AdvancedSearchPanel({
     ADDABLE_FIELDS.find((field) => field.field === activeField) ?? ADDABLE_FIELDS[0];
 
   const activeBooleanFields = new Set<keyof MailSearchFilterCondition>(
-    QUICK_BOOLEAN_FIELDS.filter((field) =>
-      filters.conditions.some((condition) => condition[field.field] === true),
-    ).map((field) => field.field),
+    QUICK_BOOLEAN_FIELDS.flatMap((field) =>
+      filters.conditions.some((condition) => condition[field.field] === true)
+        ? [field.field]
+        : [],
+    ),
   );
 
   const addDraftCondition = () => {
@@ -65,18 +83,7 @@ export function AdvancedSearchPanel({
     if (activeBooleanFields.has(field)) {
       onFiltersChange({
         ...filters,
-        conditions: filters.conditions
-          .map((condition) => {
-            if (condition[field] !== true) return condition;
-            const next = { ...condition };
-            delete next[field];
-            return next;
-          })
-          .filter((condition) =>
-            Object.values(condition).some(
-              (value) => value !== undefined && value !== false && value !== "",
-            ),
-          ),
+        conditions: removeConditionField(filters.conditions, field, true),
       });
       return;
     }
@@ -94,20 +101,7 @@ export function AdvancedSearchPanel({
     }
     onFiltersChange({
       ...filters,
-      conditions: filters.conditions
-        .map((condition) => {
-          if (condition[chip.field] === chip.value) {
-            const next = { ...condition };
-            delete next[chip.field];
-            return next;
-          }
-          return condition;
-        })
-        .filter((condition) =>
-          Object.values(condition).some(
-            (value) => value !== undefined && value !== false && value !== "",
-          ),
-        ),
+      conditions: removeConditionField(filters.conditions, chip.field, chip.value),
     });
   };
 
@@ -128,7 +122,7 @@ export function AdvancedSearchPanel({
                   type="button"
                   onClick={() => toggleBooleanFilter(field.field)}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-medium transition-colors",
+                    "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
                     isActive
                       ? "border-primary/30 bg-primary/15 text-primary"
                       : "border-border/50 bg-background/60 text-muted-foreground hover:bg-accent/50 hover:text-foreground",
@@ -189,7 +183,7 @@ export function AdvancedSearchPanel({
           {chips.map((chip, index) => (
             <span
               key={`${chip.field}-${index}`}
-              className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+              className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary"
             >
               {chip.label}
               <button
@@ -205,7 +199,7 @@ export function AdvancedSearchPanel({
           <button
             type="button"
             onClick={clearAll}
-            className="text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+            className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
           >
             Clear all
           </button>
@@ -242,7 +236,7 @@ export function AdvancedSearchToggle({
       <Filter className="size-3 shrink-0 opacity-70" strokeWidth={2.25} />
       <span className="hidden sm:inline">Filter</span>
       {activeCount > 0 ? (
-        <span className="rounded bg-primary/15 px-1 py-px text-[9px] font-semibold tabular-nums text-primary">
+        <span className="rounded bg-primary/15 px-1 py-px text-[11px] font-semibold tabular-nums text-primary">
           {activeCount}
         </span>
       ) : null}

@@ -104,19 +104,19 @@ function SearchResultRow({
         {(encryption || hasAttachment || hasLocation) ? (
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
             {hasAttachment ? (
-              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/70">
+              <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground/70">
                 <Paperclip className="size-2.5" />
                 Attachment
               </span>
             ) : null}
             {hasLocation ? (
-              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/70">
+              <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground/70">
                 <MapPin className="size-2.5" />
                 Location
               </span>
             ) : null}
             {encryption ? (
-              <span className="text-[10px] text-muted-foreground/60">
+              <span className="text-[11px] text-muted-foreground/60">
                 {encryption}
               </span>
             ) : null}

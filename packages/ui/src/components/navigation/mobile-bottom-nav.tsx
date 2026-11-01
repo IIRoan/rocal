@@ -88,7 +88,7 @@ function TabButton({
       <div className="flex items-center gap-0.5">
         <span
           className={cn(
-            "text-[10px] font-medium",
+            "text-[11px] font-medium",
             isActive ? "text-primary" : "text-muted-foreground",
           )}
         >

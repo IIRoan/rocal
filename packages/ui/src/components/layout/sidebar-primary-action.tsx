@@ -51,7 +51,6 @@ export function SidebarPrimaryAction({
             onClick={onClick}
             variant="outline"
             className={`w-full h-9 rounded-xl border-border/60 text-foreground/80 font-medium text-[13px] hover:bg-muted/60 hover:text-foreground transition-colors ${className ?? ""}`}
-            style={{ fontWeight: 470 }}
           >
             <Plus size={15} strokeWidth={2} />
             {label}

@@ -90,7 +90,7 @@ describe("MobileTopNav", () => {
     const header = container.firstElementChild as HTMLDivElement | null;
 
     expect(document.body.textContent).toContain("App switcher");
-    expect(document.body.textContent).toContain("May 18 - May 24, 2026");
+    expect(document.body.textContent).toContain("May 18 – May 24, 2026");
     expect(document.body.textContent).toContain("Week 21");
     expect(actionsButton?.textContent).toContain("Week");
     expect(header?.className).toContain("z-[45]");

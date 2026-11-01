@@ -45,7 +45,7 @@ function CalendarFormFields({
         <div className="space-y-1.5">
           <Label
             htmlFor="calendar-name"
-            className="text-xs text-muted-foreground"
+            className="text-[13px] font-medium text-muted-foreground"
           >
             Name
           </Label>
@@ -64,7 +64,9 @@ function CalendarFormFields({
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Color</Label>
+          <Label className="text-[13px] font-medium text-muted-foreground">
+            Color
+          </Label>
           <div className="flex flex-wrap gap-2">
             {PRESET_COLORS.map((preset) => (
               <SimpleTooltip content={preset.label} key={preset.value}>

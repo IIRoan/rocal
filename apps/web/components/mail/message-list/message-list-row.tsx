@@ -53,7 +53,7 @@ function MessageLabelChips({
           <span
             key={label.id}
             title={label.name}
-            className="inline-flex max-w-[5.5rem] items-center gap-0.5 rounded px-1 py-px text-[10px] font-medium leading-none"
+            className="inline-flex max-w-[5.5rem] items-center gap-0.5 rounded px-1 py-px text-[11px] font-medium leading-none"
             style={{
               color: displayColor,
               backgroundColor: `color-mix(in srgb, ${displayColor} 10%, transparent)`,
@@ -69,7 +69,7 @@ function MessageLabelChips({
         );
       })}
       {overflow > 0 ? (
-        <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
           +{overflow}
         </span>
       ) : null}
@@ -243,7 +243,7 @@ function buildMessageListRowView({
         ? formatThreadSenders(row.messages)
         : formatAddress(message.from),
     senderTone: (isRead ? "secondary" : "primary") as "secondary" | "primary",
-    senderWeight: isRead ? TypographyWeight.REGULAR : TypographyWeight.MEDIUM,
+    senderWeight: isRead ? TypographyWeight.REGULAR : TypographyWeight.BOLD,
     unreadOpacity: isRead ? 0 : 1,
     unreadLabel: isRead ? undefined : "Unread",
     thread: threaded
@@ -530,7 +530,7 @@ function MessageListRowThreadChildren({
             >
               {threadMsg.subject || "(No subject)"}
             </span>
-            <span className="shrink-0 text-[10px] text-muted-foreground/60 tabular-nums whitespace-nowrap">
+            <span className="shrink-0 text-[11px] text-muted-foreground/60 tabular-nums whitespace-nowrap">
               {formatMessageDate(threadMsg.receivedAt, timeFormat, timezone)}
             </span>
           </button>

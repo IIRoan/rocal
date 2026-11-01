@@ -2,7 +2,7 @@ import { Toaster } from "@workspace/ui/components/ui";
 import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
 import { SurfaceMotionProvider } from "@workspace/ui/providers/surface-motion-provider";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
-import { solaceDisplay, solaceSans } from "@workspace/ui/lib/fonts";
+import { solaceSans } from "@workspace/ui/lib/fonts";
 import { SettingsProvider } from "@/components/settings-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { LoggerBootstrap } from "@/components/logger-bootstrap";
@@ -60,7 +60,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body
-        className={`${solaceSans.variable} ${solaceDisplay.variable} bg-background font-sans antialiased`}
+        className={`${solaceSans.variable} bg-background font-sans antialiased`}
       >
         <SurfaceMotionProvider />
         <RouteTransitionProvider>

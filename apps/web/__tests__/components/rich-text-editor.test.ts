@@ -36,3 +36,24 @@ it("splits formatted mail paragraphs and restores them through undo and redo", (
     editor.destroy();
   }
 });
+
+it("renders quoted mail as a block island in the app font, not an inline system-ui run", () => {
+  const editor = new Editor({
+    extensions: richTextEditorExtensions,
+    content: "<p>Reply</p><div data-quoted-html><p>Quoted line</p></div>",
+  });
+
+  try {
+    const island = editor.view.dom.querySelector(".quoted-html-island");
+    const css = island?.shadowRoot?.querySelector("style")?.textContent ?? "";
+    const host = css.slice(css.indexOf(":host"), css.indexOf("}"));
+    // `all: initial` resets every property declared before it, so block display must follow it.
+    expect(host.indexOf("all: initial")).toBeLessThan(
+      host.indexOf("display: block"),
+    );
+    expect(host).toContain("font-family: var(--font-sans)");
+    expect(css).not.toContain("system-ui");
+  } finally {
+    editor.destroy();
+  }
+});

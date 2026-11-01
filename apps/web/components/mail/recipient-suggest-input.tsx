@@ -56,7 +56,7 @@ function RecipientSuggestionsList({
     >
       <div
         id={headingId}
-        className="px-2 pt-1.5 pb-1 text-[13px] font-[470] text-[var(--text-tertiary,var(--muted-foreground))]"
+        className="px-2 pt-1.5 pb-1 text-[13px] font-medium text-[var(--text-tertiary,var(--muted-foreground))]"
       >
         {heading}
       </div>

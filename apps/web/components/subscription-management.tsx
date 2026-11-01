@@ -399,7 +399,7 @@ export function SubscriptionManagement({
         return (
           <Badge
             variant="secondary"
-            className="bg-success/15 text-success text-[10px] px-1.5 py-0"
+            className="bg-success/15 text-success text-[11px] px-1.5 py-0"
           >
             Synced
           </Badge>
@@ -409,20 +409,20 @@ export function SubscriptionManagement({
           <Badge
             variant="destructive"
             title={lastErrorMessage}
-            className="text-[10px] px-1.5 py-0"
+            className="text-[11px] px-1.5 py-0"
           >
             Error
           </Badge>
         );
       case "pending":
         return (
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+          <Badge variant="outline" className="text-[11px] px-1.5 py-0">
             Pending
           </Badge>
         );
       default:
         return (
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+          <Badge variant="outline" className="text-[11px] px-1.5 py-0">
             Unknown
           </Badge>
         );
@@ -446,7 +446,7 @@ export function SubscriptionManagement({
           <PaletteViewHeader title="Subscriptions" onBack={goBackToMain} />
 
           <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+            <div className="px-4 py-2 text-[13px] font-medium text-muted-foreground">
               Actions
             </div>
             <div className="p-1">
@@ -456,7 +456,7 @@ export function SubscriptionManagement({
                 className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
               >
                 <Plus className="size-4 text-muted-foreground shrink-0" />
-                <span className="text-sm">Add External Feed</span>
+                <span className="text-[15px] leading-[130%]">Add External Feed</span>
                 <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
               </button>
               <button
@@ -465,7 +465,7 @@ export function SubscriptionManagement({
                 className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
               >
                 <Globe className="size-4 text-muted-foreground shrink-0" />
-                <span className="text-sm flex-1">Browse Holiday Calendars</span>
+                <span className="text-[15px] leading-[130%] flex-1">Browse Holiday Calendars</span>
                 {publicHolidaySubscriptions.length > 0 && (
                   <span className="text-xs text-muted-foreground/70 shrink-0">
                     {publicHolidaySubscriptions.length} added
@@ -479,12 +479,12 @@ export function SubscriptionManagement({
                 className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors cursor-pointer"
               >
                 <FileText className="size-4 text-muted-foreground shrink-0" />
-                <span className="text-sm">Import .ics File</span>
+                <span className="text-[15px] leading-[130%]">Import .ics File</span>
                 <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
               </button>
             </div>
 
-            <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+            <div className="px-4 py-2 text-[13px] font-medium text-muted-foreground border-t border-border/50 mt-1">
               Synced Calendars
               {readOnlyCalendars.length > 0 && (
                 <span className="ml-1 opacity-60">
@@ -525,7 +525,7 @@ export function SubscriptionManagement({
                         onClick={() => handleOpenEdit(subscription)}
                         className="flex-1 min-w-0 text-left"
                       >
-                        <div className="text-sm truncate">
+                        <div className="text-[15px] leading-[130%] truncate">
                           {subscription.calendar.name}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -613,7 +613,7 @@ export function SubscriptionManagement({
             <div className="space-y-1.5">
               <Label
                 htmlFor="subscription-name"
-                className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                className="text-[13px] font-medium text-muted-foreground"
               >
                 Name
               </Label>
@@ -643,7 +643,7 @@ export function SubscriptionManagement({
               <div className="flex items-center gap-1.5">
                 <Label
                   htmlFor="subscription-url"
-                  className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                  className="text-[13px] font-medium text-muted-foreground"
                 >
                   URL (.ics)
                 </Label>
@@ -672,7 +672,7 @@ export function SubscriptionManagement({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <Label className="text-[13px] font-medium text-muted-foreground">
                 Color
               </Label>
               <ColorPicker
@@ -756,12 +756,12 @@ export function SubscriptionManagement({
                         ),
                       }}
                     />
-                    <span className="text-sm flex-1 truncate">{hc.label}</span>
+                    <span className="text-[15px] leading-[130%] flex-1 truncate">{hc.label}</span>
                     {existingSub ? (
                       <div className="flex items-center gap-2 shrink-0">
                         <Badge
                           variant="secondary"
-                          className="text-[10px] bg-primary/10 text-primary px-1.5 py-0 h-auto"
+                          className="text-[11px] bg-primary/10 text-primary px-1.5 py-0 h-auto"
                         >
                           Added
                         </Badge>
@@ -816,7 +816,7 @@ export function SubscriptionManagement({
           />
 
           <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+            <div className="px-4 py-2 text-[13px] font-medium text-muted-foreground">
               Calendar
             </div>
             <div className="px-4 pb-3 space-y-3">
@@ -924,7 +924,7 @@ export function SubscriptionManagement({
 
             {!isHolidayCalendar && (
               <>
-                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                <div className="px-4 py-2 text-[13px] font-medium text-muted-foreground border-t border-border/50 mt-1">
                   Sync
                 </div>
                 <div className="p-1">
@@ -943,8 +943,8 @@ export function SubscriptionManagement({
                       }`}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm">Sync now</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-[15px] leading-[130%]">Sync now</div>
+                      <div className="text-[13px] leading-[130%] text-muted-foreground">
                         {editingSubscriptionData
                           ? `Last synced ${formatLastSync(
                               editingSubscriptionData.lastSyncAt ?? undefined,
@@ -966,7 +966,7 @@ export function SubscriptionManagement({
                   </div>
                 )}
 
-                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                <div className="px-4 py-2 text-[13px] font-medium text-muted-foreground border-t border-border/50 mt-1">
                   Source
                 </div>
                 <div className="px-4 pb-3 space-y-1.5">

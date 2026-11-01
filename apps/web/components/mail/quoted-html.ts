@@ -47,8 +47,12 @@ export const QuotedHtml = TiptapNode.create({
       const style = document.createElement("style");
       style.textContent = `
         :host {
-          display: block;
           all: initial;
+          display: block;
+          font-family: var(--font-sans);
+          font-size: 14px;
+          line-height: 1.625;
+          color: var(--foreground);
         }
         * {
           box-sizing: border-box;
@@ -63,10 +67,6 @@ export const QuotedHtml = TiptapNode.create({
         }
         a {
           color: var(--primary);
-        }
-        body, div {
-          font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-          line-height: 1.5;
         }
         @media (prefers-color-scheme: dark) {
           :host {

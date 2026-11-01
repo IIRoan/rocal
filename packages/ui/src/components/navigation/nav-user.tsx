@@ -48,10 +48,10 @@ export function NavUser({
           />
           {isCollapsed ? null : (
             <span className="grid min-w-0 text-left leading-[130%]">
-              <span className="truncate text-[13px] font-[470] text-foreground">
+              <span className="truncate text-[13px] font-medium text-foreground">
                 {appName}
               </span>
-              <span className="truncate text-[11px] uppercase tracking-[0.01em] text-muted-foreground">
+              <span className="truncate text-xs text-muted-foreground">
                 {user.name || user.email}
               </span>
             </span>

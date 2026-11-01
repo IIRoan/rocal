@@ -129,7 +129,7 @@ export function HomeAppClient() {
           <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">
             Good{timeOfDay}
           </p>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             {firstName}
           </h1>
         </div>
