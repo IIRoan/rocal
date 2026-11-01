@@ -3,6 +3,7 @@
 import { Node as TiptapNode, mergeAttributes } from "@tiptap/core";
 import { DOMSerializer } from "@tiptap/pm/model";
 import type { Editor } from "@tiptap/react";
+import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core/sanitize-email-html";
 
 export const QUOTED_HTML_MARKER = "data-quoted-html";
 
@@ -19,7 +20,8 @@ export const QuotedHtml = TiptapNode.create({
     return {
       html: {
         default: "",
-        parseHTML: (el) => el.innerHTML,
+        // Quotes, drafts and pastes all enter here and the node view writes this into the live page, so it is hostile.
+        parseHTML: (el) => sanitizeUntrustedEmailHtml(el.innerHTML),
         renderHTML: () => ({}),
       },
     };
@@ -79,7 +81,7 @@ export const QuotedHtml = TiptapNode.create({
       const inner = document.createElement("div");
       inner.contentEditable = "true";
       inner.style.cssText = "outline:none;";
-      inner.innerHTML = node.attrs.html || "";
+      inner.innerHTML = sanitizeUntrustedEmailHtml(node.attrs.html || "");
       shadow.appendChild(inner);
 
       let focused = false;
@@ -120,7 +122,7 @@ export const QuotedHtml = TiptapNode.create({
         update: (updatedNode) => {
           if (updatedNode.type.name !== "quotedHtml") return false;
           if (!focused && inner.innerHTML !== updatedNode.attrs.html) {
-            inner.innerHTML = updatedNode.attrs.html || "";
+            inner.innerHTML = sanitizeUntrustedEmailHtml(updatedNode.attrs.html || "");
           }
           return true;
         },

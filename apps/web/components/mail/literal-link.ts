@@ -1,4 +1,5 @@
 import Link from "@tiptap/extension-link";
+import { isSafeEmailUrl } from "@workspace/calendar-core/sanitize-email-html";
 
 /** Link mark storing href exactly as typed: no autolink, normalization, or protocol resolution, so relative hrefs survive round-trips. */
 export const LiteralLink = Link.extend({
@@ -9,7 +10,8 @@ export const LiteralLink = Link.extend({
       linkOnPaste: false,
       defaultProtocol: null,
       protocols: [],
-      isAllowedUri: () => true,
+      // renderHTML passes no href for a link mark without one.
+      isAllowedUri: (url) => isSafeEmailUrl("a", "href", url ?? ""),
       shouldAutoLink: () => false,
       openOnClick: false,
       HTMLAttributes: { rel: "noopener noreferrer nofollow" },
