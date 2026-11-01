@@ -21,7 +21,7 @@ const HTML_ESCAPE_MAP = {
 export const INLINE_IMAGE_PLACEHOLDER =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) =>
     HTML_ESCAPE_MAP[char as keyof typeof HTML_ESCAPE_MAP],
   );
