@@ -33,7 +33,8 @@ const EMPTY_FIELDS: ComposeTextFields = {
 
 export type ComposeSeedPlan =
   | { kind: "fields"; fields: ComposeTextFields; draftId?: string }
-  | { kind: "decrypt-draft"; draftId: string };
+  | { kind: "decrypt-draft"; draftId: string }
+  | { kind: "decrypt-source"; draftId?: undefined };
 
 export interface ComposeSeedInput {
   params: ComposeRequest;
@@ -47,6 +48,8 @@ export interface ComposeSeedInput {
   fromEmail: string | null;
   dateOptions: QuotedDateOptions;
   runtime: MailRuntime | undefined;
+  /** The decrypted source body, once an encrypted message has been opened for a reply or forward. */
+  sourcePlaintext?: string;
 }
 
 function draftHeaders(message: JmapEmailMessage): ComposeTextFields {
@@ -71,6 +74,7 @@ export function planComposeSeed({
   fromEmail,
   dateOptions,
   runtime,
+  sourcePlaintext,
 }: ComposeSeedInput): ComposeSeedPlan | null {
   if (params.to) {
     const name = params.toName?.trim();
@@ -86,6 +90,15 @@ export function planComposeSeed({
     };
   }
   if (!sourceMessage || !settingsLoaded) return null;
+
+  // Quoting must use the decrypted text; the raw body of an encrypted message is PGP armor.
+  if (
+    (params.mode === "reply" || params.mode === "reply-all" || params.mode === "forward") &&
+    sourcePlaintext === undefined &&
+    isEncrypted(sourceMessage)
+  ) {
+    return runtime ? { kind: "decrypt-source" } : null;
+  }
 
   const withSignature = (quoteBody: string) =>
     signaturePosition === "above_quote"
@@ -104,7 +117,7 @@ export function planComposeSeed({
             identities,
           }).to.join(", "),
           subject: prefixSubject(sourceMessage.subject, "Re:"),
-          body: withSignature(buildReplyBody(sourceMessage, dateOptions)),
+          body: withSignature(buildReplyBody(sourceMessage, dateOptions, sourcePlaintext)),
         },
       };
     case "reply-all": {
@@ -119,7 +132,7 @@ export function planComposeSeed({
           to: recipients.to,
           cc: recipients.cc,
           subject: prefixSubject(sourceMessage.subject, "Re:"),
-          body: withSignature(buildReplyBody(sourceMessage, dateOptions)),
+          body: withSignature(buildReplyBody(sourceMessage, dateOptions, sourcePlaintext)),
         },
       };
     }
@@ -129,12 +142,11 @@ export function planComposeSeed({
         fields: {
           ...EMPTY_FIELDS,
           subject: prefixSubject(sourceMessage.subject, "Fwd:"),
-          body: withSignature(buildForwardBody(sourceMessage, dateOptions)),
+          body: withSignature(buildForwardBody(sourceMessage, dateOptions, sourcePlaintext)),
         },
       };
     case "draft": {
-      const encryption = classifyMessageEncryption(sourceMessage);
-      if (encryption === "inline_pgp" || encryption === "pgp_mime") {
+      if (isEncrypted(sourceMessage)) {
         return runtime ? { kind: "decrypt-draft", draftId: sourceMessage.id } : null;
       }
       return {
@@ -151,6 +163,31 @@ export function planComposeSeed({
   }
 }
 
+function isEncrypted(message: JmapEmailMessage): boolean {
+  const encryption = classifyMessageEncryption(message);
+  return encryption === "inline_pgp" || encryption === "pgp_mime";
+}
+
+/** The plaintext of an inline PGP or PGP/MIME message. */
+export async function decryptMessagePlaintext(
+  runtime: MailRuntime,
+  message: JmapEmailMessage,
+): Promise<string> {
+  const decrypted =
+    classifyMessageEncryption(message) === "inline_pgp"
+      ? await decryptMailMessage(
+          runtime,
+          message.id,
+          await resolveInlinePgpArmoredCiphertext({
+            message,
+            fetchBlob: (blobId) =>
+              runtime.client.getBlobAsText(runtime.session, blobId),
+          }),
+        )
+      : await decryptPgpMimeMessage(runtime, message.id, message.bodyStructure);
+  return decrypted.plaintext;
+}
+
 /** Decrypts a saved encrypted draft for editing; a failure still opens its headers with an empty body. */
 export async function decryptDraftFields(
   runtime: MailRuntime,
@@ -158,19 +195,7 @@ export async function decryptDraftFields(
 ): Promise<{ fields: ComposeTextFields; error: string | null }> {
   const headers = draftHeaders(message);
   try {
-    const decrypted =
-      classifyMessageEncryption(message) === "inline_pgp"
-        ? await decryptMailMessage(
-            runtime,
-            message.id,
-            await resolveInlinePgpArmoredCiphertext({
-              message,
-              fetchBlob: (blobId) =>
-                runtime.client.getBlobAsText(runtime.session, blobId),
-            }),
-          )
-        : await decryptPgpMimeMessage(runtime, message.id, message.bodyStructure);
-    return { fields: { ...headers, body: decrypted.plaintext }, error: null };
+    return { fields: { ...headers, body: await decryptMessagePlaintext(runtime, message) }, error: null };
   } catch (err) {
     return {
       fields: headers,
