@@ -1,0 +1,54 @@
+# Signs in to the App Review account and captures the App Store screenshots; run by app-store-screenshots.yml.
+appId: onl.solace.mail
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 120000
+- tapOn: "Email address"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PASSWORD}
+- tapOn: "Welcome back"
+- tapOn: "Sign in"
+- runFlow:
+    when:
+      visible: "Allow"
+    commands:
+      - tapOn: "Allow"
+- extendedWaitUntil:
+    visible: "Studio walkthrough on Thursday"
+    timeout: 180000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 01-inbox
+- tapOn: "Studio walkthrough on Thursday"
+- extendedWaitUntil:
+    visible: ".*see you then.*"
+    timeout: 90000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 02-conversation
+- tapOn: "Go back"
+- tapOn: "Invitation: Studio walkthrough.*"
+- extendedWaitUntil:
+    visible: "Accept"
+    timeout: 90000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 03-invitation
+- tapOn: "Go back"
+- tapOn: "Compose message"
+- tapOn: "To"
+- inputText: "maya.lindqvist@solace.onl"
+- tapOn: "Subject"
+- inputText: "Desk measurements"
+- tapOn: "Message"
+- inputText: "Hi Maya, here are the measurements for the shared desks. See you Thursday at 10."
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 04-compose
