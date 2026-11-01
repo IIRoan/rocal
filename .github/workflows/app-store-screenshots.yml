@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [chore/app-store-screenshots]
+    paths:
+      - .github/workflows/app-store-screenshots.yml
+      - apps/native-mail/.maestro/**
 
 permissions:
   contents: read
