@@ -265,6 +265,7 @@ Audit of both apps' resolved production config (`expo config --type introspect`,
 ### Mail product page (2026-11-01)
 
 - Version 1.0.4 uses build 10, which contains the reply-quote and VoiceOver sheet fixes (#136) and the web quick-reply sender name (#135).
-- Screenshots come from the real production app on an iPhone 17 Pro Max simulator (`app-store-screenshots.yml`; the signed simulator build is cached, so flow-only changes skip the 30-minute build), in light and dark. Each one is framed with a feature pill, headline and subline. The 1.0.4 Media Manager holds five in the required "iPhone with Dynamic Island (medium display)" slot (1206 x 2622) and five in the large-display slot (1320 x 2868): inbox, conversation, reply, invitation and Settings, alternating light and dark.
+- Screenshots come from the real production app on an iPhone 17 Pro Max simulator (`app-store-screenshots.yml`; the signed simulator build is cached, so flow-only changes skip the 30-minute build), in light and dark. Each one is framed with a headline and one plain-language line (no feature pills or icon lists). The 1.0.4 Media Manager holds four in the required "iPhone with Dynamic Island (medium display)" slot (1206 x 2622) and four in the large-display slot (1320 x 2868), alternating light and dark: inbox ("Your inbox, quietly encrypted"), conversation ("Private by design"), reply ("Answer right from the thread") and Settings ("No ads. No tracking.").
+- The reviewer's "Studio walkthrough" thread was re-sent after #135 shipped, so both sides carry display names (Avery Collins, Maya Lindqvist) in the captures.
 - Nothing has been submitted: Add for Review and Submit for Review are left to the owner.
 
