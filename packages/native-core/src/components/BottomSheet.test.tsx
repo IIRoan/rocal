@@ -191,6 +191,17 @@ it("retains handle dragging and swipe-down dismissal", async () => {
   expect(onDismiss).toHaveBeenCalledTimes(1);
 });
 
+it("leaves the controls inside the sheet reachable by VoiceOver", async () => {
+  await act(async () => {
+    root.render(
+      <BottomSheet visible onDismiss={jest.fn()}>
+        <View />
+      </BottomSheet>,
+    );
+  });
+  expect(mockSheetProps.accessible).toBe(false);
+});
+
 it("registers the back handler once per open even when onDismiss changes", async () => {
   const { BackHandler } = jest.requireMock<typeof import("react-native")>(
     "react-native",
