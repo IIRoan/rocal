@@ -25,7 +25,7 @@ jobs:
         uses: chainguard-actions/actions-cache/restore@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0
         with:
           path: ${{ runner.temp }}/build/Build/Products/Release-iphonesimulator
-          key: mail-simulator-app-v1-${{ hashFiles('bun.lock', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/src/**', 'packages/native-core/plugins/**', 'apps/native-mail/app/**', 'apps/native-mail/src/**', 'apps/native-mail/assets/**', 'apps/native-mail/*.json', 'apps/native-mail/*.ts', 'apps/native-mail/*.js', 'apps/native-mail/*.cts') }}
+          key: mail-simulator-app-v2-${{ hashFiles('bun.lock', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/src/**', 'packages/native-core/plugins/**', 'apps/native-mail/app/**', 'apps/native-mail/src/**', 'apps/native-mail/assets/**', 'apps/native-mail/*.json', 'apps/native-mail/*.ts', 'apps/native-mail/*.js', 'apps/native-mail/*.cts') }}
       - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
         with:
           node-version-file: .node-version
@@ -51,6 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           # Production EAS values, so the simulator app talks to the same services as the store build.
+          # Ad-hoc signing keeps the App Group entitlement, which the keychain needs; an unsigned build can't sign in.
           eas env:exec production '
             set -euo pipefail
             node ../../packages/native-core/expo-config.cjs --check-environment
@@ -58,7 +59,7 @@ jobs:
             workspace=$(ls -d ios/*.xcworkspace | head -1)
             xcodebuild -workspace "$workspace" -scheme "$(basename "$workspace" .xcworkspace)" \
               -configuration Release -sdk iphonesimulator -destination "generic/platform=iOS Simulator" \
-              -derivedDataPath "$RUNNER_TEMP/build" CODE_SIGNING_ALLOWED=NO -quiet
+              -derivedDataPath "$RUNNER_TEMP/build" CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= -quiet
           ' --non-interactive
       - if: steps.app.outputs.cache-hit != 'true'
         uses: chainguard-actions/actions-cache/save@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0
