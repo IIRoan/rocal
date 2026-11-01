@@ -261,3 +261,10 @@ Audit of both apps' resolved production config (`expo config --type introspect`,
 - Verified compliant: resolved Info.plist has only the photo-library purpose string (profile picture only, matches use), no camera/microphone/Face ID, no `UIBackgroundModes`; ATS keeps `NSAllowsArbitraryLoads: false`; the dev launcher's Bonjour/local-network keys are stripped by its Release build phase; App icons are 1024×1024 without alpha; `OpenSSL-Universal ~> 3.6.2000` ships a signed privacy manifest (ITMS-91061/91065); the extension uses no required-reason API; store builds register APNs as `production`; listing title/subtitle/keyword/description lengths fit Apple's limits; account deletion is in-app (4 taps) and calls `DELETE /api/account`; no third-party login (4.8 n/a), no purchase/pricing links (3.1.1), push is optional with only the system prompt, Mail→Calendar falls back to a toast when Calendar is absent (4.2.3), Mail has Report spam / Not spam, Mail HTML renders sanitized without scripts.
 - Fixed: TestFlight and App Store builds no longer name their release channel (`MASTER`/`TESTING`) in Settings → App → Updates, its diagnostics or the update prompt (`visibleChannelLabel` in native-core `lib/app-update.ts`); development builds keep it.
 - Owner decision: Riftbound's read of public `playriftbound.com/api/gql` data is a minor use and stays (5.2.2 accepted).
+
+### Mail product page (2026-11-01)
+
+- Version 1.0.4 uses build 10, which contains the reply-quote and VoiceOver sheet fixes (#136) and the web quick-reply sender name (#135).
+- Screenshots come from the real production app on an iPhone 17 Pro Max simulator (`app-store-screenshots.yml`; the signed simulator build is cached, so flow-only changes skip the 30-minute build), in light and dark. Each one is framed with a feature pill, headline and subline. The 1.0.4 Media Manager holds five in the required "iPhone with Dynamic Island (medium display)" slot (1206 x 2622) and five in the large-display slot (1320 x 2868): inbox, conversation, reply, invitation and Settings, alternating light and dark.
+- Nothing has been submitted: Add for Review and Submit for Review are left to the owner.
+
