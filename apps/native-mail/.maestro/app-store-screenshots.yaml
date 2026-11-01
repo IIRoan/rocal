@@ -43,9 +43,10 @@ appId: onl.solace.mail
     timeout: 5000
 - takeScreenshot: 02-conversation
 - tapOn: "Reply"
+# The editor paints the decrypted quote a moment after the sheet opens.
 - extendedWaitUntil:
-    visible: ".*wrote:.*"
-    timeout: 30000
+    visible: ".*> Perfect, see you then.*"
+    timeout: 20000
     optional: true
 - waitForAnimationToEnd:
     timeout: 5000
@@ -54,7 +55,7 @@ appId: onl.solace.mail
 - tapOn: "Go back"
 - tapOn: ".*Invitation: Studio walkthrough.*"
 - extendedWaitUntil:
-    visible: "Accept"
+    visible: ".*Accept"
     timeout: 90000
 - waitForAnimationToEnd:
     timeout: 5000

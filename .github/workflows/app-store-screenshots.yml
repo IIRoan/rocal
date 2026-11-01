@@ -95,21 +95,22 @@ jobs:
           # The XCTest driver can take minutes to start on a freshly booted CI simulator.
           MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
         run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/screenshots"
-          cd "$RUNNER_TEMP/screenshots"
-          for attempt in 1 2 3; do
-            maestro --device "$DEVICE" test --env EMAIL="$EMAIL" --env PASSWORD="$PASSWORD" --test-output-dir "$RUNNER_TEMP/maestro-output/$attempt" "$GITHUB_WORKSPACE/apps/native-mail/.maestro/app-store-screenshots.yaml" && exit 0
+          set -uo pipefail
+          capture() {
+            for attempt in 1 2 3; do
+              maestro --device "$DEVICE" test --env EMAIL="$EMAIL" --env PASSWORD="$PASSWORD" --test-output-dir "$RUNNER_TEMP/maestro-output/$1-$attempt" "$GITHUB_WORKSPACE/apps/native-mail/.maestro/app-store-screenshots.yaml" && return 0
+            done
+            return 1
+          }
+          status=0
+          for appearance in light dark; do
+            xcrun simctl ui "$DEVICE" appearance "$appearance"
+            capture "$appearance" || status=1
           done
-          exit 1
-      - if: always()
-        working-directory: .
-        run: for f in "$RUNNER_TEMP"/screenshots/*.png; do [ -e "$f" ] && sips -g pixelWidth -g pixelHeight "$f"; done; true
+          exit "$status"
       - if: always()
         uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
         with:
           name: mail-app-store-screenshots
-          path: |
-            ${{ runner.temp }}/screenshots
-            ${{ runner.temp }}/maestro-output
+          path: ${{ runner.temp }}/maestro-output
           if-no-files-found: warn
