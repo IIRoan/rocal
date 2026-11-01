@@ -30,12 +30,12 @@ appId: onl.solace.mail
     text: "Not Now"
     optional: true
 - extendedWaitUntil:
-    visible: "(Re: )?Studio walkthrough on Thursday"
+    visible: ".*Studio walkthrough on Thursday"
     timeout: 120000
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: 01-inbox
-- tapOn: "(Re: )?Studio walkthrough on Thursday"
+- tapOn: ".*Studio walkthrough on Thursday"
 - extendedWaitUntil:
     visible: ".*see you then.*"
     timeout: 90000
@@ -48,7 +48,7 @@ appId: onl.solace.mail
 - takeScreenshot: 03-reply
 - tapOn: "Close"
 - tapOn: "Go back"
-- tapOn: "Invitation: Studio walkthrough.*"
+- tapOn: ".*Invitation: Studio walkthrough.*"
 - extendedWaitUntil:
     visible: "Accept"
     timeout: 90000
