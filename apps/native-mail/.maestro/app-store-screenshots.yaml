@@ -21,14 +21,17 @@ appId: onl.solace.mail
     env:
       TEXT: ${PASSWORD}
 - pressKey: Enter
-- runFlow:
-    when:
-      visible: "Allow"
-    commands:
-      - tapOn: "Allow"
+# iOS offers to save the password after sign-in; its sheet hides the inbox from Maestro.
+- extendedWaitUntil:
+    visible: "Not Now"
+    timeout: 180000
+    optional: true
+- tapOn:
+    text: "Not Now"
+    optional: true
 - extendedWaitUntil:
     visible: "(Re: )?Studio walkthrough on Thursday"
-    timeout: 180000
+    timeout: 120000
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: 01-inbox
