@@ -10,7 +10,6 @@ import { e2eeApiService } from "@/lib/e2ee-api-service";
 import { createPasswordEnvelope } from "@/lib/e2ee-crypto";
 import { getEncryptionSession } from "@/lib/e2ee-payloads";
 import { rememberStoredDeviceEnvelopeSalt } from "@/lib/e2ee-storage";
-import { setEncPasswordCookie } from "@/lib/enc-password-cookie";
 
 const log = createLogger("command-palette");
 
@@ -119,14 +118,11 @@ async function changePassword(input: {
     upload: (passwordEnvelope) =>
       e2eeApiService.upsertPasswordEnvelope(passwordEnvelope),
   });
-  await Promise.all([
-    rememberStoredDeviceEnvelopeSalt(
-      input.sessionUserId,
-      session.deviceId,
-      envelope.kdfSalt,
-    ),
-    setEncPasswordCookie(input.newPassword),
-  ]).catch((error: unknown) => {
+  await rememberStoredDeviceEnvelopeSalt(
+    input.sessionUserId,
+    session.deviceId,
+    envelope.kdfSalt,
+  ).catch((error: unknown) => {
     log.warn("Failed to update local encryption state", sanitizeContext({ error }));
   });
 }

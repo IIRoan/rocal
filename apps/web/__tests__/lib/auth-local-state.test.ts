@@ -11,8 +11,7 @@ import {
 
 const mockSignOut = jest.fn();
 const mockClearAuthPasswords = jest.fn();
-const mockClearEncPasswordCookie = jest.fn();
-const mockClearOrphanedEncPasswordCookie = jest.fn();
+const mockClearLegacyRememberedPassword = jest.fn();
 const mockResetE2eeBootstrap = jest.fn();
 const mockGetSession = jest.fn();
 const mockClearLocalSearchIndexDatabase = jest.fn<() => Promise<void>>();
@@ -30,13 +29,15 @@ jest.mock("@/lib/auth-client", () => ({
 
 jest.mock("@/lib/e2ee-password-cache", () => ({
   clearAuthPasswords: (...args: unknown[]) => mockClearAuthPasswords(...args),
+  clearLegacyRememberedPassword: (...args: unknown[]) =>
+    mockClearLegacyRememberedPassword(...args),
 }));
 
-jest.mock("@/lib/enc-password-cookie", () => ({
-  clearEncPasswordCookie: (...args: unknown[]) =>
-    mockClearEncPasswordCookie(...args),
-  clearOrphanedEncPasswordCookie: (...args: unknown[]) =>
-    mockClearOrphanedEncPasswordCookie(...args),
+const mockFinishNavigation = jest.fn();
+const mockBeginAuthNavigation = jest.fn((_href: string) => mockFinishNavigation);
+jest.mock("@/lib/auth-navigation", () => ({
+  beginAuthNavigation: (href: string) => mockBeginAuthNavigation(href),
+  buildE2eeLockLoginHref: (reason: string) => `/login?e2ee=${reason}`,
 }));
 
 jest.mock("@/lib/e2ee-bootstrap", () => ({
@@ -69,6 +70,7 @@ jest.mock("@workspace/logger", () => ({
 import {
   clearOrphanedClientAuthArtifacts,
   clearSolaceClientAuthArtifacts,
+  endLockedSession,
   reconcileAuthSession,
   signOutAndClearLocalState,
 } from "@/lib/auth-local-state";
@@ -96,7 +98,6 @@ describe("auth-local-state", () => {
     clearSolaceClientAuthArtifacts();
 
     expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
-    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
     expect(mockResetE2eeBootstrap).toHaveBeenCalledTimes(1);
   });
 
@@ -136,7 +137,7 @@ describe("auth-local-state", () => {
     const result = await reconcileAuthSession({ hasClientSession: false });
 
     expect(result).toEqual({ status: "unauthenticated" });
-    expect(mockClearOrphanedEncPasswordCookie).toHaveBeenCalledTimes(1);
+    expect(mockClearLegacyRememberedPassword).toHaveBeenCalledTimes(1);
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
@@ -167,7 +168,6 @@ describe("auth-local-state", () => {
     expect(result).toEqual({ status: "recovered" });
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
-    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the session when validation returns an error", async () => {
@@ -199,7 +199,7 @@ describe("auth-local-state", () => {
     await signOutAndClearLocalState();
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+    expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
   });
 
   it("deletes the server rows of recoverable device keys while the session still exists", async () => {
@@ -224,13 +224,25 @@ describe("auth-local-state", () => {
     await signOutAndClearLocalState();
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+    expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
   });
 
   it("clearOrphanedClientAuthArtifacts only clears orphaned encryption state", () => {
     clearOrphanedClientAuthArtifacts();
 
-    expect(mockClearOrphanedEncPasswordCookie).toHaveBeenCalledTimes(1);
+    expect(mockClearLegacyRememberedPassword).toHaveBeenCalledTimes(1);
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it("ends a locked session by signing out, then opening the login page with the reason", async () => {
+    endLockedSession("cannot-open");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockBeginAuthNavigation).toHaveBeenCalledWith("/login?e2ee=cannot-open");
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockFinishNavigation).toHaveBeenCalledTimes(1);
+    expect(mockSignOut.mock.invocationCallOrder[0]).toBeLessThan(
+      mockFinishNavigation.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 });

@@ -61,7 +61,7 @@ function toBufferSource(value: Uint8Array): ArrayBuffer {
 async function deriveVaultKey(
   passphrase: string,
   params: MailVaultKdfParams,
-  onDerivedKey?: (keyB64: string) => void,
+  onDerivedKey?: (key: CryptoKey) => void,
 ): Promise<CryptoKey> {
   let keyBytes: Uint8Array;
 
@@ -77,15 +77,15 @@ async function deriveVaultKey(
     keyBytes = await deriveVaultKeyBytes(passphrase, params);
   }
 
-  onDerivedKey?.(bytesToBase64(keyBytes));
-
-  return getCryptoRef().subtle.importKey(
+  const key = await getCryptoRef().subtle.importKey(
     "raw",
     toBufferSource(keyBytes),
     { name: "AES-GCM" },
     false,
     ["encrypt", "decrypt"],
   );
+  onDerivedKey?.(key);
+  return key;
 }
 
 function createKdfParams(
@@ -182,7 +182,7 @@ function parseUserKeyVault(raw: string): UserKeyVault {
 /** Unlock with a locally cached AES key, skipping the argon2id pass. */
 export async function unlockEncryptedMailVaultWithDerivedKey(
   encryptedVaultB64: string,
-  derivedKeyBase64: string,
+  key: CryptoKey,
 ): Promise<UserKeyVault> {
   try {
     const cryptoRef = getCryptoRef();
@@ -190,13 +190,6 @@ export async function unlockEncryptedMailVaultWithDerivedKey(
       decodeUtf8(base64ToBytes(encryptedVaultB64)),
     );
 
-    const key = await cryptoRef.subtle.importKey(
-      "raw",
-      toBufferSource(base64ToBytes(derivedKeyBase64)),
-      { name: "AES-GCM" },
-      false,
-      ["decrypt"],
-    );
     const plaintext = await cryptoRef.subtle.decrypt(
       {
         name: "AES-GCM",
@@ -216,7 +209,7 @@ export async function unlockEncryptedMailVault(
   encryptedVaultB64: string,
   passphrase: string,
   kdfParams: MailVaultKdfParams,
-  onDerivedKey?: (keyB64: string) => void,
+  onDerivedKey?: (key: CryptoKey) => void,
 ): Promise<UserKeyVault> {
   try {
     const cryptoRef = getCryptoRef();

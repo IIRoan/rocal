@@ -4,9 +4,8 @@ import { afterEach, describe, expect, it } from "@jest/globals";
 
 import {
   clearAuthPasswords,
+  clearLegacyRememberedPassword,
   clearPendingAuthPassword,
-  peekAuthPassword,
-  peekCachedAuthPassword,
   peekPendingAuthPassword,
   storePendingAuthPassword,
 } from "../../lib/e2ee-password-cache";
@@ -14,40 +13,52 @@ import {
 describe("e2ee auth password cache", () => {
   afterEach(() => {
     clearAuthPasswords();
+    localStorage.clear();
+    sessionStorage.clear();
   });
 
-  it("keeps the cached auth password after clearing only the pending password", () => {
+  it("keeps the sign-in password in memory only", () => {
+    storePendingAuthPassword("StrongMailboxPassword!42");
+
+    expect(peekPendingAuthPassword()).toBe("StrongMailboxPassword!42");
+    expect(document.cookie).toBe("");
+    expect(localStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(0);
+  });
+
+  it("forgets the password once cleared", () => {
     storePendingAuthPassword("StrongMailboxPassword!42");
 
     clearPendingAuthPassword();
 
     expect(peekPendingAuthPassword()).toBeNull();
-    expect(peekCachedAuthPassword()).toBe("StrongMailboxPassword!42");
-  });
-
-  it("clears both cached and pending passwords when requested", () => {
-    storePendingAuthPassword("StrongMailboxPassword!42");
-
-    clearAuthPasswords();
-
-    expect(peekPendingAuthPassword()).toBeNull();
-    expect(peekCachedAuthPassword()).toBeNull();
   });
 
   it("trims passwords before storing them", () => {
     storePendingAuthPassword("  StrongMailboxPassword!42  ");
 
     expect(peekPendingAuthPassword()).toBe("StrongMailboxPassword!42");
-    expect(peekCachedAuthPassword()).toBe("StrongMailboxPassword!42");
   });
 
-  it("returns pending password first, then the cached copy", () => {
-    storePendingAuthPassword("StrongMailboxPassword!42");
-    clearPendingAuthPassword();
+  it("removes the 30-day password cookie and its key that earlier builds stored", () => {
+    document.cookie = "solace_enc_pw=ciphertext; path=/";
+    localStorage.setItem("solace:enc-device-key", "jwk");
+    sessionStorage.setItem("solace:enc-fresh-sign-in", "1");
 
-    expect(peekAuthPassword()).toBe("StrongMailboxPassword!42");
+    clearLegacyRememberedPassword();
 
+    expect(document.cookie).not.toContain("solace_enc_pw");
+    expect(localStorage.getItem("solace:enc-device-key")).toBeNull();
+    expect(sessionStorage.getItem("solace:enc-fresh-sign-in")).toBeNull();
+  });
+
+  it("clears the legacy copy whenever all passwords are cleared", () => {
+    document.cookie = "solace_enc_pw=ciphertext; path=/";
     storePendingAuthPassword("StrongMailboxPassword!42");
-    expect(peekAuthPassword()).toBe("StrongMailboxPassword!42");
+
+    clearAuthPasswords();
+
+    expect(peekPendingAuthPassword()).toBeNull();
+    expect(document.cookie).not.toContain("solace_enc_pw");
   });
 });

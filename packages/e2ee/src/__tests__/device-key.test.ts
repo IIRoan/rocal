@@ -100,9 +100,8 @@ describe("lockWithoutDeviceKeys", () => {
     expect(lockWithoutDeviceKeys({ ...base, password: "sign-in", opened: true })).toBeNull();
   });
 
-  it("asks for a sign-in when no password, or only a remembered one, was at hand", () => {
+  it("asks for a sign-in when no password was at hand", () => {
     expect(lockWithoutDeviceKeys({ ...base, password: "none" })).toBe("sign-in-again");
-    expect(lockWithoutDeviceKeys({ ...base, password: "remembered" })).toBe("sign-in-again");
   });
 
   it("reports an envelope the password the server just accepted cannot open", () => {

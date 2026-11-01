@@ -3,11 +3,16 @@ const DATABASE_VERSION = 2;
 const VAULT_BACKUP_STORE = "vault-backups";
 const DERIVED_KEY_STORE = "derived-vault-keys";
 
+/** A non-extractable CryptoKey, so page script can use the cached key but never read its bytes. */
 type DerivedVaultKeyRecord = {
   userId: string;
-  derivedKeyB64: string;
+  key: CryptoKey;
   updatedAt: string;
 };
+
+function isCryptoKey(value: unknown): value is CryptoKey {
+  return typeof CryptoKey !== "undefined" && value instanceof CryptoKey;
+}
 
 async function openDatabase(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") {
@@ -73,25 +78,28 @@ async function withStore<T>(
 
 export async function getStoredDerivedVaultKey(
   userId: string,
-): Promise<string | null> {
+): Promise<CryptoKey | null> {
   const normalized = userId.trim();
   if (!normalized) return null;
-  const record = await withStore<DerivedVaultKeyRecord>("readonly", (store) =>
+  const record = await withStore<{ key?: unknown }>("readonly", (store) =>
     store.get(normalized),
   );
-  return record?.derivedKeyB64 ?? null;
+  if (isCryptoKey(record?.key)) return record.key;
+  // Earlier builds stored the raw key bytes here; dropping them costs one Argon2id pass.
+  if (record) await deleteStoredDerivedVaultKey(normalized);
+  return null;
 }
 
 export async function putStoredDerivedVaultKey(
   userId: string,
-  derivedKeyB64: string,
+  key: CryptoKey,
 ): Promise<void> {
   const normalized = userId.trim();
-  if (!normalized || !derivedKeyB64) return;
+  if (!normalized || key.extractable) return;
   await withStore("readwrite", (store) =>
     store.put({
       userId: normalized,
-      derivedKeyB64,
+      key,
       updatedAt: new Date().toISOString(),
     } satisfies DerivedVaultKeyRecord),
   );
