@@ -21,12 +21,12 @@ appId: onl.solace.mail
     commands:
       - tapOn: "Allow"
 - extendedWaitUntil:
-    visible: "Studio walkthrough on Thursday"
+    visible: "(Re: )?Studio walkthrough on Thursday"
     timeout: 180000
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: 01-inbox
-- tapOn: "Studio walkthrough on Thursday"
+- tapOn: "(Re: )?Studio walkthrough on Thursday"
 - extendedWaitUntil:
     visible: ".*see you then.*"
     timeout: 90000
