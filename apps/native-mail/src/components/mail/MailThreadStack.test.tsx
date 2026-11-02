@@ -2,6 +2,7 @@
 
 import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { Text } from "react-native";
 import { MailThreadStack } from "./MailThreadStack";
 import type { JmapEmailMessage } from "../../lib/mail/types";
 
@@ -88,7 +89,7 @@ describe("native mail thread stack", () => {
           onShowAll={onShowAll}
           onSelectMessage={onSelectMessage}
         >
-          <p>open message</p>
+          <Text>open message</Text>
         </MailThreadStack>,
       ),
     );
