@@ -20,7 +20,6 @@ export type MessageReaderUiState = {
   attachmentHoverPreviews: Record<string, AttachmentHoverPreview>;
   loadingAttachmentPreviewKey: string | null;
   showQuote: boolean;
-  isConversationCollapsed: boolean;
 };
 
 export const initialMessageReaderUiState: MessageReaderUiState = {
@@ -32,7 +31,6 @@ export const initialMessageReaderUiState: MessageReaderUiState = {
   attachmentHoverPreviews: {},
   loadingAttachmentPreviewKey: null,
   showQuote: false,
-  isConversationCollapsed: true,
 };
 
 export type MessageReaderUiAction =
@@ -98,7 +96,6 @@ export type MessageReaderChromeState = {
   moreActionsOpen: boolean;
   morePopoverOpen: boolean;
   isBodyExpanded: boolean;
-  showOwnMessages: boolean;
   showRawHtmlDialog: boolean;
 };
 
@@ -107,13 +104,12 @@ export const initialMessageReaderChromeState: MessageReaderChromeState = {
   moreActionsOpen: false,
   morePopoverOpen: false,
   isBodyExpanded: false,
-  showOwnMessages: false,
   showRawHtmlDialog: false,
 };
 
 export type MessageReaderChromeAction =
   | { type: "patch"; patch: Partial<MessageReaderChromeState> }
-  | { type: "toggle"; field: "isBodyExpanded" | "showOwnMessages" };
+  | { type: "toggle"; field: "isBodyExpanded" };
 
 export function messageReaderChromeReducer(
   state: MessageReaderChromeState,

@@ -19,6 +19,7 @@ export * from "./mail-mailbox-names";
 export * from "./mail-label-colors";
 export * from "./mail-message-labels";
 export * from "./mail-list-view-filter";
+export * from "./mail-thread-summary";
 export * from "./mail-jmap-validation";
 export * from "./mail-server-limits";
 export * from "./mail-server-policy";

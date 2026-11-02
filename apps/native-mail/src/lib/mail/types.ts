@@ -87,6 +87,9 @@ export type JmapAttachment = {
   content?: MailAttachmentContent | null;
 };
 
+/** Keys stay unique across a thread: decrypted attachments have no blob id. */
+export type KeyedAttachment = { key: string; attachment: JmapAttachment };
+
 export type JmapEmailMessage = MailSimpleLoginFields & MailAuthResultsFields & {
   id: string;
   threadId?: string;

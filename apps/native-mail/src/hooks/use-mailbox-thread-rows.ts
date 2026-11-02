@@ -105,7 +105,7 @@ export function useMailboxThreadRows({
     : allThreadRows;
 
   const latestMessages = threadRows.map((row) => row.latestMessage);
-  const decryptedPreviews = useConversationDecryptedPreviews(
+  const { previews: decryptedPreviews } = useConversationDecryptedPreviews(
     runtime,
     latestMessages,
   );

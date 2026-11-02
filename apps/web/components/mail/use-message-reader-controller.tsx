@@ -12,11 +12,14 @@ import {
   buildEventReminderMailView,
   enrichSelfMailRecipient,
   formatDateTimeLabel,
+  formatMailThreadDateRange,
   getErrorMessage,
+  getMailThreadParticipants,
   isDecryptedEventReminderContent,
   pickOutgoingAttachmentFiles,
   resolveMailServerLimits,
   resolveTimezone,
+  type MailThreadParticipant,
 } from "@workspace/calendar-core";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, MapPin } from "lucide-react";
@@ -70,6 +73,19 @@ type LinkedCalendarEventState = {
   error: string | null;
 };
 
+export type KeyedMailAttachment = { key: string; attachment: MailAttachment };
+
+/** Message id keeps keys unique: decrypted attachments have no blob id and a thread can repeat a file. */
+function keyAttachments(
+  messageId: string,
+  attachments: MailAttachment[],
+): KeyedMailAttachment[] {
+  return attachments.map((attachment, index) => ({
+    key: `${messageId}:${attachment.blobId ?? index}`,
+    attachment,
+  }));
+}
+
 export type MessageReaderViewModel = {
   message: NonNullable<MessageReaderProps["message"]>;
   isFlagged: boolean;
@@ -85,11 +101,10 @@ export type MessageReaderViewModel = {
   orderedConversationMessages: NonNullable<
     MessageReaderProps["conversationMessages"]
   >;
-  showConversation: boolean;
-  ownMessageCount: number;
-  visibleConversationMessages: NonNullable<
-    MessageReaderProps["conversationMessages"]
-  >;
+  threadSubject: string;
+  threadDateRange: string | null;
+  threadParticipants: MailThreadParticipant[];
+  threadAttachments: KeyedMailAttachment[];
   isInTrash: boolean;
   isInSpam: boolean;
   canReportSpam: boolean;
@@ -112,6 +127,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
     message,
     selectedMessageId,
     conversationMessages = EMPTY_ARRAY,
+    conversationAttachments,
     loading,
     plaintext,
     decryptedHtml,
@@ -172,7 +188,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
     moreActionsOpen,
     morePopoverOpen,
     isBodyExpanded,
-    showOwnMessages,
     showRawHtmlDialog,
   } = chrome;
   const [messageUi, dispatchMessageUi] = useReducer(
@@ -188,12 +203,10 @@ export function useMessageReaderController(props: MessageReaderProps) {
     attachmentHoverPreviews,
     loadingAttachmentPreviewKey,
     showQuote,
-    isConversationCollapsed,
   } = messageUi;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const expandedWrapRef = useRef<HTMLDivElement>(null);
-  const conversationListRef = useRef<HTMLUListElement>(null);
   const isMobile = useIsMobile();
   const prefersReducedMotion = usePrefersReducedMotion();
   const calendarEventLinkSource = message
@@ -335,17 +348,14 @@ export function useMessageReaderController(props: MessageReaderProps) {
         (!shouldReplaceBodyWithEventReminder && !linkedCalendarEvent.error)),
   );
 
-  const displayAttachments: MailAttachment[] = (() => {
-    const all: MailAttachment[] = attachments ?? message?.attachments ?? [];
-    if (!displaySettings.hideInlineImageAttachments) return all;
-    return all.filter(
-      (attachment) =>
-        !(
-          attachment.disposition === "inline" &&
-          Boolean(attachment.cid?.trim())
-        ),
-    );
-  })();
+  const showAttachment = (attachment: MailAttachment) =>
+    !displaySettings.hideInlineImageAttachments ||
+    !(attachment.disposition === "inline" && Boolean(attachment.cid?.trim()));
+  const displayAttachments: MailAttachment[] = (
+    attachments ??
+    message?.attachments ??
+    []
+  ).filter(showAttachment);
 
   const handleLoadAttachmentHoverPreview = (
     attachment: MailAttachment,
@@ -475,11 +485,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
     loadedForMessage: allowExternalContent,
   });
 
-  useEffect(() => {
-    const el = conversationListRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [conversationMessages.length]);
-
   const earlyReturn: ReactNode | null = !message ? (
     <div className="flex h-full min-h-0 flex-col items-center justify-center gap-1 p-8">
       <p className="text-sm text-muted-foreground">Select a conversation</p>
@@ -510,21 +515,23 @@ export function useMessageReaderController(props: MessageReaderProps) {
     const orderedConversationMessages = conversationMessages.length
       ? conversationMessages
       : [message];
-    const showConversation = orderedConversationMessages.length > 1;
-
-    const ownMessageCount = accountEmail
-      ? orderedConversationMessages.filter(
-          (m) =>
-            m.from?.[0]?.email?.toLowerCase() === accountEmail.toLowerCase(),
-        ).length
-      : 0;
-    const visibleConversationMessages =
-      accountEmail && !showOwnMessages
-        ? orderedConversationMessages.filter(
-            (m) =>
-              m.from?.[0]?.email?.toLowerCase() !== accountEmail.toLowerCase(),
-          )
-        : orderedConversationMessages;
+    const newestMessage =
+      orderedConversationMessages[orderedConversationMessages.length - 1] ??
+      message;
+    const isThread = orderedConversationMessages.length > 1;
+    // The open message's own list is decrypted already; the others fill in as their previews decrypt.
+    const threadAttachments = isThread
+      ? orderedConversationMessages.flatMap((threadMessage) =>
+          keyAttachments(
+            threadMessage.id,
+            threadMessage.id === message.id
+              ? displayAttachments
+              : (conversationAttachments?.[threadMessage.id] ?? []).filter(
+                  showAttachment,
+                ),
+          ),
+        )
+      : [];
 
     const currentMailboxRole = mailboxes
       .find((m) => m.id === currentMailboxId)
@@ -548,9 +555,14 @@ export function useMessageReaderController(props: MessageReaderProps) {
       enrichedSender,
       otherMailboxes,
       orderedConversationMessages,
-      showConversation,
-      ownMessageCount,
-      visibleConversationMessages,
+      threadSubject: newestMessage.subject || message.subject || "",
+      threadDateRange: isThread
+        ? formatMailThreadDateRange(orderedConversationMessages, timezone)
+        : null,
+      threadParticipants: isThread
+        ? getMailThreadParticipants(orderedConversationMessages, accountEmail)
+        : [],
+      threadAttachments,
       isInTrash,
       isInSpam,
       canReportSpam,
@@ -600,15 +612,16 @@ export function useMessageReaderController(props: MessageReaderProps) {
     fileInputRef,
     textareaRef,
     expandedWrapRef,
-    conversationListRef,
     displayAttachments,
+    displayAttachmentItems: message
+      ? keyAttachments(message.id, displayAttachments)
+      : [],
     attachmentHoverPreviews,
     loadingAttachmentPreviewKey,
     labelPopoverOpen,
     moreActionsOpen,
     morePopoverOpen,
     isBodyExpanded,
-    showOwnMessages,
     showRawHtmlDialog,
     replyText,
     attachedFiles,
@@ -616,7 +629,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
     isSendingReply,
     isReplyExpanded,
     showQuote,
-    isConversationCollapsed,
     selectedMessageId,
     calendarInvitation,
     mailCalendarInvite,

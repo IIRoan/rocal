@@ -16,7 +16,7 @@ import type { MessageReaderController, MessageReaderViewModel } from "../use-mes
 import { MessageReaderToolbar } from "./message-reader-toolbar";
 import { MessageReaderTitle } from "./message-reader-title";
 import { MessageReaderHeader } from "./message-reader-header";
-import { MessageReaderConversationStrip } from "./message-reader-conversation-strip";
+import { MessageReaderThreadStack } from "./message-reader-thread-stack";
 import { MessageReaderCalendarCards } from "./message-reader-calendar-cards";
 import { MessageReaderBody } from "./message-reader-body";
 import { MessageReaderReplyBar } from "./message-reader-reply-bar";
@@ -47,7 +47,7 @@ export function MessageReaderShell({
     }
   };
 
-  // Toolbar stays put; only the message content fades (WAAPI, so it stays on the compositor), making a switch read as new content in a fixed frame.
+  // Toolbar stays put; only the thread content fades (WAAPI, so it stays on the compositor), making a switch read as new content in a fixed frame.
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -55,7 +55,7 @@ export function MessageReaderShell({
       root.querySelectorAll<HTMLElement>(":scope > :not(:first-child)"),
     ).flatMap((element) => fadeInMailReaderContent(element, prefersReducedMotion) ?? []);
     return () => fades.forEach((fade) => fade.cancel());
-  }, [message?.id, prefersReducedMotion]);
+  }, [conversationThreadKey, prefersReducedMotion]);
 
   return (
     <div
@@ -64,19 +64,20 @@ export function MessageReaderShell({
     >
       <MessageReaderToolbar controller={controller} view={view} />
       <MessageReaderTitle controller={controller} view={view} />
-      <MessageReaderConversationStrip
+      <MessageReaderThreadStack
         key={conversationThreadKey}
         controller={controller}
         view={view}
-      />
-      <article className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        <MessageReaderHeader controller={controller} view={view} />
-        <MessageReaderCalendarCards controller={controller} view={view} />
-        <div className="flex min-h-0 flex-1 flex-col">
-          <MessageReaderBody controller={controller} view={view} />
-        </div>
-        <MessageReaderReplyBar controller={controller} view={view} />
-      </article>
+      >
+        <article className="flex flex-1 flex-col gap-4 p-4">
+          <MessageReaderHeader controller={controller} view={view} />
+          <MessageReaderCalendarCards controller={controller} view={view} />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <MessageReaderBody controller={controller} view={view} />
+          </div>
+          <MessageReaderReplyBar controller={controller} view={view} />
+        </article>
+      </MessageReaderThreadStack>
       <Dialog
         open={showRawHtmlDialog}
         onOpenChange={(open) =>

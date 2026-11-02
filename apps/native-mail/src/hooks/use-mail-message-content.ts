@@ -10,6 +10,7 @@ import { useConversationThread } from "../lib/mail/use-conversation-thread";
 import { useConversationDecryptedPreviews } from "../lib/mail/use-conversation-decrypted-previews";
 import type { MailDecryptResult } from "../lib/mail/mail-crypto";
 import { decryptEncryptedMessage } from "../lib/mail/mail-sender-key";
+import type { JmapAttachment, KeyedAttachment } from "../lib/mail/types";
 
 export function useMailMessageContent(messageId: string) {
   const runtimeQuery = useMailRuntime(true);
@@ -53,14 +54,13 @@ export function useMailMessageContent(messageId: string) {
     ? { text: decryptResult.plaintext, html: decryptResult.html }
     : null;
 
-  const conversationPreviews = useConversationDecryptedPreviews(
-    runtime,
-    conversationMessages,
-    {
-      messageId,
-      decrypted: selectedDecryptedPreview,
-    },
-  );
+  const {
+    previews: conversationPreviews,
+    attachments: conversationAttachments,
+  } = useConversationDecryptedPreviews(runtime, conversationMessages, {
+    messageId,
+    decrypted: selectedDecryptedPreview,
+  });
 
   const htmlContent: string | null =
     decryptResult?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
@@ -80,6 +80,27 @@ export function useMailMessageContent(messageId: string) {
     messageAttachments: message?.attachments,
   });
 
+  const displayAttachmentItems = keyAttachments(messageId, displayAttachments);
+  // The thread as the reader stacks it; until the conversation loads it is just the open message.
+  const threadMessages =
+    message && !conversationMessages.some((entry) => entry.id === message.id)
+      ? [message]
+      : conversationMessages;
+  const threadAttachments = threadMessages.flatMap((entry) =>
+    entry.id === messageId
+      ? displayAttachmentItems
+      : keyAttachments(
+          entry.id,
+          resolveDisplayAttachments({
+            encryption: classifyMessageEncryption(entry),
+            isDecrypting: false,
+            decryptSucceeded: entry.id in conversationAttachments,
+            decryptedAttachments: conversationAttachments[entry.id],
+            messageAttachments: entry.attachments,
+          }),
+        ),
+  );
+
   return {
     runtime,
     message,
@@ -87,6 +108,8 @@ export function useMailMessageContent(messageId: string) {
     isMessageError,
     messageError,
     conversationMessages,
+    threadMessages,
+    threadAttachments,
     isConversationLoading,
     conversationPreviews,
     encryption,
@@ -99,5 +122,16 @@ export function useMailMessageContent(messageId: string) {
     plainContent,
     rawHtmlSource,
     displayAttachments,
+    displayAttachmentItems,
   };
+}
+
+function keyAttachments(
+  messageId: string,
+  attachments: JmapAttachment[],
+): KeyedAttachment[] {
+  return attachments.map((attachment, index) => ({
+    key: `${messageId}:${attachment.blobId ?? index}`,
+    attachment,
+  }));
 }

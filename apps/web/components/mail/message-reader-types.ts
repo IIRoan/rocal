@@ -28,6 +28,7 @@ export interface MessageReaderProps {
   selectedMessageId?: string | null;
   conversationMessages?: JmapEmailMessage[];
   conversationPreviews?: Record<string, string>;
+  conversationAttachments?: Record<string, MailAttachment[]>;
   loading?: MessageReaderLoadingState;
   onSelectConversationMessage?: (id: string) => void;
   plaintext: string | null;

@@ -33,6 +33,7 @@ export function MailAppDetailPane({
     isMessageBodyLoading,
     selectedMessageIsDecrypting,
     conversationDecryptedPreviews,
+    conversationAttachments,
     setSelectedConversationMessageId,
     selectedMessagePlaintext,
     selectedMessageDecryptedHtml,
@@ -97,6 +98,7 @@ export function MailAppDetailPane({
             selectedMessageId={selectedMessage?.id ?? null}
             conversationMessages={selectedConversationMessages}
             conversationPreviews={conversationDecryptedPreviews}
+            conversationAttachments={conversationAttachments}
             loading={{
               conversation: isConversationLoading,
               messageBody: isMessageBodyLoading,

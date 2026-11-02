@@ -1638,3 +1638,86 @@ describe("MessageReader — untrash / restore", () => {
     expect(btn).not.toBeNull();
   });
 });
+
+describe("MessageReader — thread", () => {
+  const senders = [
+    { name: "Ali", email: "ali@example.com" },
+    { name: "Me", email: "me@solace.onl" },
+    { name: "Sarah", email: "sarah@example.com" },
+  ];
+  const thread = [1, 2, 3, 4, 5, 6].map((day, index) => ({
+    ...baseMessage,
+    id: `t${day}`,
+    threadId: "thread-1",
+    subject: day === 1 ? "Project kickoff" : "Re: Project kickoff",
+    from: [senders[index % senders.length]],
+    to: [senders[(index + 1) % senders.length]],
+    receivedAt: `2024-03-0${day}T10:00:00Z`,
+    keywords: { $seen: true },
+  }));
+  const previews = Object.fromEntries(
+    thread.map((entry) => [entry.id, `Preview of ${entry.id}`]),
+  );
+  const openNewest = (props: Partial<MessageReaderProps> = {}) =>
+    render({
+      message: thread[5] as any,
+      conversationMessages: thread as any,
+      conversationPreviews: previews,
+      accountEmail: "me@solace.onl",
+      timezone: "UTC",
+      ...props,
+    });
+
+  it("opens the newest message in place and folds the long run before it", () => {
+    openNewest();
+    expect(container.textContent).toContain("Re: Project kickoff[6]");
+    expect(container.textContent).toContain("Preview of t1");
+    expect(container.textContent).toContain("Preview of t5");
+    expect(container.textContent).not.toContain("Preview of t3");
+
+    const fold = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("3 more messages"),
+    );
+    act(() => {
+      fold?.click();
+    });
+    expect(container.textContent).toContain("Preview of t3");
+    expect(container.textContent).not.toContain("more messages");
+  });
+
+  it("opens a collapsed message from its row", () => {
+    const onSelectConversationMessage = jest.fn();
+    openNewest({ onSelectConversationMessage });
+    const row = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Preview of t1"),
+    );
+    act(() => {
+      row?.click();
+    });
+    expect(onSelectConversationMessage).toHaveBeenCalledWith("t1");
+  });
+
+  it("summarizes the dates, the people and every attachment in the thread", () => {
+    openNewest({
+      attachments: [{ name: "notes.txt", type: "text/plain", content: "n" }],
+      conversationAttachments: {
+        t2: [{ name: "plan.pdf", type: "application/pdf", content: "p" }],
+      },
+    });
+    expect(container.textContent).toContain("Mar 1, 2024 – Mar 6, 2024");
+    const people = container.querySelector('[aria-label="People in this thread"]');
+    expect(people?.textContent).toContain("Ali");
+    expect(people?.textContent).toContain("Sarah");
+    expect(people?.textContent).toContain("You");
+    expect(container.textContent).toContain("In this thread (2)");
+    expect(container.textContent).toContain("plan.pdf");
+    expect(container.textContent).toContain("notes.txt");
+  });
+
+  it("keeps a single message free of thread chrome", () => {
+    render();
+    expect(container.textContent).not.toContain("[1]");
+    expect(container.querySelector('[aria-label="People in this thread"]')).toBeNull();
+    expect(container.textContent).not.toContain("In this thread");
+  });
+});

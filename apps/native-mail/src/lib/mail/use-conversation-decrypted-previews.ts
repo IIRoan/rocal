@@ -13,7 +13,7 @@ import {
 } from "./mail-preview";
 import { classifyMessageEncryption } from "./message-security";
 import { decryptEncryptedMessage } from "./mail-sender-key";
-import type { JmapEmailMessage } from "./types";
+import type { JmapAttachment, JmapEmailMessage } from "./types";
 import type { MailRuntime } from "./mail-runtime";
 
 const MAX_CONCURRENT_PREVIEW_DECRYPTS = 2;
@@ -45,11 +45,17 @@ type SelectedDecryptedPreview = {
   decrypted: DecryptedMailPreviewContent | null;
 };
 
+type ConversationDecryptedContent = {
+  previews: Record<string, string>;
+  /** Decrypted attachments of conversation messages whose decrypt has landed, by message id. */
+  attachments: Record<string, JmapAttachment[]>;
+};
+
 export function useConversationDecryptedPreviews(
   runtime: MailRuntime | undefined,
   messages: JmapEmailMessage[],
   selected?: SelectedDecryptedPreview,
-): Record<string, string> {
+): ConversationDecryptedContent {
   const queryClient = useQueryClient();
   const selectedMessageId = selected?.messageId ?? null;
   const selectedDecrypted = selected?.decrypted ?? null;
@@ -58,7 +64,10 @@ export function useConversationDecryptedPreviews(
 
   // A stable combine keeps the map (and every list row) unchanged until a decrypt actually lands.
   const combineDecrypted = (results: UseQueryResult<MailDecryptResult>[]) => {
-    const map = new Map<string, DecryptedMailPreviewContent>();
+    const map = new Map<
+      string,
+      DecryptedMailPreviewContent & { attachments: JmapAttachment[] }
+    >();
     for (let index = 0; index < encryptedMessages.length; index += 1) {
       const message = encryptedMessages[index];
       const data = results[index]?.data;
@@ -66,6 +75,7 @@ export function useConversationDecryptedPreviews(
         map.set(message.id, {
           text: data.plaintext,
           html: data.html,
+          attachments: data.attachments ?? [],
         });
       }
     }
@@ -117,10 +127,15 @@ export function useConversationDecryptedPreviews(
   }, [queries, queryClient]);
 
   const previews: Record<string, string> = {};
+  const attachments: Record<string, JmapAttachment[]> = {};
   for (const message of encryptedMessages) {
+    const fromQuery = decryptedById.get(message.id);
+    if (fromQuery) {
+      attachments[message.id] = fromQuery.attachments;
+    }
     const selectedOverride =
       message.id === selectedMessageId ? selectedDecrypted : null;
-    const decrypted = selectedOverride ?? decryptedById.get(message.id) ?? null;
+    const decrypted = selectedOverride ?? fromQuery ?? null;
     if (!decrypted) {
       continue;
     }
@@ -129,5 +144,5 @@ export function useConversationDecryptedPreviews(
       previews[message.id] = snippet;
     }
   }
-  return previews;
+  return { previews, attachments };
 }
