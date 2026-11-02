@@ -53,14 +53,13 @@ export function useMailMessageContent(messageId: string) {
     ? { text: decryptResult.plaintext, html: decryptResult.html }
     : null;
 
-  const conversationPreviews = useConversationDecryptedPreviews(
-    runtime,
-    conversationMessages,
-    {
-      messageId,
-      decrypted: selectedDecryptedPreview,
-    },
-  );
+  const {
+    previews: conversationPreviews,
+    attachments: conversationAttachments,
+  } = useConversationDecryptedPreviews(runtime, conversationMessages, {
+    messageId,
+    decrypted: selectedDecryptedPreview,
+  });
 
   const htmlContent: string | null =
     decryptResult?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
@@ -80,6 +79,29 @@ export function useMailMessageContent(messageId: string) {
     messageAttachments: message?.attachments,
   });
 
+  // The thread as the reader stacks it; until the conversation loads it is just the open message.
+  const threadMessages =
+    message && !conversationMessages.some((entry) => entry.id === message.id)
+      ? [message]
+      : conversationMessages;
+  const threadAttachments = threadMessages.flatMap((entry) => {
+    const attachments =
+      entry.id === messageId
+        ? displayAttachments
+        : resolveDisplayAttachments({
+            encryption: classifyMessageEncryption(entry),
+            isDecrypting: false,
+            decryptSucceeded: entry.id in conversationAttachments,
+            decryptedAttachments: conversationAttachments[entry.id],
+            messageAttachments: entry.attachments,
+          });
+    // Message id keeps keys unique: decrypted attachments have no blob id.
+    return attachments.map((attachment, index) => ({
+      key: `${entry.id}:${attachment.blobId ?? index}`,
+      attachment,
+    }));
+  });
+
   return {
     runtime,
     message,
@@ -87,6 +109,8 @@ export function useMailMessageContent(messageId: string) {
     isMessageError,
     messageError,
     conversationMessages,
+    threadMessages,
+    threadAttachments,
     isConversationLoading,
     conversationPreviews,
     encryption,

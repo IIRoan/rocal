@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   useColorScheme,
@@ -36,18 +35,16 @@ import {
 import { MailZoomScrollView } from "../../../src/components/mail/MailZoomScrollView";
 import { CenteredLoader } from "@workspace/native-core/components/ui/loading";
 import { AttachmentPreviewModal } from "../../../src/components/mail/AttachmentPreviewModal";
-import { ConversationThreadStrip } from "../../../src/components/mail/ConversationThreadStrip";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { useMailCompose } from "../../../src/providers/MailComposeProvider";
-import {
-  MAIL_HOME_ROUTE,
-  mailMessageRoute,
-} from "../../../src/lib/mail-routes";
+import { MAIL_HOME_ROUTE } from "../../../src/lib/mail-routes";
 import { MailReaderToolbar } from "../../../src/components/mail/MailReaderToolbar";
 import { mailBottomBarTotalHeight } from "../../../src/components/mail/mail-bottom-action-bar-layout";
 import { MailAttachmentCards } from "../../../src/components/mail/MailAttachmentCards";
 import { MailReaderHeader } from "../../../src/components/mail/MailReaderHeader";
 import { MailMessageHeader } from "../../../src/components/mail/MailMessageHeader";
+import { MailThreadHeader } from "../../../src/components/mail/MailThreadHeader";
+import { MailThreadStack } from "../../../src/components/mail/MailThreadStack";
 import { MailMessageBody } from "../../../src/components/mail/MailMessageBody";
 import { openCalendarEvent } from "../../../src/lib/open-calendar-event";
 import { MailMessageActionsSheet } from "../../../src/components/mail/MailMessageActionsSheet";
@@ -69,7 +66,7 @@ export default function MailMessageScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const isDark = useColorScheme() === "dark";
-  const { replace, back, canGoBack } = useRouter();
+  const { replace, back, canGoBack, setParams } = useRouter();
   const { openCompose } = useMailCompose();
   const styles = createStyles(theme);
   const scrollBottomPad =
@@ -101,6 +98,11 @@ export default function MailMessageScreen() {
     string | null
   >(null);
   const showOriginalLook = originalLookMessageId === messageId;
+  // Unfolding belongs to one thread and survives opening another of its messages.
+  const [unfoldedThreadKey, setUnfoldedThreadKey] = useState<string | null>(
+    null,
+  );
+  const threadKey = message?.threadId ?? messageId;
   const canShowOriginalLook =
     isDark && resolveMailContentIsDark(displaySettings);
   const { recordUsage } = useRecentContacts();
@@ -159,6 +161,12 @@ export default function MailMessageScreen() {
     user?.email?.trim().toLowerCase() ??
     runtime?.session.username?.trim().toLowerCase() ??
     undefined;
+  const newestThreadMessage =
+    content.threadMessages[content.threadMessages.length - 1];
+  const threadSubject =
+    newestThreadMessage?.subject?.trim() ||
+    message?.subject?.trim() ||
+    "(no subject)";
   const openEvent = (eventId: string) => {
     void openCalendarEvent(eventId).then(
       (opened) => {
@@ -177,69 +185,72 @@ export default function MailMessageScreen() {
       <MailReaderState content={content}>
         {message && (
           <View style={styles.messageBody}>
+            {/* Keyed so opening another message of the thread starts at the top. */}
             <MailZoomScrollView
+              key={messageId}
               style={styles.messageScroll}
               contentContainerStyle={[
                 styles.body,
                 { paddingBottom: scrollBottomPad },
               ]}
             >
-              <MailMessageHeader
-                message={message}
+              <MailThreadHeader
+                subject={threadSubject}
+                messages={content.threadMessages}
                 accountEmail={accountEmail}
-                accountName={user?.name?.trim() || undefined}
-                identities={runtime?.identities ?? []}
+                timezone={userSettings?.timezone ?? undefined}
                 labels={getAllMessageLabels(message, labels)}
                 isFlagged={actions.isFlagged}
                 starDisabled={actions.isStarPending}
                 onToggleStar={actions.handleToggleStar}
-                simpleLoginPending={actions.isSimpleLoginPending}
-                onSimpleLoginAction={actions.handleSimpleLoginAction}
                 encryption={content.encryption}
                 encryptedAtRest={Boolean(runtime?.encryptedAtRest)}
                 signatureVerificationState={
                   content.decryptResult?.signatureVerificationState
                 }
                 decryptionFailed={Boolean(content.decryptError)}
-                timeFormat={timeFormat}
-                timezone={userSettings?.timezone}
-              />
-
-              {content.isConversationLoading ? (
-                <ActivityIndicator
-                  size="small"
-                  color={theme.colors.mutedForeground}
-                  style={{ marginBottom: theme.spacing["2"] }}
-                />
-              ) : (
-                <ConversationThreadStrip
-                  messages={content.conversationMessages}
-                  activeMessageId={messageId}
-                  accountEmail={
-                    user?.email ?? runtime?.session.username ?? null
-                  }
-                  previews={content.conversationPreviews}
-                  onSelectMessage={(id) => {
-                    if (id !== messageId) {
-                      replace(mailMessageRoute(id) as never);
-                    }
-                  }}
-                />
-              )}
-
-              <MailMessageBody
-                messageId={messageId}
-                content={content}
-                calendar={calendar}
-                onOpenEvent={openEvent}
-                showOriginalLook={showOriginalLook}
-              />
-
-              <MailAttachmentCards
-                attachments={content.displayAttachments}
+                attachments={content.threadAttachments}
                 downloadingBlobId={actions.downloadingBlobId}
                 onOpenAttachment={actions.handleOpenAttachment}
               />
+
+              <MailThreadStack
+                messages={content.threadMessages}
+                activeMessageId={messageId}
+                accountEmail={accountEmail}
+                previews={content.conversationPreviews}
+                loading={content.isConversationLoading}
+                showAll={unfoldedThreadKey === threadKey}
+                onShowAll={() => setUnfoldedThreadKey(threadKey)}
+                onSelectMessage={(id) => {
+                  if (id !== messageId) setParams({ id });
+                }}
+              >
+                <MailMessageHeader
+                  message={message}
+                  accountEmail={accountEmail}
+                  accountName={user?.name?.trim() || undefined}
+                  identities={runtime?.identities ?? []}
+                  simpleLoginPending={actions.isSimpleLoginPending}
+                  onSimpleLoginAction={actions.handleSimpleLoginAction}
+                  timeFormat={timeFormat}
+                  timezone={userSettings?.timezone}
+                />
+
+                <MailMessageBody
+                  messageId={messageId}
+                  content={content}
+                  calendar={calendar}
+                  onOpenEvent={openEvent}
+                  showOriginalLook={showOriginalLook}
+                />
+
+                <MailAttachmentCards
+                  attachments={content.displayAttachments}
+                  downloadingBlobId={actions.downloadingBlobId}
+                  onOpenAttachment={actions.handleOpenAttachment}
+                />
+              </MailThreadStack>
             </MailZoomScrollView>
 
             <MailReaderToolbar bottomInset={insets.bottom} actions={actions} />

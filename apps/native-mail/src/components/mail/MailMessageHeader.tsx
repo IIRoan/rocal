@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 import { useFadeInAfterPaint } from "@workspace/native-core/hooks/use-fade-in-after-paint";
-import { Feather, FontAwesome } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import {
   enrichSelfMailRecipient,
   getSimpleLoginForward,
@@ -20,24 +20,14 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { formatMessageDate } from "../../lib/mail/mail-helpers";
 import { formatReaderRecipientLine } from "../../lib/mail/reader-recipients";
-import type { MailSignatureVerificationState } from "../../lib/mail/mail-crypto";
-import type {
-  JmapEmailMessage,
-  JmapIdentity,
-  LabelDef,
-  MessageEncryptionState,
-} from "../../lib/mail/types";
+import type { JmapEmailMessage, JmapIdentity } from "../../lib/mail/types";
 import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar";
 import { MailAuthResultsBadge } from "./MailAuthResultsBadge";
 import { MailIdentityBadge } from "./MailIdentityBadge";
-import { MailLabelChip } from "./MailLabelChip";
-import { MailSecurityIndicator } from "./MailSecurityIndicator";
 import { MailSimpleLoginRow } from "./MailSimpleLoginRow";
 import { RecipientLinkList, RecipientSheet } from "./RecipientSheet";
 import {
   MAIL_LAYOUT,
-  mailColors,
-  useMailPalette,
   useMailSkin,
   type MailSkin,
 } from "@workspace/native-core/components/mail/mail-ui";
@@ -47,16 +37,8 @@ export type MailMessageHeaderProps = {
   accountEmail?: string;
   accountName?: string | null;
   identities: JmapIdentity[];
-  labels: LabelDef[];
-  isFlagged: boolean;
-  starDisabled?: boolean;
-  onToggleStar: () => void;
   simpleLoginPending: boolean;
   onSimpleLoginAction: (message: JmapEmailMessage, mode: SimpleLoginActionMode) => void;
-  encryption: MessageEncryptionState;
-  encryptedAtRest: boolean;
-  signatureVerificationState?: MailSignatureVerificationState;
-  decryptionFailed: boolean;
   timeFormat: TimeFormat;
   timezone?: string;
 };
@@ -68,22 +50,13 @@ export function MailMessageHeader({
   accountEmail,
   accountName,
   identities,
-  labels,
-  isFlagged,
-  starDisabled,
-  onToggleStar,
   simpleLoginPending,
   onSimpleLoginAction,
-  encryption,
-  encryptedAtRest,
-  signatureVerificationState,
-  decryptionFailed,
   timeFormat,
   timezone,
 }: MailMessageHeaderProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
-  const palette = useMailPalette();
   const styles = createStyles(theme, skin);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -103,48 +76,6 @@ export function MailMessageHeader({
 
   return (
     <View style={styles.root}>
-      <View style={styles.subjectBlock}>
-        <View style={styles.subjectRow}>
-          <Text style={styles.subject} selectable>
-            {message.subject?.trim() || "(no subject)"}
-          </Text>
-          <View style={styles.subjectActions}>
-            <MailSecurityIndicator
-              encryption={encryption}
-              encryptedAtRest={encryptedAtRest}
-              signatureVerificationState={signatureVerificationState}
-              decryptionFailed={decryptionFailed}
-            />
-            <Pressable
-              onPress={onToggleStar}
-              disabled={starDisabled}
-              hitSlop={8}
-              style={styles.starButton}
-              accessibilityRole="button"
-              accessibilityLabel={isFlagged ? "Unstar" : "Star"}
-            >
-              <FontAwesome
-                name={isFlagged ? "star" : "star-o"}
-                size={18}
-                color={isFlagged ? palette.star : skin.textTertiary}
-              />
-            </Pressable>
-          </View>
-        </View>
-
-        {labels.length > 0 ? (
-          <View style={styles.labelRow}>
-            {labels.map((label) => (
-              <MailLabelChip
-                key={label.id}
-                name={label.name}
-                color={label.color}
-              />
-            ))}
-          </View>
-        ) : null}
-      </View>
-
       <View style={styles.senderRow}>
         {sender ? (
           <RecipientSheet recipient={sender}>
@@ -396,28 +327,6 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const view = {
     root: {
       gap: theme.spacing["4"],
-      paddingBottom: theme.spacing["4"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: mailColors(theme).border,
-    },
-    subjectBlock: {
-      gap: theme.spacing["3"],
-    },
-    subjectRow: {
-      flexDirection: "row" as const,
-      alignItems: "flex-start" as const,
-      gap: theme.spacing["3"],
-    },
-    subjectActions: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["1"],
-      paddingTop: 1,
-    },
-    labelRow: {
-      flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      gap: 6,
     },
     senderRow: {
       flexDirection: "row" as const,
@@ -445,12 +354,6 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       gap: theme.spacing["1"],
       minWidth: 0,
     },
-    starButton: {
-      width: 28,
-      height: 28,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
     recipientRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -473,12 +376,6 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    subject: {
-      ...skin.title,
-      fontSize: 24,
-      lineHeight: 30,
-      flex: 1,
-    },
     senderName: {
       flexShrink: 1,
       fontSize: 16,

@@ -20,7 +20,11 @@ import {
   extractMessageBodies,
 } from "@/lib/mail/message-security";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
-import type { JmapEmailMessage, JmapSession } from "@/lib/mail/types";
+import type {
+  JmapEmailMessage,
+  JmapSession,
+  MailAttachment,
+} from "@/lib/mail/types";
 
 const log = createLogger("conversation-decrypted-previews");
 
@@ -31,6 +35,16 @@ type UseConversationDecryptedPreviewsInput = {
   config: MailDemoConfig | null | undefined;
   selectedMessageId?: string | null;
   selectedDecrypted?: DecryptedMailPreviewContent | null;
+};
+
+type ConversationMessageContent = DecryptedMailPreviewContent & {
+  attachments?: MailAttachment[];
+};
+
+export type ConversationDecryptedContent = {
+  previews: Record<string, string>;
+  /** Attachments per thread message, known once a message is decrypted or loaded in full. */
+  attachments: Record<string, MailAttachment[]>;
 };
 
 async function loadMessageForPreview(input: {
@@ -60,7 +74,7 @@ async function resolveDecryptedPreview(input: {
   session: JmapSession;
   config: MailDemoConfig | null | undefined;
   queryClient: ReturnType<typeof useQueryClient>;
-}): Promise<DecryptedMailPreviewContent> {
+}): Promise<ConversationMessageContent> {
   const fullMessage = await loadMessageForPreview(input);
   const encryption = classifyMessageEncryption(fullMessage);
 
@@ -82,12 +96,16 @@ async function resolveDecryptedPreview(input: {
 
   // List preview can look armored while the full body is plaintext.
   const bodies = extractMessageBodies(fullMessage);
-  return { text: bodies.text, html: bodies.html };
+  return {
+    text: bodies.text,
+    html: bodies.html,
+    attachments: fullMessage.attachments ?? [],
+  };
 }
 
 export function useConversationDecryptedPreviews(
   input: UseConversationDecryptedPreviewsInput,
-): Record<string, string> {
+): ConversationDecryptedContent {
   const queryClient = useQueryClient();
   const {
     messages,
@@ -114,7 +132,7 @@ export function useConversationDecryptedPreviews(
         retry: 1,
         staleTime: Infinity,
         gcTime: 5 * 60 * 1000,
-        queryFn: (): Promise<DecryptedMailPreviewContent> => {
+        queryFn: (): Promise<ConversationMessageContent> => {
           if (!client || !session) {
             throw new Error("Mail session not available");
           }
@@ -129,7 +147,7 @@ export function useConversationDecryptedPreviews(
       };
     }),
     combine: (results) => {
-      const map = new Map<string, DecryptedMailPreviewContent>();
+      const map = new Map<string, ConversationMessageContent>();
       for (let index = 0; index < encryptedMessages.length; index += 1) {
         const message = encryptedMessages[index];
         const data = results[index]?.data;
@@ -142,6 +160,15 @@ export function useConversationDecryptedPreviews(
   });
 
   const previews: Record<string, string> = {};
+  const attachments: Record<string, MailAttachment[]> = {};
+  for (const message of messages) {
+    const loaded = decryptedById.get(message.id)?.attachments;
+    if (loaded) {
+      attachments[message.id] = loaded;
+    } else if (!messageNeedsDecryptedPreview(message) && message.attachments) {
+      attachments[message.id] = message.attachments;
+    }
+  }
   for (const message of encryptedMessages) {
     const selectedOverride =
       message.id === selectedMessageId ? selectedDecrypted : null;
@@ -154,5 +181,5 @@ export function useConversationDecryptedPreviews(
       previews[message.id] = snippet;
     }
   }
-  return previews;
+  return { previews, attachments };
 }

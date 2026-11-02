@@ -8,7 +8,8 @@ import {
   resolveInlinePgpArmoredCiphertext,
 } from "@/lib/mail/message-security";
 import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
-import type { JmapEmailMessage, JmapSession } from "@/lib/mail/types";
+import { toParsedMailAttachment } from "@/lib/mail/mail-app-helpers";
+import type { JmapEmailMessage, JmapSession, MailAttachment } from "@/lib/mail/types";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 
 const log = createLogger("decrypt-message-for-compose");
@@ -16,6 +17,7 @@ const log = createLogger("decrypt-message-for-compose");
 export type DecryptedComposeContent = {
   text: string | null;
   html: string | null;
+  attachments?: MailAttachment[];
 };
 
 export async function decryptMessageForCompose(
@@ -71,6 +73,15 @@ export async function decryptMessageForCompose(
     return {
       text: parsed.text ?? decrypted.plaintext,
       html: parsed.html ?? null,
+      // Same parts the reader lists for an open PGP/MIME message.
+      attachments:
+        encState === "pgp_mime"
+          ? parsed.attachments.flatMap((attachment) =>
+              attachment.disposition === "attachment" && !attachment.related
+                ? [toParsedMailAttachment(attachment)]
+                : [],
+            )
+          : [],
     };
   } catch (parseError) {
     log.warn("Failed to parse decrypted MIME for compose", parseError);

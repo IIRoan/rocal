@@ -18,20 +18,21 @@ import { cn } from "@workspace/ui/lib/utils";
 import { resolveAttachmentPreviewKind } from "@workspace/calendar-core";
 import { PdfAttachmentThumbnail } from "../attachment-preview-dialog";
 import type {
+  KeyedMailAttachment,
   MessageReaderController,
-  MessageReaderViewModel,
 } from "../use-message-reader-controller";
 
 export function MessageReaderHeaderAttachments({
   controller,
-  view,
+  attachments,
+  label,
 }: {
   controller: MessageReaderController;
-  view: MessageReaderViewModel;
+  attachments: KeyedMailAttachment[];
+  label: string;
 }) {
   const {
     isMobile,
-    displayAttachments,
     attachmentHoverPreviews,
     loadingAttachmentPreviewKey,
     handleLoadAttachmentHoverPreview,
@@ -42,7 +43,7 @@ export function MessageReaderHeaderAttachments({
   return (
     <>
       {/* Attachments */}
-      {displayAttachments.length > 0 && (
+      {attachments.length > 0 && (
         <Collapsible defaultOpen>
           <CollapsibleTrigger asChild>
             <button
@@ -54,7 +55,7 @@ export function MessageReaderHeaderAttachments({
                   : "gap-1.5 py-0.5 text-[12px]",
               )}
             >
-              Attachments ({displayAttachments.length})
+              {label} ({attachments.length})
               <ChevronDown
                 className="size-3 transition-transform group-data-[state=open]:rotate-180"
                 strokeWidth={2}
@@ -68,7 +69,7 @@ export function MessageReaderHeaderAttachments({
                 isMobile ? "gap-1.5 pt-1" : "gap-2 pt-1.5",
               )}
             >
-              {displayAttachments.map((attachment, idx) => {
+              {attachments.map(({ key, attachment }) => {
                 const name = attachment.name?.trim() || "Attachment";
                 const mimeType = attachment.type ?? "";
                 const previewKind = resolveAttachmentPreviewKind(attachment);
@@ -142,7 +143,7 @@ export function MessageReaderHeaderAttachments({
                 );
                 return (
                   <div
-                    key={attachmentKey}
+                    key={key}
                     className="group/attachment relative flex items-center gap-1"
                   >
                     {attachmentButton}

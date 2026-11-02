@@ -1026,7 +1026,10 @@ export function useMailApp() {
     }
     : null;
 
-  const conversationDecryptedPreviews = useConversationDecryptedPreviews({
+  const {
+    previews: conversationDecryptedPreviews,
+    attachments: conversationAttachments,
+  } = useConversationDecryptedPreviews({
     messages: selectedConversationMessages,
     client: activeMailbox?.client,
     session: activeMailbox?.session,
@@ -3148,6 +3151,7 @@ export function useMailApp() {
     openMessageById,
     selectedConversationMessages,
     conversationDecryptedPreviews,
+    conversationAttachments,
     isConversationLoading,
     isMessageBodyLoading,
     loadConversationThread,

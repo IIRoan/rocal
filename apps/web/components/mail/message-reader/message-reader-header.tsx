@@ -109,7 +109,11 @@ export function MessageReaderHeader({
         </div>
       </div>
 
-      <MessageReaderHeaderAttachments controller={controller} view={view} />
+      <MessageReaderHeaderAttachments
+        controller={controller}
+        attachments={controller.displayAttachmentItems}
+        label="Attachments"
+      />
 
       {isMobile && (
         <MessageReaderMobileActionsDrawer controller={controller} view={view} />

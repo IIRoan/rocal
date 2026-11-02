@@ -1,14 +1,20 @@
 "use client";
 
-import { Star } from "lucide-react";
+import { CalendarDays, Star } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   Typography,
   TypographySize,
   TypographyWeight,
 } from "@workspace/ui/solace";
-import { resolveLabelDisplayColor } from "@workspace/calendar-core";
+import {
+  resolveLabelDisplayColor,
+  type MailThreadParticipant,
+} from "@workspace/calendar-core";
+import { SenderAvatar } from "../mail-avatar";
+import { RecipientPopover } from "../recipient-popover";
 import { MailSecurityBadge } from "./mail-security-badge";
+import { MessageReaderHeaderAttachments } from "./message-reader-header-attachments";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
@@ -21,15 +27,22 @@ export function MessageReaderTitle({
   controller: MessageReaderController;
   view: MessageReaderViewModel;
 }) {
-  const { isMobile, isBusy, message, isFlagged, messageLabels, props } =
-    controller;
+  const { isMobile, isBusy, isFlagged, messageLabels, props } = controller;
   const {
     signatureVerificationState,
     decryptError,
     accountEncryptedAtRest,
     onToggleFlagged,
   } = props;
-  const { messageState } = view;
+  const {
+    messageState,
+    orderedConversationMessages,
+    threadSubject,
+    threadDateRange,
+    threadParticipants,
+    threadAttachments,
+  } = view;
+  const threadCount = orderedConversationMessages.length;
 
   return (
     <div className="shrink-0 border-b border-[var(--border-tertiary)]">
@@ -44,7 +57,12 @@ export function MessageReaderTitle({
           weight={TypographyWeight.MEDIUM}
           wrap
         >
-          {message.subject || "(No subject)"}
+          {threadSubject || "(No subject)"}
+          {threadCount > 1 ? (
+            <span className="ml-1.5 font-normal tabular-nums text-[var(--text-secondary)]">
+              [{threadCount}]
+            </span>
+          ) : null}
         </Typography>
         <div className="mt-0.5 flex shrink-0 items-center gap-1">
           {onToggleFlagged && (
@@ -75,6 +93,23 @@ export function MessageReaderTitle({
         </div>
       </div>
 
+      {threadCount > 1 && (
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-x-3 gap-y-1.5",
+            isMobile ? "px-3 pb-2" : "-mt-1 px-4 pb-3",
+          )}
+        >
+          {threadDateRange ? (
+            <span className="inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
+              <CalendarDays className="size-3.5 shrink-0" aria-hidden />
+              {threadDateRange}
+            </span>
+          ) : null}
+          <ThreadParticipants participants={threadParticipants} />
+        </div>
+      )}
+
       {messageLabels.length > 0 && (
         <div
           className={cn(
@@ -104,6 +139,60 @@ export function MessageReaderTitle({
           })}
         </div>
       )}
+
+      {threadAttachments.length > 0 && (
+        <div className={isMobile ? "px-3 pb-2" : "px-4 pb-3"}>
+          <MessageReaderHeaderAttachments
+            controller={controller}
+            attachments={threadAttachments}
+            label="In this thread"
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+const VISIBLE_PARTICIPANTS = 4;
+
+function ThreadParticipants({
+  participants,
+}: {
+  participants: MailThreadParticipant[];
+}) {
+  const hidden = participants.slice(VISIBLE_PARTICIPANTS);
+  return (
+    <ul
+      aria-label="People in this thread"
+      className="m-0 flex min-w-0 list-none flex-wrap items-center gap-1.5 p-0"
+    >
+      {participants.slice(0, VISIBLE_PARTICIPANTS).map((participant) => (
+        <li
+          key={participant.email}
+          className="inline-flex min-w-0 items-center gap-1 rounded-full bg-[var(--bg-overlay-tertiary)] py-0.5 pl-0.5 pr-2"
+        >
+          <SenderAvatar
+            email={participant.email}
+            name={participant.name ?? undefined}
+            className="size-4 text-[8px]"
+          />
+          <RecipientPopover
+            name={participant.isSelf ? "You" : participant.name}
+            email={participant.email}
+            className="max-w-40 truncate text-xs"
+          />
+        </li>
+      ))}
+      {hidden.length > 0 ? (
+        <li
+          title={hidden
+            .map((participant) => participant.name ?? participant.email)
+            .join(", ")}
+          className="rounded-full bg-[var(--bg-overlay-tertiary)] px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
+        >
+          +{hidden.length}
+        </li>
+      ) : null}
+    </ul>
   );
 }
