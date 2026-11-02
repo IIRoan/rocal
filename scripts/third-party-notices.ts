@@ -105,22 +105,39 @@ function keySegments(key: string): string[] {
   return key.match(/@[^/]+\/[^/]+|[^/]+/g) ?? [];
 }
 
-/** Walks bun.lock, not node_modules, because leftovers from older installs would change the result per machine. */
+/** Every installed package by name@version, because Bun versions place the same lockfile entry at different paths. */
+function indexInstalled(workspaceDirs: string[]): Map<string, string> {
+  const installed = new Map<string, string>();
+  const scan = (modules: string) => {
+    if (!existsSync(modules)) return;
+    for (const entry of readdirSync(modules, { withFileTypes: true })) {
+      // Workspace links are symlinks; each workspace's own node_modules is scanned as a root.
+      if (entry.name.startsWith(".") || !entry.isDirectory()) continue;
+      const names = entry.name.startsWith("@") ? readdirSync(join(modules, entry.name)).map((name) => join(entry.name, name)) : [entry.name];
+      for (const name of names) {
+        const dir = join(modules, name);
+        const manifest = join(dir, "package.json");
+        if (!existsSync(manifest)) continue;
+        const pkg = JSON.parse(readFileSync(manifest, "utf8")) as PackageJson;
+        installed.set(`${pkg.name}@${pkg.version}`, dir);
+        scan(join(dir, "node_modules"));
+      }
+    }
+  };
+  for (const dir of workspaceDirs) scan(join(ROOT, dir, "node_modules"));
+  return installed;
+}
+
+/** Takes the package set from bun.lock, not node_modules, because leftovers from older installs would change the result per machine. */
 function collectNotices(): { notices: Notice[]; rejected: string[]; stale: string[] } {
   const lock = Bun.JSONC.parse(readFileSync(join(ROOT, "bun.lock"), "utf8")) as Lockfile;
-  const workspaceDirs = new Map(Object.entries(lock.workspaces).map(([dir, workspace]) => [workspace.name, dir]));
+  const installed = indexInstalled(Object.keys(lock.workspaces));
   const resolve = (name: string, from: string[]) => {
     for (let depth = from.length; depth >= 0; depth--) {
       const key = [...from.slice(0, depth), name].join("/");
       if (lock.packages[key]) return key;
     }
     return null;
-  };
-  const installedDir = (key: string) => {
-    const [first = "", ...rest] = keySegments(key);
-    const workspaceDir = rest.length > 0 ? workspaceDirs.get(first) : undefined;
-    const names = workspaceDir === undefined ? [first, ...rest] : rest;
-    return names.reduce((dir, name) => join(dir, "node_modules", name), join(ROOT, workspaceDir ?? ""));
   };
   // Optional peers stay out: a package that is really used is someone's dependency, and otherwise a dev tool could slip in.
   const edges = (meta: LockMeta, from: string[]) => [
@@ -153,17 +170,16 @@ function collectNotices(): { notices: Notice[]; rejected: string[]; stale: strin
       }
       // Platform binaries are build tools (esbuild, sharp, lightningcss) and differ per machine.
       if (meta.os || meta.cpu) continue;
-      const dir = installedDir(key);
-      const manifest = join(dir, "package.json");
-      const pkg = existsSync(manifest) ? (JSON.parse(readFileSync(manifest, "utf8")) as PackageJson) : null;
+      const dir = installed.get(id);
       // An optional dependency no machine installs (sharp's wasm32 build) has nothing to ship.
-      if (!pkg && next.optional) continue;
-      if (!pkg || `${pkg.name}@${pkg.version}` !== id) {
-        stale.push(`${key} should be ${id}, found ${pkg ? `${pkg.name}@${pkg.version}` : "nothing"}`);
+      if (!dir && next.optional) continue;
+      if (!dir) {
+        stale.push(`${id} (needed as ${key}) is not installed`);
         continue;
       }
       stack.push(...edges(meta, keySegments(key)));
       if (byId.has(id)) continue;
+      const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as PackageJson;
       const license = declaredLicense(pkg);
       if (!isAgplCompatible(license)) rejected.push(`${id} (${license}) from ${key}`);
       const text = findFile(dir, /^(un)?licen[cs]e([-._](mit|bsd|md|txt|markdown))*$|^copying/i);
