@@ -2,7 +2,7 @@
 
 import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { View, type ScrollViewProps } from "react-native";
+import { Text, View, type ScrollViewProps } from "react-native";
 import type { BottomSheetProps as GorhomProps } from "@gorhom/bottom-sheet";
 import {
   BottomSheet,
@@ -15,6 +15,7 @@ let mockScrollProps: ScrollViewProps;
 const mockRegisterScroll = jest.fn();
 const mockUnregisterScroll = jest.fn();
 const mockRegisterView = jest.fn();
+const mockForceClose = jest.fn();
 const mockInternal = {
   animatedLayoutState: {
     get: () => ({ containerHeight: 800, handleHeight: 28 }),
@@ -45,6 +46,7 @@ jest.mock("react-native", () => ({
     absoluteFill: {},
     hairlineWidth: 1,
   },
+  Text: ({ children }: { children?: ReactNode }) => children,
   View: ({ children }: { children?: ReactNode }) => children,
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
@@ -85,7 +87,11 @@ jest.mock("react-native-reanimated", () => ({
 
 jest.mock("@gorhom/bottom-sheet", () => ({
   __esModule: true,
-  default: (props: GorhomProps) => {
+  default: function MockGorhomSheet(
+    props: GorhomProps & { ref?: React.Ref<unknown> },
+  ) {
+    const { useImperativeHandle } = jest.requireActual<typeof React>("react");
+    useImperativeHandle(props.ref, () => ({ forceClose: mockForceClose }));
     mockSheetProps = props;
     return props.children;
   },
@@ -189,6 +195,37 @@ it("retains handle dragging and swipe-down dismissal", async () => {
   expect(mockSheetProps.enablePanDownToClose).toBe(true);
   act(() => mockSheetProps.onClose?.());
   expect(onDismiss).toHaveBeenCalledTimes(1);
+});
+
+it("slides out on a tap close and unmounts once Gorhom settles, but drops a swiped-away sheet at once", async () => {
+  const onCloseComplete = jest.fn();
+  const renderSheet = (visible: boolean) =>
+    act(async () => {
+      root.render(
+        <BottomSheet
+          visible={visible}
+          onDismiss={jest.fn()}
+          onCloseComplete={onCloseComplete}
+        >
+          <Text>Sheet body</Text>
+        </BottomSheet>,
+      );
+    });
+  await renderSheet(true);
+  await renderSheet(false);
+  expect(mockForceClose).toHaveBeenCalledTimes(1);
+  expect(container.textContent).toBe("Sheet body");
+  expect(onCloseComplete).not.toHaveBeenCalled();
+  act(() => mockSheetProps.onClose?.());
+  expect(container.textContent).toBe("");
+  expect(onCloseComplete).toHaveBeenCalledTimes(1);
+
+  await renderSheet(true);
+  act(() => mockSheetProps.onClose?.());
+  await renderSheet(false);
+  expect(container.textContent).toBe("");
+  expect(mockForceClose).toHaveBeenCalledTimes(1);
+  expect(onCloseComplete).toHaveBeenCalledTimes(2);
 });
 
 it("leaves the controls inside the sheet reachable by VoiceOver", async () => {

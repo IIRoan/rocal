@@ -221,18 +221,18 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
         .expect_status(200));
     let mut series = encrypted_event(
         "series",
-        "2026-11-02T09:00:00.000Z",
-        "2026-11-02T10:00:00.000Z",
+        "2099-11-02T09:00:00.000Z",
+        "2099-11-02T10:00:00.000Z",
     );
     series.recurrence = Some(r#"{"frequency":"daily","interval":1,"count":5}"#.into());
-    series.excluded_dates = Some(vec![Timestamp("2026-11-03T09:00:00.000Z".into())]);
+    series.excluded_dates = Some(vec![Timestamp("2099-11-03T09:00:00.000Z".into())]);
     let mut moved = encrypted_event(
         "moved",
-        "2026-11-04T11:00:00.000Z",
-        "2026-11-04T12:00:00.000Z",
+        "2099-11-04T11:00:00.000Z",
+        "2099-11-04T12:00:00.000Z",
     );
     moved.series_external_id = Some("series".into());
-    moved.occurrence_date = Some(Timestamp("2026-11-04T09:00:00.000Z".into()));
+    moved.occurrence_date = Some(Timestamp("2099-11-04T09:00:00.000Z".into()));
     moved.participants = Some(vec![ParticipantInput {
         email: "guest@example.com".into(),
         display_name: Some("Guest".into()),
@@ -434,18 +434,18 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         vec![
             encrypted_event(
                 "meeting",
-                "2026-11-05T09:00:00.000Z",
-                "2026-11-05T10:00:00.000Z",
+                "2099-11-05T09:00:00.000Z",
+                "2099-11-05T10:00:00.000Z",
             ),
             encrypted_event(
                 "copy",
-                "2026-11-06T09:00:00.000Z",
-                "2026-11-06T10:00:00.000Z",
+                "2099-11-06T09:00:00.000Z",
+                "2099-11-06T10:00:00.000Z",
             ),
             encrypted_event(
                 "typed",
-                "2026-11-07T09:00:00.000Z",
-                "2026-11-07T10:00:00.000Z",
+                "2099-11-07T09:00:00.000Z",
+                "2099-11-07T10:00:00.000Z",
             ),
         ],
     )
