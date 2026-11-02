@@ -58,6 +58,10 @@ const HANDLE_PILL_HEIGHT = 6;
 const FOOTER_BASE_PADDING = 16;
 const OVERLAY_LIGHT = 0.5;
 const OVERLAY_DARK = 0.75;
+/** Scrim at the lowest of several snaps, as a share of the full scrim reached at the tallest. */
+const PARTIAL_SNAP_SCRIM = 0.35;
+/** Unmounts a closing sheet whose slide-out Gorhom never reports (e.g. closed before its first layout). */
+const SHEET_CLOSE_FALLBACK_MS = 1200;
 /** Horizontal slop before the sheet pan gives way to horizontal gestures (page back-swipe, carousels). */
 const PAN_FAIL_OFFSET_X: [number, number] = [-12, 12];
 const PAN_ACTIVE_OFFSET_Y: [number, number] = [-6, 6];
@@ -270,16 +274,29 @@ function SheetBackdrop({
   animatedIndex,
   style,
   maxOpacity,
+  lastIndex,
   onPress,
-}: BottomSheetBackdropProps & { maxOpacity: number; onPress: () => void }) {
+}: BottomSheetBackdropProps & {
+  maxOpacity: number;
+  lastIndex: number;
+  onPress: () => void;
+}) {
   const { theme } = useTheme();
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      animatedIndex.value,
-      [-1, 0],
-      [0, maxOpacity],
-      Extrapolation.CLAMP,
-    ),
+    opacity:
+      lastIndex > 0
+        ? interpolate(
+            animatedIndex.value,
+            [-1, 0, lastIndex],
+            [0, maxOpacity * PARTIAL_SNAP_SCRIM, maxOpacity],
+            Extrapolation.CLAMP,
+          )
+        : interpolate(
+            animatedIndex.value,
+            [-1, 0],
+            [0, maxOpacity],
+            Extrapolation.CLAMP,
+          ),
   }));
 
   return (
@@ -298,6 +315,14 @@ interface SheetPresentation {
   visible: boolean;
   presentKey?: number;
   session: number;
+  /** Gorhom has finished closing this session, so it can unmount. */
+  settled: boolean;
+}
+
+/** A late close from a replaced session must not unmount the sheet that replaced it. */
+function settleSession(session: number) {
+  return (current: SheetPresentation): SheetPresentation =>
+    current.session === session ? { ...current, settled: true } : current;
 }
 
 export function BottomSheet({
@@ -318,24 +343,28 @@ export function BottomSheet({
   const { height: screenHeight } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
   const sheetRef = useRef<GorhomBottomSheet>(null);
-  // Every open is a fresh Gorhom sheet keyed by session; closing unmounts it at once so nothing lingers to block the next open.
+  // Every open is a fresh Gorhom sheet keyed by session; a close slides it out with touches passing through, then unmounts it.
   const [presentation, setPresentation] = useState<SheetPresentation>({
     visible: false,
     session: 0,
+    settled: true,
   });
   const [closing, setClosing] = useState(false);
   if (
     presentation.visible !== visible ||
     (visible && presentation.presentKey !== presentKey)
   ) {
-    setPresentation((current) => ({
-      visible,
-      presentKey,
-      session: visible ? current.session + 1 : current.session,
-    }));
+    setPresentation((current) =>
+      visible
+        ? { visible, presentKey, session: current.session + 1, settled: false }
+        : { ...current, visible },
+    );
     setClosing(false);
   }
-  const { session, visible: mounted } = presentation;
+  const { session, settled } = presentation;
+  const mounted = presentation.visible || !settled;
+  const exiting = !presentation.visible && !settled;
+  const interactive = presentation.visible && !closing;
   const keyboardVisibleRef = useRef(false);
   const visibleRef = useRef(visible);
   const sessionRef = useRef(session);
@@ -380,6 +409,18 @@ export function BottomSheet({
     Keyboard.dismiss();
     onDismissRef.current();
   }, []);
+
+  // Backdrop, button and programmatic closes slide out like a swipe; forceClose keeps a keyboard hide from reopening it.
+  useEffect(() => {
+    if (!exiting) return;
+    Keyboard.dismiss();
+    sheetRef.current?.forceClose();
+    const fallback = setTimeout(
+      () => setPresentation(settleSession(session)),
+      SHEET_CLOSE_FALLBACK_MS,
+    );
+    return () => clearTimeout(fallback);
+  }, [exiting, session]);
 
   const snapTo = useCallback(
     (index: number) => {
@@ -461,7 +502,9 @@ export function BottomSheet({
         setClosing(toIndex < 0);
       },
       onClose: () => {
-        if (isCurrent() && visibleRef.current) {
+        if (!isCurrent()) return;
+        setPresentation(settleSession(session));
+        if (visibleRef.current) {
           requestClose();
         }
       },
@@ -487,10 +530,11 @@ export function BottomSheet({
       <SheetBackdrop
         {...props}
         maxOpacity={overlayMaxOpacity}
+        lastIndex={lastIndex}
         onPress={handleOverlayPress}
       />
     ),
-    [overlayMaxOpacity, handleOverlayPress],
+    [overlayMaxOpacity, lastIndex, handleOverlayPress],
   );
 
   const renderBackground = useCallback(
@@ -521,7 +565,9 @@ export function BottomSheet({
       <SheetCloseNotifier onClosed={handleClosed} />
       <View
         style={styles.wrapper}
-        pointerEvents={closing ? "none" : "box-none"}
+        pointerEvents={interactive ? "box-none" : "none"}
+        accessibilityViewIsModal={interactive}
+        accessibilityElementsHidden={!interactive}
       >
         <GorhomBottomSheet
           key={session}
