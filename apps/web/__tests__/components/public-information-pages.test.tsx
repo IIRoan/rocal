@@ -54,6 +54,11 @@ it.each([PrivacyPage, SupportPage, LicensesPage])(
   },
 );
 
+it("keeps the wallpaper one viewport tall however long the page is", () => {
+  const page = render(<PrivacyPage />);
+  expect(page.querySelector(".sticky.top-0.h-dvh")).not.toBeNull();
+});
+
 it("publishes the AGPL notice, the source and the bundled packages' licenses", () => {
   const page = render(<LicensesPage />);
   expect(page.textContent).toContain("GNU Affero General Public License");

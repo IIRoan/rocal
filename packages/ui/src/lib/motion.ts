@@ -152,6 +152,40 @@ export function loopMotion(
   });
 }
 
+/** Slides an element taller than its frame up with the page, reaching its bottom edge as the page ends but never faster than `maxRate` of the scroll. */
+export function followPageScroll(
+  element: HTMLElement,
+  frame: HTMLElement,
+  maxRate = 0.15,
+): () => void {
+  if (prefersReducedMotion()) return () => {};
+  let request = 0;
+  const update = () => {
+    request = 0;
+    const { scrollHeight, clientHeight } = document.documentElement;
+    const scrollRange = Math.max(scrollHeight - clientHeight, 0);
+    const slack = element.offsetHeight - frame.clientHeight;
+    const rate = scrollRange > 0 ? Math.min(maxRate, slack / scrollRange) : 0;
+    // Clamped so Safari's rubber-band overscroll never opens a gap at the frame's edge.
+    const scrolled = Math.min(Math.max(window.scrollY, 0), scrollRange);
+    element.style.transform = `translateY(${-scrolled * rate}px)`;
+  };
+  const schedule = () => {
+    request ||= requestAnimationFrame(update);
+  };
+  // The page grows when a licenses group opens, which fires no scroll event.
+  const resize = new ResizeObserver(schedule);
+  resize.observe(document.body);
+  resize.observe(frame);
+  window.addEventListener("scroll", schedule, { passive: true });
+  return () => {
+    window.removeEventListener("scroll", schedule);
+    resize.disconnect();
+    cancelAnimationFrame(request);
+    element.style.removeProperty("transform");
+  };
+}
+
 /** Mirror of `slideFadeIn` that holds the hidden end state; cancel it before showing the element again. */
 export function slideFadeOut(
   element: HTMLElement,

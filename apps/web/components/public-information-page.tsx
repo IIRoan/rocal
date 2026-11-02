@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { PRODUCT_ROUTES } from "@workspace/calendar-core/product-info";
+import { PublicPageWallpaper } from "@/components/public-page-wallpaper";
 
 export function PublicInformationPage({
   title,
@@ -85,17 +85,8 @@ export function PublicInformationPage({
           </nav>
         </div>
       </div>
-      <div className="hidden lg:block lg:w-1/2 relative">
-        <div className="absolute inset-4 rounded-2xl overflow-hidden border border-border">
-          <Image
-            src="/wallpaper.jpg"
-            alt=""
-            className="size-full object-cover"
-            fill
-            sizes="50vw"
-            unoptimized
-          />
-        </div>
+      <div className="hidden lg:block lg:w-1/2">
+        <PublicPageWallpaper />
       </div>
     </section>
   );
