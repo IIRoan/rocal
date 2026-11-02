@@ -12,7 +12,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Solace",
+  title: { default: "Solace", template: "%s – Solace" },
   description: "Calendar",
   manifest: "/manifest.json",
   icons: {

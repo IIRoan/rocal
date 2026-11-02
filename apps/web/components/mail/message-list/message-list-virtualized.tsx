@@ -196,21 +196,21 @@ export function MessageListVirtualized({
           const row = threadRows[virtualRow.index];
           if (!row) return null;
 
+          // Measured, so an expanded thread's child rows push the next row down instead of overlapping it.
           return (
             <div
               key={virtualRow.key}
+              ref={virtualizer.measureElement}
               data-index={virtualRow.index}
               className="absolute top-0 left-0 w-full"
-              style={{
-                height: `${virtualRow.size}px`,
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
+              style={{ transform: `translateY(${virtualRow.start}px)` }}
             >
               <MessageListRow
                 row={row}
                 primaryIds={primaryIds}
                 interaction={interaction}
                 presentation={presentation}
+                height={estimateRowSize(virtualRow.index)}
               />
             </div>
           );

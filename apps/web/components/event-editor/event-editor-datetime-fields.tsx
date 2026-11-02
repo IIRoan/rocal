@@ -259,6 +259,7 @@ export function EventEditorDateTimeFields({
         {!eventForm.eventAllDay && (
           <ShadcnAutocomleteTimePicker
             inline
+            label="Start time"
             value={toPickerTime(eventForm.eventStartTime)}
             onChange={(date) =>
               eventForm.handleStartTimeChange(formatWallClockTime(date))
@@ -273,6 +274,7 @@ export function EventEditorDateTimeFields({
         {!eventForm.eventAllDay && (
           <ShadcnAutocomleteTimePicker
             inline
+            label="End time"
             value={toPickerTime(eventForm.eventEndTime)}
             onChange={(date) =>
               eventForm.handleEndTimeChange(formatWallClockTime(date))

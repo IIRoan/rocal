@@ -19,6 +19,17 @@ interface RichTextEditorProps {
   className?: string;
   disabled?: boolean;
   onEditorReady?: (editor: Editor) => void;
+  errorId?: string;
+}
+
+function editorAttributes(errorId?: string): Record<string, string> {
+  return {
+    class: "tiptap min-h-32 flex-1 rounded-sm bg-transparent px-1 py-2 text-sm leading-relaxed outline-none focus-visible:ring-0",
+    role: "textbox",
+    "aria-multiline": "true",
+    "aria-label": "Message body",
+    ...(errorId ? { "aria-invalid": "true", "aria-describedby": errorId } : {}),
+  };
 }
 
 export function RichTextEditor({
@@ -28,6 +39,7 @@ export function RichTextEditor({
   className,
   disabled = false,
   onEditorReady,
+  errorId,
 }: RichTextEditorProps) {
   const onImageUploadRef = useRef<RichTextEditorProps["onImageUpload"]>(undefined);
   const onEditorReadyRef = useRef<RichTextEditorProps["onEditorReady"]>(undefined);
@@ -70,9 +82,7 @@ export function RichTextEditor({
     content: "",
     editable: true,
     editorProps: {
-      attributes: {
-        class: "tiptap min-h-32 rounded-sm px-1 py-2 text-sm leading-relaxed outline-none focus-visible:ring-1 focus-visible:ring-ring/40",
-      },
+      attributes: editorAttributes(),
       handleDrop: (view, event) => {
         const upload = onImageUploadRef.current;
         if (!upload || !event.dataTransfer?.files?.length) return false;
@@ -154,6 +164,16 @@ export function RichTextEditor({
   }, [disabled, editor]);
 
   useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    editor.setOptions({
+      editorProps: {
+        ...editor.options.editorProps,
+        attributes: editorAttributes(errorId),
+      },
+    });
+  }, [editor, errorId]);
+
+  useEffect(() => {
     editorRef.current = editor;
     if (editor) onEditorReadyRef.current?.(editor);
   }, [editor]);
@@ -164,8 +184,8 @@ export function RichTextEditor({
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", className)}>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <EditorContent editor={editor} />
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <EditorContent editor={editor} className="flex flex-1 flex-col" />
       </div>
     </div>
   );

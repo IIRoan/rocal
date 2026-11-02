@@ -73,6 +73,53 @@ describe("EventItem", () => {
     expect(button?.className).toContain("hover:ring-black/10");
   });
 
+  it("names month chips with title and time even when the segment shows no text", () => {
+    act(() => {
+      root.render(
+        <EventItem
+          event={{ ...eventFixture(), isCancelled: true }}
+          view="month"
+          timeFormat="24h"
+          timezone="UTC"
+          onClick={() => undefined}
+        >
+          <div className="invisible" aria-hidden />
+        </EventItem>,
+      );
+    });
+
+    const button = container.querySelector("button");
+    expect(button?.getAttribute("aria-label")).toBe(
+      "Planning, Tuesday, May 19, 09:00 – 10:00, cancelled",
+    );
+    expect(button?.hasAttribute("aria-roledescription")).toBe(false);
+    expect(button?.hasAttribute("aria-describedby")).toBe(false);
+  });
+
+  it("names all-day and multi-day events by their dates", () => {
+    act(() => {
+      root.render(
+        <EventItem
+          event={{
+            ...eventFixture(),
+            title: "",
+            start: new Date("2026-05-19T22:00:00.000Z"),
+            end: new Date("2026-05-21T08:30:00.000Z"),
+          }}
+          view="week"
+          height={60}
+          showTime
+          timeFormat="12h"
+          timezone="UTC"
+        />,
+      );
+    });
+
+    expect(container.querySelector("button")?.getAttribute("aria-label")).toBe(
+      "Untitled event, May 19, 10:00 PM – May 21, 8:30 AM",
+    );
+  });
+
   it.each([
     { view: "month", height: undefined, showTime: false },
     { view: "week", height: 60, showTime: true },

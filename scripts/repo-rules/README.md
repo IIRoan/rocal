@@ -57,7 +57,9 @@ Add it to the matching module (`repository`, `comments`, `client`, `typescript`,
 | `wcag-visible-focus` | WCAG 2.4.7: `outline-none` requires a `focus-visible:` style on the same element. |
 | `wcag-allow-zoom` | WCAG 1.4.4: never disable pinch zoom or cap the viewport scale. |
 | `theme-tokens-only` | Colors come from theme tokens: no hex/rgb/hsl literals, raw palette or white/black classes, gradients, or backdrop blur outside palette and email-template files. |
-| `motion-compositor-only` | Motion animates only transform/opacity: no `transition-all`, layout transitions or keyframes; `dvh` not `100vh`; no press-scale. |
+| `modal-content-padding` | Modal surfaces inset their content: `DialogHeader`/`DialogFooter` (like the Sheet and Drawer slots) pad themselves, and a title, description or raw element placed directly in `DialogContent` (or a title in `SheetContent`/`DrawerContent`) needs `px-*`/`p-*` padding or `sr-only`. |
+| `motion-compositor-only` | Motion animates only transform/opacity: no `transition-all`, layout transitions or keyframes; `dvh` not `100vh`; a press scale is exactly 0.96. |
 | `motion-shared-helpers` | WAAPI via `@workspace/ui/lib/motion`, no GSAP (its license is not AGPL-compatible), no `motion/react`, no `LayoutAnimation`, native driver for core `Animated`. |
+| `toast-until-dismissed` | Web toasts come from `@workspace/ui/lib/toast`, which keeps error and action toasts open until dismissed (WCAG 2.2.1); never import `toast` from `sonner`. |
 | `motion-after-paint` | Entrances wait for their content to paint: `afterPaint` (calendar-core) instead of nested `requestAnimationFrame`, `useFadeInAfterPaint` instead of Reanimated `entering` presets. |
 | `motion-reduced-motion` | Stylesheets that declare animations honor `prefers-reduced-motion`. |

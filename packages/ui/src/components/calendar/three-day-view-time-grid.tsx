@@ -62,7 +62,7 @@ export function ThreeDayViewTimeGrid({
           >
             <span
               className={cn(
-                "absolute left-0 flex h-6 w-full items-center justify-end bg-background pe-1 text-[11px] tabular-nums text-muted-foreground/70",
+                "absolute left-0 flex h-6 w-full items-center justify-end bg-background pe-1 text-[11px] tabular-nums text-muted-foreground",
                 hourValue === 0 ? "top-0" : "-top-3",
               )}
             >
@@ -77,7 +77,7 @@ export function ThreeDayViewTimeGrid({
           key={formatCalendarDayKey(day)}
           className={cn(
             "relative min-w-0 border-r border-border/50 last:border-r-0",
-            isTodayInTimezone(day, timezone) && "bg-primary/5",
+            isTodayInTimezone(day, timezone) && "bg-accent/5",
           )}
         >
           {(processedDayEvents[dayIndex] ?? []).map((positionedEvent) => (

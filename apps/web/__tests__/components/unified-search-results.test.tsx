@@ -101,6 +101,7 @@ describe("UnifiedSearchResults", () => {
           isLoading={false}
           selectedIndex={0}
           onSelect={() => {}}
+          optionId={(index) => `result-${index}`}
         />,
       );
     });
@@ -113,6 +114,10 @@ describe("UnifiedSearchResults", () => {
     expect(container.textContent).toContain("Attachment");
     expect(container.textContent).toContain("Location");
     expect(container.innerHTML).not.toContain("group-hover:opacity-100");
+    const options = container.querySelectorAll('[role="option"]');
+    expect(options[0]?.id).toBe("result-0");
+    expect(options[0]?.getAttribute("aria-selected")).toBe("true");
+    expect(options[1]?.getAttribute("aria-selected")).toBe("false");
   });
 
   it("calls onSelect when a result row is clicked", () => {
@@ -128,6 +133,7 @@ describe("UnifiedSearchResults", () => {
           isLoading={false}
           selectedIndex={0}
           onSelect={onSelect}
+          optionId={(index) => `result-${index}`}
         />,
       );
     });

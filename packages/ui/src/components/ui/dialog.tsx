@@ -109,7 +109,7 @@ function DialogContent({
         data-variant={variant}
         className={cn(
           // repo-rules-allow wcag-visible-focus: the surface only takes focus as a fallback when a view swaps; its controls carry the focus style.
-          "bg-background fixed z-50 overflow-hidden border shadow-lg outline-none duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          "bg-background fixed z-50 overflow-x-hidden overflow-y-auto overscroll-contain border shadow-lg outline-none duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
           radius,
           sizeDefaults,
           positionClasses,
@@ -120,7 +120,7 @@ function DialogContent({
       >
         {children}
         {showClose && (
-          <DialogPrimitive.Close className="group focus-visible:border-ring focus-visible:ring-ring/50 hover:bg-accent/50 hover:scale-105 focus-visible:scale-105 absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] flex size-7 items-center justify-center rounded transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out outline-none focus-visible:ring-[3px] disabled:pointer-events-none">
+          <DialogPrimitive.Close className="group focus-visible:border-ring focus-visible:ring-ring hover:bg-hover/50 absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] flex size-7 items-center justify-center rounded transition-[color,background-color,border-color,box-shadow] duration-200 ease-out outline-none focus-visible:ring-[3px] disabled:pointer-events-none">
             <XIcon
               size={16}
               className="opacity-60 transition-opacity group-hover:opacity-100"
@@ -137,7 +137,10 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-1 text-center sm:text-left", className)}
+      className={cn(
+        "flex flex-col gap-1 px-5 pt-5 pb-3 text-center sm:text-left",
+        className,
+      )}
       {...props}
     />
   );
@@ -148,7 +151,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end [&>button]:w-full sm:[&>button]:w-auto",
+        "border-border/50 flex flex-col-reverse gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end [&>button]:w-full sm:[&>button]:w-auto",
         className,
       )}
       {...props}
@@ -163,7 +166,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      className={cn("text-lg leading-tight font-semibold", className)}
       {...props}
     />
   );

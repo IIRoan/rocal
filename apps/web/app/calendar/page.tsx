@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { CalendarPageContent } from "./_client";
 
 export const metadata: Metadata = {
-  title: "Calendar – Solace",
+  title: "Calendar",
   description: "View and manage your calendar in Solace.",
 };
 

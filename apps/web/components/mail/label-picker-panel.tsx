@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer } from "react";
+import { useId, useReducer, useRef, useState } from "react";
 import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import type { LabelDef } from "@/lib/mail/types";
@@ -15,13 +15,12 @@ import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 const DEFAULT_LABEL_COLOR = MAIL_LABEL_CUSTOM_DEFAULT_COLOR;
 
 const initialLabelPickerState = {
-  newLabelName: "",
-  newLabelColor: DEFAULT_LABEL_COLOR,
-  isSavingLabel: false,
   editingLabelId: null as string | null,
   editName: "",
   editColor: DEFAULT_LABEL_COLOR,
   isSavingEdit: false,
+  editNameMissing: false,
+  confirmDeleteId: null as string | null,
 };
 
 type LabelPickerState = typeof initialLabelPickerState;
@@ -60,21 +59,33 @@ export function LabelPickerPanel({
     initialLabelPickerState,
   );
   const {
-    newLabelName,
-    newLabelColor,
-    isSavingLabel,
     editingLabelId,
     editName,
     editColor,
     isSavingEdit,
+    editNameMissing,
+    confirmDeleteId,
   } = state;
+  const confirmDeleteLabel = labels.find((label) => label.id === confirmDeleteId);
+  const nameErrorId = useId();
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   const startEditing = (label: LabelDef) => {
     patch({
       editingLabelId: label.id,
       editName: label.name,
       editColor: resolveLabelDisplayColor(label.color),
+      confirmDeleteId: null,
     });
+  };
+
+  const requestDelete = (labelId: string) => {
+    if (confirmDeleteId !== labelId) {
+      patch({ confirmDeleteId: labelId });
+      return;
+    }
+    patch({ confirmDeleteId: null });
+    onDeleteLabel?.(labelId);
   };
 
   const cancelEditing = () => {
@@ -82,28 +93,17 @@ export function LabelPickerPanel({
       editingLabelId: null,
       editName: "",
       editColor: DEFAULT_LABEL_COLOR,
+      editNameMissing: false,
     });
   };
 
-  const handleCreate = async () => {
-    if (!onCreateLabel || !newLabelName.trim()) return;
-    patch({ isSavingLabel: true });
-    // Callee label handlers report save failures to the user; nothing more to do here.
-    let saved = true;
-    try {
-      await onCreateLabel(
-        newLabelName.trim(),
-        normalizeLabelColorInput(newLabelColor),
-      );
-    } catch {
-      saved = false;
-    }
-    patch({ isSavingLabel: false });
-    if (saved) patch({ newLabelName: "", newLabelColor: DEFAULT_LABEL_COLOR });
-  };
-
   const handleSaveEdit = async () => {
-    if (!onUpdateLabel || !editingLabelId || !editName.trim()) return;
+    if (!onUpdateLabel || !editingLabelId) return;
+    if (!editName.trim()) {
+      patch({ editNameMissing: true });
+      editInputRef.current?.focus();
+      return;
+    }
     patch({ isSavingEdit: true });
     // Callee label handlers report save failures to the user; nothing more to do here.
     let saved = true;
@@ -137,17 +137,27 @@ export function LabelPickerPanel({
                   className="rounded-lg bg-muted p-2 space-y-2"
                 >
                   <input
+                    ref={editInputRef}
                     type="text"
                     value={editName}
-                    onChange={(e) => patch({ editName: e.target.value })}
+                    onChange={(e) =>
+                      patch({ editName: e.target.value, editNameMissing: false })
+                    }
                     disabled={isSavingEdit}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void handleSaveEdit();
                       if (e.key === "Escape") cancelEditing();
                     }}
-                    className="h-7 w-full rounded bg-background px-2 text-[15px] text-foreground outline-none focus:ring-2 focus:ring-ring/40 disabled:opacity-50"
+                    className="h-7 w-full rounded bg-background px-2 text-[15px] text-foreground outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
                     aria-label="Edit label name"
+                    aria-invalid={editNameMissing || undefined}
+                    aria-describedby={editNameMissing ? nameErrorId : undefined}
                   />
+                  {editNameMissing ? (
+                    <p id={nameErrorId} className="text-[13px] text-destructive">
+                      Enter a label name.
+                    </p>
+                  ) : null}
                   <LabelColorPicker
                     color={editColor}
                     onChange={(color) => patch({ editColor: color })}
@@ -156,7 +166,7 @@ export function LabelPickerPanel({
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      disabled={isSavingEdit || !editName.trim()}
+                      disabled={isSavingEdit}
                       onClick={() => void handleSaveEdit()}
                       className="inline-flex h-7 items-center gap-1 rounded-md bg-foreground px-2 text-xs font-medium text-background disabled:opacity-50"
                     >
@@ -180,6 +190,7 @@ export function LabelPickerPanel({
               );
             }
 
+            const isConfirmingDelete = confirmDeleteId === label.id;
             return (
               <div
                 key={label.id}
@@ -188,7 +199,11 @@ export function LabelPickerPanel({
                 {onToggleLabel ? (
                   <button
                     type="button"
-                    onClick={() => onToggleLabel(label.id, !assigned)}
+                    aria-pressed={assigned}
+                    onClick={() => {
+                      patch({ confirmDeleteId: null });
+                      onToggleLabel(label.id, !assigned);
+                    }}
                     className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-[15px] text-left cursor-pointer select-none"
                   >
                     <span
@@ -226,7 +241,7 @@ export function LabelPickerPanel({
                     <button
                       type="button"
                       onClick={() => startEditing(label)}
-                      className="mr-0.5 size-6 flex items-center justify-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:bg-accent/60 hover:text-foreground group-hover:opacity-100"
+                      className="mr-0.5 size-6 flex items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-hover/60 hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                       aria-label={`Edit label ${label.name}`}
                     >
                       <Pencil className="size-3" strokeWidth={2.25} />
@@ -237,11 +252,20 @@ export function LabelPickerPanel({
                   <SimpleTooltip content={`Delete ${label.name}`}>
                     <button
                       type="button"
-                      onClick={() => onDeleteLabel(label.id)}
-                      className="mr-1 size-6 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
+                      onClick={() => requestDelete(label.id)}
+                      className={cn(
+                        "mr-1 flex h-6 min-w-6 shrink-0 items-center justify-center rounded transition-colors",
+                        isConfirmingDelete
+                          ? "bg-destructive/10 px-2 text-[13px] font-medium text-destructive"
+                          : "text-muted-foreground hover:text-destructive",
+                      )}
                       aria-label={`Delete label ${label.name}`}
                     >
-                      <Trash2 className="size-3" strokeWidth={2.25} />
+                      {isConfirmingDelete ? (
+                        "Delete"
+                      ) : (
+                        <Trash2 className="size-3" strokeWidth={2.25} />
+                      )}
                     </button>
                   </SimpleTooltip>
                 ) : null}
@@ -255,45 +279,92 @@ export function LabelPickerPanel({
         </div>
       )}
 
-      {onCreateLabel ? (
-        <div className="p-2 space-y-2">
-          <div className="text-[13px] font-medium text-muted-foreground/80 px-1">
-            New label
-          </div>
-          <input
-            type="text"
-            value={newLabelName}
-            onChange={(e) => patch({ newLabelName: e.target.value })}
-            aria-label="New label name"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && newLabelName.trim()) {
-                void handleCreate();
-              }
-            }}
-            placeholder="Label name…"
-            disabled={isSavingLabel}
-            className="h-7 w-full text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-2 focus:ring-ring/50 placeholder:text-muted-foreground/40 disabled:opacity-50"
-          />
-          <LabelColorPicker
-            color={newLabelColor}
-            onChange={(color) => patch({ newLabelColor: color })}
-            disabled={isSavingLabel}
-          />
-          <button
-            type="button"
-            disabled={!newLabelName.trim() || isSavingLabel}
-            onClick={() => void handleCreate()}
-            className="inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg bg-muted/80 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
-          >
-            {isSavingLabel ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Plus className="size-3.5" strokeWidth={2.25} />
-            )}
-            Create label
-          </button>
-        </div>
+      <p role="status" className="px-3 pb-1 text-[13px] leading-[130%] text-destructive empty:pb-0">
+        {confirmDeleteLabel
+          ? `Delete “${confirmDeleteLabel.name}”? Messages keep their content; only this label is removed. Select Delete again to confirm.`
+          : null}
+      </p>
+
+      {onCreateLabel ? <NewLabelForm onCreateLabel={onCreateLabel} /> : null}
+    </div>
+  );
+}
+
+function NewLabelForm({
+  onCreateLabel,
+}: {
+  onCreateLabel: (name: string, color: string) => Promise<LabelDef | null | void>;
+}) {
+  const [name, setName] = useState("");
+  const [color, setColor] = useState(DEFAULT_LABEL_COLOR);
+  const [isSaving, setIsSaving] = useState(false);
+  const [nameMissing, setNameMissing] = useState(false);
+  const nameErrorId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      setNameMissing(true);
+      inputRef.current?.focus();
+      return;
+    }
+    setIsSaving(true);
+    // Callee label handlers report save failures to the user; nothing more to do here.
+    let saved = true;
+    try {
+      await onCreateLabel(name.trim(), normalizeLabelColorInput(color));
+    } catch {
+      saved = false;
+    }
+    setIsSaving(false);
+    if (saved) {
+      setName("");
+      setColor(DEFAULT_LABEL_COLOR);
+    }
+  };
+
+  return (
+    <div className="p-2 space-y-2">
+      <div className="text-[13px] font-medium text-muted-foreground px-1">
+        New label
+      </div>
+      <input
+        ref={inputRef}
+        type="text"
+        value={name}
+        onChange={(e) => {
+          setName(e.target.value);
+          setNameMissing(false);
+        }}
+        aria-label="New label name"
+        aria-invalid={nameMissing || undefined}
+        aria-describedby={nameMissing ? nameErrorId : undefined}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void handleCreate();
+        }}
+        placeholder="Label name…"
+        disabled={isSaving}
+        className="h-7 w-full text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground disabled:opacity-50"
+      />
+      {nameMissing ? (
+        <p id={nameErrorId} className="px-1 text-[13px] text-destructive">
+          Enter a label name.
+        </p>
       ) : null}
+      <LabelColorPicker color={color} onChange={setColor} disabled={isSaving} />
+      <button
+        type="button"
+        disabled={isSaving}
+        onClick={() => void handleCreate()}
+        className="inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg bg-muted/80 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+      >
+        {isSaving ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Plus className="size-3.5" strokeWidth={2.25} />
+        )}
+        Create label
+      </button>
     </div>
   );
 }

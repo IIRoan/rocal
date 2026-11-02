@@ -93,6 +93,12 @@ async function clickImport() {
   });
 }
 
+function calendarRadios() {
+  return Array.from(
+    container.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
+  );
+}
+
 function findButton(label: string) {
   return Array.from(container.querySelectorAll("button")).find((button) =>
     button.textContent?.includes(label),
@@ -127,12 +133,12 @@ describe("IcsImportPanel", () => {
 
     await pickFile("team.ics", "BEGIN:VCALENDAR\nEND:VCALENDAR");
 
-    const radios = Array.from(container.querySelectorAll('[role="radio"]'));
-    expect(radios.map((radio) => radio.textContent)).toEqual([
+    const radios = calendarRadios();
+    expect(radios.map((radio) => radio.closest("label")?.textContent)).toEqual([
       "Work",
       "HomeDefault",
     ]);
-    expect(radios[1]?.getAttribute("aria-checked")).toBe("true");
+    expect(radios.map((radio) => radio.checked)).toEqual([false, true]);
 
     await clickImport();
 
@@ -155,13 +161,36 @@ describe("IcsImportPanel", () => {
 
     await pickFile("team.ics", "BEGIN:VCALENDAR");
     act(() => {
-      findButton("Work")?.click();
+      calendarRadios()[0]?.click();
     });
     await clickImport();
 
     expect(mockImportICS).toHaveBeenCalledWith(
       expect.objectContaining({ calendarId: "cal-work" }),
     );
+  });
+
+  it("groups the calendars as native radios so arrow keys move the choice", async () => {
+    render();
+
+    await pickFile("team.ics", "BEGIN:VCALENDAR");
+
+    const radios = calendarRadios();
+    const fieldset = radios[0]?.closest("fieldset");
+    expect(fieldset?.querySelector("legend")?.textContent).toBe("Import into");
+    expect(radios.every((radio) => radio.closest("fieldset") === fieldset)).toBe(
+      true,
+    );
+    expect(new Set(radios.map((radio) => radio.name)).size).toBe(1);
+    expect(radios[0]?.name).not.toBe("");
+
+    act(() => {
+      radios[0]?.click();
+    });
+    expect(calendarRadios().map((radio) => radio.checked)).toEqual([
+      true,
+      false,
+    ]);
   });
 
   it("rejects files that are not .ics", async () => {

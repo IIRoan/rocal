@@ -33,8 +33,8 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex h-9 w-full items-center justify-between gap-2 rounded-md bg-input px-3 py-2 text-sm text-input-foreground outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-        "data-[placeholder]:text-muted-foreground/70",
+        "flex h-9 w-full items-center justify-between gap-2 rounded-md bg-input px-3 py-2 text-sm text-input-foreground outline-none focus-visible:ring-ring focus-visible:ring-[3px]",
+        "data-[placeholder]:text-muted-foreground",
         "aria-invalid:bg-destructive/10",
         "disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-muted",
         "*:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&>span]:line-clamp-1",
@@ -115,7 +115,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground hover:bg-accent/50 hover:text-accent-foreground relative flex w-full cursor-pointer items-center rounded py-1.5 ps-8 pe-2 text-sm outline-hidden select-none transition-[color,background-color] duration-150 ease-out data-disabled:pointer-events-none data-disabled:opacity-50",
+        "focus:bg-hover focus:text-hover-foreground hover:bg-hover/50 hover:text-hover-foreground relative flex w-full cursor-pointer items-center rounded py-1.5 ps-8 pe-2 text-sm outline-hidden select-none transition-[color,background-color] duration-150 ease-out data-disabled:pointer-events-none data-disabled:opacity-50",
         className,
       )}
       {...props}

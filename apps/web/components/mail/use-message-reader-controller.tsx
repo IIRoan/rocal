@@ -24,7 +24,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Clock, MapPin } from "lucide-react";
 import { slideFadeIn } from "@workspace/ui/lib/motion";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { useIsMobile, usePrefersReducedMotion } from "@workspace/ui/hooks";
 import type { CalendarEvent } from "@workspace/calendar-core";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
@@ -273,10 +273,9 @@ export function useMessageReaderController(props: MessageReaderProps) {
         eventId: linkedCalendarEventId,
         event: null,
         loading: false,
-        error: getErrorMessage(
-          linkedEventQueryError,
-          "Unable to load linked event details.",
-        ),
+        error: linkedEventQueryError
+          ? "Event details not loaded. Check your connection and try again, or open the event in Calendar."
+          : null,
       };
     }
     return {
@@ -419,7 +418,12 @@ export function useMessageReaderController(props: MessageReaderProps) {
           },
         });
       } catch (error) {
-        toast.error(getErrorMessage(error, "Could not send reply."));
+        toast.error(
+          getErrorMessage(
+            error,
+            "Reply not sent. Check your connection and try again.",
+          ),
+        );
         dispatchMessageUi({ type: "patch", patch: { isSendingReply: false } });
       }
     } else {

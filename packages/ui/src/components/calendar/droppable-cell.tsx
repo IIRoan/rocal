@@ -49,7 +49,7 @@ export function DroppableCell({
       ref={setNodeRef}
       onClick={onClick}
       className={cn(
-        "data-dragging:bg-accent flex h-full flex-col px-0.5 py-1 sm:px-1",
+        "data-dragging:bg-hover flex h-full flex-col px-0.5 py-1 sm:px-1",
         className,
       )}
       style={style}

@@ -39,9 +39,9 @@ export function LandingNavbar({ onSignIn, isLeaving }: LandingNavbarProps) {
           <Link
             href="/"
             aria-label="Solace home"
-            className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
           >
-            <Logo width={26} height={26} className="text-primary" aria-hidden />
+            <Logo width={26} height={26} className="text-accent" aria-hidden />
             <span className="text-[15px] font-semibold tracking-tight text-foreground">
               Solace
             </span>
@@ -53,7 +53,7 @@ export function LandingNavbar({ onSignIn, isLeaving }: LandingNavbarProps) {
             <li key={link.href}>
               <Link
                 href={link.href}
-                className="inline-flex min-h-11 cursor-pointer items-center rounded-md text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="inline-flex min-h-11 cursor-pointer items-center rounded-md text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring"
               >
                 {link.label}
               </Link>

@@ -7,7 +7,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import {
   hasComposeUserContent,
   type ComposeTextFields,

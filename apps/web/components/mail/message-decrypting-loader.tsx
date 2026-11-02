@@ -14,7 +14,7 @@ type MessageDecryptingSkeletonProps = {
 export function MessageDecryptingSkeleton({
   isDark = false,
   className,
-  label = "Decrypting message",
+  label = "Decrypting message…",
 }: MessageDecryptingSkeletonProps) {
   // repo-rules-allow theme-tokens-only: bars sit on the fixed white/black email-document surface, so they cannot follow theme tokens.
   const bar = isDark ? "bg-white/10" : "bg-black/[0.06]";
@@ -26,8 +26,8 @@ export function MessageDecryptingSkeleton({
         className,
       )}
       aria-busy
-      aria-label={label}
     >
+      <output className="sr-only">{label}</output>
       <div
         className={cn(
           "relative min-h-[10rem] flex-1 px-5 py-4",
@@ -36,7 +36,7 @@ export function MessageDecryptingSkeleton({
       >
         <div
           className={cn(
-            "pointer-events-none absolute inset-0 overflow-hidden",
+            "pointer-events-none absolute inset-0 overflow-hidden motion-reduce:hidden",
             isDark ? "opacity-40" : "opacity-30",
           )}
           aria-hidden

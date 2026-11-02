@@ -3,9 +3,11 @@
 import { Moon, Sun } from "lucide-react";
 import { createLogger } from "@workspace/logger";
 import { useTheme } from "next-themes";
-import { useId } from "react";
+import { useId, useSyncExternalStore } from "react";
 
 const log = createLogger("theme-toggle");
+
+const subscribeToNothing = () => () => {};
 
 interface ThemeToggleProps {
   useSettingsTheme?: {
@@ -16,7 +18,17 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ useSettingsTheme }: ThemeToggleProps = {}) {
   const id = useId();
-  const { theme: nextTheme, setTheme: setNextTheme } = useTheme();
+  const {
+    theme: nextTheme,
+    resolvedTheme,
+    setTheme: setNextTheme,
+  } = useTheme();
+  // The server cannot know the applied theme, so the checked state appears only after hydration.
+  const isMounted = useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false,
+  );
 
   const currentTheme = useSettingsTheme?.currentTheme || nextTheme || "system";
   const updateTheme =
@@ -58,22 +70,17 @@ export function ThemeToggle({ useSettingsTheme }: ThemeToggleProps = {}) {
         name="theme-toggle"
         id={id}
         className="peer sr-only"
-        checked={currentTheme === "system"}
+        checked={isMounted && resolvedTheme === "dark"}
         onChange={smartToggle}
-        aria-label="Toggle dark mode"
+        aria-label="Dark mode"
       />
       <label
-        className="relative inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-foreground outline-none transition-[color,background-color,box-shadow] hover:bg-accent hover:text-accent-foreground peer-focus-visible:border-ring peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50"
+        className="relative inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-foreground outline-none transition-[color,background-color,box-shadow] hover:bg-hover hover:text-hover-foreground peer-focus-visible:border-ring peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring"
         htmlFor={id}
         aria-hidden="true"
       >
-        <span className="absolute size-5 scale-100 rotate-0 transition-transform duration-300 dark:scale-0 dark:-rotate-90">
-          <Sun size={20} />
-        </span>
-        <span className="absolute size-5 scale-0 rotate-90 transition-transform duration-300 dark:scale-100 dark:rotate-0">
-          <Moon size={20} />
-        </span>
-        <span className="sr-only">Switch to system/light/dark version</span>
+        <Sun size={20} className="dark:hidden" />
+        <Moon size={20} className="hidden dark:block" />
       </label>
     </div>
   );

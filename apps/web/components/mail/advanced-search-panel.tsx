@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
+  Check,
   X,
   Paperclip,
   Star,
@@ -57,6 +58,9 @@ export function AdvancedSearchPanel({
   const [activeField, setActiveField] =
     useState<keyof MailSearchFilterCondition>("from");
   const [draftValue, setDraftValue] = useState("");
+  const [valueMissing, setValueMissing] = useState(false);
+  const valueInputRef = useRef<HTMLInputElement>(null);
+  const valueErrorId = useId();
 
   const chips = filtersToChips(filters);
   const activeFieldMeta =
@@ -71,7 +75,12 @@ export function AdvancedSearchPanel({
   );
 
   const addDraftCondition = () => {
-    if (!activeFieldMeta || !draftValue.trim()) return;
+    if (!activeFieldMeta) return;
+    if (!draftValue.trim()) {
+      setValueMissing(true);
+      valueInputRef.current?.focus();
+      return;
+    }
     onFiltersChange({
       ...filters,
       conditions: [...filters.conditions, { [activeField]: draftValue.trim() }],
@@ -120,12 +129,13 @@ export function AdvancedSearchPanel({
                 <button
                   key={field.field}
                   type="button"
+                  aria-pressed={isActive}
                   onClick={() => toggleBooleanFilter(field.field)}
                   className={cn(
                     "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
                     isActive
-                      ? "border-primary/30 bg-primary/15 text-primary"
-                      : "border-border/50 bg-background/60 text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                      ? "border-accent/30 bg-accent/15 text-accent"
+                      : "border-border/50 bg-background/60 text-muted-foreground hover:bg-hover/50 hover:text-foreground",
                   )}
                 >
                   <QuickFilterIcon field={field.field} active={isActive} />
@@ -141,6 +151,7 @@ export function AdvancedSearchPanel({
               onChange={(event) => {
                 setActiveField(event.target.value as keyof MailSearchFilterCondition);
                 setDraftValue("");
+                setValueMissing(false);
               }}
               className="h-7 shrink-0 rounded-md border border-border/50 bg-background px-1.5 text-[11px] text-foreground"
               aria-label="Filter field"
@@ -152,9 +163,16 @@ export function AdvancedSearchPanel({
               ))}
             </select>
             <Input
+              ref={valueInputRef}
               type={activeFieldMeta?.type === "date" ? "date" : "text"}
               value={draftValue}
-              onChange={(event) => setDraftValue(event.target.value)}
+              aria-label={activeFieldMeta?.label}
+              aria-invalid={valueMissing || undefined}
+              aria-describedby={valueMissing ? valueErrorId : undefined}
+              onChange={(event) => {
+                setDraftValue(event.target.value);
+                setValueMissing(false);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -162,7 +180,7 @@ export function AdvancedSearchPanel({
                 }
               }}
               placeholder={activeFieldMeta?.placeholder}
-              className="h-7 min-w-0 flex-1 border-border/50 bg-background text-xs shadow-none focus-visible:ring-1 focus-visible:ring-ring/40"
+              className="h-7 min-w-0 flex-1 border-border/50 bg-background text-xs shadow-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             <Button
               type="button"
@@ -170,11 +188,15 @@ export function AdvancedSearchPanel({
               size="sm"
               className="h-7 shrink-0 px-2 text-[11px]"
               onClick={addDraftCondition}
-              disabled={!draftValue.trim()}
             >
               Add
             </Button>
           </div>
+          {valueMissing ? (
+            <p id={valueErrorId} className="text-[11px] text-destructive">
+              Enter a value to filter by.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -183,13 +205,13 @@ export function AdvancedSearchPanel({
           {chips.map((chip, index) => (
             <span
               key={`${chip.field}-${index}`}
-              className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary"
+              className="inline-flex items-center gap-1 rounded-md border border-accent/20 bg-accent/10 px-1.5 py-0.5 text-[11px] font-medium text-accent"
             >
               {chip.label}
               <button
                 type="button"
                 onClick={() => removeChip(chip)}
-                className="rounded-sm p-0.5 transition-colors hover:bg-primary/20"
+                className="rounded-sm p-0.5 transition-colors hover:bg-accent/20"
                 aria-label={`Remove filter ${chip.label}`}
               >
                 <X className="size-2.5" strokeWidth={2.5} />
@@ -231,18 +253,18 @@ export function AdvancedSearchToggle({
         className,
       )}
       aria-expanded={expanded}
-      aria-label="Toggle filters"
+      aria-label={activeCount > 0 ? `Filter, ${activeCount} active` : "Filter"}
     >
       <Filter className="size-3 shrink-0 opacity-70" strokeWidth={2.25} />
       <span className="hidden sm:inline">Filter</span>
       {activeCount > 0 ? (
-        <span className="rounded bg-primary/15 px-1 py-px text-[11px] font-semibold tabular-nums text-primary">
+        <span className="rounded bg-accent/15 px-1 py-px text-[11px] font-semibold tabular-nums text-accent">
           {activeCount}
         </span>
       ) : null}
       <ChevronDown
         className={cn(
-          "size-3 shrink-0 opacity-50 transition-transform duration-200",
+          "size-3 shrink-0 opacity-50 transition-transform duration-200 motion-reduce:transition-none",
           expanded && "rotate-180",
         )}
         strokeWidth={2.25}
@@ -260,8 +282,10 @@ function QuickFilterIcon({
 }) {
   const className = cn(
     "size-3 shrink-0",
-    active ? "text-primary" : "text-muted-foreground",
+    active ? "text-accent" : "text-muted-foreground",
   );
+  // The check is the non-color cue that the filter is on.
+  if (active) return <Check className={className} strokeWidth={2.5} />;
   switch (field) {
     case "hasAttachment":
       return <Paperclip className={className} strokeWidth={2.25} />;

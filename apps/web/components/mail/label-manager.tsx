@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useReducer, useRef, useState } from "react";
 import { Plus, Tag } from "lucide-react";
 import type { LabelDef } from "@/lib/mail/types";
 import {
@@ -37,6 +37,22 @@ interface LabelManagerProps {
   onDeleteLabel?: (id: string) => Promise<void>;
 }
 
+type LabelFormState = {
+  name: string;
+  color: string;
+  saving: boolean;
+  failure: string | null;
+  nameMissing: boolean;
+  confirmDelete: boolean;
+};
+
+function labelFormReducer(
+  state: LabelFormState,
+  patch: Partial<LabelFormState>,
+): LabelFormState {
+  return { ...state, ...patch };
+}
+
 function LabelForm({
   title,
   initialName,
@@ -54,44 +70,59 @@ function LabelForm({
   onSubmit: (name: string, color: string) => Promise<void>;
   onDelete?: () => Promise<void>;
 }) {
-  const [name, setName] = useState(initialName);
-  const [color, setColor] = useState(initialColor);
-  const [status, setStatus] = useState<"idle" | "saving" | "failed">("idle");
-  const saving = status === "saving";
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [form, patch] = useReducer(labelFormReducer, {
+    name: initialName,
+    color: initialColor,
+    saving: false,
+    failure: null,
+    nameMissing: false,
+    confirmDelete: false,
+  });
+  const { name, color, saving, failure, nameMissing, confirmDelete } = form;
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const trimmed = name.trim();
-  const canSave =
-    trimmed.length > 0 &&
-    !saving &&
-    (trimmed !== initialName || color !== initialColor);
+  const changed = trimmed !== initialName || color !== initialColor;
 
   // Handles rejection itself; the returned promise never rejects.
-  const run = (action: () => Promise<void>): void => {
-    setStatus("saving");
+  const run = (action: () => Promise<void>, failureMessage: string): void => {
+    patch({ saving: true, failure: null });
     void action()
       .then(() => {
-        setStatus("idle");
+        patch({ saving: false });
         onBack();
       })
-      .catch(() => setStatus("failed"));
+      .catch(() => patch({ saving: false, failure: failureMessage }));
   };
 
   const submit = () => {
-    if (canSave) run(() => onSubmit(trimmed, normalizeLabelColorInput(color)));
+    if (!trimmed) {
+      patch({ nameMissing: true });
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (changed && !saving) {
+      run(
+        () => onSubmit(trimmed, normalizeLabelColorInput(color)),
+        "Label not saved. Check your connection and try again.",
+      );
+    }
   };
 
   return (
     <PaletteView title={title} onBack={onBack}>
       <PaletteField label="Name" htmlFor="label-name">
         <input
+          ref={nameInputRef}
           id="label-name"
           type="text"
           value={name}
           autoComplete="off"
           placeholder="Label name"
           aria-label="Label name"
+          aria-invalid={nameMissing || undefined}
+          aria-describedby={nameMissing ? "label-name-error" : undefined}
           disabled={saving}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => patch({ name: e.target.value, nameMissing: false })}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -100,13 +131,27 @@ function LabelForm({
           }}
           className={PALETTE_INPUT_CLASS}
         />
+        {nameMissing ? (
+          <p id="label-name-error" className="text-[13px] leading-[130%] text-destructive">
+            Enter a label name.
+          </p>
+        ) : null}
       </PaletteField>
       <PaletteField label="Color">
-        <LabelColorPicker color={color} onChange={setColor} disabled={saving} />
+        <LabelColorPicker
+          color={color}
+          onChange={(nextColor) => patch({ color: nextColor })}
+          disabled={saving}
+        />
       </PaletteField>
-      {status === "failed" ? (
+      <p role="status" className="px-2 pt-2 text-[13px] leading-[130%] text-destructive empty:pt-0">
+        {confirmDelete
+          ? `Delete “${initialName}”? Messages stay in their mailboxes; only this label is removed from them.`
+          : null}
+      </p>
+      {failure ? (
         <p className="px-2 pt-2 text-[13px] leading-[130%] text-destructive" role="alert">
-          Something went wrong. Please try again.
+          {failure}
         </p>
       ) : null}
       <PaletteFormActions>
@@ -116,19 +161,25 @@ function LabelForm({
             className="mr-auto"
             disabled={saving}
             onClick={() =>
-              confirmDelete ? run(onDelete) : setConfirmDelete(true)
+              confirmDelete
+                ? run(onDelete, "Label not deleted. Check your connection and try again.")
+                : patch({ confirmDelete: true })
             }
           >
-            {confirmDelete ? "Confirm delete" : "Delete label"}
+            {confirmDelete ? "Delete label" : "Delete label…"}
           </PaletteButton>
         ) : null}
-        <PaletteButton variant="ghost" onClick={onBack} disabled={saving}>
-          Cancel
+        <PaletteButton
+          variant="ghost"
+          onClick={confirmDelete ? () => patch({ confirmDelete: false }) : onBack}
+          disabled={saving}
+        >
+          {confirmDelete ? "Keep label" : "Cancel"}
         </PaletteButton>
         <PaletteButton
           variant="primary"
           loading={saving}
-          disabled={!canSave}
+          disabled={!changed}
           onClick={submit}
         >
           {submitLabel}

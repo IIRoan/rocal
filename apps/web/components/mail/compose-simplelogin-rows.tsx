@@ -50,7 +50,7 @@ export function ComposeSimpleLoginViaRow({
       }`}
     >
       <span
-        className={`shrink-0 text-xs font-medium text-muted-foreground/60 ${
+        className={`shrink-0 text-xs font-medium text-muted-foreground ${
           isMobile ? "w-10" : "w-14"
         }`}
       >
@@ -62,7 +62,7 @@ export function ComposeSimpleLoginViaRow({
         aria-hidden
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm text-foreground/80">{via.alias}</span>
+        <span className="break-words text-sm text-foreground/80">{via.alias}</span>
         <span className="text-[11px] leading-snug text-muted-foreground">
           {via.detail}
         </span>

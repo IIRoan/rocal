@@ -68,8 +68,14 @@ jest.mock("@workspace/ui/components/ui", () => ({
   SidebarInset: MockContainer,
 }));
 jest.mock("@workspace/ui/components/ui/button", () => ({
-  Button: ({ children }: { children: React.ReactNode }) => (
-    <button>{children}</button>
+  Button: ({
+    children,
+    onClick,
+    "aria-label": ariaLabel,
+  }: React.ComponentProps<"button">) => (
+    <button onClick={onClick} aria-label={ariaLabel}>
+      {children}
+    </button>
   ),
 }));
 jest.mock("@workspace/ui/components/ui/tooltip", () => ({

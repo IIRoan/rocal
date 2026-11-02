@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef } from "react";
 import { Copy } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { Button } from "@workspace/ui/components/ui/button";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { fadeInMailReaderContent } from "../mail-app/mail-reader-transition";
@@ -43,7 +43,7 @@ export function MessageReaderShell({
       await navigator.clipboard.writeText(displayHtml);
       toast.success("Copied");
     } catch {
-      toast.error("Failed to copy");
+      toast.error("Unable to copy. Select the source and copy it manually.");
     }
   };
 
@@ -95,7 +95,7 @@ export function MessageReaderShell({
               Copy source
             </Button>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-auto px-6 py-4">
+          <div className="flex-1 min-h-0 overflow-auto overscroll-contain px-6 py-4">
             <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap break-all select-all">
               {displayHtml}
             </pre>

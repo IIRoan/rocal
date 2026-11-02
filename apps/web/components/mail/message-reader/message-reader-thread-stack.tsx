@@ -16,7 +16,7 @@ import type {
 } from "../use-message-reader-controller";
 
 const ROW_FOCUS_CLASS =
-  "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60";
+  "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
 /** The thread as one scroll: the open message in place, the others as rows that open it. */
 export function MessageReaderThreadStack({
@@ -44,6 +44,7 @@ export function MessageReaderThreadStack({
   const scrollRef = useRef<HTMLDivElement>(null);
   const expandedRef = useRef<HTMLDivElement>(null);
   const shownMessageIdRef = useRef(message.id);
+  const revealedIdRef = useRef<string | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
   const entries = planMailThreadStack(
     orderedConversationMessages,
@@ -71,9 +72,22 @@ export function MessageReaderThreadStack({
     ) {
       scroller.scrollTop = top;
     }
+    // The activated row unmounted with its focus; hand it to the message that replaced it.
+    if (document.activeElement === document.body) expanded.focus({ preventScroll: true });
     const fade = fadeInMailReaderContent(expanded, prefersReducedMotion);
     return () => fade?.cancel();
   }, [message.id, prefersReducedMotion]);
+
+  useLayoutEffect(() => {
+    const revealedId = revealedIdRef.current;
+    revealedIdRef.current = null;
+    if (!revealedId) return;
+    Array.from(
+      scrollRef.current?.querySelectorAll<HTMLElement>("[data-message-id]") ?? [],
+    )
+      .find((element) => element.dataset.messageId === revealedId)
+      ?.focus();
+  }, [showAll]);
 
   return (
     <div
@@ -86,14 +100,21 @@ export function MessageReaderThreadStack({
             <button
               key={`folded:${entry.firstHiddenId}`}
               type="button"
-              onClick={() => setShowAll(true)}
+              aria-expanded={false}
+              onClick={() => {
+                revealedIdRef.current = entry.firstHiddenId;
+                setShowAll(true);
+              }}
               className={cn(
                 "flex shrink-0 cursor-pointer items-center gap-3 border-b border-[var(--border-tertiary)] py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--bg-cell-hover)] hover:text-foreground",
                 isMobile ? "px-3" : "px-4",
                 ROW_FOCUS_CLASS,
               )}
             >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-secondary)] text-[11px] tabular-nums">
+              <span
+                aria-hidden
+                className="flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-secondary)] text-[11px] tabular-nums"
+              >
                 {entry.count}
               </span>
               {entry.count} more messages
@@ -105,8 +126,9 @@ export function MessageReaderThreadStack({
             <div
               key={entry.message.id}
               ref={expandedRef}
+              tabIndex={-1}
               className={cn(
-                "flex flex-1 flex-col",
+                "flex flex-1 flex-col focus-visible:-outline-offset-2",
                 isThread &&
                   "min-h-[min(36rem,80dvh)] border-b border-[var(--border-tertiary)] last:border-b-0",
               )}
@@ -173,6 +195,8 @@ function CollapsedThreadMessage({
     <div className="flex shrink-0 items-stretch border-b border-[var(--border-tertiary)] last:border-b-0 hover:bg-[var(--bg-cell-hover)]">
       <button
         type="button"
+        data-message-id={threadMessage.id}
+        aria-expanded={false}
         onClick={() => onSelect?.(threadMessage.id)}
         className={cn(
           "flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-2.5 text-left",
@@ -199,7 +223,7 @@ function CollapsedThreadMessage({
               {label}
             </span>
             {isRead ? null : (
-              <span className="size-1.5 shrink-0 rounded-full bg-primary">
+              <span className="size-1.5 shrink-0 rounded-full bg-accent">
                 <span className="sr-only">Unread</span>
               </span>
             )}

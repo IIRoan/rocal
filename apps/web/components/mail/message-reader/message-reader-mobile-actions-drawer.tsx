@@ -106,7 +106,7 @@ export function MessageReaderMobileActionsDrawer({
             <DrawerHeader>
               <DrawerTitle>Message actions</DrawerTitle>
             </DrawerHeader>
-            <div className="flex flex-col gap-1 overflow-y-auto px-4 pb-6">
+            <div className="flex flex-col gap-1 overflow-y-auto overscroll-contain px-4 pb-6">
               {hasPrev && onNavigatePrev && (
                 <button
                   type="button"
@@ -115,7 +115,7 @@ export function MessageReaderMobileActionsDrawer({
                     dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                   }}
                   disabled={isBusy}
-                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
                 >
                   <ChevronLeft className="size-4 text-muted-foreground" />
                   Previous message
@@ -129,7 +129,7 @@ export function MessageReaderMobileActionsDrawer({
                     dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                   }}
                   disabled={isBusy}
-                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
                 >
                   <ChevronRight className="size-4 text-muted-foreground" />
                   Next message
@@ -142,7 +142,7 @@ export function MessageReaderMobileActionsDrawer({
                   dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                 }}
                 disabled={!canReply}
-                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
               >
                 <Reply
                   className="size-4 text-muted-foreground"
@@ -157,7 +157,7 @@ export function MessageReaderMobileActionsDrawer({
                   dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                 }}
                 disabled={!canReply}
-                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
               >
                 <Forward
                   className="size-4 text-muted-foreground"
@@ -173,7 +173,7 @@ export function MessageReaderMobileActionsDrawer({
                     dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                   }}
                   disabled={isBusy}
-                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
                 >
                   <Archive
                     className="size-4 text-muted-foreground"
@@ -189,7 +189,7 @@ export function MessageReaderMobileActionsDrawer({
                   dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                 }}
                 disabled={isBusy}
-                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
               >
                 <MailOpen
                   className="size-4 text-muted-foreground"
@@ -203,7 +203,7 @@ export function MessageReaderMobileActionsDrawer({
                     <button
                       type="button"
                       disabled={isBusy}
-                      className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                      className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
                     >
                       <FolderInput
                         className="size-4 text-muted-foreground"
@@ -226,7 +226,7 @@ export function MessageReaderMobileActionsDrawer({
                           onMove(mailbox.id);
                           dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                         }}
-                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-hover/50 transition-colors text-left"
                       >
                         {getMailboxDisplayName(mailbox)}
                       </button>
@@ -248,7 +248,7 @@ export function MessageReaderMobileActionsDrawer({
                     <button
                       type="button"
                       disabled={isBusy}
-                      className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                      className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
                     >
                       <Tag
                         className="size-4 text-muted-foreground"
@@ -268,7 +268,7 @@ export function MessageReaderMobileActionsDrawer({
                     dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                   }}
                   disabled={isBusy}
-                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
                 >
                   <OctagonAlert
                     className="size-4 text-muted-foreground"
@@ -285,7 +285,7 @@ export function MessageReaderMobileActionsDrawer({
                     dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                   }}
                   disabled={isBusy}
-                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
                 >
                   <Inbox
                     className="size-4 text-muted-foreground"
@@ -301,7 +301,7 @@ export function MessageReaderMobileActionsDrawer({
                   dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
                 }}
                 disabled={isBusy}
-                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-destructive/80 transition-colors hover:bg-destructive/10 active:bg-destructive/20 disabled:opacity-40"
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-destructive transition-colors hover:bg-destructive/10 active:bg-destructive/20 disabled:opacity-40"
               >
                 <Trash2 className="size-4" strokeWidth={2} />
                 {isInTrash ? "Delete permanently" : "Move to trash"}
@@ -309,7 +309,7 @@ export function MessageReaderMobileActionsDrawer({
               <DrawerClose asChild>
                 <button
                   type="button"
-                  className="mt-2 flex h-11 w-full items-center justify-center rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-accent/40"
+                  className="mt-2 flex h-11 w-full items-center justify-center rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-hover/40"
                 >
                   Cancel
                 </button>

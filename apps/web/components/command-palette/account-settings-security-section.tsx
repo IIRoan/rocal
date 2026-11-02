@@ -34,11 +34,7 @@ export function AccountSecuritySection({
 
   return (
     <PaletteSection label="Security">
-      {security.message && !isAnySecurityFormOpen ? (
-        <div className="px-2 py-1">
-          <InlineMessage msg={security.message} />
-        </div>
-      ) : null}
+      <InlineMessage msg={security.message} />
       <AccountSecurityActions
         hasPasswordAccount={hasPasswordAccount}
         busy={isBusy}

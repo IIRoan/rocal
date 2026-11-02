@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useId, useRef, useState } from "react";
 import {
   UserPlus,
   X,
@@ -21,6 +21,7 @@ import { format } from "date-fns";
 import {
   PaletteButton,
   PaletteEmptyState,
+  PaletteFormActions,
   PaletteIconBox,
   PaletteSection,
   PaletteView,
@@ -70,8 +71,13 @@ function InviteRow({
   revoking: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const revokeRef = useRef<HTMLButtonElement>(null);
+  const confirmId = useId();
   const isActive = isInviteActive(invite);
   const isExpired = isActive && isInviteExpired(invite);
+  const isInactive = invite.status === "revoked" || isExpired;
 
   async function copyToken() {
     await navigator.clipboard.writeText(invite.token);
@@ -79,17 +85,63 @@ function InviteRow({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  if (confirmingRevoke) {
+    return (
+      <fieldset
+        aria-labelledby={`${confirmId}-title`}
+        aria-describedby={`${confirmId}-body`}
+        className="min-w-0 p-2"
+      >
+        <p
+          id={`${confirmId}-title`}
+          className="text-[15px] leading-[130%] break-words text-foreground"
+        >
+          Revoke the invite for &ldquo;{invite.email}&rdquo;?
+        </p>
+        <p
+          id={`${confirmId}-body`}
+          className="mt-0.5 text-[13px] leading-[130%] text-muted-foreground"
+        >
+          Their invite token stops working, so they can&rsquo;t use it to sign
+          up.
+        </p>
+        <PaletteFormActions>
+          <PaletteButton
+            ref={cancelRef}
+            variant="ghost"
+            onClick={() => {
+              setConfirmingRevoke(false);
+              requestAnimationFrame(() => revokeRef.current?.focus());
+            }}
+          >
+            Cancel
+          </PaletteButton>
+          <PaletteButton
+            variant="destructive"
+            onClick={() => {
+              setConfirmingRevoke(false);
+              onRevoke(invite.id);
+            }}
+          >
+            <X className="size-3.5" />
+            Revoke invite
+          </PaletteButton>
+        </PaletteFormActions>
+      </fieldset>
+    );
+  }
+
   return (
-    <div
-      className={`flex items-start gap-3 p-2 ${
-        invite.status === "revoked" || isExpired ? "opacity-50" : ""
-      }`}
-    >
+    <div className="flex items-start gap-3 p-2">
       <PaletteIconBox>
         <Mail className="size-4" />
       </PaletteIconBox>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] leading-[130%] text-foreground">
+        <p
+          className={`truncate text-[15px] leading-[130%] ${
+            isInactive ? "text-muted-foreground" : "text-foreground"
+          }`}
+        >
           {invite.email}
         </p>
         <div className="mt-0.5 flex items-center gap-2 text-[13px] leading-[130%]">
@@ -128,7 +180,12 @@ function InviteRow({
         <SimpleTooltip content="Revoke invite">
           <button
             type="button"
-            onClick={() => onRevoke(invite.id)}
+            ref={revokeRef}
+            onClick={() => {
+              setConfirmingRevoke(true);
+              // The confirm replaces this row, so focus lands on the safe choice once it renders.
+              requestAnimationFrame(() => cancelRef.current?.focus());
+            }}
             disabled={revoking}
             className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
             aria-label="Revoke invite"
@@ -166,7 +223,7 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
     e.preventDefault();
     const trimmed = email.trim();
     if (!trimmed) {
-      setMessage({ kind: "error", text: "Please enter an email address." });
+      setMessage({ kind: "error", text: "Enter an email address to invite." });
       return;
     }
     setMessage(null);
@@ -209,21 +266,27 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
         sign-up.
       </p>
 
-      {message && (
-        <div className="px-2 py-1">
+      <div role="status">
+        {message && message.kind !== "error" ? (
           <div
-            className={`rounded-lg px-3 py-2 text-[13px] ${
+            className={`mx-2 my-1 rounded-lg px-3 py-2 text-[13px] ${
               message.kind === "success"
                 ? "bg-success/10 text-success"
-                : message.kind === "warning"
-                  ? "bg-warning/10 text-warning"
-                  : "bg-destructive/10 text-destructive"
+                : "bg-warning/10 text-warning"
             }`}
           >
             {message.text}
           </div>
+        ) : null}
+      </div>
+      {message?.kind === "error" ? (
+        <div
+          role="alert"
+          className="mx-2 my-1 rounded-lg bg-destructive/10 px-3 py-2 text-[13px] text-destructive"
+        >
+          {message.text}
         </div>
-      )}
+      ) : null}
 
       <form onSubmit={handleCreate} className="flex gap-2 px-2 pt-2 pb-3">
         <div className="flex-1">
@@ -246,15 +309,10 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
           type="submit"
           variant="primary"
           loading={createMutation.isPending}
-          disabled={!email.trim()}
           className="h-9 shrink-0"
         >
-          {createMutation.isPending ? null : (
-            <>
-              <UserPlus className="size-4" />
-              Invite
-            </>
-          )}
+          {createMutation.isPending ? null : <UserPlus className="size-4" />}
+          Invite
         </PaletteButton>
       </form>
 
@@ -293,7 +351,7 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
           {invites.length === 0 && (
             <PaletteEmptyState>
               <span className="block text-[15px]">No invites yet</span>
-              <span className="block text-muted-foreground/70">
+              <span className="block text-muted-foreground">
                 Invite someone above to get started
               </span>
             </PaletteEmptyState>

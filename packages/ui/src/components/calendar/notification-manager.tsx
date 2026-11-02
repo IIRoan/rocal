@@ -41,7 +41,7 @@ interface NotificationManagerProps {
 }
 
 const CHIP_CLASS =
-  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-accent/60 text-sm text-foreground transition-colors cursor-pointer outline-none hover:bg-accent data-[state=open]:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50";
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-hover/60 text-sm text-foreground transition-colors cursor-pointer outline-none hover:bg-hover data-[state=open]:bg-hover focus-visible:ring-2 focus-visible:ring-ring";
 
 function ReminderChip({
   value,
@@ -75,8 +75,8 @@ function ReminderChip({
           className={cn(
             "flex items-center justify-center h-9 rounded-md text-sm transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
             option.value === value
-              ? "bg-primary text-primary-foreground"
-              : "hover:bg-accent",
+              ? "bg-accent text-accent-foreground"
+              : "hover:bg-hover",
           )}
         >
           {option.label}
@@ -124,7 +124,7 @@ function ReminderChip({
           onClick={onRemove}
           aria-label={`Remove ${formatReminderShort(value)} reminder`}
           className={cn(
-            "tap-target ml-0.5 flex aspect-square items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
+            "tap-target ml-0.5 flex aspect-square items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
             height,
           )}
         >

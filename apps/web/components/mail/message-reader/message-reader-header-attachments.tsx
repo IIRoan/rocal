@@ -120,10 +120,12 @@ export function MessageReaderHeaderAttachments({
                     }
                     aria-label={`${canPreview ? "Preview" : "Download"} ${name}`}
                     className={cn(
+                      // Long file names wrap instead of pushing the card past a narrow reader.
+                      "h-auto min-h-6 max-w-full shrink whitespace-normal py-1 text-left",
                       canPreview || canDownload
                         ? "cursor-pointer"
                         : "cursor-default",
-                      isMobile ? "h-5 gap-1 px-1.5 text-[11px]" : "",
+                      isMobile ? "min-h-5 gap-1 px-1.5 py-0.5 text-[11px]" : "",
                     )}
                   >
                     {canPreview ? (
@@ -133,7 +135,7 @@ export function MessageReaderHeaderAttachments({
                     ) : (
                       <Paperclip />
                     )}
-                    <span className="font-normal">{name}</span>
+                    <span className="min-w-0 font-normal [overflow-wrap:anywhere]">{name}</span>
                     {ext && (
                       <span className="font-normal text-muted-foreground">
                         {ext}
@@ -144,7 +146,7 @@ export function MessageReaderHeaderAttachments({
                 return (
                   <div
                     key={key}
-                    className="group/attachment relative flex items-center gap-1"
+                    className="group/attachment relative flex max-w-full items-center gap-1"
                   >
                     {attachmentButton}
                     {canPreview && onLoadAttachmentPreview && (

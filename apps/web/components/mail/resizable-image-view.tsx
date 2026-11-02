@@ -1,59 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
 
 export function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const [resizing, setResizing] = useState(false);
-  const startState = useRef({
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-    handle: "",
-  });
 
-  const onMouseDown = (e: React.MouseEvent, handle: string) => {
+  const onMouseDown = (e: React.MouseEvent, handle: "left" | "right" | "bottom-right") => {
     e.preventDefault();
     e.stopPropagation();
     const img = imgRef.current;
     if (!img) return;
-    startState.current = {
-      x: e.clientX,
-      y: e.clientY,
-      width: img.offsetWidth,
-      height: img.offsetHeight,
-      handle,
+    const startX = e.clientX;
+    const startWidth = img.offsetWidth;
+
+    const onMouseMove = (event: MouseEvent) => {
+      const dx = event.clientX - startX;
+      const newWidth = handle === "left" ? startWidth - dx : startWidth + dx;
+      updateAttributes({ width: Math.round(Math.max(50, newWidth)) });
     };
-    setResizing(true);
-  };
-
-  useEffect(() => {
-    if (!resizing) return;
-
-    const onMouseMove = (e: MouseEvent) => {
-      const { x, width, handle } = startState.current;
-      const dx = e.clientX - x;
-      const newWidth =
-        handle === "right" || handle === "bottom-right" || handle === "top-right"
-          ? Math.max(50, width + dx)
-          : Math.max(50, width - dx);
-      updateAttributes({ width: Math.round(newWidth) });
-    };
-
     const onMouseUp = () => {
-      setResizing(false);
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    return () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
     };
-  }, [resizing, updateAttributes]);
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
 
   const width = node.attrs.width;
   const style: React.CSSProperties = {
@@ -64,9 +37,10 @@ export function ResizableImageView({ node, updateAttributes, selected }: NodeVie
   return (
     <NodeViewWrapper as="span" className="inline-block relative" draggable data-drag-handle>
       <span
-        className={`relative inline-block group ${selected ? "ring-2 ring-primary rounded" : ""}`}
+        className={`relative inline-block group ${selected ? "ring-2 ring-accent rounded" : ""}`}
         style={style}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           ref={imgRef}
           src={node.attrs.src}
@@ -75,19 +49,23 @@ export function ResizableImageView({ node, updateAttributes, selected }: NodeVie
           style={{ width: "100%", height: "auto", display: "block" }}
           draggable={false}
         />
+        {/* Drag handles are a pointer shortcut; the formatting toolbar resizes a selected image by keyboard. */}
         {selected && (
           <>
             <span
+              role="presentation"
               onMouseDown={(e) => onMouseDown(e, "right")}
-              className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-8 bg-primary rounded cursor-ew-resize"
+              className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-8 bg-accent rounded cursor-ew-resize"
             />
             <span
+              role="presentation"
               onMouseDown={(e) => onMouseDown(e, "left")}
-              className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-8 bg-primary rounded cursor-ew-resize"
+              className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-8 bg-accent rounded cursor-ew-resize"
             />
             <span
+              role="presentation"
               onMouseDown={(e) => onMouseDown(e, "bottom-right")}
-              className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-primary rounded cursor-nwse-resize"
+              className="absolute -bottom-1.5 -right-1.5 size-3 bg-accent rounded cursor-nwse-resize"
             />
           </>
         )}

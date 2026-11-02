@@ -5,7 +5,6 @@ import { FileText, Loader2, Minus, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
@@ -46,6 +45,9 @@ const PDF_DOCUMENT_OPTIONS = {
   enableXfa: false,
 };
 
+const PDF_PREVIEW_FAILED =
+  "Unable to preview this PDF. Close the preview and download the file to open it in another app.";
+
 let pdfjsModulePromise: Promise<typeof import("pdfjs-dist")> | null = null;
 
 function loadPdfjs() {
@@ -68,7 +70,7 @@ function PdfPageCanvas({
   scale: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -106,15 +108,10 @@ function PdfPageCanvas({
         });
         await renderTask.promise;
       })
-      .catch((renderError) => {
-        if (cancelled) {
-          return;
+      .catch(() => {
+        if (!cancelled) {
+          setFailed(true);
         }
-        setError(
-          renderError instanceof Error
-            ? renderError.message
-            : "Could not render this PDF page.",
-        );
       });
 
     return () => {
@@ -123,10 +120,11 @@ function PdfPageCanvas({
     };
   }, [pageNumber, pdfDocument, scale]);
 
-  if (error) {
+  if (failed) {
     return (
       <div className="text-muted-foreground flex min-h-64 items-center justify-center rounded-md border border-border/60 bg-background px-6 py-8 text-center text-sm shadow-sm">
-        {error}
+        Unable to show page {pageNumber}. Download the file to open it in
+        another app.
       </div>
     );
   }
@@ -261,10 +259,10 @@ function PdfAttachmentPreview({
   preview: Extract<MailAttachmentPreview, { kind: "pdf" }>;
 }) {
   const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
-  const [pageCount, setPageCount] = useState(0);
+  const pageCount = pdfDocument?.numPages ?? 0;
   const [scale, setScale] = useState(1.15);
   const [isLoadingDocument, setIsLoadingDocument] = useState(true);
-  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfFailed, setPdfFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -287,32 +285,22 @@ function PdfAttachmentPreview({
             return;
           }
           setPdfDocument(document);
-          setPageCount(document.numPages);
         })
-        .catch((error) => {
-          if (cancelled) {
-            return;
+        .catch(() => {
+          if (!cancelled) {
+            setPdfFailed(true);
           }
-          setPdfError(
-            error instanceof Error
-              ? error.message
-              : "Could not load this PDF preview.",
-          );
         })
         .finally(() => {
           if (!cancelled) {
             setIsLoadingDocument(false);
           }
         });
-    })().catch((loadError) => {
+    })().catch(() => {
       if (cancelled) {
         return;
       }
-      setPdfError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Could not load this PDF preview.",
-      );
+      setPdfFailed(true);
       setIsLoadingDocument(false);
     });
 
@@ -327,7 +315,7 @@ function PdfAttachmentPreview({
       <DialogHeader className="border-b border-border/50 px-4 py-3 pr-12">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <DialogTitle className="truncate text-base">
+            <DialogTitle className="break-words text-base">
               {preview.name}
             </DialogTitle>
             <div className="text-muted-foreground mt-1 text-xs uppercase tracking-wide">
@@ -337,7 +325,7 @@ function PdfAttachmentPreview({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="inline-flex size-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground disabled:opacity-40"
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-hover/50 hover:text-foreground disabled:opacity-40"
               onClick={() =>
                 setScale((current) => Math.max(0.6, current - 0.15))
               }
@@ -346,12 +334,13 @@ function PdfAttachmentPreview({
             >
               <Minus className="size-4" strokeWidth={2.25} />
             </button>
-            <div className="text-muted-foreground min-w-28 text-center text-xs font-medium">
-              {Math.round(scale * 100)}% · {pageCount || "…"} pages
+            <div className="text-muted-foreground min-w-28 text-center text-xs font-medium tabular-nums">
+              {Math.round(scale * 100)}% ·{" "}
+              {pageCount === 1 ? "1 page" : `${pageCount || "…"} pages`}
             </div>
             <button
               type="button"
-              className="inline-flex size-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground disabled:opacity-40"
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-hover/50 hover:text-foreground disabled:opacity-40"
               onClick={() =>
                 setScale((current) => Math.min(2.4, current + 0.15))
               }
@@ -364,16 +353,16 @@ function PdfAttachmentPreview({
         </div>
       </DialogHeader>
 
-      <div className="bg-muted/20 min-h-0 flex-1 overflow-auto p-4">
+      <div className="bg-muted/20 min-h-0 flex-1 overflow-auto overscroll-contain p-4">
         {isLoadingDocument ? (
           <div className="text-muted-foreground flex h-full min-h-64 items-center justify-center gap-2 rounded-lg border border-border/60 bg-background text-sm shadow-sm">
             <Loader2 className="size-4 animate-spin" />
             Loading PDF preview
           </div>
-        ) : pdfError ? (
+        ) : pdfFailed ? (
           <div className="text-muted-foreground flex h-full min-h-64 flex-col items-center justify-center gap-2 rounded-lg border border-border/60 bg-background px-6 py-8 text-center shadow-sm">
-            <FileText className="size-6" />
-            <p className="max-w-md text-sm">{pdfError}</p>
+            <FileText className="size-6" aria-hidden />
+            <p className="max-w-md text-sm">{PDF_PREVIEW_FAILED}</p>
           </div>
         ) : pdfDocument ? (
           <div className="flex flex-col items-center gap-5">
@@ -401,7 +390,7 @@ function TextAttachmentPreview({
     <>
       <DialogHeader className="border-b border-border/50 px-4 py-3 pr-12">
         <div className="min-w-0">
-          <DialogTitle className="truncate text-base">
+          <DialogTitle className="break-words text-base">
             {preview.name}
           </DialogTitle>
           <div className="text-muted-foreground mt-1 text-xs uppercase tracking-wide">
@@ -409,7 +398,7 @@ function TextAttachmentPreview({
           </div>
         </div>
       </DialogHeader>
-      <div className="bg-muted/20 min-h-0 flex-1 overflow-auto p-4">
+      <div className="bg-muted/20 min-h-0 flex-1 overflow-auto overscroll-contain p-4">
         <pre className="min-h-full whitespace-pre-wrap break-words rounded-lg border border-border/60 bg-background px-4 py-3 font-mono text-sm leading-6 shadow-sm">
           {preview.text}
         </pre>
@@ -427,7 +416,7 @@ function ImageAttachmentPreview({
     <>
       <DialogHeader className="border-b border-border/50 px-4 py-3 pr-12">
         <div className="min-w-0">
-          <DialogTitle className="truncate text-base">
+          <DialogTitle className="break-words text-base">
             {preview.name}
           </DialogTitle>
           <div className="text-muted-foreground mt-1 text-xs uppercase tracking-wide">
@@ -435,7 +424,7 @@ function ImageAttachmentPreview({
           </div>
         </div>
       </DialogHeader>
-      <div className="bg-muted/20 flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+      <div className="bg-muted/20 flex min-h-0 flex-1 items-center justify-center overflow-auto overscroll-contain p-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={preview.url}
@@ -457,22 +446,18 @@ export function AttachmentPreviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="flex h-[min(92dvh,900px)] w-[min(96dvw,1100px)] max-w-[96dvw] flex-col p-0"
+        aria-describedby={undefined}
         onEscapeKeyDown={(event) => event.stopPropagation()}
       >
-        {/* Fallback title/description for Radix accessibility — overridden by each preview */}
-        <DialogHeader className="sr-only">
-          <DialogTitle>Attachment Preview</DialogTitle>
-          <DialogDescription>
-            Preview the selected attachment inline without leaving the mail app.
-          </DialogDescription>
-        </DialogHeader>
         {preview?.kind === "pdf" ? (
           <PdfAttachmentPreview key={preview.url} preview={preview} />
         ) : preview?.kind === "text" ? (
           <TextAttachmentPreview preview={preview} />
         ) : preview?.kind === "image" ? (
           <ImageAttachmentPreview preview={preview} />
-        ) : null}
+        ) : (
+          <DialogTitle className="sr-only">Attachment preview</DialogTitle>
+        )}
       </DialogContent>
     </Dialog>
   );

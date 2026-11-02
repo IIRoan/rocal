@@ -42,7 +42,7 @@ export function SidebarPrimaryAction({
             onClick={onClick}
             className={collapsedClassName}
           >
-            {icon ?? <Plus size={18} strokeWidth={2.5} className="text-primary" />}
+            {icon ?? <Plus size={18} strokeWidth={2.5} className="text-accent" />}
           </SidebarIconButton>
         </SidebarGroupContent>
       ) : (

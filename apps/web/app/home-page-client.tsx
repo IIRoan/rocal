@@ -75,9 +75,9 @@ export function HomePageClient() {
       {
         selector:
           "[data-hero-copy], [data-hero-art], [data-hero-preview], [data-hero-pillar]",
-        offset: { y: 12 },
-        duration: 550,
-        stagger: 90,
+        offset: { y: 12, blur: 4 },
+        duration: 300,
+        stagger: 100,
       },
     ]);
   }, [prefersReducedMotion, shouldShowLoadingOverlay]);
@@ -95,13 +95,23 @@ export function HomePageClient() {
   };
 
   return (
+    // The page scroller keeps focus and #calendar/#mail clear of the 5.75rem sticky header, only while this page is mounted.
     <section
       ref={rootRef}
-      className="relative isolate flex min-h-dvh flex-col overflow-clip bg-background"
+      className="relative isolate flex min-h-dvh flex-col overflow-clip bg-background [html:has(&)]:scroll-pbs-28"
     >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-md"
+      >
+        Skip to content
+      </a>
       <LandingNavbar onSignIn={handleSignIn} isLeaving={isLeaving} />
 
-      <main className="relative z-10 flex w-full flex-1 flex-col pb-12">
+      <main
+        id="main-content"
+        className="relative z-10 flex w-full flex-1 flex-col pb-12"
+      >
         <div
           data-hero-copy
           className="mx-auto grid w-full max-w-6xl gap-6 px-6 pt-8 pb-12 sm:px-8 sm:pt-12 sm:pb-14 lg:grid-cols-[1.6fr_1fr] lg:items-end lg:gap-16 lg:px-10 lg:pt-14 lg:pb-16"
@@ -146,7 +156,7 @@ export function HomePageClient() {
               key={pillar.title}
               id={pillar.id}
               data-hero-pillar
-              className="min-w-0 scroll-mt-28"
+              className="min-w-0"
             >
               <h2 className="text-lg font-semibold tracking-tight text-foreground">
                 {pillar.title}
@@ -170,7 +180,7 @@ export function HomePageClient() {
         <p>Solace. Calendar and mail, kept private.</p>
         <Link
           href="/privacy"
-          className="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 lg:min-h-0"
+          className="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring lg:min-h-0"
         >
           Privacy commitments
         </Link>

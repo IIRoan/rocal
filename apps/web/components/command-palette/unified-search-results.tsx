@@ -17,6 +17,7 @@ type UnifiedSearchResultsProps = {
   selectedIndex: number;
   baseIndex?: number;
   onSelect: (result: Result) => void;
+  optionId: (index: number) => string;
 };
 
 function formatTimestamp(value?: string) {
@@ -46,11 +47,13 @@ function SearchResultRow({
   globalIndex,
   isSelected,
   onSelect,
+  optionId,
   result,
 }: {
   globalIndex: number;
   isSelected: boolean;
   onSelect: (result: Result) => void;
+  optionId: string;
   result: Result;
 }) {
   const timestamp = formatTimestamp(result.timestamp);
@@ -66,13 +69,17 @@ function SearchResultRow({
 
   return (
     <button
+      id={optionId}
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={-1}
       data-index={globalIndex}
       data-source-row={result.source}
       type="button"
       onClick={() => onSelect(result)}
       className={cn(
-        "flex w-full items-start gap-2 px-3 py-2 text-left transition-colors outline-none focus-visible:bg-accent/50",
-        isSelected ? "bg-accent/50" : "hover:bg-accent/35",
+        "flex w-full items-start gap-2 px-3 py-2 text-left transition-colors outline-none focus-visible:bg-hover/50",
+        isSelected ? "bg-hover/50" : "hover:bg-hover/35",
       )}
     >
       <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center text-muted-foreground/70">
@@ -104,19 +111,19 @@ function SearchResultRow({
         {(encryption || hasAttachment || hasLocation) ? (
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
             {hasAttachment ? (
-              <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground/70">
+              <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
                 <Paperclip className="size-2.5" />
                 Attachment
               </span>
             ) : null}
             {hasLocation ? (
-              <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground/70">
+              <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
                 <MapPin className="size-2.5" />
                 Location
               </span>
             ) : null}
             {encryption ? (
-              <span className="text-[11px] text-muted-foreground/60">
+              <span className="text-[11px] text-muted-foreground">
                 {encryption}
               </span>
             ) : null}
@@ -139,6 +146,7 @@ export function UnifiedSearchResults({
   selectedIndex,
   baseIndex = 0,
   onSelect,
+  optionId,
 }: UnifiedSearchResultsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -187,6 +195,8 @@ export function UnifiedSearchResults({
   return (
     <div ref={containerRef} className="flex">
       <section
+        role="group"
+        aria-label="Mail"
         data-source-section="messages"
         className="min-w-0 overflow-hidden"
         style={{
@@ -204,6 +214,7 @@ export function UnifiedSearchResults({
                   globalIndex={globalIndex}
                   isSelected={globalIndex === selectedIndex}
                   onSelect={onSelect}
+                  optionId={optionId(globalIndex)}
                   result={result}
                 />
               );
@@ -221,6 +232,8 @@ export function UnifiedSearchResults({
       />
 
       <section
+        role="group"
+        aria-label="Calendar"
         data-source-section="calendar"
         className="min-w-0 overflow-hidden"
         style={{
@@ -238,6 +251,7 @@ export function UnifiedSearchResults({
                   globalIndex={globalIndex}
                   isSelected={globalIndex === selectedIndex}
                   onSelect={onSelect}
+                  optionId={optionId(globalIndex)}
                   result={result}
                 />
               );

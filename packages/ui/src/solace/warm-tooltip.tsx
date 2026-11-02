@@ -155,7 +155,8 @@ const HOLD_SLOP = 10;
 const SWAP = 0.14;
 const SWAP_SHIFT = 10;
 const RISE = 4;
-const GRACE = 80;
+// Long enough to cross the gap from the trigger onto the hoverable tooltip.
+const GRACE = 150;
 
 const FLIP_ROOM = 40;
 
@@ -422,14 +423,20 @@ export function WarmTooltipGroup({
     const onHidden = () => {
       if (document.visibilityState === 'hidden' && st.current.current) api.current.hide(st.current.current.id, true);
     };
+    // WCAG 1.4.13: a hover-opened tooltip must also close on Escape while focus is elsewhere.
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && st.current.current) api.current.hide(st.current.current.id, true);
+    };
     window.addEventListener('scroll', follow, { capture: true, passive: true });
     window.addEventListener('resize', follow);
     document.addEventListener('visibilitychange', onHidden);
+    document.addEventListener('keydown', onEscape);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('scroll', follow, { capture: true });
       window.removeEventListener('resize', follow);
       document.removeEventListener('visibilitychange', onHidden);
+      document.removeEventListener('keydown', onEscape);
     };
   }, [state, ax, ay, ax.jump, ay.jump]);
 
@@ -457,6 +464,12 @@ export function WarmTooltipGroup({
               role="tooltip"
               className="warm-tooltip"
               data-side={side}
+              data-state={state}
+              // WCAG 1.4.13: the pointer may move onto the tooltip; leaving it closes after the same grace as the trigger.
+              onPointerEnter={() => clearTimeout(st.current.leaveTimer)}
+              onPointerLeave={() => api.current.hide(current.id)}
+              // React bubbles portal clicks to the trigger's ancestors (e.g. a clickable mail row); stop that.
+              onClick={(event) => event.stopPropagation()}
               style={
                 {
                   transform: place,
@@ -690,8 +703,8 @@ const WarmTooltip: React.FC<WarmTooltipProps> = ({
   side = 'top',
   delay,
   warmWindow,
-  surfaceColor = "var(--primary)",
-  inkColor = "var(--primary-foreground)",
+  surfaceColor = "var(--accent)",
+  inkColor = "var(--accent-foreground)",
   size = 'md',
   radius = 6,
   gap = 8,

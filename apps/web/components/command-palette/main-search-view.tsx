@@ -1,9 +1,10 @@
-import type { ComponentType } from "react";
+import { useId, type ComponentType } from "react";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { ChevronRight, Search } from "lucide-react";
 
 import type { UseCommandPaletteSearchResult } from "@/hooks/use-command-palette-search";
+import { getCommandPaletteListLength } from "@/lib/command-palette-interactions";
 import { PaletteSectionLabel } from "./palette-ui";
 import { UnifiedSearchResults } from "./unified-search-results";
 
@@ -35,12 +36,21 @@ function SearchOnlyIntroState() {
   );
 }
 
+const RESULT_PLURAL_RULES = new Intl.PluralRules("en-US");
+
+function resultCountLabel(count: number) {
+  return RESULT_PLURAL_RULES.select(count) === "one"
+    ? `${count} result`
+    : `${count} results`;
+}
+
 function NavigationResultButton({
   description,
   icon: Icon,
   isSelected,
   label,
   onClick,
+  optionId,
   resultIndex,
 }: {
   description: string;
@@ -48,22 +58,27 @@ function NavigationResultButton({
   isSelected: boolean;
   label: string;
   onClick: () => void;
+  optionId: string;
   resultIndex: number;
 }) {
   return (
     <button
+      id={optionId}
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={-1}
       data-index={resultIndex}
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-3 p-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left outline-none focus-visible:bg-accent/50 transition-colors group ${
-        isSelected ? "bg-accent/50" : "hover:bg-accent/50"
+      className={`flex items-center gap-3 p-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left outline-none focus-visible:bg-hover/50 transition-colors group ${
+        isSelected ? "bg-hover/50" : "hover:bg-hover/50"
       }`}
     >
       <div className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">
         <Icon className="h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground" />
       </div>
       <span className="text-[15px] leading-[130%] flex-1 truncate">{label}</span>
-      <span className="text-[13px] leading-[130%] text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
+      <span className="text-[13px] leading-[130%] text-muted-foreground hidden sm:block">
         {description}
       </span>
       <ChevronRight
@@ -98,6 +113,24 @@ export function CommandPaletteMainSearchView({
     totalSearchResults,
     visibleNavigationItems,
   } = search;
+  const optionIdPrefix = useId();
+  const listboxId = `${optionIdPrefix}-results`;
+  const optionId = (index: number) => `${optionIdPrefix}-option-${index}`;
+  const optionCount = getCommandPaletteListLength({
+    isCommandMode,
+    matchingCommandCount: matchingCommands.length,
+    isSearchOnly,
+    filteredItemCount: visibleNavigationItems.length,
+    totalSearchEvents: totalSearchResults,
+  });
+  const hasQuery = isCommandMode || debouncedQuery.trim().length > 0;
+  const resultStatus = !hasQuery
+    ? ""
+    : showEventSearch && searchLoading
+      ? "Searching…"
+      : optionCount === 0
+        ? "No results"
+        : resultCountLabel(optionCount);
 
   return (
     <div
@@ -109,10 +142,10 @@ export function CommandPaletteMainSearchView({
     >
       <div className="flex items-center gap-2 p-3 sm:py-2 border-b border-border/50">
         {isCommandMode && !isSearchOnly ? (
-          <span className="text-sm font-medium text-primary">Command</span>
+          <span className="text-sm font-medium text-accent">Command</span>
         ) : isSearchOnly ? (
-          <div className="flex items-center justify-center size-6 rounded-md bg-primary/10 shrink-0">
-            <Search className="size-3.5 text-primary" />
+          <div className="flex items-center justify-center size-6 rounded-md bg-accent/10 shrink-0">
+            <Search className="size-3.5 text-accent" />
           </div>
         ) : (
           <Search className="size-4 text-muted-foreground shrink-0" />
@@ -120,16 +153,28 @@ export function CommandPaletteMainSearchView({
         <Input
           ref={searchInputRef}
           type="text"
+          role="combobox"
+          aria-label={
+            isSearchOnly
+              ? "Search mail and calendar"
+              : "Search mail, calendar & settings"
+          }
+          aria-autocomplete="list"
+          aria-expanded={optionCount > 0}
+          aria-controls={listboxId}
+          aria-activedescendant={
+            selectedIndex < optionCount ? optionId(selectedIndex) : undefined
+          }
           placeholder={
             isSearchOnly
-            ? "Search mail and calendar..."
+              ? "Search mail and calendar…"
               : isCommandMode
-                ? "Type a command..."
+                ? "Type a command…"
                 : "Search mail, calendar & settings…"
           }
           value={searchQuery}
           {...searchInputInteractionProps}
-          className="-ml-2 flex-1 h-8 rounded-md border-0 bg-transparent px-2 text-[15px] placeholder:text-muted-foreground/60 focus-visible:bg-accent/40 focus-visible:ring-0"
+          className="-ml-2 flex-1 h-8 rounded-md border-0 bg-transparent px-2 text-[15px] placeholder:text-muted-foreground focus-visible:bg-hover/40 focus-visible:ring-0"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
@@ -141,8 +186,10 @@ export function CommandPaletteMainSearchView({
             size="sm"
             onClick={clearSearchQuery}
             className="p-1 h-auto"
+            aria-label="Clear search"
           >
             <svg
+              aria-hidden="true"
               className="size-4 text-muted-foreground"
               viewBox="0 0 16 16"
               fill="currentColor"
@@ -152,7 +199,16 @@ export function CommandPaletteMainSearchView({
           </Button>
         )}
       </div>
-      <div ref={listRef} className="flex-1 overflow-y-auto py-2">
+      <p role="status" className="sr-only">
+        {resultStatus}
+      </p>
+      <div
+        ref={listRef}
+        id={listboxId}
+        role="listbox"
+        aria-label="Results"
+        className="flex-1 overflow-y-auto overscroll-contain py-2"
+      >
         {isCommandMode ? (
           matchingCommands.length === 0 ? (
             <div className="px-3 py-6 text-center text-sm text-muted-foreground">
@@ -163,6 +219,7 @@ export function CommandPaletteMainSearchView({
               {matchingCommands.map((command, index) => (
                 <NavigationResultButton
                   key={command.command}
+                  optionId={optionId(index)}
                   resultIndex={index}
                   label={command.label}
                   description={command.description}
@@ -182,6 +239,7 @@ export function CommandPaletteMainSearchView({
                 onSelect={selectSearchResult}
                 selectedIndex={selectedIndex}
                 baseIndex={0}
+                optionId={optionId}
               />
             ) : (
               <SearchOnlyEmptyState debouncedQuery={debouncedQuery} />
@@ -198,6 +256,7 @@ export function CommandPaletteMainSearchView({
                 onSelect={selectSearchResult}
                 selectedIndex={selectedIndex}
                 baseIndex={0}
+                optionId={optionId}
               />
             )}
             {visibleNavigationItems.length === 0 &&
@@ -217,6 +276,7 @@ export function CommandPaletteMainSearchView({
                   return (
                     <NavigationResultButton
                       key={item.id}
+                      optionId={optionId(globalIndex)}
                       resultIndex={globalIndex}
                       label={item.label}
                       description={item.description}
@@ -234,7 +294,7 @@ export function CommandPaletteMainSearchView({
                 No mail or calendar results found for &quot;{debouncedQuery}&quot;
               </div>
             ) : !debouncedQuery.trim() ? (
-              <p className="px-4 pt-1 pb-2 text-[11px] text-muted-foreground/50">
+              <p className="px-4 pt-1 pb-2 text-[11px] text-muted-foreground">
                 Searches mail, calendar, and settings
               </p>
             ) : null}

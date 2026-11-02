@@ -34,7 +34,10 @@ import {
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Button } from "../ui/button";
 import { LogOut } from "lucide-react";
-import { getColorSwatchValue } from "../calendar/utils";
+import {
+  getColorSwatchBorderValue,
+  getColorSwatchValue,
+} from "../calendar/utils";
 import { SidebarShell } from "./sidebar-shell";
 import { SidebarPrimaryAction } from "./sidebar-primary-action";
 import { SidebarIconButton } from "./sidebar-icon-button";
@@ -129,7 +132,7 @@ function AppSidebarMobile({
       {/* Header */}
       <div className="safe-area-inset-top flex shrink-0 items-center justify-between border-b border-border/40 px-4 pb-2.5 pt-2.5">
         <div className="flex items-center gap-2.5">
-          <LogoSvg className="size-7 text-primary" />
+          <LogoSvg className="size-7 text-accent" />
           <span
             className="text-[17px] tracking-[-0.04em] text-foreground"
             style={{ fontWeight: 380 }}
@@ -152,7 +155,11 @@ function AppSidebarMobile({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" className="outline-none cursor-pointer focus-visible:ring-[3px] focus-visible:ring-ring/50">
+              <button
+                type="button"
+                aria-label="Account menu"
+                className="outline-none cursor-pointer focus-visible:ring-[3px] focus-visible:ring-ring"
+              >
                 <BlobatarAvatar
                   email={user?.email}
                   name={user?.name}
@@ -185,7 +192,8 @@ function AppSidebarMobile({
               <DropdownMenuSeparator />
               <SheetClose asChild>
                 <DropdownMenuItem
-                  className="gap-2.5 text-destructive focus:text-destructive cursor-pointer"
+                  variant="destructive"
+                  className="gap-2.5 cursor-pointer"
                   onClick={onLogout}
                 >
                   <LogOut size={16} />
@@ -233,7 +241,7 @@ function AppSidebarMobile({
               <button
                 type="button"
                 onClick={onOpenCalendarManagement}
-                className="text-muted-foreground/50 hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="Manage calendars"
               >
                 <Settings2 size={14} strokeWidth={2.5} />
@@ -243,7 +251,6 @@ function AppSidebarMobile({
           <div className="flex flex-col gap-1">
             {ownedCalendars.map((calendar: CalendarData) => {
               const isVisible = isCalendarVisible(calendar.id);
-              const calColor = getColorSwatchValue(calendar.color || "blue");
               return (
                 <button
                   key={calendar.id}
@@ -253,15 +260,13 @@ function AppSidebarMobile({
                   className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors ${
                     isVisible
                       ? "bg-muted/50 text-foreground"
-                      : "text-muted-foreground/60 hover:bg-muted/30"
+                      : "text-muted-foreground hover:bg-muted/30"
                   }`}
                 >
-                  <span
-                    className="size-2.5 rounded-full shrink-0 transition-opacity"
-                    style={{
-                      backgroundColor: calColor,
-                      opacity: isVisible ? 1 : 0.35,
-                    }}
+                  <CalendarSwatch
+                    color={calendar.color}
+                    isVisible={isVisible}
+                    className="size-2.5"
                   />
                   <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
                     {calendar.name}
@@ -279,14 +284,11 @@ function AppSidebarMobile({
 
             {publicCalendars.length > 0 && (
               <>
-                <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Public
                 </div>
                 {publicCalendars.map((calendar: CalendarData) => {
                   const isVisible = isCalendarVisible(calendar.id);
-                  const calColor = getColorSwatchValue(
-                    calendar.color || "blue",
-                  );
                   return (
                     <button
                       key={calendar.id}
@@ -296,15 +298,13 @@ function AppSidebarMobile({
                       className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors ${
                         isVisible
                           ? "bg-muted/50 text-foreground"
-                          : "text-muted-foreground/60 hover:bg-muted/30"
+                          : "text-muted-foreground hover:bg-muted/30"
                       }`}
                     >
-                      <span
-                        className="size-2.5 rounded-full shrink-0 transition-opacity"
-                        style={{
-                          backgroundColor: calColor,
-                          opacity: isVisible ? 1 : 0.35,
-                        }}
+                      <CalendarSwatch
+                        color={calendar.color}
+                        isVisible={isVisible}
+                        className="size-2.5"
                       />
                       <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
                         {calendar.name}
@@ -324,14 +324,11 @@ function AppSidebarMobile({
 
             {subscribedCalendars.length > 0 && (
               <>
-                <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Subscribed
                 </div>
                 {subscribedCalendars.map((calendar: CalendarData) => {
                   const isVisible = isCalendarVisible(calendar.id);
-                  const calColor = getColorSwatchValue(
-                    calendar.color || "blue",
-                  );
                   return (
                     <button
                       key={calendar.id}
@@ -341,15 +338,13 @@ function AppSidebarMobile({
                       className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors ${
                         isVisible
                           ? "bg-muted/50 text-foreground"
-                          : "text-muted-foreground/60 hover:bg-muted/30"
+                          : "text-muted-foreground hover:bg-muted/30"
                       }`}
                     >
-                      <span
-                        className="size-2.5 rounded-full shrink-0 transition-opacity"
-                        style={{
-                          backgroundColor: calColor,
-                          opacity: isVisible ? 1 : 0.35,
-                        }}
+                      <CalendarSwatch
+                        color={calendar.color}
+                        isVisible={isVisible}
+                        className="size-2.5"
                       />
                       <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
                         {calendar.name}
@@ -382,6 +377,31 @@ function AppSidebarMobile({
         </SheetClose>
       </div>
     </div>
+  );
+}
+
+/** Filled when the calendar is shown and hollow when hidden, so visibility is not carried by color alone. */
+function CalendarSwatch({
+  color,
+  isVisible,
+  className,
+}: {
+  color?: string;
+  isVisible: boolean;
+  className: string;
+}) {
+  const swatchColor = color || "blue";
+  return (
+    <span
+      aria-hidden
+      className={`${className} shrink-0 rounded-full border-[1.5px]`}
+      style={{
+        borderColor: getColorSwatchBorderValue(swatchColor),
+        backgroundColor: isVisible
+          ? getColorSwatchValue(swatchColor)
+          : "transparent",
+      }}
+    />
   );
 }
 
@@ -446,7 +466,7 @@ function AppSidebarDesktop({
             <SidebarPrimaryAction
               label="New event"
               onClick={onCreateEvent}
-              collapsedClassName="text-primary hover:bg-primary/10 hover:text-primary"
+              collapsedClassName="text-accent hover:bg-accent/10 hover:text-accent"
             />
           )}
 
@@ -465,16 +485,13 @@ function AppSidebarDesktop({
                   >
                     <SidebarIconButton
                       label={calendar.name}
+                      pressed={isVisible}
                       onClick={() => toggleCalendarVisibility(calendar.id)}
                     >
-                      <span
-                        className="size-2.5 rounded-full shrink-0 transition-opacity"
-                        style={{
-                          backgroundColor: getColorSwatchValue(
-                            calendar.color || "blue",
-                          ),
-                          opacity: isVisible ? 1 : 0.3,
-                        }}
+                      <CalendarSwatch
+                        color={calendar.color}
+                        isVisible={isVisible}
+                        className="size-2.5"
                       />
                     </SidebarIconButton>
                   </SidebarMenuItem>
@@ -484,14 +501,14 @@ function AppSidebarDesktop({
           ) : (
             <>
               <div className="flex items-center justify-between px-2 mb-1.5">
-                <span className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                   Calendars
                 </span>
                 <button
                   type="button"
                   onClick={onOpenCalendarManagement}
                   aria-label="Manage calendars"
-                  className="text-muted-foreground/40 hover:text-foreground transition-colors"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Settings2 size={13} strokeWidth={2.5} />
                 </button>
@@ -506,20 +523,17 @@ function AppSidebarDesktop({
                           onClick={() =>
                             toggleCalendarVisibility(calendar.id)
                           }
+                          aria-pressed={isVisible}
                           className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
                               ? "text-foreground"
-                              : "text-muted-foreground/40"
+                              : "text-muted-foreground"
                           }`}
                         >
-                          <span
-                            className="size-2 rounded-full shrink-0 transition-opacity"
-                            style={{
-                              backgroundColor: getColorSwatchValue(
-                                calendar.color || "blue",
-                              ),
-                              opacity: isVisible ? 1 : 0.3,
-                            }}
+                          <CalendarSwatch
+                            color={calendar.color}
+                            isVisible={isVisible}
+                            className="size-2"
                           />
                           <span className="truncate">{calendar.name}</span>
                         </SidebarMenuButton>
@@ -528,7 +542,7 @@ function AppSidebarDesktop({
                   })}
 
                   {publicCalendars.length > 0 && (
-                    <SidebarMenuItem className="px-2 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/55 list-none">
+                    <SidebarMenuItem className="px-2 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground list-none">
                       Public
                     </SidebarMenuItem>
                   )}
@@ -540,20 +554,17 @@ function AppSidebarDesktop({
                           onClick={() =>
                             toggleCalendarVisibility(calendar.id)
                           }
+                          aria-pressed={isVisible}
                           className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
                               ? "text-foreground"
-                              : "text-muted-foreground/40"
+                              : "text-muted-foreground"
                           }`}
                         >
-                          <span
-                            className="size-2 rounded-full shrink-0 transition-opacity"
-                            style={{
-                              backgroundColor: getColorSwatchValue(
-                                calendar.color || "blue",
-                              ),
-                              opacity: isVisible ? 1 : 0.3,
-                            }}
+                          <CalendarSwatch
+                            color={calendar.color}
+                            isVisible={isVisible}
+                            className="size-2"
                           />
                           <span className="truncate">{calendar.name}</span>
                         </SidebarMenuButton>
@@ -562,7 +573,7 @@ function AppSidebarDesktop({
                   })}
 
                   {subscribedCalendars.length > 0 && (
-                    <SidebarMenuItem className="px-2 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/55 list-none">
+                    <SidebarMenuItem className="px-2 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground list-none">
                       Subscribed
                     </SidebarMenuItem>
                   )}
@@ -574,20 +585,17 @@ function AppSidebarDesktop({
                           onClick={() =>
                             toggleCalendarVisibility(calendar.id)
                           }
+                          aria-pressed={isVisible}
                           className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
                               ? "text-foreground"
-                              : "text-muted-foreground/40"
+                              : "text-muted-foreground"
                           }`}
                         >
-                          <span
-                            className="size-2 rounded-full shrink-0 transition-opacity"
-                            style={{
-                              backgroundColor: getColorSwatchValue(
-                                calendar.color || "blue",
-                              ),
-                              opacity: isVisible ? 1 : 0.3,
-                            }}
+                          <CalendarSwatch
+                            color={calendar.color}
+                            isVisible={isVisible}
+                            className="size-2"
                           />
                           <span className="truncate">{calendar.name}</span>
                         </SidebarMenuButton>

@@ -9,7 +9,7 @@ import {
   type RefObject,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { afterPaint, getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { useIsMobile, usePaintedValue } from "@workspace/ui/hooks";
@@ -134,7 +134,7 @@ export function useMailAppContentController(
     enabled: Boolean(activeMailbox && session?.user),
     onRefresh: () =>
       void handleManualRefresh().catch((error) =>
-        toast.error(getErrorMessage(error, "Could not refresh mail.")),
+        toast.error(getErrorMessage(error, "Could not refresh mail. Check your connection and try again.")),
       ),
   });
 
@@ -447,7 +447,7 @@ export function useMailAppContentController(
       compose: () => handleOpenCompose(),
       refresh: () =>
         void handleManualRefresh().catch((error) =>
-          toast.error(getErrorMessage(error, "Could not refresh mail.")),
+          toast.error(getErrorMessage(error, "Could not refresh mail. Check your connection and try again.")),
         ),
       closeMessage: handleCloseMessage,
       focusSearch: () => {

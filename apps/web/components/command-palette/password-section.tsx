@@ -1,9 +1,9 @@
 "use client";
 
 import { useId, useReducer } from "react";
-import { getErrorMessage } from "@workspace/calendar-core";
 import { Lock } from "lucide-react";
 import { InlineMessage } from "./account-settings-inline-message";
+import { getAccountSettingsErrorMessage } from "./account-settings-utils";
 import {
   initialSecurityUiState,
   securityUiReducer,
@@ -60,7 +60,10 @@ export function PasswordSection({
       return;
     }
     if (newPwd !== confirmPwd) {
-      setMsg({ kind: "error", text: "Passwords do not match." });
+      setMsg({
+        kind: "error",
+        text: "New password and confirmation must match.",
+      });
       return;
     }
     try {
@@ -71,10 +74,7 @@ export function PasswordSection({
       setMsg({ kind: "success", text: "Password updated." });
       dispatch({ type: "finishForm" });
     } catch (err) {
-      setMsg({
-        kind: "error",
-        text: getErrorMessage(err, "Something went wrong."),
-      });
+      setMsg({ kind: "error", text: getAccountSettingsErrorMessage(err) });
     }
   };
 
@@ -85,11 +85,7 @@ export function PasswordSection({
 
   return (
     <div>
-      {msg && !isFormOpen ? (
-        <div className="px-2 py-1">
-          <InlineMessage msg={msg} />
-        </div>
-      ) : null}
+      <InlineMessage msg={msg} />
       {!isFormOpen ? (
         <PaletteNavRow
           icon={Lock}
@@ -101,11 +97,6 @@ export function PasswordSection({
         />
       ) : (
         <form onSubmit={(e) => void handleSubmit(e)}>
-          {msg ? (
-            <div className="px-2 py-1">
-              <InlineMessage msg={msg} />
-            </div>
-          ) : null}
           <PaletteField label="Current password" htmlFor={`${fieldId}-current`}>
             <input
               id={`${fieldId}-current`}

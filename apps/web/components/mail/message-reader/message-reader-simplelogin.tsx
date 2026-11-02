@@ -12,7 +12,7 @@ import {
   UserX,
   type LucideIcon,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import {
   getSimpleLoginForward,
   getSimpleLoginForwardNotice,
@@ -76,7 +76,7 @@ export function MessageReaderSimpleLoginLine({
       toast.success("Alias copied");
       setOpen(false);
     } catch {
-      toast.error("Failed to copy");
+      toast.error("Unable to copy. Select the alias and copy it manually.");
     }
   };
 

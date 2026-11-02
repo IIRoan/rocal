@@ -23,6 +23,7 @@ export interface MailCommandPaletteProps {
   onCreateMailbox?: (name: string) => Promise<void>;
   onDeleteMailbox?: (id: string) => Promise<void>;
   onRenameMailbox?: (id: string, name: string) => Promise<void>;
+  onReorderMailboxes?: (reordered: JmapMailbox[]) => void;
   labels?: LabelDef[];
   onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
   onUpdateLabel?: (
@@ -43,6 +44,7 @@ export function MailCommandPalette({
   onCreateMailbox,
   onDeleteMailbox,
   onRenameMailbox,
+  onReorderMailboxes,
   labels = EMPTY_LABELS,
   onCreateLabel,
   onUpdateLabel,
@@ -58,6 +60,7 @@ export function MailCommandPalette({
     onCreateMailbox,
     onDeleteMailbox,
     onRenameMailbox,
+    onReorderMailboxes,
     labels,
     onCreateLabel,
     onUpdateLabel,
@@ -116,6 +119,7 @@ export function MailCommandPalette({
                 onCreateMailbox={c.onCreateMailbox}
                 onDeleteMailbox={c.onDeleteMailbox}
                 onRenameMailbox={c.onRenameMailbox}
+                onReorderMailboxes={c.onReorderMailboxes}
                 labels={c.labels}
                 onCreateLabel={c.onCreateLabel}
                 onUpdateLabel={c.onUpdateLabel}

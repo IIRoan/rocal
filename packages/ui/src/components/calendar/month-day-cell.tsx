@@ -86,6 +86,7 @@ export function MonthDayCell({
   const hasMore =
     visibleCount !== undefined && allDayEvents.length > visibleCount;
   const remainingCount = hasMore ? allDayEvents.length - visibleCount : 0;
+  const isToday = isTodayInTimezone(day, resolvedTimezone);
 
   function handleEventClick(event: CalendarEvent, e: React.MouseEvent) {
     e.stopPropagation();
@@ -94,10 +95,10 @@ export function MonthDayCell({
 
   return (
     <div
-      className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 transition-[background-color,box-shadow] duration-200 hover:bg-accent/5 hover:shadow-sm ${
+      className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground border-r border-b last:border-r-0 transition-[background-color,box-shadow] duration-200 hover:bg-hover/5 hover:shadow-sm ${
         isCurrentMonth ? DAY_SHADE_CLASS[shade ?? "none"] : ""
       }`}
-      data-today={isTodayInTimezone(day, resolvedTimezone) || undefined}
+      data-today={isToday || undefined}
       data-outside-cell={!isCurrentMonth || undefined}
     >
       <DroppableCell
@@ -109,7 +110,11 @@ export function MonthDayCell({
           );
         }}
       >
-        <div className="group-data-today:bg-[var(--calendar-accent-bg)] group-data-today:text-[var(--calendar-accent)] group-data-today:font-semibold mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm transition-[background-color,scale] duration-200 hover:scale-110 hover:bg-accent/10 group-data-today:animate-pulse">
+        <div
+          aria-current={isToday ? "date" : undefined}
+          className="group-data-today:bg-[var(--calendar-accent-bg)] group-data-today:text-[var(--calendar-accent)] group-data-today:font-semibold mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm tabular-nums transition-[background-color] duration-200 hover:bg-hover/10"
+        >
+          {isToday && <span className="sr-only">Today, </span>}
           {format(day, "d")}
         </div>
         <div
@@ -161,8 +166,7 @@ export function MonthDayCell({
                       )}
                       <span
                         className={cn(
-                          isCancelledCalendarEvent(event) &&
-                            "line-through opacity-70",
+                          isCancelledCalendarEvent(event) && "line-through",
                         )}
                       >
                         {event.title}
@@ -200,7 +204,7 @@ export function MonthDayCell({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-[1.02] mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[11px] transition-[color,background-color,scale] duration-200 outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs"
+                  className="focus-visible:border-ring focus-visible:ring-ring text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[11px] tabular-nums transition-[color,background-color] duration-200 outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span>
@@ -211,7 +215,7 @@ export function MonthDayCell({
               </PopoverTrigger>
               <PopoverContent
                 align="center"
-                className="max-w-52 p-3 animate-scale-in"
+                className="max-w-52 p-3"
                 style={
                   {
                     "--event-height": `${EventHeight}px`,

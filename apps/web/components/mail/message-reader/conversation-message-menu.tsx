@@ -31,7 +31,7 @@ export function ConversationMessageMenu({
           type="button"
           onClick={(e) => e.stopPropagation()}
           aria-label="Message actions"
-          className="shrink-0 flex size-6 cursor-pointer items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-accent/50 hover:text-foreground"
+          className="shrink-0 flex size-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-hover/50 hover:text-foreground"
         >
           <MoreHorizontal className="size-3.5" strokeWidth={2.25} />
         </button>

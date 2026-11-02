@@ -204,7 +204,7 @@ export function MobileWeekView({
               key={day.toString()}
               className={cn(
                 "flex-1 min-w-0 relative border-r border-border/50 last:border-r-0",
-                isTodayInTimezone(day, resolvedTimezone) && "bg-primary/5",
+                isTodayInTimezone(day, resolvedTimezone) && "bg-accent/5",
               )}
             >
               {(processedDayEvents[dayIndex] ?? []).map(
@@ -321,15 +321,17 @@ function MobileWeekDayHeaders({
         return (
           <div
             key={day.toString()}
+            aria-current={today ? "date" : undefined}
             className={cn(
               "flex-1 min-w-0 border-r border-border/50 py-1.5 text-center last:border-r-0",
-              today && "bg-primary/5",
+              today && "bg-accent/5",
             )}
           >
+            {today && <span className="sr-only">Today, </span>}
             <span
               className={cn(
                 "block text-[11px] font-medium uppercase leading-none tracking-wide",
-                today ? "text-primary" : "text-muted-foreground",
+                today ? "text-accent" : "text-muted-foreground",
               )}
             >
               {format(day, "EEE")}
@@ -337,11 +339,17 @@ function MobileWeekDayHeaders({
             <span
               className={cn(
                 "mt-1 block text-sm font-semibold leading-none tabular-nums",
-                today ? "text-primary" : "text-foreground",
+                today ? "text-accent" : "text-foreground",
               )}
             >
               {format(day, "d")}
             </span>
+            <div
+              className={cn(
+                "mx-auto mt-1 h-[2px] w-5 rounded-full",
+                today ? "bg-accent" : "bg-transparent",
+              )}
+            />
           </div>
         );
       })}
@@ -371,12 +379,12 @@ function OverlappingEventsDrawer({
         responsiveHeight="70dvh"
         className="overflow-hidden"
       >
-        <DrawerTitle className="sr-only">Select Event</DrawerTitle>
+        <DrawerTitle className="sr-only">Select event</DrawerTitle>
         <DrawerShell
           header={
             <div className="px-5 py-3 border-b border-border/40">
               <span className="text-base font-semibold">
-                Select Event
+                Select event
               </span>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {events[0] &&
@@ -397,7 +405,7 @@ function OverlappingEventsDrawer({
                 <button
                   key={event.id}
                   type="button"
-                  className="w-full text-left flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer"
+                  className="w-full text-left flex items-center gap-3 p-2 rounded-md hover:bg-hover/30 transition-colors cursor-pointer"
                   onClick={() => onSelect(event)}
                 >
                   <div className="flex items-center justify-center size-6 shrink-0">
@@ -418,7 +426,7 @@ function OverlappingEventsDrawer({
                           "line-through opacity-70",
                       )}
                     >
-                      {event.title || "Untitled Event"}
+                      {event.title || "Untitled event"}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {event.allDay

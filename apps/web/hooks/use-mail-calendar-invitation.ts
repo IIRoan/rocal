@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import type {
   CalendarEvent,
   InvitationResponseStatus,
@@ -124,7 +124,7 @@ export function useMailCalendarInvitation({
           error:
             !event && importSummary && importSummary.errors.length > 0
               ? (importSummary.errors[0] ??
-                "Unable to process cancellation details.")
+                "Cancellation not applied. Check your connection and reopen this message.")
               : null,
         });
         return;
@@ -180,7 +180,7 @@ export function useMailCalendarInvitation({
           loading: false,
           error:
             importSummary.errors[0] ??
-            "Unable to add this invitation to your calendar.",
+            "Invitation not added. Check your connection and reopen this message.",
         });
         return;
       }
@@ -205,7 +205,7 @@ export function useMailCalendarInvitation({
         loading: false,
         error: sealed
           ? null
-          : "Invitation was staged but could not be loaded.",
+          : "Invitation saved but not loaded. Reopen this message to try again.",
       });
     })().catch((error: unknown) => {
       if (cancelled) return;
@@ -216,7 +216,7 @@ export function useMailCalendarInvitation({
         error:
           error instanceof Error
             ? error.message
-            : "Unable to load invitation details.",
+            : "Invitation not loaded. Check your connection and reopen this message.",
       });
     });
 
@@ -283,7 +283,7 @@ export function useMailCalendarInvitation({
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to update invitation response.",
+            : "Response not sent. Check your connection and try again.",
         );
       });
     setInviteResponsePending(null);
@@ -308,7 +308,7 @@ export function useMailCalendarInvitation({
       });
       toast.success("Cancelled event removed from your calendar.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to remove event."));
+      toast.error(getErrorMessage(error, "Event not removed. Check your connection and try again."));
     }
     setCancelProcessPending(false);
   };

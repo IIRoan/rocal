@@ -221,4 +221,40 @@ describe("SurfaceMotionProvider", () => {
     expect(animate).not.toHaveBeenCalled();
     expect(dialog.hasAttribute("data-motion-pending")).toBe(false);
   });
+
+  it("keeps only the opacity fade for animate-* reveals under reduced motion", async () => {
+    const reducedMotion = (query: string): MediaQueryList => ({
+      matches: query.includes("reduce"),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    });
+    window.matchMedia = reducedMotion;
+    try {
+      act(() => root.unmount());
+      root = createRoot(container);
+      act(() => {
+        root.render(React.createElement(SurfaceMotionProvider));
+      });
+
+      const node = document.createElement("div");
+      node.className = "animate-slide-in";
+      document.body.appendChild(node);
+      await flushFrame();
+
+      expect(animate).toHaveBeenCalledTimes(1);
+      const [keyframes] = animate.mock.calls[0]!;
+      expect(keyframes[0]).toMatchObject({ opacity: 0 });
+      expect(keyframes[1]).toMatchObject({ opacity: 1 });
+      for (const frame of keyframes) {
+        expect(frame).not.toHaveProperty("transform");
+      }
+    } finally {
+      Reflect.deleteProperty(window, "matchMedia");
+    }
+  });
 });

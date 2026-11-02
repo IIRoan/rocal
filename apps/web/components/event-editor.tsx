@@ -5,10 +5,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   canCurrentUserDeleteEvent,
   canCurrentUserEditEvent,
+  isCancelledCalendarEvent,
 } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { RecurringScopeModal } from "@/components/command-palette/recurring-scope-modal";
@@ -16,7 +17,6 @@ import { useCategories } from "@/hooks/use-categories";
 import { useEventForm } from "@/hooks/use-event-form";
 import {
   buildEventEditorEncryptionPreview,
-  canSaveEventEditor,
   isRecurringEventDeleteCandidate,
 } from "@/lib/event-editor-view-model";
 import { getActiveE2eeSession } from "@/lib/e2ee-session";
@@ -29,6 +29,7 @@ import {
   respondToEventInvitation,
 } from "./event-editor/event-editor-invitation";
 import { useEventEditorLivePreview } from "./event-editor/event-editor-preview";
+import { EventDeleteConfirmDialog } from "./event-editor/event-delete-confirm-dialog";
 import { EventEditorView } from "./event-editor/event-editor-view";
 import type { EventEditorInvitationResponseStatus } from "./event-editor/types";
 
@@ -95,6 +96,7 @@ export function EventEditor({
   const [inviteResponsePending, setInviteResponsePending] =
     useState<EventEditorInvitationResponseStatus | null>(null);
   const [showRecurringSaveModal, setShowRecurringSaveModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const isMobile = useIsMobile();
 
   useEventEditorLivePreview({
@@ -147,13 +149,15 @@ export function EventEditor({
       toast.error("Imported invitation events are read-only for attendees.");
       return;
     }
-    if (!canSaveEventEditor({ eventCalendarId, eventSaving, eventTitle })) {
+    // A missing title or calendar reaches saveEvent, which names the fix in a toast.
+    if (eventSaving) {
       return;
     }
     // The recurring edit endpoint cannot clear a rule, so turning repeat off keeps the plain series update.
     const stopsRepeating = Boolean(selectedEvent?.recurrence) && !isRecurring;
     if (
       selectedEvent?.id &&
+      eventTitle.trim() &&
       !stopsRepeating &&
       isRecurringEventDeleteCandidate(selectedEvent)
     ) {
@@ -172,6 +176,11 @@ export function EventEditor({
       toast.error("Synced calendar events cannot be deleted.");
       return;
     }
+    setShowDeleteConfirm(true);
+  }
+
+  function confirmEventDelete() {
+    setShowDeleteConfirm(false);
     // deleteEvent toasts every failure path itself.
     void deleteEvent(calendarData).catch(() => undefined);
   }
@@ -209,10 +218,10 @@ export function EventEditor({
         hasActiveEncryptionSession: getActiveE2eeSession() !== null,
       });
   const dialogTitle = !selectedEvent?.id
-    ? "Create Event"
+    ? "Create event"
     : isViewMode
-      ? "Event Details"
-      : "Edit Event";
+      ? "Event details"
+      : "Edit event";
 
   return (
     <EventEditorView
@@ -258,6 +267,15 @@ export function EventEditor({
       recurringModal={
         selectedEvent ? (
           <>
+            <EventDeleteConfirmDialog
+              open={showDeleteConfirm}
+              onOpenChange={setShowDeleteConfirm}
+              eventTitle={selectedEvent.title}
+              removeOnly={
+                !canEditSelectedEvent && isCancelledCalendarEvent(selectedEvent)
+              }
+              onConfirm={confirmEventDelete}
+            />
             <RecurringScopeModal
               open={showRecurringDeleteModal}
               onOpenChange={setShowRecurringDeleteModal}

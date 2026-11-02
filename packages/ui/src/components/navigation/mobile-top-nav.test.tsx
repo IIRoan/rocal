@@ -76,7 +76,7 @@ describe("MobileTopNav", () => {
       '[aria-label="Add new event"]',
     ) as HTMLButtonElement | null;
     const quickNavButton = document.querySelector(
-      '[aria-label="Open calendar quick navigation"]',
+      '[aria-label="May 18 – May 24, 2026, open quick navigation"]',
     ) as HTMLButtonElement | null;
     const previousButton = document.querySelector(
       '[aria-label="Previous period"]',
@@ -85,7 +85,7 @@ describe("MobileTopNav", () => {
       '[aria-label="Next period"]',
     ) as HTMLButtonElement | null;
     const actionsButton = document.querySelector(
-      '[aria-label="Open calendar actions"]',
+      '[aria-label="Week, open calendar actions"]',
     ) as HTMLButtonElement | null;
     const header = container.firstElementChild as HTMLDivElement | null;
 

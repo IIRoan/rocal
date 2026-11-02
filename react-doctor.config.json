@@ -80,6 +80,38 @@
         "rules": ["react-doctor/prefer-tag-over-role"]
       },
       {
+        "files": ["**/components/mail/recipient-suggest-input.tsx"],
+        "rules": ["react-doctor/prefer-tag-over-role"]
+      },
+      {
+        "files": [
+          "**/components/command-palette/main-search-view.tsx",
+          "**/components/mail/mail-command-palette-main-view.tsx"
+        ],
+        "rules": ["react-doctor/prefer-tag-over-role"]
+      },
+      {
+        "files": ["**/components/mail/mail-command-palette-main-view.tsx"],
+        "rules": ["react-doctor/no-redundant-roles"]
+      },
+      {
+        "files": [
+          "**/app/login/_content.tsx",
+          "**/app/passkey/native/_content.tsx",
+          "**/components/command-palette/account-settings-inline-message.tsx",
+          "**/components/command-palette/invite-settings.tsx",
+          "**/components/ui/logo-spinner.tsx"
+        ],
+        "rules": ["react-doctor/prefer-tag-over-role"]
+      },
+      {
+        "files": [
+          "**/components/mail/attachment-preview-dialog.tsx",
+          "**/components/mail/resizable-image-view.tsx"
+        ],
+        "rules": ["react-doctor/nextjs-no-img-element"]
+      },
+      {
         "files": ["**/components/mail/message-list/use-message-list-virtualizer.ts"],
         "rules": ["react-hooks-js/incompatible-library"]
       },

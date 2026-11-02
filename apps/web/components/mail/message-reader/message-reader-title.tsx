@@ -52,18 +52,20 @@ export function MessageReaderTitle({
           isMobile ? "px-3 py-2" : "min-h-14 px-4 py-[15px]",
         )}
       >
-        <Typography
-          size={isMobile ? TypographySize.SMALL : TypographySize.H3}
-          weight={TypographyWeight.MEDIUM}
-          wrap
-        >
-          {threadSubject || "(No subject)"}
-          {threadCount > 1 ? (
-            <span className="ml-1.5 font-normal tabular-nums text-[var(--text-secondary)]">
-              [{threadCount}]
-            </span>
-          ) : null}
-        </Typography>
+        <h2 className="min-w-0">
+          <Typography
+            size={isMobile ? TypographySize.SMALL : TypographySize.H3}
+            weight={TypographyWeight.MEDIUM}
+            wrap
+          >
+            {threadSubject || "(No subject)"}
+            {threadCount > 1 ? (
+              <span className="ml-1.5 font-normal tabular-nums text-[var(--text-secondary)]">
+                [{threadCount}]
+              </span>
+            ) : null}
+          </Typography>
+        </h2>
         <div className="mt-0.5 flex shrink-0 items-center gap-1">
           {onToggleFlagged && (
             <button
@@ -71,14 +73,14 @@ export function MessageReaderTitle({
               onClick={onToggleFlagged}
               disabled={isBusy}
               aria-label={isFlagged ? "Unstar" : "Star"}
-              className="inline-flex size-7 cursor-pointer items-center justify-center rounded outline-none transition-colors hover:bg-[var(--bg-overlay-tertiary)] focus-visible:ring-2 focus-visible:ring-ring/60 disabled:opacity-40"
+              className="inline-flex size-7 cursor-pointer items-center justify-center rounded outline-none transition-colors hover:bg-[var(--bg-overlay-tertiary)] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
             >
               <Star
                 className={cn(
                   "size-4 transition-colors",
                   isFlagged
                     ? "fill-warning text-warning"
-                    : "text-[var(--icon-disabled)] hover:text-warning",
+                    : "text-[var(--icon-tertiary)] hover:text-warning",
                 )}
                 strokeWidth={2}
               />
@@ -123,10 +125,9 @@ export function MessageReaderTitle({
               <span
                 key={label.id}
                 title={label.name}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-[var(--text-primary)]"
                 style={{
                   backgroundColor: `color-mix(in srgb, ${displayColor} 13%, transparent)`,
-                  color: displayColor,
                 }}
               >
                 <span

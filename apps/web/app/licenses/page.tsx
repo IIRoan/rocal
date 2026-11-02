@@ -12,7 +12,7 @@ import {
 import { PublicInformationPage } from "@/components/public-information-page";
 
 export const metadata: Metadata = {
-  title: "Licenses · Solace",
+  title: "Licenses",
   description:
     "The license Solace is published under and the open source software Solace Calendar and Solace Mail include.",
 };
@@ -38,7 +38,7 @@ export default function LicensesPage() {
             href={PRODUCT_SOURCE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-primary underline underline-offset-4 cursor-pointer"
+            className="text-accent underline underline-offset-4 cursor-pointer"
           >
             Read the source code
           </a>

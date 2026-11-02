@@ -125,5 +125,17 @@ describe("CommandPaletteMainSearchView", () => {
       container.querySelector('[data-testid="unified-search-results"]'),
     ).not.toBeNull();
     expect(container.textContent).toContain("Planning");
+
+    const input = container.querySelector('[role="combobox"]');
+    const listbox = container.querySelector('[role="listbox"]');
+    expect(input?.getAttribute("aria-controls")).toBe(listbox?.id);
+    expect(input?.getAttribute("aria-expanded")).toBe("true");
+    expect(input?.getAttribute("aria-activedescendant")).toMatch(/-option-0$/);
+    expect(container.querySelector('[role="status"]')?.textContent).toBe(
+      "1 result",
+    );
+    expect(
+      container.querySelector('button[aria-label="Clear search"]'),
+    ).not.toBeNull();
   });
 });

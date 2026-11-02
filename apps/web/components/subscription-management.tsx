@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { getErrorMessage } from "@/lib/calendar-ui-helpers";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import {
@@ -63,6 +63,9 @@ import {
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 const ALLOWED_COLOR_VALUES = PRESET_COLORS.map((c) => c.value);
+const LAST_SYNC_RELATIVE = new Intl.RelativeTimeFormat(undefined, {
+  numeric: "auto",
+});
 
 const isValidColor = (value: string) =>
   ALLOWED_COLOR_VALUES.includes(value) ||
@@ -74,16 +77,20 @@ const customSubscriptionSchema = z.object({
     .string()
     .trim()
     .min(1, "Calendar URL is required")
-    .pipe(z.url({ error: "Please enter a valid URL" }))
+    .pipe(
+      z.url({
+        error: "Enter a full URL, such as https://example.com/calendar.ics",
+      }),
+    )
     .refine((value) => isLikelyIcsFeedUrl(value), {
       error: "URL should point to a calendar feed",
     }),
-  color: z.string().trim().refine(isValidColor, "Please select a valid color"),
+  color: z.string().trim().refine(isValidColor, "Choose one of the preset colors"),
 });
 
 const editableSubscriptionSchema = z.object({
   name: z.string().trim().min(1, "Calendar name is required").max(100),
-  color: z.string().trim().refine(isValidColor, "Please select a valid color"),
+  color: z.string().trim().refine(isValidColor, "Choose one of the preset colors"),
 });
 
 type CustomSubscriptionForm = z.infer<typeof customSubscriptionSchema>;
@@ -375,7 +382,7 @@ export function SubscriptionManagement({
   };
 
   const formatLastSync = (lastSyncAt?: string) => {
-    if (!lastSyncAt) return "Never";
+    if (!lastSyncAt) return "never";
 
     const date = new Date(lastSyncAt);
     const now = new Date();
@@ -384,13 +391,12 @@ export function SubscriptionManagement({
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24)
-      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return LAST_SYNC_RELATIVE.format(-diffMins, "minute");
+    if (diffHours < 24) return LAST_SYNC_RELATIVE.format(-diffHours, "hour");
+    if (diffDays < 7) return LAST_SYNC_RELATIVE.format(-diffDays, "day");
 
-    return date.toLocaleDateString();
+    return date.toLocaleDateString(undefined, { dateStyle: "medium" });
   };
 
   const getStatusBadge = (status: string, lastErrorMessage?: string) => {
@@ -453,7 +459,7 @@ export function SubscriptionManagement({
               <button
                 type="button"
                 onClick={() => goToSubView("subscriptions-add-feed")}
-                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-hover/30 outline-none focus-visible:bg-hover/50 focus-visible:ring-2 focus-visible:ring-ring transition-colors"
               >
                 <Plus className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-[15px] leading-[130%]">Add External Feed</span>
@@ -462,12 +468,12 @@ export function SubscriptionManagement({
               <button
                 type="button"
                 onClick={() => goToSubView("subscriptions-holidays")}
-                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-hover/30 outline-none focus-visible:bg-hover/50 focus-visible:ring-2 focus-visible:ring-ring transition-colors"
               >
                 <Globe className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-[15px] leading-[130%] flex-1">Browse Holiday Calendars</span>
                 {publicHolidaySubscriptions.length > 0 && (
-                  <span className="text-xs text-muted-foreground/70 shrink-0">
+                  <span className="text-xs text-muted-foreground shrink-0">
                     {publicHolidaySubscriptions.length} added
                   </span>
                 )}
@@ -476,7 +482,7 @@ export function SubscriptionManagement({
               <button
                 type="button"
                 onClick={() => goToSubView("subscriptions-import-ics")}
-                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors cursor-pointer"
+                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-hover/30 outline-none focus-visible:bg-hover/50 focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
               >
                 <FileText className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-[15px] leading-[130%]">Import .ics File</span>
@@ -487,7 +493,7 @@ export function SubscriptionManagement({
             <div className="px-4 py-2 text-[13px] font-medium text-muted-foreground border-t border-border/50 mt-1">
               Synced Calendars
               {readOnlyCalendars.length > 0 && (
-                <span className="ml-1 opacity-60">
+                <span className="ml-1">
                   · {readOnlyCalendars.length}
                 </span>
               )}
@@ -510,7 +516,7 @@ export function SubscriptionManagement({
                   return (
                     <div
                       key={subscription.id}
-                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-accent/20 group"
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-hover/20 group"
                     >
                       <div
                         className="size-3.5 rounded-sm shrink-0"
@@ -543,13 +549,13 @@ export function SubscriptionManagement({
                               subscription.lastErrorMessage,
                             )}
                           {!isCalendarVisible(subscription.calendar.id) && (
-                            <span className="text-xs text-muted-foreground/60">
+                            <span className="text-xs text-muted-foreground">
                               · Hidden
                             </span>
                           )}
                         </div>
                       </button>
-                      <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-0.5 shrink-0">
                         <SimpleTooltip content={isCalendarVisible(subscription.calendar.id) ? "Hide calendar" : "Show calendar"}>
                           <button
                             type="button"
@@ -699,7 +705,7 @@ export function SubscriptionManagement({
                 ) : (
                   <>
                     <Plus className="mr-2 size-3.5" />
-                    Add Feed
+                    Add feed
                   </>
                 )}
               </Button>
@@ -717,8 +723,9 @@ export function SubscriptionManagement({
             <Input
               value={holidaySearch}
               onChange={(e) => setHolidaySearch(e.target.value)}
-              placeholder="Search country or language..."
-              className="-ml-2 h-7 rounded-md border-0 bg-transparent px-2 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-accent/40 focus-visible:ring-0"
+              placeholder="Search country or language…"
+              aria-label="Search holiday calendars"
+              className="-ml-2 h-7 rounded-md border-0 bg-transparent px-2 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-hover/40 focus-visible:ring-0"
               autoComplete="off"
             />
             {holidaySearch && (
@@ -726,7 +733,7 @@ export function SubscriptionManagement({
                 type="button"
                 aria-label="Clear search"
                 onClick={() => setHolidaySearch("")}
-                className="cursor-pointer text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
               >
                 <CircleX className="size-3.5" />
               </button>
@@ -746,7 +753,7 @@ export function SubscriptionManagement({
                 return (
                   <div
                     key={hc.id}
-                    className="flex items-center gap-3 px-4 py-2 hover:bg-accent/20 transition-colors"
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-hover/20 transition-colors"
                   >
                     <span
                       className="size-3 rounded-full shrink-0"
@@ -761,7 +768,7 @@ export function SubscriptionManagement({
                       <div className="flex items-center gap-2 shrink-0">
                         <Badge
                           variant="secondary"
-                          className="text-[11px] bg-primary/10 text-primary px-1.5 py-0 h-auto"
+                          className="text-[11px] bg-accent/10 text-accent px-1.5 py-0 h-auto"
                         >
                           Added
                         </Badge>
@@ -849,12 +856,21 @@ export function SubscriptionManagement({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Color</Label>
-                <div className="flex flex-wrap gap-2">
+                <Label
+                  id="subscription-color-label"
+                  className="text-xs text-muted-foreground"
+                >
+                  Color
+                </Label>
+                <fieldset
+                  aria-labelledby="subscription-color-label"
+                  className="flex min-w-0 flex-wrap gap-2"
+                >
                   {PRESET_COLORS.map((preset) => (
                     <SimpleTooltip content={preset.label} key={preset.value}>
                       <button
                         type="button"
+                        aria-pressed={editingColor === preset.value}
                         onClick={() => {
                           updateEditField("color", preset.value);
                           if (editValidationErrors.color)
@@ -863,7 +879,7 @@ export function SubscriptionManagement({
                               color: undefined,
                             }));
                         }}
-                        className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] ${
+                        className={`size-6 rounded-full border-2 transition-[border-color,transform,box-shadow] motion-reduce:transition-none ${
                           editingColor === preset.value
                             ? "border-foreground scale-110"
                             : "border-transparent hover:scale-105"
@@ -875,7 +891,7 @@ export function SubscriptionManagement({
                       />
                     </SimpleTooltip>
                   ))}
-                </div>
+                </fieldset>
                 {editValidationErrors.color && (
                   <p className="flex items-center gap-1 text-xs text-destructive">
                     <AlertCircle className="size-3" />
@@ -912,7 +928,7 @@ export function SubscriptionManagement({
                             automatically in the background. Last synced{" "}
                             {formatLastSync(
                               editingSubscriptionData.lastSyncAt ?? undefined,
-                            ).toLowerCase()}
+                            )}
                             .
                           </p>
                         </div>
@@ -935,7 +951,7 @@ export function SubscriptionManagement({
                       handleSyncSubscription(editingSubscriptionData)
                     }
                     disabled={loading || !editingSubscriptionData}
-                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none disabled:opacity-60"
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-hover/30 outline-none focus-visible:bg-hover/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                   >
                     <RefreshCw
                       className={`size-4 text-muted-foreground shrink-0 ${
@@ -948,7 +964,7 @@ export function SubscriptionManagement({
                         {editingSubscriptionData
                           ? `Last synced ${formatLastSync(
                               editingSubscriptionData.lastSyncAt ?? undefined,
-                            ).toLowerCase()}`
+                            )}`
                           : "Loading sync info\u2026"}
                       </div>
                     </div>
@@ -970,11 +986,15 @@ export function SubscriptionManagement({
                   Source
                 </div>
                 <div className="px-4 pb-3 space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">
+                  <Label
+                    htmlFor="subscription-feed-url"
+                    className="text-xs text-muted-foreground"
+                  >
                     Feed URL
                   </Label>
                   <div className="flex items-center gap-2">
                     <Input
+                      id="subscription-feed-url"
                       value={editingSubscriptionData?.url ?? ""}
                       placeholder={
                         editingSubscriptionData ? undefined : "Loading\u2026"
@@ -994,7 +1014,7 @@ export function SubscriptionManagement({
                             );
                             toast.success("Feed URL copied to clipboard");
                           } catch {
-                            toast.error("Unable to copy link automatically");
+                            toast.error("Unable to copy the feed URL. Select it and copy it manually.");
                           }
                         }}
                         disabled={!editingSubscriptionData}
@@ -1057,10 +1077,11 @@ export function SubscriptionManagement({
         className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
       >
         <DialogHeader className="px-5 pt-5 pb-3">
-          <DialogTitle>Remove subscription?</DialogTitle>
+          <DialogTitle>
+            Remove &ldquo;{pendingDelete?.name}&rdquo;?
+          </DialogTitle>
           <DialogDescription>
-            Remove &ldquo;{pendingDelete?.name}&rdquo;? The read-only calendar
-            and its synced events will be deleted.
+            The read-only calendar and its synced events will be deleted.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
@@ -1081,7 +1102,7 @@ export function SubscriptionManagement({
               setPendingDelete(null);
             }}
           >
-            Remove
+            Remove subscription
           </Button>
         </DialogFooter>
       </DialogContent>

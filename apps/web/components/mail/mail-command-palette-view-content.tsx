@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Monitor, Moon, Shield, Sun } from "lucide-react";
+import { Monitor, Moon, Shield, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
 import type { UserSettings } from "@/lib/types/calendar";
@@ -81,6 +81,7 @@ export type MailCommandPaletteViewContentProps = {
   onCreateMailbox?: (name: string) => Promise<void>;
   onDeleteMailbox?: (id: string) => Promise<void>;
   onRenameMailbox?: (id: string, name: string) => Promise<void>;
+  onReorderMailboxes?: (reordered: JmapMailbox[]) => void;
   labels: LabelDef[];
   onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
   onUpdateLabel?: (
@@ -89,8 +90,6 @@ export type MailCommandPaletteViewContentProps = {
   ) => Promise<void>;
   onDeleteLabel?: (id: string) => Promise<void>;
 };
-
-const SELECTED_THEME_CHECK = <Check className="size-4 shrink-0 text-primary" />;
 
 function MailAppearanceView({ goBack }: { goBack: () => void }) {
   const { theme, setTheme } = useTheme();
@@ -113,7 +112,7 @@ function MailAppearanceView({ goBack }: { goBack: () => void }) {
             icon={item.icon}
             label={item.label}
             onClick={() => setTheme(item.value)}
-            trailing={currentTheme === item.value ? SELECTED_THEME_CHECK : null}
+            checked={currentTheme === item.value}
           />
         ))}
       </PaletteSection>
@@ -279,6 +278,7 @@ export function MailCommandPaletteViewContent(
       onCreateMailbox={props.onCreateMailbox}
       onDeleteMailbox={props.onDeleteMailbox}
       onRenameMailbox={props.onRenameMailbox}
+      onReorderMailboxes={props.onReorderMailboxes}
       labels={props.labels}
       onCreateLabel={props.onCreateLabel}
       onUpdateLabel={props.onUpdateLabel}
@@ -296,6 +296,7 @@ type MailPreferencesViewContentProps = Pick<
   | "onCreateMailbox"
   | "onDeleteMailbox"
   | "onRenameMailbox"
+  | "onReorderMailboxes"
   | "labels"
   | "onCreateLabel"
   | "onUpdateLabel"
@@ -325,6 +326,7 @@ function MailPreferencesViewContent(props: MailPreferencesViewContentProps) {
         onCreateMailbox={props.onCreateMailbox ?? (() => Promise.resolve())}
         onDeleteMailbox={props.onDeleteMailbox ?? (() => Promise.resolve())}
         onRenameMailbox={props.onRenameMailbox}
+        onReorderMailboxes={props.onReorderMailboxes}
       />
     );
   }

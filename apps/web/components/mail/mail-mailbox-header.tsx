@@ -86,14 +86,15 @@ export function MailMailboxHeader({
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
               onKeyDown={onSearchKeyDown}
+              aria-label="Search messages"
               placeholder="Search all messages…"
-              className="h-8 w-full rounded-md border-0 bg-[var(--bg-overlay-tertiary)] pl-7 pr-8 text-[13px] shadow-none placeholder:text-[var(--text-disabled)] focus-visible:ring-1 focus-visible:ring-ring/40"
+              className="h-8 w-full rounded-md border-0 bg-[var(--bg-overlay-tertiary)] pl-7 pr-8 text-[13px] shadow-none placeholder:text-[var(--text-tertiary)] focus-visible:ring-1 focus-visible:ring-ring"
             />
             {searchBusy ? (
               <RotateCcw
                 size={11}
                 strokeWidth={2}
-                className="pointer-events-none absolute right-2 animate-spin text-[var(--icon-disabled)]"
+                className="pointer-events-none absolute right-2 animate-spin text-[var(--icon-tertiary)]"
               />
             ) : (
               <button
@@ -102,7 +103,7 @@ export function MailMailboxHeader({
                   onSearchClear();
                   onSearchOpenChange(false);
                 }}
-                className="absolute right-2 text-[var(--icon-disabled)] hover:text-[var(--icon-primary)]"
+                className="absolute right-1 flex size-6 cursor-pointer items-center justify-center rounded text-[var(--icon-secondary)] hover:text-[var(--icon-primary)]"
                 aria-label="Close search"
               >
                 <X size={12} strokeWidth={2.5} />
@@ -114,10 +115,15 @@ export function MailMailboxHeader({
 
       <div className="flex min-h-12 items-center gap-2 px-5 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          <Typography weight={TypographyWeight.MEDIUM}>{title}</Typography>
+          <h1 className="flex min-w-0 tracking-normal">
+            <Typography weight={TypographyWeight.MEDIUM} wrap>
+              {title}
+            </Typography>
+          </h1>
           {unreadCount > 0 ? (
             <Typography color="link" selectable={false}>
               {unreadCount.toLocaleString()}
+              <span className="sr-only"> unread</span>
             </Typography>
           ) : null}
         </div>
@@ -138,6 +144,7 @@ export function MailMailboxHeader({
                     type="button"
                     className="inline-flex h-[27px] cursor-pointer items-center gap-1.5 rounded border border-[var(--border-secondary)] bg-[var(--cta-secondary-default)] px-2 text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-overlay-tertiary)]"
                   >
+                    <span className="sr-only">Filter: </span>
                     {filterLabel}
                     <Icons
                       color="primary"

@@ -54,7 +54,7 @@ function CommandPaletteLoadingDialog({
         <VisuallyHidden>
           <DialogTitle>Loading Settings</DialogTitle>
         </VisuallyHidden>
-        <div className="flex items-center justify-center min-h-[200px]">
+        <div className="flex items-center justify-center min-h-[200px] p-6">
           <div className="text-center">
             <Loader2 className="size-6 animate-spin mx-auto mb-2 text-muted-foreground" />
             <p className="text-xs text-muted-foreground">Loading…</p>

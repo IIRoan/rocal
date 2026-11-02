@@ -20,7 +20,10 @@ import { formatAddress, formatMessageDate } from "../mail-helpers";
 import { SenderAvatar } from "../mail-avatar";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
 import { resolveLabelDisplayColor, type TimeFormat } from "@workspace/calendar-core";
-import { buildMailPreviewSnippet } from "@/lib/mail/mail-preview";
+import {
+  buildMailPreviewSnippet,
+  ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER,
+} from "@/lib/mail/mail-preview";
 import {
   formatThreadSenders,
   getSecondaryThreadMessages,
@@ -53,9 +56,8 @@ function MessageLabelChips({
           <span
             key={label.id}
             title={label.name}
-            className="inline-flex max-w-[5.5rem] items-center gap-0.5 rounded px-1 py-px text-[11px] font-medium leading-none"
+            className="inline-flex max-w-[5.5rem] items-center gap-0.5 rounded px-1 py-px text-[11px] font-medium leading-none text-[var(--text-primary)]"
             style={{
-              color: displayColor,
               backgroundColor: `color-mix(in srgb, ${displayColor} 10%, transparent)`,
               border: `1px solid color-mix(in srgb, ${displayColor} 25%, transparent)`,
             }}
@@ -98,7 +100,7 @@ function rowShellClassName({
       ? "hover:bg-[var(--bg-cell-hover)]"
       : "bg-[var(--bg-cell-unread)] hover:border-b-[var(--border-primary)]";
   return cn(
-    "group/row relative h-full w-full overflow-hidden text-left cursor-pointer border-b border-[var(--border-tertiary)] box-border transition-colors duration-150",
+    "group/row relative w-full overflow-hidden text-left cursor-pointer border-b border-[var(--border-tertiary)] box-border transition-colors duration-150",
     padding,
     tone,
   );
@@ -119,6 +121,8 @@ function MessageListRowSelectAvatar({
     <div className="mr-3 flex shrink-0 items-center gap-3">
       <IconButton
         aria-label="Select message"
+        aria-pressed={isChecked}
+        className="relative z-2"
         icon={isChecked ? Icon.CheckboxFilled : Icon.CheckboxEmpty}
         onClick={onToggleSelect}
         size={Size.SMALL}
@@ -151,7 +155,7 @@ function MessageListRowSubject({
 }) {
   const weight = isRead ? TypographyWeight.REGULAR : TypographyWeight.MEDIUM;
   return (
-    <div className={cn("ml-1 flex min-w-0 flex-1 items-center overflow-hidden", className)}>
+    <div className={cn("ml-1 flex min-w-0 flex-1 items-center", className)}>
       {thread ? (
         <button
           type="button"
@@ -159,8 +163,10 @@ function MessageListRowSubject({
             event.stopPropagation();
             onToggleThreadExpand(thread.id);
           }}
-          className="mr-1 shrink-0 rounded p-0.5 text-[var(--icon-disabled)] hover:text-[var(--icon-primary)]"
-          aria-label={thread.expanded ? "Collapse thread" : "Expand thread"}
+          // The 16px chevron gets a 24px hit area (WCAG 2.5.8); the text clip sits on the sibling so it can't cut it.
+          className="relative z-2 mr-1 shrink-0 rounded p-0.5 text-[var(--icon-tertiary)] after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-1/2 hover:text-[var(--icon-primary)]"
+          aria-label="Show thread messages"
+          aria-expanded={thread.expanded}
         >
           {thread.loading ? (
             <RotateCcw className="size-3 animate-spin" strokeWidth={2} />
@@ -171,15 +177,17 @@ function MessageListRowSubject({
           )}
         </button>
       ) : null}
-      <Typography color={isRead ? "secondary" : "primary"} minWidth="auto" weight={weight}>
-        {subject || "(No subject)"}
-      </Typography>
-      {previewSnippet ? (
-        <Typography color={isRead ? "disabled" : "secondary"}>
-          <span>&nbsp;–&nbsp;</span>
-          {previewSnippet}
+      <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+        <Typography color={isRead ? "secondary" : "primary"} minWidth="auto" weight={weight}>
+          {subject || "(No subject)"}
         </Typography>
-      ) : null}
+        {previewSnippet ? (
+          <Typography color={isRead ? "tertiary" : "secondary"}>
+            <span>&nbsp;–&nbsp;</span>
+            {previewSnippet}
+          </Typography>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -189,6 +197,7 @@ export type MessageListRowProps = {
   primaryIds: Set<string>;
   interaction: MessageListRowInteraction;
   presentation: MessageListRowPresentation;
+  height?: number;
 };
 
 function buildMessageListRowView({
@@ -215,6 +224,16 @@ function buildMessageListRowView({
     row.messages.filter((entry) => primaryIds.has(entry.id) && !entry.keywords?.["$seen"])
       .length === 0;
   const threaded = display.threadExpandEnabled && row.messages.length > 1;
+  const hasAttachments = row.messages.some(
+    (entry) => entry.hasAttachment === true || (entry.attachments?.length ?? 0) > 0,
+  );
+  const snippet = buildMailPreviewSnippet(message);
+  // A list row shows only the subject for encrypted mail; the reader names the encryption.
+  const previewSnippet = snippet === ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER ? "" : snippet;
+  const senderLabel =
+    row.messages.length > 1
+      ? formatThreadSenders(row.messages)
+      : formatAddress(message.from);
   return {
     row,
     message,
@@ -233,19 +252,22 @@ function buildMessageListRowView({
     isSelected: row.messageIds.includes(selectedMessageId ?? ""),
     isRead,
     isFlagged: row.messages.some((entry) => entry.keywords?.["$flagged"] === true),
-    hasAttachments: row.messages.some(
-      (entry) => entry.hasAttachment === true || (entry.attachments?.length ?? 0) > 0,
-    ),
+    hasAttachments,
     messageLabels: display.showLabelChips ? getAllMessageLabels(message, labels) : [],
-    previewSnippet: buildMailPreviewSnippet(message) ?? "",
-    senderLabel:
-      row.messages.length > 1
-        ? formatThreadSenders(row.messages)
-        : formatAddress(message.from),
+    previewSnippet,
+    senderLabel,
+    rowLabel: [
+      senderLabel,
+      message.subject || "(No subject)",
+      formatMessageDate(message.receivedAt, timeFormat, timezone),
+      hasAttachments ? "Has attachment" : null,
+      isRead ? null : "Unread",
+    ]
+      .filter(Boolean)
+      .join(", "),
     senderTone: (isRead ? "secondary" : "primary") as "secondary" | "primary",
     senderWeight: isRead ? TypographyWeight.REGULAR : TypographyWeight.BOLD,
     unreadOpacity: isRead ? 0 : 1,
-    unreadLabel: isRead ? undefined : "Unread",
     thread: threaded
       ? {
           id: row.id,
@@ -280,13 +302,13 @@ function MessageListRowTrailing({
     <div className="ml-auto flex shrink-0 items-center gap-4">
       <div className="flex items-center gap-1">
         {hasAttachments ? (
-          <Icons color="disabled" icon={Icon.PaperClip} size={Size.SMALL} />
+          <Icons color="tertiary" icon={Icon.PaperClip} size={Size.SMALL} />
         ) : null}
         <MessageLabelChips messageLabels={messageLabels} />
       </div>
       <Typography
         className="group-hover/row:hidden"
-        color="disabled"
+        color="tertiary"
         mono
         size={TypographySize.SMALL}
       >
@@ -297,14 +319,10 @@ function MessageListRowTrailing({
   );
 }
 
-function UnreadDot({ opacity, label }: { opacity: number; label?: string }) {
+function UnreadDot({ opacity }: { opacity: number }) {
   return (
     <span className="ml-1 flex h-2 w-2.5 shrink-0 items-center">
-      <span
-        className="size-2 rounded-full bg-primary"
-        style={{ opacity }}
-        aria-label={label}
-      />
+      <span className="size-2 rounded-full bg-accent" style={{ opacity }} />
     </span>
   );
 }
@@ -333,15 +351,15 @@ function MessageListRowStacked({
               {view.senderLabel}
             </Typography>
           </div>
-          <UnreadDot opacity={view.unreadOpacity} label={view.unreadLabel} />
+          <UnreadDot opacity={view.unreadOpacity} />
           {view.hasAttachments ? (
-            <Icons color="disabled" icon={Icon.PaperClip} size={Size.SMALL} />
+            <Icons color="tertiary" icon={Icon.PaperClip} size={Size.SMALL} />
           ) : null}
           {showMenu ? (
-            <div className="group/actions flex shrink-0 items-center">
+            <div className="group/actions relative z-2 flex shrink-0 items-center">
               <Typography
                 className="group-hover/row:hidden group-has-[[data-state=open]]/actions:hidden"
-                color="disabled"
+                color="tertiary"
                 mono
                 size={TypographySize.SMALL}
               >
@@ -361,7 +379,7 @@ function MessageListRowStacked({
               </div>
             </div>
           ) : (
-            <Typography color="disabled" mono size={TypographySize.SMALL}>
+            <Typography color="tertiary" mono size={TypographySize.SMALL}>
               {date}
             </Typography>
           )}
@@ -399,7 +417,7 @@ function MessageListRowInline({
           {view.senderLabel}
         </Typography>
       </div>
-      <UnreadDot opacity={view.unreadOpacity} label={view.unreadLabel} />
+      <UnreadDot opacity={view.unreadOpacity} />
       <MessageListRowSubject
         isRead={view.isRead}
         subject={message.subject ?? ""}
@@ -442,17 +460,7 @@ export function MessageListRow(props: MessageListRowProps) {
         width={220}
         trigger={
         <div
-          role="button"
-          tabIndex={0}
-          onClick={() => view.onSelect(message.id)}
-          onKeyDown={(event) => {
-            // Keys from nested controls and portaled menu items bubble here through the React tree.
-            if (event.target !== event.currentTarget) return;
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              view.onSelect(message.id);
-            }
-          }}
+          style={{ height: props.height }}
           className={rowShellClassName({
             stacked: display.isMobile || display.narrow,
             density: display.density,
@@ -461,6 +469,14 @@ export function MessageListRow(props: MessageListRowProps) {
             isRead: view.isRead,
           })}
         >
+          {/* One real button covers the row; the row's own controls sit above it (z-2) so nothing nests inside a button. */}
+          <button
+            type="button"
+            aria-label={view.rowLabel}
+            aria-current={view.isSelected || undefined}
+            onClick={() => view.onSelect(message.id)}
+            className="absolute inset-0 z-1 cursor-pointer focus-visible:-outline-offset-2"
+          />
           {display.isMobile || display.narrow ? (
             <MessageListRowStacked view={view} />
           ) : (
@@ -519,18 +535,20 @@ function MessageListRowThreadChildren({
             <span
               className={cn(
                 "size-1.5 shrink-0 rounded-full",
-                threadRead ? "bg-transparent" : "bg-primary",
+                threadRead ? "bg-transparent" : "bg-accent",
               )}
-            />
+            >
+              {threadRead ? null : <span className="sr-only">Unread</span>}
+            </span>
             <span
               className={cn(
                 "flex-1 min-w-0 truncate text-[11px]",
-                threadRead ? "text-foreground/50" : "font-medium text-foreground/80",
+                threadRead ? "text-muted-foreground" : "font-medium text-foreground/80",
               )}
             >
               {threadMsg.subject || "(No subject)"}
             </span>
-            <span className="shrink-0 text-[11px] text-muted-foreground/60 tabular-nums whitespace-nowrap">
+            <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
               {formatMessageDate(threadMsg.receivedAt, timeFormat, timezone)}
             </span>
           </button>

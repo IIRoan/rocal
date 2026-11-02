@@ -15,7 +15,7 @@ interface CurrentTimeIndicatorProps {
 }
 
 const indicatorVariantClass: Record<CurrentTimeIndicatorVariant, string> = {
-  primary: "bg-primary",
+  primary: "bg-accent",
   destructive: "bg-destructive",
   "calendar-accent": "bg-[var(--calendar-accent)]",
 };
@@ -42,7 +42,7 @@ export function CurrentTimeIndicator({
           <div
             className={cn(
               indicatorClassName,
-              "text-primary-foreground absolute -left-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums shadow-sm",
+              "text-accent-foreground absolute -left-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums shadow-sm",
             )}
           >
             {label}

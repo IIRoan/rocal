@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ShieldCheck, ShieldAlert, Lock } from "lucide-react";
 import {
   getMailSecurityNotice,
@@ -26,7 +27,7 @@ export function MailSecurityBadge(props: {
         : Lock;
   const iconClassName =
     meta.tone === "encrypted"
-      ? "text-primary"
+      ? "text-accent"
       : meta.tone === "warning"
         ? "text-destructive"
         : "text-muted-foreground";
@@ -56,14 +57,14 @@ export function MailSecurityBadge(props: {
         <p className="text-xs leading-snug text-[var(--text-secondary)]">
           {MAIL_READABLE_METADATA}
         </p>
-        <a
+        <Link
           href="/privacy#mail-encryption"
           target="_blank"
           rel="noopener noreferrer"
           className="cursor-pointer text-xs text-[var(--text-link)] underline-offset-2 hover:underline"
         >
           Encryption details
-        </a>
+        </Link>
       </div>
     </DropdownPanel>
   );
