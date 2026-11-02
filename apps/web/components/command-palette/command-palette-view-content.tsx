@@ -278,9 +278,9 @@ export function CommandPaletteViewContent({
     <div className="flex flex-col">
       <PaletteViewHeader title="Settings" onBack={goBack} />
       <div className="flex-1 overflow-y-auto p-1">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-md opacity-50">
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-md">
           <Settings className="size-4 text-muted-foreground shrink-0" />
-          <span className="text-sm">This section is coming soon</span>
+          <span className="text-sm text-muted-foreground">This section is coming soon</span>
         </div>
       </div>
     </div>

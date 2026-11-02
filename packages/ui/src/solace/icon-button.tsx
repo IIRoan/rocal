@@ -77,6 +77,8 @@ export function IconButton({
   type = Type.PRIMARY,
   variant = FilledVariant.FILLED,
   onClick,
+  onKeyDown,
+  onPointerDown,
   ref,
   ...props
 }: IconButtonProps) {
@@ -95,12 +97,16 @@ export function IconButton({
     <button
       ref={ref}
       type="button"
-      disabled={disabled}
+      // Not native `disabled`: the button stays focusable so its tooltip can still open.
+      aria-disabled={disabled || undefined}
       aria-label={tooltip || undefined}
+      // Dropping activation also keeps a wrapping Radix menu or popover trigger closed.
       onClick={disabled ? undefined : onClick}
+      onKeyDown={disabled ? undefined : onKeyDown}
+      onPointerDown={disabled ? undefined : onPointerDown}
       className={cn(
         "inline-flex cursor-pointer items-center justify-center select-none",
-        disabled && "cursor-default pointer-events-none",
+        disabled && "cursor-default pointer-events-none forced-colors:text-[GrayText]",
         active && "bg-[var(--bg-overlay-secondary)]",
         surfaceClass,
         className,
@@ -123,7 +129,7 @@ export function IconButton({
   if (!tooltip) return button;
 
   return (
-    <WarmTooltip content={tooltip} disabled={disabled} side="top">
+    <WarmTooltip content={tooltip} side="top">
       {button}
     </WarmTooltip>
   );

@@ -68,7 +68,7 @@ export const QuotedHtml = TiptapNode.create({
           height: auto;
         }
         a {
-          color: var(--primary);
+          color: var(--accent);
         }
         @media (prefers-color-scheme: dark) {
           :host {

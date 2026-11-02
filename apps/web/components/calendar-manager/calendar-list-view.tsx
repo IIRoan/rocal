@@ -11,7 +11,7 @@ import { partitionCalendarsByKind } from "@/lib/calendar-ui-helpers";
 import { CalendarManagerHeader } from "./calendar-manager-header";
 
 const ROW_BUTTON_CLASS =
-  "rounded-md text-left hover:bg-accent/30 focus-visible:bg-accent/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 transition-colors";
+  "rounded-md text-left hover:bg-hover/30 focus-visible:bg-hover/50 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring transition-colors";
 
 const SECTION_LABEL_CLASS =
   "px-4 py-2 text-[13px] font-medium text-muted-foreground border-t border-border/50 mt-1";
@@ -90,7 +90,7 @@ function CalendarRow({
         aria-label={
           isVisible ? `Hide ${calendar.name}` : `Show ${calendar.name}`
         }
-        className="shrink-0 size-11 sm:size-8 flex items-center justify-center rounded-md cursor-pointer text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
+        className="shrink-0 size-11 sm:size-8 flex items-center justify-center rounded-md cursor-pointer text-muted-foreground hover:text-foreground hover:bg-hover/40 transition-colors mr-1"
       >
         {isVisible ? (
           <Eye className="size-3.5" strokeWidth={2} />

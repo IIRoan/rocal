@@ -35,10 +35,11 @@ export function MailViewer({ previews }: { previews: EmailPreview[] }) {
                 ? [
                     <button
                       key={p.id}
+                      type="button"
                       onClick={() => setActiveId(p.id)}
                       className={`w-full text-left px-4 py-3 flex flex-col gap-0.5 transition-colors border-l-2 ${
                         activeId === p.id
-                          ? "bg-primary/8 border-primary"
+                          ? "bg-accent/8 border-accent"
                           : "border-transparent hover:bg-muted/40 hover:border-border"
                       }`}
                     >
@@ -78,6 +79,7 @@ export function MailViewer({ previews }: { previews: EmailPreview[] }) {
             {(["desktop", "mobile"] as const).map((w) => (
               <button
                 key={w}
+                type="button"
                 onClick={() => setWidth(w)}
                 className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors ${
                   width === w

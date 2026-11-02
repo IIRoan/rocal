@@ -49,7 +49,7 @@ export function EventEditorView({
       type="button"
       onClick={onBack}
       aria-label="Back"
-      className="-ml-1 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="-ml-1 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
     >
       <ArrowLeft className="size-4" />
     </button>
@@ -116,7 +116,7 @@ export function EventEditorView({
                       iconSize="sm"
                     />
                   </h2>
-                  <DrawerClose className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                  <DrawerClose className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
                     <X className="size-5" />
                     <span className="sr-only">Close</span>
                   </DrawerClose>

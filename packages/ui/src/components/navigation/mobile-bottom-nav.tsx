@@ -79,8 +79,8 @@ function TabButton({
       <div
         className={cn(
           "flex items-center justify-center w-7 h-7 rounded-lg transition-colors duration-150",
-          isActive && "bg-primary/10",
-          !isActive && "active:bg-accent/50",
+          isActive && "bg-accent/10",
+          !isActive && "active:bg-hover/50",
         )}
       >
         {icon}
@@ -89,7 +89,7 @@ function TabButton({
         <span
           className={cn(
             "text-[11px] font-medium",
-            isActive ? "text-primary" : "text-muted-foreground",
+            isActive ? "text-accent" : "text-muted-foreground",
           )}
         >
           {label}
@@ -223,14 +223,14 @@ export function MobileBottomNav({
                           className={cn(
                             "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors",
                             isActive
-                              ? "bg-primary/10 text-primary"
-                              : "hover:bg-accent/60 active:bg-accent",
+                              ? "bg-accent/10 text-accent"
+                              : "hover:bg-hover/60 active:bg-hover",
                           )}
                         >
                           <Icon size={18} />
                           <span className="flex-1 text-left">{label}</span>
                           {isActive && (
-                            <Check size={16} className="text-primary" />
+                            <Check size={16} className="text-accent" />
                           )}
                         </button>
                       );

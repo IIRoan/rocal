@@ -5,7 +5,7 @@ import {
   SidebarInset,
 } from "@workspace/ui/components/ui/sidebar";
 import { SolaceTheme } from "@workspace/ui/solace";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { MailSidebar } from "../mail-sidebar";
@@ -89,7 +89,7 @@ export function MailAppMainLayout({
                 onRefresh={() =>
                   void handleManualRefresh().catch((error) =>
                     toast.error(
-                      getErrorMessage(error, "Could not refresh mail."),
+                      getErrorMessage(error, "Could not refresh mail. Check your connection and try again."),
                     ),
                   )
                 }

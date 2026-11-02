@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, type ReactNode } from "react";
+import { useId, useReducer, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Check, RotateCcw, Trash2 } from "lucide-react";
 
 import { AnimatedCollapse } from "@workspace/ui/components/ui/animated-collapse";
@@ -10,20 +10,24 @@ import {
 } from "./account-settings-ui-state";
 import {
   PaletteButton,
+  PaletteField,
   PaletteFormActions,
   PaletteIconBox,
   PaletteNavRow,
   PaletteSection,
 } from "./palette-ui";
+import { PALETTE_INPUT_CLASS } from "./palette-styles";
 
 export function AccountDangerZone({
   isBusy,
   deletingAccount,
+  accountEmail,
   handleReset,
   handleDeleteAccount,
 }: {
   isBusy: boolean;
   deletingAccount: boolean;
+  accountEmail: string | null;
   handleReset: () => void;
   handleDeleteAccount: () => void;
 }) {
@@ -59,23 +63,16 @@ export function AccountDangerZone({
       )}
 
       <AnimatedCollapse isOpen={dangerZone.showDeleteConfirm}>
-        <ConfirmPanel
-          message="This permanently deletes your account, mailbox and all its mail, calendars, events, categories, subscriptions, passkeys, and settings. This cannot be undone."
+        <DeleteAccountConfirm
+          isBusy={isBusy}
+          deletingAccount={deletingAccount}
+          accountEmail={accountEmail}
           onCancel={() => dispatch({ type: "closeDeleteConfirm" })}
-        >
-          <PaletteButton
-            variant="destructive"
-            loading={deletingAccount}
-            disabled={isBusy}
-            onClick={() => {
-              handleDeleteAccount();
-              dispatch({ type: "closeDeleteConfirm" });
-            }}
-          >
-            {deletingAccount ? null : <Trash2 className="size-3.5" />}
-            Delete my account
-          </PaletteButton>
-        </ConfirmPanel>
+          onConfirm={() => {
+            handleDeleteAccount();
+            dispatch({ type: "closeDeleteConfirm" });
+          }}
+        />
       </AnimatedCollapse>
 
       <AnimatedCollapse isOpen={dangerZone.showResetConfirm}>
@@ -92,7 +89,7 @@ export function AccountDangerZone({
             }}
           >
             <Check className="size-3.5" />
-            Yes, reset everything
+            Reset all settings
           </PaletteButton>
         </ConfirmPanel>
       </AnimatedCollapse>
@@ -100,12 +97,95 @@ export function AccountDangerZone({
   );
 }
 
+function DeleteAccountConfirm({
+  isBusy,
+  deletingAccount,
+  accountEmail,
+  onCancel,
+  onConfirm,
+}: {
+  isBusy: boolean;
+  deletingAccount: boolean;
+  accountEmail: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const fieldId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [typedEmail, setTypedEmail] = useState("");
+  const [error, setError] = useState<string>();
+  const errorId = `${fieldId}-error`;
+  const label = "Type your email to confirm";
+
+  return (
+    <form
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        const expected = accountEmail?.trim().toLowerCase();
+        if (!expected || typedEmail.trim().toLowerCase() !== expected) {
+          setError(
+            `That doesn’t match. Type ${accountEmail ?? "your account email"} to delete your account.`,
+          );
+          inputRef.current?.focus();
+          return;
+        }
+        onConfirm();
+      }}
+    >
+      <ConfirmPanel
+        message="This permanently deletes your account, mailbox and all its mail, calendars, events, categories, subscriptions, passkeys, and settings. This cannot be undone."
+        onCancel={onCancel}
+        field={
+          <PaletteField label={label} htmlFor={fieldId}>
+            <input
+              ref={inputRef}
+              id={fieldId}
+              aria-label={label}
+              type="email"
+              value={typedEmail}
+              onChange={(e) => {
+                setTypedEmail(e.target.value);
+                setError(undefined);
+              }}
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
+              disabled={deletingAccount}
+              className={PALETTE_INPUT_CLASS}
+            />
+            {error ? (
+              <p id={errorId} className="text-[13px] text-destructive">
+                {error}
+              </p>
+            ) : null}
+          </PaletteField>
+        }
+      >
+        <PaletteButton
+          type="submit"
+          variant="destructive"
+          loading={deletingAccount}
+          disabled={isBusy}
+        >
+          {deletingAccount ? null : <Trash2 className="size-3.5" />}
+          Delete my account
+        </PaletteButton>
+      </ConfirmPanel>
+    </form>
+  );
+}
+
 function ConfirmPanel({
   message,
+  field,
   onCancel,
   children,
 }: {
   message: string;
+  field?: ReactNode;
   onCancel: () => void;
   children: ReactNode;
 }) {
@@ -117,8 +197,10 @@ function ConfirmPanel({
         </PaletteIconBox>
         <span>{message}</span>
       </div>
+      {field}
       <PaletteFormActions>
-        <PaletteButton variant="ghost" onClick={onCancel}>
+        {/* Opening the panel unmounts its trigger, so focus lands on the safe choice. */}
+        <PaletteButton variant="ghost" onClick={onCancel} autoFocus>
           Cancel
         </PaletteButton>
         {children}

@@ -32,10 +32,11 @@ export function TableSizePicker({
                 aria-label={sizeLabel}
                 title={sizeLabel}
                 onMouseEnter={() => setHover({ r, c })}
+                onFocus={() => setHover({ r, c })}
                 onClick={() => onPick(r + 1, c + 1)}
                 className={cn(
                   "size-4 rounded-[2px] border border-border/60 transition-colors",
-                  active ? "border-primary bg-primary" : "bg-background hover:bg-muted/60",
+                  active ? "border-accent bg-accent" : "bg-background hover:bg-muted/60",
                 )}
               />
             );

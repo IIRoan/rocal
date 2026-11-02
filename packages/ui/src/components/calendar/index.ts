@@ -24,11 +24,7 @@ export {
   resolveEncryptionState,
 } from "./encryption-status-utils";
 export { formatEventDescription } from "./event-description-formatter";
-export {
-  CalendarSkeleton,
-  EventDialogSkeleton,
-  SidebarCalendarSkeleton,
-} from "./calendar-skeleton";
+export { CalendarSkeleton } from "./calendar-skeleton";
 export { EventLoadingSkeleton } from "./event-loading-skeleton";
 
 // Context providers

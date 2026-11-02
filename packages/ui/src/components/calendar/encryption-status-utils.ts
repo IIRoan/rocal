@@ -21,6 +21,6 @@ export function getEncryptionStatusMeta(
     ...notice,
     Icon: notice.state === "encrypted" ? ShieldCheck : LockOpen,
     iconClassName:
-      notice.state === "encrypted" ? "text-primary" : "text-muted-foreground",
+      notice.state === "encrypted" ? "text-accent" : "text-muted-foreground",
   };
 }

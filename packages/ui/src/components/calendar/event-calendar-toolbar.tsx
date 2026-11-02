@@ -14,13 +14,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "../../lib/utils";
 import { CalendarViewTitle } from "./calendar-view-title";
 import type { CalendarView } from "./types";
+import { CALENDAR_VIEW_SHORTCUTS } from "./use-calendar-view-shortcuts";
 
 const VIEW_OPTIONS = [
-  { value: "month", label: "Month", icon: LayoutGrid, shortcut: "M" },
-  { value: "week", label: "Week", icon: Columns3, shortcut: "W" },
-  { value: "3day", label: "3 Days", icon: Columns3, shortcut: "T" },
-  { value: "day", label: "Day", icon: Square, shortcut: "D" },
-  { value: "agenda", label: "Agenda", icon: AlignJustify, shortcut: "A" },
+  { value: "month", label: "Month", icon: LayoutGrid },
+  { value: "week", label: "Week", icon: Columns3 },
+  { value: "3day", label: "3 Days", icon: Columns3 },
+  { value: "day", label: "Day", icon: Square },
+  { value: "agenda", label: "Agenda", icon: AlignJustify },
 ] as const;
 
 export function EventCalendarToolbar({
@@ -63,7 +64,7 @@ export function EventCalendarToolbar({
             onClick={onSidebarToggle}
           >
             <ListIcon size={16} />
-            <span className="sr-only">Toggle Sidebar</span>
+            <span className="sr-only">Toggle sidebar</span>
           </Button>
         )}
         <h2 className="min-w-0 truncate font-semibold text-base sm:text-xl">
@@ -81,13 +82,16 @@ export function EventCalendarToolbar({
             className="shrink-0"
           />
         )}
+        <output className="sr-only">
+          {eventsLoading ? "Loading events…" : ""}
+        </output>
       </div>
       <div className="flex items-center gap-2">
         <div className="inline-flex items-center rounded-md border border-border/60 bg-background shadow-xs overflow-hidden">
           <Button
             variant="ghost"
             size="icon"
-            className="size-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-accent/60 -scale-x-[1]"
+            className="size-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-hover/60 -scale-x-[1]"
             onClick={onPrevious}
             onMouseEnter={onPrefetchPrevious}
             aria-label="Previous"
@@ -101,7 +105,7 @@ export function EventCalendarToolbar({
             size="sm"
             onClick={onToday}
             disabled={loading}
-            className="h-7 px-3 rounded-none text-xs font-medium hover:bg-accent/60"
+            className="h-7 px-3 rounded-none text-xs font-medium hover:bg-hover/60"
           >
             Today
           </Button>
@@ -109,7 +113,7 @@ export function EventCalendarToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className="size-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-accent/60"
+            className="size-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-hover/60"
             onClick={onNext}
             onMouseEnter={onPrefetchNext}
             aria-label="Next"
@@ -118,30 +122,25 @@ export function EventCalendarToolbar({
             <ChevronRightIcon size={16} aria-hidden="true" />
           </Button>
         </div>
-        <div
-          role="radiogroup"
-          aria-label="Calendar view"
-          className="inline-flex items-center rounded-md border border-border/60 bg-background shadow-xs p-0.5 gap-0.5"
-        >
-          {VIEW_OPTIONS.map(({ value, label, icon: Icon, shortcut }) => {
+        <div className="inline-flex items-center rounded-md border border-border/60 bg-background shadow-xs p-0.5 gap-0.5">
+          {VIEW_OPTIONS.map(({ value, label, icon: Icon }) => {
             const active = view === value;
             return (
               <Tooltip key={value}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    role="radio"
-                    aria-checked={active}
+                    aria-pressed={active}
                     aria-label={label}
                     disabled={loading}
                     onClick={() => onViewChange(value)}
                     className={cn(
                       "inline-flex items-center justify-center h-6 w-7 rounded-sm",
-                      "text-muted-foreground/70 hover:text-foreground hover:bg-accent/60",
+                      "text-muted-foreground/70 hover:text-foreground hover:bg-hover/60",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       "disabled:opacity-50 disabled:pointer-events-none",
                       active &&
-                        "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm",
+                        "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground shadow-sm",
                     )}
                   >
                     <Icon size={14} aria-hidden="true" />
@@ -149,7 +148,9 @@ export function EventCalendarToolbar({
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
                   {label}
-                  <span className="ml-1.5 opacity-60">{shortcut}</span>
+                  <span className="ml-1.5">
+                    {CALENDAR_VIEW_SHORTCUTS[value]}
+                  </span>
                 </TooltipContent>
               </Tooltip>
             );

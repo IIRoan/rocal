@@ -60,7 +60,7 @@ export async function runMailPasswordChange(input: {
   setBusy: (value: boolean) => void;
 }): Promise<void> {
   if (!input.sessionUserId || !input.sessionEmail) {
-    throw new Error("Your session is unavailable. Please try again.");
+    throw new Error("Your session is unavailable. Reload the page and try again.");
   }
 
   input.setBusy(true);
@@ -127,7 +127,7 @@ export function selectUnifiedMailPaletteResult(input: {
 }
 
 export function handleMailPaletteKeyDown(input: {
-  event: ReactKeyboardEvent;
+  event: Pick<ReactKeyboardEvent, "key" | "target" | "preventDefault">;
   currentView: MailPaletteView;
   showUnifiedSearch: boolean;
   unifiedResults: UnifiedSearchResult<JmapEmailMessage>[];
@@ -138,6 +138,8 @@ export function handleMailPaletteKeyDown(input: {
   onSelectItem: (item: MailPaletteItem) => void;
 }): void {
   if (input.currentView !== "main") return;
+  // Rows are real buttons, so Enter on a focused row must press that row and not the highlighted one.
+  if (!(input.event.target instanceof HTMLInputElement)) return;
 
   const unifiedCount = input.showUnifiedSearch
     ? input.unifiedResults.length

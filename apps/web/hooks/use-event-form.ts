@@ -41,7 +41,7 @@ import {
 import { validateEventForm } from "@/components/command-palette/event-utils";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { encryptReminderTitle } from "@/lib/e2ee-notification-title";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import {
   useMutation,
   useQueryClient,
@@ -56,22 +56,12 @@ import {
 import { useRecentContacts } from "./use-recent-contacts";
 import type { UseCalendarDataReturn } from "./use-calendar-data";
 import { EVENTS_QUERY_KEY } from "./use-calendar-events-loader";
+import {
+  RECURRING_DELETE_FAILURE_MESSAGES,
+  RECURRING_DELETE_SUCCESS_MESSAGES,
+} from "@/lib/event-editor-view-model";
 
 const log = createLogger("event-form");
-
-const RECURRING_DELETE_SUCCESS_MESSAGES: Record<RecurrenceDeleteScope, string> =
-  {
-    this_only: "Event occurrence deleted",
-    this_and_future: "This and following events deleted",
-    all: "Entire event series deleted",
-  };
-
-const RECURRING_DELETE_FAILURE_MESSAGES: Record<RecurrenceDeleteScope, string> =
-  {
-    this_only: "Failed to delete event occurrence",
-    this_and_future: "Failed to delete following events",
-    all: "Failed to delete event series",
-  };
 
 type NotificationPayload = Pick<
   EventNotification,

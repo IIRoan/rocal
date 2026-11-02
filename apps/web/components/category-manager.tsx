@@ -155,7 +155,7 @@ function CategoryColorPicker({
           aria-label={preset.label}
           onClick={() => onChange(preset.value)}
           className={cn(
-            "tap-target flex size-8 cursor-pointer items-center justify-center rounded-full outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/50",
+            "tap-target flex size-8 cursor-pointer items-center justify-center rounded-full outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring",
             value === preset.value && "ring-2 ring-foreground/70",
           )}
         >
@@ -249,7 +249,6 @@ function CategoryCreateView({ onBack }: { onBack: () => void }) {
         <PaletteButton
           variant="primary"
           loading={createCategory.isPending}
-          disabled={!name.trim()}
           onClick={handleCreate}
         >
           Create
@@ -357,7 +356,6 @@ function CategoryEditForm({
         <PaletteButton
           variant="primary"
           loading={updateCategory.isPending}
-          disabled={!name.trim()}
           onClick={handleSave}
         >
           Save changes

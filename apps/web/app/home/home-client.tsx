@@ -16,6 +16,7 @@ import { CalendarDays, Mail, ChevronRight, LogOut } from "lucide-react";
 import { signOutAndClearLocalState } from "@/lib/auth-local-state";
 import Link from "next/link";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
+import { Button } from "@workspace/ui/components/ui/button";
 
 const NAV_ITEMS = [
   {
@@ -112,14 +113,16 @@ export function HomeAppClient() {
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <SimpleTooltip content="Sign out">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={handleSignOut}
-              className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+              className="text-muted-foreground hover:text-foreground"
               aria-label="Sign out"
             >
-              <LogOut size={15} />
-            </button>
+              <LogOut aria-hidden="true" />
+            </Button>
           </SimpleTooltip>
         </div>
       </header>
@@ -140,12 +143,12 @@ export function HomeAppClient() {
               <li key={item.href} data-home-nav-item>
                 <Link
                   href={item.href}
-                  className="flex items-center justify-between py-4 group transition-colors hover:text-primary cursor-pointer"
+                  className="flex items-center justify-between py-4 group transition-colors hover:text-accent cursor-pointer"
                 >
                   <div className="flex items-center gap-3.5">
                     <item.icon
                       size={17}
-                      className="text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0"
+                      className="text-muted-foreground group-hover:text-accent transition-colors flex-shrink-0"
                     />
                     <div>
                       <span className="text-[15px] font-medium leading-none block mb-0.5">
@@ -158,7 +161,7 @@ export function HomeAppClient() {
                   </div>
                   <ChevronRight
                     size={14}
-                    className="text-muted-foreground/50 group-hover:text-primary transition-colors"
+                    className="text-muted-foreground/50 group-hover:text-accent transition-colors"
                   />
                 </Link>
               </li>

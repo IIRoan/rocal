@@ -58,7 +58,7 @@ export function MobileCalendarOverlays({
           className="w-full p-0 sm:max-w-none overflow-hidden safe-area-inset-bottom"
         >
           <VisuallyHidden>
-            <DrawerTitle>Quick Date Navigation</DrawerTitle>
+            <DrawerTitle>Quick date navigation</DrawerTitle>
             <DrawerDescription>
               Select a date from the mini calendar.
             </DrawerDescription>
@@ -83,7 +83,7 @@ export function MobileCalendarOverlays({
           className="h-[100dvh] max-w-[92vw] rounded-none border-r border-border p-0 safe-area-inset-bottom"
         >
           <VisuallyHidden>
-            <SheetTitle>Calendar Sidebar</SheetTitle>
+            <SheetTitle>Calendar sidebar</SheetTitle>
             <SheetDescription>
               Access your calendars, mini calendar, and account settings
             </SheetDescription>

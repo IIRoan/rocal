@@ -6,7 +6,6 @@ import type {
 
 import {
   buildEventEditorEncryptionPreview,
-  canSaveEventEditor,
   formatReminderMinutes,
   getEnabledEmailReminderMinutes,
   getEventDateDisplay,
@@ -117,37 +116,6 @@ describe("event-editor-view-model", () => {
         id: "event-1",
         recurrence: null,
       } as RecurringDeleteCandidate),
-    ).toBe(false);
-  });
-
-  it("only allows save when the form is valid and not already saving", () => {
-    expect(
-      canSaveEventEditor({
-        eventCalendarId: "calendar-1",
-        eventSaving: false,
-        eventTitle: "Planning",
-      }),
-    ).toBe(true);
-    expect(
-      canSaveEventEditor({
-        eventCalendarId: "",
-        eventSaving: false,
-        eventTitle: "Planning",
-      }),
-    ).toBe(false);
-    expect(
-      canSaveEventEditor({
-        eventCalendarId: "calendar-1",
-        eventSaving: true,
-        eventTitle: "Planning",
-      }),
-    ).toBe(false);
-    expect(
-      canSaveEventEditor({
-        eventCalendarId: "calendar-1",
-        eventSaving: false,
-        eventTitle: "   ",
-      }),
     ).toBe(false);
   });
 });

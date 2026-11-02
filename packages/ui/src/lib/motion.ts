@@ -6,8 +6,8 @@ export const MOTION_EASING = {
   reveal: "cubic-bezier(0.215, 0.61, 0.355, 1)",
   /** power2.out */
   soft: "cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-  /** power2.in */
-  exit: "cubic-bezier(0.55, 0.085, 0.68, 0.53)",
+  /** CSS ease-out, so exits slow into their hidden state like entrances do. */
+  exit: "cubic-bezier(0, 0, 0.58, 1)",
   /** back.out(1.55) */
   overshoot: "cubic-bezier(0.34, 1.56, 0.64, 1)",
   /** sine.inOut */
@@ -21,10 +21,24 @@ export interface MotionOffset {
   x?: number;
   y?: number;
   scale?: number;
+  /** Pixels of blur the element sharpens from; only for staged entrances of small chunks. */
+  blur?: number;
 }
 
 function offsetTransform({ x = 0, y = 0, scale = 1 }: MotionOffset) {
   return `translate(${x}px, ${y}px) scale(${scale})`;
+}
+
+/** Movement, scale and blur keyframes; reduced motion drops them and keeps only the opacity fade. */
+function offsetKeyframes(offset: MotionOffset | null): [Keyframe, Keyframe] {
+  if (!offset || prefersReducedMotion()) return [{}, {}];
+  const from: Keyframe = { transform: offsetTransform(offset) };
+  const to: Keyframe = { transform: "none" };
+  if (offset.blur) {
+    from.filter = `blur(${offset.blur}px)`;
+    to.filter = "blur(0px)";
+  }
+  return [from, to];
 }
 
 function canAnimate(element: Element) {
@@ -78,19 +92,16 @@ export function slideFadeIn(
   options: { duration: number; easing?: string; delay?: number },
 ): Animation | null {
   if (!canAnimate(element)) return null;
-  const from: Keyframe = { opacity: 0, visibility: "visible" };
+  const [moveFrom, moveTo] = offsetKeyframes(offset);
   // An inline 0 is a pre-hide, so drop it or the element vanishes again once the fade ends.
   if (Number(element.style.opacity) === 0) element.style.removeProperty("opacity");
+  const from: Keyframe = { opacity: 0, visibility: "visible", ...moveFrom };
   // Ends on the element's own inline opacity (e.g. 0.85 previews) instead of snapping there after the fade.
-  const to: Keyframe = { opacity: element.style.opacity || 1, visibility: "visible" };
-  if (offset) {
-    from.transform = offsetTransform(offset);
-    to.transform = "none";
-  }
+  const to: Keyframe = { opacity: element.style.opacity || 1, visibility: "visible", ...moveTo };
   const delay = prefersReducedMotion() ? 0 : (options.delay ?? 0);
   return playAfterPaint(
     element.animate([from, to], {
-      duration: motionDuration(options.duration),
+      duration: options.duration,
       easing: options.easing ?? MOTION_EASING.reveal,
       delay,
       fill: delay > 0 ? "backwards" : "none",
@@ -193,14 +204,11 @@ export function slideFadeOut(
   options: { duration: number; easing?: string },
 ): Animation | null {
   if (!canAnimate(element)) return null;
-  const from: Keyframe = { opacity: 1, visibility: "visible" };
-  const to: Keyframe = { opacity: 0, visibility: "hidden" };
-  if (offset) {
-    from.transform = "none";
-    to.transform = offsetTransform(offset);
-  }
+  const [moveTo, moveFrom] = offsetKeyframes(offset);
+  const from: Keyframe = { opacity: 1, visibility: "visible", ...moveFrom };
+  const to: Keyframe = { opacity: 0, visibility: "hidden", ...moveTo };
   return element.animate([from, to], {
-    duration: motionDuration(options.duration),
+    duration: options.duration,
     easing: options.easing ?? MOTION_EASING.exit,
     fill: "forwards",
   });

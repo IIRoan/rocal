@@ -59,3 +59,26 @@ export function getMailboxDisplayName(mailbox: {
   }
   return mailbox.name;
 }
+
+const SIDEBAR_ROLE_ORDER = [
+  "inbox",
+  "sent",
+  "drafts",
+  "archive",
+  "junk",
+  "spam",
+  "trash",
+];
+
+/** Sidebar order, which drag and the mailbox settings' move buttons both reorder. */
+export function sortMailboxesForSidebar(mailboxes: JmapMailbox[]): JmapMailbox[] {
+  return Array.from(mailboxes).sort((a, b) => {
+    if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+      return a.sortOrder - b.sortOrder;
+    }
+    const ai = SIDEBAR_ROLE_ORDER.indexOf(normalizeMailboxRole(a.role));
+    const bi = SIDEBAR_ROLE_ORDER.indexOf(normalizeMailboxRole(b.role));
+    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+}

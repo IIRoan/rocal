@@ -158,7 +158,7 @@ export function LogoSpinner({
         <div className="absolute inset-[8px] rounded-[inherit] border border-border/50" />
         <div ref={logoRef} className="relative">
           <Logo
-            className={cn("relative text-primary", LOGO_SPINNER_SIZE_CLASSES[size])}
+            className={cn("relative text-accent", LOGO_SPINNER_SIZE_CLASSES[size])}
             fill="currentColor"
           />
         </div>
@@ -210,10 +210,13 @@ function LoadingBoard({
   }, [prefersReducedMotion]);
 
   return (
-    <div className="relative flex h-full flex-col justify-between overflow-hidden p-8 sm:p-14">
+    <div
+      aria-hidden="true"
+      className="relative flex h-full flex-col justify-between overflow-hidden p-8 sm:p-14"
+    >
       <div className="relative flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Logo className="size-4 text-primary" fill="currentColor" />
+          <Logo className="size-4 text-accent" fill="currentColor" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.5em] text-muted-foreground/40">
             Solace
           </span>
@@ -254,7 +257,7 @@ function LoadingBoard({
       <div className="relative">
         <p
           className={cn(
-            "mb-3 text-[11px] font-medium uppercase tracking-widest text-muted-foreground/40 transition-opacity duration-300",
+            "mb-3 text-[11px] font-medium uppercase tracking-widest text-muted-foreground transition-opacity duration-300",
             isTransitioning && enableCycling && !message
               ? "opacity-20"
               : "opacity-100",
@@ -266,7 +269,7 @@ function LoadingBoard({
           <div
             ref={sweepRef}
             // repo-rules-allow theme-tokens-only: the sweep highlight is inherently a moving gradient between transparent and primary.
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/80 to-transparent"
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-accent/80 to-transparent"
           />
         </div>
       </div>
@@ -338,6 +341,7 @@ export function PageLoadingOverlay({
 
   return (
     <div
+      role="status"
       data-motion-skip="true"
       data-page-loading-overlay="true"
       className={cn(
@@ -364,6 +368,7 @@ export function PageLoadingOverlay({
           onComplete={unmountOverlay}
         />
       ) : null}
+      <span className="sr-only">{message ?? "Loading…"}</span>
       <LoadingBoard
         message={message}
         messageContext={messageContext}
@@ -404,7 +409,7 @@ export function InlineLogoSpinner({
     <div className={cn("flex items-center gap-2", className)}>
       <div ref={logoRef}>
         <Logo
-          className={cn("text-primary", INLINE_LOGO_SPINNER_SIZE_CLASSES[size])}
+          className={cn("text-accent", INLINE_LOGO_SPINNER_SIZE_CLASSES[size])}
           fill="currentColor"
         />
       </div>

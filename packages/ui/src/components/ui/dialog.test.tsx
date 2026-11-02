@@ -17,7 +17,13 @@ jest.mock("lucide-react", () => ({
   XIcon: () => null,
 }));
 
-import { Dialog, DialogContent, DialogTitle } from "./dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./dialog";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -95,6 +101,33 @@ describe("DialogContent spotlight variant", () => {
     expect(content?.className).toContain("-translate-x-1/2");
     expect(content?.className).toContain("-translate-y-1/2");
     expect(content?.className).toContain("dialog-center-animation");
+  });
+
+  it("insets header and footer slots from the content edge by default", () => {
+    act(() => {
+      root.render(
+        <Dialog open>
+          <DialogContent showClose={false} aria-describedby={undefined}>
+            <DialogHeader>
+              <DialogTitle>Delete event?</DialogTitle>
+            </DialogHeader>
+            <DialogFooter>
+              <button type="button">Delete</button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>,
+      );
+    });
+
+    const header = document.querySelector("[data-slot='dialog-header']");
+    const footer = document.querySelector("[data-slot='dialog-footer']");
+
+    expect(header?.className.split(" ")).toEqual(
+      expect.arrayContaining(["px-5", "pt-5", "pb-3"]),
+    );
+    expect(footer?.className.split(" ")).toEqual(
+      expect.arrayContaining(["px-5", "py-4", "border-t"]),
+    );
   });
 
   it("uses the dedicated spotlight animation instead of generic transform classes", () => {

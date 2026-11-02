@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -8,6 +9,10 @@ import {
   resolveLabelDisplayColor,
 } from "@workspace/calendar-core";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
+
+// The inputs are visually hidden, so the swatch draws their keyboard focus ring.
+const SWATCH_FOCUS_CLASS =
+  "has-focus-visible:outline-2 has-focus-visible:outline-offset-4 has-focus-visible:outline-ring";
 
 function swatchRing(color: string) {
   return { boxShadow: `0 0 0 2px var(--background), 0 0 0 3.5px ${color}` };
@@ -22,6 +27,7 @@ export function LabelColorPicker({
   onChange: (color: string) => void;
   disabled?: boolean;
 }) {
+  const groupName = useId();
   const selected = resolveLabelDisplayColor(color).toLowerCase();
   const isPreset = MAIL_LABEL_PRESET_COLORS.some(
     (entry) => entry.hex.toLowerCase() === selected,
@@ -33,19 +39,27 @@ export function LabelColorPicker({
         const isSelected = entry.hex.toLowerCase() === selected;
         return (
           <SimpleTooltip content={entry.label} key={entry.value}>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={isSelected}
-              aria-label={entry.label}
-              disabled={disabled}
-              onClick={() => onChange(entry.hex)}
-              className="size-5 cursor-pointer rounded-full transition-shadow disabled:opacity-50"
+            <label
+              className={cn(
+                "relative size-5 cursor-pointer rounded-full transition-shadow has-disabled:cursor-default has-disabled:opacity-50",
+                SWATCH_FOCUS_CLASS,
+              )}
               style={{
                 backgroundColor: entry.hex,
                 ...(isSelected ? swatchRing(entry.hex) : {}),
               }}
-            />
+            >
+              <input
+                type="radio"
+                name={groupName}
+                value={entry.hex}
+                checked={isSelected}
+                aria-label={entry.label}
+                disabled={disabled}
+                onChange={() => onChange(entry.hex)}
+                className="sr-only"
+              />
+            </label>
           </SimpleTooltip>
         );
       })}
@@ -53,6 +67,7 @@ export function LabelColorPicker({
         <label
           className={cn(
             "relative flex size-5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-shadow",
+            SWATCH_FOCUS_CLASS,
             isPreset ? "border border-dashed border-muted-foreground/50" : "",
           )}
           style={isPreset ? undefined : { backgroundColor: selected, ...swatchRing(selected) }}

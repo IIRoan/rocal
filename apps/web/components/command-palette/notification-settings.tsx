@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Mail, Bell, Send, Smartphone } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import type { UserSettings } from "@/lib/types/calendar";
 import {
   APP_NOTIFICATION_SETTING,
@@ -63,7 +63,10 @@ export function NotificationSettings({
       })
       .catch((error: unknown) => {
         toast.error(
-          getErrorMessage(error, "Failed to send test notification."),
+          getErrorMessage(
+            error,
+            "Test notification not sent. Check your connection and try again.",
+          ),
         );
       })
       .finally(() => {

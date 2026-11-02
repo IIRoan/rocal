@@ -8,7 +8,7 @@ import {
   EventIcsExportError,
 } from "@workspace/calendar-core/event-ics-export";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 
 import { calendarApiService } from "@/lib/calendar-api-service";
 
@@ -97,7 +97,7 @@ export async function respondToEventInvitation(input: {
     const message =
       error && typeof error === "object" && "message" in error
         ? String(error.message)
-        : "Failed to update invitation response.";
+        : "Response not sent. Check your connection and try again.";
     toast.error(message);
   } finally {
     input.setPending(null);

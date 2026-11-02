@@ -1,5 +1,5 @@
 import type {
-  ButtonHTMLAttributes,
+  ComponentProps,
   ComponentType,
   CSSProperties,
   ReactNode,
@@ -37,7 +37,7 @@ export function PaletteViewHeader({
         type="button"
         onClick={onBack}
         aria-label="Back"
-        className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/25 md:size-8"
+        className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring md:size-8"
       >
         <ChevronLeft className="size-4" strokeWidth={2} />
       </button>
@@ -88,13 +88,17 @@ export function PaletteView({
 
 export function PaletteSection({
   label,
+  role,
   children,
 }: {
   label?: ReactNode;
+  /** "group" when the section sits inside a listbox. */
+  role?: "group";
   children: ReactNode;
 }) {
   return (
     <section
+      role={role}
       aria-label={typeof label === "string" ? label : undefined}
       className="flex flex-col gap-px pb-2 last:pb-0"
     >
@@ -144,6 +148,7 @@ export function PaletteNavRow({
   index,
   isSelected = false,
   checked,
+  optionId,
 }: {
   icon?: ComponentType<{ className?: string; style?: CSSProperties }>;
   iconColor?: string;
@@ -158,6 +163,8 @@ export function PaletteNavRow({
   isSelected?: boolean;
   /** Set on option rows, so assistive tech hears which option is on and not only sees the check. */
   checked?: boolean;
+  /** Set when the row is a listbox option driven by a combobox's aria-activedescendant. */
+  optionId?: string;
 }) {
   return (
     <button
@@ -165,7 +172,11 @@ export function PaletteNavRow({
       onClick={onClick}
       disabled={disabled}
       data-index={index}
-      aria-current={isSelected ? "true" : undefined}
+      id={optionId}
+      role={optionId ? "option" : undefined}
+      aria-selected={optionId ? isSelected : undefined}
+      tabIndex={optionId ? -1 : undefined}
+      aria-current={!optionId && isSelected ? "true" : undefined}
       aria-pressed={checked}
       className={cn(PALETTE_ROW_CLASS, "group", isSelected && "bg-muted")}
     >
@@ -301,7 +312,7 @@ export function PaletteSelect<T extends string>({
             <SelectItem
               key={option.value}
               value={option.value}
-              className="min-h-11 rounded-lg text-[15px] focus:bg-[var(--bg-cell-hover)] hover:bg-[var(--bg-cell-hover)] md:min-h-8 [&_svg]:text-primary [&>span:last-child]:truncate"
+              className="min-h-11 rounded-lg text-[15px] focus:bg-[var(--bg-cell-hover)] hover:bg-[var(--bg-cell-hover)] md:min-h-8 [&_svg]:text-accent [&>span:last-child]:truncate"
             >
               {option.label}
             </SelectItem>
@@ -313,7 +324,7 @@ export function PaletteSelect<T extends string>({
 }
 
 const BUTTON_VARIANT = {
-  primary: "bg-primary text-primary-foreground hover:opacity-90",
+  primary: "bg-accent text-accent-foreground hover:opacity-90",
   secondary: "bg-muted text-foreground hover:bg-muted/70",
   ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
   destructive: "bg-destructive/10 text-destructive hover:bg-destructive/15",
@@ -326,7 +337,7 @@ export function PaletteButton({
   children,
   disabled,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
+}: ComponentProps<"button"> & {
   variant?: keyof typeof BUTTON_VARIANT;
   loading?: boolean;
 }) {
@@ -335,7 +346,7 @@ export function PaletteButton({
       type="button"
       disabled={disabled || loading}
       className={cn(
-        "inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium outline-none transition-[background-color,opacity,color] focus-visible:ring-2 focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-40 md:min-h-8 md:min-w-8",
+        "inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium outline-none transition-[background-color,opacity,color] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 md:min-h-8 md:min-w-8",
         BUTTON_VARIANT[variant],
         className,
       )}

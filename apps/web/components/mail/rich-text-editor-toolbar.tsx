@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useReducer, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useReducer,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import type { Editor } from "@tiptap/react";
 import { DROPDOWN_PANEL_ROW_CLASS, DropdownPanel } from "@workspace/ui/solace";
 import { cn } from "@workspace/ui/lib/utils";
@@ -27,9 +33,44 @@ import {
   Rows3,
   Columns3,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { TableSizePicker } from "./rich-text-editor-table-picker";
 import { SimpleTooltip, Tooltip, TooltipTrigger, TooltipContent } from "@workspace/ui/components/ui/tooltip";
+
+const TOOLBAR_KEYS = ["ArrowLeft", "ArrowRight", "Home", "End"];
+
+/** APG toolbar: one Tab stop, arrow keys move between the enabled buttons. */
+function moveToolbarFocus(event: KeyboardEvent<HTMLDivElement>) {
+  if (!TOOLBAR_KEYS.includes(event.key)) return;
+  const buttons = Array.from(
+    event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+  );
+  const current = buttons.findIndex((button) => button === document.activeElement);
+  if (current < 0) return;
+  event.preventDefault();
+  const step = event.key === "ArrowRight" ? 1 : -1;
+  const next =
+    event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? buttons.length - 1
+        : (current + step + buttons.length) % buttons.length;
+  buttons[next]?.focus();
+}
+
+function resizeSelectedImage(editor: Editor, factor: number) {
+  const node = editor.view.nodeDOM(editor.state.selection.from);
+  const width =
+    node instanceof HTMLElement ? node.querySelector("img")?.offsetWidth : 0;
+  if (!width) return;
+  editor
+    .chain()
+    .focus()
+    .updateAttributes("image", { width: Math.max(50, Math.round(width * factor)) })
+    .run();
+}
 
 function ToolbarButton({
   active,
@@ -37,18 +78,22 @@ function ToolbarButton({
   children,
   title,
   disabled,
+  tabStop = false,
 }: {
   active?: boolean;
   onClick: () => void;
   children: ReactNode;
   title: string;
   disabled?: boolean;
+  tabStop?: boolean;
 }) {
   return (
     <SimpleTooltip content={title}>
       <button
         type="button"
         aria-label={title}
+        aria-pressed={active}
+        tabIndex={tabStop ? 0 : -1}
         disabled={disabled}
         onClick={onClick}
         className={cn(
@@ -85,12 +130,12 @@ function TableMenu({
         onOpenChange={onOpenChange}
         align="start"
         className="z-[100] p-1"
-        onOpenAutoFocus={(event) => event.preventDefault()}
         trigger={
           <TooltipTrigger asChild>
             <button
               type="button"
               aria-label="Table"
+              tabIndex={-1}
               disabled={disabled}
               className={cn(
                 "inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-secondary)] disabled:opacity-40",
@@ -253,9 +298,16 @@ export function RichTextEditorToolbar({
 
   return (
     <div className="flex h-11 w-full shrink-0 items-center border-t border-[var(--border-tertiary)] bg-[var(--bg-overlay-tertiary)] pl-4 pr-2">
-      <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+      <div
+        role="toolbar"
+        aria-label="Formatting"
+        tabIndex={-1}
+        onKeyDown={moveToolbarFocus}
+        className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
+      >
       <ToolbarButton
         title="Bold"
+        tabStop
         disabled={disabled}
         active={editor.isActive("bold")}
         onClick={() => editor.chain().focus().toggleBold().run()}
@@ -385,6 +437,25 @@ export function RichTextEditorToolbar({
         open={tableMenuOpen}
         onOpenChange={setTableMenuOpen}
       />
+
+      {editor.isActive("image") ? (
+        <>
+          <ToolbarButton
+            title="Make image smaller"
+            disabled={disabled}
+            onClick={() => resizeSelectedImage(editor, 0.8)}
+          >
+            <ZoomOut className="size-3.5" strokeWidth={2.25} />
+          </ToolbarButton>
+          <ToolbarButton
+            title="Make image larger"
+            disabled={disabled}
+            onClick={() => resizeSelectedImage(editor, 1.25)}
+          >
+            <ZoomIn className="size-3.5" strokeWidth={2.25} />
+          </ToolbarButton>
+        </>
+      ) : null}
 
       <ToolbarSeparator />
 

@@ -47,7 +47,7 @@ export function WeekViewTimeGrid({
             className="relative min-h-[var(--week-cells-height)]"
           >
             {hourValue > StartHour && (
-              <span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-full items-center justify-end pe-1 text-[11px] tabular-nums">
+              <span className="bg-background text-muted-foreground absolute -top-3 left-0 flex h-6 w-full items-center justify-end pe-1 text-[11px] tabular-nums">
                 {formatWeekHourLabel(hourValue, timeFormat)}
               </span>
             )}

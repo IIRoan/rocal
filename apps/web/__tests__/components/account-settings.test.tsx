@@ -131,6 +131,34 @@ describe("AccountSettings", () => {
       container.querySelectorAll("button"),
     ).find((el) => el.textContent?.includes("Delete my account"));
     expect(confirmDeleteButton).toBeDefined();
+    expect(confirmDeleteButton?.disabled).toBe(false);
+    expect(document.activeElement?.textContent).toBe("Cancel");
+
+    const emailInput = Array.from(container.querySelectorAll("label"))
+      .find((label) => label.textContent === "Type your email to confirm")
+      ?.control as HTMLInputElement | null | undefined;
+    expect(emailInput?.getAttribute("autocomplete")).toBe("off");
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "someone@example.com");
+      confirmDeleteButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(handleDeleteAccount).not.toHaveBeenCalled();
+    expect(emailInput?.getAttribute("aria-invalid")).toBe("true");
+    const errorId = emailInput?.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(document.getElementById(errorId ?? "")?.textContent).toBe(
+      "That doesn’t match. Type roan@example.com to delete your account.",
+    );
+    expect(document.activeElement).toBe(emailInput);
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "  ROAN@Example.com ");
+      await Promise.resolve();
+    });
+    expect(emailInput?.hasAttribute("aria-invalid")).toBe(false);
 
     await act(async () => {
       confirmDeleteButton?.click();

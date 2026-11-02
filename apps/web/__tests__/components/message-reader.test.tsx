@@ -968,19 +968,29 @@ describe("MessageReader — toolbar navigation", () => {
   });
 
   it("disables Previous button when hasPrev is false", () => {
-    render({ navigation: { hasPrev: false }, onNavigatePrev: jest.fn() });
+    const onNavigatePrev = jest.fn();
+    render({ navigation: { hasPrev: false }, onNavigatePrev });
     const btn = container.querySelector(
       "[aria-label='Previous message']",
     ) as HTMLButtonElement;
-    expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    act(() => {
+      btn.click();
+    });
+    expect(onNavigatePrev).not.toHaveBeenCalled();
   });
 
   it("disables Next button when hasNext is false", () => {
-    render({ navigation: { hasNext: false }, onNavigateNext: jest.fn() });
+    const onNavigateNext = jest.fn();
+    render({ navigation: { hasNext: false }, onNavigateNext });
     const btn = container.querySelector(
       "[aria-label='Next message']",
     ) as HTMLButtonElement;
-    expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    act(() => {
+      btn.click();
+    });
+    expect(onNavigateNext).not.toHaveBeenCalled();
   });
 });
 
@@ -1456,7 +1466,10 @@ describe("MessageReader — reply bar", () => {
       await Promise.resolve();
     });
     expect(onSendReply).toHaveBeenCalledWith("Thanks for the update", []);
-    expect(mockToast.error).toHaveBeenCalledWith("Network error");
+    expect(mockToast.error).toHaveBeenCalledWith(
+      "Network error",
+      expect.objectContaining({ duration: Infinity }),
+    );
   });
 
   it("clears the typed reply when switching to another message", () => {
@@ -1670,7 +1683,7 @@ describe("MessageReader — thread", () => {
 
   it("opens the newest message in place and folds the long run before it", () => {
     openNewest();
-    expect(container.textContent).toContain("Re: Project kickoff[6]");
+    expect(container.querySelector("h2")?.textContent).toBe("Re: Project kickoff[6]");
     expect(container.textContent).toContain("Preview of t1");
     expect(container.textContent).toContain("Preview of t5");
     expect(container.textContent).not.toContain("Preview of t3");
@@ -1678,11 +1691,14 @@ describe("MessageReader — thread", () => {
     const fold = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("3 more messages"),
     );
+    expect(fold?.getAttribute("aria-expanded")).toBe("false");
     act(() => {
+      fold?.focus();
       fold?.click();
     });
     expect(container.textContent).toContain("Preview of t3");
     expect(container.textContent).not.toContain("more messages");
+    expect(document.activeElement?.textContent).toContain("Preview of t2");
   });
 
   it("opens a collapsed message from its row", () => {

@@ -13,7 +13,7 @@ import {
 } from "@workspace/calendar-core";
 
 export const metadata: Metadata = {
-  title: "Privacy · Solace",
+  title: "Privacy",
   description:
     "How Solace Calendar and Mail handle encryption, personal data, providers, retention and account deletion.",
 };
@@ -423,7 +423,7 @@ function PrivacyRights({ contact }: { contact: string | null }) {
         {contact ? (
           <a
             href={contact}
-            className="text-primary underline underline-offset-4 cursor-pointer"
+            className="text-accent underline underline-offset-4 cursor-pointer"
           >
             contact Solace privately
           </a>
@@ -449,7 +449,7 @@ function PrivacyRights({ contact }: { contact: string | null }) {
         The{" "}
         <Link
           href={PRODUCT_ROUTES.support}
-          className="text-primary underline underline-offset-4 cursor-pointer"
+          className="text-accent underline underline-offset-4 cursor-pointer"
         >
           support page
         </Link>{" "}

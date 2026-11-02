@@ -29,6 +29,9 @@ const log = createLogger("web:passkey-bridge");
 const subscribeNever = () => () => {};
 const getClientMounted = () => true;
 const getServerMounted = () => false;
+const MISSING_CALLBACK_ERROR =
+  "This passkey request is missing a valid app callback URL. Return to the app and start again.";
+
 const passkeyChallengeCache = new Map<
   string,
   Promise<NativePasskeyBridgeActionResult>
@@ -77,7 +80,7 @@ function emitLog(
 function ButtonSpinner() {
   return (
     <div
-      className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
+      className="size-4 animate-spin rounded-full border-2 border-accent-foreground/30 border-t-accent-foreground"
       aria-hidden="true"
     />
   );
@@ -86,7 +89,7 @@ function ButtonSpinner() {
 function WaitingRow({ label }: { label: string }) {
   return (
     <div
-      className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground"
+      className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent text-sm font-medium text-accent-foreground"
       aria-live="polite"
       aria-busy
     >
@@ -342,7 +345,7 @@ export function NativePasskeyBridgeContent() {
       emitLog("warn", "Continue blocked by invalid callback URL", {
         callbackUrl: summarizeUrl(callbackURL),
       });
-      setError("This passkey request is missing a valid app callback URL.");
+      setError(MISSING_CALLBACK_ERROR);
       return;
     }
 
@@ -393,14 +396,14 @@ export function NativePasskeyBridgeContent() {
     isWorking || (mode === "sign-in" && !isMounted && !notice && !error);
 
   return (
-    <section className="flex min-h-[100dvh]">
+    <main className="flex min-h-[100dvh]">
       <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12">
         <div className="relative z-10 mx-auto w-full max-w-md">
           <div className="mb-10 flex items-center justify-between">
             <Logo
               width={44}
               height={44}
-              className="text-primary"
+              className="text-accent"
               aria-label="Solace"
             />
             <ThemeToggle />
@@ -415,11 +418,13 @@ export function NativePasskeyBridgeContent() {
             </p>
           </div>
 
-          {notice ? (
-            <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
-              <p className="text-sm text-foreground">{notice}</p>
-            </div>
-          ) : null}
+          <div role="status">
+            {notice ? (
+              <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
+                <p className="text-sm text-foreground">{notice}</p>
+              </div>
+            ) : null}
+          </div>
 
           {error ? (
             <div
@@ -435,9 +440,7 @@ export function NativePasskeyBridgeContent() {
               className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-3"
               role="alert"
             >
-              <p className="text-sm text-destructive">
-                This passkey request is missing a valid app callback URL.
-              </p>
+              <p className="text-sm text-destructive">{MISSING_CALLBACK_ERROR}</p>
             </div>
           ) : null}
 
@@ -474,13 +477,13 @@ export function NativePasskeyBridgeContent() {
             <button
               type="button"
               onClick={handleCancel}
-              className="font-medium text-primary transition-colors hover:text-primary/80"
+              className="font-medium text-accent transition-colors hover:text-accent/80"
             >
               Cancel and return to the app
             </button>
           </p>
         </div>
       </div>
-    </section>
+    </main>
   );
 }

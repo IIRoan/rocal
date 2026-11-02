@@ -92,6 +92,26 @@ it("handles rejected loading-task cleanup when a thumbnail unmounts", async () =
   expect(destroy).toHaveBeenCalledTimes(1);
 });
 
+it("names the dialog after the file and says how to recover when a PDF cannot load", async () => {
+  mockGetDocument.mockReturnValue({
+    promise: Promise.reject(new Error("Invalid PDF structure")),
+    destroy: jest.fn(async () => undefined),
+  });
+
+  await act(async () => root.render(
+    <AttachmentPreviewDialog
+      preview={{ kind: "pdf", name: "report.pdf", type: "application/pdf", url: "blob:pdf" }}
+      onOpenChange={jest.fn()}
+    />,
+  ));
+
+  const dialog = document.querySelector('[role="dialog"]');
+  const title = document.getElementById(dialog?.getAttribute("aria-labelledby") ?? "");
+  expect(title?.textContent).toBe("report.pdf");
+  expect(document.body.textContent).not.toContain("Invalid PDF structure");
+  expect(document.body.textContent).toContain("download the file");
+});
+
 it("closes the attachment on Escape without triggering the reader shortcut", async () => {
   const readerShortcut = jest.fn();
   const onOpenChange = jest.fn();

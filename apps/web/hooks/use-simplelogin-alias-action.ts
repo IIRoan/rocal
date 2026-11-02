@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import {
   getErrorMessage,
   getSimpleLoginForward,

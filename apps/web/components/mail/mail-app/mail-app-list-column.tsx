@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
 import { playAfterPaint } from "@workspace/ui/lib/motion";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import {
@@ -107,6 +107,16 @@ export function MailAppListColumn({
     "all",
     activeLabelId,
   ).filter((message) => !message.keywords?.["$seen"]).length;
+  const listNarrowed =
+    searchActive || listViewFilter !== "all" || Boolean(activeLabelId);
+  const shownCount = filteredListMessages.length;
+  const listStatus = showSearchLoadingState
+    ? "Searching…"
+    : !listNarrowed
+      ? ""
+      : shownCount === 1
+        ? "1 message"
+        : `${shownCount} messages`;
 
   return (
     <div
@@ -159,7 +169,7 @@ export function MailAppListColumn({
               disabled: isRefreshing || isBusy,
               onClick: () =>
                 void handleManualRefresh().catch((error) =>
-                  toast.error(getErrorMessage(error, "Could not refresh mail.")),
+                  toast.error(getErrorMessage(error, "Could not refresh mail. Check your connection and try again.")),
                 ),
             }}
             emptyFolder={
@@ -172,6 +182,9 @@ export function MailAppListColumn({
             }
           />
         )}
+        <p role="status" className="sr-only">
+          {listStatus}
+        </p>
         <div className="flex min-h-0 flex-1 flex-col">
           {showSearchLoadingState ? (
             <div className="flex flex-1 items-center justify-center p-8">

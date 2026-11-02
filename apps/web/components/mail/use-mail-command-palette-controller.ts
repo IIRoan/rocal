@@ -43,6 +43,7 @@ export type UseMailCommandPaletteControllerOptions = {
   onCreateMailbox?: (name: string) => Promise<void>;
   onDeleteMailbox?: (id: string) => Promise<void>;
   onRenameMailbox?: (id: string, name: string) => Promise<void>;
+  onReorderMailboxes?: (reordered: JmapMailbox[]) => void;
   labels: LabelDef[];
   onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
   onUpdateLabel?: (
@@ -62,6 +63,7 @@ export function useMailCommandPaletteController({
   onCreateMailbox,
   onDeleteMailbox,
   onRenameMailbox,
+  onReorderMailboxes,
   labels,
   onCreateLabel,
   onUpdateLabel,
@@ -270,6 +272,7 @@ export function useMailCommandPaletteController({
     onCreateMailbox,
     onDeleteMailbox,
     onRenameMailbox,
+    onReorderMailboxes,
     onCreateLabel,
     onUpdateLabel,
     onDeleteLabel,

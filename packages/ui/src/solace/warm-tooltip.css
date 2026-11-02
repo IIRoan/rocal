@@ -85,8 +85,11 @@
   left: 0;
   z-index: 9999;
   display: block;
-  pointer-events: none;
   font-family: inherit;
+}
+
+.warm-tooltip[data-state='closing'] {
+  pointer-events: none;
 }
 
 .warm-tooltip__box {

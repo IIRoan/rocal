@@ -40,7 +40,7 @@ export function MailIdentityBadge({
         <SimpleTooltip content={`Sub-address tag: ${displayTag}`}>
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary",
+              "inline-flex items-center gap-1 rounded bg-accent/10 px-1.5 py-0.5 text-xs text-accent",
               className,
             )}
           >
@@ -78,7 +78,7 @@ export function MailIdentityBadge({
       {displayTag ? (
         <SimpleTooltip content={`Sub-address tag: ${displayTag}`}>
           <span
-            className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+            className="inline-flex items-center gap-1 rounded-md border border-accent/20 bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent"
           >
             <Tag className="size-3" strokeWidth={2.25} />
             <span className="font-mono">

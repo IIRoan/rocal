@@ -10,14 +10,13 @@ import {
   type TimeFormat,
 } from "@workspace/calendar-core";
 import { addDays } from "date-fns";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
+import { toast } from "../../lib/toast";
 
 import { useCalendarContext } from "./calendar-context";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { EventCalendarContextMenu } from "./event-calendar-context-menu";
 import {
-  persistDeletedCalendarEvent,
   persistDraggedCalendarEvent,
   type MoveRecurringCalendarEvent,
 } from "./event-calendar-mutations";
@@ -30,6 +29,7 @@ import {
   EventHeight,
   WeekCellsHeight,
 } from "./constants";
+import { useCalendarViewShortcuts } from "./use-calendar-view-shortcuts";
 import { useEventCalendarContextMenu } from "./use-event-calendar-context-menu";
 import { addMinutesToDate } from "./utils";
 import type { CalendarEvent, CalendarView } from "./types";
@@ -37,7 +37,6 @@ import type { EventNotification } from "./notification-manager";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ErrorBoundary } from "../ui/error-boundary";
-import { useDropdownShortcuts } from "../../hooks/use-keyboard-shortcuts";
 import { usePrefersReducedMotion } from "../../hooks/use-prefers-reduced-motion";
 import { slideFadeIn } from "../../lib/motion";
 
@@ -61,7 +60,8 @@ export interface EventCalendarProps {
   onCreateEvent?: (event: unknown) => Promise<unknown>;
   onUpdateEvent?: (id: string, event: unknown) => Promise<unknown>;
   onMoveRecurringEvent?: MoveRecurringCalendarEvent;
-  onDeleteEvent?: (id: string) => Promise<void>;
+  /** Asks the app to confirm and delete an event; the calendar never deletes without that prompt. */
+  onEventDeleteRequest?: (event: CalendarEvent) => void;
   onCreateCategory?: (category: unknown) => Promise<unknown>;
   onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
   showWeekNumbers?: boolean;
@@ -102,7 +102,7 @@ export function EventCalendar({
   error = null,
   onUpdateEvent,
   onMoveRecurringEvent,
-  onDeleteEvent,
+  onEventDeleteRequest,
   showWeekNumbers = false,
   compactView = false,
   timeFormat,
@@ -125,15 +125,8 @@ export function EventCalendar({
   const viewStageRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = usePrefersReducedMotion();
   const updateEvent = onUpdateEvent || (async () => {});
-  const deleteEvent = onDeleteEvent || (async () => undefined);
 
-  useDropdownShortcuts([
-    { key: "m", action: () => setCurrentView("month") },
-    { key: "w", action: () => setCurrentView("week") },
-    { key: "t", action: () => setCurrentView("3day") },
-    { key: "d", action: () => setCurrentView("day") },
-    { key: "a", action: () => setCurrentView("agenda") },
-  ]);
+  useCalendarViewShortcuts(setCurrentView);
 
   const {
     handleContextMenuCapture,
@@ -239,13 +232,10 @@ export function EventCalendar({
     onEventEdit?.(newEvent);
   };
 
-  const handleEventDelete = (eventId: string) =>
-    persistDeletedCalendarEvent({
-      deleteEvent,
-      eventId,
-      events,
-      timezone: resolvedTimezone,
-    });
+  const handleEventDelete = (eventId: string) => {
+    const event = events.find((item) => item.id === eventId);
+    if (event) onEventDeleteRequest?.(event);
+  };
 
   const handleEventUpdate = (updatedEvent: CalendarEvent) =>
     persistDraggedCalendarEvent({
@@ -272,7 +262,7 @@ export function EventCalendar({
           <p className="text-destructive mb-2">Failed to load calendar</p>
           <p className="text-sm text-muted-foreground">{error.message}</p>
           <Button variant="outline" className="mt-4" onClick={reloadWindow}>
-            <Loader2 className="size-4 mr-2" />
+            <RefreshCw className="size-4 mr-2" aria-hidden="true" />
             Retry
           </Button>
         </div>
@@ -284,7 +274,7 @@ export function EventCalendar({
     <ErrorBoundary
       onError={(caughtError, errorInfo) => {
         log.error("Calendar error:", caughtError, errorInfo);
-        toast.error("Calendar encountered an error. Please refresh the page.");
+        toast.error("Calendar encountered an error. Refresh the page to try again.");
       }}
     >
       <div

@@ -12,7 +12,7 @@ import type { UserSettings } from "@/lib/types/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
 import { WORKING_DAYS } from "./constants";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import {
   PaletteNavRow,
   PaletteSection,
@@ -56,7 +56,9 @@ export function CalendarDefaultsSettings({
       await refetchCalendars();
       toast.success(`Set "${calendar.name}" as default`);
     } catch (error) {
-      toast.error("Failed to update default calendar");
+      toast.error(
+        "Default calendar not changed. Check your connection and try again.",
+      );
     }
   };
 
@@ -79,7 +81,10 @@ export function CalendarDefaultsSettings({
             value={defaultCalendar?.id}
             onValueChange={handleDefaultCalendarChange}
           >
-            <SelectTrigger className={`w-[140px] ${PALETTE_COMPACT_SELECT_CLASS}`}>
+            <SelectTrigger
+              aria-label="Default calendar"
+              className={`w-[140px] ${PALETTE_COMPACT_SELECT_CLASS}`}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -99,7 +104,10 @@ export function CalendarDefaultsSettings({
               updateSetting("defaultView", value as CalendarView)
             }
           >
-            <SelectTrigger className={`w-[120px] ${PALETTE_COMPACT_SELECT_CLASS}`}>
+            <SelectTrigger
+              aria-label="Default view"
+              className={`w-[120px] ${PALETTE_COMPACT_SELECT_CLASS}`}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -119,7 +127,10 @@ export function CalendarDefaultsSettings({
               updateSetting("weekStartDay", Number(value))
             }
           >
-            <SelectTrigger className={`w-[120px] ${PALETTE_COMPACT_SELECT_CLASS}`}>
+            <SelectTrigger
+              aria-label="First day of week"
+              className={`w-[120px] ${PALETTE_COMPACT_SELECT_CLASS}`}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

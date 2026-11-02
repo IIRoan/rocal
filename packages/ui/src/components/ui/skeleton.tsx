@@ -14,8 +14,8 @@ function Skeleton({
   const animationClass = animate
     ? {
         default: "[animation:pulse_1.8s_ease-in-out_infinite]",
-        shimmer: "[animation:shimmer_1.5s_ease-in-out_infinite]",
-        wave: "[animation:wave_2.4s_ease-in-out_infinite]",
+        shimmer: "motion-safe:[animation:shimmer_1.5s_ease-in-out_infinite]",
+        wave: "motion-safe:[animation:wave_2.4s_ease-in-out_infinite]",
       }[variant]
     : "";
 
@@ -23,11 +23,11 @@ function Skeleton({
     <div
       data-slot="skeleton"
       className={cn(
-        "bg-accent rounded-md",
+        "bg-hover rounded-md",
         variant === "shimmer" &&
           // repo-rules-allow theme-tokens-only: shimmer sweep is inherently a moving accent gradient, not a flat surface.
-          "bg-gradient-to-r from-accent/40 via-accent/80 to-accent/40 bg-[length:200%_100%]",
-        variant === "wave" && "relative overflow-hidden bg-accent",
+          "bg-gradient-to-r from-hover/40 via-hover/80 to-hover/40 bg-[length:200%_100%]",
+        variant === "wave" && "relative overflow-hidden bg-hover",
         animationClass,
         className,
       )}
@@ -35,7 +35,7 @@ function Skeleton({
     >
       {variant === "wave" && (
         // repo-rules-allow theme-tokens-only: wave highlight streak must read lighter than the surface in both themes, which no token provides.
-        <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent [animation:wave_2.4s_ease-in-out_infinite]" />
+        <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent motion-safe:[animation:wave_2.4s_ease-in-out_infinite]" />
       )}
     </div>
   );

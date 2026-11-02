@@ -60,7 +60,8 @@ export function DraggableEvent({
   const isMultiDayEvent =
     multiDay || event.allDay || differenceInDays(eventEnd, eventStart) >= 1;
 
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
+  // dnd-kit's attributes are left off: without a KeyboardSensor its "press space to pick up" description is false; the editor moves events by keyboard.
+  const { listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: `${event.id}-${view}`,
       data: {
@@ -143,7 +144,6 @@ export function DraggableEvent({
         onMouseDown={isPreview ? undefined : handleMouseDown}
         onTouchStart={isPreview ? undefined : handleTouchStart}
         dndListeners={isPreview ? undefined : listeners}
-        dndAttributes={isPreview ? undefined : attributes}
         aria-hidden={ariaHidden}
         timeFormat={timeFormat}
         timezone={timezone}

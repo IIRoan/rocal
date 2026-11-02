@@ -46,7 +46,7 @@ function SyncedEventInfoBadge() {
         <button
           type="button"
           aria-label="Synced from external calendar"
-          className="tap-target inline-flex items-center justify-center size-5 rounded-md text-foreground/60 hover:text-foreground hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="tap-target inline-flex items-center justify-center size-5 rounded-md text-foreground/60 hover:text-foreground hover:bg-hover/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onClick={stopEventPropagation}
         >
           <RefreshCw className="size-3" strokeWidth={2.25} aria-hidden />
@@ -206,7 +206,7 @@ export function EventEditorReadView({
               className="size-2.5 shrink-0 rounded-full"
               style={{ backgroundColor: swatch }}
             />
-            <span className="truncate">
+            <span className="min-w-0 break-words">
               {selectedCalendar?.name || "Unknown calendar"}
             </span>
           </div>
@@ -220,7 +220,7 @@ export function EventEditorReadView({
                 className="size-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: getColorSwatchValue(category.color) }}
               />
-              <span className="truncate">{category.name}</span>
+              <span className="min-w-0 break-words">{category.name}</span>
             </div>
           </EventEditorRow>
         ) : null}
@@ -245,10 +245,10 @@ export function EventEditorReadView({
                     title={participant.displayName || participant.email}
                   />
                   <div className="min-w-0 flex-1 leading-tight">
-                    <div className="truncate text-sm text-foreground">
+                    <div className="break-words text-sm text-foreground">
                       {participant.displayName || participant.email}
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">
+                    <div className="break-words text-xs text-muted-foreground">
                       {participant.role === "organizer"
                         ? "Organizer"
                         : formatParticipantStatus(participant.status)}

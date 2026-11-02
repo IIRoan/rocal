@@ -200,8 +200,8 @@ export function MobileTopNav({
             type="button"
             variant="ghost"
             onClick={onOpenQuickNav}
-            className="h-auto min-w-0 flex-1 flex-col items-stretch gap-0 rounded-2xl px-3 py-1 text-left hover:bg-accent/50 active:bg-accent/70"
-            aria-label="Open calendar quick navigation"
+            className="h-auto min-w-0 flex-1 flex-col items-stretch gap-0 rounded-2xl px-3 py-1 text-left hover:bg-hover/50 active:bg-hover/70"
+            aria-label={`${displayText.main}, open quick navigation`}
           >
             <div className="truncate text-sm font-medium">{displayText.main}</div>
             {displayText.sub && (
@@ -228,7 +228,7 @@ export function MobileTopNav({
                 type="button"
                 variant="ghost"
                 className="h-9 shrink-0 rounded-2xl px-3 text-xs font-medium text-muted-foreground"
-                aria-label="Open calendar actions"
+                aria-label={`${currentViewLabel}, open calendar actions`}
               >
                 <span className="max-w-16 truncate">{currentViewLabel}</span>
                 <MoreHorizontal size={16} />
@@ -260,7 +260,7 @@ export function MobileTopNav({
                   >
                     <Icon size={16} className="text-muted-foreground" />
                     <span className="flex-1">{label}</span>
-                    {isActive && <Check size={15} className="text-primary" />}
+                    {isActive && <Check size={15} className="text-accent" />}
                   </DropdownMenuItem>
                 );
               })}

@@ -196,9 +196,6 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     return persistDraft().catch((error: unknown) => {
       log.error("Failed to auto-save draft", error);
       bridge.setDraftSaveStatus("error");
-      window.setTimeout(() => {
-        bridge.setDraftSaveStatus("idle");
-      }, 3000);
       return null;
     });
   };

@@ -19,14 +19,14 @@ export function PublicInformationPage({
   children: ReactNode;
 }) {
   return (
-    <section className="min-h-dvh flex">
+    <main className="min-h-dvh flex">
       <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-10 flex items-center justify-between">
             <Logo
               width={44}
               height={44}
-              className="text-primary"
+              className="text-accent"
               aria-label="Solace"
             />
             <ThemeToggle />
@@ -60,7 +60,7 @@ export function PublicInformationPage({
               aria-current={
                 currentPath === PRODUCT_ROUTES.support ? "page" : undefined
               }
-              className="text-primary underline-offset-4 hover:underline cursor-pointer"
+              className="text-accent underline-offset-4 hover:underline cursor-pointer"
             >
               Support
             </Link>
@@ -69,7 +69,7 @@ export function PublicInformationPage({
               aria-current={
                 currentPath === PRODUCT_ROUTES.privacy ? "page" : undefined
               }
-              className="text-primary underline-offset-4 hover:underline cursor-pointer"
+              className="text-accent underline-offset-4 hover:underline cursor-pointer"
             >
               Privacy
             </Link>
@@ -78,7 +78,7 @@ export function PublicInformationPage({
               aria-current={
                 currentPath === PRODUCT_ROUTES.licenses ? "page" : undefined
               }
-              className="text-primary underline-offset-4 hover:underline cursor-pointer"
+              className="text-accent underline-offset-4 hover:underline cursor-pointer"
             >
               Licenses
             </Link>
@@ -88,6 +88,6 @@ export function PublicInformationPage({
       <div className="hidden lg:block lg:w-1/2">
         <PublicPageWallpaper />
       </div>
-    </section>
+    </main>
   );
 }

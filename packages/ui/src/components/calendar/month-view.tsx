@@ -146,14 +146,14 @@ export function MonthView({
         className={`border-border/70 grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} border-y uppercase`}
       >
         {showWeekNumbers && (
-          <div className="text-muted-foreground/70 py-2 text-center text-xs font-medium">
+          <div className="text-muted-foreground py-2 text-center text-xs font-medium">
             W
           </div>
         )}
         {weekdays.map((day) => (
           <div
             key={day}
-            className="text-muted-foreground/70 py-2 text-center text-xs"
+            className="text-muted-foreground py-2 text-center text-xs"
           >
             {day}
           </div>
@@ -170,7 +170,7 @@ export function MonthView({
             >
               {showWeekNumbers && (
                 <div className="border-border/70 border-r border-b bg-muted/10 flex items-center justify-center">
-                  <span className="text-muted-foreground/60 text-xs font-medium">
+                  <span className="text-muted-foreground text-xs font-medium tabular-nums">
                     {getWeek(weekStart)}
                   </span>
                 </div>

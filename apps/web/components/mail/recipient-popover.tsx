@@ -12,7 +12,7 @@ import {
   Icons,
 } from "@workspace/ui/solace";
 import { cn } from "@workspace/ui/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { getMailComposeBridge } from "./mail-compose-bridge";
 import { SenderAvatar } from "./mail-avatar";
 
@@ -41,14 +41,14 @@ export function RecipientPopover({
       toast.success("Copied");
       setOpen(false);
     } catch {
-      toast.error("Failed to copy");
+      toast.error("Couldn't copy the address. Select it above and copy it.");
     }
   };
 
   const handleCompose = () => {
     const bridge = getMailComposeBridge();
     if (!bridge) {
-      toast.error("Compose is not available");
+      toast.error("Couldn't start a new message. Reload Mail and try again.");
       return;
     }
     bridge.seedNewMessage({ email, name });
@@ -71,7 +71,7 @@ export function RecipientPopover({
         >
           {showAddressSuffix ? (
             <>
-              <span className="text-foreground hover:text-primary hover:underline">
+              <span className="text-foreground hover:text-accent hover:underline">
                 {displayName}
               </span>
               <span className="text-muted-foreground">
@@ -80,7 +80,7 @@ export function RecipientPopover({
               </span>
             </>
           ) : (
-            <span className="text-foreground hover:text-primary hover:underline">
+            <span className="text-foreground hover:text-accent hover:underline">
               {displayName}
             </span>
           )}
@@ -90,11 +90,11 @@ export function RecipientPopover({
       <div className="flex items-center gap-3 p-3">
         <SenderAvatar email={email} name={name ?? undefined} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-medium text-[var(--text-primary)]">
+          <div className="break-words text-[15px] font-medium text-[var(--text-primary)]">
             {displayName}
           </div>
           {displayName !== email ? (
-            <div className="truncate text-[13px] text-[var(--text-secondary)]">
+            <div className="break-words text-[13px] text-[var(--text-secondary)]">
               {email}
             </div>
           ) : null}
@@ -135,7 +135,8 @@ export function RecipientPopoverList({
   className?: string;
   maxVisible?: number;
 }) {
-  const visible = recipients.slice(0, maxVisible);
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? recipients : recipients.slice(0, maxVisible);
   const remaining = recipients.length - visible.length;
   const account = { email: currentUserEmail, name: currentUserName };
 
@@ -159,7 +160,14 @@ export function RecipientPopoverList({
         );
       })}
       {remaining > 0 ? (
-        <span className="ml-1 text-muted-foreground">+{remaining}</span>
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="ml-1 cursor-pointer text-muted-foreground hover:text-foreground"
+        >
+          +{remaining}
+          <span className="sr-only"> more recipients</span>
+        </button>
       ) : null}
     </span>
   );

@@ -10,8 +10,10 @@ import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { useRecurringMovePrompt } from "@/hooks/use-recurring-move-prompt";
+import { useEventDeletePrompt } from "@/hooks/use-event-delete-prompt";
 import { useCommandPalette } from "./command-palette-context";
 import { RecurringScopeModal } from "./command-palette/recurring-scope-modal";
+import { EventDeleteConfirmDialog } from "./event-editor/event-delete-confirm-dialog";
 import { useCalendarWorkspaceReady } from "@/components/calendar-workspace-ready";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
@@ -32,6 +34,11 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { moveRecurringEvent, scopePrompt } = useRecurringMovePrompt(
     calendarData.editRecurringEvent,
   );
+  const {
+    requestDelete,
+    confirmPrompt: deleteConfirmPrompt,
+    scopePrompt: deleteScopePrompt,
+  } = useEventDeletePrompt(calendarData);
   const {
     defaultCalendarId,
     handleSetPreview,
@@ -71,7 +78,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         onCreateEvent={calendarData.createEvent}
         onUpdateEvent={calendarData.updateEvent}
         onMoveRecurringEvent={moveRecurringEvent}
-        onDeleteEvent={calendarData.deleteEvent}
+        onEventDeleteRequest={requestDelete}
         onCreateCategory={calendarData.createCategory}
         onDateRangeChange={calendarData.setDateRange}
         showWeekNumbers={settings?.showWeekNumbers}
@@ -89,6 +96,8 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         onPrefetchRange={calendarData.prefetchRange}
       />
       <RecurringScopeModal action="edit" {...scopePrompt} />
+      <EventDeleteConfirmDialog {...deleteConfirmPrompt} />
+      <RecurringScopeModal {...deleteScopePrompt} />
       {FORCE_LOADING_DESIGN_PREVIEW ? (
         <PageLoadingOverlay
           isLoading={true}

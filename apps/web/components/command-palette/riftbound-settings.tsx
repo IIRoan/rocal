@@ -246,7 +246,7 @@ function RiftboundForm({
                       ),
                     })
                   }
-                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring/25 md:size-8"
+                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring md:size-8"
                 >
                   <X className="size-4" />
                 </button>

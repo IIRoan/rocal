@@ -109,18 +109,19 @@ export function AccountProfileSection({
               else choosePhoto();
             }}
             disabled={updatingProfile}
-            className="group relative shrink-0 cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:cursor-default"
+            className="group relative shrink-0 cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
             aria-label={
               hasPicture ? "Change profile picture" : "Add profile picture"
             }
             aria-expanded={editing}
           >
             {avatar}
-            <span className="absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors group-hover:bg-accent">
+            {/* Mail's hover and border tokens are translucent, so the badge uses tokens that stay solid over the photo. */}
+            <span className="absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border border-input-border bg-background text-muted-foreground shadow-sm transition-colors group-hover:border-accent group-hover:bg-accent group-hover:text-accent-foreground">
               {hasPicture ? (
-                <Pencil className="size-2.5 text-muted-foreground" />
+                <Pencil className="size-2.5" />
               ) : (
-                <Plus className="size-3 text-muted-foreground" />
+                <Plus className="size-3" />
               )}
             </span>
           </button>
@@ -163,11 +164,7 @@ export function AccountProfileSection({
         />
       ) : null}
 
-      {profile.message && !editing ? (
-        <div className="px-2 py-1">
-          <InlineMessage msg={profile.message} />
-        </div>
-      ) : null}
+      <InlineMessage msg={editing ? null : profile.message} />
 
       <AnimatedCollapse isOpen={editing && !!handleUpdateProfile}>
         <div className="p-2">

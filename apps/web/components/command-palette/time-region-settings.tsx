@@ -111,12 +111,12 @@ export function TimeRegionSettings({
           <Search className="size-4 shrink-0 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search timezones..."
+            placeholder="Search timezones…"
             aria-label="Search timezones"
             value={timezoneSearch}
             onChange={(e) => setTimezoneSearch(e.target.value)}
             onKeyDown={stopEventPropagation}
-            className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-[15px] text-foreground shadow-none outline-none placeholder:text-muted-foreground/60 focus:border-0 focus:shadow-none focus:ring-0"
+            className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-[15px] text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:border-0 focus:shadow-none focus:ring-0"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"

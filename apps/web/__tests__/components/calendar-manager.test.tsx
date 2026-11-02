@@ -29,6 +29,13 @@ jest.mock("../../components/command-palette/index", () => ({
   ToggleIndicator: () => <span />,
 }));
 
+jest.mock("../../components/command-palette/calendar-utils", () => ({
+  resetCalendarForm: jest.fn(),
+  handleCalendarCreate: jest.fn(),
+  handleCalendarUpdate: jest.fn(),
+  handleCalendarDelete: jest.fn(),
+}));
+
 jest.mock("../../lib/calendar-api-service", () => ({
   calendarApiService: {
     getSubscriptions: jest.fn(async () => []),
@@ -96,6 +103,7 @@ jest.mock("lucide-react", () => {
 });
 
 import { useSharedCalendarData } from "../../components/calendar-data-provider";
+import { handleCalendarDelete } from "../../components/command-palette/calendar-utils";
 import { calendarApiService } from "../../lib/calendar-api-service";
 import { CalendarManager } from "../../components/calendar-manager";
 
@@ -174,6 +182,54 @@ describe("CalendarManager", () => {
     expect(
       container.querySelector('[data-testid="badge-cal-1"]'),
     ).not.toBeNull();
+  });
+
+  it("asks before deleting a calendar and all of its events", async () => {
+    const renderView = (currentView: "calendars" | "calendar-edit") =>
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <CalendarManager
+            currentView={currentView}
+            onBack={() => {}}
+            onGoToSubscriptions={() => {}}
+            onNavigateTo={() => {}}
+          />
+        </QueryClientProvider>,
+      );
+    const findButton = (text: string) =>
+      Array.from(container.querySelectorAll("button")).find(
+        (element) => element.textContent?.trim() === text,
+      );
+
+    await act(async () => {
+      renderView("calendars");
+      await Promise.resolve();
+    });
+    act(() => {
+      Array.from(container.querySelectorAll("button"))
+        .find((element) => element.textContent?.includes("Primary"))
+        ?.click();
+    });
+    await act(async () => {
+      renderView("calendar-edit");
+      await Promise.resolve();
+    });
+
+    act(() => findButton("Delete")?.click());
+    expect(handleCalendarDelete).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Delete “Primary”?");
+
+    act(() => findButton("Cancel")?.click());
+    expect(findButton("Delete calendar")).toBeUndefined();
+
+    act(() => findButton("Delete")?.click());
+    act(() => findButton("Delete calendar")?.click());
+    expect(handleCalendarDelete).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "cal-1" }),
+      expect.anything(),
+      expect.any(Function),
+      expect.any(Function),
+    );
   });
 
   it.each(["calendars", "calendar-create"] as const)(

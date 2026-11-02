@@ -217,6 +217,51 @@ describe("RecipientSuggestInput", () => {
     );
   });
 
+  it("exposes the APG combobox: a listbox of options and the highlighted one as the active descendant", () => {
+    renderInput("");
+
+    act(() => {
+      getInput().dispatchEvent(new FocusEvent("focus", { bubbles: true }));
+    });
+    act(() => {
+      getInput().dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
+    });
+
+    const input = getInput();
+    const listbox = document.getElementById(input.getAttribute("aria-controls") ?? "");
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+    expect(listbox?.getAttribute("role")).toBe("listbox");
+    const active = document.getElementById(
+      input.getAttribute("aria-activedescendant") ?? "",
+    );
+    expect(active?.getAttribute("role")).toBe("option");
+    expect(active?.getAttribute("aria-selected")).toBe("true");
+    expect(active?.textContent).toContain("alice@example.com");
+  });
+
+  it("passes the field id and error description through to the input", () => {
+    act(() => {
+      root.render(
+        <RecipientSuggestInput
+          id="participants"
+          aria-invalid
+          aria-describedby="participants-error"
+          value=""
+          onChange={onChange}
+          appearance="field"
+          mode="calendar"
+        />,
+      );
+    });
+
+    const input = getInput();
+    expect(input.id).toBe("participants");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe("participants-error");
+  });
+
   it("appends after existing recipients when a comma-separated list is present", () => {
     renderInput("existing@example.com, al");
 

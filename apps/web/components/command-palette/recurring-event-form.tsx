@@ -63,10 +63,10 @@ function WeekdayPicker({
               aria-label={day.long}
               onClick={() => onToggle(day.index)}
               className={cn(
-                "inline-flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                "inline-flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 active
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-accent/60 text-foreground hover:bg-accent",
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-hover/60 text-foreground hover:bg-hover",
               )}
             >
               {day.short}

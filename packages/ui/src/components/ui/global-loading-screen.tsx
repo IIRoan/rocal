@@ -1,8 +1,9 @@
 "use client";
 
 import { cn } from "@workspace/ui/lib/utils";
+import { Button } from "./button";
 import { Skeleton } from "./skeleton";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { LogoSpinner } from "./logo-spinner";
 import type { COMBINED_MESSAGES } from "../../constants/loading-messages";
 
@@ -137,8 +138,8 @@ export function GlobalLoadingScreen({
           className,
         )}
       >
-        <div className="flex items-center space-x-2">
-          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent [animation:spin_1s_linear_infinite]" />
+        <div className="flex items-center gap-2">
+          <div className="size-6 rounded-full border-2 border-accent border-t-transparent [animation:spin_1s_linear_infinite]" />
           <span className="text-sm font-medium text-muted-foreground">
             {message ?? "Loading"}
             {dots}
@@ -156,7 +157,7 @@ export function GlobalLoadingScreen({
         className,
       )}
     >
-      <div className="flex flex-col items-center space-y-6 max-w-md mx-auto px-4">
+      <div className="flex flex-col items-center gap-6 max-w-md mx-auto px-4">
         <LogoSpinner
           size={variant === "splash" ? "lg" : "md"}
           text={message}
@@ -172,7 +173,7 @@ export function GlobalLoadingScreen({
             </p>
           )}
           {autoRetryEnabled && nextRetryAt && timeLeft !== null && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground tabular-nums">
               {attempt > 0
                 ? `Attempt ${attempt + 1} of ${delays.length}. `
                 : ""}
@@ -184,30 +185,27 @@ export function GlobalLoadingScreen({
         <div className="w-full max-w-sm">
           <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full bg-primary [animation:pulse_1.4s_ease-in-out_infinite]"
-              style={{ width: "75%", animationDuration: "1.4s" }}
+              className="h-full rounded-full bg-accent [animation:pulse_1.4s_ease-in-out_infinite]"
+              style={{ width: "75%" }}
             />
           </div>
         </div>
 
         {autoRetryEnabled && (
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => void doRetry()}
-              className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            >
+            <Button type="button" size="sm" onClick={() => void doRetry()}>
               Try again now
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={() => {
                 if (typeof window !== "undefined") window.location.reload();
               }}
-              className="inline-flex items-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
               Reload app
-            </button>
+            </Button>
           </div>
         )}
 
@@ -243,64 +241,4 @@ export function GlobalLoadingScreen({
   );
 }
 
-interface SectionLoadingProps {
-  title?: string;
-  description?: string;
-  className?: string;
-}
-
-export function SectionLoading({
-  title = "Loading",
-  description = "Please wait...",
-  className,
-}: SectionLoadingProps) {
-  return (
-    <div
-      data-motion-skip="true"
-      className={cn(
-        "flex flex-col items-center justify-center p-8 text-center space-y-4",
-        className,
-      )}
-    >
-      <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary [animation:spin_1s_linear_infinite]" />
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-    </div>
-  );
-}
-
-interface LoadingOverlayProps {
-  isLoading?: boolean;
-  children: React.ReactNode;
-  message?: string;
-  className?: string;
-}
-
-export function LoadingOverlay({
-  isLoading = false,
-  children,
-  message = "Loading...",
-  className,
-}: LoadingOverlayProps) {
-  return (
-    <div data-motion-skip="true" className={cn("relative", className)}>
-      {children}
-      {isLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background rounded-lg">
-          <div className="flex items-center space-x-2">
-            <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent [animation:spin_1s_linear_infinite]" />
-            <span className="text-sm font-medium">{message}</span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export type {
-  GlobalLoadingScreenProps,
-  SectionLoadingProps,
-  LoadingOverlayProps,
-};
+export type { GlobalLoadingScreenProps };

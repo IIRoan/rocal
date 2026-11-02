@@ -24,6 +24,8 @@ const CELL_EVENT_WIDTHS: Record<number, string[]> = {
   33: ["w-3/5"],
 };
 
+const AGENDA_EVENT_COUNTS = { mon: 2, tue: 1, wed: 3, thu: 1, fri: 2, sat: 1, sun: 2 };
+
 export function CalendarSkeleton({
   view = "month",
   className,
@@ -55,9 +57,9 @@ export function CalendarSkeleton({
                   key={d}
                   className="p-2 border-r border-border/60 last:border-r-0 space-y-1 min-h-[5rem]"
                 >
-                  <Skeleton className="h-5 w-5 rounded-full" />
-                  {eventWidths.map((w, ei) => (
-                    <Skeleton key={ei} className={cn("h-4 rounded", w)} />
+                  <Skeleton className="size-5 rounded-full" />
+                  {eventWidths.map((width) => (
+                    <Skeleton key={width} className={cn("h-4 rounded", width)} />
                   ))}
                 </div>
               );
@@ -83,7 +85,7 @@ export function CalendarSkeleton({
               className="p-3 text-center border-r border-border/60 last:border-r-0 space-y-1"
             >
               <Skeleton className="h-3 w-6 mx-auto" />
-              <Skeleton className="h-6 w-6 mx-auto rounded-full" />
+              <Skeleton className="size-6 mx-auto rounded-full" />
             </div>
           ))}
         </div>
@@ -112,11 +114,10 @@ export function CalendarSkeleton({
   }
 
   if (view === "agenda") {
-    const AGENDA_PATTERN = [2, 1, 3, 1, 2, 1, 2] as const;
     return (
       <div className={cn("space-y-5 p-4 animate-fade-in", className)}>
-        {AGENDA_PATTERN.map((count, di) => (
-          <div key={di} className="space-y-2">
+        {Object.entries(AGENDA_EVENT_COUNTS).map(([day, count]) => (
+          <div key={day} className="space-y-2">
             <div className="flex items-center gap-3 pb-1 border-b border-border/50">
               <Skeleton className="h-4 w-20" />
               <Skeleton className="h-px flex-1" />
@@ -128,7 +129,7 @@ export function CalendarSkeleton({
                   className="flex items-center gap-3 py-2 px-3 rounded-md border border-border/40"
                 >
                   <Skeleton className="h-3 w-10 shrink-0" />
-                  <Skeleton className="h-3 w-3 rounded-full shrink-0" />
+                  <Skeleton className="size-3 rounded-full shrink-0" />
                   <Skeleton className="h-4 flex-1" />
                 </div>
               ))}
@@ -140,204 +141,4 @@ export function CalendarSkeleton({
   }
 
   return null;
-}
-
-// Skeleton for event dialog
-export function EventDialogSkeleton() {
-  return (
-    <div className="space-y-6 p-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-border">
-        <Skeleton className="h-6 w-32" variant="shimmer" />
-        <Skeleton className="h-6 w-6 rounded" variant="shimmer" />
-      </div>
-
-      {/* Title field */}
-      <div
-        className="space-y-2 animate-slide-in"
-        style={{ animationDelay: "0.1s" }}
-      >
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-4 w-4" variant="shimmer" />
-          <Skeleton className="h-4 w-12" variant="shimmer" />
-        </div>
-        <Skeleton className="h-10 w-full rounded" variant="wave" />
-      </div>
-
-      {/* Description field */}
-      <div
-        className="space-y-2 animate-slide-in"
-        style={{ animationDelay: "0.2s" }}
-      >
-        <Skeleton className="h-4 w-20" variant="shimmer" />
-        <Skeleton className="h-20 w-full rounded" variant="wave" />
-      </div>
-
-      {/* Calendar selection */}
-      <div
-        className="space-y-2 animate-slide-in"
-        style={{ animationDelay: "0.3s" }}
-      >
-        <Skeleton className="h-4 w-16" variant="shimmer" />
-        <Skeleton className="h-10 w-full rounded" variant="wave" />
-      </div>
-
-      {/* Date and time fields */}
-      <div
-        className="grid grid-cols-2 gap-4 animate-slide-in"
-        style={{ animationDelay: "0.4s" }}
-      >
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-20" variant="shimmer" />
-          <Skeleton className="h-10 w-full rounded" variant="wave" />
-        </div>
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-20" variant="shimmer" />
-          <Skeleton className="h-10 w-full rounded" variant="wave" />
-        </div>
-      </div>
-
-      <div
-        className="grid grid-cols-2 gap-4 animate-slide-in"
-        style={{ animationDelay: "0.5s" }}
-      >
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-16" variant="shimmer" />
-          <Skeleton className="h-10 w-full rounded" variant="wave" />
-        </div>
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-16" variant="shimmer" />
-          <Skeleton className="h-10 w-full rounded" variant="wave" />
-        </div>
-      </div>
-
-      {/* All day toggle */}
-      <div
-        className="flex items-center space-x-2 animate-slide-in"
-        style={{ animationDelay: "0.6s" }}
-      >
-        <Skeleton className="h-4 w-4 rounded" variant="shimmer" />
-        <Skeleton className="h-4 w-24" variant="shimmer" />
-      </div>
-
-      {/* Location field */}
-      <div
-        className="space-y-2 animate-slide-in"
-        style={{ animationDelay: "0.7s" }}
-      >
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-4 w-4" variant="shimmer" />
-          <Skeleton className="h-4 w-16" variant="shimmer" />
-        </div>
-        <Skeleton className="h-10 w-full rounded" variant="wave" />
-      </div>
-
-      {/* Action buttons */}
-      <div
-        className="flex justify-between pt-4 border-t border-border animate-scale-in"
-        style={{ animationDelay: "0.8s" }}
-      >
-        <Skeleton className="h-10 w-16 rounded" variant="shimmer" />
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-16 rounded" variant="shimmer" />
-          <Skeleton className="h-10 w-12 rounded" variant="shimmer" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Skeleton for sidebar calendar
-export function SidebarCalendarSkeleton() {
-  return (
-    <div className="space-y-4 p-4 animate-fade-in">
-      {/* Header with navigation */}
-      <div className="flex items-center justify-between animate-slide-in">
-        <Skeleton className="h-5 w-20" variant="shimmer" />
-        <div className="flex gap-1">
-          <Skeleton className="h-6 w-6 rounded" variant="shimmer" />
-          <Skeleton className="h-6 w-6 rounded" variant="shimmer" />
-        </div>
-      </div>
-
-      {/* Mini calendar skeleton */}
-      <div
-        className="space-y-1 animate-slide-in"
-        style={{ animationDelay: "0.1s" }}
-      >
-        {/* Days of week */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <Skeleton
-              key={i}
-              className="h-3 w-full text-center"
-              variant="shimmer"
-            />
-          ))}
-        </div>
-
-        {/* Calendar dates */}
-        {Array.from({ length: 6 }).map((_, weekIndex) => (
-          <div key={weekIndex} className="grid grid-cols-7 gap-1">
-            {Array.from({ length: 7 }).map((_, dayIndex) => {
-              const isToday = weekIndex === 2 && dayIndex === 3; // Mock today
-              return (
-                <Skeleton
-                  key={dayIndex}
-                  className={`h-6 w-6 ${isToday ? "rounded-full" : "rounded"}`}
-                  variant={isToday ? "shimmer" : "wave"}
-                  style={{
-                    animationDelay: `${(weekIndex * 7 + dayIndex) * 0.02}s`,
-                  }}
-                />
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      {/* My Calendars section */}
-      <div
-        className="space-y-3 animate-slide-in"
-        style={{ animationDelay: "0.2s" }}
-      >
-        <Skeleton className="h-4 w-24" variant="shimmer" />
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-3 p-2 rounded hover:bg-accent/50 transition-colors"
-          >
-            <Skeleton className="h-3 w-3 rounded-full" variant="shimmer" />
-            <Skeleton className="h-4 flex-1" variant="wave" />
-            <Skeleton className="h-4 w-4 rounded" variant="shimmer" />
-          </div>
-        ))}
-      </div>
-
-      {/* Categories section */}
-      <div
-        className="space-y-3 animate-slide-in"
-        style={{ animationDelay: "0.3s" }}
-      >
-        <Skeleton className="h-4 w-20" variant="shimmer" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-3 p-2 rounded hover:bg-accent/50 transition-colors"
-          >
-            <Skeleton
-              className="h-3 w-3 rounded-full"
-              variant="shimmer"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            />
-            <Skeleton
-              className="h-4 flex-1"
-              variant="wave"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }

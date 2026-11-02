@@ -35,8 +35,12 @@ export function NavUser({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label="Account menu"
-          className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md p-1 outline-none transition-colors hover:bg-muted data-[state=open]:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60"
+          aria-label={
+            isCollapsed
+              ? "Account menu"
+              : `${appName}, ${user.name || user.email}, account menu`
+          }
+          className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md p-1 outline-none transition-colors hover:bg-muted data-[state=open]:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         >
           <BlobatarAvatar
             email={user.email}

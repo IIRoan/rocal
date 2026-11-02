@@ -115,6 +115,7 @@ export function EventCalendarViewStage({
             currentDate={currentDate}
             events={events}
             onEventSelect={onEventSelect}
+            onEventCreate={onEventCreate}
             timeFormat={timeFormat}
             timezone={timezone}
             onEventEdit={onEventEdit}

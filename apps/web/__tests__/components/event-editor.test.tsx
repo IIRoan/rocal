@@ -25,7 +25,34 @@ jest.mock("../../components/event-editor/event-editor-body", () => ({
 }));
 
 jest.mock("../../components/event-editor/event-editor-footer", () => ({
-  EventEditorFooter: () => <div data-testid="event-editor-footer" />,
+  EventEditorFooter: ({
+    handleEventDelete,
+  }: {
+    handleEventDelete: () => void;
+  }) => (
+    <div data-testid="event-editor-footer">
+      <button type="button" onClick={handleEventDelete}>
+        Delete
+      </button>
+    </div>
+  ),
+}));
+
+jest.mock("../../components/event-editor/event-delete-confirm-dialog", () => ({
+  EventDeleteConfirmDialog: ({
+    open,
+    onConfirm,
+  }: {
+    open: boolean;
+    onConfirm: () => void;
+  }) =>
+    open ? (
+      <div data-testid="delete-confirm">
+        <button type="button" onClick={onConfirm}>
+          Delete event
+        </button>
+      </div>
+    ) : null,
 }));
 
 jest.mock("../../components/event-editor/event-editor-header", () => ({
@@ -143,6 +170,7 @@ jest.mock("lucide-react", () => {
 jest.mock("sonner", () => ({
   toast: {
     error: jest.fn(),
+    success: jest.fn(),
   },
 }));
 
@@ -275,7 +303,7 @@ describe("EventEditor", () => {
     });
 
     expect(mockGetEventNotifications).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain("Edit Event");
+    expect(container.textContent).toContain("Edit event");
     expect(
       consoleErrorSpy.mock.calls
         .flat()
@@ -320,6 +348,50 @@ describe("EventEditor", () => {
     expect(drawerMain).not.toBeNull();
     expect(drawerContent?.dataset.responsive).toBe("true");
     expect(drawerContent?.dataset.responsiveHeight).toBe("92dvh");
-    expect(drawerContent?.textContent).toContain("Edit Event");
+    expect(drawerContent?.textContent).toContain("Edit event");
+  });
+
+  it("asks for confirmation before deleting an event", async () => {
+    const deleteEvent = jest.fn(async () => {});
+    mockUseSharedCalendarData.mockReturnValue({
+      calendars: [...calendars],
+      deleteEvent,
+    } as any);
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <EventEditor
+            open={true}
+            onOpenChange={() => {}}
+            eventToEdit={existingEvent as any}
+            onBack={() => {}}
+            localSettings={localSettings as any}
+          />
+        </QueryClientProvider>,
+      );
+
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const deleteButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Delete",
+    );
+    await act(async () => {
+      deleteButton?.click();
+    });
+
+    expect(deleteEvent).not.toHaveBeenCalled();
+    const confirm = container.querySelector('[data-testid="delete-confirm"] button');
+    expect(confirm).not.toBeNull();
+
+    await act(async () => {
+      (confirm as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+
+    expect(deleteEvent).toHaveBeenCalledWith("event-1");
+    expect(container.querySelector('[data-testid="delete-confirm"]')).toBeNull();
   });
 });

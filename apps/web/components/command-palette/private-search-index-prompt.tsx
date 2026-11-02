@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
+import { Button } from "@workspace/ui/components/ui/button";
 import { usePrivateSearchIndexControls } from "@/hooks/use-private-search-index-controls";
 
 export function PrivateSearchIndexPrompt({
@@ -32,30 +33,23 @@ export function PrivateSearchIndexPrompt({
         }
       }}
     >
-      <DialogContent className="w-[calc(100dvw-1rem)] p-6 pr-12 sm:w-auto sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="w-[calc(100dvw-1rem)] sm:w-auto sm:max-w-md">
+        <DialogHeader className="pr-12">
           <DialogTitle>Search your full history on this device?</DialogTitle>
           <DialogDescription>
-            Solace can keep an encrypted title index on this device so older
-            mail and events stay searchable. Titles never leave the device, and
-            encrypted event bodies stay encrypted on the server.
+            Solace can keep encrypted titles of your mail and events, and the
+            start of each message, on this device so older items stay
+            searchable. The index never leaves the device, and encrypted event
+            bodies stay encrypted on the server.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <button
-            type="button"
-            onClick={() => privateSearchIndex.decline()}
-            className="cursor-pointer rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted"
-          >
+          <Button variant="outline" onClick={() => privateSearchIndex.decline()}>
             Not now
-          </button>
-          <button
-            type="button"
-            onClick={() => privateSearchIndex.accept()}
-            className="cursor-pointer rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
+          </Button>
+          <Button onClick={() => privateSearchIndex.accept()}>
             Enable on this device
-          </button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -202,19 +202,75 @@ describe("MessageList", () => {
 
     expect(onSelect).not.toHaveBeenCalled();
     expect(renderedContainer.textContent).toContain("1 selected");
+    expect(selectButton?.getAttribute("aria-pressed")).toBe("true");
 
-    const row = renderedContainer.querySelector(
-      '.group\\/row[role="button"]',
-    ) as HTMLDivElement | null;
+    expect(renderedContainer.querySelector('[role="button"]')).toBeNull();
+    const row = renderedContainer.querySelector<HTMLButtonElement>(
+      'button[aria-label^="Ada, Hello, "]',
+    );
     expect(row).not.toBeNull();
 
     act(() => {
-      row?.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      row?.click();
+    });
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith("message-1");
+  });
+
+  it("names unread and open rows without relying on color", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderedContainer = container;
+    const renderedRoot = root;
+    const unread: JmapEmailMessage = { ...message, id: "message-2", threadId: "thread-2", subject: "Draft" };
+    const read: JmapEmailMessage = { ...message, keywords: { $seen: true } };
+
+    act(() => {
+      renderedRoot.render(
+        <MessageList
+          messages={[read, unread]}
+          selectedMessageId="message-1"
+          timeFormat="24h"
+          onSelect={jest.fn()}
+        />,
       );
     });
 
-    expect(onSelect).toHaveBeenCalledWith("message-1");
+    const openRow = renderedContainer.querySelector('button[aria-label^="Ada, Hello, "]');
+    const unreadRow = renderedContainer.querySelector('button[aria-label^="Ada, Draft, "]');
+    expect(openRow?.getAttribute("aria-current")).toBe("true");
+    expect(openRow?.getAttribute("aria-label")).not.toContain("Unread");
+    expect(unreadRow?.hasAttribute("aria-current")).toBe(false);
+    expect(unreadRow?.getAttribute("aria-label")).toMatch(/, Unread$/);
+  });
+
+  it("shows only the subject for an encrypted message", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderedContainer = container;
+    const renderedRoot = root;
+    const encrypted: JmapEmailMessage = {
+      ...message,
+      preview: "-----BEGIN PGP MESSAGE-----\n\nciphertext\n-----END PGP MESSAGE-----",
+    };
+
+    act(() => {
+      renderedRoot.render(
+        <MessageList
+          messages={[encrypted]}
+          selectedMessageId={null}
+          timeFormat="24h"
+          onSelect={jest.fn()}
+        />,
+      );
+    });
+
+    expect(renderedContainer.textContent).toContain("Hello");
+    expect(renderedContainer.textContent).not.toContain("Encrypted message");
+    expect(renderedContainer.textContent).not.toContain("–");
   });
 
   it("drops selected messages that a filter hides", () => {

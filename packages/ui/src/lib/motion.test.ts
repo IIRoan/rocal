@@ -9,6 +9,7 @@ import {
   playAfterPaint,
   revealSequence,
   slideFadeIn,
+  slideFadeOut,
 } from "./motion";
 
 const nextFrame = () =>
@@ -139,11 +140,45 @@ describe("slideFadeIn", () => {
     expect(hidden.style.opacity).toBe("");
   });
 
+  it("sharpens a staged entrance from its blur together with the slide", () => {
+    slideFadeIn(document.createElement("div"), { y: 12, blur: 4 }, { duration: 300 });
+
+    const [keyframes] = firstAnimateCall();
+    expect(keyframes[0]).toMatchObject({ filter: "blur(4px)", transform: "translate(0px, 12px) scale(1)" });
+    expect(keyframes[1]).toMatchObject({ filter: "blur(0px)", transform: "none" });
+  });
+
+  it("keeps only the opacity fade under reduced motion", () => {
+    reducedMotion = true;
+    slideFadeIn(document.createElement("div"), { y: 12, blur: 4 }, { duration: 300, delay: 100 });
+
+    const [keyframes, options] = firstAnimateCall();
+    expect(keyframes).toEqual([
+      { opacity: 0, visibility: "visible" },
+      { opacity: 1, visibility: "visible" },
+    ]);
+    expect(options).toMatchObject({ duration: 300, delay: 0 });
+  });
+
   it("keeps a delayed entrance hidden until its delay ends", () => {
     slideFadeIn(document.createElement("div"), { y: 8 }, { duration: 200, delay: 90 });
 
     const [, options] = firstAnimateCall();
     expect(options).toMatchObject({ delay: 90, fill: "backwards" });
+  });
+});
+
+describe("slideFadeOut", () => {
+  it("eases out and fades in place under reduced motion", () => {
+    reducedMotion = true;
+    slideFadeOut(document.createElement("div"), { y: -12 }, { duration: 150 });
+
+    const [keyframes, options] = firstAnimateCall();
+    expect(keyframes).toEqual([
+      { opacity: 1, visibility: "visible" },
+      { opacity: 0, visibility: "hidden" },
+    ]);
+    expect(options).toMatchObject({ duration: 150, easing: "cubic-bezier(0, 0, 0.58, 1)" });
   });
 });
 

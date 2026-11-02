@@ -26,11 +26,11 @@ const SURFACE_CLASS =
 
 const MENU_SURFACE_CLASS = cn(
   SURFACE_CLASS,
-  "flex max-h-[min(28rem,var(--radix-dropdown-menu-content-available-height,28rem))] flex-col gap-px overflow-y-auto p-1",
+  "flex max-h-[min(28rem,var(--radix-dropdown-menu-content-available-height,28rem))] flex-col gap-px overflow-y-auto overscroll-contain p-1",
 );
 
 const ITEM_CLASS =
-  "group/item flex h-8 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2 text-left text-sm leading-[130%] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-cell-hover)] focus-visible:bg-[var(--bg-cell-hover)] data-[highlighted]:bg-[var(--bg-cell-hover)] data-[state=open]:bg-[var(--bg-cell-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-40";
+  "group/item flex h-8 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2 text-left text-sm leading-[1.3] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-cell-hover)] focus-visible:bg-[var(--bg-cell-hover)] focus-visible:-outline-offset-2 data-[highlighted]:bg-[var(--bg-cell-hover)] data-[state=open]:bg-[var(--bg-cell-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-40";
 
 const DESTRUCTIVE_ITEM_CLASS =
   "text-[var(--text-destructive)] data-[highlighted]:bg-[var(--cta-destructive-hover)]";
@@ -91,7 +91,6 @@ export function Dropdown({
             className={cn(MENU_SURFACE_CLASS, className)}
             style={style}
             onClick={stopPortalClick}
-            onCloseAutoFocus={(event) => event.preventDefault()}
           >
             {children}
           </DropdownMenuPrimitive.Content>
@@ -208,7 +207,7 @@ export function DropdownSubmenu({
           />
         ) : null}
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        <Icons icon={Icon.ChevronRight} color="disabled" size={14} />
+        <Icons icon={Icon.ChevronRight} color="tertiary" size={14} />
       </Primitive.SubTrigger>
       <Primitive.Portal>
         <Primitive.SubContent
@@ -301,4 +300,4 @@ export function DropdownPanel({
 
 /** Row styling for plain buttons inside a `DropdownPanel`. */
 export const DROPDOWN_PANEL_ROW_CLASS =
-  "flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm leading-[130%] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-cell-hover)] focus-visible:bg-[var(--bg-cell-hover)] disabled:pointer-events-none disabled:opacity-40";
+  "flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm leading-[1.3] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-cell-hover)] focus-visible:bg-[var(--bg-cell-hover)] focus-visible:-outline-offset-2 disabled:pointer-events-none disabled:opacity-40";

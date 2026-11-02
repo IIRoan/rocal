@@ -54,8 +54,9 @@ export function EventReminderBanner({
         ]
       : undefined;
 
+  // Calendar is the way forward when the details fail to load, so the link stays on error.
   const actions =
-    !loading && !error ? (
+    !loading ? (
       <Button asChild variant="outline" size="xs" className="ml-auto gap-1.5">
         <a href={eventUrl}>
           Open in calendar

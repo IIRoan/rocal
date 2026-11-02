@@ -16,6 +16,8 @@ const SvgComponent = React.memo(function SvgComponent({
       viewBox="-2676.459 -972.76 25693.16 23573.573"
       preserveAspectRatio="xMidYMid meet"
       role="img"
+      // Decorative unless a caller names it, so an unnamed logo never reads as a nameless image.
+      aria-hidden={props["aria-label"] === undefined || undefined}
       fill={fill}
       focusable="false"
       {...props}

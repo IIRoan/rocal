@@ -16,6 +16,7 @@ import {
 import { ThemeToggle } from "../layout/theme-toggle";
 import { MobileCalendarViewTitle } from "./calendar-view-title";
 import type { CalendarView } from "./types";
+import { CALENDAR_VIEW_SHORTCUTS } from "./use-calendar-view-shortcuts";
 
 export function MobileEventCalendarToolbar({
   currentDate,
@@ -68,6 +69,9 @@ export function MobileEventCalendarToolbar({
               className="shrink-0"
             />
           )}
+          <output className="sr-only">
+            {eventsLoading ? "Loading events…" : ""}
+          </output>
         </div>
       </div>
       <div className="flex items-center justify-between gap-2">
@@ -95,7 +99,7 @@ export function MobileEventCalendarToolbar({
             </Button>
           </div>
           <Button
-            className="max-sm:h-8 max-sm:px-2.5! bg-accent hover:bg-accent/80 text-accent-foreground"
+            className="max-sm:h-8 max-sm:px-2.5! bg-hover hover:bg-hover/80 text-hover-foreground"
             onClick={onToday}
             disabled={loading}
           >
@@ -109,7 +113,7 @@ export function MobileEventCalendarToolbar({
             onClick={onNewEvent}
             disabled={loading}
           >
-            New Event
+            New event
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -128,19 +132,34 @@ export function MobileEventCalendarToolbar({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-32">
               <DropdownMenuItem onClick={() => onViewChange("month")}>
-                Month <DropdownMenuShortcut>⌘+M</DropdownMenuShortcut>
+                Month{" "}
+                <DropdownMenuShortcut>
+                  {CALENDAR_VIEW_SHORTCUTS.month}
+                </DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewChange("week")}>
-                Week <DropdownMenuShortcut>⌘+W</DropdownMenuShortcut>
+                Week{" "}
+                <DropdownMenuShortcut>
+                  {CALENDAR_VIEW_SHORTCUTS.week}
+                </DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewChange("day")}>
-                Day <DropdownMenuShortcut>⌘+D</DropdownMenuShortcut>
+                Day{" "}
+                <DropdownMenuShortcut>
+                  {CALENDAR_VIEW_SHORTCUTS.day}
+                </DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewChange("agenda")}>
-                Agenda <DropdownMenuShortcut>⌘+A</DropdownMenuShortcut>
+                Agenda{" "}
+                <DropdownMenuShortcut>
+                  {CALENDAR_VIEW_SHORTCUTS.agenda}
+                </DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewChange("3day")}>
-                3 Days <DropdownMenuShortcut>⌘+T</DropdownMenuShortcut>
+                3 Days{" "}
+                <DropdownMenuShortcut>
+                  {CALENDAR_VIEW_SHORTCUTS["3day"]}
+                </DropdownMenuShortcut>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -34,11 +34,11 @@ export function ThreeDayOverlapDrawer({
         responsiveHeight="70dvh"
         className="overflow-hidden"
       >
-        <DrawerTitle className="sr-only">Select Event</DrawerTitle>
+        <DrawerTitle className="sr-only">Select event</DrawerTitle>
         <DrawerShell
           header={
             <div className="border-b border-border/40 px-5 py-3">
-              <span className="text-base font-semibold">Select Event</span>
+              <span className="text-base font-semibold">Select event</span>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {events[0] &&
                   formatInUserTimezone(
@@ -58,7 +58,7 @@ export function ThreeDayOverlapDrawer({
                 <button
                   key={event.id}
                   type="button"
-                  className="flex w-full cursor-pointer items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-accent/30"
+                  className="flex w-full cursor-pointer items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-hover/30"
                   onClick={() => {
                     onEventSelect(event);
                     onOpenChange(false);
@@ -82,7 +82,7 @@ export function ThreeDayOverlapDrawer({
                           "line-through opacity-70",
                       )}
                     >
-                      {event.title || "Untitled Event"}
+                      {event.title || "Untitled event"}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {event.allDay

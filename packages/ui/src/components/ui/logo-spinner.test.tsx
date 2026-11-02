@@ -85,6 +85,24 @@ describe("PageLoadingOverlay", () => {
     expect(overlay?.style.visibility).toBe("");
   });
 
+  it("announces one steady loading status instead of the cycling board", () => {
+    act(() => {
+      root.render(<PageLoadingOverlay isLoading={true} />);
+    });
+
+    const overlay = document.querySelector<HTMLElement>(
+      "[data-page-loading-overlay='true']",
+    );
+
+    expect(overlay?.getAttribute("role")).toBe("status");
+    expect(overlay?.querySelector(".sr-only")?.textContent).toBe("Loading…");
+    expect(
+      overlay?.querySelector(".sr-only")?.nextElementSibling?.getAttribute(
+        "aria-hidden",
+      ),
+    ).toBe("true");
+  });
+
   it("fades out before unmounting", () => {
     act(() => {
       root.render(<PageLoadingOverlay isLoading={true} fadeDurationMs={300} />);

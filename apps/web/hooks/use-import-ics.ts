@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage } from "@workspace/calendar-core";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 
 import { calendarApiService } from "../lib/calendar-api-service";
 import type {

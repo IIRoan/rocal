@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { NotificationManager } from "@workspace/ui/components/calendar";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Textarea } from "@workspace/ui/components/ui/textarea";
@@ -32,7 +33,7 @@ function ParticipantList({
         return (
           <li
             key={participant.email}
-            className="group/participant flex items-center gap-2.5 rounded-md px-1.5 py-1 transition-colors hover:bg-accent/40"
+            className="group/participant flex items-center gap-2.5 rounded-md px-1.5 py-1 transition-colors hover:bg-hover/40"
           >
             <SolaceAvatar
               email={participant.email}
@@ -42,8 +43,8 @@ function ParticipantList({
               title={name}
             />
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-sm text-foreground">{name}</div>
-              <div className="truncate text-xs text-muted-foreground">
+              <div className="break-words text-sm text-foreground">{name}</div>
+              <div className="break-words text-xs text-muted-foreground">
                 {participant.role === "organizer"
                   ? "Organizer"
                   : participant.displayName
@@ -58,7 +59,7 @@ function ParticipantList({
                   aria-label={`Remove ${name}`}
                   onClick={() => onRemove(participant.email)}
                   className={cn(
-                    "tap-target flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,opacity] cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50",
+                    "tap-target flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,opacity] cursor-pointer outline-none hover:bg-hover hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring",
                     desktop && "opacity-0 group-hover/participant:opacity-100",
                   )}
                 >
@@ -94,33 +95,48 @@ export function EventEditorOptionalFields({
   participantError: string | null;
   participantItems: ParticipantItem[];
 }) {
+  const participantInputId = useId();
+  const participantErrorId = useId();
+
   return (
     <>
       <EventEditorRow desktop={desktop} icon={Users} label="Participants">
         <div className="flex items-center gap-1">
-          <RecipientSuggestInput
-            appearance="field"
-            mode="calendar"
-            value={participantDraft}
-            onChange={onParticipantDraftChange}
-            onSelectSuggestion={onAddParticipantFromSuggestion}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                onAddParticipant();
-              }
-            }}
-            placeholder="Add participants"
-            className="flex-1"
-            inputClassName={fieldClass(desktop)}
-          />
+          <div className="min-w-0 flex-1">
+            <label htmlFor={participantInputId} className="sr-only">
+              Participants
+            </label>
+            <RecipientSuggestInput
+              id={participantInputId}
+              appearance="field"
+              mode="calendar"
+              value={participantDraft}
+              onChange={onParticipantDraftChange}
+              onSelectSuggestion={onAddParticipantFromSuggestion}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  onAddParticipant();
+                }
+              }}
+              placeholder="Add participants"
+              inputClassName={fieldClass(desktop)}
+              aria-invalid={participantError ? true : undefined}
+              aria-describedby={participantError ? participantErrorId : undefined}
+            />
+          </div>
           <ParticipantsInviteInfo />
         </div>
         {participantError && (
-          <p role="alert" className="px-1 pt-1 text-xs text-destructive">
+          <p
+            id={participantErrorId}
+            className="px-1 pt-1 text-xs text-destructive"
+          >
             {participantError}
           </p>
         )}
+        {/* Enter on a bad address keeps focus in the field, so the description alone is never re-read. */}
+        <output className="sr-only">{participantError ?? ""}</output>
         {participantItems.length > 0 && (
           <ParticipantList
             desktop={desktop}
