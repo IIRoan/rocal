@@ -4,6 +4,7 @@ import { AccountSettingsContent } from "./AccountSettingsContent";
 import { AppearanceSettingsContent } from "./AppearanceSettingsContent";
 import { AppSettingsContent } from "./AppSettingsContent";
 import { InvitesSettingsContent } from "./InvitesSettingsContent";
+import { LicensesSettingsContent } from "./LicensesSettingsContent";
 import { NotificationsSettingsContent } from "./NotificationsSettingsContent";
 import { SecuritySettingsContent } from "./SecuritySettingsContent";
 import { TimeRegionSettingsContent } from "./TimeRegionSettingsContent";
@@ -15,6 +16,7 @@ export const SHARED_SETTINGS_SHEET_PAGES: Record<string, ComponentType> = {
   appearance: AppearanceSettingsContent,
   app: AppSettingsContent,
   invites: InvitesSettingsContent,
+  licenses: LicensesSettingsContent,
   notifications: NotificationsSettingsContent,
   security: SecuritySettingsContent,
   "time-region": TimeRegionSettingsContent,
@@ -27,6 +29,9 @@ export function settingsSheetPageTitle(
 ): string {
   if (page === "timezone") {
     return "Timezone";
+  }
+  if (page === "licenses") {
+    return "Open source licenses";
   }
   return labels[page] ?? getSettingsNavItem(page)?.label ?? "Settings";
 }

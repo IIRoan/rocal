@@ -222,13 +222,13 @@ export const uiRules: Rule[] = [
   },
   {
     id: "motion-shared-helpers",
-    summary: "Motion goes through the shared helpers so reduced motion and Firefox/Safari quirks are handled once: WAAPI via @workspace/ui/lib/motion, GSAP via @workspace/ui/lib/gsap, no LayoutAnimation, native driver for core Animated.",
+    summary: "Motion goes through the shared helpers so reduced motion and Firefox/Safari quirks are handled once: WAAPI via @workspace/ui/lib/motion, no GSAP (its license is not AGPL-compatible), no LayoutAnimation, native driver for core Animated.",
     files: ALL_UI_CODE,
     check: (file) =>
       find(file, (node) => {
         if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
           const source = node.moduleSpecifier.text;
-          if (/^(gsap|@gsap\/react)(\/|$)/.test(source) && file.path !== "packages/ui/src/lib/gsap.ts") return `import ${source} through @workspace/ui/lib/gsap`;
+          if (/^(gsap|@gsap\/react)(\/|$)/.test(source)) return `${source} is not AGPL-compatible; use @workspace/ui/lib/motion (WAAPI)`;
           if (/^(framer-motion|motion\/react|motion)$/.test(source)) return `${source} is not a Solace motion library; use @workspace/ui/lib/motion (WAAPI)`;
         }
         if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return null;
@@ -249,20 +249,17 @@ export const uiRules: Rule[] = [
     examples: {
       path: "apps/web/components/drawer.tsx",
       bad: ['import { gsap } from "gsap";', 'import { motion } from "motion/react";', "element.animate([{ opacity: 0 }, { opacity: 1 }], 200);", "LayoutAnimation.easeInEaseOut();", "Animated.timing(value, { toValue: 1 }).start();"],
-      good: ['import { gsap } from "@workspace/ui/lib/gsap";', "slideFadeIn(element, { y: 8 }, { duration: 200 });", "Animated.timing(value, { toValue: 1, useNativeDriver: true }).start();"],
+      good: ["loopMotion(element, PULSE, { duration: 1200 });", "slideFadeIn(element, { y: 8 }, { duration: 200 });", "Animated.timing(value, { toValue: 1, useNativeDriver: true }).start();"],
     },
   },
   {
     id: "motion-after-paint",
-    summary: "Entrances start once their content has painted: two-frame waits use afterPaint (@workspace/calendar-core), native mount fades use useFadeInAfterPaint instead of Reanimated `entering` presets, and GSAP (which starts in the render frame) is reserved for the logo spinner loop.",
+    summary: "Entrances start once their content has painted: two-frame waits use afterPaint (@workspace/calendar-core), native mount fades use useFadeInAfterPaint instead of Reanimated `entering` presets.",
     files: ALL_UI_CODE,
     check: (file) =>
       find(file, (node) => {
         if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
           const source = node.moduleSpecifier.text;
-          if (/(^|\/)lib\/gsap$/.test(source) && !/(^|\/)logo-spinner\.tsx$/.test(file.path)) {
-            return "GSAP tweens start in the render frame; use slideFadeIn/revealSequence from @workspace/ui/lib/motion";
-          }
           const bindings = node.importClause?.namedBindings;
           const preset = source === "react-native-reanimated" && bindings && ts.isNamedImports(bindings)
             ? bindings.elements.find((element) => REANIMATED_ENTERING_PRESET.test(element.name.text))
@@ -283,7 +280,6 @@ export const uiRules: Rule[] = [
         "requestAnimationFrame(() => requestAnimationFrame(() => setOpen(true)));",
         "const view = <Animated.View entering={fade} />;",
         'import { FadeIn } from "react-native-reanimated";',
-        'import { gsap } from "@workspace/ui/lib/gsap";',
       ],
       good: [
         "afterPaint(() => setOpen(true));",

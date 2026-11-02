@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { gsap } from "../../lib/gsap";
+import { loopMotion } from "../../lib/motion";
 import { cn } from "@workspace/ui/lib/utils";
 import { default as Logo } from "../layout/logo";
 import { useCyclingMessage } from "../../hooks/use-cycling-message";
@@ -97,6 +97,30 @@ const INLINE_LOGO_SPINNER_SIZE_CLASSES = {
   md: "h-6 w-6",
 } as const;
 
+const LOGO_PULSE: Keyframe[] = [
+  { opacity: 1, transform: "scale(1)" },
+  { opacity: 0.58, transform: "scale(1.04)" },
+];
+
+const LOADING_SWEEP: Keyframe[] = [
+  { transform: "translateX(-120%)" },
+  { transform: "translateX(120%)" },
+];
+
+function useLogoPulse() {
+  const logoRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => {
+    const logoNode = logoRef.current;
+    if (!logoNode || prefersReducedMotion) return;
+    const pulse = loopMotion(logoNode, LOGO_PULSE, { duration: 1200, alternate: true });
+    return () => pulse?.cancel();
+  }, [prefersReducedMotion]);
+
+  return logoRef;
+}
+
 interface LogoSpinnerProps {
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
@@ -114,8 +138,7 @@ export function LogoSpinner({
   messageContext = "PAGE_LOAD",
   enableCycling = true,
 }: LogoSpinnerProps) {
-  const logoRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = usePrefersReducedMotion();
+  const logoRef = useLogoPulse();
 
   const { message, isTransitioning } = useCyclingMessage({
     context: messageContext,
@@ -123,36 +146,6 @@ export function LogoSpinner({
   });
 
   const displayText = text || message;
-
-  useEffect(() => {
-    const logoNode = logoRef.current;
-
-    if (!logoNode) {
-      return;
-    }
-
-    gsap.killTweensOf(logoNode);
-
-    if (prefersReducedMotion) {
-      gsap.set(logoNode, { clearProps: "opacity,scale" });
-      return;
-    }
-
-    const tween = gsap.to(logoNode, {
-      opacity: 0.58,
-      scale: 1.04,
-      duration: 1.2,
-      ease: "sine.inOut",
-      repeat: -1,
-      yoyo: true,
-      transformOrigin: "center center",
-    });
-
-    return () => {
-      tween.kill();
-      gsap.set(logoNode, { clearProps: "opacity,scale" });
-    };
-  }, [prefersReducedMotion]);
 
   return (
     <div className={cn("flex flex-col items-center gap-3", className)}>
@@ -211,33 +204,9 @@ function LoadingBoard({
 
   useEffect(() => {
     const sweepNode = sweepRef.current;
-
-    if (!sweepNode) {
-      return;
-    }
-
-    gsap.killTweensOf(sweepNode);
-
-    if (prefersReducedMotion) {
-      gsap.set(sweepNode, { clearProps: "transform" });
-      return;
-    }
-
-    const tween = gsap.fromTo(
-      sweepNode,
-      { xPercent: -120 },
-      {
-        xPercent: 120,
-        duration: 2.4,
-        ease: "sine.inOut",
-        repeat: -1,
-      },
-    );
-
-    return () => {
-      tween.kill();
-      gsap.set(sweepNode, { clearProps: "transform" });
-    };
+    if (!sweepNode || prefersReducedMotion) return;
+    const sweep = loopMotion(sweepNode, LOADING_SWEEP, { duration: 2400 });
+    return () => sweep?.cancel();
   }, [prefersReducedMotion]);
 
   return (
@@ -421,8 +390,7 @@ export function InlineLogoSpinner({
   enableCycling = false,
   showText = true,
 }: InlineLogoSpinnerProps) {
-  const logoRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = usePrefersReducedMotion();
+  const logoRef = useLogoPulse();
 
   const { message, isTransitioning } = useCyclingMessage({
     context: messageContext,
@@ -431,36 +399,6 @@ export function InlineLogoSpinner({
   });
 
   const displayText = text || message;
-
-  useEffect(() => {
-    const logoNode = logoRef.current;
-
-    if (!logoNode) {
-      return;
-    }
-
-    gsap.killTweensOf(logoNode);
-
-    if (prefersReducedMotion) {
-      gsap.set(logoNode, { clearProps: "opacity,scale" });
-      return;
-    }
-
-    const tween = gsap.to(logoNode, {
-      opacity: 0.58,
-      scale: 1.04,
-      duration: 1.2,
-      ease: "sine.inOut",
-      repeat: -1,
-      yoyo: true,
-      transformOrigin: "center center",
-    });
-
-    return () => {
-      tween.kill();
-      gsap.set(logoNode, { clearProps: "opacity,scale" });
-    };
-  }, [prefersReducedMotion]);
 
   return (
     <div className={cn("flex items-center gap-2", className)}>

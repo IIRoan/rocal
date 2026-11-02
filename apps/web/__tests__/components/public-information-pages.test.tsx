@@ -2,12 +2,14 @@
 import React from "react";
 import { expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server.node";
+import LicensesPage from "../../app/licenses/page";
 import PrivacyPage from "../../app/privacy/page";
 import SupportPage from "../../app/support/page";
 import { AccountMoreLinks } from "../../components/command-palette/account-settings-more-links";
 
 jest.mock("lucide-react", () => ({
   ArrowLeft: () => <svg aria-hidden="true" />,
+  FileText: () => <svg aria-hidden="true" />,
   HelpCircle: () => <svg aria-hidden="true" />,
   Shield: () => <svg aria-hidden="true" />,
   Users: () => <svg aria-hidden="true" />,
@@ -40,16 +42,33 @@ function render(element: React.ReactNode) {
   return container;
 }
 
-it.each([PrivacyPage, SupportPage])(
+it.each([PrivacyPage, SupportPage, LicensesPage])(
   "renders public information without an authenticated session",
   (Page) => {
     const page = render(<Page />);
     expect(page.querySelector("h1")?.textContent).toBeTruthy();
     expect(page.querySelector('a[href="/support"]')).not.toBeNull();
     expect(page.querySelector('a[href="/privacy"]')).not.toBeNull();
+    expect(page.querySelector('a[href="/licenses"]')).not.toBeNull();
     expect(page.querySelector('a[href="/"]')).not.toBeNull();
   },
 );
+
+it("keeps the wallpaper one viewport tall however long the page is", () => {
+  const page = render(<PrivacyPage />);
+  expect(page.querySelector(".sticky.top-0.h-dvh")).not.toBeNull();
+});
+
+it("publishes the AGPL notice, the source and the bundled packages' licenses", () => {
+  const page = render(<LicensesPage />);
+  expect(page.textContent).toContain("GNU Affero General Public License");
+  expect(
+    page.querySelector('a[href="https://github.com/IIRoan/rocal"]'),
+  ).not.toBeNull();
+  expect(page.textContent).toContain("openpgp");
+  expect(page.textContent).toContain("Permission is hereby granted");
+  expect(page.textContent).not.toContain("gsap");
+});
 
 it("explains actual retention windows and the limits of account deletion", () => {
   const page = render(<PrivacyPage />);
@@ -79,4 +98,5 @@ it("keeps help links available in web account settings when optional actions are
     page.querySelector('a[href="/privacy"]')?.getAttribute("rel"),
   ).toContain("noopener");
   expect(page.querySelector('a[href="/support"]')).not.toBeNull();
+  expect(page.querySelector('a[href="/licenses"]')).not.toBeNull();
 });

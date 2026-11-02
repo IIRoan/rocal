@@ -28,29 +28,6 @@ jest.mock("../../hooks/use-prefers-reduced-motion", () => ({
   usePrefersReducedMotion: () => false,
 }));
 
-jest.mock("../../lib/gsap", () => {
-  const noopTween = { kill: jest.fn() };
-
-  return {
-    GSAP_EASES: {
-      reveal: "power3.out",
-      emphatic: "expo.out",
-      exit: "power2.in",
-      gentle: "sine.inOut",
-      linear: "none",
-    },
-    getGsapDirectionOffset: () => ({ x: 0, y: 0 }),
-    gsap: {
-      killTweensOf: jest.fn(),
-      set: jest.fn(),
-      to: jest.fn(() => noopTween),
-      fromTo: jest.fn(() => noopTween),
-      registerPlugin: jest.fn(),
-    },
-    useGSAP: jest.fn(),
-  };
-});
-
 jest.mock("../layout/logo", () => ({
   __esModule: true,
   default: (props: React.SVGProps<SVGSVGElement>) => (

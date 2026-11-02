@@ -4,9 +4,16 @@ import product from "./product-info.json";
 export const PRODUCT_ROUTES = {
   privacy: product.privacyPath,
   support: product.supportPath,
+  licenses: product.licensesPath,
 } as const;
 
 export const PRODUCT_ISSUES_URL = product.issuesUrl;
+
+export const PRODUCT_SOURCE_URL = product.sourceUrl;
+
+/** AGPL-3.0 asks that users of the running service can find its source. */
+export const PRODUCT_LICENSE_NOTICE =
+  "Solace is free software: you can use, study, share and change it under the GNU Affero General Public License, version 3. Its source code is public.";
 
 /** Support handles forgotten passwords until account recovery exists. */
 export const FORGOT_PASSWORD_NOTICE = `Email ${product.supportEmail} from a different email address and include your Solace address. Solace does not reset passwords from the sign-in screen.`;

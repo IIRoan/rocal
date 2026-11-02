@@ -1,4 +1,4 @@
-import { HelpCircle, Shield, Users } from "lucide-react";
+import { FileText, HelpCircle, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { PRODUCT_ROUTES } from "@workspace/calendar-core/product-info";
 
@@ -63,6 +63,19 @@ export function AccountMoreLinks({
           </PaletteIconBox>
           <span className="flex-1 truncate text-[15px] leading-[130%] text-foreground">
             Privacy policy
+          </span>
+        </Link>
+        <Link
+          href={PRODUCT_ROUTES.licenses}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={PALETTE_ROW_CLASS}
+        >
+          <PaletteIconBox>
+            <FileText className="size-4" aria-hidden="true" />
+          </PaletteIconBox>
+          <span className="flex-1 truncate text-[15px] leading-[130%] text-foreground">
+            Open source licenses
           </span>
         </Link>
       </PaletteSection>

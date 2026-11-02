@@ -48,7 +48,6 @@ jest.mock("@workspace/ui/hooks", () => ({
   usePrefersReducedMotion: () => true,
   useIsMobile: () => false,
 }));
-jest.mock("@workspace/ui/lib/gsap", () => ({ gsap: {}, useGSAP: () => {} }));
 jest.mock("lucide-react", () => ({
   CalendarDays: () => null,
   Mail: () => null,

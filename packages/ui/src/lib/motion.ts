@@ -10,6 +10,8 @@ export const MOTION_EASING = {
   exit: "cubic-bezier(0.55, 0.085, 0.68, 0.53)",
   /** back.out(1.55) */
   overshoot: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+  /** sine.inOut */
+  gentle: "cubic-bezier(0.37, 0, 0.63, 1)",
 } as const;
 
 /** Set while a CSS entrance waits for its first paint; globals.css pauses the animation on its first keyframe. */
@@ -132,6 +134,55 @@ export function revealSequence(root: ParentNode, steps: RevealStep[]): () => voi
   );
   return () => {
     for (const animation of animations) animation?.cancel();
+  };
+}
+
+/** Endless loading loop that starts at once; reduced motion leaves the element still. */
+export function loopMotion(
+  element: HTMLElement,
+  keyframes: Keyframe[],
+  options: { duration: number; alternate?: boolean },
+): Animation | null {
+  if (!canAnimate(element) || prefersReducedMotion()) return null;
+  return element.animate(keyframes, {
+    duration: options.duration,
+    easing: MOTION_EASING.gentle,
+    iterations: Infinity,
+    direction: options.alternate ? "alternate" : "normal",
+  });
+}
+
+/** Slides an element taller than its frame up with the page, reaching its bottom edge as the page ends but never faster than `maxRate` of the scroll. */
+export function followPageScroll(
+  element: HTMLElement,
+  frame: HTMLElement,
+  maxRate = 0.15,
+): () => void {
+  if (prefersReducedMotion()) return () => {};
+  let request = 0;
+  const update = () => {
+    request = 0;
+    const { scrollHeight, clientHeight } = document.documentElement;
+    const scrollRange = Math.max(scrollHeight - clientHeight, 0);
+    const slack = element.offsetHeight - frame.clientHeight;
+    const rate = scrollRange > 0 ? Math.min(maxRate, slack / scrollRange) : 0;
+    // Clamped so Safari's rubber-band overscroll never opens a gap at the frame's edge.
+    const scrolled = Math.min(Math.max(window.scrollY, 0), scrollRange);
+    element.style.transform = `translateY(${-scrolled * rate}px)`;
+  };
+  const schedule = () => {
+    request ||= requestAnimationFrame(update);
+  };
+  // The page grows when a licenses group opens, which fires no scroll event.
+  const resize = new ResizeObserver(schedule);
+  resize.observe(document.body);
+  resize.observe(frame);
+  window.addEventListener("scroll", schedule, { passive: true });
+  return () => {
+    window.removeEventListener("scroll", schedule);
+    resize.disconnect();
+    cancelAnimationFrame(request);
+    element.style.removeProperty("transform");
   };
 }
 

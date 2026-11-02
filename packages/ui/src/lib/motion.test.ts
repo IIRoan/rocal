@@ -2,7 +2,9 @@
 
 import {
   MOTION_PENDING_ATTRIBUTE,
+  followPageScroll,
   holdUntilPainted,
+  loopMotion,
   moveFrom,
   playAfterPaint,
   revealSequence,
@@ -171,5 +173,137 @@ describe("moveFrom", () => {
       { transform: "translate(12px, -4px) scale(1)" },
       { transform: "none" },
     ]);
+  });
+});
+
+describe("loopMotion", () => {
+  it("runs a loading loop forever without waiting for paint", () => {
+    const element = document.createElement("div");
+    const pulse = [{ opacity: 1 }, { opacity: 0.58 }];
+    const animation = loopMotion(element, pulse, { duration: 1200, alternate: true });
+    expect(animation?.pause).not.toHaveBeenCalled();
+    expect(firstAnimateCall()).toEqual([
+      pulse,
+      expect.objectContaining({ iterations: Infinity, direction: "alternate" }),
+    ]);
+  });
+
+  it("leaves the element still under reduced motion", () => {
+    reducedMotion = true;
+    expect(loopMotion(document.createElement("div"), [], { duration: 2400 })).toBeNull();
+    expect(animate).not.toHaveBeenCalled();
+  });
+});
+
+describe("followPageScroll", () => {
+  const disconnect = jest.fn();
+  let resized: () => void = () => {};
+  let stop: () => void = () => {};
+
+  function setPage(scrollHeight: number, scrollY: number) {
+    const root = document.documentElement;
+    Object.defineProperty(root, "scrollHeight", { configurable: true, value: scrollHeight });
+    Object.defineProperty(root, "clientHeight", { configurable: true, value: 1000 });
+    Object.defineProperty(window, "scrollY", { configurable: true, value: scrollY });
+  }
+
+  /** An image 200px taller than its frame. */
+  function follow() {
+    const image = document.createElement("div");
+    const frame = document.createElement("div");
+    Object.defineProperty(image, "offsetHeight", { value: 1200 });
+    Object.defineProperty(frame, "clientHeight", { value: 1000 });
+    stop = followPageScroll(image, frame);
+    return image;
+  }
+
+  async function scroll() {
+    window.dispatchEvent(new Event("scroll"));
+    await nextFrame();
+  }
+
+  beforeEach(() => {
+    disconnect.mockClear();
+    Object.assign(globalThis, {
+      ResizeObserver: class {
+        constructor(callback: () => void) {
+          resized = callback;
+        }
+        observe() {}
+        disconnect = disconnect;
+      },
+    });
+  });
+
+  afterEach(() => {
+    stop();
+    stop = () => {};
+    Reflect.deleteProperty(document.documentElement, "scrollHeight");
+    Reflect.deleteProperty(document.documentElement, "clientHeight");
+    Reflect.deleteProperty(window, "scrollY");
+    Reflect.deleteProperty(globalThis, "ResizeObserver");
+  });
+
+  it("spends the whole spare height across a long page", async () => {
+    const image = follow();
+    setPage(6000, 2500);
+    await scroll();
+    expect(image.style.transform).toBe("translateY(-100px)");
+    setPage(6000, 5000);
+    await scroll();
+    expect(image.style.transform).toBe("translateY(-200px)");
+  });
+
+  it("keeps drifting slowly on a short page instead of racing through the spare height", async () => {
+    const image = follow();
+    setPage(1400, 400);
+    await scroll();
+    expect(image.style.transform).toBe("translateY(-60px)");
+  });
+
+  it("stays put when the page cannot scroll", async () => {
+    const image = follow();
+    setPage(1000, 0);
+    await scroll();
+    expect(image.style.transform).toBe("translateY(0px)");
+  });
+
+  it("never opens a gap during rubber-band overscroll", async () => {
+    const image = follow();
+    setPage(6000, -50);
+    await scroll();
+    expect(image.style.transform).toBe("translateY(0px)");
+    setPage(6000, 5100);
+    await scroll();
+    expect(image.style.transform).toBe("translateY(-200px)");
+  });
+
+  it("recalculates when the page grows without a scroll event", async () => {
+    const image = follow();
+    setPage(6000, 2500);
+    await scroll();
+    setPage(11000, 2500);
+    resized();
+    await nextFrame();
+    expect(image.style.transform).toBe("translateY(-50px)");
+  });
+
+  it("leaves the element still under reduced motion", async () => {
+    reducedMotion = true;
+    const image = follow();
+    setPage(6000, 2500);
+    await scroll();
+    expect(image.style.transform).toBe("");
+  });
+
+  it("stops following and clears its position when cleaned up", async () => {
+    const image = follow();
+    setPage(6000, 2500);
+    await scroll();
+    stop();
+    expect(disconnect).toHaveBeenCalled();
+    expect(image.style.transform).toBe("");
+    await scroll();
+    expect(image.style.transform).toBe("");
   });
 });
