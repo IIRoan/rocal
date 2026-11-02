@@ -41,9 +41,9 @@ on:
           - testing
         default: development
 
-# One group per profile (each publishes to one R2 slot, newest run wins); fork PRs, which the meta guard skips, get their own group so they can't cancel a real build.
+# One group per PR, so a PR that skips its build never cancels another PR's; pushes and dispatches group per profile (one R2 slot each, newest run wins).
 concurrency:
-  group: mobile-internal-${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && format('fork-{0}', github.run_id) || github.event_name == 'push' && github.ref_name == 'testing' && 'testing' || github.event_name == 'push' && 'preview' || inputs.profile || 'development' }}
+  group: mobile-internal-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'push' && github.ref_name == 'testing' && 'testing' || github.event_name == 'push' && 'preview' || inputs.profile || 'development' }}
   cancel-in-progress: true
 
 permissions:
@@ -54,16 +54,39 @@ jobs:
     # Fork PRs have no access to EXPO_TOKEN / R2 secrets.
     if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name != 'push' || github.ref_name == github.event.repository.default_branch || github.ref_name == 'testing')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     outputs:
       profile: ${{ steps.meta.outputs.profile }}
       title_suffix: ${{ steps.meta.outputs.title_suffix }}
       matrix: ${{ steps.meta.outputs.matrix }}
       eas_version: ${{ steps.meta.outputs.eas_version }}
+      build: ${{ steps.meta.outputs.build }}
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+        with:
+          # A PR's merge commit has the base branch tip as its first parent.
+          fetch-depth: 2
       - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
         with:
           bun-version-file: .bun-version
+      # Compare with the last successful run (it built, or matched the build before it), so a cancelled or failed build is retried; dispatches always build.
+      - name: Check out the last built commit
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          base=$(gh run list --workflow mobile-internal-build.yml --event "$EVENT" --branch "$BRANCH" --status success --limit 1 --json headSha --jq '.[0].headSha // empty' || true)
+          if [ -z "$base" ] && [ "$EVENT" = pull_request ]; then base=$(git rev-parse HEAD^1); fi
+          if [ -n "$base" ] && git fetch --depth=1 origin "$base" && git worktree add --detach "$RUNNER_TEMP/base" "$base" && (cd "$RUNNER_TEMP/base" && bun install --frozen-lockfile); then
+            bun install --frozen-lockfile
+            echo "NATIVE_BASE_ROOT=$RUNNER_TEMP/base" >> "$GITHUB_ENV"
+          else
+            echo "::notice::No earlier build to compare with; building every app"
+          fi
       - name: Resolve profile metadata
         id: meta
         env:
@@ -73,6 +96,8 @@ jobs:
 
   checks:
     needs: meta
+    # Skipping checks skips every build job after it; JS-only changes ship through expo-update.yml.
+    if: needs.meta.outputs.build == 'true'
     uses: ./.github/workflows/native-checks.yml
 
   ios:

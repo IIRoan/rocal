@@ -15,7 +15,25 @@ const profile = resolveNativeReleaseProfile({
 const selectedApp = process.env.INPUT_APP || "all";
 const apps = Object.entries(settings.apps).filter(([app]) => selectedApp === "all" || selectedApp === app);
 if (apps.length === 0) throw new Error("Choose calendar, mail or all");
-const include = apps.map(([app, identity]) => {
+const baseRoot = process.env.NATIVE_BASE_ROOT;
+
+/** Expo's native fingerprint (native modules, app config, plugins, icons); JS-only changes leave it alone and ship as updates. */
+function nativeFingerprint(appDirectory: string) {
+  const cli = require.resolve("expo-updates/bin/cli.js", { paths: [appDirectory] });
+  return ["ios", "android"].map((platform) => {
+    const run = Bun.spawnSync([process.execPath, cli, "fingerprint:generate", "--platform", platform], { cwd: appDirectory, stderr: "inherit" });
+    const output: unknown = run.success ? JSON.parse(run.stdout.toString()) : undefined;
+    return typeof output === "object" && output !== null && "hash" in output && typeof output.hash === "string" ? output.hash : "unknown";
+  }).join(",");
+}
+
+const include = apps.filter(([app]) => {
+  if (!baseRoot) return true;
+  const head = nativeFingerprint(resolve(root, `apps/native-${app}`));
+  const base = nativeFingerprint(resolve(baseRoot, `apps/native-${app}`));
+  console.log(`${app}: native fingerprint ${base} -> ${head}`);
+  return head !== base || head.includes("unknown");
+}).map(([app, identity]) => {
   const dir = `apps/native-${app}`;
   const eas: unknown = JSON.parse(readFileSync(resolve(root, dir, "eas.json"), "utf8"));
   return { app, dir, name: identity.name, ...nativeReleaseProfileMetadata(eas, profile) };
@@ -25,6 +43,7 @@ const output = {
   title_suffix: profile === "development" ? "Dev" : profile.charAt(0).toUpperCase() + profile.slice(1),
   eas_version: settings.easCliVersion,
   matrix: JSON.stringify({ include }),
+  build: String(include.length > 0),
 };
 const lines = Object.entries(output).map(([key, value]) => `${key}=${value}`).join("\n") + "\n";
 if (!process.env.GITHUB_OUTPUT) throw new Error("GITHUB_OUTPUT is required");
