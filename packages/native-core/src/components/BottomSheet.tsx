@@ -593,6 +593,8 @@ export function BottomSheet({
           onClose={sessionCallbacks.onClose}
           onAnimate={sessionCallbacks.onAnimate}
           style={styles.sheetShadow}
+          // Gorhom makes the whole sheet one accessibility element, which hides every control inside from VoiceOver.
+          accessible={false}
         >
           <SheetViewport>
             {header}

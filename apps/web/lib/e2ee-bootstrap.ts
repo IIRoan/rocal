@@ -1,4 +1,8 @@
-import { resolveDeviceEnvelopeSalt } from "@workspace/e2ee";
+import {
+  lockWithoutDeviceKeys,
+  resolveDeviceEnvelopeSalt,
+  type E2eeLock,
+} from "@workspace/e2ee";
 import { createLogger } from "@workspace/logger";
 import { e2eeApiService } from "./e2ee-api-service";
 import {
@@ -29,7 +33,6 @@ import {
 } from "./e2ee-crypto";
 import {
   clearPendingAuthPassword,
-  peekAuthPassword,
   peekPendingAuthPassword,
 } from "./e2ee-password-cache";
 import type { E2eeBootstrapResponse, E2eeDeviceRecord } from "./types/calendar";
@@ -115,7 +118,7 @@ async function activateFromRemote(
     {
       storedSalt: localRecord.envelopeSalt,
       envelope: bootstrap.passwordEnvelope,
-      password: peekAuthPassword(),
+      password: peekPendingAuthPassword(),
       accountKey,
     },
   )
@@ -330,7 +333,7 @@ async function bootstrapUser(
   }
 
   if (remoteBootstrap.passwordEnvelope) {
-    const authPassword = peekAuthPassword();
+    const authPassword = peekPendingAuthPassword();
 
     if (authPassword) {
       return activateFromPasswordEnvelope(
@@ -399,6 +402,48 @@ export async function unlockE2eeWithPassword(
 
   const generation = beginBootstrap(userId);
   return activateFromPasswordEnvelope(userId, generation, bootstrap, password);
+}
+
+/** Opens the keys with the password the server just accepted; the login page runs it before the reload forgets the password. */
+export async function unlockWithSignInPassword(
+  userId: string,
+): Promise<E2eeLock | null> {
+  const password = peekPendingAuthPassword();
+  if (!userId || !password) return null;
+
+  const result = await ensureE2eeBootstrap(userId);
+  const bootstrap = result.bootstrap;
+  // A network failure never locks here; without a device key the next page asks for a fresh sign-in.
+  if (!bootstrap) return null;
+
+  if (result.activated) {
+    // A browser holding the only keys stays signed in; only a password the server just accepted may wrap them.
+    if (!bootstrap.passwordEnvelope) {
+      await storePasswordEnvelopeForActiveSession(userId, password).catch(
+        (error: unknown) => {
+          log.warn("Failed to store the missing encryption envelope", {
+            userId,
+            error,
+          });
+        },
+      );
+    }
+    return null;
+  }
+
+  let opened = false;
+  if (bootstrap.passwordEnvelope && !result.passwordUnlockFailed) {
+    const unlocked = await unlockE2eeWithPassword(userId, password, bootstrap);
+    if (!unlocked.activated && !unlocked.passwordUnlockFailed) return null;
+    opened = unlocked.activated;
+  }
+
+  return lockWithoutDeviceKeys({
+    hasEnvelope: Boolean(bootstrap.passwordEnvelope),
+    hasOtherDevices: bootstrap.devices.length > 0,
+    password: "sign-in",
+    opened,
+  });
 }
 
 export function ensureE2eeBootstrap(

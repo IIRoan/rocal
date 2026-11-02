@@ -192,7 +192,7 @@ describe("web private body index", () => {
   });
 
   it("falls back to the sealed secret when a cached derived key is stale", async () => {
-    jest.mocked(getStoredDerivedVaultKey).mockResolvedValue("stale-key");
+    jest.mocked(getStoredDerivedVaultKey).mockResolvedValue({ extractable: false } as CryptoKey);
     jest
       .mocked(unlockEncryptedMailVaultWithDerivedKey)
       .mockRejectedValue(new Error("Stale key"));

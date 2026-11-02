@@ -2,11 +2,6 @@ import { createLogger } from "@workspace/logger";
 import { createMailOAuthTokenManager } from "./oauth-client";
 import { StalwartJmapClient } from "./jmap-client";
 import { mailDemoApiService } from "./api-service";
-import {
-  deleteStoredDerivedVaultKey,
-  getStoredDerivedVaultKey,
-  putStoredDerivedVaultKey,
-} from "./derived-vault-key-storage";
 import type { JmapSession, MailDemoConfig } from "./types";
 
 const log = createLogger("mail-open-prefetch");

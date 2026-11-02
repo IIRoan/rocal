@@ -88,10 +88,10 @@ Live EAS inspection on 2026-10-28 found stored credentials for the current main-
 
 ## 5. Reviewer access and onboarding
 
-- [ ] Prepare a dedicated reviewer account through a normally accepted invite, with mailbox provisioning and E2EE setup completed.
+- [x] Prepare a dedicated reviewer account through a normally accepted invite, with mailbox provisioning and E2EE setup completed: `appreview@solace.onl` (Avery Collins), 2026-11-01, from an operator-issued invite row; sign-up, E2EE and mailbox ran through the normal web flow. Credentials are in the App Store Connect review record and the `APP_REVIEW_*` repository secrets.
 - [x] Prepare a synthetic calendar fixture and review walkthrough below, with sample mail instructions that use the normal send flow.
-- [ ] Load the samples into the dedicated reviewer account and verify its credentials with the selected binaries.
-- [ ] Ensure reviewer access does not depend on the operator's personal passkey or device.
+- [ ] Load the samples into the dedicated reviewer account and verify its credentials with the selected binaries. Mail samples are loaded: synthetic senders `maya.lindqvist@solace.onl` and `jonas.weber@solace.onl` (invited from the review account) sent five encrypted messages plus a reply thread and a calendar invitation. Binary sign-in is verified by the screenshot workflow.
+- [x] Ensure reviewer access does not depend on the operator's personal passkey or device: the account has no passkey and unlocks from its password envelope on a fresh simulator.
 - [x] Explain invite-only onboarding and the relationship between Calendar and Mail in draft review notes and separate listing copy; verify the final App Store Connect notes before submission.
 - [ ] Confirm backend and support availability throughout review.
 
@@ -129,7 +129,7 @@ Existing development/preview profiles use `distribution: internal`; their QR/ad-
 ## 8. Listings, review and launch
 
 - [x] Prepare separate names, subtitles, descriptions, keywords and configured support/privacy URLs as EAS Metadata drafts from shared identity/listing/product files.
-- [ ] Confirm publisher/copyright, primary/secondary categories, age ratings and launch territories; capture the required iPhone screenshots with synthetic data.
+- [ ] Confirm publisher/copyright, primary/secondary categories, age ratings and launch territories; capture the required iPhone screenshots with synthetic data. Mail (2026-11-01): copyright `2026 Roan Van Westerop`, Productivity/Business, 4+ (only Messaging and Chat), free, 174 territories without France, manual release, build 9 attached. Screenshots come from `.github/workflows/app-store-screenshots.yml` (real production app on a 6.9" simulator, Maestro flow in `apps/native-mail/.maestro/`).
 - [x] Generate reviewable `store.config.draft.json` files in the store workflow without pushing metadata or defaulting legal/age-rating answers.
 - [ ] Review the generated metadata and publish approved listing fields through EAS Metadata or App Store Connect; finish unsupported fields/screenshots in App Store Connect.
 - [ ] Select the exact tested builds, complete declarations and reviewer instructions, and submit both apps for App Review.
@@ -261,3 +261,11 @@ Audit of both apps' resolved production config (`expo config --type introspect`,
 - Verified compliant: resolved Info.plist has only the photo-library purpose string (profile picture only, matches use), no camera/microphone/Face ID, no `UIBackgroundModes`; ATS keeps `NSAllowsArbitraryLoads: false`; the dev launcher's Bonjour/local-network keys are stripped by its Release build phase; App icons are 1024×1024 without alpha; `OpenSSL-Universal ~> 3.6.2000` ships a signed privacy manifest (ITMS-91061/91065); the extension uses no required-reason API; store builds register APNs as `production`; listing title/subtitle/keyword/description lengths fit Apple's limits; account deletion is in-app (4 taps) and calls `DELETE /api/account`; no third-party login (4.8 n/a), no purchase/pricing links (3.1.1), push is optional with only the system prompt, Mail→Calendar falls back to a toast when Calendar is absent (4.2.3), Mail has Report spam / Not spam, Mail HTML renders sanitized without scripts.
 - Fixed: TestFlight and App Store builds no longer name their release channel (`MASTER`/`TESTING`) in Settings → App → Updates, its diagnostics or the update prompt (`visibleChannelLabel` in native-core `lib/app-update.ts`); development builds keep it.
 - Owner decision: Riftbound's read of public `playriftbound.com/api/gql` data is a minor use and stays (5.2.2 accepted).
+
+### Mail product page (2026-11-01)
+
+- Version 1.0.4 uses build 10, which contains the reply-quote and VoiceOver sheet fixes (#136) and the web quick-reply sender name (#135).
+- Screenshots come from the real production app on an iPhone 17 Pro Max simulator (`app-store-screenshots.yml`; the signed simulator build is cached, so flow-only changes skip the 30-minute build), in light and dark. Each one is framed with a headline and one plain-language line (no feature pills or icon lists). The 1.0.4 Media Manager holds four in the required "iPhone with Dynamic Island (medium display)" slot (1206 x 2622) and four in the large-display slot (1320 x 2868), alternating light and dark: inbox ("Your inbox, quietly encrypted"), conversation ("Private by design"), reply ("Answer right from the thread") and Settings ("No ads. No tracking.").
+- The reviewer's "Studio walkthrough" thread was re-sent after #135 shipped, so both sides carry display names (Avery Collins, Maya Lindqvist) in the captures.
+- Nothing has been submitted: Add for Review and Submit for Review are left to the owner.
+

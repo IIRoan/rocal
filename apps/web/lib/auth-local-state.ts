@@ -1,11 +1,15 @@
 import { createLogger } from "@workspace/logger";
 import { authClient, signOut } from "@/lib/auth-client";
-import { clearAuthPasswords } from "@/lib/e2ee-password-cache";
+import type { E2eeLock } from "@workspace/e2ee";
 import {
-  clearEncPasswordCookie,
-  clearOrphanedEncPasswordCookie,
-} from "@/lib/enc-password-cookie";
+  clearAuthPasswords,
+  clearLegacyRememberedPassword,
+} from "@/lib/e2ee-password-cache";
 import { resetE2eeBootstrap } from "@/lib/e2ee-bootstrap";
+import {
+  beginAuthNavigation,
+  buildE2eeLockLoginHref,
+} from "@/lib/auth-navigation";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import {
   deleteRecoverableE2eeDevices,
@@ -33,7 +37,6 @@ function deleteDatabase(name: string): Promise<void> {
 /** Remove client artifacts that must never survive sign-out or an unauthenticated visit. */
 export function clearSolaceClientAuthArtifacts(): void {
   clearAuthPasswords();
-  clearEncPasswordCookie();
   resetE2eeBootstrap();
   clearLocalMailSettings();
   // The device key, the mail vault key and the search index would otherwise stay on disk after sign-out.
@@ -48,7 +51,7 @@ export function clearSolaceClientAuthArtifacts(): void {
 
 /** Drop encryption artifacts left when the session is gone but a prior device's key material remains. */
 export function clearOrphanedClientAuthArtifacts(): void {
-  clearOrphanedEncPasswordCookie();
+  clearLegacyRememberedPassword();
   clearLocalMailSettings();
 }
 
@@ -72,6 +75,15 @@ export async function signOutAndClearLocalState(): Promise<void> {
   }
 
   clearSolaceClientAuthArtifacts();
+}
+
+/** Signed in means unlocked: a session that cannot open the account key ends, and the login page says why. */
+export function endLockedSession(reason: E2eeLock): void {
+  const finishNavigation = beginAuthNavigation(buildE2eeLockLoginHref(reason));
+  if (!finishNavigation) return;
+  void signOutAndClearLocalState()
+    .then(finishNavigation)
+    .catch(finishNavigation);
 }
 
 export type AuthSessionReconciliation =

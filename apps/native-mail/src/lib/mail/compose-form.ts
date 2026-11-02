@@ -59,7 +59,7 @@ export function composeFormReducer(
       return { ...state, showCcBcc: !state.showCcBcc };
     case "seed": {
       const next = { ...state, draftId: action.plan.draftId ?? state.draftId };
-      return action.plan.kind === "decrypt-draft"
+      return action.plan.kind === "decrypt-draft" || action.plan.kind === "decrypt-source"
         ? { ...next, decrypting: true }
         : withSeed(next, action.plan.fields);
     }

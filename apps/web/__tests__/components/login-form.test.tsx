@@ -155,19 +155,25 @@ jest.mock("@/lib/api-clients", () => ({
   },
 }));
 
+const mockPendingPassword: { current: string | null } = { current: null };
 jest.mock("@/lib/e2ee-password-cache", () => ({
   clearAuthPasswords: jest.fn(),
-  clearPendingAuthPassword: jest.fn(),
-  storePendingAuthPassword: jest.fn(),
+  clearPendingAuthPassword: jest.fn(() => {
+    mockPendingPassword.current = null;
+  }),
+  peekPendingAuthPassword: () => mockPendingPassword.current,
+  storePendingAuthPassword: jest.fn((password: string) => {
+    mockPendingPassword.current = password;
+  }),
 }));
 
-jest.mock("@/lib/enc-password-cookie", () => ({
-  clearEncPasswordCookie: jest.fn(),
-  setEncPasswordCookie: jest.fn(),
+jest.mock("@/lib/e2ee-bootstrap", () => ({
+  unlockWithSignInPassword: jest.fn(),
 }));
 
 jest.mock("@/lib/auth-local-state", () => ({
   clearOrphanedClientAuthArtifacts: jest.fn(),
+  endLockedSession: jest.fn(),
   reconcileAuthSession: jest.fn(),
 }));
 
@@ -197,12 +203,10 @@ import {
   clearPendingAuthPassword,
   storePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
-import {
-  clearEncPasswordCookie,
-  setEncPasswordCookie,
-} from "@/lib/enc-password-cookie";
+import { unlockWithSignInPassword } from "@/lib/e2ee-bootstrap";
 import {
   clearOrphanedClientAuthArtifacts,
+  endLockedSession,
   reconcileAuthSession,
 } from "@/lib/auth-local-state";
 
@@ -226,8 +230,8 @@ const mockUpdateUserSettings = jest.mocked(
 const mockStorePendingAuthPassword = jest.mocked(storePendingAuthPassword);
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
 const mockClearPendingAuthPassword = jest.mocked(clearPendingAuthPassword);
-const mockSetEncPasswordCookie = jest.mocked(setEncPasswordCookie);
-const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
+const mockUnlockWithSignInPassword = jest.mocked(unlockWithSignInPassword);
+const mockEndLockedSession = jest.mocked(endLockedSession);
 const mockClearOrphanedClientAuthArtifacts = jest.mocked(
   clearOrphanedClientAuthArtifacts,
 );
@@ -287,6 +291,8 @@ describe("LoginForm", () => {
     });
     mockEmailSignIn.mockResolvedValue({});
     mockGetSession.mockResolvedValue({ data: null, error: null });
+    mockPendingPassword.current = null;
+    mockUnlockWithSignInPassword.mockResolvedValue(null);
     mockEmailSignUp.mockResolvedValue({});
     mockPasskeySignIn.mockResolvedValue({
       data: authSessionDataFixture,
@@ -424,7 +430,63 @@ describe("LoginForm", () => {
     expect(
       mockStorePendingAuthPassword.mock.invocationCallOrder[0],
     ).toBeLessThan(mockEmailSignIn.mock.invocationCallOrder[0] ?? Infinity);
-    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("secret-password");
+    expect(document.cookie).not.toContain("solace_enc_pw");
+  });
+
+  it("opens the encryption keys with the sign-in password before leaving the page", async () => {
+    mockGetSession.mockResolvedValue({ data: authSessionDataFixture, error: null });
+    await renderForm();
+
+    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const passwordInput = container.querySelector("#password") as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
+    );
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      submitButton?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockUnlockWithSignInPassword).toHaveBeenCalledWith(
+      authSessionDataFixture.user.id,
+    );
+    expect(mockCompleteAuthNavigation).toHaveBeenCalledTimes(1);
+    expect(
+      mockUnlockWithSignInPassword.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockCompleteAuthNavigation.mock.invocationCallOrder[0] ?? 0);
+    expect(mockPendingPassword.current).toBeNull();
+  });
+
+  it("ends the session with the notice instead of continuing when the sign-in password cannot open the keys", async () => {
+    mockGetSession.mockResolvedValue({ data: authSessionDataFixture, error: null });
+    mockUnlockWithSignInPassword.mockResolvedValue("cannot-open");
+    await renderForm();
+
+    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const passwordInput = container.querySelector("#password") as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
+    );
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      submitButton?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockEndLockedSession).toHaveBeenCalledWith("cannot-open");
+    expect(mockCompleteAuthNavigation).not.toHaveBeenCalled();
+    expect(mockPendingPassword.current).toBeNull();
   });
 
   it("checks email availability before signing up with email", async () => {
@@ -475,7 +537,7 @@ describe("LoginForm", () => {
       name: "Roan",
     });
     expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("Secret123!");
-    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("Secret123!");
+    expect(document.cookie).not.toContain("solace_enc_pw");
   });
 
   it("shows the availability error and skips sign-up when the Solace email is taken", async () => {
@@ -526,7 +588,7 @@ describe("LoginForm", () => {
     );
     expect(mockEmailSignUp).not.toHaveBeenCalled();
     expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
-    expect(mockSetEncPasswordCookie).not.toHaveBeenCalled();
+    expect(mockUnlockWithSignInPassword).not.toHaveBeenCalled();
   });
 
   it("shows the invite claim error without attempting sign-up when the chosen email is already claimed elsewhere", async () => {
@@ -606,9 +668,8 @@ describe("LoginForm", () => {
       "secret-password",
     );
     expect(mockClearPendingAuthPassword).toHaveBeenCalled();
-    expect(mockSetEncPasswordCookie).not.toHaveBeenCalled();
+    expect(mockUnlockWithSignInPassword).not.toHaveBeenCalled();
     expect(mockClearAuthPasswords).not.toHaveBeenCalled();
-    expect(mockClearEncPasswordCookie).not.toHaveBeenCalled();
   });
 
   it("finishes login when a lost sign-in response still created the requested session", async () => {
@@ -937,7 +998,7 @@ describe("LoginForm", () => {
     });
 
     expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("Secret123!");
-    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("Secret123!");
+    expect(document.cookie).not.toContain("solace_enc_pw");
     expect(mockCompleteAuthNavigation).toHaveBeenCalled();
   });
 
@@ -974,7 +1035,7 @@ describe("LoginForm", () => {
     });
 
     expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("Secret123!");
-    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("Secret123!");
+    expect(document.cookie).not.toContain("solace_enc_pw");
     expect(container.textContent).not.toContain(
       "Local browser state was reset",
     );
