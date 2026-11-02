@@ -10,6 +10,8 @@ export const MOTION_EASING = {
   exit: "cubic-bezier(0.55, 0.085, 0.68, 0.53)",
   /** back.out(1.55) */
   overshoot: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+  /** sine.inOut */
+  gentle: "cubic-bezier(0.37, 0, 0.63, 1)",
 } as const;
 
 /** Set while a CSS entrance waits for its first paint; globals.css pauses the animation on its first keyframe. */
@@ -133,6 +135,21 @@ export function revealSequence(root: ParentNode, steps: RevealStep[]): () => voi
   return () => {
     for (const animation of animations) animation?.cancel();
   };
+}
+
+/** Endless loading loop that starts at once; reduced motion leaves the element still. */
+export function loopMotion(
+  element: HTMLElement,
+  keyframes: Keyframe[],
+  options: { duration: number; alternate?: boolean },
+): Animation | null {
+  if (!canAnimate(element) || prefersReducedMotion()) return null;
+  return element.animate(keyframes, {
+    duration: options.duration,
+    easing: MOTION_EASING.gentle,
+    iterations: Infinity,
+    direction: options.alternate ? "alternate" : "normal",
+  });
 }
 
 /** Mirror of `slideFadeIn` that holds the hidden end state; cancel it before showing the element again. */

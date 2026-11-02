@@ -18,6 +18,7 @@ jest.mock("lucide-react", () => {
     Check: Icon,
     X: Icon,
     ArrowLeft: Icon,
+    FileText: Icon,
     ChevronLeft: Icon,
     ChevronRight: Icon,
     AlertTriangle: Icon,

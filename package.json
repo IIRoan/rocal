@@ -2,6 +2,7 @@
   "name": "solace",
   "version": "0.0.1",
   "private": true,
+  "license": "AGPL-3.0-only",
   "packageManager": "bun@1.4.4",
   "workspaces": [
     "apps/*",
@@ -22,8 +23,9 @@
     "dev:mobile": "bun run ./scripts/dev-mobile.ts",
     "cloudflared": "bun run ./scripts/cloudflared.ts",
     "dev:notifications": "cargo xtask dev notifications",
-    "lint": "bun run check:rules && cd apps/web && bun run lint && cd ../native-calendar && bun run lint && cd ../native-mail && bun run lint && cd ../../packages/native-core && bun run lint",
+    "lint": "bun run check:rules && bun run notices --check && cd apps/web && bun run lint && cd ../native-calendar && bun run lint && cd ../native-mail && bun run lint && cd ../../packages/native-core && bun run lint",
     "check:rules": "bun run scripts/check-repo-rules.ts",
+    "notices": "bun run scripts/third-party-notices.ts",
     "lint:react-doctor": "bun run --cwd apps/web lint:react-doctor && bun run --cwd packages/ui lint:react-doctor",
     "typecheck": "cd apps/web && bun run typecheck",
     "typecheck:native": "cd packages/native-core && bun run typecheck && cd ../../apps/native-calendar && bun run typecheck && cd ../native-mail && bun run typecheck",

@@ -106,3 +106,9 @@ Notes:
 
 - Backend auth/cors supports extra origins through `TRUSTED_ORIGINS` (see `apps/backend/.env.example`).
 - The native app uses secure storage for auth state and the same backend API as the web app.
+
+## License
+
+Solace is free software, licensed under the [GNU Affero General Public License v3.0 only](LICENSE). If you run a modified version as a network service, AGPL section 13 requires you to offer its source code to its users.
+
+Third-party packages keep their own licenses; `bun run notices` checks that each is AGPL-compatible and regenerates the notices shown at `/licenses` and in each app's Open source licenses page. The Inter font is under the SIL Open Font License (`packages/ui/src/font/inter-font/LICENSE.txt`).

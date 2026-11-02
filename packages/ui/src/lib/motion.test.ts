@@ -3,6 +3,7 @@
 import {
   MOTION_PENDING_ATTRIBUTE,
   holdUntilPainted,
+  loopMotion,
   moveFrom,
   playAfterPaint,
   revealSequence,
@@ -171,5 +172,24 @@ describe("moveFrom", () => {
       { transform: "translate(12px, -4px) scale(1)" },
       { transform: "none" },
     ]);
+  });
+});
+
+describe("loopMotion", () => {
+  it("runs a loading loop forever without waiting for paint", () => {
+    const element = document.createElement("div");
+    const pulse = [{ opacity: 1 }, { opacity: 0.58 }];
+    const animation = loopMotion(element, pulse, { duration: 1200, alternate: true });
+    expect(animation?.pause).not.toHaveBeenCalled();
+    expect(firstAnimateCall()).toEqual([
+      pulse,
+      expect.objectContaining({ iterations: Infinity, direction: "alternate" }),
+    ]);
+  });
+
+  it("leaves the element still under reduced motion", () => {
+    reducedMotion = true;
+    expect(loopMotion(document.createElement("div"), [], { duration: 2400 })).toBeNull();
+    expect(animate).not.toHaveBeenCalled();
   });
 });

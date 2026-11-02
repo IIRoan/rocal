@@ -4,8 +4,8 @@
     "title": "Solace API",
     "description": "The Solace calendar and mail API.",
     "license": {
-      "name": "UNLICENSED",
-      "identifier": "UNLICENSED"
+      "name": "AGPL-3.0-only",
+      "identifier": "AGPL-3.0-only"
     },
     "version": "0.1.0"
   },

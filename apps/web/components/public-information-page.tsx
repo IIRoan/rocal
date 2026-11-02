@@ -73,6 +73,15 @@ export function PublicInformationPage({
             >
               Privacy
             </Link>
+            <Link
+              href={PRODUCT_ROUTES.licenses}
+              aria-current={
+                currentPath === PRODUCT_ROUTES.licenses ? "page" : undefined
+              }
+              className="text-primary underline-offset-4 hover:underline cursor-pointer"
+            >
+              Licenses
+            </Link>
           </nav>
         </div>
       </div>

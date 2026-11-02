@@ -6,6 +6,10 @@ import { AppInformationSettingsSection } from "./AppInformationSettingsSection";
 import { AppInformationLinks } from "../AppInformationLinks";
 
 let mockAppUrl: string | null = "https://preview.example.test";
+const mockNavigate = jest.fn();
+jest.mock("./SettingsPage", () => ({
+  useSettingsNavigator: () => mockNavigate,
+}));
 jest.mock("../../lib/constants", () => ({
   get APP_BASE_URL() {
     return mockAppUrl;
@@ -122,9 +126,18 @@ describe("shared app information", () => {
     );
   });
 
-  it("omits the section when no valid website is configured", () => {
+  it("keeps the bundled licenses when no valid website is configured", () => {
     mockAppUrl = null;
     act(() => root.render(<AppInformationSettingsSection />));
-    expect(container.textContent).toBe("");
+    expect(container.textContent).toBe("Open source licenses");
+  });
+
+  it("opens the licenses page inside the app", () => {
+    act(() => root.render(<AppInformationSettingsSection />));
+    const row = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Open source licenses",
+    );
+    act(() => row?.click());
+    expect(mockNavigate).toHaveBeenCalledWith("/settings/licenses");
   });
 });

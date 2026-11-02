@@ -9,6 +9,7 @@ export const SETTINGS_INVITES_ROUTE = "/settings/invites";
 export const SETTINGS_NOTIFICATIONS_ROUTE = "/settings/notifications";
 export const SETTINGS_SECURITY_ROUTE = "/settings/security";
 export const SETTINGS_APP_ROUTE = "/settings/app";
+export const SETTINGS_LICENSES_ROUTE = "/settings/licenses";
 
 export const NATIVE_STACK_SCREEN_OPTIONS = {
   headerShown: false,

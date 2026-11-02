@@ -1,6 +1,8 @@
 {
   "privacyPath": "/privacy",
   "supportPath": "/support",
+  "licensesPath": "/licenses",
   "supportEmail": "support@solace.onl",
-  "issuesUrl": "https://github.com/IIRoan/rocal/issues"
+  "issuesUrl": "https://github.com/IIRoan/rocal/issues",
+  "sourceUrl": "https://github.com/IIRoan/rocal"
 }

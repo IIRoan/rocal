@@ -32,6 +32,7 @@
     "./event-ics-export": "./src/event-ics-export.ts",
     "./ics-import": "./src/ics-import.ts",
     "./riftbound": "./src/riftbound.ts",
-    "./riftbound-settings": "./src/riftbound-settings.ts"
+    "./riftbound-settings": "./src/riftbound-settings.ts",
+    "./third-party-notices": "./src/third-party-notices.ts"
   }
 }
