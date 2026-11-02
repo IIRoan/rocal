@@ -15,6 +15,37 @@ function linkLabel(url: string): string {
   }
 }
 
+interface TeamsLink {
+  index: number;
+  end: number;
+  label: string;
+  url: string;
+}
+
+const TEAMS_LINK_URL = /^https?:\/\/[^>]/;
+
+/** Finds Teams-style `Label<https://…>` links in one linear pass; the equivalent regex backtracks polynomially (CodeQL js/polynomial-redos). */
+export function findTeamsLinks(line: string): TeamsLink[] {
+  const links: TeamsLink[] = [];
+  let labelStart = 0;
+  let close = -1;
+  for (let open = line.indexOf("<"); open !== -1; open = line.indexOf("<", open + 1)) {
+    if (close <= open) {
+      close = line.indexOf(">", open + 1);
+      if (close === -1) break;
+    }
+    const url = line.slice(open + 1, close);
+    if (open > labelStart && TEAMS_LINK_URL.test(url)) {
+      links.push({ index: labelStart, end: close + 1, label: line.slice(labelStart, open), url });
+      labelStart = close + 1;
+      open = close;
+    } else {
+      labelStart = open + 1;
+    }
+  }
+  return links;
+}
+
 /** `links: false` is for previews rendered inside a button, where a nested link is unreachable. */
 export const formatEventDescription = (
   description: string,
@@ -36,28 +67,26 @@ export const formatEventDescription = (
   });
 
   return lines.map(({ line, start }) => {
-    // Handle Teams meeting format: "Text<URL>"
-    const teamsLinkRegex = /([^<]+)<(https?:\/\/[^>]+)>/g;
     const urlOnlyRegex = /(https?:\/\/[^\s<>]+)/g;
 
     const parts = [];
     let lastIndex = 0;
     let match;
 
-    // First check for Teams format links
-    while ((match = teamsLinkRegex.exec(line)) !== null) {
+    // First check for Teams format links: "Text<URL>"
+    for (const teams of findTeamsLinks(line)) {
       // Add text before the link
-      if (match.index > lastIndex) {
-        parts.push(line.slice(lastIndex, match.index));
+      if (teams.index > lastIndex) {
+        parts.push(line.slice(lastIndex, teams.index));
       }
 
-      const url = match[2] ?? "";
-      const displayText = match[1]?.trim() || linkLabel(url);
+      const url = teams.url;
+      const displayText = teams.label.trim() || linkLabel(url);
 
       parts.push(
         links ? (
           <a
-            key={`${start}-teams-${match.index}`}
+            key={`${start}-teams-${teams.index}`}
             href={url}
             target="_blank"
             rel="noopener noreferrer"
@@ -71,7 +100,7 @@ export const formatEventDescription = (
         ),
       );
 
-      lastIndex = match.index + match[0].length;
+      lastIndex = teams.end;
     }
 
     // If no Teams format links were found, check for standalone URLs
