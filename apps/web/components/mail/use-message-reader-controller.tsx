@@ -203,7 +203,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
     attachmentHoverPreviews,
     loadingAttachmentPreviewKey,
     showQuote,
-    isConversationCollapsed,
   } = messageUi;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -630,7 +629,6 @@ export function useMessageReaderController(props: MessageReaderProps) {
     isSendingReply,
     isReplyExpanded,
     showQuote,
-    isConversationCollapsed,
     selectedMessageId,
     calendarInvitation,
     mailCalendarInvite,

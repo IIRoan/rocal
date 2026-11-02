@@ -45,7 +45,7 @@ type SelectedDecryptedPreview = {
   decrypted: DecryptedMailPreviewContent | null;
 };
 
-export type ConversationDecryptedContent = {
+type ConversationDecryptedContent = {
   previews: Record<string, string>;
   /** Decrypted attachments of conversation messages whose decrypt has landed, by message id. */
   attachments: Record<string, JmapAttachment[]>;

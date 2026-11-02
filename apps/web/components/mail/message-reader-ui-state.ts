@@ -20,7 +20,6 @@ export type MessageReaderUiState = {
   attachmentHoverPreviews: Record<string, AttachmentHoverPreview>;
   loadingAttachmentPreviewKey: string | null;
   showQuote: boolean;
-  isConversationCollapsed: boolean;
 };
 
 export const initialMessageReaderUiState: MessageReaderUiState = {
@@ -32,7 +31,6 @@ export const initialMessageReaderUiState: MessageReaderUiState = {
   attachmentHoverPreviews: {},
   loadingAttachmentPreviewKey: null,
   showQuote: false,
-  isConversationCollapsed: true,
 };
 
 export type MessageReaderUiAction =

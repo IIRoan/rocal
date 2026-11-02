@@ -41,7 +41,7 @@ type ConversationMessageContent = DecryptedMailPreviewContent & {
   attachments?: MailAttachment[];
 };
 
-export type ConversationDecryptedContent = {
+type ConversationDecryptedContent = {
   previews: Record<string, string>;
   /** Attachments per thread message, known once a message is decrypted or loaded in full. */
   attachments: Record<string, MailAttachment[]>;

@@ -246,7 +246,7 @@ export default function MailMessageScreen() {
                 />
 
                 <MailAttachmentCards
-                  attachments={content.displayAttachments}
+                  attachments={content.displayAttachmentItems}
                   downloadingBlobId={actions.downloadingBlobId}
                   onOpenAttachment={actions.handleOpenAttachment}
                 />

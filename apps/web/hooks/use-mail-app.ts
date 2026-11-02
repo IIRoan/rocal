@@ -137,7 +137,7 @@ import {
   getPrimaryMailboxId,
   messageBelongsToMailbox,
   sortMessages,
-  toParsedMailAttachment,
+  listedDecryptedAttachments,
   buildAttachmentPreviewCacheKey,
   buildReplyContext,
   createOptimisticReplyMessage,
@@ -980,11 +980,7 @@ export function useMailApp() {
         setSelectedMessagePlaintext(parsed.text ?? decrypted.plaintext);
         if (encState === "pgp_mime") {
           setSelectedMessageDecryptedAttachments(
-            parsed.attachments.flatMap((attachment) =>
-              attachment.disposition === "attachment" && !attachment.related
-                ? [toParsedMailAttachment(attachment)]
-                : [],
-            ),
+            listedDecryptedAttachments(parsed.attachments),
           );
         } else {
           setSelectedMessageDecryptedAttachments(null);

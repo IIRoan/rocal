@@ -1,5 +1,4 @@
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -11,7 +10,6 @@ import { Feather, FontAwesome } from "@expo/vector-icons";
 import {
   formatMailThreadDateRange,
   getMailThreadParticipants,
-  resolveAttachmentPreviewKind,
   type MailThreadParticipant,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -23,24 +21,19 @@ import {
   useMailSkin,
   type MailSkin,
 } from "@workspace/native-core/components/mail/mail-ui";
-import { formatAttachmentSize } from "../../lib/mail/compose-attachments";
 import type { MailSignatureVerificationState } from "../../lib/mail/mail-crypto";
-import {
-  formatAttachmentCount,
-  readerAttachmentIcon,
-} from "../../lib/mail/reader-recipients";
 import type {
   JmapAttachment,
   JmapEmailMessage,
+  KeyedAttachment,
   LabelDef,
   MessageEncryptionState,
 } from "../../lib/mail/types";
+import { MailAttachmentCards } from "./MailAttachmentCards";
 import { MailLabelChip } from "./MailLabelChip";
 import { MailSecurityIndicator } from "./MailSecurityIndicator";
 
 const MAX_PARTICIPANT_CHIPS = 4;
-
-export type MailThreadAttachment = { key: string; attachment: JmapAttachment };
 
 type MailThreadHeaderProps = {
   subject: string;
@@ -55,7 +48,7 @@ type MailThreadHeaderProps = {
   encryptedAtRest: boolean;
   signatureVerificationState?: MailSignatureVerificationState;
   decryptionFailed: boolean;
-  attachments: MailThreadAttachment[];
+  attachments: KeyedAttachment[];
   downloadingBlobId: string | null;
   onOpenAttachment: (attachment: JmapAttachment, cacheKey: string) => void;
 };
@@ -152,22 +145,12 @@ export function MailThreadHeader({
         </View>
       ) : null}
 
-      {isThread && attachments.length > 0 ? (
-        <View style={styles.attachments}>
-          <Text style={styles.meta}>{formatAttachmentCount(attachments.length)}</Text>
-          <View style={styles.wrapRow}>
-            {attachments.map(({ key, attachment }) => (
-              <ThreadAttachmentChip
-                key={key}
-                cacheKey={key}
-                attachment={attachment}
-                downloading={downloadingBlobId === key}
-                onOpen={onOpenAttachment}
-                styles={styles}
-              />
-            ))}
-          </View>
-        </View>
+      {isThread ? (
+        <MailAttachmentCards
+          attachments={attachments}
+          downloadingBlobId={downloadingBlobId}
+          onOpenAttachment={onOpenAttachment}
+        />
       ) : null}
     </View>
   );
@@ -192,56 +175,6 @@ function ParticipantChip({
         {participant.isSelf ? "You" : participant.name || participant.email}
       </Text>
     </View>
-  );
-}
-
-function ThreadAttachmentChip({
-  cacheKey,
-  attachment,
-  downloading,
-  onOpen,
-  styles,
-}: {
-  cacheKey: string;
-  attachment: JmapAttachment;
-  downloading: boolean;
-  onOpen: (attachment: JmapAttachment, cacheKey: string) => void;
-  styles: ThreadHeaderStyles;
-}) {
-  const skin = useMailSkin();
-  const name = attachment.name ?? "attachment";
-  const previewKind = resolveAttachmentPreviewKind({
-    name: attachment.name,
-    type: attachment.type,
-  });
-  return (
-    <Pressable
-      onPress={() => onOpen(attachment, cacheKey)}
-      disabled={downloading}
-      hitSlop={6}
-      style={({ pressed }) => [
-        styles.attachment,
-        pressed && styles.attachmentPressed,
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={`${previewKind ? "Preview" : "Download"} ${name}`}
-    >
-      {downloading ? (
-        <ActivityIndicator size={12} color={skin.textSecondary} />
-      ) : (
-        <Feather
-          name={readerAttachmentIcon(previewKind)}
-          size={13}
-          color={skin.textSecondary}
-        />
-      )}
-      <Text style={styles.attachmentName} numberOfLines={1}>
-        {name}
-      </Text>
-      {typeof attachment.size === "number" && attachment.size > 0 ? (
-        <Text style={styles.meta}>{formatAttachmentSize(attachment.size)}</Text>
-      ) : null}
-    </Pressable>
   );
 }
 
@@ -295,24 +228,6 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       borderRadius: theme.borderRadius.full,
       backgroundColor: skin.surface,
     },
-    attachments: {
-      gap: theme.spacing["2"],
-    },
-    attachment: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 6,
-      maxWidth: "100%" as const,
-      minHeight: 32,
-      paddingHorizontal: theme.spacing["2"],
-      borderRadius: theme.borderRadius.md,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: skin.borderPrimary,
-      backgroundColor: skin.surface,
-    },
-    attachmentPressed: {
-      backgroundColor: skin.pressed,
-    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -335,14 +250,6 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       flexShrink: 1,
       fontSize: 13,
       lineHeight: 17,
-      color: theme.colors.foreground,
-    },
-    attachmentName: {
-      flexShrink: 1,
-      maxWidth: 180,
-      fontSize: 13,
-      lineHeight: 17,
-      fontWeight: "500" as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
   } satisfies Record<string, TextStyle>;

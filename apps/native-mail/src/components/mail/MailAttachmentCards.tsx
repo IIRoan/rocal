@@ -14,11 +14,11 @@ import {
   formatAttachmentCount,
   readerAttachmentIcon,
 } from "../../lib/mail/reader-recipients";
-import type { JmapAttachment } from "../../lib/mail/types";
+import type { JmapAttachment, KeyedAttachment } from "../../lib/mail/types";
 import { useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
 
 type MailAttachmentCardsProps = {
-  attachments: JmapAttachment[];
+  attachments: KeyedAttachment[];
   downloadingBlobId: string | null;
   onOpenAttachment: (attachment: JmapAttachment, cacheKey: string) => void;
 };
@@ -40,8 +40,7 @@ export function MailAttachmentCards({
         {formatAttachmentCount(attachments.length)}
       </Text>
       <View style={styles.grid}>
-        {attachments.map((attachment, index) => {
-          const key = attachment.blobId ?? `inline-${index}`;
+        {attachments.map(({ key, attachment }) => {
           const isDownloading = downloadingBlobId === key;
           const previewKind = resolveAttachmentPreviewKind({
             name: attachment.name,

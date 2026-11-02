@@ -136,7 +136,7 @@ function toAttachmentBlobPart(content: MailAttachment["content"]): BlobPart {
   throw new Error("Attachment content is unavailable.");
 }
 
-export function toParsedMailAttachment(
+function toParsedMailAttachment(
   attachment: ParsedMailAttachment,
 ): MailAttachment {
   return {
@@ -145,6 +145,17 @@ export function toParsedMailAttachment(
     size: getAttachmentSize(attachment.content),
     content: attachment.content,
   };
+}
+
+/** The parts of a decrypted PGP/MIME message the reader lists as attachments. */
+export function listedDecryptedAttachments(
+  attachments: ParsedMailAttachment[],
+): MailAttachment[] {
+  return attachments.flatMap((attachment) =>
+    attachment.disposition === "attachment" && !attachment.related
+      ? [toParsedMailAttachment(attachment)]
+      : [],
+  );
 }
 
 export async function resolveAttachmentBlob(input: {
