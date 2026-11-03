@@ -1682,14 +1682,14 @@
     },
     {
      "name": "@tanstack/react-virtual",
-     "version": "3.14.25",
+     "version": "3.14.26",
      "copyright": [
       "Copyright (c) 2021-present Tanner Linsley"
      ]
     },
     {
      "name": "@tanstack/virtual-core",
-     "version": "3.19.10",
+     "version": "3.19.11",
      "copyright": [
       "Copyright (c) 2021-present Tanner Linsley"
      ]
