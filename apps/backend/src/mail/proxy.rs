@@ -450,9 +450,14 @@ impl Attempt<'_> {
         if email.is_empty() {
             return Ok(None);
         }
-        // Only a session-minted token that itself drew the 401 is dropped; a client bearer's 401 keeps the warm cache.
         if retry_after == Some(AuthSource::Session) {
             service::invalidate_access_token(self.state, &user.id);
+        } else if retry_after == Some(AuthSource::ClientBearer)
+            && let Some((_, rejected)) = self
+                .client_authorization
+                .and_then(|authorization| authorization.split_once(char::is_whitespace))
+        {
+            service::invalidate_rejected_access_token(self.state, &user.id, rejected.trim()).await;
         }
         let token_started = Instant::now();
         let token = service::access_token_for_user(self.state, &user.id, email).await;

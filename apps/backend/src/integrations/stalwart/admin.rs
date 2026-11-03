@@ -513,13 +513,21 @@ impl<'a> Admin<'a> {
             return Ok(());
         }
         let path = redirect_uri.replace('~', "~0").replace('/', "~1");
-        let result = self
-            .call(
-                "x:OAuthClient/set",
-                json!({"update": {id: {format!("redirectUris/{path}"): true}}}),
-                "c1",
-            )
-            .await?;
+        let calls = json!([["x:OAuthClient/set", {"update": {id: {format!("redirectUris/{path}"): true}}}, "c1"]]);
+        let mut attempt = 0;
+        // The patch is idempotent; Stalwart can reject concurrent writes to this shared client.
+        let result = loop {
+            let envelope = self.call_jmap(calls.clone()).await?;
+            if super::method_response(&envelope, "error")
+                .is_some_and(|error| error["type"] == "serverUnavailable")
+                && attempt < super::LIMIT_RETRIES
+            {
+                tokio::time::sleep(super::backoff(attempt)).await;
+                attempt += 1;
+                continue;
+            }
+            break method_result(&envelope, "x:OAuthClient/set")?.clone();
+        };
         acknowledged(
             &result,
             id,
@@ -1067,10 +1075,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn adds_a_missing_callback_without_replacing_existing_redirects() {
+    async fn adds_a_missing_callback_after_write_contention_without_replacing_existing_redirects() {
         let fake = FakeStalwart::scripted(vec![
             envelope("x:OAuthClient/query", json!({"ids": ["client-1"]}), "c1"),
             envelope("x:OAuthClient/get", json!({"list": [{"id": "client-1", "clientId": "bridge", "redirectUris": {"https://old.test/callback": true}}]}), "c1"),
+            envelope("error", json!({"type": "serverUnavailable"}), "c1"),
+            envelope("error", json!({"type": "serverUnavailable"}), "c1"),
             envelope("x:OAuthClient/set", json!({"updated": {"client-1": null}}), "c1"),
         ]).await;
         admin(&fake)
@@ -1081,6 +1091,10 @@ mod tests {
             fake.requests()[2].json()["methodCalls"][0][1],
             json!({"update": {"client-1": {"redirectUris/https:~1~1new.test~1~0callback": true}}})
         );
+        assert_eq!(fake.requests().len(), 5);
+        for request in &fake.requests()[2..] {
+            assert_eq!(request.json(), fake.requests()[2].json());
+        }
     }
 
     #[tokio::test]
@@ -1098,6 +1112,30 @@ mod tests {
                 .is_err()
         );
         assert_eq!(fake.requests().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn callback_retries_are_bounded_and_only_for_unavailable_updates() {
+        let retries = usize::try_from(super::super::LIMIT_RETRIES).unwrap();
+        for (kind, attempts) in [("serverUnavailable", retries + 1), ("forbidden", 1)] {
+            let mut replies = vec![
+                envelope("x:OAuthClient/query", json!({"ids": ["client-1"]}), "c1"),
+                envelope(
+                    "x:OAuthClient/get",
+                    json!({"list": [{"id": "client-1", "clientId": "bridge", "redirectUris": {}}]}),
+                    "c1",
+                ),
+            ];
+            replies.extend((0..attempts).map(|_| envelope("error", json!({"type": kind}), "c1")));
+            let fake = FakeStalwart::scripted(replies).await;
+            assert!(
+                admin(&fake)
+                    .ensure_oauth_redirect("bridge", "https://new.test/callback")
+                    .await
+                    .is_err()
+            );
+            assert_eq!(fake.requests().len(), attempts + 2, "{kind}");
+        }
     }
 
     #[tokio::test]
