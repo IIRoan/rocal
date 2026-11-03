@@ -364,8 +364,11 @@ export function isApiError(value: unknown): value is ApiError {
   );
 }
 
-export function isNotFoundError(value: unknown): boolean {
-  return isApiError(value) && value.statusCode === 404;
+/** The API answers a missing or foreign event with 400 and this message, pinned by its suite. */
+export const EVENT_NOT_FOUND_MESSAGE = "Event not found or access denied";
+
+export function isEventNotFoundError(value: unknown): boolean {
+  return isApiError(value) && value.message === EVENT_NOT_FOUND_MESSAGE;
 }
 
 export interface UserSettings {

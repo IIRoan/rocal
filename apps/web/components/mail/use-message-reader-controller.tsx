@@ -16,7 +16,7 @@ import {
   getErrorMessage,
   getMailThreadParticipants,
   isDecryptedEventReminderContent,
-  isNotFoundError,
+  isEventNotFoundError,
   pickOutgoingAttachmentFiles,
   resolveMailServerLimits,
   resolveTimezone,
@@ -257,7 +257,8 @@ export function useMessageReaderController(props: MessageReaderProps) {
     enabled: Boolean(isEventReminderEmail && linkedCalendarEventId),
     // TanStack only runs queryFn while enabled, so linkedCalendarEventId is guaranteed set here.
     queryFn: () => calendarApiService.getEvent(linkedCalendarEventId!),
-    retry: (failureCount, error) => failureCount < 3 && !isNotFoundError(error),
+    retry: (failureCount, error) =>
+      failureCount < 3 && !isEventNotFoundError(error),
   });
   const linkedCalendarEvent = ((): LinkedCalendarEventState | null => {
     if (!isEventReminderEmail || !linkedCalendarEventId) {
@@ -273,7 +274,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
       };
     }
     if (isLinkedEventError) {
-      const deleted = isNotFoundError(linkedEventQueryError);
+      const deleted = isEventNotFoundError(linkedEventQueryError);
       return {
         eventId: linkedCalendarEventId,
         event: null,
