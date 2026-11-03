@@ -9,7 +9,7 @@ Patterns that fire diagnostics but are safe to suppress.
   email/passkey sign-in, sign-out, step-up, header helpers). Splitting would
   fragment tightly coupled session state transitions without a reusable seam —
   tests target the exported provider. Same pattern as web `LoginFormBody`.
-- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+- **Config**: Suppressed via `doctor.config.json` → `ignore.overrides`
   for `**/providers/AuthProvider.tsx`.
 
 ## react-doctor/no-set-state-after-await-in-effect — native AuthProvider bootstrap
@@ -19,7 +19,7 @@ Patterns that fire diagnostics but are safe to suppress.
   `ignore` flag cleared in the effect cleanup. Overlapping dependency re-runs
   cannot commit stale session state. The static rule still matches the
   await-then-set pattern and does not treat the ignore guard as sufficient.
-- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+- **Config**: Suppressed via `doctor.config.json` → `ignore.overrides`
   for `**/providers/AuthProvider.tsx`.
 
 ## react-doctor/no-giant-component — native E2eeProvider
@@ -30,7 +30,7 @@ Patterns that fire diagnostics but are safe to suppress.
   bootstrap state machine (generation guard, pending-bootstrap promise, session
   ref, pending sign-in password). Splitting it further would spread one race
   guard across files. Same reasoning as `AuthProvider`.
-- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+- **Config**: Suppressed via `doctor.config.json` → `ignore.overrides`
   for `**/providers/E2eeProvider.tsx`.
 
 ## react-doctor/rn-prefer-expo-image — AttachmentPreviewModal
@@ -40,7 +40,7 @@ Patterns that fire diagnostics but are safe to suppress.
   is a single local `file://` URI from the attachment cache shown once in a
   preview modal, so expo-image's disk/memory caching and placeholders add
   nothing.
-- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+- **Config**: Suppressed via `doctor.config.json` → `ignore.overrides`
   for `**/components/mail/AttachmentPreviewModal.tsx`.
 
 ## react-doctor/only-export-components — Next.js page metadata
@@ -137,7 +137,7 @@ Patterns that fire diagnostics but are safe to suppress.
   forgot-password, passkey step-up) with shared overlay, validation debouncing,
   and redirect logic. Splitting would fragment tightly coupled state transitions
   without improving testability — tests target the exported `LoginForm` wrapper.
-- **Config**: Suppressed via `react-doctor.config.json` →
+- **Config**: Suppressed via `doctor.config.json` →
   `ignore.overrides` for `**/app/login/_content.tsx`.
 
 ## react-doctor/async-await-in-loop — e2ee password setup retries (resolved)
@@ -239,7 +239,7 @@ Patterns that fire diagnostics but are safe to suppress.
   sections from the loaded event. This is prop→form synchronization, not a
   parent event handler or data lift. The calendar parent already owns
   `eventToEdit`; the editor cannot fetch it independently.
-- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+- **Config**: Suppressed via `doctor.config.json` → `ignore.overrides`
   for `**/components/event-editor.tsx`.
 
 ## react-doctor/no-cascading-set-state — EventEditor open/load effects
@@ -380,7 +380,7 @@ Patterns that fire diagnostics but are safe to suppress.
   Virtualization is isolated in `MessageListVirtualized` with the `"use no memo"`
   directive (file + component) so the rest of the list tree remains
   compiler-friendly. No memo-safe TanStack Virtual replacement exists.
-- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+- **Config**: Suppressed via `doctor.config.json` → `ignore.overrides`
   for `**/components/mail/message-list/message-list-virtualized.tsx`.
 
 ## react-doctor/prefer-tag-over-role — MessageList row shell
@@ -434,7 +434,7 @@ Patterns that fire diagnostics but are safe to suppress.
   dimensions. Splitting the provider would fragment one coordinated drag
   lifecycle without a reusable seam. The file was only touched to pass
   `EventItem`'s `dragging` prop.
-- **Config**: Suppressed via `react-doctor.config.json` → `ignore.overrides`
+- **Config**: Suppressed via `doctor.config.json` → `ignore.overrides`
   for `**/components/calendar/calendar-dnd-context.tsx`.
 
 ## react-doctor/prefer-useReducer — CalendarDndProvider drag session fields

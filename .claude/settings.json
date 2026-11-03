@@ -1,4 +1,7 @@
 {
+  "env": {
+    "REACT_DOCTOR_NO_TELEMETRY": "1"
+  },
   "hooks": {
     "PostToolBatch": [
       {
