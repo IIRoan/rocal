@@ -86,7 +86,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Trivy
-        uses: chainguard-actions/aquasecurity-setup-trivy@deb1161fd2f15201014bca22c580972ef4c71b0e # v0.3.1
+        uses: chainguard-actions/aquasecurity-setup-trivy@cd2a9562cb0a609ac860e78e2f6bc5885b37c12b # v0.3.1
         with:
           version: v0.76.1
 
@@ -153,7 +153,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=security-${{ matrix.image }}
 
       - name: Setup Trivy
-        uses: chainguard-actions/aquasecurity-setup-trivy@deb1161fd2f15201014bca22c580972ef4c71b0e # v0.3.1
+        uses: chainguard-actions/aquasecurity-setup-trivy@cd2a9562cb0a609ac860e78e2f6bc5885b37c12b # v0.3.1
         with:
           version: v0.76.1
 
