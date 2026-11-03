@@ -19,7 +19,7 @@ class MonitorTest(unittest.TestCase):
     def snapshot(self, proxies=None, http=True, inactive=None):
         output = io.StringIO()
         if proxies is None:
-            proxies = {"http-test": "online", "smtp-test": "online"}
+            proxies = {"http-test": "online", "https-test": "online", "smtp-test": "online"}
         with (
             patch.object(monitor, "fetch_frp_proxies", return_value=proxies),
             patch.object(monitor, "http_ready", return_value=http),
@@ -30,14 +30,20 @@ class MonitorTest(unittest.TestCase):
             status = monitor.main()
         return status, json.loads(output.getvalue())
 
-    def test_healthy_requires_both_groups_and_http(self):
+    def test_healthy_requires_every_group_and_http(self):
         status, body = self.snapshot()
         self.assertEqual(status, 0)
         self.assertEqual(body["status"], "healthy")
-        self.assertEqual(body["groupMembers"], {"http": 1, "smtp": 1})
+        self.assertEqual(body["groupMembers"], {"http": 1, "https": 1, "smtp": 1})
+
+    def test_missing_https_passthrough_member_is_degraded(self):
+        status, body = self.snapshot({"http-test": "online", "smtp-test": "online"})
+        self.assertEqual(status, 1)
+        self.assertEqual(body["status"], "degraded")
+        self.assertEqual(body["groupMembers"]["https"], 0)
 
     def test_running_services_without_tunnel_member_fail(self):
-        status, body = self.snapshot({"http-test": "offline", "smtp-test": "online"})
+        status, body = self.snapshot({"http-test": "offline", "https-test": "online", "smtp-test": "online"})
         self.assertEqual(status, 1)
         self.assertEqual(body["status"], "degraded")
         self.assertEqual(body["groupMembers"]["http"], 0)

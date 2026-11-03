@@ -145,10 +145,11 @@ class EntrypointTests(unittest.TestCase):
             proxies = {proxy["name"]: proxy for proxy in config["proxies"]}
             self.assertEqual({name: (proxy["remotePort"], proxy["loadBalancer"]["group"])
                               for name, proxy in proxies.items()},
-                             {"smtp-owner": (10025, "smtp"), "http-owner": (18080, "http")})
+                             {"smtp-owner": (10025, "smtp"), "http-owner": (18080, "http"),
+                              "https-owner": (18443, "https")})
             self.assertEqual(config["visitors"][0]["bindPort"], 2525)
             recovery = tomllib.loads(render_frpc_config(Path(tmp, "frpc.toml"), RECOVERY_MODE="true"))
-            self.assertEqual([proxy["name"] for proxy in recovery["proxies"]], ["http-owner"])
+            self.assertEqual([proxy["name"] for proxy in recovery["proxies"]], ["http-owner", "https-owner"])
 
     def test_frpc_tls_settings_follow_the_staged_rollout(self):
         pem = base64.b64encode(b"pem").decode()
