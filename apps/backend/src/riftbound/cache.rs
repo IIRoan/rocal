@@ -48,7 +48,6 @@ impl<V: Clone> TtlCache<V> {
                 .retain(|_, (stored, ..)| stored.elapsed() < ttl);
             inner.weight = inner.entries.values().map(|(_, weight, _)| weight).sum();
         }
-        // ponytail: drops everything once live entries fill the budget; LRU eviction if that churns.
         if inner.weight + weight > self.budget {
             inner.entries.clear();
             inner.weight = 0;

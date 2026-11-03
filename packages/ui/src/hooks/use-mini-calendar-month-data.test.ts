@@ -1,11 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import { addDays, eachDayOfInterval, endOfDay, startOfDay } from "date-fns";
+import { wallClockToUtc } from "@workspace/calendar-core";
 
 import type { CalendarEvent } from "../components/calendar/types";
 import {
   buildMiniCalendarDayEventsMap,
   toMiniCalendarDayKey,
 } from "./mini-calendar-day-events";
+
+const TIMEZONE = "Europe/Amsterdam";
 
 function createEvent(
   id: string,
@@ -16,8 +19,8 @@ function createEvent(
   return {
     id,
     title: id,
-    start: new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9, 0, 0),
-    end: new Date(day.getFullYear(), day.getMonth(), day.getDate(), 10, 0, 0),
+    start: wallClockToUtc(day, 9, 0, TIMEZONE),
+    end: wallClockToUtc(day, 10, 0, TIMEZONE),
     calendarId,
     color,
     userId: "user-1",
@@ -61,6 +64,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       ],
       calendarColorMap,
       visibleCalendarIds: new Set(["visible"]),
+      timezone: TIMEZONE,
     });
 
     expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([
@@ -83,6 +87,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
         createEvent("hidden-event", targetDay, "hidden", "pink"),
       ],
       calendarColorMap,
+      timezone: TIMEZONE,
     });
 
     expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([
@@ -105,6 +110,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       ],
       calendarColorMap,
       visibleCalendarIds: new Set(["visible"]),
+      timezone: TIMEZONE,
     });
 
     expect(
@@ -122,6 +128,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       cachedEvents: [],
       calendarColorMap,
       visibleCalendarIds: new Set(["visible"]),
+      timezone: TIMEZONE,
     });
 
     expect(dayEventsMap.get(toMiniCalendarDayKey(gridStart))).toEqual([]);
@@ -135,6 +142,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       gridEnd: endOfDay(gridEnd),
       cachedEvents: [createEvent("event-1", targetDay, "unmapped", "pink")],
       calendarColorMap,
+      timezone: TIMEZONE,
     });
 
     expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([
@@ -150,6 +158,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       gridEnd: endOfDay(gridEnd),
       cachedEvents: [createEvent("event-unstyled", targetDay, "unmapped")],
       calendarColorMap,
+      timezone: TIMEZONE,
     });
 
     expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([
@@ -171,6 +180,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       cachedEvents: [invalidEvent],
       calendarColorMap,
       visibleCalendarIds: new Set(["visible"]),
+      timezone: TIMEZONE,
     });
 
     expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([]);
@@ -187,6 +197,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       ],
       calendarColorMap,
       visibleCalendarIds: new Set(["visible"]),
+      timezone: TIMEZONE,
     });
 
     expect(dayEventsMap.get(toMiniCalendarDayKey(gridEnd))).toEqual([]);
@@ -211,6 +222,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       cachedEvents: [spanningEvent],
       calendarColorMap,
       visibleCalendarIds: new Set(["visible"]),
+      timezone: TIMEZONE,
     });
 
     expect(dayEventsMap.get(toMiniCalendarDayKey(gridStart))).toEqual([
@@ -220,4 +232,53 @@ describe("buildMiniCalendarDayEventsMap", () => {
       expect.objectContaining({ id: "spanning", color: "teal" }),
     ]);
   });
+});
+
+describe("buildMiniCalendarDayEventsMap in the account time zone", () => {
+  const gridStart = new Date(2026, 0, 5);
+  const gridEnd = addDays(gridStart, 6);
+  const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+  const day = new Date(2026, 0, 7);
+
+  // Zones far from any test machine's zone, so browser-local grouping would land on the wrong day.
+  it.each(["Pacific/Pago_Pago", "UTC", "Pacific/Kiritimati"])(
+    "puts near-midnight and all-day events on their %s day",
+    (timezone) => {
+      const base = createEvent("base", day, "visible");
+      const dayEventsMap = buildMiniCalendarDayEventsMap({
+        days,
+        gridStart,
+        gridEnd,
+        cachedEvents: [
+          {
+            ...base,
+            id: "after-midnight",
+            start: wallClockToUtc(day, 0, 30, timezone),
+            end: wallClockToUtc(day, 1, 0, timezone),
+          },
+          {
+            ...base,
+            id: "before-midnight",
+            start: wallClockToUtc(day, 23, 0, timezone),
+            end: wallClockToUtc(day, 23, 30, timezone),
+          },
+          {
+            ...base,
+            id: "all-day",
+            allDay: true,
+            start: new Date("2026-01-07T00:00:00.000Z"),
+            end: new Date("2026-01-08T00:00:00.000Z"),
+          },
+        ],
+        calendarColorMap: new Map(),
+        timezone,
+      });
+      const idsOn = (date: Date) =>
+        dayEventsMap.get(toMiniCalendarDayKey(date))?.map((event) => event.id);
+
+      expect(idsOn(addDays(day, -1))).toEqual([]);
+      expect(idsOn(day)).toEqual(["all-day", "after-midnight", "before-midnight"]);
+      expect(idsOn(addDays(day, 1))).toEqual([]);
+    },
+  );
 });

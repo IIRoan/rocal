@@ -4,12 +4,11 @@ import { createLogger } from "@workspace/logger";
 import {
   getZonedDateParts,
   isTodayInTimezone,
-  navigateCalendarDate,
+  navigateCalendarInstant,
   resolveTimezone,
   wallClockToUtc,
   type TimeFormat,
 } from "@workspace/calendar-core";
-import { addDays } from "date-fns";
 import { RefreshCw } from "lucide-react";
 import { toast } from "../../lib/toast";
 
@@ -21,7 +20,6 @@ import { useCalendarContext } from "./calendar-context";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { CalendarSkeleton } from "./calendar-skeleton";
 import {
-  AgendaDaysToShow,
   EventGap,
   EventHeight,
   WeekCellsHeight,
@@ -132,19 +130,11 @@ export function MobileEventCalendar({
   };
 
   const handlePrevious = () => {
-    navigateTo(
-      view === "agenda"
-        ? addDays(currentDate, -AgendaDaysToShow)
-        : navigateCalendarDate(currentDate, view, -1),
-    );
+    navigateTo(navigateCalendarInstant(currentDate, view, -1, resolvedTimezone));
   };
 
   const handleNext = () => {
-    navigateTo(
-      view === "agenda"
-        ? addDays(currentDate, AgendaDaysToShow)
-        : navigateCalendarDate(currentDate, view, 1),
-    );
+    navigateTo(navigateCalendarInstant(currentDate, view, 1, resolvedTimezone));
   };
 
   const handleEventSelect = (event: CalendarEvent) => {

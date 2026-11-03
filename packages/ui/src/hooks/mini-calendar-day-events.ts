@@ -1,4 +1,7 @@
-import { eachDayOfInterval } from "date-fns";
+import {
+  groupEventsByCalendarDay,
+  resolveTimezone,
+} from "@workspace/calendar-core";
 
 import type { CalendarEvent } from "../components/calendar/types";
 
@@ -23,6 +26,7 @@ interface BuildMiniCalendarDayEventsMapOptions {
   cachedEvents?: CalendarEvent[];
   calendarColorMap: Map<string, string>;
   visibleCalendarIds?: ReadonlySet<string>;
+  timezone?: string | null;
 }
 
 export function buildMiniCalendarDayEventsMap({
@@ -32,6 +36,7 @@ export function buildMiniCalendarDayEventsMap({
   cachedEvents,
   calendarColorMap,
   visibleCalendarIds,
+  timezone,
 }: BuildMiniCalendarDayEventsMapOptions) {
   const map = new Map<string, CalendarEvent[]>();
   for (const day of days) {
@@ -42,39 +47,21 @@ export function buildMiniCalendarDayEventsMap({
     return map;
   }
 
-  for (const rawEvent of cachedEvents) {
-    if (visibleCalendarIds && !visibleCalendarIds.has(rawEvent.calendarId)) {
-      continue;
-    }
+  const visible = visibleCalendarIds
+    ? cachedEvents.filter((event) => visibleCalendarIds.has(event.calendarId))
+    : cachedEvents;
+  const buckets = groupEventsByCalendarDay(
+    visible,
+    { firstDay: gridStart, lastDay: gridEnd },
+    resolveTimezone(timezone),
+  );
+  const withColor = (event: CalendarEvent): CalendarEvent => {
+    const color = resolveMiniCalendarIndicatorColor(event, calendarColorMap);
+    return color !== event.color ? { ...event, color } : event;
+  };
 
-    const rawStart = new Date(rawEvent.start);
-    const rawEnd = new Date(rawEvent.end);
-    if (isNaN(rawStart.getTime()) || isNaN(rawEnd.getTime())) continue;
-
-    const eventStart = rawStart < gridStart ? gridStart : rawStart;
-    const eventEnd = rawEnd > gridEnd ? gridEnd : rawEnd;
-    if (eventEnd < gridStart || eventStart > gridEnd) continue;
-
-    const resolvedColor = resolveMiniCalendarIndicatorColor(
-      rawEvent,
-      calendarColorMap,
-    );
-    const event: CalendarEvent =
-      resolvedColor !== rawEvent.color
-        ? { ...rawEvent, color: resolvedColor }
-        : rawEvent;
-
-    const daysInEvent = eachDayOfInterval({
-      start: eventStart,
-      end: eventEnd,
-    });
-
-    for (const day of daysInEvent) {
-      const key = toMiniCalendarDayKey(day);
-      const existing = map.get(key);
-      if (!existing || existing.length >= 3) continue;
-      existing.push(event);
-    }
+  for (const [key, bucket] of buckets) {
+    if (map.has(key)) map.set(key, bucket.slice(0, 3).map(withColor));
   }
 
   return map;

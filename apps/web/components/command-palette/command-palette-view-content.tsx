@@ -1,5 +1,6 @@
 "use client";
 
+import type { Ref } from "react";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import type { UserSettings } from "@/lib/types/calendar";
 import { parseWorkingDays } from "@/lib/calendar-view-model";
@@ -22,6 +23,7 @@ import type { PaletteView } from "./constants";
 import { CommandPaletteMainSearchView } from "./main-search-view";
 import { Settings } from "lucide-react";
 import type { EventEditorMode } from "../command-palette-context";
+import type { EventEditorCloseHandle } from "../event-editor";
 import { PaletteViewHeader } from "./palette-ui";
 
 type CommandPaletteViewContentProps = {
@@ -63,6 +65,7 @@ type CommandPaletteViewContentProps = {
   popoverAnchorPosition: { x: number; y: number } | null;
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
   calendars: Array<{ id: string }> | undefined;
+  eventEditorCloseRef: Ref<EventEditorCloseHandle>;
 };
 
 export function CommandPaletteViewContent({
@@ -95,6 +98,7 @@ export function CommandPaletteViewContent({
   popoverAnchorPosition,
   updatePreviewEvent,
   calendars,
+  eventEditorCloseRef,
 }: CommandPaletteViewContentProps) {
   const workingDaysList = parseWorkingDays(localSettings.workingDays);
 
@@ -270,6 +274,7 @@ export function CommandPaletteViewContent({
         anchorPosition={popoverAnchorPosition}
         updatePreviewEvent={updatePreviewEvent}
         showBackButton
+        closeHandleRef={eventEditorCloseRef}
       />
     );
   }

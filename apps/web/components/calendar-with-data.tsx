@@ -13,7 +13,7 @@ import { useRecurringMovePrompt } from "@/hooks/use-recurring-move-prompt";
 import { useEventDeletePrompt } from "@/hooks/use-event-delete-prompt";
 import { useCommandPalette } from "./command-palette-context";
 import { RecurringScopeModal } from "./command-palette/recurring-scope-modal";
-import { EventDeleteConfirmDialog } from "./event-editor/event-delete-confirm-dialog";
+import { EventConfirmDialog } from "./event-editor/event-confirm-dialog";
 import { useCalendarWorkspaceReady } from "@/components/calendar-workspace-ready";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
@@ -72,7 +72,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         initialView={initialView}
         events={transformedEvents}
         categories={calendarData.categories}
-        loading={false}
+        loading={settingsLoading}
         eventsLoading={calendarData.eventsLoading}
         error={calendarData.error}
         onCreateEvent={calendarData.createEvent}
@@ -96,7 +96,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         onPrefetchRange={calendarData.prefetchRange}
       />
       <RecurringScopeModal action="edit" {...scopePrompt} />
-      <EventDeleteConfirmDialog {...deleteConfirmPrompt} />
+      <EventConfirmDialog {...deleteConfirmPrompt} />
       <RecurringScopeModal {...deleteScopePrompt} />
       {FORCE_LOADING_DESIGN_PREVIEW ? (
         <PageLoadingOverlay

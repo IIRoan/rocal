@@ -8,6 +8,7 @@ export { useMiniCalendarMonthData } from "./use-mini-calendar-month-data";
 export { usePrefersReducedMotion } from "./use-prefers-reduced-motion";
 export { usePaintedValue } from "./use-painted-value";
 export { useDrawerViewport } from "./use-drawer-viewport";
+export { useShortcutLabel } from "./use-shortcut-label";
 export {
   useKeyboardShortcuts,
   useDropdownShortcuts,

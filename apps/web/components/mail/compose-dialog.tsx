@@ -13,7 +13,7 @@ import {
   AlignLeft,
   Type,
 } from "lucide-react";
-import { useId, useRef, useState, useEffect } from "react";
+import { useEffectEvent, useId, useRef, useState, useEffect } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   useMailCompose,
@@ -36,7 +36,7 @@ import {
 } from "@workspace/ui/components/ui/drawer";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Button } from "@workspace/ui/components/ui/button";
-import { useIsMobile } from "@workspace/ui/hooks";
+import { useIsMobile, useShortcutLabel } from "@workspace/ui/hooks";
 import type { JmapIdentity } from "@/lib/mail/types";
 import {
   canSendCompose,
@@ -234,7 +234,8 @@ export function ComposeForm({
   isBusy,
   onImageUpload,
   activeMailbox = null,
-}: ComposeDialogProps) {
+  autoFocus = false,
+}: ComposeDialogProps & { autoFocus?: boolean }) {
   const {
     composeTo,
     setComposeTo,
@@ -300,6 +301,8 @@ export function ComposeForm({
   const fieldId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
+  const sendShortcut = useShortcutLabel("↵");
+  const hasRecipients = composeTo.trim().length > 0;
 
   const selectedIdentity =
     identities.find((identity) => identity.id === selectedIdentityId) ??
@@ -328,6 +331,23 @@ export function ComposeForm({
     quotedAttachments,
     activeMailbox,
   });
+
+  // Only the editor the dialog opens with takes the initial focus; one created by a later mode switch leaves the caret alone.
+  const editorAutoFocusRef = useRef(autoFocus && !plainTextMode);
+  const focusComposeStart = useEffectEvent(() => {
+    if (!hasRecipients) {
+      document.getElementById(`${fieldId}-to`)?.focus();
+      return;
+    }
+    if (plainTextMode) {
+      bodyRef.current?.focus();
+      bodyRef.current?.setSelectionRange(0, 0);
+    }
+  });
+
+  useEffect(() => {
+    if (autoFocus) focusComposeStart();
+  }, [autoFocus]);
 
   useEffect(() => {
     const previousMode = prevPlainTextModeRef.current;
@@ -947,6 +967,11 @@ export function ComposeForm({
             onEditorReady={(nextEditor) => {
               editorRef.current = nextEditor;
               setFormatEditor(nextEditor);
+              if (editorAutoFocusRef.current && hasRecipients) {
+                // The editor loads the quoted reply a frame later; focusing first would push the caret below it.
+                requestAnimationFrame(() => nextEditor.commands.focus("start"));
+              }
+              editorAutoFocusRef.current = false;
             }}
           />
         )}
@@ -1077,7 +1102,7 @@ export function ComposeForm({
         ) : (
           <span className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
             <kbd className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">
-              ⌘↵
+              {sendShortcut}
             </kbd>
             to send
           </span>
@@ -1203,6 +1228,8 @@ export function ComposeDialog({
         showOverlay={false}
         aria-describedby={undefined}
         className="left-auto right-2 bottom-2 translate-x-0 overflow-hidden p-0 flex flex-col min-h-[500px] w-[min(50vw,800px)] min-w-[min(100%,680px)] max-h-[min(920px,calc(100dvh-16px))] rounded-[20px] bg-[var(--bg-l2-solid)] border-[var(--border-secondary)] shadow-[var(--shadow-l3)]"
+        // ComposeForm focuses To, or the body when replying, instead of the first header button.
+        onOpenAutoFocus={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={handleDismissRequest}
@@ -1210,7 +1237,7 @@ export function ComposeDialog({
         <VisuallyHidden>
           <DialogTitle>New mail</DialogTitle>
         </VisuallyHidden>
-        <ComposeForm {...formProps} />
+        <ComposeForm {...formProps} autoFocus />
       </DialogContent>
     </Dialog>
   );

@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   format,
   isSameDay,
   isSameMonth,
-  isToday,
   addMonths,
   subMonths,
-  startOfMonth,
-  endOfMonth,
 } from "date-fns";
+import {
+  getPaddedCalendarMonthRange,
+  isTodayInTimezone,
+  resolveTimezone,
+  utcToPickerDate,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent } from "../calendar/types";
@@ -32,6 +36,7 @@ interface SidebarCalendarProps {
   className?: string;
   isMobile?: boolean;
   weekStartDay?: number;
+  timezone?: string;
 }
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -43,10 +48,22 @@ export function SidebarCalendar({
   className,
   isMobile = false,
   weekStartDay = 1,
+  timezone,
 }: SidebarCalendarProps) {
   const { currentDate, setCurrentDate, calendars, getVisibleCalendars } =
     useCalendarContext();
-  const [calendarMonth, setCalendarMonth] = useState<Date>(currentDate);
+  const resolvedTimezone = resolveTimezone(timezone);
+  const selectedDay = useMemo(
+    () => utcToPickerDate(currentDate, resolvedTimezone),
+    [currentDate, resolvedTimezone],
+  );
+  // A browsed month holds only until the selected date or zone changes.
+  const [browsedMonth, setBrowsedMonth] = useState<{
+    selectedDay: Date;
+    month: Date;
+  } | null>(null);
+  const calendarMonth =
+    browsedMonth?.selectedDay === selectedDay ? browsedMonth.month : selectedDay;
   const slideDirectionRef = useRef<1 | -1>(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const monthStageRef = useRef<HTMLDivElement>(null);
@@ -58,16 +75,6 @@ export function SidebarCalendar({
     [getVisibleCalendars],
   );
 
-  useEffect(() => {
-    if (currentDate && !isNaN(currentDate.getTime())) {
-      setCalendarMonth(currentDate);
-    } else {
-      const now = new Date();
-      setCalendarMonth(now);
-      setCurrentDate(now);
-    }
-  }, [currentDate, setCurrentDate]);
-
   const weekdayLabels = WEEKDAY_LABELS.map(
     (_, index) => WEEKDAY_LABELS[(weekStartDay + index) % 7],
   );
@@ -78,13 +85,14 @@ export function SidebarCalendar({
     getCachedEventsForRange,
     prefetchRange,
     weekStartDay,
+    timezone: resolvedTimezone,
   });
 
   const goToPreviousMonth = () => {
     if (swipeLockRef.current) return;
     swipeLockRef.current = true;
     slideDirectionRef.current = -1;
-    setCalendarMonth((prev) => subMonths(prev, 1));
+    setBrowsedMonth({ selectedDay, month: subMonths(calendarMonth, 1) });
     window.setTimeout(() => {
       swipeLockRef.current = false;
     }, 100);
@@ -94,7 +102,7 @@ export function SidebarCalendar({
     if (swipeLockRef.current) return;
     swipeLockRef.current = true;
     slideDirectionRef.current = 1;
-    setCalendarMonth((prev) => addMonths(prev, 1));
+    setBrowsedMonth({ selectedDay, month: addMonths(calendarMonth, 1) });
     window.setTimeout(() => {
       swipeLockRef.current = false;
     }, 100);
@@ -103,7 +111,7 @@ export function SidebarCalendar({
   const hoverPrefetchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefetchMonth = (month: Date) => {
     if (!prefetchRange) return;
-    prefetchRange({ start: startOfMonth(month), end: endOfMonth(month) });
+    prefetchRange(getPaddedCalendarMonthRange(month, 0, resolvedTimezone));
   };
   const schedulePrefetch = (month: Date) => {
     if (hoverPrefetchRef.current) clearTimeout(hoverPrefetchRef.current);
@@ -115,9 +123,9 @@ export function SidebarCalendar({
 
   const goToToday = () => {
     const now = new Date();
-    const isGoingForward = now.getTime() >= calendarMonth.getTime();
+    const today = utcToPickerDate(now, resolvedTimezone);
+    const isGoingForward = today.getTime() >= calendarMonth.getTime();
     slideDirectionRef.current = isGoingForward ? 1 : -1;
-    setCalendarMonth(now);
     setCurrentDate(now);
     onDateSelect?.(now);
   };
@@ -197,9 +205,9 @@ export function SidebarCalendar({
 
           <div className="grid grid-cols-7">
             {grid.days.map((day) => {
-              const isSelected = isSameDay(day, currentDate);
+              const isSelected = isSameDay(day, selectedDay);
               const isCurrentMonth = isSameMonth(day, calendarMonth);
-              const isCurrentDay = isToday(day);
+              const isCurrentDay = isTodayInTimezone(day, resolvedTimezone);
               const dayEvents = dayEventsMap.get(toDayKey(day)) || [];
 
               return (
@@ -210,8 +218,9 @@ export function SidebarCalendar({
                   aria-current={isCurrentDay ? "date" : undefined}
                   aria-pressed={isSelected}
                   onClick={() => {
-                    setCurrentDate(day);
-                    onDateSelect?.(day);
+                    const date = wallClockToUtc(day, 12, 0, resolvedTimezone);
+                    setCurrentDate(date);
+                    onDateSelect?.(date);
                   }}
                   onMouseEnter={() => schedulePrefetch(day)}
                   onMouseLeave={cancelPrefetch}

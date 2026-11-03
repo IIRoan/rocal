@@ -10,21 +10,23 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 
-export function EventDeleteConfirmDialog({
-  eventTitle,
+export function EventConfirmDialog({
+  cancelLabel = "Cancel",
+  confirmLabel,
+  description,
   onConfirm,
   onOpenChange,
   open,
-  removeOnly,
+  title,
 }: {
-  eventTitle: string;
+  cancelLabel?: string;
+  confirmLabel: string;
+  description: string;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
-  removeOnly: boolean;
+  title: string;
 }) {
-  const title = eventTitle || "Untitled event";
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -32,23 +34,15 @@ export function EventDeleteConfirmDialog({
         className="w-[calc(100dvw-1rem)] sm:w-auto sm:max-w-sm"
       >
         <DialogHeader>
-          <DialogTitle>
-            {removeOnly
-              ? `Remove “${title}” from your calendar?`
-              : `Delete “${title}”?`}
-          </DialogTitle>
-          <DialogDescription>
-            {removeOnly
-              ? "The cancelled event leaves your calendar. You can’t undo this."
-              : "This permanently deletes the event. You can’t undo this."}
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
+            {cancelLabel}
           </Button>
           <Button variant="destructive" size="sm" onClick={onConfirm}>
-            {removeOnly ? "Remove event" : "Delete event"}
+            {confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

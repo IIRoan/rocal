@@ -10,15 +10,6 @@ import {
   validateEventData,
 } from "@workspace/calendar-core";
 
-export function roundToNextHour(date: Date): Date {
-  const d = new Date(date);
-  if (d.getMinutes() > 0 || d.getSeconds() > 0 || d.getMilliseconds() > 0) {
-    // repo-rules-allow timezone-safe-calendar-code: rounds the device's current local time into a default picker wall-clock value, not an event instant.
-    d.setHours(d.getHours() + 1, 0, 0, 0);
-  }
-  return d;
-}
-
 /** Format a Date to `YYYY-MM-DDTHH:mm` for the text inputs. */
 export function toLocalISOString(date: Date): string {
   const y = date.getFullYear();

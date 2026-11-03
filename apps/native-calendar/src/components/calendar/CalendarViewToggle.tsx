@@ -27,13 +27,13 @@ export function CalendarViewToggle({
   return (
     <View style={styles.track} accessibilityRole="tablist">
       {SIDEBAR_VIEW_OPTIONS.map((option) => {
-        const selected = option.view === activeView;
+        const selected = option.value === activeView;
 
         return (
           <Pressable
-            key={option.view}
+            key={option.value}
             onPress={() => {
-              if (!selected) onViewChange(option.view);
+              if (!selected) onViewChange(option.value);
             }}
             style={({ pressed }) => [
               styles.segment,

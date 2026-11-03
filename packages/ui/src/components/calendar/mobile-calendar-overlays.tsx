@@ -26,6 +26,7 @@ export function MobileCalendarOverlays({
   prefetchRange,
   user,
   weekStartDay,
+  timezone,
 }: {
   getCachedEventsForRange?: (range: {
     start: Date;
@@ -44,6 +45,7 @@ export function MobileCalendarOverlays({
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   user?: User;
   weekStartDay?: number;
+  timezone?: string;
 }) {
   return (
     <>
@@ -70,6 +72,7 @@ export function MobileCalendarOverlays({
               onDateSelect={onCloseQuickNav}
               isMobile={true}
               weekStartDay={weekStartDay}
+              timezone={timezone}
             />
           </div>
         </DrawerContent>
@@ -100,6 +103,7 @@ export function MobileCalendarOverlays({
               prefetchRange={prefetchRange}
               isMobile={true}
               weekStartDay={weekStartDay}
+              timezone={timezone}
             />
           </SidebarProvider>
         </SheetContent>

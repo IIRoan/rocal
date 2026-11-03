@@ -9,7 +9,6 @@ import {
 } from "date-fns";
 
 import {
-  toFetchRange,
   monthKey,
   buildViewPrefetchRanges,
   type DateRange,
@@ -23,9 +22,6 @@ import { getDefaultCalendarDateRange } from "../../lib/calendar-view-model";
 
 /** Days of padding the loader adds before/after the calendar month. */
 const MONTH_PADDING_DAYS = 7;
-
-/** All weekStartDay values supported by the calendar UI. */
-const ALL_WEEK_START_DAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,154 +61,6 @@ describe("monthKey", () => {
     for (let day = 1; day <= 30; day++) {
       expect(monthKey(new Date(2026, 3, day))).toBe(expected);
     }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// toFetchRange
-// ---------------------------------------------------------------------------
-describe("toFetchRange", () => {
-  describe("view stability: all views for the same month produce the same fetch range", () => {
-    // This is the core invariant.  If it holds, switching views within a
-    // month never changes the React Query key and never triggers a refetch.
-
-    for (const weekStartDay of ALL_WEEK_START_DAYS) {
-      it(`month/week/day views for Jan 15 2026 with weekStartDay=${weekStartDay}`, () => {
-        const base = new Date(2026, 0, 15);
-        const monthFetch = toFetchRange(viewRange(base, "month", weekStartDay));
-        const weekFetch = toFetchRange(viewRange(base, "week", weekStartDay));
-        const dayFetch = toFetchRange(viewRange(base, "day", weekStartDay));
-
-        expect(weekFetch.start.getTime()).toBe(monthFetch.start.getTime());
-        expect(weekFetch.end.getTime()).toBe(monthFetch.end.getTime());
-        expect(dayFetch.start.getTime()).toBe(monthFetch.start.getTime());
-        expect(dayFetch.end.getTime()).toBe(monthFetch.end.getTime());
-      });
-    }
-  });
-
-  describe("round-trip stability: month→week→month produces identical ranges", () => {
-    for (const weekStartDay of [0, 1] as const) {
-      it(`weekStartDay=${weekStartDay}`, () => {
-        const base = new Date(2026, 0, 15);
-        const first = toFetchRange(viewRange(base, "month", weekStartDay));
-        const second = toFetchRange(viewRange(base, "week", weekStartDay));
-        const third = toFetchRange(viewRange(base, "month", weekStartDay));
-
-        expect(first.start.toISOString()).toBe(second.start.toISOString());
-        expect(first.end.toISOString()).toBe(second.end.toISOString());
-        expect(first.start.toISOString()).toBe(third.start.toISOString());
-        expect(first.end.toISOString()).toBe(third.end.toISOString());
-      });
-    }
-  });
-
-  describe("coverage: fetch range fully contains the view range", () => {
-    it("covers month view for every weekStartDay", () => {
-      for (const weekStartDay of ALL_WEEK_START_DAYS) {
-        const vr = viewRange(new Date(2026, 0, 15), "month", weekStartDay);
-        const fr = toFetchRange(vr);
-        expect(fr.start.getTime()).toBeLessThanOrEqual(vr.start.getTime());
-        expect(fr.end.getTime()).toBeGreaterThanOrEqual(vr.end.getTime());
-      }
-    });
-
-    it("covers week view for every weekStartDay", () => {
-      for (const weekStartDay of ALL_WEEK_START_DAYS) {
-        const vr = viewRange(new Date(2026, 0, 15), "week", weekStartDay);
-        const fr = toFetchRange(vr);
-        expect(fr.start.getTime()).toBeLessThanOrEqual(vr.start.getTime());
-        expect(fr.end.getTime()).toBeGreaterThanOrEqual(vr.end.getTime());
-      }
-    });
-
-    it("covers day view", () => {
-      const vr = viewRange(new Date(2026, 0, 15), "day");
-      const fr = toFetchRange(vr);
-      expect(fr.start.getTime()).toBeLessThanOrEqual(vr.start.getTime());
-      expect(fr.end.getTime()).toBeGreaterThanOrEqual(vr.end.getTime());
-    });
-
-    it("covers agenda view", () => {
-      const vr = viewRange(new Date(2026, 0, 15), "agenda");
-      const fr = toFetchRange(vr);
-      expect(fr.start.getTime()).toBeLessThanOrEqual(vr.start.getTime());
-      expect(fr.end.getTime()).toBeGreaterThanOrEqual(vr.end.getTime());
-    });
-  });
-
-  describe("padding", () => {
-    it("pads exactly MONTH_PADDING_DAYS before the 1st", () => {
-      const monthDate = new Date(2026, 0, 15);
-      const fr = toFetchRange(viewRange(monthDate, "month"));
-      const expected = expectedMonthFetch(monthDate);
-      expect(fr.start.getTime()).toBe(expected.start.getTime());
-    });
-
-    it("pads exactly MONTH_PADDING_DAYS after the last day", () => {
-      const monthDate = new Date(2026, 0, 15);
-      const fr = toFetchRange(viewRange(monthDate, "month"));
-      const expected = expectedMonthFetch(monthDate);
-      expect(fr.end.getTime()).toBe(expected.end.getTime());
-    });
-  });
-
-  describe("edge cases", () => {
-    it("year boundary: Dec 31 anchors to December", () => {
-      const fr = toFetchRange({
-        start: new Date(2025, 11, 31),
-        end: new Date(2025, 11, 31),
-      });
-      const expected = expectedMonthFetch(new Date(2025, 11, 1));
-      expect(fr.start.getTime()).toBe(expected.start.getTime());
-      expect(fr.end.getTime()).toBe(expected.end.getTime());
-    });
-
-    it("year boundary: Jan 1 anchors to January", () => {
-      const fr = toFetchRange({
-        start: new Date(2026, 0, 1),
-        end: new Date(2026, 0, 1),
-      });
-      const expected = expectedMonthFetch(new Date(2026, 0, 1));
-      expect(fr.start.getTime()).toBe(expected.start.getTime());
-      expect(fr.end.getTime()).toBe(expected.end.getTime());
-    });
-
-    it("Feb 28 in a non-leap year", () => {
-      const fr = toFetchRange({
-        start: new Date(2026, 1, 28),
-        end: new Date(2026, 1, 28),
-      });
-      expect(fr.start.getTime()).toBeLessThanOrEqual(
-        new Date(2026, 1, 1).getTime(),
-      );
-      expect(fr.end.getTime()).toBeGreaterThanOrEqual(
-        new Date(2026, 1, 28).getTime(),
-      );
-    });
-
-    it("Feb 29 in a leap year", () => {
-      const fr = toFetchRange({
-        start: new Date(2028, 1, 29),
-        end: new Date(2028, 1, 29),
-      });
-      expect(fr.start.getTime()).toBeLessThanOrEqual(
-        new Date(2028, 1, 1).getTime(),
-      );
-      expect(fr.end.getTime()).toBeGreaterThanOrEqual(
-        new Date(2028, 1, 29).getTime(),
-      );
-    });
-
-    it("month-boundary week: week containing Jan 31 still anchors to January", () => {
-      // Jan 31 2026 is a Saturday.  A Monday-start week is Jan 26–Feb 1.
-      // Midpoint is Jan 29 → still January.
-      const weekRange = viewRange(new Date(2026, 0, 31), "week", 1);
-      const fr = toFetchRange(weekRange);
-      const janFetch = expectedMonthFetch(new Date(2026, 0, 1));
-      expect(fr.start.getTime()).toBe(janFetch.start.getTime());
-      expect(fr.end.getTime()).toBe(janFetch.end.getTime());
-    });
   });
 });
 

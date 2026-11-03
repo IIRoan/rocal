@@ -1,17 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  addDays,
-  eachDayOfInterval,
-  endOfDay,
-  startOfDay,
-  startOfMonth,
-  startOfWeek,
-} from "date-fns";
+import { addDays, eachDayOfInterval, startOfMonth, startOfWeek } from "date-fns";
 import {
   buildPaddedCalendarMonthRanges,
   getCalendarMonthKey,
+  getZonedDayUtcBounds,
 } from "@workspace/calendar-core";
 import type { CalendarEvent } from "../components/calendar/types";
 import {
@@ -37,6 +31,7 @@ interface UseMiniCalendarMonthDataOptions {
   prefetchRange?: (range: DateRange) => void;
   rangeChangeDebounceMs?: number;
   weekStartDay?: number;
+  timezone: string;
 }
 
 export function useMiniCalendarMonthData({
@@ -47,6 +42,7 @@ export function useMiniCalendarMonthData({
   prefetchRange,
   rangeChangeDebounceMs = 120,
   weekStartDay = 1,
+  timezone,
 }: UseMiniCalendarMonthDataOptions) {
   const grid = useMemo(() => {
     const monthStart = startOfMonth(calendarMonth);
@@ -57,6 +53,14 @@ export function useMiniCalendarMonthData({
     const days = eachDayOfInterval({ start, end });
     return { start, end, days };
   }, [calendarMonth, weekStartDay]);
+
+  const gridRange = useMemo(
+    () => ({
+      start: getZonedDayUtcBounds(grid.start, timezone).start,
+      end: getZonedDayUtcBounds(grid.end, timezone).end,
+    }),
+    [grid, timezone],
+  );
 
   const monthKey = getCalendarMonthKey(calendarMonth);
 
@@ -74,6 +78,7 @@ export function useMiniCalendarMonthData({
     const run = () => {
       for (const range of buildPaddedCalendarMonthRanges(calendarMonth, {
         adjacentMonthDepth: 2,
+        timezone,
       })) {
         prefetchRange(range);
       }
@@ -88,7 +93,7 @@ export function useMiniCalendarMonthData({
     }, rangeChangeDebounceMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [calendarMonth, prefetchRange, rangeChangeDebounceMs]);
+  }, [calendarMonth, prefetchRange, rangeChangeDebounceMs, timezone]);
 
   // Periodically check for new cached data to pick up prefetch results
   const [cacheBuster, setCacheBuster] = useState(0);
@@ -98,10 +103,7 @@ export function useMiniCalendarMonthData({
     if (!getCachedEventsForRange) return;
 
     const check = () => {
-      const cached = getCachedEventsForRange({
-        start: grid.start,
-        end: grid.end,
-      });
+      const cached = getCachedEventsForRange(gridRange);
       const count = cached?.length ?? 0;
       if (count !== lastEventCountRef.current) {
         lastEventCountRef.current = count;
@@ -115,7 +117,7 @@ export function useMiniCalendarMonthData({
     // Then poll at a low frequency
     const intervalId = window.setInterval(check, 1000);
     return () => window.clearInterval(intervalId);
-  }, [getCachedEventsForRange, grid.start, grid.end]);
+  }, [getCachedEventsForRange, gridRange]);
 
   // Build a calendar color lookup map
   const calendarColorMap = useMemo(() => {
@@ -131,32 +133,33 @@ export function useMiniCalendarMonthData({
     if (!getCachedEventsForRange) {
       return buildMiniCalendarDayEventsMap({
         days: grid.days,
-        gridStart: startOfDay(grid.start),
-        gridEnd: endOfDay(grid.end),
+        gridStart: grid.start,
+        gridEnd: grid.end,
         calendarColorMap,
         visibleCalendarIds,
+        timezone,
       });
     }
 
-    const cachedEvents = getCachedEventsForRange({
-      start: grid.start,
-      end: grid.end,
-    });
+    const cachedEvents = getCachedEventsForRange(gridRange);
 
     return buildMiniCalendarDayEventsMap({
       days: grid.days,
-      gridStart: startOfDay(grid.start),
-      gridEnd: endOfDay(grid.end),
+      gridStart: grid.start,
+      gridEnd: grid.end,
       cachedEvents,
       calendarColorMap,
       visibleCalendarIds,
+      timezone,
     });
   }, [
     grid,
+    gridRange,
     getCachedEventsForRange,
     cacheBuster,
     calendarColorMap,
     visibleCalendarIds,
+    timezone,
   ]);
 
   return { grid, dayEventsMap, monthKey, toDayKey: toMiniCalendarDayKey };

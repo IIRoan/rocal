@@ -88,7 +88,7 @@ describe("useEventDeletePrompt", () => {
     act(() => prompt.requestDelete(single));
 
     expect(prompt.confirmPrompt.open).toBe(true);
-    expect(prompt.confirmPrompt.eventTitle).toBe("Planning");
+    expect(prompt.confirmPrompt.title).toBe("Delete “Planning”?");
     expect(prompt.scopePrompt.open).toBe(false);
     expect(deleteEvent).not.toHaveBeenCalled();
 

@@ -50,6 +50,7 @@ export type RecipientSuggestInputProps = {
   value: string;
   onChangeText: (text: string) => void;
   placeholder: string;
+  accessibilityLabel?: string;
   mode?: "mail" | "calendar";
   onSelectSuggestion?: (entry: RecentContactEntry) => void;
   onSubmitEditing?: () => void;
@@ -71,6 +72,7 @@ export function RecipientSuggestInput({
   value,
   onChangeText,
   placeholder,
+  accessibilityLabel,
   mode = "mail",
   onSelectSuggestion,
   onSubmitEditing,
@@ -221,6 +223,7 @@ export function RecipientSuggestInput({
             }, BLUR_CLOSE_MS);
           }}
           placeholder={placeholder}
+          accessibilityLabel={accessibilityLabel}
           placeholderTextColor={theme.colors.mutedForeground}
           keyboardType="email-address"
           autoCapitalize="none"

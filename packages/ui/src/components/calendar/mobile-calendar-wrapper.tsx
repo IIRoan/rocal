@@ -9,13 +9,12 @@ import React, {
   useCallback,
 } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import { afterPaint } from "@workspace/calendar-core";
+import { afterPaint, navigateCalendarInstant } from "@workspace/calendar-core";
 import {
   MobileEventCalendar,
   MobileEventCalendarProps,
 } from "./mobile-event-calendar";
 import { MobileCalendarOverlays } from "./mobile-calendar-overlays";
-import { shiftMobileCalendarDate } from "./mobile-calendar-navigation";
 import { MobileTopNav } from "../navigation/mobile-top-nav";
 import { useCalendarContext } from "./calendar-context";
 import { useIsMobile } from "../../hooks/use-mobile";
@@ -78,22 +77,22 @@ export function MobileCalendarWrapper({
     setCurrentView(view);
   };
 
-  const handlePrevious = useCallback(() => {
-    setCurrentDate(shiftMobileCalendarDate(currentDate, currentView, -1));
-  }, [currentDate, currentView, setCurrentDate]);
-
-  const handleNext = useCallback(() => {
-    setCurrentDate(shiftMobileCalendarDate(currentDate, currentView, 1));
-  }, [currentDate, currentView, setCurrentDate]);
-
   const prevDate = useMemo(
-    () => shiftMobileCalendarDate(currentDate, currentView, -1),
-    [currentDate, currentView],
+    () => navigateCalendarInstant(currentDate, currentView, -1, props.timezone),
+    [currentDate, currentView, props.timezone],
   );
   const nextDate = useMemo(
-    () => shiftMobileCalendarDate(currentDate, currentView, 1),
-    [currentDate, currentView],
+    () => navigateCalendarInstant(currentDate, currentView, 1, props.timezone),
+    [currentDate, currentView, props.timezone],
   );
+
+  const handlePrevious = useCallback(() => {
+    setCurrentDate(prevDate);
+  }, [prevDate, setCurrentDate]);
+
+  const handleNext = useCallback(() => {
+    setCurrentDate(nextDate);
+  }, [nextDate, setCurrentDate]);
 
   // Embla Carousel - 3 slides, start on center (index 1)
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -264,6 +263,7 @@ export function MobileCalendarWrapper({
         prefetchRange={prefetchRange}
         user={user}
         weekStartDay={props.weekStartDay}
+        timezone={props.timezone}
       />
     </div>
   );

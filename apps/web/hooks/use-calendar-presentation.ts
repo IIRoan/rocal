@@ -96,7 +96,11 @@ export function useCalendarPresentation({
       return;
     }
 
-    const ranges = buildViewPrefetchRanges(currentDate, currentView);
+    const ranges = buildViewPrefetchRanges(
+      currentDate,
+      currentView,
+      settings?.timezone,
+    );
     const eagerRanges = ranges.slice(0, 2);
     const deferredRanges = ranges.slice(2);
 
@@ -128,7 +132,7 @@ export function useCalendarPresentation({
 
     const id = setTimeout(runDeferredPrefetch, 32);
     return () => clearTimeout(id);
-  }, [currentDate, currentView, prefetchRange]);
+  }, [currentDate, currentView, prefetchRange, settings?.timezone]);
 
   return {
     defaultCalendarId,

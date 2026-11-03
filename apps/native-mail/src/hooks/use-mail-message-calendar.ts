@@ -3,6 +3,7 @@ import {
   buildEventReminderMailView,
   formatDateTimeLabel,
   isDecryptedEventReminderContent,
+  isNotFoundError,
   resolveTimezone,
 } from "@workspace/calendar-core";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
@@ -70,7 +71,9 @@ export function useMailMessageCalendar({
       Boolean(linkedCalendarEventId) && isEventReminderEmail && isE2eeReady,
     // Non-null: enabled only when linkedCalendarEventId is set.
     queryFn: () => calendarApiService.getEvent(linkedCalendarEventId!),
+    retry: (failureCount, error) => failureCount < 1 && !isNotFoundError(error),
   });
+  const isLinkedEventDeleted = isNotFoundError(linkedEventError);
   const { data: userSettings } = useQuery({
     queryKey: QUERY_KEYS.settings(),
     queryFn: () => calendarApiService.getUserSettings(),
@@ -109,7 +112,9 @@ export function useMailMessageCalendar({
     eventReminderView,
     isReminderEventLoading,
     isLinkedEventSuccess,
-    linkedEventError: isLinkedEventError ? linkedEventError : null,
+    isLinkedEventDeleted,
+    linkedEventError:
+      isLinkedEventError && !isLinkedEventDeleted ? linkedEventError : null,
     userSettings,
   };
 }

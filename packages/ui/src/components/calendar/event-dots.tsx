@@ -18,6 +18,10 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { useNumberedShortcuts } from "../../hooks/use-keyboard-shortcuts";
+import {
+  formatShortcut,
+  useIsApplePlatform,
+} from "../../hooks/use-shortcut-label";
 import { SimpleTooltip } from "../ui/tooltip";
 
 interface EventDotsProps {
@@ -42,6 +46,7 @@ export function EventDots({
   timezone,
 }: EventDotsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const isApplePlatform = useIsApplePlatform();
 
   // Must run before any early return (rules of hooks).
   useNumberedShortcuts(
@@ -186,7 +191,7 @@ export function EventDots({
                 </div>
                 {showShortcut && (
                   <DropdownMenuShortcut>
-                    ⌘+{shortcutNumber}
+                    {formatShortcut(String(shortcutNumber), isApplePlatform)}
                   </DropdownMenuShortcut>
                 )}
               </DropdownMenuItem>

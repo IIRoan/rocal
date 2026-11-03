@@ -547,7 +547,7 @@ async function openMailboxSearch() {
     trigger!.click();
   });
   const searchInput = container.querySelector<HTMLInputElement>(
-    'input[placeholder*="Search all messages"]',
+    'input[aria-label="Search messages"]',
   );
   expect(searchInput).not.toBeNull();
   return searchInput!;
@@ -1122,7 +1122,7 @@ describe("MailApp", () => {
     });
 
     const searchInput = container.querySelector<HTMLInputElement>(
-      'input[placeholder*="Search all messages"]',
+      'input[aria-label="Search messages"]',
     );
     expect(searchInput).not.toBeNull();
 
@@ -1417,9 +1417,17 @@ describe("MailApp", () => {
 
     await waitForExpectation(() => {
       expect(mockJmapClient.searchMailboxMessages).toHaveBeenCalled();
-      expect(container.textContent).toContain("No messages");
+      expect(container.textContent).toContain("No results for “nomatch”");
+      expect(container.textContent).toContain("Search covers Inbox only.");
       expect(container.textContent).not.toContain("Encrypted hello");
     });
+
+    act(() => {
+      setInputValue(searchInput!, "");
+    });
+
+    expect(container.textContent).not.toContain("No messages match these filters");
+    expect(container.textContent).toContain("Encrypted hello");
   });
 
   it("clears inline search when switching mailboxes", async () => {
@@ -1485,7 +1493,7 @@ describe("MailApp", () => {
 
     await waitForExpectation(() => {
       expect(
-        container.querySelector('input[placeholder*="Search all messages"]'),
+        container.querySelector('input[aria-label="Search messages"]'),
       ).toBeNull();
       expect(container.textContent).toContain("Sent item");
       expect(container.textContent).not.toContain("Encrypted hello");

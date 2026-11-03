@@ -81,8 +81,8 @@ export function MobileThreeDayView({
   const resolvedTimezone = resolveTimezone(timezone);
 
   const days = useMemo(
-    () => getThreeDayCalendarDays(currentDate),
-    [currentDate],
+    () => getThreeDayCalendarDays(currentDate, resolvedTimezone),
+    [currentDate, resolvedTimezone],
   );
 
   const processedDayEvents = useMemo(() => {
@@ -133,9 +133,8 @@ export function MobileThreeDayView({
   };
 
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
-    currentDate,
-    "week",
-    timezone,
+    days,
+    resolvedTimezone,
   );
 
   useLayoutEffect(() => {

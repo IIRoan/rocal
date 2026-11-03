@@ -147,9 +147,8 @@ export function MobileWeekView({
   };
 
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
-    currentDate,
-    "week",
-    timezone,
+    days,
+    resolvedTimezone,
   );
 
   useEffect(() => {

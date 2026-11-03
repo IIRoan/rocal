@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { useDropdownShortcuts } from "../../hooks/use-keyboard-shortcuts";
+import { useShortcutLabel } from "../../hooks/use-shortcut-label";
 import { User } from "../calendar/types";
 
 export function NavUser({
@@ -30,6 +31,8 @@ export function NavUser({
     { key: "s", action: () => onOpenSettings?.() },
     { key: "l", action: () => onLogout?.() },
   ]);
+  const settingsShortcut = useShortcutLabel("S");
+  const signOutShortcut = useShortcutLabel("L");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -89,12 +92,12 @@ export function NavUser({
           <DropdownMenuItem onClick={onOpenSettings}>
             <Settings size={16} />
             Settings
-            <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+            <DropdownMenuShortcut>{settingsShortcut}</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onLogout}>
             <LogOut size={16} />
             Sign out
-            <DropdownMenuShortcut>⌘L</DropdownMenuShortcut>
+            <DropdownMenuShortcut>{signOutShortcut}</DropdownMenuShortcut>
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

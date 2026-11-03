@@ -66,7 +66,7 @@ export function TimeRegionSettings({
   if (currentView === "time-region") {
     return (
       <PaletteView title="Time & Region" onBack={goBack}>
-        <PaletteSection label="Timezone">
+        <PaletteSection label="Region">
           <PaletteNavRow
             icon={Globe}
             label="Timezone"

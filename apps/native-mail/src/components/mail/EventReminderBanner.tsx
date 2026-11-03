@@ -15,6 +15,7 @@ import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 
 type EventReminderBannerProps = {
   loading?: boolean;
+  deleted?: boolean;
   error?: string | null;
   reminder?: EventReminderMailView | null;
   onOpenEvent?: () => void;
@@ -22,6 +23,7 @@ type EventReminderBannerProps = {
 
 export function EventReminderBanner({
   loading = false,
+  deleted = false,
   error = null,
   reminder,
   onOpenEvent,
@@ -31,9 +33,11 @@ export function EventReminderBanner({
 
   const title = loading
     ? null
-    : error
-      ? "Couldn't load event"
-      : (reminder?.title ?? "Event reminder");
+    : deleted
+      ? "Event deleted"
+      : error
+        ? "Couldn't load event"
+        : (reminder?.title ?? "Event reminder");
 
   return (
     <View style={styles.container}>
@@ -49,7 +53,11 @@ export function EventReminderBanner({
         ) : (
           <Text style={styles.title}>{title}</Text>
         )}
-        {error ? (
+        {deleted ? (
+          <Text style={styles.description}>
+            This event is no longer in your calendar.
+          </Text>
+        ) : error ? (
           <Text style={styles.errorText}>{error}</Text>
         ) : loading ? (
           <Text style={styles.description}>
@@ -79,7 +87,7 @@ export function EventReminderBanner({
         </View>
       ) : null}
 
-      {!loading && !error && onOpenEvent ? (
+      {!loading && !error && !deleted && onOpenEvent ? (
         <View style={styles.actions}>
           <Pressable
             onPress={onOpenEvent}

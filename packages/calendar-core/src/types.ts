@@ -364,6 +364,10 @@ export function isApiError(value: unknown): value is ApiError {
   );
 }
 
+export function isNotFoundError(value: unknown): boolean {
+  return isApiError(value) && value.statusCode === 404;
+}
+
 export interface UserSettings {
   id: string;
   userId: string;

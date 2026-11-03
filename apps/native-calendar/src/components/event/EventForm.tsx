@@ -3,6 +3,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
   type Ref,
 } from "react";
 import { Keyboard, ScrollView, TextInput, View } from "react-native";
@@ -72,6 +73,7 @@ interface EventFormProps {
 
 export interface EventFormHandle {
   submit: () => void;
+  isDirty: () => boolean;
 }
 
 export function EventForm({
@@ -99,6 +101,7 @@ export function EventForm({
     initialReminders,
     timezone: resolvedTimezone,
   });
+  const [initialFields] = useState(fields);
   const [ui, updateUi] = useEventFormUi();
   const { allDay, start, end, categoryId, recurrenceRule, reminders } = fields;
 
@@ -184,7 +187,14 @@ export function EventForm({
     onSubmit({ request, reminders: fields.reminders });
   }, [fields, calendarId, initialValues, resolvedTimezone, onSubmit, updateUi]);
 
-  useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      submit: handleSubmit,
+      isDirty: () => JSON.stringify(fields) !== JSON.stringify(initialFields),
+    }),
+    [fields, handleSubmit, initialFields],
+  );
 
   const selectedCategory = categories.find(
     (category) => category.id === categoryId,
