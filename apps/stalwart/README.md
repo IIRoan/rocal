@@ -173,8 +173,8 @@ logged by these actions.
 Public JMAP, discovery and monitoring remain independent of this authorizer and
 retain Stalwart's own authentication and permissions. Existing administrator
 bearers remain valid until Stalwart revokes or expires them; Solace sign-out does
-not revoke those tokens. The VPS HTTPS rollback route keeps its separate operator
-IP restriction. Pinned VPS SSH access and the Stalwart CLI remain the recovery path
+not revoke those tokens. The VPS HTTPS route has no admin surface: it passes TLS
+through to Stalwart's `https` listener, which serves only the public paths. Pinned VPS SSH access and the Stalwart CLI remain the recovery path
 while the Solace API is unavailable. This is operator tooling with no native screen.
 
 ## Inbound mail (Internet → Stalwart)
@@ -196,13 +196,14 @@ sequenceDiagram
 Every container runs one frpc that registers its proxies into frp **load-balancing
 groups** on fixed frps ports, so HAProxy has a single backend per protocol and frps
 spreads connections over whichever containers are registered. Proxy names carry a
-per-container id (`smtp-<uuid>`, `http-<uuid>`) because frps requires unique names.
+per-container id (`smtp-<uuid>`, `http-<uuid>`, `https-<uuid>`) because frps requires unique names.
 frpc logs go straight to the container's stderr.
 
 | Group  | frps port | Container port |
 |--------|-----------|----------------|
 | `smtp` | 10025     | 25             |
 | `http` | 18080     | 8080           |
+| `https` | 18443    | 8443 (TLS, VPS `:443` passthrough) |
 
 The DATA stage on port 25 runs the system Sieve script [`stalwart/sieve/solace-simplelogin.sieve`](stalwart/sieve/solace-simplelogin.sieve). It strips any `X-Solace-*` markers. For DKIM-verified SimpleLogin forwards it puts the original sender in From, the reverse alias in Reply-To, and adds `X-Solace-SimpleLogin: forward` for the apps. The plan embeds the file in `30-mta.ndjson`, and `tests/test_simplelogin_sieve.py` keeps them in sync. To roll back, set the `MtaStageData` `then` to `"false"`. Deleting the line does not reset it, because `update` only patches.
 
@@ -290,14 +291,12 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 |------|---------|
 | `stalwart/plan/` | Desired-state NDJSON (`stalwart-cli apply` on boot) |
 | `scripts/stalwart-plan.sh` | apply / dry-run / snapshot / drift / dns-publish |
-| `scripts/sync-haproxy-cert.py` | Export Stalwart ACME cert → HAProxy PEM |
 | `scripts/test-relay-route.sh` | Offline tests for relay-route helpers |
 | `scripts/frp-tls-certs.sh` | Mints the frp CA, frps server cert and frpc client cert for tunnel mutual TLS |
 | `railway-entrypoint.sh` | Stalwart + health server + plan apply + relay IP, then frpc joins the tunnel groups; SIGTERM leaves them before stopping Stalwart |
 | `backend-gate.cfg` | HAProxy gate for the Solace API: key check, path allowlist, `X-Real-IP` → PROXY v2 to Stalwart `:8080` |
 | `Dockerfile` | Mail image (Railway `rootDirectory: apps/stalwart`) |
-| [`vps/README.md`](vps/README.md) | VPS services, cutover, cert sync |
-| `../../.github/workflows/sync-haproxy-cert.yml` | Weekly / on-demand HAProxy cert sync |
+| [`vps/README.md`](vps/README.md) | VPS services and cutover |
 | `../../.railway/railway.ts` | Solace Railway IaC |
 
 ## Railway environment variables

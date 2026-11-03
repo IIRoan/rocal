@@ -17,7 +17,7 @@ SERVICES = (
     "postfix",
 )
 GROUP_HTTP_PORT = 18080
-GROUPS = ("smtp", "http")
+GROUPS = ("smtp", "http", "https")
 
 
 def http_ready(port: int) -> bool:

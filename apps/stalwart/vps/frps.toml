@@ -29,3 +29,7 @@ end = 10025
 [[allowPorts]]
 start = 18080
 end = 18080
+
+[[allowPorts]]
+start = 18443
+end = 18443

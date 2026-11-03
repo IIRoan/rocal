@@ -2,7 +2,7 @@ name: Sync mail VPS
 
 on:
   push:
-    branches: [master, main]
+    branches: [master]
     paths:
       - "apps/stalwart/vps/haproxy.cfg"
       - "apps/stalwart/vps/apply-vps-repo.sh"
@@ -47,7 +47,7 @@ jobs:
     if: |
       github.repository == 'IIRoan/rocal'
       && github.event.repository.fork == false
-      && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+      && github.ref == 'refs/heads/master'
       && (
         github.event_name == 'push'
         || (github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner)
@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           test "${GITHUB_REPOSITORY}" = "IIRoan/rocal"
-          test "${GITHUB_REF}" = "refs/heads/master" -o "${GITHUB_REF}" = "refs/heads/main"
+          test "${GITHUB_REF}" = "refs/heads/master"
           test "${GITHUB_EVENT_NAME}" = "push" -o "${GITHUB_EVENT_NAME}" = "workflow_dispatch"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             test "${GITHUB_ACTOR}" = "${GITHUB_REPOSITORY_OWNER}"
@@ -79,7 +79,6 @@ jobs:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           VPS_SSH_HOST: ${{ secrets.VPS_SSH_HOST }}
           VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
-          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
           VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
         run: python3 -B apps/stalwart/vps/diagnose-network.py
 
@@ -130,9 +129,7 @@ jobs:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           VPS_SSH_HOST: ${{ secrets.VPS_SSH_HOST }}
           VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
-          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
           VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
-          ADMIN_ALLOW_IP: ${{ secrets.ADMIN_ALLOW_IP }}
           FRP_TOKEN: ${{ secrets.FRP_TOKEN }}
           FRP_RELAY_STCP_KEY: ${{ secrets.FRP_RELAY_STCP_KEY }}
           FRP_TLS_CA: ${{ secrets.FRP_TLS_CA }}
@@ -144,7 +141,6 @@ jobs:
           set -euo pipefail
           : "${VPS_SSH_PRIVATE_KEY:?set Environment secret VPS_SSH_PRIVATE_KEY on mail-vps}"
           : "${VPS_SSH_KNOWN_HOSTS:?set Environment secret VPS_SSH_KNOWN_HOSTS on mail-vps (ssh-keyscan output for the VPS)}"
-          : "${ADMIN_ALLOW_IP:?set Environment secret ADMIN_ALLOW_IP on mail-vps}"
           if [[ "${APPLY_FRP}" == "1" ]]; then
             : "${FRP_TOKEN:?set Environment secret FRP_TOKEN on mail-vps}"
             : "${FRP_RELAY_STCP_KEY:?set Environment secret FRP_RELAY_STCP_KEY on mail-vps}"
@@ -152,31 +148,22 @@ jobs:
               : "${!secret:?set Environment secret ${secret} on mail-vps (apps/stalwart/scripts/frp-tls-certs.sh)}"
             done
           fi
-          while IFS= read -r line; do
-            [[ -z "$line" ]] && continue
-            if ! printf '%s' "$line" | grep -Eq '^[0-9a-fA-F.:/]+$'; then
-              echo "ADMIN_ALLOW_IP has unexpected characters: $line" >&2
-              exit 1
-            fi
-          done <<<"$ADMIN_ALLOW_IP"
 
           HOST="${VPS_SSH_HOST:-mx.solace.onl}"
           USER="${VPS_SSH_USER:-Roan}"
-          PORT="${VPS_SSH_PORT:-22}"
+          PORT=22
           echo "Deploy target: ${USER}@${HOST}:${PORT}"
 
           KEY="$(mktemp)"
-          ALLOW="$(mktemp)"
           FRP_SECRETS="$(mktemp)"
           KNOWN_HOSTS="$(mktemp)"
-          trap 'rm -f "$KEY" "$ALLOW" "$FRP_SECRETS" "$KNOWN_HOSTS"' EXIT
+          trap 'rm -f "$KEY" "$FRP_SECRETS" "$KNOWN_HOSTS"' EXIT
           printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" >"$KNOWN_HOSTS"
           printf '%s\n' "$VPS_SSH_PRIVATE_KEY" >"$KEY"
-          printf '%s\n' "$ADMIN_ALLOW_IP" >"$ALLOW"
           printf 'FRP_TOKEN=%s\nFRP_RELAY_STCP_KEY=%s\nFRP_TLS_CA=%s\nFRP_TLS_SERVER_CERT=%s\nFRP_TLS_SERVER_KEY=%s\nFRP_TLS_CLIENT_CERT=%s\nFRP_TLS_CLIENT_KEY=%s\n' \
             "$FRP_TOKEN" "$FRP_RELAY_STCP_KEY" "$FRP_TLS_CA" "$FRP_TLS_SERVER_CERT" "$FRP_TLS_SERVER_KEY" \
             "$FRP_TLS_CLIENT_CERT" "$FRP_TLS_CLIENT_KEY" >"$FRP_SECRETS"
-          chmod 600 "$KEY" "$ALLOW" "$FRP_SECRETS"
+          chmod 600 "$KEY" "$FRP_SECRETS"
 
           # A fresh runner has no known_hosts, so pin the VPS host key instead of trusting the first answer.
           SSH=(ssh -i "$KEY" -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes
@@ -187,17 +174,15 @@ jobs:
           REMOTE_DIR="/tmp/rocal-vps-$$"
           "${SSH[@]}" "${USER}@${HOST}" "rm -rf '$REMOTE_DIR' && mkdir -p '$REMOTE_DIR'"
           "${SCP[@]}" -r "${STAGE}/." "${USER}@${HOST}:${REMOTE_DIR}/"
-          "${SCP[@]}" "$ALLOW" "${USER}@${HOST}:/tmp/admin-allow.lst.new"
           if [[ "${APPLY_FRP}" == "1" ]]; then
             "${SCP[@]}" -p "$FRP_SECRETS" "${USER}@${HOST}:${REMOTE_DIR}.frp-secrets"
           fi
 
           "${SSH[@]}" "${USER}@${HOST}" bash -s <<REMOTE
           set -euo pipefail
-          trap 'rm -rf ${REMOTE_DIR} ${REMOTE_DIR}.frp-secrets /tmp/admin-allow.lst.new' EXIT
+          trap 'rm -rf ${REMOTE_DIR} ${REMOTE_DIR}.frp-secrets' EXIT
           chmod +x ${REMOTE_DIR}/apply-vps-repo.sh
           sudo -n env \
-            APPLY_ALLOWLIST=/tmp/admin-allow.lst.new \
             APPLY_FRP=${APPLY_FRP:-0} \
             APPLY_FRP_SECRETS=${REMOTE_DIR}.frp-secrets \
             ${REMOTE_DIR}/apply-vps-repo.sh ${REMOTE_DIR}
