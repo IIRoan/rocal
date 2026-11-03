@@ -138,6 +138,11 @@ async fn registration_options_follow_simplewebauthn() {
     let options = ok(response.value());
     assert_eq!(options["rp"], json!({"id": rp_id(&app), "name": "Rocani"}));
     assert_eq!(options["attestation"], json!("none"));
+    assert_eq!(
+        options["pubKeyCredParams"],
+        json!([{"alg": -7, "type": "public-key"}, {"alg": -257, "type": "public-key"}]),
+        "EdDSA is not offered: webauthn-rs-core cannot verify it"
+    );
     assert_eq!(options["user"]["name"], json!(user.email));
     assert_eq!(options["user"]["displayName"], json!(user.email));
     assert_eq!(options["excludeCredentials"], json!([]));
@@ -399,6 +404,75 @@ async fn signing_in_with_a_passkey_creates_a_session_with_step_up() {
         .expect("passkey");
     assert_eq!(counter, 1);
     ok(agent.get("/api/settings").await.expect_status(200));
+}
+
+#[tokio::test]
+async fn an_rs256_passkey_registers_and_signs_in() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let options = ok(user
+        .get("/api/auth/passkey/generate-register-options")
+        .await
+        .value());
+    let mut passkey = SoftPasskey::new_rs256(&rp_id(&app)).expect("passkey");
+    let response = passkey
+        .register(&options, &app.origin)
+        .expect("attestation");
+    let created = ok(user
+        .post(
+            "/api/auth/passkey/verify-registration",
+            json!({"response": response, "name": "Windows Hello"}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    let public_key = created["publicKey"].as_str().expect("publicKey");
+    assert!(
+        public_key.starts_with("pAEDAzkBAC"),
+        "standard base64 of the COSE RS256 key: {public_key}"
+    );
+
+    let mut agent = app.anonymous();
+    let options = ok(agent
+        .get("/api/auth/passkey/generate-authenticate-options")
+        .await
+        .value());
+    let mut forged = passkey
+        .authenticate(&options, &app.origin)
+        .expect("assertion");
+    let signature = forged["response"]["signature"].as_str().expect("signature");
+    let flipped = if signature.starts_with('A') { "B" } else { "A" };
+    forged["response"]["signature"] = json!(format!("{flipped}{}", &signature[1..]));
+    let response = ok(agent
+        .post(
+            "/api/auth/passkey/verify-authentication",
+            json!({"response": forged}),
+        )
+        .await);
+    auth_error(
+        &response,
+        401,
+        "AUTHENTICATION_FAILED",
+        "Authentication failed",
+    );
+
+    let options = ok(agent
+        .get("/api/auth/passkey/generate-authenticate-options")
+        .await
+        .value());
+    let assertion = passkey
+        .authenticate(&options, &app.origin)
+        .expect("assertion");
+    let body: SessionWithUser = ok(agent
+        .post(
+            "/api/auth/passkey/verify-authentication",
+            json!({"response": assertion}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(body.user.id.0, user.id);
+    assert!(agent.cookie(STEP_UP_COOKIE).is_some());
 }
 
 #[tokio::test]

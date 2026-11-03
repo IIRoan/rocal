@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { placePickedEndTime } from "@workspace/calendar-core";
 import {
   setPickerDatePart,
   setPickerTimePart,
@@ -52,8 +53,11 @@ export function useEventFormDateTime({
   );
 
   const handleEndTimeChange = useCallback(
-    (time: Date) => updateFields({ end: setPickerTimePart(end, time) }),
-    [end, updateFields],
+    (time: Date) =>
+      updateFields({
+        end: placePickedEndTime(start, end, setPickerTimePart(end, time)),
+      }),
+    [end, start, updateFields],
   );
 
   return {

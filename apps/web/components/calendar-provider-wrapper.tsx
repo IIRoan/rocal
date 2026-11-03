@@ -23,6 +23,7 @@ export function CalendarProviderWrapper({
       onCreateCalendar={calendarData.createCalendar}
       onUpdateCalendar={calendarData.updateCalendar}
       onRefreshCalendars={calendarData.refetchCalendars}
+      onCurrentDateChange={calendarData.setMonth}
     >
       {children}
     </CalendarProvider>

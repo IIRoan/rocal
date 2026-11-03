@@ -102,14 +102,26 @@ export function getWorkingDayShade(
   return null;
 }
 
-/** Round a date up to the next full hour without mutating the input. */
-export function roundToNextHour(date: Date): Date {
-  const d = new Date(date);
-  if (d.getMinutes() > 0 || d.getSeconds() > 0 || d.getMilliseconds() > 0) {
-    // repo-rules-allow timezone-safe-calendar-code: builds a picker wall-clock default for the event form, never a stored event instant.
-    d.setHours(d.getHours() + 1, 0, 0, 0);
-  }
-  return d;
+const QUARTER_HOUR_MS = 15 * 60 * 1000;
+
+/** Every current zone offset is a whole number of quarter hours, so this lands on :00/:15/:30/:45 in the account zone too. */
+export function roundUpToQuarterHour(date: Date): Date {
+  return new Date(Math.ceil(date.getTime() / QUARTER_HOUR_MS) * QUARTER_HOUR_MS);
+}
+
+/** Within a day of the start, a picked end time means its next occurrence after the start (overnight ends roll over); longer events keep the end day. */
+export function placePickedEndTime(
+  start: string,
+  previousEnd: string,
+  pickedEnd: string,
+): string {
+  const nextDay = new Date(Date.parse(`${start.slice(0, 10)}T00:00Z`) + 864e5)
+    .toISOString()
+    .slice(0, 10);
+  if (previousEnd >= `${nextDay}${start.slice(10)}`) return pickedEnd;
+  const time = pickedEnd.slice(11);
+  const sameDay = `${start.slice(0, 10)}T${time}`;
+  return sameDay > start ? sameDay : `${nextDay}T${time}`;
 }
 
 /** Format a Date to `YYYY-MM-DDTHH:mm` using local time. */

@@ -103,9 +103,13 @@ jest.mock("@workspace/ui/components/ui/dropdown-menu", () => ({
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 jest.mock("../../components/mail/recipient-suggest-input", () => ({
-  RecipientSuggestInput: ({ placeholder }: { placeholder?: string }) => (
-    <input placeholder={placeholder} />
-  ),
+  RecipientSuggestInput: ({
+    id,
+    placeholder,
+  }: {
+    id?: string;
+    placeholder?: string;
+  }) => <input id={id} placeholder={placeholder} />,
 }));
 jest.mock("@workspace/ui/hooks/use-mobile", () => ({
   useIsMobile: () => false,
@@ -352,7 +356,10 @@ describe("EventEditorBody", () => {
 
     expect(container.querySelector('input[placeholder="Add location"]')).not.toBeNull();
     expect(container.querySelector('textarea[placeholder="Add description"]')).not.toBeNull();
-    expect(container.querySelector('input[placeholder="Add participants"]')).not.toBeNull();
+    const participants = container.querySelector(
+      'input[placeholder="Add participants"]',
+    ) as HTMLInputElement | null;
+    expect(participants?.labels?.[0]?.textContent).toBe("Participants");
     expect(container.textContent).toContain("Does not repeat");
 
     const title = container.querySelector(

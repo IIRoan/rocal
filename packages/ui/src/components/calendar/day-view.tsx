@@ -1,24 +1,24 @@
 "use client";
 
-import React, { useMemo } from "react";
-import { isCancelledCalendarEvent, type TimeFormat } from "@workspace/calendar-core";
+import React, { useMemo, useRef } from "react";
+import type { TimeFormat } from "@workspace/calendar-core";
 import {
-  eventOverlapsCalendarDay,
-  formatEventSpanLabel,
+  getTimedTimelineEventsForDay,
   resolveTimezone,
   utcToPickerDate,
   wallClockToUtc,
 } from "@workspace/calendar-core";
+import { AllDayEventRow } from "./all-day-event-row";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
-import { EventItem } from "./event-item";
-import { getEventSegmentForCalendarDay, isAllDayRowEvent, isMultiDayEvent } from "./utils";
 import { WeekCellsHeight, StartHour } from "./constants";
+import { useTimelineStartScroll } from "./use-timeline-start-scroll";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { cn } from "../../lib/utils";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { layoutTimelineEvents } from "./timeline-layout";
+import { WeekViewDayHeaders } from "./week-view-day-headers";
 import { WEEK_HOUR_VALUES, formatWeekHourLabel } from "./week-view-hours";
 
 interface DayViewProps {
@@ -47,119 +47,73 @@ export function DayView({
   onEventDelete,
   onEventView,
 }: DayViewProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const resolvedTimezone = resolveTimezone(timezone);
   const calendarDay = useMemo(
     () => utcToPickerDate(currentDate, resolvedTimezone),
     [currentDate, resolvedTimezone],
   );
-
-  const dayEvents = useMemo(() => {
-    return events
-      .filter((event) =>
-        eventOverlapsCalendarDay(event, calendarDay, resolvedTimezone),
-      )
-      .sort(
-        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
-      );
-  }, [calendarDay, events, resolvedTimezone]);
-
-  const allDayEvents = useMemo(() => {
-    return dayEvents.filter((event) =>
-      isAllDayRowEvent(event, resolvedTimezone),
-    );
-  }, [dayEvents, resolvedTimezone]);
-
-  const timeEvents = useMemo(() => {
-    return dayEvents.filter(
-      (event) => !isAllDayRowEvent(event, resolvedTimezone),
-    );
-  }, [dayEvents, resolvedTimezone]);
+  const days = useMemo(() => [calendarDay], [calendarDay]);
 
   const positionedEvents = useMemo(() => {
-    return layoutTimelineEvents(timeEvents, calendarDay, {
-      cellHeight: WeekCellsHeight,
-      startHour: StartHour,
-      sortByDurationOnTie: true,
-      widthStrategy: "desktop-cascade",
-      timezone: resolvedTimezone,
-    });
-  }, [calendarDay, resolvedTimezone, timeEvents]);
+    return layoutTimelineEvents(
+      getTimedTimelineEventsForDay(events, calendarDay, resolvedTimezone, {
+        excludeMultiDay: true,
+      }),
+      calendarDay,
+      {
+        cellHeight: WeekCellsHeight,
+        startHour: StartHour,
+        sortByDurationOnTie: true,
+        widthStrategy: "desktop-cascade",
+        timezone: resolvedTimezone,
+      },
+    );
+  }, [calendarDay, events, resolvedTimezone]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
     onEventSelect(event);
   };
 
-  const showAllDaySection = allDayEvents.length > 0;
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
-    currentDate,
-    "day",
-    timezone,
+    days,
+    resolvedTimezone,
   );
+
+  useTimelineStartScroll(scrollContainerRef, currentDate);
+
+  const handlers = {
+    onEventClick: handleEventClick,
+    onEventCreate,
+    onEventDelete,
+    onEventEdit,
+    onEventView,
+  };
 
   return (
     <div
       data-slot="day-view"
       className="absolute inset-0 flex flex-col bg-background"
     >
-      {showAllDaySection && (
-        <div className="border-border/70 bg-muted/50 border-t shrink-0 overflow-hidden [scrollbar-gutter:stable]">
-          <div className="grid grid-cols-[3rem_1fr] sm:grid-cols-[4rem_1fr]">
-            <div className="relative">
-              <span className="text-muted-foreground absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[11px] sm:pe-4 sm:text-xs">
-                All day
-              </span>
-            </div>
-            <div className="relative px-0.5 py-1">
-              {allDayEvents.map((event) => {
-                const { isFirstDay, isLastDay } = getEventSegmentForCalendarDay(
-                  event,
-                  calendarDay,
-                  resolvedTimezone,
-                );
-                const spanLabel = isMultiDayEvent(event, resolvedTimezone)
-                  ? formatEventSpanLabel(event, resolvedTimezone)
-                  : null;
+      <WeekViewDayHeaders
+        currentDate={currentDate}
+        days={days}
+        timezone={resolvedTimezone}
+      />
+      <AllDayEventRow
+        columnTemplate="3rem minmax(0, 1fr)"
+        days={days}
+        events={events}
+        handlers={handlers}
+        timezone={resolvedTimezone}
+        timeFormat={timeFormat}
+      />
 
-                return (
-                  <EventItem
-                    key={`spanning-${event.id}`}
-                    onClick={(e) => handleEventClick(event, e)}
-                    event={event}
-                    view="month"
-                    isFirstDay={isFirstDay}
-                    isLastDay={isLastDay}
-                    connectAcrossCells={false}
-                    timezone={timezone}
-                    timeFormat={timeFormat}
-                    onEdit={onEventEdit}
-                    onDelete={onEventDelete}
-                    onView={onEventView}
-                  >
-                    <div className="flex min-w-0 items-center gap-1">
-                      <span
-                        className={cn(
-                          "min-w-0 flex-1 truncate font-semibold",
-                          isCancelledCalendarEvent(event) && "line-through",
-                        )}
-                      >
-                        {event.title}
-                      </span>
-                      {spanLabel ? (
-                        <span className="shrink-0 text-[11px] font-normal tabular-nums">
-                          {spanLabel}
-                        </span>
-                      ) : null}
-                    </div>
-                  </EventItem>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="border-border/70 grid flex-1 grid-cols-[3rem_1fr] border-t sm:grid-cols-[4rem_1fr] overflow-y-auto [scrollbar-gutter:stable] relative min-h-0">
+      <div
+        ref={scrollContainerRef}
+        className="grid flex-1 grid-cols-[3rem_1fr] overflow-y-auto [scrollbar-gutter:stable] relative min-h-0"
+      >
         <div>
           {WEEK_HOUR_VALUES.map((hourValue) => (
             <div
@@ -167,7 +121,7 @@ export function DayView({
               className="border-border/70 relative h-[var(--week-cells-height)] border-b last:border-b-0"
             >
               {hourValue > StartHour && (
-                <span className="bg-background text-muted-foreground absolute -top-3 left-0 flex h-6 w-16 max-w-full items-center justify-end pe-2 text-[11px] tabular-nums sm:pe-4 sm:text-xs">
+                <span className="bg-background text-muted-foreground absolute -top-3 left-0 flex h-6 w-full items-center justify-end pe-1 text-[11px] tabular-nums">
                   {formatWeekHourLabel(hourValue, timeFormat)}
                 </span>
               )}

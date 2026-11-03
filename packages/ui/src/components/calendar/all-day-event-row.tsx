@@ -39,7 +39,7 @@ export function AllDayEventRow({
 
   return (
     <div
-      className="relative z-30 grid w-full shrink-0 items-stretch border-b border-border/40"
+      className="relative z-30 grid w-full shrink-0 items-stretch overflow-hidden border-b border-border/40 [scrollbar-gutter:stable]"
       style={{
         gridTemplateColumns: columnTemplate,
         gridTemplateRows: `repeat(${rows}, minmax(1.375rem, auto))`,

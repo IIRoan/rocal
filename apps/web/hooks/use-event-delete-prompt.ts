@@ -12,6 +12,7 @@ import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { toast } from "@workspace/ui/lib/toast";
 
 import {
+  getEventDeleteConfirmCopy,
   isRecurringEventDeleteCandidate,
   RECURRING_DELETE_FAILURE_MESSAGES,
   RECURRING_DELETE_SUCCESS_MESSAGES,
@@ -79,11 +80,12 @@ export function useEventDeletePrompt(
     confirmPrompt: {
       open: open && !asksScope,
       onOpenChange,
-      eventTitle,
-      removeOnly:
+      ...getEventDeleteConfirmCopy(
+        eventTitle,
         target !== null &&
-        !canCurrentUserEditEvent(target) &&
-        isCancelledCalendarEvent(target),
+          !canCurrentUserEditEvent(target) &&
+          isCancelledCalendarEvent(target),
+      ),
       onConfirm: confirmDelete,
     },
     scopePrompt: {

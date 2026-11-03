@@ -6,6 +6,7 @@ import { addDays, format } from "date-fns";
 import {
   isTodayInTimezone,
   resolveTimezone,
+  utcToPickerDate,
   wallClockToUtc,
   type TimeFormat,
 } from "@workspace/calendar-core";
@@ -41,11 +42,15 @@ export function AgendaView({
   onEventView,
 }: AgendaViewProps) {
   const resolvedTimezone = resolveTimezone(timezone);
+  const firstDay = useMemo(
+    () => utcToPickerDate(currentDate, resolvedTimezone),
+    [currentDate, resolvedTimezone],
+  );
   const days = useMemo(() => {
     return Array.from({ length: AgendaDaysToShow }, (_, i) =>
-      addDays(new Date(currentDate), i),
+      addDays(firstDay, i),
     );
-  }, [currentDate]);
+  }, [firstDay]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -75,7 +80,7 @@ export function AgendaView({
               onClick={() =>
                 onEventCreate(
                   wallClockToUtc(
-                    currentDate,
+                    firstDay,
                     DefaultStartHour,
                     0,
                     resolvedTimezone,

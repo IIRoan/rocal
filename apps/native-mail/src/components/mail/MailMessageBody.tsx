@@ -58,6 +58,7 @@ export function MailMessageBody({
     calendarInvitation,
     eventReminderView,
     isEventReminderEmail,
+    isLinkedEventDeleted,
     isLinkedEventSuccess,
     isReminderEventLoading,
     linkedCalendarEventId,
@@ -108,6 +109,7 @@ export function MailMessageBody({
       {isEventReminderEmail && linkedCalendarEventId ? (
         <EventReminderBanner
           loading={isReminderEventLoading}
+          deleted={isLinkedEventDeleted}
           error={
             linkedEventError
               ? getErrorMessage(

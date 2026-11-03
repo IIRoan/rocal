@@ -16,6 +16,7 @@ import {
   getErrorMessage,
   getMailThreadParticipants,
   isDecryptedEventReminderContent,
+  isEventNotFoundError,
   pickOutgoingAttachmentFiles,
   resolveMailServerLimits,
   resolveTimezone,
@@ -70,6 +71,7 @@ type LinkedCalendarEventState = {
   eventId: string;
   event: CalendarEvent | null;
   loading: boolean;
+  deleted: boolean;
   error: string | null;
 };
 
@@ -255,6 +257,8 @@ export function useMessageReaderController(props: MessageReaderProps) {
     enabled: Boolean(isEventReminderEmail && linkedCalendarEventId),
     // TanStack only runs queryFn while enabled, so linkedCalendarEventId is guaranteed set here.
     queryFn: () => calendarApiService.getEvent(linkedCalendarEventId!),
+    retry: (failureCount, error) =>
+      failureCount < 3 && !isEventNotFoundError(error),
   });
   const linkedCalendarEvent = ((): LinkedCalendarEventState | null => {
     if (!isEventReminderEmail || !linkedCalendarEventId) {
@@ -265,23 +269,27 @@ export function useMessageReaderController(props: MessageReaderProps) {
         eventId: linkedCalendarEventId,
         event: null,
         loading: true,
+        deleted: false,
         error: null,
       };
     }
     if (isLinkedEventError) {
+      const deleted = isEventNotFoundError(linkedEventQueryError);
       return {
         eventId: linkedCalendarEventId,
         event: null,
         loading: false,
-        error: linkedEventQueryError
-          ? "Event details not loaded. Check your connection and try again, or open the event in Calendar."
-          : null,
+        deleted,
+        error: deleted
+          ? null
+          : "Event details not loaded. Check your connection and try again, or open the event in Calendar.",
       };
     }
     return {
       eventId: linkedCalendarEventId,
       event: linkedEventData ?? null,
       loading: false,
+      deleted: false,
       error: null,
     };
   })();
@@ -344,7 +352,9 @@ export function useMessageReaderController(props: MessageReaderProps) {
     isEventReminderEmail &&
       linkedCalendarEvent &&
       (linkedCalendarEvent.loading ||
-        (!shouldReplaceBodyWithEventReminder && !linkedCalendarEvent.error)),
+        (!shouldReplaceBodyWithEventReminder &&
+          !linkedCalendarEvent.error &&
+          !linkedCalendarEvent.deleted)),
   );
 
   const showAttachment = (attachment: MailAttachment) =>

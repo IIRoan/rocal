@@ -1,12 +1,13 @@
 import { useReducer } from "react";
 import {
   normalizeReminderMinutes,
+  roundUpToQuarterHour,
   type CreateEventRequest,
   type EventParticipantInput,
   type RecurrenceRule,
 } from "@workspace/calendar-core";
 import { parseStoredRecurrence } from "./recurrence-picker-utils";
-import { roundToNextHour, toTimezonePickerISOString } from "./event-form-utils";
+import { toTimezonePickerISOString } from "./event-form-utils";
 
 const DEFAULT_REMINDER_MINUTES = 15;
 
@@ -67,7 +68,7 @@ function initialFields({
   initialReminders?: number[];
   timezone: string;
 }): EventFormFields {
-  const defaultStart = roundToNextHour(new Date());
+  const defaultStart = roundUpToQuarterHour(new Date());
   const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
   return {
     title: initialValues?.title ?? "",

@@ -10,6 +10,7 @@ import {
   jest,
 } from "@jest/globals";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { formatCalendarDayKey } from "@workspace/calendar-core";
 import { createRoot, type Root } from "react-dom/client";
 
 jest.mock("../../lib/calendar-api-service", () => ({
@@ -210,6 +211,56 @@ describe("useEventForm reminder hydration", () => {
 
     expect(latestFormRef.current?.eventNotifications).toEqual([]);
     expect(latestFormRef.current?.showNotifications).toBe(false);
+  });
+
+  it("drops a reminders fetch that resolves after another event loaded", async () => {
+    type NotificationsResponse = Awaited<
+      ReturnType<typeof calendarApiService.getEventNotifications>
+    >;
+    let resolveFirst: (response: NotificationsResponse) => void = () => {};
+    mockGetEventNotifications
+      .mockImplementationOnce(
+        () =>
+          new Promise<NotificationsResponse>((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({
+        data: { notifications: [] },
+        success: true,
+      } as NotificationsResponse);
+
+    let firstLoad: unknown;
+    act(() => {
+      firstLoad = latestFormRef.current!.loadEventData(baseEvent);
+    });
+    await act(async () => {
+      await latestFormRef.current!.loadEventData({
+        ...baseEvent,
+        id: "event-2",
+      });
+    });
+    await act(async () => {
+      resolveFirst({
+        data: {
+          notifications: [
+            {
+              id: "notif-1",
+              isEnabled: true,
+              minutesBefore: 45,
+              notificationType: "email",
+            },
+          ],
+        },
+        success: true,
+      } as NotificationsResponse);
+      await firstLoad;
+    });
+
+    expect(latestFormRef.current?.selectedEvent?.id).toBe("event-2");
+    expect(latestFormRef.current?.eventNotifications).toEqual([]);
+    expect(latestFormRef.current?.isDirty).toBe(false);
+    expect(latestFormRef.current?.notificationsLoading).toBe(false);
   });
 
   it("does not re-add the removed minimum reminder when a later reminder remains", async () => {
@@ -615,6 +666,108 @@ describe("useEventForm reminder hydration", () => {
         participants: [],
       }),
     );
+  });
+
+  describe("unsaved changes and times", () => {
+    const lateEvent = {
+      ...baseEvent,
+      start: new Date("2026-11-02T22:51:00.000Z"),
+      end: new Date("2026-11-02T23:51:00.000Z"),
+    };
+
+    beforeEach(() => {
+      mockGetEventNotifications.mockResolvedValue({
+        data: {
+          notifications: [
+            {
+              id: "notif-1",
+              isEnabled: true,
+              minutesBefore: 30,
+              notificationType: "email",
+            },
+          ],
+        },
+        success: true,
+      } as any);
+    });
+
+    it("is clean after loading an event and dirty only while a field differs", async () => {
+      await act(async () => {
+        await latestFormRef.current!.loadEventData(baseEvent);
+      });
+      expect(latestFormRef.current?.isDirty).toBe(false);
+
+      act(() => {
+        latestFormRef.current!.setEventTitle("Renamed");
+      });
+      expect(latestFormRef.current?.isDirty).toBe(true);
+
+      act(() => {
+        latestFormRef.current!.setEventTitle(baseEvent.title);
+      });
+      expect(latestFormRef.current?.isDirty).toBe(false);
+
+      act(() => {
+        latestFormRef.current!.handleNotificationChange([]);
+      });
+      expect(latestFormRef.current?.isDirty).toBe(true);
+    });
+
+    it("counts any input on a new event and clears on reset", async () => {
+      await act(async () => {
+        await latestFormRef.current!.loadEventData({
+          ...lateEvent,
+          id: undefined,
+          title: "",
+        } as any);
+      });
+      expect(latestFormRef.current?.isDirty).toBe(false);
+
+      act(() => {
+        latestFormRef.current!.setEventLocation("Office");
+      });
+      expect(latestFormRef.current?.isDirty).toBe(true);
+
+      act(() => {
+        latestFormRef.current!.resetForm();
+      });
+      expect(latestFormRef.current?.isDirty).toBe(false);
+    });
+
+    it("keeps the start and rolls an earlier end time over to the next day", async () => {
+      await act(async () => {
+        await latestFormRef.current!.loadEventData(lateEvent);
+      });
+
+      act(() => {
+        latestFormRef.current!.handleEndTimeChange("01:00");
+      });
+      const form = latestFormRef.current!;
+      expect(form.eventStartTime).toBe("22:51");
+      expect(formatCalendarDayKey(form.eventStartDate)).toBe("2026-11-02");
+      expect(form.eventEndTime).toBe("01:00");
+      expect(formatCalendarDayKey(form.eventEndDate)).toBe("2026-11-03");
+
+      act(() => {
+        latestFormRef.current!.handleEndTimeChange("23:30");
+      });
+      expect(formatCalendarDayKey(latestFormRef.current!.eventEndDate)).toBe(
+        "2026-11-02",
+      );
+    });
+
+    it("moves the end past midnight when the start passes it", async () => {
+      await act(async () => {
+        await latestFormRef.current!.loadEventData(lateEvent);
+      });
+
+      act(() => {
+        latestFormRef.current!.handleStartTimeChange("23:55");
+      });
+      const form = latestFormRef.current!;
+      expect(form.eventEndTime).toBe("00:55");
+      expect(formatCalendarDayKey(form.eventEndDate)).toBe("2026-11-03");
+    });
   });
 
   describe("recurring scopes", () => {

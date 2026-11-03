@@ -424,6 +424,12 @@ export function BottomSheet({
 
   const snapTo = useCallback(
     (index: number) => {
+      // A swipe settled the session; reopening it (e.g. Keep Editing) must slide out again on the next close.
+      setPresentation((current) =>
+        current.visible && current.settled
+          ? { ...current, settled: false }
+          : current,
+      );
       sheetRef.current?.snapToIndex(Math.max(0, Math.min(index, lastIndex)));
     },
     [lastIndex],

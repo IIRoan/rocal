@@ -50,7 +50,7 @@ export function AppearanceSettings({
             icon={Layout}
             label={
               <span className="capitalize">
-                {view === "3day" ? "3 Days" : `${view} View`}
+                {view === "3day" ? "3 Days" : view}
               </span>
             }
             onClick={() => updateSetting("defaultView", view)}

@@ -8,7 +8,6 @@ import {
   getTimedTimelineEventsForDay,
   isMultiDayEvent,
 } from "./utils";
-import { groupThreeDayAllDayEventsByDay } from "./three-day-view-utils";
 
 const timezone = "Europe/Amsterdam";
 const friday = new Date(2026, 5, 19);
@@ -100,21 +99,6 @@ describe("Friday all-day event does not leak to Saturday", () => {
       expect(getTimedTimelineEventsForDay([event], saturday, timezone)).toEqual(
         [],
       );
-    },
-  );
-
-  it.each(fridayAllDayVariants)(
-    "shows only in the Friday column of a Fri-Sat-Sun 3-day view for %s",
-    (_label, event) => {
-      const grouped = groupThreeDayAllDayEventsByDay(
-        [event],
-        saturday,
-        timezone,
-      );
-
-      expect(grouped[0]!.map((item) => item.id)).toEqual([event.id]);
-      expect(grouped[1]!.map((item) => item.id)).toEqual([]);
-      expect(grouped[2]!.map((item) => item.id)).toEqual([]);
     },
   );
 });

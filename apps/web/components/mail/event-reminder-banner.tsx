@@ -7,6 +7,7 @@ import { MailNotificationBanner } from "./mail-notification-banner";
 type EventReminderBannerProps = {
   eventId: string;
   loading?: boolean;
+  deleted?: boolean;
   error?: string | null;
   reminder?: EventReminderMailView | null;
   className?: string;
@@ -15,6 +16,7 @@ type EventReminderBannerProps = {
 export function EventReminderBanner({
   eventId,
   loading = false,
+  deleted = false,
   error = null,
   reminder,
   className,
@@ -26,13 +28,17 @@ export function EventReminderBanner({
       <Loader2 className="size-4 shrink-0 animate-spin" />
       Loading event details…
     </span>
+  ) : deleted ? (
+    "Event deleted"
   ) : error ? (
     "Couldn't load event"
   ) : (
     (reminder?.title ?? "Event reminder")
   );
 
-  const description = error ? (
+  const description = deleted ? (
+    "This event is no longer in your calendar."
+  ) : error ? (
     <span className="text-destructive">{error}</span>
   ) : loading ? (
     "Fetching the latest event content from your calendar."
@@ -56,7 +62,7 @@ export function EventReminderBanner({
 
   // Calendar is the way forward when the details fail to load, so the link stays on error.
   const actions =
-    !loading ? (
+    !loading && !deleted ? (
       <Button asChild variant="outline" size="xs" className="ml-auto gap-1.5">
         <a href={eventUrl}>
           Open in calendar

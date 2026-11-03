@@ -1,14 +1,15 @@
+import { VIEW_OPTIONS } from "../lib/calendar-view-options";
 import type { NativeCalendarView } from "../lib/calendar-views";
 
-export interface SidebarViewOption {
-  view: NativeCalendarView;
-  label: string;
-}
-
-export const SIDEBAR_VIEW_OPTIONS: SidebarViewOption[] = [
-  { view: "day", label: "Day" },
-  { view: "3day", label: "3 Day" },
-  { view: "week", label: "Week" },
-  { view: "month", label: "Month" },
-  { view: "agenda", label: "Agenda" },
+const SIDEBAR_VIEW_ORDER: readonly NativeCalendarView[] = [
+  "day",
+  "3day",
+  "week",
+  "month",
+  "agenda",
 ];
+
+export const SIDEBAR_VIEW_OPTIONS = [...VIEW_OPTIONS].sort(
+  (a, b) =>
+    SIDEBAR_VIEW_ORDER.indexOf(a.value) - SIDEBAR_VIEW_ORDER.indexOf(b.value),
+);

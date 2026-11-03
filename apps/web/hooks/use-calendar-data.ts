@@ -5,6 +5,7 @@ import {
   type QueryClient,
   type QueryKey,
 } from "@tanstack/react-query";
+import { eachMonthOfInterval } from "date-fns";
 import { createLogger } from "@workspace/logger";
 import { calendarApiService } from "../lib/calendar-api-service";
 import { encryptReminderTitle } from "../lib/e2ee-notification-title";
@@ -27,6 +28,8 @@ import {
   invitationByExternalIdQueryKey,
   isRecurringSeriesMember,
   resolveRecurringEventTarget,
+  resolveTimezone,
+  utcToPickerDate,
   type RecurrenceDeleteScope,
   type RecurrenceEditScope,
 } from "@workspace/calendar-core";
@@ -159,28 +162,27 @@ export function invalidateEventRanges(
   queryClient: QueryClient,
   start?: Date | string | null,
   end?: Date | string | null,
+  timezone?: string | null,
 ) {
   if (!start) {
     queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
     return;
   }
+  const resolvedTimezone = resolveTimezone(timezone);
   const startDate = new Date(start);
-  const endDate = end ? new Date(end) : startDate;
-  const months = new Set<string>();
-  const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-  while (cursor <= endDate) {
-    months.add(monthKey(cursor));
-    // repo-rules-allow timezone-safe-calendar-code: wall-clock month-key enumeration, matching monthKey's local getters, not an event instant.
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-  for (const month of months) {
-    queryClient.invalidateQueries({ queryKey: getMonthQueryKey(month) });
+  for (const month of eachMonthOfInterval({
+    start: utcToPickerDate(startDate, resolvedTimezone),
+    end: utcToPickerDate(end ? new Date(end) : startDate, resolvedTimezone),
+  })) {
+    queryClient.invalidateQueries({ queryKey: getMonthQueryKey(monthKey(month)) });
   }
 }
 
 interface UseCalendarDataOptions {
   cacheTimeout?: number;
   autoRefetch?: boolean;
+  timezone?: string | null;
+  initialDate?: Date;
 }
 
 export interface UseCalendarDataReturn {
@@ -254,7 +256,12 @@ export interface UseCalendarDataReturn {
 export function useCalendarData(
   options: UseCalendarDataOptions = {},
 ): UseCalendarDataReturn {
-  const { cacheTimeout = DEFAULT_CACHE_TIMEOUT_MS, autoRefetch = true } = options;
+  const {
+    cacheTimeout = DEFAULT_CACHE_TIMEOUT_MS,
+    autoRefetch = true,
+    timezone,
+    initialDate,
+  } = options;
 
   const queryClient = useQueryClient();
 
@@ -271,6 +278,8 @@ export function useCalendarData(
     cacheTimeout,
     autoRefetch,
     preloadMonthsAhead: 2,
+    timezone,
+    initialDate,
   });
 
   // --- Queries ---
@@ -299,7 +308,12 @@ export function useCalendarData(
         queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
-      invalidateEventRanges(queryClient, variables.start, variables.end);
+      invalidateEventRanges(
+        queryClient,
+        variables.start,
+        variables.end,
+        timezone,
+      );
     },
   });
 
@@ -321,10 +335,10 @@ export function useCalendarData(
         return;
       }
       if (cached) {
-        invalidateEventRanges(queryClient, cached.start, cached.end);
+        invalidateEventRanges(queryClient, cached.start, cached.end, timezone);
       }
       if (event.start && event.end) {
-        invalidateEventRanges(queryClient, event.start, event.end);
+        invalidateEventRanges(queryClient, event.start, event.end, timezone);
       } else if (event.start || event.end) {
         queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
       }
@@ -348,7 +362,7 @@ export function useCalendarData(
         queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
-      invalidateEventRanges(queryClient, cached.start, cached.end);
+      invalidateEventRanges(queryClient, cached.start, cached.end, timezone);
     },
   });
 
@@ -378,9 +392,14 @@ export function useCalendarData(
         queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
-      invalidateEventRanges(queryClient, event.start, event.end);
+      invalidateEventRanges(queryClient, event.start, event.end, timezone);
       if (updates.start) {
-        invalidateEventRanges(queryClient, updates.start, updates.end);
+        invalidateEventRanges(
+          queryClient,
+          updates.start,
+          updates.end,
+          timezone,
+        );
       }
     },
   });
@@ -401,7 +420,7 @@ export function useCalendarData(
     },
     onSettled: (_data, _error, { event, scope }) => {
       if (scope === "this_only") {
-        invalidateEventRanges(queryClient, event.start, event.end);
+        invalidateEventRanges(queryClient, event.start, event.end, timezone);
         return;
       }
       queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });

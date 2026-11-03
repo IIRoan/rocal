@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   buildPaddedCalendarMonthRanges,
+  formatInstantCalendarMonthKey,
   getCalendarMonthKey,
   getPaddedCalendarMonthRange,
+  resolveTimezone,
+  utcToPickerDate,
+  wallClockToUtc,
 } from "@workspace/calendar-core";
 import { calendarApiService } from "../lib/calendar-api-service";
 import { CalendarEvent, ApiError } from "../lib/types/calendar";
@@ -19,6 +23,9 @@ interface UseCalendarEventsLoaderOptions {
   cacheTimeout?: number;
   autoRefetch?: boolean;
   preloadMonthsAhead?: number;
+  timezone?: string | null;
+  /** Date shown before the calendar first moves, so its month loads at once. */
+  initialDate?: Date;
 }
 
 // One padded month range per query key; view switches within the month don't refetch.
@@ -32,9 +39,14 @@ const DEFAULT_STALE_TIME = 15 * 60 * 1000;
 /** Garbage-collection time for event queries (30 minutes). */
 const GC_TIME = 30 * 60 * 1000;
 
-/** Padded fetch range for the calendar month containing `date`. */
-function monthFetchRange(date: Date): DateRange {
-  return getPaddedCalendarMonthRange(date, MONTH_PADDING_DAYS);
+/** Padded fetch range for an account-zone month key (`"YYYY-MM"`). */
+function monthFetchRange(month: string, timezone: string): DateRange {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return getPaddedCalendarMonthRange(
+    new Date(year, monthNumber - 1, 1),
+    MONTH_PADDING_DAYS,
+    timezone,
+  );
 }
 
 /** Stable string key for a calendar month: `"YYYY-MM"`. */
@@ -42,36 +54,22 @@ export function monthKey(date: Date): string {
   return getCalendarMonthKey(date);
 }
 
-/** Map a view range to a padded fetch range containing it, expanding past the anchor month when the view outruns it. */
-export function toFetchRange(viewRange: DateRange): DateRange {
-  const midpoint = new Date(
-    (viewRange.start.getTime() + viewRange.end.getTime()) / 2,
-  );
-  const primary = monthFetchRange(midpoint);
-
-  // If the primary range already covers the view, return it directly.
-  if (primary.start <= viewRange.start && primary.end >= viewRange.end) {
-    return primary;
-  }
-
-  // Expand to cover the end month as well.
-  const endMonth = monthFetchRange(viewRange.end);
-  return {
-    start: primary.start < endMonth.start ? primary.start : endMonth.start,
-    end: primary.end > endMonth.end ? primary.end : endMonth.end,
-  };
-}
-
-/** Prefetch ranges for adjacent months around `center`. */
+/** Prefetch ranges for the account-zone months adjacent to the instant `center`. */
 export function buildViewPrefetchRanges(
   center: Date,
   _view: string,
+  timezone?: string | null,
 ): DateRange[] {
-  return buildPaddedCalendarMonthRanges(center, {
-    includeCurrent: false,
-    adjacentMonthDepth: 2,
-    paddingDays: MONTH_PADDING_DAYS,
-  });
+  const resolvedTimezone = resolveTimezone(timezone);
+  return buildPaddedCalendarMonthRanges(
+    utcToPickerDate(center, resolvedTimezone),
+    {
+      includeCurrent: false,
+      adjacentMonthDepth: 2,
+      paddingDays: MONTH_PADDING_DAYS,
+      timezone: resolvedTimezone,
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -80,8 +78,10 @@ export function buildViewPrefetchRanges(
 
 export const EVENTS_QUERY_KEY = ["events"] as const;
 
-export function getMonthQueryKey(month: string | null) {
+/** Keyed by zone because fetch bounds are account-zone days; without one it is a prefix that invalidates the month in every zone. */
+export function getMonthQueryKey(month: string | null, timezone?: string) {
   if (!month) return [...EVENTS_QUERY_KEY, "none"] as const;
+  if (timezone) return [...EVENTS_QUERY_KEY, month, timezone] as const;
   return [...EVENTS_QUERY_KEY, month] as const;
 }
 
@@ -118,11 +118,6 @@ function validateAndCleanEvents(
 // Hook
 // ---------------------------------------------------------------------------
 
-function activeMonthFetchRange(activeMonth: string): DateRange {
-  const [year, month] = activeMonth.split("-").map(Number);
-  return monthFetchRange(new Date(year, month - 1, 15));
-}
-
 export function useCalendarEventsLoader(
   options: UseCalendarEventsLoaderOptions = {},
 ) {
@@ -130,20 +125,27 @@ export function useCalendarEventsLoader(
     cacheTimeout = DEFAULT_STALE_TIME,
     autoRefetch = true,
     preloadMonthsAhead = 2,
+    timezone,
+    initialDate,
   } = options;
+  const resolvedTimezone = resolveTimezone(timezone);
+  const instantMonthKey = (date: Date) =>
+    formatInstantCalendarMonthKey(date, resolvedTimezone);
 
-  // Which calendar month to show.  Set exclusively by `setMonth`, which is called by CalendarDateSync from `currentDate` in the calendar context.
-  const [activeMonth, setActiveMonth] = useState<string | null>(null);
+  // The month is derived from an instant, so a later zone change re-reads it in the new zone.
+  const [anchorDate, setAnchorDate] = useState<Date | null>(null);
+  const monthAnchor = anchorDate ?? initialDate ?? null;
+  const activeMonth = monthAnchor ? instantMonthKey(monthAnchor) : null;
 
   // Stable fetch range derived from the active month string.
   const fetchRange: DateRange | null = activeMonth
-    ? activeMonthFetchRange(activeMonth)
+    ? monthFetchRange(activeMonth, resolvedTimezone)
     : null;
 
   const queryClient = useQueryClient();
 
   const eventsQuery = useQuery<CalendarEvent[], ApiError>({
-    queryKey: getMonthQueryKey(activeMonth),
+    queryKey: getMonthQueryKey(activeMonth, resolvedTimezone),
     queryFn: async () => {
       if (!fetchRange) return [];
       const res = await calendarApiService.getEvents(
@@ -162,17 +164,26 @@ export function useCalendarEventsLoader(
     if (!activeMonth || preloadMonthsAhead <= 0) return;
 
     const [year, month] = activeMonth.split("-").map(Number);
-    const center = new Date(year, month - 1, 15);
+    const center = wallClockToUtc(
+      new Date(year, month - 1, 15),
+      12,
+      0,
+      resolvedTimezone,
+    );
 
     const runPrefetch = () => {
-      for (const range of buildViewPrefetchRanges(center, "month")) {
+      for (const range of buildViewPrefetchRanges(
+        center,
+        "month",
+        resolvedTimezone,
+      )) {
         const midpoint = new Date(
           (range.start.getTime() + range.end.getTime()) / 2,
         );
-        const key = monthKey(midpoint);
+        const key = formatInstantCalendarMonthKey(midpoint, resolvedTimezone);
 
         queryClient.prefetchQuery({
-          queryKey: getMonthQueryKey(key),
+          queryKey: getMonthQueryKey(key, resolvedTimezone),
           queryFn: async () => {
             const res = await calendarApiService.getEvents(
               range.start,
@@ -199,15 +210,12 @@ export function useCalendarEventsLoader(
 
     const timeoutId = setTimeout(runPrefetch, 0);
     return () => clearTimeout(timeoutId);
-  }, [activeMonth, cacheTimeout, preloadMonthsAhead, queryClient]);
+  }, [activeMonth, cacheTimeout, preloadMonthsAhead, queryClient, resolvedTimezone]);
 
-  /** Set the active month from a Date.  Called by CalendarDateSync. */
-  const setMonth = (date: Date) => {
-    const key = monthKey(date);
-    setActiveMonth((prev) => (prev === key ? prev : key));
-  };
+  /** Follows the calendar's date (CalendarProvider's onCurrentDateChange); the latest date decides the month, also after a zone change. */
+  const setMonth = (date: Date) => setAnchorDate(date);
 
-  /** No-op kept for EventCalendar's onDateRangeChange; month selection is driven by CalendarDateSync → setMonth. */
+  /** No-op kept for EventCalendar's onDateRangeChange; month selection follows the calendar date through setMonth. */
   const setDateRange = (_dateRange: DateRange) => {};
 
   const refetchEvents = async (dateRange?: DateRange) => {
@@ -225,11 +233,11 @@ export function useCalendarEventsLoader(
     const midpoint = new Date(
       (range.start.getTime() + range.end.getTime()) / 2,
     );
-    const key = monthKey(midpoint);
-    const fetchRangeForMonth = monthFetchRange(midpoint);
+    const key = instantMonthKey(midpoint);
+    const fetchRangeForMonth = monthFetchRange(key, resolvedTimezone);
 
     queryClient.prefetchQuery({
-      queryKey: getMonthQueryKey(key),
+      queryKey: getMonthQueryKey(key, resolvedTimezone),
       queryFn: async () => {
         const res = await calendarApiService.getEvents(
           fetchRangeForMonth.start,
@@ -241,13 +249,22 @@ export function useCalendarEventsLoader(
     });
   };
 
+  /** Merges every cached month the range touches (a six-week grid spans up to three), so each month query stays narrow. */
   const getCachedEventsForRange = (range: DateRange): CalendarEvent[] | undefined => {
     const midpoint = new Date(
       (range.start.getTime() + range.end.getTime()) / 2,
     );
-    return queryClient.getQueryData<CalendarEvent[]>(
-      getMonthQueryKey(monthKey(midpoint)),
+    const months = new Set(
+      [range.start, midpoint, range.end].map(instantMonthKey),
     );
+    const byId = new Map<string, CalendarEvent>();
+    for (const month of months) {
+      const cached = queryClient.getQueryData<CalendarEvent[]>(
+        getMonthQueryKey(month, resolvedTimezone),
+      );
+      for (const event of cached ?? []) byId.set(event.id, event);
+    }
+    return [...byId.values()];
   };
 
   return {

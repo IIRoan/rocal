@@ -11,12 +11,15 @@ import type {
   EventParticipantInput,
 } from "@workspace/calendar-core";
 import {
+  formatCalendarDayKey,
   getErrorMessage,
   getEventPickerDateRange,
   getOperationWarningMessages,
   eventNotificationsQueryKey,
   getReminderMinutes,
+  parseCalendarDayKey,
   pickerDateAndTimeToUtc,
+  placePickedEndTime,
   pickerDateToAllDayUtcRange,
   resolveSubmittedCategoryId,
   resolveTimezone,
@@ -145,6 +148,30 @@ function replaceLegacyReminder(
   return [...nonEmailNotifications, createLegacyReminderNotification(reminder)];
 }
 
+function toPickerValue(date: Date, time: string): string {
+  return `${formatCalendarDayKey(date)}T${time}`;
+}
+
+/** The values a close would lose; the editor asks before discarding once they differ from the loaded ones. */
+function eventFormSnapshot(values: {
+  title: string;
+  description: string;
+  location: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  calendarId: string;
+  categoryId: string;
+  participants: EventParticipantInput[];
+  recurrenceRule: RecurrenceRule | null;
+  notifications: EventNotification[];
+}): string {
+  return JSON.stringify({
+    ...values,
+    notifications: normalizeNotificationPayload(values.notifications),
+  });
+}
+
 interface UseEventFormProps {
   calendars: Calendar[];
   localSettings: UserSettings;
@@ -172,6 +199,7 @@ interface UseEventFormReturn {
   recurrenceRule: RecurrenceRule | null;
 
   eventSaving: boolean;
+  isDirty: boolean;
   showRecurringDeleteModal: boolean;
   startDateOpen: boolean;
   endDateOpen: boolean;
@@ -304,7 +332,25 @@ export function useEventForm({
   >([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [showNotifications, setShowNotificationsState] = useState(false);
+  const [loadedSnapshot, setLoadedSnapshot] = useState<string | null>(null);
+  // Bumped by every load and reset, so a late reminders fetch never lands on another event's form.
+  const loadGenerationRef = useRef(0);
   const eventReminder = getReminderFromNotifications(eventNotifications);
+  const isDirty =
+    loadedSnapshot !== null &&
+    eventFormSnapshot({
+      title: eventTitle,
+      description: eventDescription,
+      location: eventLocation,
+      start: toPickerValue(eventStartDate, eventStartTime),
+      end: toPickerValue(eventEndDate, eventEndTime),
+      allDay: eventAllDay,
+      calendarId: eventCalendarId,
+      categoryId: eventCategoryId,
+      participants: eventParticipants,
+      recurrenceRule: isRecurring ? recurrenceRule : null,
+      notifications: showNotifications ? eventNotifications : [],
+    }) !== loadedSnapshot;
 
   const setEventReminder = (reminder: number | null) => {
     setEventNotificationsState((currentNotifications) =>
@@ -355,60 +401,76 @@ export function useEventForm({
     const isNewEvent = !event.id || event.id === "" || event.id === undefined;
     const fallbackNotifications = getFallbackNotifications(event.reminder);
 
-    setSelectedEvent(event);
-    setEventViewMode(isNewEvent ? "edit" : "view");
-    setEventTitle(event.title || "");
-    setEventDescription(event.description || "");
     const { startDate, endDate } = getEventPickerDateRange(
       event,
       localSettings.timezone,
     );
-    setEventStartDate(startDate);
-    setEventEndDate(endDate);
-    setEventStartTime(
-      formatTimeForInput(new Date(event.start), localSettings.timezone),
+    const startTime = formatTimeForInput(
+      new Date(event.start),
+      localSettings.timezone,
     );
-    setEventEndTime(
-      formatTimeForInput(new Date(event.end), localSettings.timezone),
+    const endTime = formatTimeForInput(
+      new Date(event.end),
+      localSettings.timezone,
     );
-    setEventAllDay(event.allDay || false);
-    setEventLocation(event.location || "");
-    setEventCalendarId(
+    const calendarId =
       event.calendarId ||
       calendarsRef.current?.find((c) => !c.isSyncOnly)?.id ||
-      "",
-    );
-    setEventCategoryId(event.categoryId || "");
-    setEventNotifications(fallbackNotifications);
-    setEventParticipants(
-      (event.participants ?? []).map((participant: EventParticipant) => ({
-        email: participant.email,
-        displayName: participant.displayName ?? undefined,
-        role: participant.role,
-        status: participant.status,
-      })),
-    );
-    setShowNotifications(fallbackNotifications.length > 0);
-
-    const hasRecurrence = !!event.recurrence;
-    setIsRecurring(hasRecurrence);
-    if (hasRecurrence && event.recurrence) {
-      const parsedRule = RecurrenceEngine.parseRecurrenceRule(
-        event.recurrence,
-      );
-      if (parsedRule) {
-        setRecurrenceRule(parsedRule as RecurrenceRule);
-      } else {
-        log.error("Failed to parse recurrence rule:", event.recurrence);
-        setIsRecurring(false);
-        setRecurrenceRule(null);
-      }
-    } else {
-      setRecurrenceRule(null);
+      "";
+    const participants = isNewEvent
+      ? []
+      : (event.participants ?? []).map((participant: EventParticipant) => ({
+          email: participant.email,
+          displayName: participant.displayName ?? undefined,
+          role: participant.role,
+          status: participant.status,
+        }));
+    const parsedRule = event.recurrence
+      ? (RecurrenceEngine.parseRecurrenceRule(
+          event.recurrence,
+        ) as RecurrenceRule | null)
+      : null;
+    if (event.recurrence && !parsedRule) {
+      log.error("Failed to parse recurrence rule:", event.recurrence);
     }
+    const snapshotWith = (notifications: EventNotification[]) =>
+      eventFormSnapshot({
+        title: event.title || "",
+        description: event.description || "",
+        location: event.location || "",
+        start: toPickerValue(startDate, startTime),
+        end: toPickerValue(endDate, endTime),
+        allDay: event.allDay || false,
+        calendarId,
+        categoryId: event.categoryId || "",
+        participants,
+        recurrenceRule: parsedRule,
+        notifications,
+      });
+    const loadedNotifications = isNewEvent ? [] : fallbackNotifications;
+    const generation = ++loadGenerationRef.current;
+
+    setSelectedEvent(event);
+    setEventViewMode(isNewEvent ? "edit" : "view");
+    setEventTitle(event.title || "");
+    setEventDescription(event.description || "");
+    setEventStartDate(startDate);
+    setEventEndDate(endDate);
+    setEventStartTime(startTime);
+    setEventEndTime(endTime);
+    setEventAllDay(event.allDay || false);
+    setEventLocation(event.location || "");
+    setEventCalendarId(calendarId);
+    setEventCategoryId(event.categoryId || "");
+    setEventNotifications(loadedNotifications);
+    setEventParticipants(participants);
+    setShowNotifications(loadedNotifications.length > 0);
+    setIsRecurring(parsedRule !== null);
+    setRecurrenceRule(parsedRule);
+    setLoadedSnapshot(snapshotWith(loadedNotifications));
+    setNotificationsLoading(!isNewEvent);
 
     if (!isNewEvent && event.id) {
-      setNotificationsLoading(true);
       const emailNotifications = await fetchEmailNotifications(
         queryClient,
         event.id,
@@ -416,6 +478,7 @@ export function useEventForm({
         log.error("Failed to load event notifications:", error);
         return [];
       });
+      if (generation !== loadGenerationRef.current) return;
       if (emailNotifications) {
         const notificationsToUse =
           emailNotifications.length > 0
@@ -423,12 +486,9 @@ export function useEventForm({
             : fallbackNotifications;
         setEventNotifications(notificationsToUse);
         setShowNotifications(notificationsToUse.length > 0);
+        setLoadedSnapshot(snapshotWith(notificationsToUse));
       }
       setNotificationsLoading(false);
-    } else {
-      setEventNotifications([]);
-      setEventParticipants([]);
-      setShowNotifications(false);
     }
   };
 
@@ -436,6 +496,7 @@ export function useEventForm({
     const startDate = new Date();
     const endDate = new Date();
     endDate.setHours(startDate.getHours() + 1);
+    loadGenerationRef.current++;
 
     setSelectedEvent(null);
     setEventViewMode("view");
@@ -462,6 +523,14 @@ export function useEventForm({
     setEndTimeOpen(false);
     setTimeErrors({});
     setShowNotifications(false);
+    setNotificationsLoading(false);
+    setLoadedSnapshot(null);
+  };
+
+  const setPickedEnd = (end: string) => {
+    setEventEndDate(parseCalendarDayKey(end.slice(0, 10)) ?? eventEndDate);
+    setEventEndTime(end.slice(11));
+    setTimeErrors((prev) => ({ ...prev, end: undefined }));
   };
 
   const handleStartTimeChange = (newStartTime: string) => {
@@ -471,14 +540,13 @@ export function useEventForm({
       setEventStartTime(validation.time);
       setTimeErrors((prev) => ({ ...prev, start: undefined }));
 
-      const startMinutes = timeToMinutes(validation.time);
-      const endMinutes = timeToMinutes(eventEndTime);
-
-      if (endMinutes <= startMinutes) {
-        const newEndMinutes = startMinutes + 60;
-        const newEndTime = minutesToTime(newEndMinutes);
-        setEventEndTime(newEndTime);
-        setTimeErrors((prev) => ({ ...prev, end: undefined }));
+      const start = toPickerValue(eventStartDate, validation.time);
+      const end = toPickerValue(eventEndDate, eventEndTime);
+      if (end <= start) {
+        const hourLater = minutesToTime(timeToMinutes(validation.time) + 60);
+        setPickedEnd(
+          placePickedEndTime(start, end, toPickerValue(eventEndDate, hourLater)),
+        );
       }
     } else {
       setEventStartTime(newStartTime);
@@ -490,18 +558,13 @@ export function useEventForm({
     const validation = validateTime(newEndTime);
 
     if (validation.isValid && validation.time) {
-      setEventEndTime(validation.time);
-      setTimeErrors((prev) => ({ ...prev, end: undefined }));
-
-      const startMinutes = timeToMinutes(eventStartTime);
-      const endMinutes = timeToMinutes(validation.time);
-
-      if (endMinutes <= startMinutes) {
-        const newStartMinutes = Math.max(0, endMinutes - 60);
-        const newStartTime = minutesToTime(newStartMinutes);
-        setEventStartTime(newStartTime);
-        setTimeErrors((prev) => ({ ...prev, start: undefined }));
-      }
+      setPickedEnd(
+        placePickedEndTime(
+          toPickerValue(eventStartDate, eventStartTime),
+          toPickerValue(eventEndDate, eventEndTime),
+          toPickerValue(eventEndDate, validation.time),
+        ),
+      );
     } else {
       setEventEndTime(newEndTime);
       setTimeErrors((prev) => ({ ...prev, end: validation.error }));
@@ -905,6 +968,7 @@ export function useEventForm({
     recurrenceRule,
 
     eventSaving,
+    isDirty,
     showRecurringDeleteModal,
     startDateOpen,
     endDateOpen,

@@ -1,11 +1,12 @@
 "use client";
 
-import { createContext, use, useEffect, ReactNode } from "react";
+import { createContext, use, ReactNode } from "react";
 import {
   useCalendarData,
   UseCalendarDataReturn,
 } from "@/hooks/use-calendar-data";
-import { useCalendarContext } from "@workspace/ui/components/calendar";
+import { useBootstrapCalendarDate } from "@workspace/ui/components/calendar";
+import { useSettings } from "@/hooks/use-settings";
 
 const CalendarDataContext = createContext<UseCalendarDataReturn | undefined>(
   undefined,
@@ -26,9 +27,13 @@ interface CalendarDataProviderProps {
 }
 
 export function CalendarDataProvider({ children }: CalendarDataProviderProps) {
+  const { settings } = useSettings();
+  const initialDate = useBootstrapCalendarDate();
   const calendarData = useCalendarData({
     autoRefetch: true,
     cacheTimeout: 10 * 60 * 1000, // 10 minutes cache
+    timezone: settings?.timezone,
+    initialDate,
   });
 
   return (
@@ -36,16 +41,4 @@ export function CalendarDataProvider({ children }: CalendarDataProviderProps) {
       {children}
     </CalendarDataContext.Provider>
   );
-}
-
-/** Syncs the calendar context currentDate to the data layer's active month; this is the only month-fetch control, and onDateRangeChange callbacks are no-ops. */
-export function CalendarDateSync() {
-  const { currentDate } = useCalendarContext();
-  const { setMonth } = useSharedCalendarData();
-
-  useEffect(() => {
-    setMonth(currentDate);
-  }, [currentDate, setMonth]);
-
-  return null;
 }

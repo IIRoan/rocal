@@ -336,7 +336,9 @@ Leave `STALWART_RECOVERY_MODE` unset for normal operation; set it only for a pla
 
 The mail PostgreSQL instance allows 100 connections, enough for two overlapping Stalwart pools of 32 plus administration. Its 128 MiB shared buffer cache is unchanged. The setting lives in PostgreSQL's persistent `postgresql.auto.conf`; recovery details are in [UPGRADE-1.0.md](UPGRADE-1.0.md).
 
-The Dockerfile enables background release of unused allocator pages through jemalloc's `/etc/malloc.conf` symlink. The official binary's network-binding capability disables environment-based allocator configuration under the service user, so neither `MALLOC_CONF` nor `_RJEM_MALLOC_CONF` works for this deployment. Arena counts and decay times retain upstream defaults.
+The Dockerfile enables background release of unused allocator pages through jemalloc's `/etc/malloc.conf` symlink. The official binary's network-binding capability disables environment-based allocator configuration under the service user, so neither `MALLOC_CONF` nor `_RJEM_MALLOC_CONF` works for this deployment. The same symlink caps jemalloc at eight arenas, the CPU quota. By default it creates four per visible host CPU (192 on Railway), and memory freed into that many arenas fragments, so RSS ratchets up with use. Decay times retain upstream defaults.
+
+The plan sets ASN and country lookups (`Asn`) to Team Cymru DNS instead of downloaded CSV tables, which held about 25–30 MiB and were rebuilt daily from 58 MB of downloads. Only inbound SMTP sessions (and the admin spam-classify action) look up an address, so the resolver sees the connecting mail server's IP, as the DNS blocklists already do. Set `Asn` to `{"@type":"Disabled"}` to stop the lookups.
 
 The backend gate caps HAProxy at eight worker threads, matching the Railway CPU quota. Automatic detection otherwise follows the host's larger CPU set and wastes memory on extra workers. Review this cap if the service's CPU quota changes.
 
