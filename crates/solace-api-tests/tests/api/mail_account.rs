@@ -814,6 +814,34 @@ async fn mailboxes_resolve_by_owner_and_never_attach_to_another_account() {
 }
 
 #[tokio::test]
+async fn concurrent_backends_register_their_callbacks_and_mint_mail_tokens() {
+    let mut backends = Vec::new();
+    let mut users = Vec::new();
+    for index in 0..8 {
+        let backend_url = format!("https://backend-{}.solace.test", hex(8));
+        let app = TestApp::spawn_with_config(|config| config.backend_url = backend_url).await;
+        let mut user = app.user().await;
+        let signup: MailSignup = ok(bootstrap(&mut user, &bootstrap_request(index))
+            .await
+            .expect_status(200)
+            .and_then(|response| response.dto()));
+        set_bridge_password(&app, &signup.stalwart_account_id.0, &user.id, &user.email).await;
+        users.push(user);
+        backends.push(app);
+    }
+    let mut mints = tokio::task::JoinSet::new();
+    for mut user in users {
+        mints.spawn(async move { user.get("/api/mail/oauth/access-token").await });
+    }
+    for response in mints.join_all().await {
+        let token: MailAccessToken = ok(response
+            .expect_status(200)
+            .and_then(|response| response.dto()));
+        assert!(!token.access_token.is_empty());
+    }
+}
+
+#[tokio::test]
 async fn provisioning_and_first_mint_bursts_wait_out_stalwarts_concurrency_limit() {
     let app = TestApp::spawn().await;
     let mut users = Vec::new();
