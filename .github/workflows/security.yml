@@ -122,19 +122,15 @@ jobs:
           - image: backend
             context: .
             dockerfile: apps/backend/Dockerfile
-            builder: true
           - image: notifications
             context: .
             dockerfile: apps/notifications/Dockerfile
-            builder: true
           - image: stalwart
             context: apps/stalwart
             dockerfile: apps/stalwart/Dockerfile
-            builder: false
           - image: gatus
             context: apps/gatus
             dockerfile: apps/gatus/Dockerfile
-            builder: false
 
     steps:
       - name: Checkout
@@ -175,34 +171,5 @@ jobs:
           sarif_file: ${{ runner.temp }}/runtime.sarif
           category: /trivy/container/${{ matrix.image }}/runtime
 
-      - name: Load the Rust build stage for statically linked OpenSSL scanning
-        if: matrix.builder
-        uses: chainguard-actions/docker-build-push-action@5b225cb1d6f5196bc2459eaa52642b902bf3750f # v7.4.0
-        with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
-          target: build
-          tags: solace-security:${{ matrix.image }}-build
-          load: true
-
-      - name: Scan the Rust build stage
-        if: matrix.builder
-        env:
-          IMAGE: solace-security:${{ matrix.image }}-build
-        run: |
-          trivy image --image-src docker --scanners vuln --pkg-types os --format json --output "$RUNNER_TEMP/build.json" "$IMAGE"
-          trivy convert --format sarif --output "$RUNNER_TEMP/build.sarif" "$RUNNER_TEMP/build.json"
-
-      - name: Publish build stage findings
-        if: matrix.builder
-        uses: chainguard-actions/github-codeql-action/upload-sarif@fb4cd6516f031c131efd4b91cb7a4ab5975a11ae # v4.39.1
-        with:
-          sarif_file: ${{ runner.temp }}/build.sarif
-          category: /trivy/container/${{ matrix.image }}/build
-
       - name: Summarize application vulnerabilities
         run: trivy convert --format table --scanners vuln --table-mode summary "$RUNNER_TEMP/runtime.json" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Summarize build stage vulnerabilities
-        if: matrix.builder
-        run: trivy convert --format table --scanners vuln --table-mode summary "$RUNNER_TEMP/build.json" >> "$GITHUB_STEP_SUMMARY"

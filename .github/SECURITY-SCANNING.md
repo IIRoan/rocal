@@ -8,7 +8,6 @@ Chainguard Guardener maintains the hardened Actions and container migrations in 
 | Bun audit | Every JavaScript workspace in `bun.lock`, including transitive and development dependencies |
 | Trivy repository | Cargo dependencies including development dependencies, and Dockerfile misconfigurations |
 | Trivy containers | Images built from the backend, notifications, Stalwart, and Gatus Dockerfiles |
-| Trivy Rust build stages | Debian build-stage packages, including the OpenSSL library statically linked into the Rust executables |
 | GitHub secret protection | Repository secret scanning and push protection, enabled in repository settings |
 | Dependabot | Dependency alerts and security updates, plus weekly Bun, Cargo, and Actions update PRs |
 | Dependency review | High or critical vulnerabilities introduced by dependency changes that GitHub's dependency graph can compare, including development dependencies |
@@ -21,7 +20,7 @@ Trivy publishes all severities, including unfixed vulnerabilities, to **Security
 
 On pull requests, GitHub's native dependency review fails when a dependency change introduces a high or critical advisory in runtime, development or unknown scopes. It uses GitHub's supported dependency graph and does not compare arbitrary container or OS inventories; the full Bun and Trivy scans remain necessary. CodeQL also publishes source findings through GitHub's code scanning checks. The existing `Tests` and `Rust` branch requirements remain in place; new checks are not added as required merge checks automatically.
 
-The build-stage report includes compiler and other build-only packages as well as OpenSSL; it does not prove each reported package ships in the runtime. Cargo scanning is necessary because the Rust executables do not embed an auditable Cargo dependency inventory. Source and freshly built image scans also do not establish which digest is currently deployed, inspect VPS packages or managed Postgres/Redis instances, audit App Store binaries or Apple frameworks, or prove application authorization and E2EE behavior.
+The Rust executables statically link no Debian package, and the runtime image scan covers the glibc they load. Cargo scanning is necessary because the Rust executables do not embed an auditable Cargo dependency inventory. Source and freshly built image scans also do not establish which digest is currently deployed, inspect VPS packages or managed Postgres/Redis instances, audit App Store binaries or Apple frameworks, or prove application authorization and E2EE behavior.
 
 To reproduce the dependency checks without installing packages:
 

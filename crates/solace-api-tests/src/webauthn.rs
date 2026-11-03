@@ -1,10 +1,13 @@
-//! A software platform authenticator (ES256, "none" attestation) that answers WebAuthn options like a browser would.
+//! A software platform authenticator (ES256 or RS256, "none" attestation) that answers WebAuthn options like a browser would.
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ciborium::Value as Cbor;
-use p256::ecdsa::signature::Signer;
+use p256::ecdsa::signature::{SignatureEncoding, Signer};
 use p256::ecdsa::{Signature, SigningKey};
+use rsa::pkcs8::{DecodePrivateKey, EncodePrivateKey};
+use rsa::traits::PublicKeyParts;
+use rsa::{RsaPrivateKey, pkcs1v15};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -29,6 +32,9 @@ pub struct SoftPasskey {
     /// A synced passkey like iCloud Keychain's: backup eligible and backed up, its counter always 0.
     #[serde(default)]
     pub synced: bool,
+    /// RS256 keys (PKCS#8) are what Windows Hello registers; `false` is an ES256 scalar.
+    #[serde(default)]
+    pub rs256: bool,
 }
 
 impl SoftPasskey {
@@ -47,6 +53,7 @@ impl SoftPasskey {
             rp_id: rp_id.to_owned(),
             user_handle: None,
             synced: false,
+            rs256: false,
         })
     }
 
@@ -57,11 +64,43 @@ impl SoftPasskey {
         })
     }
 
-    fn signing_key(&self) -> Result<SigningKey> {
-        let bytes = URL_SAFE_NO_PAD
-            .decode(&self.private_key)
+    pub fn new_rs256(rp_id: &str) -> Result<Self> {
+        let key = RsaPrivateKey::new(&mut rand::rng(), 2048)
             .map_err(|e| Error::Unexpected(e.to_string()))?;
-        SigningKey::from_slice(&bytes).map_err(|e| Error::Unexpected(e.to_string()))
+        let der = key
+            .to_pkcs8_der()
+            .map_err(|e| Error::Unexpected(e.to_string()))?;
+        Ok(Self {
+            private_key: URL_SAFE_NO_PAD.encode(der.as_bytes()),
+            rs256: true,
+            ..Self::new(rp_id)?
+        })
+    }
+
+    fn private_key_bytes(&self) -> Result<Vec<u8>> {
+        URL_SAFE_NO_PAD
+            .decode(&self.private_key)
+            .map_err(|e| Error::Unexpected(e.to_string()))
+    }
+
+    fn signing_key(&self) -> Result<SigningKey> {
+        SigningKey::from_slice(&self.private_key_bytes()?)
+            .map_err(|e| Error::Unexpected(e.to_string()))
+    }
+
+    fn rsa_key(&self) -> Result<RsaPrivateKey> {
+        RsaPrivateKey::from_pkcs8_der(&self.private_key_bytes()?)
+            .map_err(|e| Error::Unexpected(e.to_string()))
+    }
+
+    /// An ES256 signature is DER, an RS256 one the PKCS#1 v1.5 block.
+    fn sign(&self, data: &[u8]) -> Result<Vec<u8>> {
+        if self.rs256 {
+            let key = pkcs1v15::SigningKey::<Sha256>::new(self.rsa_key()?);
+            return Ok(key.sign(data).to_vec());
+        }
+        let signature: Signature = self.signing_key()?.sign(data);
+        Ok(signature.to_der().as_bytes().to_vec())
     }
 
     /// The `navigator.credentials.create()` result for registration `options`, as JSON the server verifies.
@@ -122,7 +161,7 @@ impl SoftPasskey {
         let auth_data = self.authenticator_data(FLAG_USER_PRESENT | FLAG_USER_VERIFIED);
         let mut signed = auth_data.clone();
         signed.extend_from_slice(&Sha256::digest(&client_data));
-        let signature: Signature = self.signing_key()?.sign(&signed);
+        let signature = self.sign(&signed)?;
 
         Ok(json!({
             "id": self.credential_id,
@@ -133,7 +172,7 @@ impl SoftPasskey {
             "response": {
                 "clientDataJSON": URL_SAFE_NO_PAD.encode(client_data),
                 "authenticatorData": URL_SAFE_NO_PAD.encode(auth_data),
-                "signature": URL_SAFE_NO_PAD.encode(signature.to_der().as_bytes()),
+                "signature": URL_SAFE_NO_PAD.encode(signature),
                 "userHandle": self.user_handle,
             },
         }))
@@ -152,17 +191,33 @@ impl SoftPasskey {
     }
 
     fn cose_public_key(&self) -> Result<Vec<u8>> {
-        let point = self.signing_key()?.verifying_key().to_sec1_point(false);
-        let (Some(x), Some(y)) = (point.x(), point.y()) else {
-            return Err(Error::Unexpected("public key has no coordinates".into()));
+        let key = if self.rs256 {
+            let key = self.rsa_key()?;
+            Cbor::Map(vec![
+                (Cbor::Integer(1.into()), Cbor::Integer(3.into())),
+                (Cbor::Integer(3.into()), Cbor::Integer((-257).into())),
+                (
+                    Cbor::Integer((-1).into()),
+                    Cbor::Bytes(key.n_bytes().into()),
+                ),
+                (
+                    Cbor::Integer((-2).into()),
+                    Cbor::Bytes(key.e_bytes().into()),
+                ),
+            ])
+        } else {
+            let point = self.signing_key()?.verifying_key().to_sec1_point(false);
+            let (Some(x), Some(y)) = (point.x(), point.y()) else {
+                return Err(Error::Unexpected("public key has no coordinates".into()));
+            };
+            Cbor::Map(vec![
+                (Cbor::Integer(1.into()), Cbor::Integer(2.into())),
+                (Cbor::Integer(3.into()), Cbor::Integer((-7).into())),
+                (Cbor::Integer((-1).into()), Cbor::Integer(1.into())),
+                (Cbor::Integer((-2).into()), Cbor::Bytes(x.to_vec())),
+                (Cbor::Integer((-3).into()), Cbor::Bytes(y.to_vec())),
+            ])
         };
-        let key = Cbor::Map(vec![
-            (Cbor::Integer(1.into()), Cbor::Integer(2.into())),
-            (Cbor::Integer(3.into()), Cbor::Integer((-7).into())),
-            (Cbor::Integer((-1).into()), Cbor::Integer(1.into())),
-            (Cbor::Integer((-2).into()), Cbor::Bytes(x.to_vec())),
-            (Cbor::Integer((-3).into()), Cbor::Bytes(y.to_vec())),
-        ]);
         let mut out = Vec::new();
         ciborium::into_writer(&key, &mut out).map_err(|e| Error::Unexpected(e.to_string()))?;
         Ok(out)

@@ -15,9 +15,9 @@ use solace_api_types::auth::{OkFlag, Passkey, PasskeyUpdated, StatusFlag};
 use webauthn_rs_core::WebauthnCore;
 use webauthn_rs_core::error::WebauthnError;
 use webauthn_rs_core::proto::{
-    AttestationFormat, AttestationMetadata, AuthenticationState, COSEKey, Credential,
-    ParsedAttestation, ParsedAttestationData, PublicKeyCredential, RegisterPublicKeyCredential,
-    RegisteredExtensions, RegistrationState, UserVerificationPolicy,
+    AttestationFormat, AttestationMetadata, AuthenticationState, COSEAlgorithm, COSEKey,
+    Credential, ParsedAttestation, ParsedAttestationData, PublicKeyCredential,
+    RegisterPublicKeyCredential, RegisteredExtensions, RegistrationState, UserVerificationPolicy,
 };
 
 use super::api::{
@@ -37,20 +37,8 @@ use crate::state::AppState;
 const CHALLENGE_SECONDS: i64 = 300;
 const TIMEOUT_MS: u64 = 60_000;
 const RP_NAME: &str = "Rocani";
-const OFFERED_ALGORITHMS: [i32; 3] = [-8, -7, -257];
-/// simplewebauthn verifies every algorithm it supports, not only the three it offers.
-const VERIFIED_ALGORITHMS: [&str; 10] = [
-    "EDDSA",
-    "ES256",
-    "ES512",
-    "PS256",
-    "PS384",
-    "PS512",
-    "RS256",
-    "RS384",
-    "RS512",
-    "INSECURE_RS1",
-];
+/// Offered and verified alike: webauthn-rs-core 0.6 cannot verify EdDSA, and a P-521 signature never verifies.
+const ALGORITHMS: [COSEAlgorithm; 2] = [COSEAlgorithm::ES256, COSEAlgorithm::RS256];
 
 static REGISTER_QUERY: LazyLock<Schema> = LazyLock::new(|| {
     zod::object([
@@ -308,7 +296,7 @@ pub async fn registration_options(
                 "name": query.name.filter(|n| !n.is_empty()).unwrap_or_else(|| name.clone()),
                 "displayName": name,
             },
-            "pubKeyCredParams": OFFERED_ALGORITHMS.map(|alg| json!({"alg": alg, "type": "public-key"})),
+            "pubKeyCredParams": ALGORITHMS.map(|alg| json!({"alg": alg as i32, "type": "public-key"})),
             "timeout": TIMEOUT_MS,
             "attestation": "none",
             "excludeCredentials": descriptors(&store::user_passkeys(&state.db, &user.id).await?),
@@ -454,7 +442,7 @@ fn verify_attestation(
         "policy": "preferred",
         "exclude_credentials": [],
         "challenge": expected_challenge,
-        "credential_algorithms": VERIFIED_ALGORITHMS,
+        "credential_algorithms": ALGORITHMS,
         "require_resident_key": false,
         "authenticator_attachment": null,
         "extensions": {},
@@ -620,7 +608,7 @@ fn verify_assertion(
         .decode(&row.credential_id)
         .map_err(|e| invalid(e.to_string()))?;
     let stored = Credential {
-        cred_id: credential_id.into(),
+        cred_id: credential_id,
         cred: key,
         counter: u32::try_from(row.counter).unwrap_or(0),
         transports: None,
