@@ -22,7 +22,30 @@ export function licenseGroupKey(group: ThirdPartyLicenseGroup): string {
   return `${group.license}:${first?.name}@${first?.version}`;
 }
 
-export function licenseGroupCount(group: ThirdPartyLicenseGroup): string {
-  const count = group.packages.length;
-  return `${count} ${count === 1 ? "package" : "packages"}`;
+/** Names a lone package itself, and a license several groups share by the group's first packages, so no two rows read alike. */
+export function licenseGroupLabel(
+  group: ThirdPartyLicenseGroup,
+  groups: readonly ThirdPartyLicenseGroup[] = THIRD_PARTY_LICENSE_GROUPS,
+): { title: string; detail: string } {
+  const names = [...new Set(group.packages.map((pkg) => pkg.name))];
+  const [first, second] = names;
+  if (names.length === 1 && first) {
+    return { title: first, detail: group.license };
+  }
+  const licenseRepeats = groups.some(
+    (other) =>
+      other !== group &&
+      other.packages.length > 1 &&
+      other.license === group.license,
+  );
+  if (!licenseRepeats || !first || !second) {
+    return { title: group.license, detail: `${group.packages.length} packages` };
+  }
+  return {
+    title: group.license,
+    detail:
+      names.length === 2
+        ? `${first} and ${second}`
+        : `${first}, ${second} and ${names.length - 2} more`,
+  };
 }

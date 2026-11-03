@@ -1,114 +1,55 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { endOfWeek, isSameDay, isWithinInterval, startOfWeek } from "date-fns";
-import { StartHour, EndHour } from "../components/calendar/constants";
+import { useSyncExternalStore } from "react";
+import {
+  getZonedDateParts,
+  isSamePickerDay,
+  resolveTimezone,
+  utcToPickerDate,
+} from "@workspace/calendar-core";
+import { StartHour } from "../components/calendar/constants";
 
-function getCurrentTimeInTimezone(timezone?: string): {
-  hours: number;
-  minutes: number;
-  date: Date;
-} {
-  if (!timezone) {
-    const now = new Date();
-    return {
-      hours: now.getHours(),
-      minutes: now.getMinutes(),
-      date: now,
-    };
-  }
+const MINUTE_MS = 60_000;
 
-  // Use Intl.DateTimeFormat to get current time in the specified timezone
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+function subscribeToMinutes(onChange: () => void) {
+  const interval = window.setInterval(onChange, MINUTE_MS);
+  return () => window.clearInterval(interval);
+}
 
-  const timeString = formatter.format(now);
-  const [hoursStr, minutesStr] = timeString.split(":");
-  const hours = parseInt(hoursStr || "0", 10);
-  const minutes = parseInt(minutesStr || "0", 10);
+const getCurrentMinute = () => Math.floor(Date.now() / MINUTE_MS);
+// The server renders no line, so hydration never mismatches the client clock.
+const getServerMinute = () => null;
 
-  // Create a date object representing today in the specified timezone
-  const dateFormatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+/** Line position and visibility for the account-zone days a timeline renders. */
+export function getCurrentTimeIndicator(
+  now: Date,
+  days: readonly Date[],
+  timezone?: string | null,
+) {
+  const resolvedTimezone = resolveTimezone(timezone);
+  const { hours, minutes } = getZonedDateParts(now, resolvedTimezone);
+  const today = utcToPickerDate(now, resolvedTimezone);
 
-  const dateString = dateFormatter.format(now);
-  const [monthStr, dayStr, yearStr] = dateString.split("/");
-  const timezoneDate = new Date(
-    parseInt(yearStr || "2025", 10),
-    parseInt(monthStr || "1", 10) - 1,
-    parseInt(dayStr || "1", 10),
-  );
-
-  return { hours, minutes, date: timezoneDate };
+  return {
+    currentTimePosition: (((hours - StartHour) * 60 + minutes) / (24 * 60)) * 100,
+    currentTimeVisible: days.some((day) => isSamePickerDay(day, today)),
+    currentTime: { hours, minutes },
+  };
 }
 
 export function useCurrentTimeIndicator(
-  currentDate: Date,
-  view: "day" | "week",
-  timezone?: string,
+  days: readonly Date[],
+  timezone?: string | null,
 ) {
-  const [currentTimePosition, setCurrentTimePosition] = useState<number>(0);
-  const [currentTimeVisible, setCurrentTimeVisible] = useState<boolean>(false);
-  const [currentTime, setCurrentTime] = useState<{
-    hours: number;
-    minutes: number;
-  } | null>(null);
+  const minute = useSyncExternalStore(
+    subscribeToMinutes,
+    getCurrentMinute,
+    getServerMinute,
+  );
 
-  useEffect(() => {
-    const calculateTimePosition = () => {
-      const {
-        hours,
-        minutes,
-        date: timezoneDate,
-      } = getCurrentTimeInTimezone(timezone);
+  if (minute === null) {
+    return { currentTimePosition: 0, currentTimeVisible: false, currentTime: null };
+  }
 
-      const totalMinutes = (hours - StartHour) * 60 + minutes;
-      const dayStartMinutes = 0;
-      // EndHour is 23, but we need to include the full 24th hour (23:00-23:59)
-      // So the total range should be 24 hours (0-23:59)
-      const dayEndMinutes = 24 * 60; // Full 24 hours in minutes
-
-      // Calculate position as percentage of day
-      const position =
-        ((totalMinutes - dayStartMinutes) / (dayEndMinutes - dayStartMinutes)) *
-        100;
-
-      // Check if current day is in view based on the calendar view
-      let isCurrentTimeVisible = false;
-
-      if (view === "day") {
-        isCurrentTimeVisible = isSameDay(timezoneDate, currentDate);
-      } else if (view === "week") {
-        const startOfWeekDate = startOfWeek(currentDate, { weekStartsOn: 0 });
-        const endOfWeekDate = endOfWeek(currentDate, { weekStartsOn: 0 });
-        isCurrentTimeVisible = isWithinInterval(timezoneDate, {
-          start: startOfWeekDate,
-          end: endOfWeekDate,
-        });
-      }
-
-      setCurrentTimePosition(position);
-      setCurrentTimeVisible(isCurrentTimeVisible);
-      setCurrentTime({ hours, minutes });
-    };
-
-    // Calculate immediately
-    calculateTimePosition();
-
-    // Update every minute
-    const interval = setInterval(calculateTimePosition, 60000);
-
-    return () => clearInterval(interval);
-  }, [currentDate, view, timezone]);
-
-  return { currentTimePosition, currentTimeVisible, currentTime };
+  return getCurrentTimeIndicator(new Date(minute * MINUTE_MS), days, timezone);
 }

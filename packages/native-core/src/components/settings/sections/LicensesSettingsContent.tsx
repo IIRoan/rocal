@@ -7,8 +7,8 @@ import {
 } from "@workspace/calendar-core/product-info";
 import {
   THIRD_PARTY_LICENSE_GROUPS,
-  licenseGroupCount,
   licenseGroupKey,
+  licenseGroupLabel,
   type ThirdPartyLicenseGroup,
 } from "@workspace/calendar-core/third-party-notices";
 import { openExternalLink } from "../../../lib/open-external-link";
@@ -60,11 +60,12 @@ export function LicensesSettingsContent() {
             {THIRD_PARTY_LICENSE_GROUPS.flatMap((group) => {
               const key = licenseGroupKey(group);
               const open = openKey === key;
+              const label = licenseGroupLabel(group);
               const row = (
                 <SheetItem
                   key={key}
-                  label={group.license}
-                  detail={licenseGroupCount(group)}
+                  label={label.title}
+                  detail={label.detail}
                   accessory={open ? "chevron-up" : "chevron-down"}
                   accessibilityState={{ expanded: open }}
                   onPress={() => setOpenKey(open ? null : key)}

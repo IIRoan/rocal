@@ -75,7 +75,6 @@ fn enforce_at(store: &'static str, key: &str, limit: Limit, now: Instant) -> Res
                 store.entries.retain(|_, entry| entry.reset > now);
             }
             // A full store drops the entry nearest its reset, so a new key is always counted rather than let through.
-            // ponytail: O(n) scan only while 50,000 live keys are held; a time-ordered index if floods become routine.
             if store.entries.len() >= MAX_KEYS_PER_STORE
                 && let Some(oldest) = store
                     .entries

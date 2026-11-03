@@ -102,6 +102,8 @@ export function MailAppListColumn({
   }
 
   const activeLabel = labels.find((label) => label.id === activeLabelId);
+  const listTitle = activeLabel?.name ?? selectedMailboxName;
+  const searchQuery = mailListSearch.trim();
   const unreadCount = applyMailListViewFilter(
     activeMailbox.messages,
     "all",
@@ -138,7 +140,7 @@ export function MailAppListColumn({
       <div ref={contentRef} className="flex min-h-0 flex-1 flex-col">
         {!isMobile && (
           <MailMailboxHeader
-            title={activeLabel?.name ?? selectedMailboxName}
+            title={listTitle}
             unreadCount={unreadCount}
             filter={{
               value: listViewFilter,
@@ -189,6 +191,17 @@ export function MailAppListColumn({
           {showSearchLoadingState ? (
             <div className="flex flex-1 items-center justify-center p-8">
               <p className="text-sm text-muted-foreground">Searching…</p>
+            </div>
+          ) : searchActive && shownCount === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-1 p-8 text-center">
+              <p className="max-w-full break-words text-sm text-foreground">
+                {searchQuery
+                  ? `No results for “${searchQuery}”`
+                  : "No messages match these filters"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Search covers {listTitle} only. Open another folder to search there.
+              </p>
             </div>
           ) : (
             <MessageList

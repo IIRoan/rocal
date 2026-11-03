@@ -6,7 +6,6 @@ import {
 } from "@workspace/ui/components/ui/dialog";
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
   DrawerShell,
   DrawerTitle,
@@ -26,6 +25,7 @@ export function EventEditorView({
   badgeItem,
   calendars,
   categories,
+  confirmsDiscard,
   dialogTitle,
   eventForm,
   flags,
@@ -38,6 +38,7 @@ export function EventEditorView({
   layout,
   localSettings,
   onBack,
+  onCancelEdit,
   onOpenChange,
   open,
   recurringModal,
@@ -96,6 +97,8 @@ export function EventEditorView({
           onOpenChange={onOpenChange}
           direction="bottom"
           modal={true}
+          // Swipes and outside taps cannot ask first, so unsaved changes close only through the buttons, which do.
+          dismissible={!confirmsDiscard}
         >
           <DrawerContent
             responsive
@@ -116,10 +119,14 @@ export function EventEditorView({
                       iconSize="sm"
                     />
                   </h2>
-                  <DrawerClose className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  >
                     <X className="size-5" />
                     <span className="sr-only">Close</span>
-                  </DrawerClose>
+                  </button>
                 </div>
               }
               footer={
@@ -128,6 +135,7 @@ export function EventEditorView({
                   isViewMode={flags.isViewMode}
                   eventForm={eventForm}
                   onBack={onBack}
+                  onCancelEdit={onCancelEdit}
                   handleEventSave={handleEventSave}
                   handleEventDelete={handleEventDelete}
                   handleEventDownloadIcs={handleEventDownloadIcs}

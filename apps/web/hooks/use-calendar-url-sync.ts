@@ -3,21 +3,27 @@
 import { useEffect, useRef } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import {
-  formatCalendarDayKey,
-  parseCalendarDayKey,
+  formatInstantCalendarDayKey,
+  resolveTimezone,
+  wallClockFromCalendarDayKey,
 } from "@workspace/calendar-core";
 import {
   useCalendarContext,
   CALENDAR_VIEWS,
 } from "@workspace/ui/components/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
+import { useSettings } from "@/hooks/use-settings";
 
 const DATE_PARAM = "date";
 const VIEW_PARAM = "view";
 
-function parseDateParam(value: string | null): Date | null {
+/** Noon in the account zone keeps the day intact whatever zone the browser is in. */
+export function parseDateParam(
+  value: string | null,
+  timezone: string,
+): Date | null {
   if (!value) return null;
-  return parseCalendarDayKey(value);
+  return wallClockFromCalendarDayKey(value, 12, 0, timezone);
 }
 
 function parseViewParam(value: string | null): CalendarView | null {
@@ -28,25 +34,22 @@ function parseViewParam(value: string | null): CalendarView | null {
   return null;
 }
 
-function formatDateParam(date: Date): string {
-  return formatCalendarDayKey(date);
-}
-
 export function useCalendarUrlSync() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { currentDate, setCurrentDate, currentView, setCurrentView } =
     useCalendarContext();
+  const { settings, loading: settingsLoading } = useSettings();
+  const timezone = resolveTimezone(settings?.timezone);
   const initializedRef = useRef(false);
-  const isUpdatingUrlRef = useRef(false);
 
-  // On initial mount, read date/view from URL and apply them
+  // The URL day is read in the account zone, so wait for settings before applying it.
   useEffect(() => {
-    if (initializedRef.current) return;
+    if (initializedRef.current || settingsLoading) return;
     initializedRef.current = true;
 
     const dateParam = searchParams.get(DATE_PARAM);
-    const parsed = parseDateParam(dateParam);
+    const parsed = parseDateParam(dateParam, timezone);
     if (parsed) {
       setCurrentDate(parsed);
     }
@@ -56,19 +59,15 @@ export function useCalendarUrlSync() {
     if (parsedView) {
       setCurrentView(parsedView);
     }
-  }, [searchParams, setCurrentDate, setCurrentView]);
+  }, [searchParams, setCurrentDate, setCurrentView, settingsLoading, timezone]);
 
+  // A run in the same commit as the init still sees the pre-URL state; the commit that applies the URL writes it back.
   useEffect(() => {
     if (!initializedRef.current) return;
-    if (isUpdatingUrlRef.current) return;
 
-    isUpdatingUrlRef.current = true;
-    queueMicrotask(() => {
-      isUpdatingUrlRef.current = false;
-    });
     const params = new URLSearchParams(window.location.search);
 
-    params.set(DATE_PARAM, formatDateParam(currentDate));
+    params.set(DATE_PARAM, formatInstantCalendarDayKey(currentDate, timezone));
     params.set(VIEW_PARAM, currentView);
 
     const newSearch = params.toString();
@@ -76,5 +75,5 @@ export function useCalendarUrlSync() {
     const newUrl = `${path}${newSearch ? `?${newSearch}` : ""}`;
 
     window.history.replaceState(null, "", newUrl);
-  }, [currentDate, currentView, pathname]);
+  }, [currentDate, currentView, pathname, timezone]);
 }

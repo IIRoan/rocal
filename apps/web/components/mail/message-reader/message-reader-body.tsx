@@ -213,6 +213,7 @@ export function MessageReaderBody({
         <EventReminderBanner
           eventId={linkedCalendarEvent.eventId}
           loading={linkedCalendarEvent.loading}
+          deleted={linkedCalendarEvent.deleted}
           error={linkedCalendarEvent.error}
           reminder={eventReminderView}
           className="mb-3 shrink-0"

@@ -25,6 +25,7 @@ jest.mock("lucide-react", () => {
 });
 
 import { MobileTopNav } from "./mobile-top-nav";
+import type { CalendarView } from "../calendar/types";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -109,4 +110,27 @@ describe("MobileTopNav", () => {
     expect(onPrevious).toHaveBeenCalledTimes(1);
     expect(onNext).toHaveBeenCalledTimes(1);
   });
+
+  // Noon on March 1 in Kiritimati is still February 28 in every zone west of UTC+12.
+  it.each([
+    ["day", "Sunday, Mar 1"],
+    ["3day", "Feb 28 – Mar 2"],
+    ["month", "March 2026"],
+    ["agenda", "March 2026"],
+  ] as Array<[CalendarView, string]>)(
+    "titles the %s view with the account-zone day",
+    (view, title) => {
+      act(() => {
+        root.render(
+          <MobileTopNav
+            currentDate={new Date("2026-02-28T22:00:00.000Z")}
+            currentView={view}
+            timezone="Pacific/Kiritimati"
+          />,
+        );
+      });
+
+      expect(document.body.textContent).toContain(title);
+    },
+  );
 });

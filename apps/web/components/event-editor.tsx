@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useImperativeHandle, useState, type Ref } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   canCurrentUserDeleteEvent,
@@ -17,6 +17,7 @@ import { useCategories } from "@/hooks/use-categories";
 import { useEventForm } from "@/hooks/use-event-form";
 import {
   buildEventEditorEncryptionPreview,
+  getEventDeleteConfirmCopy,
   isRecurringEventDeleteCandidate,
 } from "@/lib/event-editor-view-model";
 import { getActiveE2eeSession } from "@/lib/e2ee-session";
@@ -29,9 +30,10 @@ import {
   respondToEventInvitation,
 } from "./event-editor/event-editor-invitation";
 import { useEventEditorLivePreview } from "./event-editor/event-editor-preview";
-import { EventDeleteConfirmDialog } from "./event-editor/event-delete-confirm-dialog";
+import { EventConfirmDialog } from "./event-editor/event-confirm-dialog";
 import { EventEditorView } from "./event-editor/event-editor-view";
 import type { EventEditorInvitationResponseStatus } from "./event-editor/types";
+import { useDiscardGuard } from "./event-editor/use-discard-guard";
 
 interface EventEditorProps {
   open: boolean;
@@ -45,7 +47,11 @@ interface EventEditorProps {
   initialEventViewMode?: "view" | "edit";
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
   showBackButton?: boolean;
+  closeHandleRef?: Ref<EventEditorCloseHandle>;
 }
+
+/** Lets a host surface that owns dismissal (the palette) ask before discarding unsaved changes. */
+export type EventEditorCloseHandle = { requestClose: () => void };
 
 export function EventEditor({
   open,
@@ -59,6 +65,7 @@ export function EventEditor({
   initialEventViewMode = "view",
   updatePreviewEvent,
   showBackButton = false,
+  closeHandleRef,
 }: EventEditorProps) {
   const calendarData = useSharedCalendarData();
   const queryClient = useQueryClient();
@@ -144,7 +151,29 @@ export function EventEditor({
     setEventViewMode,
   ]);
 
+  const canEditSelectedEvent = selectedEvent
+    ? canCurrentUserEditEvent(selectedEvent)
+    : true;
+  const isViewMode = eventViewMode === "view" || !canEditSelectedEvent;
+  const confirmsDiscard = eventForm.isDirty && !isViewMode;
+  const discardGuard = useDiscardGuard(confirmsDiscard, (action) => {
+    if (action === "close") {
+      onOpenChange(false);
+    } else if (action === "back") {
+      onBack();
+    } else if (selectedEvent && eventForm.isDirty) {
+      // The read view shows the form fields, so discarded edits reload the stored event.
+      loadEventData(selectedEvent);
+    } else {
+      setEventViewMode("view");
+    }
+  });
+  useImperativeHandle(closeHandleRef, () => ({
+    requestClose: () => discardGuard.requestLeave("close"),
+  }));
+
   function handleEventSave() {
+    discardGuard.cancel();
     if (selectedEvent && !canCurrentUserEditEvent(selectedEvent)) {
       toast.error("Imported invitation events are read-only for attendees.");
       return;
@@ -204,14 +233,10 @@ export function EventEditor({
     }).catch(() => undefined);
   }
 
-  const canEditSelectedEvent = selectedEvent
-    ? canCurrentUserEditEvent(selectedEvent)
-    : true;
   const invitationStatus = getInvitationResponseStatus(
     selectedEvent,
     canEditSelectedEvent,
   );
-  const isViewMode = eventViewMode === "view" || !canEditSelectedEvent;
   const badgeItem = selectedEvent?.id
     ? selectedEvent
     : buildEventEditorEncryptionPreview({
@@ -229,6 +254,7 @@ export function EventEditor({
       badgeItem={badgeItem}
       calendars={calendars}
       categories={categories}
+      confirmsDiscard={confirmsDiscard}
       dialogTitle={dialogTitle}
       eventForm={eventForm}
       flags={{
@@ -261,19 +287,33 @@ export function EventEditor({
               : "dialog"
       }
       localSettings={localSettings}
-      onBack={onBack}
-      onOpenChange={onOpenChange}
+      onBack={() => discardGuard.requestLeave("back")}
+      onCancelEdit={() => discardGuard.requestLeave("view")}
+      onOpenChange={(nextOpen) =>
+        nextOpen ? onOpenChange(true) : discardGuard.requestLeave("close")
+      }
       open={open}
       recurringModal={
         selectedEvent ? (
           <>
-            <EventDeleteConfirmDialog
+            <EventConfirmDialog
+              {...discardGuard.dialog}
+              title={selectedEvent.id ? "Discard your changes?" : "Discard this event?"}
+              description={
+                selectedEvent.id
+                  ? "Your edits to this event haven’t been saved."
+                  : "The event hasn’t been saved yet."
+              }
+              cancelLabel="Keep editing"
+              confirmLabel={selectedEvent.id ? "Discard changes" : "Discard event"}
+            />
+            <EventConfirmDialog
               open={showDeleteConfirm}
               onOpenChange={setShowDeleteConfirm}
-              eventTitle={selectedEvent.title}
-              removeOnly={
-                !canEditSelectedEvent && isCancelledCalendarEvent(selectedEvent)
-              }
+              {...getEventDeleteConfirmCopy(
+                selectedEvent.title,
+                !canEditSelectedEvent && isCancelledCalendarEvent(selectedEvent),
+              )}
               onConfirm={confirmEventDelete}
             />
             <RecurringScopeModal

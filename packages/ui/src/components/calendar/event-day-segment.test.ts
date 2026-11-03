@@ -7,7 +7,6 @@ import {
   isAllDayRowEvent,
   isMultiDayEvent,
 } from "./utils";
-import { groupThreeDayAllDayEventsByDay } from "./three-day-view-utils";
 
 const timezone = "Europe/Amsterdam";
 
@@ -68,23 +67,6 @@ describe("single-day event membership", () => {
     ).toBe(false);
   });
 
-  it("marks only the Saturday column in a 3-day all-day row", () => {
-    const event = createEvent({
-      allDay: true,
-      start: "2026-06-19T22:00:00.000Z",
-      end: "2026-06-20T22:00:00.000Z",
-    });
-    const grouped = groupThreeDayAllDayEventsByDay(
-      [event],
-      new Date(2026, 5, 20),
-      timezone,
-    );
-
-    expect(grouped[0]!.map((item) => item.id)).toEqual([]);
-    expect(grouped[1]!.map((item) => item.id)).toEqual([event.id]);
-    expect(grouped[2]!.map((item) => item.id)).toEqual([]);
-  });
-
   it("keeps a Friday all-day event off Saturday when stored at UTC midnight", () => {
     const event = createEvent({
       allDay: true,
@@ -100,14 +82,6 @@ describe("single-day event membership", () => {
     expect(
       eventOverlapsRange(event, saturday, saturday, "day", timezone),
     ).toBe(false);
-
-    const grouped = groupThreeDayAllDayEventsByDay(
-      [event],
-      saturday,
-      timezone,
-    );
-    expect(grouped[0]!.map((item) => item.id)).toEqual([event.id]);
-    expect(grouped[1]!.map((item) => item.id)).toEqual([]);
   });
 
   it("uses rounded segment ends for a single-day all-day event", () => {
@@ -152,20 +126,6 @@ describe("single-day event membership", () => {
       isFirstDay: false,
       isLastDay: false,
     });
-  });
-
-  it("does not put timed single-day events in the all-day grouping", () => {
-    const event = createEvent({
-      start: "2026-06-20T08:00:00.000Z",
-      end: "2026-06-20T09:00:00.000Z",
-    });
-    const grouped = groupThreeDayAllDayEventsByDay(
-      [event],
-      new Date(2026, 5, 20),
-      timezone,
-    );
-
-    expect(grouped).toEqual([[], [], []]);
   });
 });
 

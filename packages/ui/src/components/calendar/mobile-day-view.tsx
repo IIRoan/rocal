@@ -118,7 +118,7 @@ export function MobileDayView({
   };
 
   const { currentTimePosition, currentTimeVisible, currentTime } =
-    useCurrentTimeIndicator(currentDate, "day", timezone);
+    useCurrentTimeIndicator([calendarDay], resolvedTimezone);
   const currentTimeLabel = formatCurrentTimeLabel(currentTime, timeFormat);
 
   useEffect(() => {

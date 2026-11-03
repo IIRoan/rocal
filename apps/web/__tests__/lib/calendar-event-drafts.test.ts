@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 
 import { createDraftCalendarEvent } from "../../lib/calendar-event-drafts";
 
@@ -17,6 +17,17 @@ describe("calendar-event-drafts", () => {
     expect(event.end.toISOString()).toBe("2026-04-24T14:04:00.000Z");
     expect(event.title).toBe("");
     expect(event.allDay).toBe(false);
+  });
+
+  it("starts a draft without a start at the next quarter hour for an hour", () => {
+    jest.useFakeTimers({ now: new Date("2026-11-02T22:51:12.000Z") });
+    try {
+      const event = createDraftCalendarEvent();
+      expect(event.start.toISOString()).toBe("2026-11-02T23:00:00.000Z");
+      expect(event.end.toISOString()).toBe("2026-11-03T00:00:00.000Z");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("falls back to the first available calendar and then to an empty value", () => {

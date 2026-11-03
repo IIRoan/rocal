@@ -1,7 +1,11 @@
-import { addDays, format, isSameMonth } from "date-fns";
-import { getWeekCalendarRange } from "@workspace/calendar-core";
+import { format, isSameMonth } from "date-fns";
+import {
+  getAgendaLastDay,
+  getWeekCalendarRange,
+  utcToPickerDate,
+} from "@workspace/calendar-core";
 
-import { AgendaDaysToShow } from "./constants";
+import { getThreeDayCalendarDays } from "./three-day-view-utils";
 import type { CalendarView } from "./types";
 
 function formatMonthYear(date: Date) {
@@ -24,8 +28,10 @@ export function CalendarViewTitle({
   weekStartDay: number;
   timezone: string;
 }) {
+  const day = utcToPickerDate(currentDate, timezone);
+
   if (view === "month") {
-    return formatMonthYear(currentDate);
+    return formatMonthYear(day);
   }
 
   if (view === "week") {
@@ -52,21 +58,20 @@ export function CalendarViewTitle({
     return (
       <>
         <span className="min-sm:hidden" aria-hidden="true">
-          {format(currentDate, "MMM d, yyyy")}
+          {format(day, "MMM d, yyyy")}
         </span>
         <span className="max-sm:hidden min-md:hidden" aria-hidden="true">
-          {format(currentDate, "MMMM d, yyyy")}
+          {format(day, "MMMM d, yyyy")}
         </span>
         <span className="max-md:hidden">
-          {format(currentDate, "EEE, MMMM d, yyyy")}
+          {format(day, "EEE, MMMM d, yyyy")}
         </span>
       </>
     );
   }
 
   if (view === "3day") {
-    const start = addDays(currentDate, -1);
-    const end = addDays(currentDate, 1);
+    const [start, , end] = getThreeDayCalendarDays(currentDate, timezone);
     if (isSameMonth(start, end)) {
       return (
         <>
@@ -89,8 +94,8 @@ export function CalendarViewTitle({
   }
 
   if (view === "agenda") {
-    const start = currentDate;
-    const end = addDays(currentDate, AgendaDaysToShow - 1);
+    const start = day;
+    const end = getAgendaLastDay(day);
 
     if (isSameMonth(start, end)) {
       return formatMonthYear(start);
@@ -106,7 +111,7 @@ export function CalendarViewTitle({
     );
   }
 
-  return formatMonthYear(currentDate);
+  return formatMonthYear(day);
 }
 
 export function MobileCalendarViewTitle({
@@ -120,8 +125,10 @@ export function MobileCalendarViewTitle({
   weekStartDay: number;
   timezone: string;
 }) {
+  const day = utcToPickerDate(currentDate, timezone);
+
   if (view === "month") {
-    return format(currentDate, "MMMM yyyy");
+    return format(day, "MMMM yyyy");
   }
 
   if (view === "week") {
@@ -141,21 +148,20 @@ export function MobileCalendarViewTitle({
     return (
       <>
         <span className="min-sm:hidden" aria-hidden="true">
-          {format(currentDate, "MMM d, yyyy")}
+          {format(day, "MMM d, yyyy")}
         </span>
         <span className="max-sm:hidden min-md:hidden" aria-hidden="true">
-          {format(currentDate, "MMMM d, yyyy")}
+          {format(day, "MMMM d, yyyy")}
         </span>
         <span className="max-md:hidden">
-          {format(currentDate, "EEE, MMMM d, yyyy")}
+          {format(day, "EEE, MMMM d, yyyy")}
         </span>
       </>
     );
   }
 
   if (view === "3day") {
-    const start = addDays(currentDate, -1);
-    const end = addDays(currentDate, 1);
+    const [start, , end] = getThreeDayCalendarDays(currentDate, timezone);
     if (isSameMonth(start, end)) {
       return `${format(start, "MMM d")} – ${format(end, "d, yyyy")}`;
     }
@@ -164,8 +170,8 @@ export function MobileCalendarViewTitle({
   }
 
   if (view === "agenda") {
-    const start = currentDate;
-    const end = addDays(currentDate, AgendaDaysToShow - 1);
+    const start = day;
+    const end = getAgendaLastDay(day);
 
     if (isSameMonth(start, end)) {
       return format(start, "MMMM yyyy");
@@ -174,5 +180,5 @@ export function MobileCalendarViewTitle({
     return `${format(start, "MMM")} – ${format(end, "MMM yyyy")}`;
   }
 
-  return format(currentDate, "MMMM yyyy");
+  return format(day, "MMMM yyyy");
 }

@@ -179,7 +179,10 @@ export function useMailAppContentController(
   const mailboxId = activeMailbox?.selectedMailboxId ?? null;
 
   const trimmedMailListSearch = mailListSearch.trim();
-  const trimmedDebouncedMailListSearch = debouncedMailListSearch.trim();
+  // Clearing the box ends the search at once; only typing waits for the debounce.
+  const trimmedDebouncedMailListSearch = trimmedMailListSearch
+    ? debouncedMailListSearch.trim()
+    : "";
   const hasAdvancedFilters = hasActiveFilters({
     text: advancedFilters.text,
     conditions: advancedFilters.conditions,

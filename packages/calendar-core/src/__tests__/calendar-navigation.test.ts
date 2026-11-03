@@ -8,8 +8,17 @@ import {
   getThreeDayCalendarDays,
   getTimezoneAwareCalendarDateRange,
   navigateCalendarDate,
+  navigateCalendarInstant,
 } from "../calendar-navigation";
-import { getZonedDayUtcBounds, resolveTimezone } from "../timezone";
+import {
+  formatInstantCalendarDayKey,
+  getZonedDayUtcBounds,
+  resolveTimezone,
+  wallClockToUtc,
+} from "../timezone";
+
+// Zones far from any test machine's zone, so browser-local days would land on the wrong day.
+const zones = ["Pacific/Pago_Pago", "UTC", "Pacific/Kiritimati"];
 
 describe("getThreeDayCalendarDays", () => {
   it("returns yesterday, center, and tomorrow", () => {
@@ -95,6 +104,61 @@ describe("getTimezoneAwareCalendarDateRange", () => {
 
     expect(range.start.toISOString()).toBe("2026-06-14T22:00:00.000Z");
     expect(range.end.toISOString()).toBe("2026-06-21T22:00:00.000Z");
+  });
+});
+
+describe("calendar date ranges in the account time zone", () => {
+  const daysRange = (firstDay: Date, lastDay: Date, timezone: string) => ({
+    start: getZonedDayUtcBounds(firstDay, timezone).start,
+    end: getZonedDayUtcBounds(lastDay, timezone).end,
+  });
+  // Monday Nov 30 2026 ends a month whose Monday-start grid begins on Oct 26.
+  const views = [
+    ["day", new Date(2026, 10, 30), new Date(2026, 10, 30)],
+    ["3day", new Date(2026, 10, 29), new Date(2026, 11, 1)],
+    ["week", new Date(2026, 10, 30), new Date(2026, 11, 6)],
+    ["month", new Date(2026, 9, 26), new Date(2026, 11, 6)],
+    ["agenda", new Date(2026, 10, 30), new Date(2026, 11, 29)],
+  ] as const;
+
+  it.each(zones)(
+    "covers the %s days around the instant at either end of its day",
+    (timezone) => {
+      for (const hour of [0, 23]) {
+        const baseDate = wallClockToUtc(new Date(2026, 10, 30), hour, 30, timezone);
+        for (const [view, firstDay, lastDay] of views) {
+          expect(
+            getTimezoneAwareCalendarDateRange({
+              baseDate,
+              view,
+              weekStartDay: 1,
+              timezone,
+            }),
+          ).toEqual(daysRange(firstDay, lastDay, timezone));
+        }
+      }
+    },
+  );
+
+  it.each(zones)("pages from the %s day of the instant", (timezone) => {
+    const currentDate = wallClockToUtc(new Date(2026, 10, 30), 23, 30, timezone);
+
+    expect(
+      getPrefetchCalendarDateRange({
+        currentDate,
+        view: "day",
+        direction: 1,
+        timezone,
+      }),
+    ).toEqual(daysRange(new Date(2026, 11, 1), new Date(2026, 11, 1), timezone));
+    expect(
+      getSurroundingCalendarDateRange({
+        currentDate,
+        view: "3day",
+        pageRadius: 1,
+        timezone,
+      }),
+    ).toEqual(daysRange(new Date(2026, 10, 26), new Date(2026, 11, 4), timezone));
   });
 });
 
@@ -195,5 +259,33 @@ describe("getCalendarViewAnimationKey", () => {
     expect(getCalendarViewAnimationKey("month", baseDate, 1, "Europe/Amsterdam")).toBe(
       "month-2026-06",
     );
+  });
+});
+
+describe("navigateCalendarInstant", () => {
+  it.each(zones)("pages from the account-zone day in %s", (timezone) => {
+    const march1 = wallClockToUtc(new Date(2026, 2, 1), 12, 0, timezone);
+    const page = (view: Parameters<typeof navigateCalendarInstant>[1], direction: 1 | -1) =>
+      formatInstantCalendarDayKey(
+        navigateCalendarInstant(march1, view, direction, timezone),
+        timezone,
+      );
+
+    expect(page("month", 1)).toBe("2026-04-01");
+    expect(page("month", -1)).toBe("2026-02-01");
+    expect(page("week", 1)).toBe("2026-03-08");
+    expect(page("3day", -1)).toBe("2026-02-26");
+    expect(page("day", -1)).toBe("2026-02-28");
+    expect(page("agenda", 1)).toBe("2026-03-31");
+  });
+
+  it.each(zones)("keeps the day of a late-evening instant in %s", (timezone) => {
+    const lateMarch1 = wallClockToUtc(new Date(2026, 2, 1), 23, 30, timezone);
+    expect(
+      formatInstantCalendarDayKey(
+        navigateCalendarInstant(lateMarch1, "month", 1, timezone),
+        timezone,
+      ),
+    ).toBe("2026-04-01");
   });
 });

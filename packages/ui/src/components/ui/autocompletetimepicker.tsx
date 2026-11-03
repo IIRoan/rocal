@@ -1,4 +1,12 @@
-import { useState, useRef, useEffect, useCallback, useId, useMemo } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useId,
+  useMemo,
+} from "react";
 import { Clock } from "lucide-react";
 import type { TimeFormat } from "@workspace/calendar-core";
 import { cn } from "@workspace/ui/lib/utils";
@@ -125,20 +133,21 @@ function TimeList({
 }: Omit<TimeGridProps, "compact">) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => {
-      containerRef.current
-        ?.querySelector<HTMLElement>(`[data-time-index="${scrollToIndex}"]`)
-        ?.scrollIntoView({ block: "center" });
-    });
-    return () => cancelAnimationFrame(frame);
+  // Sets scrollTop before paint: scrollIntoView also scrolls the smooth-scrolling page, and a later focus move cancels that scroll.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const option = container?.querySelector<HTMLElement>(
+      `[data-time-index="${scrollToIndex}"]`,
+    );
+    if (!open || !container || !option) return;
+    container.scrollTop =
+      option.offsetTop - (container.clientHeight - option.offsetHeight) / 2;
   }, [open, scrollToIndex]);
 
   return (
     <div
       ref={containerRef}
-      className="max-h-64 overflow-y-auto overscroll-contain p-1"
+      className="relative max-h-64 overflow-y-auto overscroll-contain p-1"
     >
       {timeOptions.map((time, index) => {
         const timeString = formatTime(time);
