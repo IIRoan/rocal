@@ -3337,7 +3337,7 @@ dependencies = [
  "aes-gcm",
  "aes-kw",
  "argon2",
- "base64 0.22.1",
+ "base64 0.21.7",
  "bitfields",
  "block-padding",
  "blowfish",
@@ -4672,7 +4672,7 @@ dependencies = [
 name = "solace-api-tests"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "ciborium",
  "cookie",
  "hmac 0.13.0",
@@ -4709,7 +4709,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "dotenvy",
  "hex",
  "jiff",
@@ -4732,7 +4732,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "cookie",
  "cuid",
  "flate2",

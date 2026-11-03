@@ -57,7 +57,7 @@ serde_cbor_2 = "0.13"
 anyhow = "1"
 # Local runs of the notifications worker read the shared dev `.env` files.
 dotenvy = "0.15"
-base64 = "0.22"
+base64 = "0.23"
 ciborium = "0.2"
 cookie = "0.18"
 hmac = "0.13"
