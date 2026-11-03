@@ -51,7 +51,7 @@
     "jest-environment-jsdom": "30.5.2",
     "prettier": "3.9.10",
     "railway": "^3.16.0",
-    "react-doctor": "^0.9.18",
+    "react-doctor": "^0.2.10",
     "typescript": "5.9.3"
   },
   "engines": {
