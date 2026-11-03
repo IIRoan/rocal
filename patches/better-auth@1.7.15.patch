@@ -1,9 +1,9 @@
 diff --git a/dist/client/path-to-object.d.mts b/dist/client/path-to-object.d.mts
-index 3f8083066b2bf5c01220de3edd2ce7f36f1ce3b9..acb41e8091f911f89f9deaa966f3d70d97f88375 100644
+index c82073e3b59d96ec04d65d0392849bbe227babb3..c8965412a1e8e8dd7c581b2b1b410a66d5cb1dee 100644
 --- a/dist/client/path-to-object.d.mts
 +++ b/dist/client/path-to-object.d.mts
-@@ -64,8 +64,8 @@ type InferUserUpdateCtx<ClientOpts extends BetterAuthClientOptions, FetchOptions
- type InferSessionUpdateCtx<ClientOpts extends BetterAuthClientOptions, FetchOptions extends ClientFetchOption> = {
+@@ -63,8 +63,8 @@ export type InferUserUpdateCtx<ClientOpts extends BetterAuthClientOptions, Fetch
+ export type InferSessionUpdateCtx<ClientOpts extends BetterAuthClientOptions, FetchOptions extends ClientFetchOption> = {
    fetchOptions?: FetchOptions | undefined;
  } & Partial<UnionToIntersection<InferAdditionalFromClient<ClientOpts, "session", "input">>>;
 -type InferCtxQuery<C extends InputContext<any, any>, FetchOptions extends ClientFetchOption> = C["query"] extends Record<string, any> ? {
