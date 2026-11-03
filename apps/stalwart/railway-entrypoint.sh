@@ -170,6 +170,8 @@ EOF
 		write_frpc_group_proxy smtp 25 10025
 	fi
 	write_frpc_group_proxy http "${STALWART_HTTP_PORT}" 18080
+	# The VPS passes :443 through still encrypted, so Stalwart answers with its own ACME certificate.
+	write_frpc_group_proxy https 8443 18443
 }
 
 port_listening() {

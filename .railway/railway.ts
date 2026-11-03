@@ -36,7 +36,6 @@ export default defineRailway(() => {
   });
   postgresStalwart.networking = {
     privateNetworkEndpoint: "postgres-stalwart",
-    tcpProxies: { "5432": {} },
   };
 
   const postgresVolume = volume("postgres-volume", {

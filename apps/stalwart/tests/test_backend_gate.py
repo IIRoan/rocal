@@ -2,6 +2,7 @@
 
 import hashlib
 import ipaddress
+import json
 import os
 import socket
 import struct
@@ -177,48 +178,94 @@ class BackendGateTests(unittest.TestCase):
                 self.assertEqual(self.request(path, headers=headers, key=None, public=True), 404, path)
                 self.assertEqual(len(self.upstream.requests), before, path)
 
-    def test_vps_rollback_route_also_blocks_direct_user_authentication(self):
-        with tempfile.TemporaryDirectory(prefix="solace-vps-auth-") as tmp:
+    def test_vps_passes_tls_through_untouched_with_the_client_address(self):
+        received = []
+        sink = socket.create_server(("127.0.0.1", 0))
+
+        def accept():
+            conn, _ = sink.accept()
+            with conn:
+                conn.settimeout(3)
+                data = b""
+                try:
+                    while chunk := conn.recv(4096):
+                        data += chunk
+                except socket.timeout:
+                    pass
+                received.append(data)
+
+        threading.Thread(target=accept, daemon=True).start()
+        with tempfile.TemporaryDirectory(prefix="solace-vps-tls-") as tmp:
             config = (ROOT / "vps/haproxy.cfg").read_text()
-            public_port = free_port()
-            bindings = []
+            public_port, redirect_port = free_port(), free_port()
+            lines = []
             for line in config.splitlines():
                 if line.strip().startswith("bind "):
-                    port = public_port if "*:443" in line else free_port()
+                    port = {"*:443": public_port, "*:80": redirect_port}.get(line.split()[1], free_port())
                     line = f"    bind 127.0.0.1:{port}"
-                bindings.append(line)
-            config = "\n".join(bindings).replace("global\n", "global\n    thread-hard-limit 8\n", 1)
-            allow_file = os.path.join(tmp, "operators")
-            with open(allow_file, "w") as handle:
-                handle.write("203.0.113.11/32\n")
-            config = config.replace("/etc/haproxy/admin-allow.lst", allow_file)
-            config = config.replace("127.0.0.1:18080", f"127.0.0.1:{self.upstream.port}")
-            config = config.replace("127.0.0.1:10025", f"127.0.0.1:{self.upstream.port}")
+                if "127.0.0.1:18443" in line:
+                    # The sink would answer health checks too; the passthrough itself is under test.
+                    line = f"    server stalwart 127.0.0.1:{sink.getsockname()[1]} send-proxy-v2"
+                lines.append(line)
+            config = "\n".join(lines).replace("global\n", "global\n    thread-hard-limit 8\n", 1)
             config = config.replace("/run/haproxy/admin.sock", os.path.join(tmp, "admin.sock"))
             config_file = os.path.join(tmp, "haproxy.cfg")
             with open(config_file, "w") as handle:
                 handle.write(config + "\n")
-            gate = subprocess.Popen([os.environ["HAPROXY_TEST_BINARY"], "-db", "-f", config_file],
+            edge = subprocess.Popen([os.environ["HAPROXY_TEST_BINARY"], "-db", "-f", config_file],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
+                # Probing :443 itself would open a passthrough connection, so readiness waits on :80.
                 deadline = time.monotonic() + 5
                 while time.monotonic() < deadline:
                     with socket.socket() as sock:
-                        if sock.connect_ex(("127.0.0.1", public_port)) == 0:
+                        if sock.connect_ex(("127.0.0.1", redirect_port)) == 0:
                             break
                     time.sleep(0.05)
-                for path in ("/login", "/admin", "/api/auth", "/auth/token", "/auth/register", "/device"):
-                    req = urllib.request.Request(f"http://127.0.0.1:{public_port}{path}",
-                                                 headers={"X-Real-IP": "203.0.113.11"})
-                    with self.assertRaises(urllib.error.HTTPError) as error:
-                        urllib.request.urlopen(req, timeout=3)
-                    self.assertEqual(error.exception.code, 404)
-                with urllib.request.urlopen(f"http://127.0.0.1:{public_port}/jmap/session", timeout=3) as response:
-                    self.assertEqual(response.status, 200)
+                client_hello = b"\x16\x03\x01\x00\x2a" + bytes(range(42))
+                with socket.create_connection(("127.0.0.1", public_port), timeout=3) as client:
+                    client.sendall(client_hello)
+                    time.sleep(0.5)
+                deadline = time.monotonic() + 5
+                while not received and time.monotonic() < deadline:
+                    time.sleep(0.05)
             finally:
-                gate.terminate()
-                gate.wait(timeout=5)
+                edge.terminate()
+                edge.wait(timeout=5)
+                sink.close()
+        self.assertTrue(received, "the TLS stream never reached the Stalwart group port")
+        data = received[0]
+        self.assertEqual(data[:12], PROXY_V2_SIGNATURE)
+        header_length = 16 + struct.unpack("!H", data[14:16])[0]
+        self.assertEqual(data[13], 0x11)
+        self.assertEqual(str(ipaddress.IPv4Address(data[16:20])), "127.0.0.1")
+        self.assertEqual(data[header_length:], client_hello, "HAProxy must not terminate or alter TLS")
 
+
+class VpsHttpsListenerPlanTests(unittest.TestCase):
+    def setUp(self):
+        plan = [json.loads(line) for line in (ROOT / "stalwart/plan/10-network.ndjson").read_text().splitlines()]
+        self.listeners = {v["name"]: v for v in next(p for p in plan if p["object"] == "NetworkListener")["value"].values()}
+        self.rule = next(p for p in plan if p["object"] == "Http")["value"]["allowedEndpoints"]
+
+    def test_stalwart_terminates_the_passthrough_tls_itself(self):
+        https = self.listeners["https"]
+        self.assertEqual((https["protocol"], https["useTls"], https["implicitTls"], https["bind"]),
+                         ("http", True, True, {"[::]:8443": True}))
+        self.assertFalse(self.listeners["http"]["useTls"])
+
+    def test_the_vps_listener_admits_only_public_paths(self):
+        self.assertEqual(self.rule["else"], "200")
+        (condition,) = self.rule["match"].values()
+        self.assertEqual(condition["then"], "404")
+        self.assertTrue(condition["if"].startswith("listener == 'https' && (!("), condition["if"])
+        for public in ("'/jmap'", "'/jmap/'", "'/.well-known/'", "'/api/discover'", "'/mail/config-v1.1.xml'",
+                       "'/autodiscover/autodiscover.xml'", "'/autodiscover/autodiscover.json'"):
+            self.assertIn(public, condition["if"])
+        for unsafe in ("'/../'", "'/./'", "'//'", "'%2e'", "'%2E'", "'%2f'", "'%2F'"):
+            self.assertIn(f"contains(url, {unsafe})", condition["if"])
+        for private in ("/admin", "/login", "/api/principal", "/auth", "/account", "/oauth", "/device"):
+            self.assertNotIn(f"'{private}", condition["if"])
 
 if __name__ == "__main__":
     unittest.main()

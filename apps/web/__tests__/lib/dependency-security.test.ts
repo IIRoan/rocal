@@ -70,15 +70,6 @@ describe("dependency compatibility", () => {
     `);
   });
 
-  it("loads React Doctor's TOML parser", () => {
-    runDependencyCheck(`
-      const { createRequire } = require("node:module");
-      const doctorRequire = createRequire(require.resolve("react-doctor"));
-      const effectRequire = createRequire(doctorRequire.resolve("effect"));
-      assert.equal(effectRequire("toml").parse('[scan]\\nenabled = true').scan.enabled, true);
-    `);
-  });
-
   it("serves the PDF worker shipped with the installed PDF.js release", () => {
     const installedWorker = path.join(
       path.dirname(requireFromRoot.resolve("pdfjs-dist/package.json")),

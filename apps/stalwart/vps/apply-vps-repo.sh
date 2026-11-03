@@ -12,8 +12,6 @@ SRC="$(cd "$SRC" && pwd)"
 APPLY_FRP="${APPLY_FRP:-0}"
 
 HAPROXY_CFG_DST=/etc/haproxy/haproxy.cfg
-ALLOW_DST=/etc/haproxy/admin-allow.lst
-ALLOW_SRC="${APPLY_ALLOWLIST:-}"
 
 ALLOWED_FILES=(
   apply-vps-repo.sh
@@ -65,27 +63,12 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
 install -m 644 "${SRC}/haproxy.cfg" "${STAGE}/haproxy.cfg"
-if [[ -n "$ALLOW_SRC" ]]; then
-  test -f "$ALLOW_SRC"
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line="${line//$'\r'/}"
-    [[ -z "$line" ]] && continue
-    if ! printf '%s' "$line" | grep -Eq '^[0-9a-fA-F.:/]+$'; then
-      echo "invalid allowlist entry: $line" >&2
-      exit 1
-    fi
-  done <"$ALLOW_SRC"
-  install -m 644 "$ALLOW_SRC" "${STAGE}/admin-allow.lst"
-fi
 
 echo "==> Checking HAProxy config"
 haproxy -c -f "${STAGE}/haproxy.cfg"
 
 echo "==> Installing HAProxy config"
 install -m 644 "${STAGE}/haproxy.cfg" "$HAPROXY_CFG_DST"
-if [[ -f "${STAGE}/admin-allow.lst" ]]; then
-  install -m 644 "${STAGE}/admin-allow.lst" "$ALLOW_DST"
-fi
 systemctl reload haproxy
 echo "    haproxy reloaded"
 
