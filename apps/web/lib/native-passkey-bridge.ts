@@ -142,18 +142,22 @@ export function isPasskeyAuthCancelled(error: unknown): boolean {
   return false;
 }
 
-const DISALLOWED_CALLBACK_PROTOCOLS = new Set([
-  "about:",
-  "blob:",
-  "data:",
-  "file:",
-  "http:",
-  "https:",
-  "javascript:",
+/** The two apps' release, development and dev-client schemes (`packages/native-core/expo-apps.json`); the token goes nowhere else. */
+const NATIVE_CALLBACK_PROTOCOLS = new Set([
+  "solace:",
+  "solace-dev:",
+  "solace-mail:",
+  "solace-mail-dev:",
+  "exp+solace:",
+  "exp+solace-calendar:",
+  "exp+solace-mail:",
 ]);
+/** Expo Go fetches its URL from the network, so a token there would reach that host; local development only. */
+const EXPO_GO_CALLBACK_PROTOCOLS = new Set(["exp:", "exps:"]);
 
 export function isValidNativePasskeyCallbackURL(
   value: string | null,
+  allowExpoGo = process.env.NODE_ENV === "development",
 ): value is string {
   if (!value) {
     return false;
@@ -161,7 +165,10 @@ export function isValidNativePasskeyCallbackURL(
 
   try {
     const { protocol } = new URL(value);
-    return !DISALLOWED_CALLBACK_PROTOCOLS.has(protocol);
+    return (
+      NATIVE_CALLBACK_PROTOCOLS.has(protocol) ||
+      (allowExpoGo && EXPO_GO_CALLBACK_PROTOCOLS.has(protocol))
+    );
   } catch {
     return false;
   }

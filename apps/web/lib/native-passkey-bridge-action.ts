@@ -23,7 +23,7 @@ export type NativePasskeyBridgeActionResult =
   | { status: "error"; message: string };
 
 type AuthClientFetchResult = {
-  data: { token?: string } | null;
+  data: { token?: string; user?: { id?: string } } | null;
   error: { message?: string } | null;
 };
 
@@ -148,6 +148,12 @@ export async function runNativePasskeyBridgeAction(
 
     if (signInResult.error) {
       return resolvePasskeyClientError(signInResult.error, input);
+    }
+
+    // A hand-off token for one account must never come back as a session for whoever owns the passkey.
+    const bridgeUserId = bridgeSession.data.user?.id;
+    if (!bridgeUserId || signInResult.data.user.id !== bridgeUserId) {
+      return { status: "error", message: input.failureMessage };
     }
 
     const tokenResult = (await authClient.$fetch("/one-time-token/generate", {

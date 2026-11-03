@@ -3,7 +3,6 @@
 type SecurityHeaderEnv = {
   NODE_ENV?: string;
   NEXT_PUBLIC_API_URL?: string;
-  NEXT_PUBLIC_APP_URL?: string;
 };
 
 type Header = { key: string; value: string };
@@ -25,7 +24,6 @@ function unique(values: Array<string | null>): string[] {
 export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
   const isDev = env.NODE_ENV === "development";
   const apiOrigin = toOrigin(env.NEXT_PUBLIC_API_URL);
-  const appOrigin = toOrigin(env.NEXT_PUBLIC_APP_URL);
 
   const directives: Array<[string, string[]]> = [
     ["default-src", ["'self'"]],
@@ -53,8 +51,8 @@ export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
     ["media-src", ["'self'", "blob:", "data:"]],
     ["worker-src", ["'self'", "blob:"]],
     ["manifest-src", ["'self'"]],
-    // Silent mail OAuth iframe: API authorize endpoint redirecting back to the app.
-    ["frame-src", unique(["'self'", apiOrigin, appOrigin])],
+    // Only the srcdoc mail reader frames remain; nothing loads the API or another origin in a frame.
+    ["frame-src", ["'self'"]],
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
     ["form-action", unique(["'self'", apiOrigin])],

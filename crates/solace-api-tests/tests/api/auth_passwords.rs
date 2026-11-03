@@ -6,7 +6,8 @@ use solace_api_tests::seed::fake_token;
 use solace_api_types::auth::{SessionWithUser, StatusFlag};
 
 use crate::helpers::{
-    TestApp, TestUser, auth_error, auth_key, count, hex, ok, set_cookies_named, signed_cookie_token,
+    TestApp, TestUser, auth_error, auth_key, count, expect_unauthorized, hex, ok,
+    set_cookies_named, signed_cookie_token,
 };
 
 const UPDATED_SUBJECT: &str = "Your Solace password was updated";
@@ -129,9 +130,10 @@ async fn change_password_replaces_the_hash_and_mails_a_confirmation() {
 }
 
 #[tokio::test]
-async fn change_password_can_revoke_the_other_sessions() {
+async fn change_password_revokes_other_sessions_without_rotating_the_current_one() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
+    let mut unrelated = app.user().await;
     let mut other = app.anonymous();
     ok(other
         .post(
@@ -146,6 +148,9 @@ async fn change_password_can_revoke_the_other_sessions() {
         .cookie(&app.session_cookie())
         .expect("cookie")
         .to_owned();
+    let before: SessionWithUser = ok(user.get("/api/auth/get-session").await.dto());
+    let mut cached_cookie = app.expo("solace-mail");
+    cached_cookie.set_cookie(&app.session_cookie(), &old_cookie);
     let response = user
         .post(
             "/api/auth/change-password",
@@ -155,14 +160,14 @@ async fn change_password_can_revoke_the_other_sessions() {
     let body = ok(response.expect_status(200).and_then(|r| r.value()));
     let token = body["token"]
         .as_str()
-        .expect("a fresh session token")
+        .expect("the current session token")
         .to_owned();
     let issued = signed_cookie_token(
         &app.env.better_auth_secret,
         user.agent.cookie(&app.session_cookie()).expect("cookie"),
     );
     assert_eq!(issued.as_deref(), Some(token.as_str()));
-    assert_ne!(
+    assert_eq!(
         user.agent.cookie(&app.session_cookie()),
         Some(old_cookie.as_str())
     );
@@ -177,6 +182,13 @@ async fn change_password_can_revoke_the_other_sessions() {
     );
     let session: SessionWithUser = ok(user.get("/api/auth/get-session").await.dto());
     assert_eq!(session.session.token, token);
+    assert_eq!(session.session.id, before.session.id);
+    assert_eq!(token, before.session.token);
+    let cached: SessionWithUser = ok(cached_cookie.get("/api/auth/get-session").await.dto());
+    assert_eq!(cached.session.id, before.session.id);
+    ok(cached_cookie.get("/api/settings").await.expect_status(200));
+    expect_unauthorized(&ok(other.get("/api/settings").await));
+    ok(unrelated.get("/api/settings").await.expect_status(200));
 }
 
 #[tokio::test]
@@ -347,6 +359,7 @@ async fn change_password_stores_the_envelope_for_the_new_password_with_it() {
                 "currentPassword": current,
                 "newPassword": changed,
                 "passwordEnvelope": envelope(&format!(" {new_salt} ")),
+                "revokeOtherSessions": true,
             }),
         )
         .await

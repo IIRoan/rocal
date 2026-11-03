@@ -12,7 +12,7 @@ fn assert_security_headers(app: &TestApp, response: &ApiResponse, corp: &str) {
     assert_eq!(header(response, "referrer-policy"), Some("no-referrer"));
     assert_eq!(
         header(response, "content-security-policy"),
-        Some("default-src 'none'; frame-ancestors 'none'")
+        Some("default-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'")
     );
     assert_eq!(header(response, "cross-origin-resource-policy"), Some(corp));
     assert_eq!(

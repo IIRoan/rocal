@@ -159,11 +159,15 @@ function createMockAuthContext(
   };
 }
 
-function storeDevice(envelopeSalt: string | null) {
+function storeDevice(
+  envelopeSalt: string | null,
+  extra: Record<string, string> = {},
+) {
   const stored: Record<string, string | null> = {
     E2EE_DEVICE_ID: "device-1",
     E2EE_PRIVATE_KEY: '{"kty":"RSA"}',
     E2EE_ENVELOPE_SALT: envelopeSalt,
+    ...extra,
   };
   mockGetItemAsync.mockImplementation(async (key: string) => stored[key] ?? null);
 }
@@ -679,7 +683,74 @@ describe("E2eeProvider", () => {
     await clearRecoverableStoredDevice();
 
     expect(mockDeleteItemAsync.mock.calls.map(([key]) => key)).toEqual(
-      deleted ? ["E2EE_DEVICE_ID", "E2EE_PRIVATE_KEY", "E2EE_ENVELOPE_SALT"] : [],
+      deleted
+        ? ["E2EE_DEVICE_ID", "E2EE_PRIVATE_KEY", "E2EE_DEVICE_KEYS", "E2EE_ENVELOPE_SALT"]
+        : [],
+    );
+  });
+
+  it.each([
+    [
+      "unwraps its own copy of the keys, never the server's",
+      {
+        E2EE_DEVICE_KEYS: JSON.stringify({
+          deviceId: "device-1",
+          wrappedAccountKey: "own-account-key",
+          wrappedSearchKey: "own-search-key",
+        }),
+      },
+      "own-account-key",
+    ],
+    ["keeps the server's copy once on an install that has none", {}, "wrapped-account-key"],
+    [
+      "ignores a copy left by an earlier device",
+      {
+        E2EE_DEVICE_KEYS: JSON.stringify({
+          deviceId: "device-0",
+          wrappedAccountKey: "old-account-key",
+          wrappedSearchKey: "old-search-key",
+        }),
+      },
+      "wrapped-account-key",
+    ],
+  ])("%s", async (_case, extra, unwrapped) => {
+    storeDevice("salt", extra);
+    mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
+    mockE2eeModule.unwrapAccountKey.mockResolvedValue(accountKey);
+    mockE2eeModule.unwrapBlindIndexKey.mockResolvedValue(blindIndexKey);
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(
+          createBootstrapResponse({
+            devices: [storedDeviceRecord],
+            passwordEnvelope: createPasswordRecord(),
+          }),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+    await flushBootstrap();
+
+    expect(getActiveE2eeSession()).toMatchObject({ deviceId: "device-1", accountKey });
+    expect(mockE2eeModule.unwrapAccountKey).toHaveBeenCalledWith(
+      unwrapped,
+      expect.anything(),
+    );
+    const kept = mockSetItemAsync.mock.calls.find(([key]) => key === "E2EE_DEVICE_KEYS");
+    expect(kept ? JSON.parse(kept[1]) : null).toEqual(
+      unwrapped === "own-account-key"
+        ? null
+        : {
+            deviceId: "device-1",
+            wrappedAccountKey: "wrapped-account-key",
+            wrappedSearchKey: "wrapped-search-key",
+          },
     );
   });
 

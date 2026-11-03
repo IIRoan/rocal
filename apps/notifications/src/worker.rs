@@ -92,7 +92,7 @@ impl Worker {
         }
         let apns = match settings.apns() {
             Ok((key_id, team_id, pem)) => Apns::new(&key_id, &team_id, &pem)
-                .inspect_err(|error| tracing::warn!(%error, "APNs client could not start; push sending is disabled"))
+                .inspect_err(|error| tracing::warn!(error = %redact_pii(&error.to_string()), "APNs client could not start; push sending is disabled"))
                 .ok(),
             Err(missing) => {
                 tracing::warn!(missing = %missing.join(", "), "APNs is not fully configured; push sending is disabled");
@@ -173,10 +173,10 @@ impl Worker {
                     sent += 1;
                     self.status().processed += 1;
                     if let Err(error) = jobs::mark_sent(&self.db, &job.id).await {
-                        tracing::warn!(job_id = %job.id, %error, "Job sent but could not be marked sent");
+                        tracing::warn!(job_id = %job.id, error = %redact_pii(&error.to_string()), "Job sent but could not be marked sent");
                     }
                     if let Err(error) = jobs::insert_log(&self.db, job, "sent").await {
-                        tracing::warn!(job_id = %job.id, %error, "Failed to write the notification log");
+                        tracing::warn!(job_id = %job.id, error = %redact_pii(&error.to_string()), "Failed to write the notification log");
                     }
                 }
                 Err(Undelivered::Skipped) => skipped += 1,
@@ -186,12 +186,12 @@ impl Worker {
                     self.record_error(&message);
                     tracing::error!(kind = %job.kind(), channel = %job.channel, error = %redact_pii(&message), "Failed to send job");
                     if let Err(error) = jobs::insert_log(&self.db, job, "failed").await {
-                        tracing::warn!(job_id = %job.id, %error, "Failed to write the notification failure log");
+                        tracing::warn!(job_id = %job.id, error = %redact_pii(&error.to_string()), "Failed to write the notification failure log");
                     }
                     let delay = jobs::retry_delay(job.attempts);
                     if let Err(error) = jobs::mark_failed(&self.db, &job.id, delay, &message).await
                     {
-                        tracing::warn!(job_id = %job.id, %error, "Failed to reschedule the job");
+                        tracing::warn!(job_id = %job.id, error = %redact_pii(&error.to_string()), "Failed to reschedule the job");
                     }
                 }
             }
@@ -314,7 +314,7 @@ impl Worker {
             match self.send_to_device(apns, device, &notification).await {
                 Ok(()) => sent += 1,
                 Err(error) => {
-                    tracing::warn!(bundle = %device.bundle_id, environment = %device.environment, %error, "APNs delivery failed");
+                    tracing::warn!(bundle = %device.bundle_id, environment = %device.environment, error = %redact_pii(&error.to_string()), "APNs delivery failed");
                     last_error = Some(error);
                 }
             }
@@ -351,7 +351,7 @@ impl Worker {
             .map_err(|error| error.to_string())?;
         if delivery.unregistered {
             if let Err(error) = jobs::delete_push_device(&self.db, &device.token_hash).await {
-                tracing::warn!(%error, "Failed to delete an unregistered device");
+                tracing::warn!(error = %redact_pii(&error.to_string()), "Failed to delete an unregistered device");
             }
             return Err("APNs rejected an unregistered token".into());
         }
@@ -365,7 +365,7 @@ impl Worker {
             && let Err(error) =
                 jobs::set_push_device_environment(&self.db, &device.token_hash, &environment).await
         {
-            tracing::warn!(%error, "Failed to store the device's APNs environment");
+            tracing::warn!(error = %redact_pii(&error.to_string()), "Failed to store the device's APNs environment");
         }
         tracing::info!(kind = notification.kind.as_str(), %environment, status = delivery.status, bundle = %device.bundle_id, "APNs accepted push");
         Ok(())
@@ -392,7 +392,7 @@ impl Worker {
                 }
                 for error in &errors {
                     self.record_error(error);
-                    tracing::error!(%error, "Retention cleanup failed");
+                    tracing::error!(error = %redact_pii(&error.to_string()), "Retention cleanup failed");
                 }
                 let total: u64 = deleted.iter().map(|(_, count)| count).sum();
                 tracing::info!(total, "Retention cleanup complete");
@@ -428,7 +428,7 @@ impl Worker {
                 .fetch_one(&self.db)
                 .await
                 .inspect_err(
-                    |error| tracing::warn!(%error, "Failed to count pending notifications"),
+                    |error| tracing::warn!(error = %redact_pii(&error.to_string()), "Failed to count pending notifications"),
                 )
                 .unwrap_or_default();
         let status = self.status();

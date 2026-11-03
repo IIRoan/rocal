@@ -126,6 +126,7 @@ it("sends the envelope for the new password with the change so the server stores
     newPassword: "new-password",
     email: "ada@solace.test",
     passwordEnvelope: envelope,
+    revokeOtherSessions: true,
   });
   expect(mockUploadPasswordEnvelope).not.toHaveBeenCalled();
   expect(mockRememberDeviceEnvelopeSalt).toHaveBeenCalledWith("new-salt");

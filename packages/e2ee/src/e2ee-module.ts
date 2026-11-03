@@ -110,6 +110,27 @@ export function base64UrlToArrayBuffer(value: string): ArrayBuffer {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/** The API's accepted range; anything else came from a server we must not trust. */
+const MIN_PASSWORD_KDF_ITERATIONS = 100_000;
+const MAX_PASSWORD_KDF_ITERATIONS = 5_000_000;
+
+/** Envelopes always carry a random 16-byte salt, so a server cannot steer the KDF onto the auth key's email salt. */
+function assertEnvelopeKdfParameters(
+  envelope: Pick<PasswordEnvelopeInput, "kdfSalt" | "kdfIterations">,
+): void {
+  const { kdfIterations } = envelope;
+  if (
+    !Number.isInteger(kdfIterations) ||
+    kdfIterations < MIN_PASSWORD_KDF_ITERATIONS ||
+    kdfIterations > MAX_PASSWORD_KDF_ITERATIONS
+  ) {
+    throw new Error("Password envelope has invalid KDF iterations.");
+  }
+  if (base64UrlToArrayBuffer(envelope.kdfSalt).byteLength !== PASSWORD_SALT_BYTES) {
+    throw new Error("Password envelope has an invalid KDF salt.");
+  }
+}
+
 /** Wire shape of a wrapped key envelope; `version` defaults to 1 when the sender omits it. */
 function isEncryptedPayloadFields(
   value: unknown,
@@ -387,6 +408,7 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
     password: string,
     envelope: PasswordEnvelopeInput,
   ): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }> {
+    assertEnvelopeKdfParameters(envelope);
     const wrappingKey = await derivePasswordWrappingKey(
       password,
       envelope.kdfSalt,

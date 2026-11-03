@@ -219,6 +219,19 @@ pub async fn delete_user_sessions<C: ConnectionTrait>(
         .map(|_| ())
 }
 
+pub async fn delete_other_user_sessions<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+    current_token: &str,
+) -> Result<(), sea_orm::DbErr> {
+    session::Entity::delete_many()
+        .filter(session::Column::UserId.eq(user_id))
+        .filter(session::Column::Token.ne(current_token))
+        .exec(db)
+        .await
+        .map(|_| ())
+}
+
 /// The user's sessions that have not expired.
 pub async fn active_sessions<C: ConnectionTrait>(
     db: &C,

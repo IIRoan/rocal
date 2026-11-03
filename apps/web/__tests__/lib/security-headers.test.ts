@@ -26,7 +26,7 @@ function headerMap(headers: Array<{ key: string; value: string }>) {
 }
 
 describe("buildContentSecurityPolicy", () => {
-  it("derives connect/frame/form hosts from env", () => {
+  it("derives connect/form hosts from env and frames no other origin", () => {
     const csp = directives(buildContentSecurityPolicy(PRODUCTION_ENV));
 
     expect(csp.get("connect-src")).toEqual([
@@ -35,7 +35,7 @@ describe("buildContentSecurityPolicy", () => {
       "blob:",
       "data:",
     ]);
-    expect(csp.get("frame-src")).toEqual(["'self'", "https://api.solace.onl", "https://app.solace.onl"]);
+    expect(csp.get("frame-src")).toEqual(["'self'"]);
     expect(csp.get("form-action")).toEqual(["'self'", "https://api.solace.onl"]);
   });
 

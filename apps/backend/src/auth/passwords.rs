@@ -136,22 +136,23 @@ pub async fn change_password(
         else {
             return Err(codes::credential_account_not_found());
         };
-        let new_hash = password::hash(&body.new_password, &active.user.email)
-            .await
-            .map_err(|_| ApiError::internal())?;
+        // A wrong current password must not cost one of the two hashing slots every sign-in shares.
         require_match(
             password::verify(&stored, &body.current_password, &active.user.email)
                 .await
                 .map_err(|_| ApiError::internal())?,
         )?;
+        let new_hash = password::hash(&body.new_password, &active.user.email)
+            .await
+            .map_err(|_| ApiError::internal())?;
         let envelope_stored = envelope.is_some();
         store::change_password(&state.db, credential, new_hash, envelope).await?;
         let mut token = None;
         if body.revoke_other_sessions == Some(true) {
-            store::delete_user_sessions(&state.db, &active.user.id).await?;
-            let fresh = store::create_session(&state.db, &active.user.id, false).await?;
-            cookies.extend(hooks::session_cookies(&state, &fresh.token, false));
-            token = Some(fresh.token);
+            // Native fallback auth and the notification extension keep this session's cookie.
+            store::delete_other_user_sessions(&state.db, &active.user.id, &active.session.token)
+                .await?;
+            token = Some(active.session.token.clone());
         }
         notify_password_updated(&state, &active.user).await;
         let user: AuthUser = session::user_dto(&active.user);

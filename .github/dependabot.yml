@@ -4,6 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # A hijacked release is usually caught within days; never propose one sooner.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 3
     groups:
       javascript:
@@ -12,6 +15,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 3
     groups:
       rust:
@@ -20,6 +25,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 3
     groups:
       actions:
