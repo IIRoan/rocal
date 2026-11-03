@@ -143,7 +143,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Docker Buildx
-        uses: chainguard-actions/docker-setup-buildx-action@9e5cde6a2bfeda6fa52c81f71365a9271a46fce0 # v4.4.1
+        uses: chainguard-actions/docker-setup-buildx-action@9744db81e7643f97efc7d98e7ce3d11d197f3093 # v4.4.1
 
       - name: Build the application image
         uses: chainguard-actions/docker-build-push-action@5b225cb1d6f5196bc2459eaa52642b902bf3750f # v7.4.0
