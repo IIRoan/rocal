@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { differenceInMinutes, isPast } from "date-fns";
 import { MapPin as MapPinIcon } from "lucide-react";
@@ -22,10 +21,14 @@ import {
 import { CalendarEvent, type CalendarView } from "./types";
 import { cn } from "../../lib/utils";
 import { formatEventDescription } from "./event-description-formatter";
-import { formatTimeWithOptionalMinutesTZ } from "./event-time-label";
+import {
+  formatEventAccessibleLabel,
+  formatTimeWithOptionalMinutesTZ,
+} from "./event-time-label";
 
 interface EventWrapperProps {
   event: CalendarEvent;
+  label: string;
   isFirstDay?: boolean;
   isLastDay?: boolean;
   isDragging?: boolean;
@@ -36,13 +39,13 @@ interface EventWrapperProps {
   compact?: boolean;
   connectAcrossCells?: boolean;
   dndListeners?: SyntheticListenerMap;
-  dndAttributes?: DraggableAttributes;
   onMouseDown?: (e: React.MouseEvent) => void;
   onTouchStart?: (e: React.TouchEvent) => void;
 }
 
 function EventWrapper({
   event,
+  label,
   isFirstDay = true,
   isLastDay = true,
   isDragging,
@@ -53,7 +56,6 @@ function EventWrapper({
   compact = false,
   connectAcrossCells = true,
   dndListeners,
-  dndAttributes,
   onMouseDown,
   onTouchStart,
 }: EventWrapperProps) {
@@ -108,10 +110,11 @@ function EventWrapper({
       type="button"
       className={cn(
         "group/ev relative flex h-full w-full overflow-hidden text-left transition-[color,background-color,border-color,box-shadow,opacity,filter] duration-150 ease-out outline-none select-none",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-[3px]",
         "cursor-pointer",
         "data-dragging:cursor-grabbing data-dragging:shadow-lg data-dragging:z-20",
-        "data-past-event:opacity-65",
+        // Desaturating instead of fading keeps chip text at 4.5:1; any opacity drops dark chips below it.
+        "data-past-event:saturate-[.4]",
         "data-invitation-ghost:border data-invitation-ghost:border-dashed data-invitation-ghost:border-current/60 data-invitation-ghost:bg-transparent data-invitation-ghost:opacity-75",
         "hover:brightness-[1.04] hover:shadow-sm hover:ring-1 hover:ring-black/10 dark:hover:ring-foreground/15 hover:z-10",
         "touch-manipulation",
@@ -123,6 +126,7 @@ function EventWrapper({
         className,
       )}
       style={getEventColorStyles(event.color)}
+      aria-label={label}
       data-dragging={isDragging || undefined}
       data-past-event={isEventInPast || undefined}
       data-invitation-ghost={isInvitationGhost || undefined}
@@ -131,7 +135,6 @@ function EventWrapper({
       onTouchStart={onTouchStart}
       data-event-id={event.id}
       {...dndListeners}
-      {...dndAttributes}
     >
       {children}
     </button>
@@ -152,7 +155,6 @@ interface EventItemProps {
   className?: string;
   connectAcrossCells?: boolean;
   dndListeners?: SyntheticListenerMap;
-  dndAttributes?: DraggableAttributes;
   onMouseDown?: (e: React.MouseEvent) => void;
   onTouchStart?: (e: React.TouchEvent) => void;
   timeFormat: TimeFormat;
@@ -176,13 +178,13 @@ export function EventItem({
   className,
   connectAcrossCells = true,
   dndListeners,
-  dndAttributes,
   onMouseDown,
   onTouchStart,
   timeFormat,
   timezone,
 }: EventItemProps) {
   const eventColor = event.color;
+  const label = formatEventAccessibleLabel(event, timeFormat, timezone);
 
   const displayStart = useMemo(() => {
     return currentTime || new Date(event.start);
@@ -206,6 +208,7 @@ export function EventItem({
       return (
         <EventWrapper
           event={event}
+          label={label}
           isFirstDay={isFirstDay}
           isLastDay={isLastDay}
           isDragging={dragging}
@@ -217,7 +220,6 @@ export function EventItem({
           currentTime={currentTime}
           connectAcrossCells={connectAcrossCells}
           dndListeners={dndListeners}
-          dndAttributes={dndAttributes}
           onMouseDown={onMouseDown}
           onTouchStart={onTouchStart}
         >
@@ -226,7 +228,7 @@ export function EventItem({
               <span
                 className={cn(
                   "truncate",
-                  isCancelledCalendarEvent(event) && "line-through opacity-70",
+                  isCancelledCalendarEvent(event) && "line-through",
                 )}
               >
                 {event.title}
@@ -261,6 +263,7 @@ export function EventItem({
       return (
         <EventWrapper
           event={event}
+          label={label}
           isFirstDay={isFirstDay}
           isLastDay={isLastDay}
           isDragging={dragging}
@@ -284,7 +287,6 @@ export function EventItem({
           )}
           currentTime={currentTime}
           dndListeners={dndListeners}
-          dndAttributes={dndAttributes}
           onMouseDown={onMouseDown}
           onTouchStart={onTouchStart}
         >
@@ -294,7 +296,7 @@ export function EventItem({
                 <span
                   className={cn(
                     "font-semibold flex-1 min-w-0 truncate",
-                    isCancelledCalendarEvent(event) && "line-through opacity-70",
+                    isCancelledCalendarEvent(event) && "line-through",
                   )}
                   title={event.title}
                 >
@@ -302,9 +304,9 @@ export function EventItem({
                 </span>
               </div>
               <div className="flex items-center w-full min-w-0">
-                <span className="text-[11px] font-normal tabular-nums opacity-80 truncate">
+                <span className="text-[11px] font-normal tabular-nums truncate">
                   {startLabel}
-                  <span className="opacity-60 mx-1">–</span>
+                  <span className="mx-1">–</span>
                   {endLabel}
                 </span>
               </div>
@@ -315,14 +317,14 @@ export function EventItem({
                 className={cn(
                   "flex-1 min-w-0 truncate whitespace-nowrap",
                   isCompact ? "font-medium" : "font-semibold",
-                  isCancelledCalendarEvent(event) && "line-through opacity-70",
+                  isCancelledCalendarEvent(event) && "line-through",
                 )}
                 title={event.title}
               >
                 {event.title}
               </span>
               {!isCompact && showTime && !event.allDay && (
-                <span className="shrink-0 text-[11px] font-normal tabular-nums opacity-70 whitespace-nowrap">
+                <span className="shrink-0 text-[11px] font-normal tabular-nums whitespace-nowrap">
                   {startLabel}
                 </span>
               )}
@@ -351,12 +353,12 @@ export function EventItem({
         className={cn(
           "group/ev relative isolate w-full rounded-lg text-left transition-colors duration-150 ease-out outline-none",
           "hover:bg-muted/60 active:bg-muted/80",
-          "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-          "data-past-event:opacity-55",
+          "focus-visible:ring-ring focus-visible:ring-[3px]",
           "data-invitation-ghost:border data-invitation-ghost:border-dashed data-invitation-ghost:border-current/60 data-invitation-ghost:bg-muted/20 data-invitation-ghost:opacity-75",
           className,
         )}
         style={{ "--ev-accent": accentColor } as React.CSSProperties}
+        aria-label={event.location ? `${label}, ${event.location}` : label}
         data-past-event={isPast(new Date(event.end)) || undefined}
         data-invitation-ghost={isInvitationGhost || undefined}
         data-event-id={event.id}
@@ -364,7 +366,6 @@ export function EventItem({
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}
         {...dndListeners}
-        {...dndAttributes}
       >
         <div className="flex items-start gap-3 px-2 py-3">
           <div className="flex w-[68px] shrink-0 flex-col items-end pt-0.5 tabular-nums">
@@ -377,7 +378,7 @@ export function EventItem({
                 <span className="text-[15px] font-semibold leading-tight text-foreground">
                   {agendaTimeStart}
                 </span>
-                <span className="text-[11px] leading-tight text-muted-foreground/70 mt-0.5">
+                <span className="text-[11px] leading-tight text-muted-foreground mt-0.5">
                   {agendaTimeEnd}
                 </span>
               </>
@@ -411,8 +412,8 @@ export function EventItem({
               </div>
             )}
             {event.description && (
-              <div className="mt-0.5 text-[12px] leading-snug text-muted-foreground/80 line-clamp-2">
-                {formatEventDescription(event.description)}
+              <div className="mt-0.5 text-[12px] leading-snug text-muted-foreground line-clamp-2">
+                {formatEventDescription(event.description, { links: false })}
               </div>
             )}
           </div>

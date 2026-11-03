@@ -8,7 +8,7 @@ import {
 import { PublicInformationPage } from "@/components/public-information-page";
 
 export const metadata: Metadata = {
-  title: "Support · Solace",
+  title: "Support",
   description:
     "Help with Solace Calendar and Solace Mail, account access, encryption and privacy.",
 };
@@ -77,7 +77,7 @@ export default function SupportPage() {
           <p className="mt-2">
             <a
               href={contact}
-              className="text-primary underline underline-offset-4 cursor-pointer"
+              className="text-accent underline underline-offset-4 cursor-pointer"
             >
               Contact support privately
             </a>{" "}
@@ -91,18 +91,18 @@ export default function SupportPage() {
             href={PRODUCT_ISSUES_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-primary underline underline-offset-4 cursor-pointer"
+            className="text-accent underline underline-offset-4 cursor-pointer"
           >
             report a bug or request a feature
           </a>{" "}
-          on GitHub. Reports are public: never include passwords, recovery keys,
-          session tokens, message content or private event details.
+          on GitHub. Reports are public: never include passwords, session
+          tokens, message content or private event details.
         </p>
         <p className="mt-3">
           Read the{" "}
           <Link
             href={PRODUCT_ROUTES.privacy}
-            className="text-primary underline underline-offset-4 cursor-pointer"
+            className="text-accent underline underline-offset-4 cursor-pointer"
           >
             privacy policy
           </Link>{" "}

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Key, Smartphone, Usb } from "lucide-react";
 import {
   useAddPasskey,
@@ -43,6 +42,10 @@ export function PasskeySettings({
   const [showAddOverride, setShowAddPasskey] = useState<boolean | null>(null);
   const showAddPasskey = showAddOverride ?? startInAddMode;
   const [passkeyName, setPasskeyName] = useState("");
+  const [nameError, setNameError] = useState<string>();
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
+    null,
+  );
 
   // Passkey utility functions
   const getDeviceIcon = (deviceType?: string | null) => {
@@ -69,7 +72,7 @@ export function PasskeySettings({
 
   const addPasskey = () => {
     if (!passkeyName.trim()) {
-      toast.error("Please enter a name for your passkey");
+      setNameError("Enter a name for this passkey, such as the device it is on");
       return;
     }
     addPasskeyMutation.mutate(passkeyName);
@@ -96,7 +99,7 @@ export function PasskeySettings({
           ) : passkeys.length === 0 ? (
             <PaletteEmptyState>
               <span className="block">No passkeys found</span>
-              <span className="block text-muted-foreground/70">
+              <span className="block">
                 Add your first passkey to enable passwordless authentication
               </span>
             </PaletteEmptyState>
@@ -106,6 +109,36 @@ export function PasskeySettings({
                 if (!passkey?.id) return [];
 
                 const DeviceIcon = getDeviceIcon(passkey?.deviceType);
+                const passkeyLabel = passkey?.name || "Unnamed Passkey";
+                if (confirmingDeleteId === passkey.id) {
+                  return [
+                    <div key={passkey.id}>
+                      <p className="px-2 py-1.5 text-[13px] leading-[130%] text-foreground">
+                        Delete &ldquo;{passkeyLabel}&rdquo;? You can no longer
+                        sign in with this passkey.
+                      </p>
+                      <PaletteFormActions>
+                        <PaletteButton
+                          variant="ghost"
+                          autoFocus
+                          onClick={() => setConfirmingDeleteId(null)}
+                        >
+                          Cancel
+                        </PaletteButton>
+                        <PaletteButton
+                          variant="destructive"
+                          onClick={() => {
+                            deletePasskeyMutation.mutate(passkey.id);
+                            setConfirmingDeleteId(null);
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                          Delete passkey
+                        </PaletteButton>
+                      </PaletteFormActions>
+                    </div>,
+                  ];
+                }
                 return [
                   <div
                     key={passkey.id}
@@ -116,19 +149,22 @@ export function PasskeySettings({
                     </PaletteIconBox>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[15px] leading-[130%] text-foreground">
-                        {passkey?.name || "Unnamed Passkey"}
+                        {passkeyLabel}
                       </div>
                       <p className="text-[13px] leading-[130%] text-muted-foreground">
                         Added{" "}
                         {passkey?.createdAt
-                          ? new Date(passkey.createdAt).toLocaleDateString()
+                          ? new Date(passkey.createdAt).toLocaleDateString(
+                              undefined,
+                              { dateStyle: "medium" },
+                            )
                           : "Unknown date"}
                       </p>
                     </div>
                     <button
                       type="button"
-                      aria-label="Delete passkey"
-                      onClick={() => deletePasskeyMutation.mutate(passkey.id)}
+                      aria-label={`Delete ${passkeyLabel}`}
+                      onClick={() => setConfirmingDeleteId(passkey.id)}
                       className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 className="size-4" />
@@ -148,10 +184,19 @@ export function PasskeySettings({
               aria-label="Passkey Name"
               type="text"
               value={passkeyName}
-              onChange={(e) => setPasskeyName(e.target.value)}
+              onChange={(e) => {
+                setPasskeyName(e.target.value);
+                setNameError(undefined);
+              }}
               placeholder="e.g., iPhone Face ID, YubiKey"
+              aria-invalid={nameError ? true : undefined}
               className={PALETTE_INPUT_CLASS}
             />
+            {nameError ? (
+              <p role="alert" className="text-[13px] text-destructive">
+                {nameError}
+              </p>
+            ) : null}
           </PaletteField>
           <PaletteFormActions>
             <PaletteButton
@@ -159,6 +204,7 @@ export function PasskeySettings({
               onClick={() => {
                 setShowAddPasskey(false);
                 setPasskeyName("");
+                setNameError(undefined);
               }}
               disabled={addPasskeyMutation.isPending}
             >
@@ -168,9 +214,8 @@ export function PasskeySettings({
               variant="primary"
               onClick={addPasskey}
               loading={addPasskeyMutation.isPending}
-              disabled={!passkeyName.trim()}
             >
-              {addPasskeyMutation.isPending ? "Adding…" : "Create Passkey"}
+              {addPasskeyMutation.isPending ? "Adding…" : "Create passkey"}
             </PaletteButton>
           </PaletteFormActions>
         </>

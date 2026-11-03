@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { Alert, Keyboard, Text, View } from "react-native";
 import type { RecurrenceEditScope } from "@workspace/calendar-core";
 import { resolveTimezone } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -96,19 +96,41 @@ export function EventSheet({
   const isViewOrEdit = mode?.type === "view" || mode?.type === "edit";
   const eventId = isViewOrEdit ? mode.eventId : undefined;
 
-  const handleSheetDismissRequest = useCallback(() => {
+  const confirmDiscard = useCallback(
+    (discard: () => void, keepEditing?: () => void) => {
+      if (!formRef.current?.isDirty()) {
+        discard();
+        return;
+      }
+      Alert.alert(
+        isCreate ? "Discard this event?" : "Discard your changes?",
+        undefined,
+        [
+          { text: "Keep Editing", style: "cancel", onPress: keepEditing },
+          {
+            text: isCreate ? "Discard Event" : "Discard Changes",
+            style: "destructive",
+            onPress: discard,
+          },
+        ],
+      );
+    },
+    [isCreate],
+  );
+
+  // Closes directly, not through the sheet's dismiss, which would ask to discard a just-saved form.
+  const dismissSheet = useCallback(() => {
+    Keyboard.dismiss();
     setServerErrors([]);
     onDismiss();
   }, [onDismiss]);
 
-  const dismissSheet = useCallback(() => {
-    setServerErrors([]);
-    if (bottomSheetRef.current) {
-      bottomSheetRef.current.dismiss();
-      return;
-    }
-    onDismiss();
-  }, [onDismiss]);
+  // A swipe has already slid the sheet away, so keeping the edits brings it back.
+  const handleSheetDismissRequest = useCallback(
+    () =>
+      confirmDiscard(dismissSheet, () => bottomSheetRef.current?.snapTo(0)),
+    [confirmDiscard, dismissSheet],
+  );
 
   const { data: event, isLoading: eventLoading } = useEventSheetEvent(
     eventId,
@@ -143,12 +165,14 @@ export function EventSheet({
 
   const handleCancel = useCallback(() => {
     if (viewMode === "edit" && isViewOrEdit && event) {
-      setEditState((current) => ({ ...current, viewMode: "view" }));
-      setServerErrors([]);
+      confirmDiscard(() => {
+        setEditState((current) => ({ ...current, viewMode: "view" }));
+        setServerErrors([]);
+      });
     } else {
-      dismissSheet();
+      confirmDiscard(dismissSheet);
     }
-  }, [viewMode, isViewOrEdit, event, dismissSheet]);
+  }, [viewMode, isViewOrEdit, event, confirmDiscard, dismissSheet]);
 
   const recurrenceLabel = event
     ? (formatRecurrenceLabel(event.recurrence) ??

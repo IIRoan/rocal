@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import {
+  getColorSwatchBorderValue,
   getColorSwatchValue,
   getEventColorClasses,
   getEventColorStyles,
@@ -39,6 +40,19 @@ describe("inline color aliases", () => {
   it("keeps swatches and event dots on the same resolver", () => {
     expect(getColorSwatchValue("blue")).toBe(resolveInlineColorValue("blue"));
     expect(resolveEventColorValue("red")).toBe(resolveInlineColorValue("red"));
+  });
+});
+
+describe("getColorSwatchBorderValue", () => {
+  it("outlines named swatches with their own text token", () => {
+    expect(getColorSwatchBorderValue("blue")).toBe("var(--event-sky-foreground)");
+    expect(getColorSwatchBorderValue("teal")).toBe("var(--event-teal-foreground)");
+  });
+
+  it("pulls a picked hex toward the sidebar text so the outline keeps 3:1", () => {
+    expect(getColorSwatchBorderValue("#ffff00")).toBe(
+      "color-mix(in oklab, #ffff00 40%, var(--sidebar-foreground))",
+    );
   });
 });
 

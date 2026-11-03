@@ -39,7 +39,7 @@ export function AllDayEventRow({
 
   return (
     <div
-      className="relative z-30 grid w-full shrink-0 items-stretch border-b border-border/40"
+      className="relative z-30 grid w-full shrink-0 items-stretch overflow-hidden border-b border-border/40 [scrollbar-gutter:stable]"
       style={{
         gridTemplateColumns: columnTemplate,
         gridTemplateRows: `repeat(${rows}, minmax(1.375rem, auto))`,
@@ -50,8 +50,8 @@ export function AllDayEventRow({
         style={{ gridColumn: 1, gridRow: `1 / span ${rows}` }}
       >
         <div className="flex min-h-[24px] flex-1 flex-col items-center justify-center">
-          <span className="text-[11px] leading-none text-muted-foreground/70">
-            all-day
+          <span className="text-[11px] leading-none text-muted-foreground">
+            All day
           </span>
         </div>
       </div>
@@ -108,7 +108,7 @@ export function AllDayEventRow({
                 <span
                   className={cn(
                     "min-w-0 flex-1 truncate font-semibold leading-tight",
-                    isCancelledCalendarEvent(event) && "line-through opacity-70",
+                    isCancelledCalendarEvent(event) && "line-through",
                   )}
                 >
                   {event.title}
@@ -116,7 +116,7 @@ export function AllDayEventRow({
                 {spanLabel ? (
                   <span
                     className={cn(
-                      "text-[11px] font-normal tabular-nums leading-none opacity-80",
+                      "text-[11px] font-normal tabular-nums leading-none",
                       placement.span > 1 ? "shrink-0" : "min-w-0 truncate",
                     )}
                   >

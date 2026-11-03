@@ -1,6 +1,5 @@
 // Component exports
 export * from "./ui";
-export * from "./email/email-primitives";
 export * from "./layout";
 export * from "./navigation";
 
@@ -16,11 +15,7 @@ export { EventItem } from "./calendar/event-item";
 export { EventsPopup } from "./calendar/events-popup";
 export { DraggableEvent } from "./calendar/draggable-event";
 export { DroppableCell } from "./calendar/droppable-cell";
-export {
-  CalendarSkeleton,
-  EventDialogSkeleton,
-  SidebarCalendarSkeleton,
-} from "./calendar/calendar-skeleton";
+export { CalendarSkeleton } from "./calendar/calendar-skeleton";
 
 // Context providers
 export {

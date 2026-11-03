@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useLayoutEffect, useMemo, useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import {
   getWeekCalendarDays,
   resolveTimezone,
@@ -12,6 +12,7 @@ import { WeekViewDayHeaders } from "./week-view-day-headers";
 import { WeekViewTimeGrid } from "./week-view-time-grid";
 import { getTimedTimelineEventsForDay } from "./utils";
 import { StartHour, WeekCellsHeight } from "./constants";
+import { useTimelineStartScroll } from "./use-timeline-start-scroll";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { layoutTimelineEvents } from "./timeline-layout";
@@ -80,23 +81,11 @@ export const WeekView = React.memo(function WeekView({
   };
 
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
-    currentDate,
-    "week",
-    timezone,
+    days,
+    resolvedTimezone,
   );
 
-  useLayoutEffect(() => {
-    if (!scrollContainerRef.current) {
-      return;
-    }
-
-    const scrollPosition = Math.max(0, (9 - StartHour) * WeekCellsHeight);
-    const previousScrollBehavior =
-      scrollContainerRef.current.style.scrollBehavior;
-    scrollContainerRef.current.style.scrollBehavior = "auto";
-    scrollContainerRef.current.scrollTop = scrollPosition;
-    scrollContainerRef.current.style.scrollBehavior = previousScrollBehavior;
-  }, [currentDate]);
+  useTimelineStartScroll(scrollContainerRef, currentDate);
 
   const handlers = {
     onEventClick: handleEventClick,

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, Plus, Search, ShieldCheck, Trash2, UserRound } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import {
   formatContactContextSummary,
   getContactDisplayLabel,
@@ -52,6 +52,8 @@ function AddContactForm({
 }) {
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
+  const [emailInvalid, setEmailInvalid] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="pb-2">
@@ -59,41 +61,63 @@ function AddContactForm({
         Add someone you email even if they have not appeared in your history
         yet.
       </p>
-      <div className="flex flex-col gap-1.5 px-2">
+      <PaletteField label="Email" htmlFor="new-contact-email">
         <input
+          ref={emailInputRef}
+          id="new-contact-email"
           value={newEmail}
-          onChange={(event) => setNewEmail(event.target.value)}
-          aria-label="Email"
+          onChange={(event) => {
+            setNewEmail(event.target.value);
+            setEmailInvalid(false);
+          }}
           placeholder="email@example.com"
+          aria-label="Email"
+          aria-invalid={emailInvalid || undefined}
+          aria-describedby={emailInvalid ? "new-contact-email-error" : undefined}
           className={PALETTE_INPUT_CLASS}
           type="email"
           autoComplete="email"
         />
+        {emailInvalid ? (
+          <p id="new-contact-email-error" className="text-[13px] leading-[130%] text-destructive">
+            Enter an email address, like name@example.com.
+          </p>
+        ) : null}
+      </PaletteField>
+      <PaletteField label="Full name (optional)" htmlFor="new-contact-name">
         <input
+          id="new-contact-name"
           value={newName}
           onChange={(event) => setNewName(event.target.value)}
-          aria-label="Full name"
-          placeholder="Full name (optional)"
+          aria-label="Full name (optional)"
+          placeholder="Ada Lovelace"
           className={PALETTE_INPUT_CLASS}
+          autoComplete="name"
         />
-      </div>
+      </PaletteField>
       <PaletteFormActions>
         <PaletteButton variant="ghost" onClick={onCancel}>
           Cancel
         </PaletteButton>
         <PaletteButton
           variant="primary"
-          disabled={!newEmail.trim().includes("@") || isSaving}
+          disabled={isSaving}
           onClick={() => {
             const email = normalizeEmailAddress(newEmail);
-            if (!email) return;
+            if (!email.includes("@")) {
+              setEmailInvalid(true);
+              emailInputRef.current?.focus();
+              return;
+            }
             void onSave(email, newName.trim() || undefined)
               .then((saved) => {
                 if (!saved) return;
                 setNewEmail("");
                 setNewName("");
               })
-              .catch(() => toast.error("Could not save the contact."));
+              .catch(() =>
+                toast.error("Contact not saved. Check your connection and try again."),
+              );
           }}
         >
           Save contact
@@ -102,6 +126,12 @@ function AddContactForm({
     </div>
   );
 }
+
+const REMOVE_CONTACT_LABEL = {
+  idle: "Remove contact…",
+  confirm: "Remove contact",
+  removing: "Removing…",
+} as const;
 
 function ContactDetailView({
   contact,
@@ -124,7 +154,7 @@ function ContactDetailView({
   const [displayName, setDisplayName] = useState(contact.displayName ?? "");
   const [phone, setPhone] = useState(contact.phone ?? "");
   const [notes, setNotes] = useState(contact.notes ?? "");
-  const [isRemoving, setIsRemoving] = useState(false);
+  const [removeStep, setRemoveStep] = useState<"idle" | "confirm" | "removing">("idle");
 
   const trusted = isTrustedSender(contact.email, settings);
   const contextSummary = formatContactContextSummary(contact);
@@ -146,7 +176,7 @@ function ContactDetailView({
           className="size-8"
         />
         <div className="min-w-0">
-          <div className="truncate text-[15px] leading-[130%] text-foreground">
+          <div className="text-[15px] leading-[130%] text-foreground wrap-anywhere">
             {contact.email}
           </div>
           {contextSummary ? (
@@ -198,21 +228,38 @@ function ContactDetailView({
         onCheckedChange={handleTrustedChange}
       />
 
+      <p role="status" className="px-2 pt-2 text-[13px] leading-[130%] text-destructive empty:pt-0">
+        {removeStep === "idle"
+          ? null
+          : `Remove “${getContactDisplayLabel(contact)}” from contacts? Their name, phone number and notes are deleted.`}
+      </p>
+
       <PaletteFormActions>
         <PaletteButton
           variant="destructive"
           className="mr-auto"
-          disabled={isRemoving}
+          disabled={removeStep === "removing"}
           onClick={() => {
-            setIsRemoving(true);
+            if (removeStep === "idle") {
+              setRemoveStep("confirm");
+              return;
+            }
+            setRemoveStep("removing");
             void onRemove()
-              .catch(() => toast.error("Could not remove the contact."))
-              .finally(() => setIsRemoving(false));
+              .catch(() =>
+                toast.error("Contact not removed. Check your connection and try again."),
+              )
+              .finally(() => setRemoveStep("idle"));
           }}
         >
           <Trash2 className="size-3.5" />
-          {isRemoving ? "Removing…" : "Remove"}
+          {REMOVE_CONTACT_LABEL[removeStep]}
         </PaletteButton>
+        {removeStep === "confirm" ? (
+          <PaletteButton variant="ghost" onClick={() => setRemoveStep("idle")}>
+            Keep contact
+          </PaletteButton>
+        ) : null}
         <PaletteButton
           variant="primary"
           loading={isSaving}
@@ -228,10 +275,12 @@ function ContactDetailView({
                   onBack();
                 }
               })
-              .catch(() => toast.error("Could not save the contact."))
+              .catch(() =>
+                toast.error("Contact not saved. Check your connection and try again."),
+              )
           }
         >
-          {isSaving ? "Saving" : "Save"}
+          {isSaving ? "Saving…" : "Save"}
         </PaletteButton>
       </PaletteFormActions>
     </PaletteView>
@@ -313,7 +362,7 @@ export function ContactsSettingsPanel({ goBack }: { goBack: () => void }) {
           onChange={(event) => setQuery(event.target.value)}
           aria-label="Search contacts"
           placeholder="Search contacts"
-          className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-[15px] text-foreground shadow-none outline-none placeholder:text-muted-foreground/60 focus:border-0 focus:shadow-none focus:ring-0"
+          className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-[15px] text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:border-0 focus:shadow-none focus:ring-0"
         />
       </div>
 
@@ -375,6 +424,7 @@ export function ContactsSettingsPanel({ goBack }: { goBack: () => void }) {
                         {trusted ? (
                           <ShieldCheck
                             className="size-3 shrink-0 text-foreground"
+                            role="img"
                             aria-label="Trusted sender"
                           />
                         ) : null}

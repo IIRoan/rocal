@@ -37,7 +37,7 @@ export function WeekViewTimeGrid({
   return (
     <div
       ref={scrollRef}
-      className="grid flex-1 grid-cols-[3rem_repeat(7,minmax(0,1fr))] overflow-y-auto min-h-0"
+      className="grid flex-1 grid-cols-[3rem_repeat(7,minmax(0,1fr))] overflow-y-auto [scrollbar-gutter:stable] min-h-0"
       style={{ scrollBehavior: "auto" }}
     >
       <div className="grid auto-cols-fr">
@@ -47,7 +47,7 @@ export function WeekViewTimeGrid({
             className="relative min-h-[var(--week-cells-height)]"
           >
             {hourValue > StartHour && (
-              <span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-full items-center justify-end pe-1 text-[11px] tabular-nums">
+              <span className="bg-background text-muted-foreground absolute -top-3 left-0 flex h-6 w-full items-center justify-end pe-1 text-[11px] tabular-nums">
                 {formatWeekHourLabel(hourValue, timeFormat)}
               </span>
             )}

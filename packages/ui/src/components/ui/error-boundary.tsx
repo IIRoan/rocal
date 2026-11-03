@@ -50,15 +50,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
       // Default error UI
       return (
-        <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
-          <div className="flex items-center justify-center w-16 h-16 bg-destructive/10 rounded-full">
-            <AlertTriangle className="w-8 h-8 text-destructive" />
+        <div className="flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <div className="flex size-16 items-center justify-center bg-destructive/10 rounded-full">
+            <AlertTriangle className="size-8 text-destructive" aria-hidden="true" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold">Something went wrong</h3>
+            <h3 className="text-lg font-semibold">Unable to show this section</h3>
             <p className="text-sm text-muted-foreground max-w-md">
-              An unexpected error occurred. Please try refreshing the page or
-              contact support if the problem persists.
+              Try again. If the problem continues, reload the page or contact
+              support.
             </p>
             {process.env.NODE_ENV === "development" && this.state.error && (
               <details className="mt-4 text-left">
@@ -76,7 +76,7 @@ export class ErrorBoundary extends Component<Props, State> {
             variant="outline"
             className="gap-2"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="size-4" aria-hidden="true" />
             Try again
           </Button>
         </div>

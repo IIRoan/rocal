@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { getContactDisplayLabel } from "@workspace/calendar-core";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
@@ -23,7 +23,10 @@ export function TrustedSendersPanel() {
   const { settings } = useMailDisplaySettings();
   const { payload } = useRecentContacts();
   const [newEmail, setNewEmail] = useState("");
+  const [emailInvalid, setEmailInvalid] = useState(false);
   const emailInputId = useId();
+  const emailErrorId = useId();
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   const contactsByEmail = new Map<string, string>();
   for (const contact of payload?.contacts ?? []) {
@@ -43,32 +46,43 @@ export function TrustedSendersPanel() {
       <PaletteField label="Add a sender" htmlFor={emailInputId}>
         <form
           className="flex items-center gap-2"
+          noValidate
           action={() => {
             const trimmed = newEmail.trim();
-            if (!trimmed.includes("@")) return;
+            if (!trimmed.includes("@")) {
+              setEmailInvalid(true);
+              emailInputRef.current?.focus();
+              return;
+            }
             addTrustedSender(trimmed);
             setNewEmail("");
           }}
         >
           <input
+            ref={emailInputRef}
             id={emailInputId}
-            aria-label="Email address for trusted sender"
             value={newEmail}
-            onChange={(event) => setNewEmail(event.target.value)}
+            onChange={(event) => {
+              setNewEmail(event.target.value);
+              setEmailInvalid(false);
+            }}
             placeholder="sender@example.com"
+            aria-label="Add a sender"
+            aria-invalid={emailInvalid || undefined}
+            aria-describedby={emailInvalid ? emailErrorId : undefined}
             className={PALETTE_INPUT_CLASS}
             type="email"
             autoComplete="email"
           />
-          <PaletteButton
-            type="submit"
-            variant="primary"
-            className="h-9"
-            disabled={!newEmail.trim().includes("@")}
-          >
+          <PaletteButton type="submit" variant="primary" className="h-9">
             Add
           </PaletteButton>
         </form>
+        {emailInvalid ? (
+          <p id={emailErrorId} className="text-[13px] leading-[130%] text-destructive">
+            Enter an email address, like sender@example.com.
+          </p>
+        ) : null}
       </PaletteField>
       {trustedEntries.length === 0 ? (
         <PaletteEmptyState>No trusted senders yet.</PaletteEmptyState>
@@ -84,11 +98,11 @@ export function TrustedSendersPanel() {
                   <ShieldCheck className="size-4" />
                 </PaletteIconBox>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px] leading-[130%] text-foreground">
+                  <div className="text-[15px] leading-[130%] text-foreground wrap-anywhere">
                     {label}
                   </div>
                   {label !== email ? (
-                    <div className="truncate text-[13px] leading-[130%] text-muted-foreground">
+                    <div className="text-[13px] leading-[130%] text-muted-foreground wrap-anywhere">
                       {email}
                     </div>
                   ) : null}

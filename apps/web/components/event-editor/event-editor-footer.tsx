@@ -3,6 +3,7 @@ import {
   isCancelledCalendarEvent,
 } from "@workspace/calendar-core";
 import { Button } from "@workspace/ui/components/ui/button";
+import { useShortcutLabel } from "@workspace/ui/hooks";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,10 +14,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { Check, ChevronDown, Download, Edit3, Loader2, Save, Trash2 } from "lucide-react";
 
-import {
-  canSaveEventEditor,
-  isRecurringEventDeleteCandidate,
-} from "@/lib/event-editor-view-model";
+import { isRecurringEventDeleteCandidate } from "@/lib/event-editor-view-model";
 import type { EventEditorFooterProps } from "./types";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
@@ -32,8 +30,10 @@ export function EventEditorFooter({
   isViewMode,
   onInvitationResponse,
   onBack,
+  onCancelEdit,
   onClose,
 }: EventEditorFooterProps) {
+  const saveShortcut = useShortcutLabel("↵");
   const isCancelledEvent = eventForm.selectedEvent
     ? isCancelledCalendarEvent(eventForm.selectedEvent)
     : false;
@@ -57,11 +57,6 @@ export function EventEditorFooter({
     handleEventDelete();
   };
 
-  const canSave = canSaveEventEditor({
-    eventCalendarId: eventForm.eventCalendarId,
-    eventSaving: eventForm.eventSaving,
-    eventTitle: eventForm.eventTitle,
-  });
   const showInvitationActions =
     Boolean(eventForm.selectedEvent?.id) && !canEditEvent && !isCancelledEvent;
   const invitationActions = showInvitationActions ? (
@@ -217,8 +212,8 @@ export function EventEditorFooter({
         ) : (
           <>
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <kbd className="rounded bg-accent px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
-                ⌘↵
+              <kbd className="rounded bg-hover px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
+                {saveShortcut}
               </kbd>
               to save
             </span>
@@ -229,8 +224,8 @@ export function EventEditorFooter({
             <Button
               size="sm"
               onClick={handleEventSave}
-              disabled={!canEditEvent || !canSave}
-              title={!eventForm.eventTitle.trim() ? "Add a title to save" : undefined}
+              disabled={!canEditEvent}
+              aria-disabled={eventForm.eventSaving || undefined}
             >
               {eventForm.eventSaving ? (
                 <>
@@ -265,7 +260,7 @@ export function EventEditorFooter({
           <div className="flex-1" />
           {eventForm.selectedEvent?.id && (
             <Button variant="outline" onClick={handleEventDownloadIcs}>
-              <Download className="size-4 mr-2" /> ICS
+              <Download className="size-4 mr-2" /> Export
             </Button>
           )}
           <Button variant="outline" onClick={onBack}>
@@ -284,18 +279,15 @@ export function EventEditorFooter({
         <>
           <Button
             variant="outline"
-            onClick={
-              eventForm.selectedEvent?.id
-                ? () => eventForm.setEventViewMode("view")
-                : onBack
-            }
+            onClick={eventForm.selectedEvent?.id ? onCancelEdit : onBack}
           >
             Cancel
           </Button>
           <div className="flex-1" />
           <Button
             onClick={handleEventSave}
-            disabled={!canEditEvent || !canSave}
+            disabled={!canEditEvent}
+            aria-disabled={eventForm.eventSaving || undefined}
           >
             {eventForm.eventSaving ? (
               <>

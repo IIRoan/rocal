@@ -16,12 +16,26 @@ import {
 
 export type RecurringScope = RecurrenceEditScope & RecurrenceDeleteScope;
 
-const RECURRING_SCOPE_OPTIONS: { scope: RecurringScope; label: string }[] =
-  [
-    { scope: "this_only", label: "This event" },
-    { scope: "this_and_future", label: "This and following events" },
-    { scope: "all", label: "All events" },
-  ];
+const RECURRING_SCOPE_OPTIONS: {
+  scope: RecurringScope;
+  label: Record<"edit" | "delete", string>;
+}[] = [
+  {
+    scope: "this_only",
+    label: { edit: "Update this event", delete: "Delete this event" },
+  },
+  {
+    scope: "this_and_future",
+    label: {
+      edit: "Update this and following events",
+      delete: "Delete this and following events",
+    },
+  },
+  {
+    scope: "all",
+    label: { edit: "Update all events", delete: "Delete all events" },
+  },
+];
 
 interface RecurringScopeModalProps {
   open: boolean;
@@ -45,18 +59,18 @@ export function RecurringScopeModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100dvw-1rem)] sm:w-auto sm:max-w-sm">
-        <DialogHeader>
+        <DialogHeader className="pr-12">
           <DialogTitle className="flex items-center gap-2">
             <Repeat className="size-4 text-muted-foreground" />
             {isDelete ? "Delete recurring event" : "Save recurring event"}
           </DialogTitle>
           <DialogDescription>
-            &quot;{eventTitle || "Untitled event"}&quot; repeats. Which events
+            &ldquo;{eventTitle || "Untitled event"}&rdquo; repeats. Which events
             should {isDelete ? "be deleted" : "change"}?
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 px-5 pb-5">
           {RECURRING_SCOPE_OPTIONS.map((option) => (
             <Button
               key={option.scope}
@@ -65,7 +79,7 @@ export function RecurringScopeModal({
               disabled={loading}
               className="w-full justify-start"
             >
-              {option.label}
+              {option.label[action]}
             </Button>
           ))}
           <Button

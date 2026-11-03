@@ -22,7 +22,6 @@ import { CommandPalette } from "@/components/command-palette";
 import { CommandPaletteProvider } from "@/components/command-palette-context";
 import {
   CalendarDataProvider,
-  CalendarDateSync,
   useSharedCalendarData,
 } from "@/components/calendar-data-provider";
 import { CalendarProviderWrapper } from "@/components/calendar-provider-wrapper";
@@ -184,6 +183,7 @@ function SidebarWithContext() {
       getCachedEventsForRange={calendarData.getCachedEventsForRange}
       prefetchRange={calendarData.prefetchRange}
       weekStartDay={settings?.weekStartDay}
+      timezone={settings?.timezone}
     />
   );
 }
@@ -261,7 +261,7 @@ function MobileLayoutContent() {
         initialView={initialView}
         events={transformedEvents}
         categories={calendarData.categories}
-        loading={false}
+        loading={settingsLoading}
         eventsLoading={calendarData.eventsLoading}
         error={calendarData.error}
         onCreateEvent={calendarData.createEvent}
@@ -307,7 +307,7 @@ export function CalendarPageContent() {
       <MobileLayoutContent />
     </div>
   ) : (
-    <CalendarWithData className="h-full min-h-dvh flex flex-1" />
+    <CalendarWithData className="h-full min-h-dvh lg:min-h-[calc(100dvh-1rem)] flex flex-1" />
   );
 }
 
@@ -355,7 +355,6 @@ export function CalendarShell({ children }: { children: ReactNode }) {
           <SettingsProvider>
             <CalendarDataProvider>
               <CalendarProviderWrapper>
-                <CalendarDateSync />
                 <RiftboundCalendarSync />
                 <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
                   <Suspense fallback={null}>

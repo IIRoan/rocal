@@ -67,6 +67,22 @@ function windowRouteKey(): string {
     : window.location.pathname;
 }
 
+/** A client navigation drops focus to <body> with its unmounted trigger, so keyboard users land on the new view instead of the page top. */
+function focusRouteView() {
+  if (document.activeElement && document.activeElement !== document.body) return;
+  const view =
+    document.querySelector<HTMLElement>("main") ??
+    document.querySelector<HTMLElement>("h1");
+  if (!view) return;
+  if (!view.hasAttribute("tabindex")) {
+    view.setAttribute("tabindex", "-1");
+    view.addEventListener("blur", () => view.removeAttribute("tabindex"), {
+      once: true,
+    });
+  }
+  view.focus({ preventScroll: true });
+}
+
 function clearOverlayTimers(refs: OverlayTimerRefs) {
   if (refs.hideTimerRef.current !== null) {
     window.clearTimeout(refs.hideTimerRef.current);
@@ -95,10 +111,18 @@ function RouteTransitionRouteTracker({
   const currentRouteKeyRef = useRef<string | null>(null);
   const previousRouteKeyRef = useRef<string | null>(null);
   const didHydrateRef = useRef(false);
+  const previousPathRef = useRef(path);
 
   useEffect(() => {
     currentRouteKeyRef.current = routeKey;
   }, [routeKey]);
+
+  // Pathname only: mail and calendar rewrite the query string on every selection.
+  useEffect(() => {
+    if (previousPathRef.current === path) return;
+    previousPathRef.current = path;
+    return afterPaint(focusRouteView);
+  }, [path]);
 
   useEffect(() => {
     if (!didHydrateRef.current) {

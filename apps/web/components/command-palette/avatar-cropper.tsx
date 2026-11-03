@@ -130,7 +130,7 @@ export function AvatarCropper({
           onPointerUp={() => (dragRef.current = null)}
           onPointerCancel={() => (dragRef.current = null)}
           onKeyDown={onKeyDown}
-          className="size-full cursor-grab touch-none outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="size-full cursor-grab touch-none outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring"
         />
         <div
           aria-hidden
@@ -150,7 +150,7 @@ export function AvatarCropper({
             update(() => ({ zoom: Number(event.target.value) }))
           }
           aria-label="Zoom"
-          className="h-1 flex-1 cursor-pointer accent-primary"
+          className="h-1 flex-1 cursor-pointer accent-accent"
         />
         <ZoomIn className="size-3.5 shrink-0 text-muted-foreground" />
       </label>

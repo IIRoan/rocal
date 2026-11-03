@@ -24,6 +24,7 @@ import type { MailPaletteItem } from "./mail-command-palette-items";
 type PaletteResult = UnifiedSearchResult<JmapEmailMessage>;
 
 function PaletteRow({
+  optionId,
   index,
   isSelected,
   icon,
@@ -32,6 +33,7 @@ function PaletteRow({
   meta,
   onSelect,
 }: {
+  optionId: string;
   index: number;
   isSelected: boolean;
   icon: ReactNode;
@@ -43,11 +45,14 @@ function PaletteRow({
   return (
     <button
       type="button"
-      aria-current={isSelected ? "true" : undefined}
+      id={optionId}
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={-1}
       data-index={index}
       onClick={onSelect}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60",
+        "flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
         subtitle ? "min-h-12 py-1.5" : "min-h-11 sm:min-h-9",
         isSelected ? "bg-[var(--bg-cell-hover)]" : "hover:bg-[var(--bg-cell-hover)]",
       )}
@@ -74,11 +79,13 @@ function PaletteRow({
 }
 
 function ResultRow({
+  optionId,
   result,
   index,
   isSelected,
   onSelect,
 }: {
+  optionId: string;
   result: PaletteResult;
   index: number;
   isSelected: boolean;
@@ -89,13 +96,14 @@ function ResultRow({
   const isMail = result.source === "mail";
   return (
     <PaletteRow
+      optionId={optionId}
       index={index}
       isSelected={isSelected}
       icon={<Icons icon={isMail ? Icon.Envelope : Icon.Calendar} size={Size.MEDIUM} color="source" />}
       title={result.title || "(No subject)"}
       subtitle={isMail && !isBodyOnlyMatch(result.matchedFields) ? (result.from ?? result.snippet) : result.snippet}
       meta={
-        <Typography size={TypographySize.SMALL} color="disabled">
+        <Typography size={TypographySize.SMALL} color="tertiary">
           {formatMessageDate(
             result.timestamp,
             timeFormat,
@@ -131,6 +139,7 @@ export function MailCommandPaletteMainView({
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
+  const optionId = (index: number) => `${listboxId}-option-${index}`;
   const [isPointerFocused, setIsPointerFocused] = useState(false);
   const results = showUnifiedSearch ? unifiedResults : [];
   const mailResults = results.filter((result) => result.source === "mail");
@@ -138,6 +147,15 @@ export function MailCommandPaletteMainView({
   const hasQuery = query.trim().length > 0;
   const isEmpty =
     results.length === 0 && mainListItems.length === 0 && !unifiedSearchLoading;
+  const resultCount = results.length + mainListItems.length;
+  const hasSelectedOption = selectedIndex >= 0 && selectedIndex < resultCount;
+  const resultStatus = !hasQuery
+    ? ""
+    : showUnifiedSearch && unifiedSearchLoading
+      ? "Searching…"
+      : resultCount === 1
+        ? "1 result"
+        : `${resultCount} results`;
   const actionSections = hasQuery
     ? [{ label: "Actions", items: mainListItems }]
     : [
@@ -166,7 +184,13 @@ export function MailCommandPaletteMainView({
         />
         <input
           type="text"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={resultCount > 0}
           aria-controls={listboxId}
+          aria-activedescendant={
+            hasSelectedOption ? optionId(selectedIndex) : undefined
+          }
           aria-label="Search mail and commands"
           placeholder="Search for mail, events, or settings"
           value={query}
@@ -192,21 +216,27 @@ export function MailCommandPaletteMainView({
         <span
           aria-hidden
           className={cn(
-            "pointer-events-none absolute inset-x-0 -bottom-px h-px origin-left bg-[var(--border-hover)] transition-transform duration-200 ease-out",
+            "pointer-events-none absolute inset-x-0 -bottom-px h-px origin-left bg-[var(--border-hover)] transition-transform duration-200 ease-out motion-reduce:transition-none",
             isPointerFocused ? "scale-x-100" : "scale-x-0",
           )}
         />
       </div>
+      <p role="status" className="sr-only">
+        {resultStatus}
+      </p>
       <div
         ref={listRef}
         id={listboxId}
+        role="listbox"
+        aria-label="Results"
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5"
       >
         {mailResults.length > 0 ? (
-          <PaletteSection label="Messages">
+          <PaletteSection label="Messages" role="group">
             {mailResults.map((result, i) => (
               <ResultRow
                 key={`mail-${result.messageId}`}
+                optionId={optionId(i)}
                 result={result}
                 index={i}
                 isSelected={i === selectedIndex}
@@ -216,12 +246,13 @@ export function MailCommandPaletteMainView({
           </PaletteSection>
         ) : null}
         {eventResults.length > 0 ? (
-          <PaletteSection label="Events">
+          <PaletteSection label="Events" role="group">
             {eventResults.map((result, i) => {
               const index = mailResults.length + i;
               return (
                 <ResultRow
                   key={`event-${result.eventId}`}
+                  optionId={optionId(index)}
                   result={result}
                   index={index}
                   isSelected={index === selectedIndex}
@@ -240,12 +271,17 @@ export function MailCommandPaletteMainView({
         ) : null}
         {actionSections.map((section) =>
           section.items.length === 0 ? null : (
-            <PaletteSection key={section.label} label={section.label}>
+            <PaletteSection
+              key={section.label}
+              label={section.label}
+              role="group"
+            >
               {section.items.map((item) => {
                 const index = results.length + mainListItems.indexOf(item);
                 return (
                   <PaletteNavRow
                     key={item.id}
+                    optionId={optionId(index)}
                     index={index}
                     isSelected={index === selectedIndex}
                     icon={item.icon}

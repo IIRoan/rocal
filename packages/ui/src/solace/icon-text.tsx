@@ -85,9 +85,10 @@ function iconTextClassName({
   className?: string;
 }) {
   return cn(
-    "inline-flex min-w-0 items-center justify-center rounded select-none",
+    "inline-flex min-w-0 items-center justify-center rounded",
     GAP_CLASS[size],
     fullWidth ? "w-full" : "max-w-fit",
+    isClickable && "select-none",
     isClickable && !disabled && "cursor-pointer hover:bg-[var(--bg-overlay-tertiary)]",
     color === "destructive" &&
       isClickable &&

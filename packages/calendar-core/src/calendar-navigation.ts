@@ -8,15 +8,17 @@ import {
   startOfWeek,
 } from "date-fns";
 
-import { AgendaDaysToShow, type CalendarView } from "./types";
+import type { CalendarView } from "./types";
 import type { CalendarDateRange } from "./calendar-month-ranges";
+import { getAgendaLastDay, getAgendaPageDate } from "./calendar-view-days";
 import {
-  formatCalendarDayKey,
-  formatCalendarMonthKey,
   formatCalendarWeekKey,
-  getWeekCalendarDays,
+  formatInstantCalendarDayKey,
+  formatInstantCalendarMonthKey,
   getZonedDayUtcBounds,
   resolveTimezone,
+  utcToPickerDate,
+  wallClockToUtc,
 } from "./timezone";
 
 type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -78,6 +80,55 @@ export function navigateCalendarDate(
   return getCalendarPageDate(currentDate, view, direction);
 }
 
+/** Pages the account-zone day an instant falls on and returns noon of the new day, so the browser's zone cannot shift it. */
+export function navigateCalendarInstant(
+  currentDate: Date,
+  view: CalendarView,
+  direction: 1 | -1,
+  timezone?: string | null,
+): Date {
+  const resolvedTimezone = resolveTimezone(timezone);
+  const day = utcToPickerDate(currentDate, resolvedTimezone);
+  const target =
+    view === "agenda"
+      ? getAgendaPageDate(day, direction)
+      : getCalendarPageDate(day, view, direction);
+  return wallClockToUtc(target, 12, 0, resolvedTimezone);
+}
+
+/** UTC range of the first through last account-zone day a view shows around the calendar day `day`. */
+function getCalendarDayViewRange(
+  day: Date,
+  view: CalendarView,
+  weekStartDay: number | null | undefined,
+  timezone: string,
+): CalendarDateRange {
+  const weekStartsOn = ((((weekStartDay ?? 1) % 7) + 7) % 7) as Day;
+  const range = (firstDay: Date, lastDay: Date): CalendarDateRange => ({
+    start: getZonedDayUtcBounds(firstDay, timezone).start,
+    end: getZonedDayUtcBounds(lastDay, timezone).end,
+  });
+
+  switch (view) {
+    case "day":
+      return range(day, day);
+    case "3day": {
+      const [firstDay, , lastDay] = getThreeDayCalendarDays(day);
+      return range(firstDay, lastDay);
+    }
+    case "week":
+      return range(startOfWeek(day, { weekStartsOn }), endOfWeek(day, { weekStartsOn }));
+    case "month":
+      return range(
+        startOfWeek(startOfMonth(day), { weekStartsOn }),
+        endOfWeek(endOfMonth(day), { weekStartsOn }),
+      );
+    case "agenda":
+      return range(day, getAgendaLastDay(day));
+  }
+}
+
+/** UTC range of the account-zone days a view shows around the instant `baseDate`. */
 export function getTimezoneAwareCalendarDateRange({
   baseDate,
   view,
@@ -86,61 +137,12 @@ export function getTimezoneAwareCalendarDateRange({
 }: TimezoneAwareCalendarDateRangeOptions): CalendarDateRange {
   const resolvedTimezone = resolveTimezone(timezone);
 
-  if (view === "day") {
-    return getZonedDayUtcBounds(baseDate, resolvedTimezone);
-  }
-
-  if (view === "3day") {
-    const [firstDay, , lastDay] = getThreeDayCalendarDays(baseDate);
-    return {
-      start: getZonedDayUtcBounds(firstDay, resolvedTimezone).start,
-      end: getZonedDayUtcBounds(lastDay, resolvedTimezone).end,
-    };
-  }
-
-  if (view === "week") {
-    const days = getWeekCalendarDays(
-      baseDate,
-      weekStartDay ?? 1,
-      resolvedTimezone,
-    );
-    const firstDay = days[0] ?? baseDate;
-    const lastDay = days[days.length - 1] ?? baseDate;
-    return {
-      start: getZonedDayUtcBounds(firstDay, resolvedTimezone).start,
-      end: getZonedDayUtcBounds(lastDay, resolvedTimezone).end,
-    };
-  }
-
-  if (view === "month") {
-    const weekStartsOn = ((weekStartDay ?? 1) % 7) as Day;
-    const monthStart = startOfMonth(baseDate);
-    const monthEnd = endOfMonth(baseDate);
-    const gridStart = startOfWeek(monthStart, { weekStartsOn });
-    const gridEnd = endOfWeek(monthEnd, { weekStartsOn });
-
-    return {
-      start: getZonedDayUtcBounds(gridStart, resolvedTimezone).start,
-      end: getZonedDayUtcBounds(gridEnd, resolvedTimezone).end,
-    };
-  }
-
-  if (view === "agenda") {
-    const lastDay = addDays(baseDate, AgendaDaysToShow - 1);
-
-    return {
-      start: getZonedDayUtcBounds(baseDate, resolvedTimezone).start,
-      end: getZonedDayUtcBounds(lastDay, resolvedTimezone).end,
-    };
-  }
-
-  const monthStart = startOfMonth(baseDate);
-  const monthEnd = endOfMonth(baseDate);
-
-  return {
-    start: getZonedDayUtcBounds(monthStart, resolvedTimezone).start,
-    end: getZonedDayUtcBounds(monthEnd, resolvedTimezone).end,
-  };
+  return getCalendarDayViewRange(
+    utcToPickerDate(baseDate, resolvedTimezone),
+    view,
+    weekStartDay,
+    resolvedTimezone,
+  );
 }
 
 /** One fetch window covering the current page and nearby swipe pages. */
@@ -155,15 +157,15 @@ export function getSurroundingCalendarDateRange({
   let start: Date | null = null;
   let end: Date | null = null;
   const resolvedTimezone = resolveTimezone(timezone);
+  const day = utcToPickerDate(currentDate, resolvedTimezone);
 
   for (let offset = -radius; offset <= radius; offset++) {
-    const baseDate = getCalendarPageDate(currentDate, view, offset);
-    const range = getTimezoneAwareCalendarDateRange({
-      baseDate,
+    const range = getCalendarDayViewRange(
+      getCalendarPageDate(day, view, offset),
       view,
       weekStartDay,
-      timezone: resolvedTimezone,
-    });
+      resolvedTimezone,
+    );
 
     if (start == null || range.start < start) {
       start = range.start;
@@ -183,14 +185,18 @@ export function getPrefetchCalendarDateRange({
   weekStartDay,
   timezone,
 }: PrefetchCalendarDateRangeOptions): CalendarDateRange {
-  const nextDate = getCalendarPageDate(currentDate, view, direction);
+  const resolvedTimezone = resolveTimezone(timezone);
 
-  return getTimezoneAwareCalendarDateRange({
-    baseDate: nextDate,
+  return getCalendarDayViewRange(
+    getCalendarPageDate(
+      utcToPickerDate(currentDate, resolvedTimezone),
+      view,
+      direction,
+    ),
     view,
     weekStartDay,
-    timezone,
-  });
+    resolvedTimezone,
+  );
 }
 
 /** Stable per-period key that drives calendar view transition animations. */
@@ -203,12 +209,12 @@ export function getCalendarViewAnimationKey(
   const resolvedTimezone = resolveTimezone(timezone);
 
   if (view === "day" || view === "3day" || view === "agenda") {
-    return `${view}-${formatCalendarDayKey(currentDate)}`;
+    return `${view}-${formatInstantCalendarDayKey(currentDate, resolvedTimezone)}`;
   }
 
   if (view === "week") {
     return `${view}-${formatCalendarWeekKey(currentDate, weekStartDay, resolvedTimezone)}`;
   }
 
-  return `${view}-${formatCalendarMonthKey(currentDate)}`;
+  return `${view}-${formatInstantCalendarMonthKey(currentDate, resolvedTimezone)}`;
 }

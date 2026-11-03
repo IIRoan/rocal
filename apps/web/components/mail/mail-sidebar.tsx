@@ -3,13 +3,17 @@
 import {
   DndContext,
   closestCenter,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
+  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
   arrayMove,
@@ -52,22 +56,16 @@ import {
   SidebarIconButton,
 } from "@workspace/ui/components/layout";
 import type { JmapMailbox, LabelDef } from "@/lib/mail/types";
-import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
+import {
+  getMailboxDisplayName,
+  sortMailboxesForSidebar,
+} from "@/lib/mail/mail-mailbox-roles";
 import type { ActiveMailboxState } from "@/hooks/use-mail-app";
 import { useHiddenMailboxIds } from "@/hooks/use-hidden-mailbox-ids";
-import { MailSidebarLabels } from "./mail-sidebar-labels";
+import { MailSidebarLabels, TruncatedNameTooltip } from "./mail-sidebar-labels";
 
 const EMPTY_LABELS: LabelDef[] = [];
 
-const ROLE_ORDER = [
-  "inbox",
-  "sent",
-  "drafts",
-  "archive",
-  "junk",
-  "spam",
-  "trash",
-];
 function getMailboxIcon(role: string | null | undefined): LucideIcon {
   switch (role?.toLowerCase()) {
     case "inbox":
@@ -128,6 +126,8 @@ function SortableMailboxItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const name = getMailboxDisplayName(mailbox);
+
   return (
     <SidebarMenuItem
       ref={setNodeRef}
@@ -136,21 +136,45 @@ function SortableMailboxItem({
     >
       <button
         type="button"
-        className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-8 flex items-center justify-center opacity-0 group-hover/item:opacity-100 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground/70 transition-[opacity,color] z-10"
-        aria-label="Drag to reorder"
+        className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-8 flex items-center justify-center opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-[opacity,color] z-10"
         {...attributes}
         {...listeners}
+        aria-label={`Reorder ${name}`}
       >
         <GripVertical size={12} strokeWidth={2} />
       </button>
 
-      <SidebarMenuButton isActive={isSelected} onClick={onSelect}>
-        <MailboxIcon role={mailbox.role} isSelected={isSelected} />
-        <span className="truncate">{getMailboxDisplayName(mailbox)}</span>
-      </SidebarMenuButton>
-
+      <TruncatedNameTooltip name={name}>
+        <SidebarMenuButton
+          isActive={isSelected}
+          aria-current={isSelected ? "page" : undefined}
+          onClick={onSelect}
+        >
+          <MailboxIcon role={mailbox.role} isSelected={isSelected} />
+          <span data-sidebar-name className="truncate">
+            {name}
+          </span>
+        </SidebarMenuButton>
+      </TruncatedNameTooltip>
     </SidebarMenuItem>
   );
+}
+
+function mailboxReorderAnnouncements(mailboxes: JmapMailbox[]): Announcements {
+  const nameOf = (id: UniqueIdentifier) => {
+    const mailbox = mailboxes.find((entry) => entry.id === id);
+    return mailbox ? getMailboxDisplayName(mailbox) : "Mailbox";
+  };
+  return {
+    onDragStart: ({ active }) => `Picked up ${nameOf(active.id)}.`,
+    onDragOver: ({ active, over }) =>
+      over ? `${nameOf(active.id)} is over ${nameOf(over.id)}.` : undefined,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `${nameOf(active.id)} moved to the place of ${nameOf(over.id)}.`
+        : `${nameOf(active.id)} dropped.`,
+    onDragCancel: ({ active }) => `Reordering ${nameOf(active.id)} cancelled.`,
+  };
 }
 
 function ExpandedMailboxNav({
@@ -181,7 +205,7 @@ function ExpandedMailboxNav({
   return (
     <>
       <div data-sidebar-heading className="justify-between">
-        <span>General</span>
+        <h2 className="font-medium tracking-normal">General</h2>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -202,6 +226,9 @@ function ExpandedMailboxNav({
           sensors={sensors}
           collisionDetection={closestCenter}
           modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+          accessibility={{
+            announcements: mailboxReorderAnnouncements(visibleItems),
+          }}
           onDragEnd={onDragEnd}
         >
           <SortableContext
@@ -328,18 +355,13 @@ export function MailSidebar({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const sorted = activeMailbox
-    ? Array.from(activeMailbox.mailboxes).sort((a, b) => {
-        if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
-          return a.sortOrder - b.sortOrder;
-        }
-        const ai = ROLE_ORDER.indexOf(a.role?.toLowerCase() ?? "");
-        const bi = ROLE_ORDER.indexOf(b.role?.toLowerCase() ?? "");
-        if (ai === -1 && bi === -1) return a.name.localeCompare(b.name);
-        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-      })
+    ? sortMailboxesForSidebar(activeMailbox.mailboxes)
     : [];
 
   const visibleItems = sorted.filter((m) => !hiddenIds.includes(m.id));
@@ -374,8 +396,9 @@ export function MailSidebar({
             <SidebarGroup
               className={`px-2 flex-1 overflow-y-auto ${isCollapsed ? "pt-2" : "pt-4"}`}
             >
+            <nav aria-label="Mailboxes">
             {isCollapsed ? (
-              <SidebarGroupContent className="flex flex-col items-center gap-1">
+              <SidebarMenu className="items-center">
                 {visibleItems.map((mailbox) => {
                   const isSelected =
                     !activeLabelId &&
@@ -383,26 +406,27 @@ export function MailSidebar({
                   return (
                     <SidebarMenuItem
                       key={mailbox.id}
-                      className="flex justify-center list-none"
+                      className="flex justify-center"
                     >
                       <SidebarIconButton
                         label={getMailboxDisplayName(mailbox)}
                         onClick={() => onSelectMailbox(mailbox.id)}
+                        aria-current={isSelected ? "page" : undefined}
+                        className={
+                          isSelected
+                            ? "bg-hover text-foreground"
+                            : "text-muted-foreground"
+                        }
                       >
                         <MailboxIcon
                           role={mailbox.role}
                           isSelected={isSelected}
-                          className={
-                            isSelected
-                              ? "text-foreground"
-                              : "text-muted-foreground/60"
-                          }
                         />
                       </SidebarIconButton>
                     </SidebarMenuItem>
                   );
                 })}
-              </SidebarGroupContent>
+              </SidebarMenu>
             ) : (
               <ExpandedMailboxNav
                 visibleItems={visibleItems}
@@ -418,6 +442,7 @@ export function MailSidebar({
                 onOpenLabels={onOpenLabels}
               />
             )}
+            </nav>
             </SidebarGroup>
           )}
         </>

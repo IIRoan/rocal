@@ -20,6 +20,7 @@ import {
 
 import type { CalendarEvent } from "./types";
 export {
+  getColorSwatchBorderValue,
   getColorSwatchValue,
   getEventColorClasses,
   getEventColorStyles,

@@ -13,7 +13,7 @@ import {
 } from "@/lib/auth-navigation";
 import { Key, Eye, EyeOff, ArrowRight, Check, X, Ticket } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
-import { getErrorMessage } from "@workspace/calendar-core";
+import { afterPaint, getErrorMessage } from "@workspace/calendar-core";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -44,6 +44,7 @@ import {
   loginFormChromeReducer,
   loginFormFieldsReducer,
   type AuthMode,
+  type LoginField,
 } from "./login-form-state";
 import type { LoginSearchParams } from "./login-form-params";
 
@@ -64,7 +65,10 @@ async function fetchInviteTokenValidation(trimmed: string) {
   try {
     return await inviteApiService.validateInviteToken(trimmed);
   } catch {
-    return { valid: false as const, reason: "Could not validate token" };
+    return {
+      valid: false as const,
+      reason: "Unable to check the invite token. Check your connection and try again.",
+    };
   }
 }
 
@@ -191,14 +195,19 @@ function meetsMinPasswordRequirements(password: string): boolean {
 function PasswordRequirements({ password }: { password: string }) {
   const requirements = getPasswordRequirements(password);
   return (
-    <ul className="mt-2 space-y-1" aria-label="Password requirements">
+    <ul
+      id="password-hint"
+      className="mt-2 space-y-1"
+      aria-label="Password requirements"
+    >
       {requirements.map((req) => (
         <li key={req.label} className="flex items-center gap-2">
           {req.met ? (
-            <Check className="size-3.5 shrink-0 text-success" />
+            <Check className="size-3.5 shrink-0 text-success" aria-hidden="true" />
           ) : (
-            <X className="size-3.5 shrink-0 text-muted-foreground/50" />
+            <X className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           )}
+          <span className="sr-only">{req.met ? "Met:" : "Not met:"}</span>
           <span
             className={`text-xs ${
               req.met
@@ -261,7 +270,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     showPassword,
     signupDomain,
   } = fields;
-  const { passkeyLoading, emailLoading, error, notice } = chrome;
+  const { passkeyLoading, emailLoading, error, errorField, notice } = chrome;
   const { availability: emailAvailability, checking: emailChecking } =
     emailAvailabilityUi;
   const { validation: inviteValidation, validating: inviteValidating } =
@@ -291,6 +300,26 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
   const getRedirectTarget = () =>
     resolveAuthRedirectTarget(nextPath, callbackUrl);
+
+  /** Shows a field's error, then focuses that field once the error has rendered so it is announced with it. */
+  function failField(field: LoginField, message: string) {
+    dispatchChrome({ type: "set-error", error: message, field });
+    afterPaint(() => document.getElementById(field)?.focus());
+  }
+
+  function fieldErrorProps(
+    field: LoginField,
+    describedBy?: string,
+    invalidHint = false,
+  ) {
+    const hasError = errorField === field;
+    return {
+      "aria-invalid": hasError || invalidHint || undefined,
+      "aria-describedby":
+        [hasError ? "login-error" : null, describedBy].filter(Boolean).join(" ") ||
+        undefined,
+    };
+  }
 
   function switchMode(mode: AuthMode) {
     dispatchFields({ type: "switch-mode", mode });
@@ -392,7 +421,8 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
             type: "set-result",
             validation: {
               valid: false,
-              reason: invalid.reason ?? "Invalid token",
+              reason:
+                invalid.reason ?? "This invite token is not valid. Ask for a new invite.",
             },
           });
         })
@@ -453,6 +483,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
   }
 
   async function handlePasskeyStepUp() {
+    if (passkeyLoading) return;
     dispatchChrome({ type: "start-passkey-auth" });
 
     const verifyPasskey = async () => {
@@ -473,7 +504,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           type: "set-error",
           error:
             result.error.message ||
-            "Passkey authentication failed. Please try again.",
+            "Passkey authentication failed. Try again.",
         });
         dispatchChrome({ type: "finish-passkey-auth" });
         return;
@@ -484,7 +515,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       if (authStatus?.authenticated && authStatus.requiresPasskeyStepUp) {
         dispatchChrome({
           type: "set-error",
-          error: "Passkey verification is still required. Please try again.",
+          error: "Passkey verification is still required. Try again.",
         });
         dispatchChrome({ type: "finish-passkey-auth" });
         return;
@@ -508,7 +539,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
         type: "set-error",
         error: getErrorMessage(
           error,
-          "Passkey authentication failed. Please try again.",
+          "Passkey authentication failed. Try again.",
         ),
       });
       dispatchChrome({ type: "finish-passkey-auth" });
@@ -709,10 +740,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     const normalizedDesiredEmail = normalizeFormValue(rawDesiredEmail);
 
     if (!normalizedDesiredEmail) {
-      dispatchChrome({
-        type: "set-error",
-        error: `Please choose your @${signupDomain} email.`,
-      });
+      failField("desired-email", `Choose your @${signupDomain} email.`);
       return null;
     }
 
@@ -721,7 +749,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     );
 
     if (!availability.available) {
-      dispatchChrome({ type: "set-error", error: availability.message });
+      failField("desired-email", availability.message);
       return null;
     }
 
@@ -731,10 +759,10 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
   async function claimRequiredInvite(normalizedEmail: string) {
     const trimmedToken = inviteToken.trim();
     if (!trimmedToken) {
-      dispatchChrome({
-        type: "set-error",
-        error: "An invite token is required to create an account.",
-      });
+      failField(
+        "invite-token",
+        "Enter the invite token shared with you to create an account.",
+      );
       return false;
     }
 
@@ -756,14 +784,12 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
   async function handleEmailAuth(e: React.FormEvent) {
     e.preventDefault();
+    if (emailLoading) return;
     const normalizedEmail = normalizeFormValue(email);
     const trimmedName = name.trim();
 
     if (!password) {
-      dispatchChrome({
-        type: "set-error",
-        error: "Please enter your password.",
-      });
+      failField("password", "Enter your password.");
       return;
     }
 
@@ -771,20 +797,16 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
     if (isSignUp) {
       if (!trimmedName) {
-        dispatchChrome({
-          type: "set-error",
-          error: "Please enter your name.",
-        });
+        failField("name", "Enter your name.");
         dispatchChrome({ type: "finish-email-auth" });
         return;
       }
 
       if (!meetsMinPasswordRequirements(password)) {
-        dispatchChrome({
-          type: "set-error",
-          error:
-            "Your password doesn't meet the requirements. Please check the list below.",
-        });
+        failField(
+          "password",
+          "Choose a password that meets every requirement below.",
+        );
         dispatchChrome({ type: "finish-email-auth" });
         return;
       }
@@ -811,7 +833,9 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
         clearPendingAuthPassword();
         dispatchChrome({
           type: "set-error",
-          error: signUpResult.error.message || "Sign up failed. Please try again.",
+          error:
+            signUpResult.error.message ||
+            "Unable to create your account. Try again.",
         });
         dispatchChrome({ type: "finish-email-auth" });
         return;
@@ -823,10 +847,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       });
     } else {
       if (!normalizedEmail) {
-        dispatchChrome({
-          type: "set-error",
-          error: "Please enter your account email address.",
-        });
+        failField("email", "Enter your account email address.");
         dispatchChrome({ type: "finish-email-auth" });
         return;
       }
@@ -851,7 +872,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
             type: "set-error",
             error: getErrorMessage(
               err,
-              "Authentication failed. Please try again.",
+              "Unable to sign in. Check your connection and try again.",
             ),
           });
           dispatchChrome({ type: "finish-email-auth" });
@@ -867,7 +888,9 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           clearPendingAuthPassword();
           dispatchChrome({
             type: "set-error",
-            error: signInResult.error.message || "Invalid email or password.",
+            error:
+              signInResult.error.message ||
+              "Email or password is incorrect. Check both and try again.",
           });
           dispatchChrome({ type: "finish-email-auth" });
           return;
@@ -881,7 +904,10 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       log.error("Email auth failed:", err);
       dispatchChrome({
         type: "set-error",
-        error: getErrorMessage(err, "Authentication failed. Please try again."),
+        error: getErrorMessage(
+          err,
+          "Unable to sign in. Check your connection and try again.",
+        ),
       });
     }
 
@@ -906,14 +932,14 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
   return (
     <>
-      <section className="flex min-h-[100dvh]">
+      <main className="flex min-h-[100dvh]">
         <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
           <div className="relative z-10 mx-auto w-full max-w-md">
             <div className="mb-10 flex items-center justify-between">
               <Logo
                 width={44}
                 height={44}
-                className="text-primary"
+                className="text-accent"
                 aria-label="Solace"
               />
               <ThemeToggle />
@@ -929,20 +955,21 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
             </div>
 
             <div>
-              {notice ? (
-                <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
-                  <p className="text-sm text-foreground">{notice}</p>
-                </div>
-              ) : null}
+              <div role="status">
+                {notice ? (
+                  <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
+                    <p className="text-sm text-foreground">{notice}</p>
+                  </div>
+                ) : null}
+              </div>
 
-              {error ? (
-                <div
-                  className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-3"
-                  role="alert"
-                >
-                  <p className="text-sm text-destructive">{error}</p>
-                </div>
-              ) : null}
+              <div id="login-error" role="alert">
+                {error ? (
+                  <div className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-3">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                ) : null}
+              </div>
 
               <form onSubmit={handleEmailAuth} className="space-y-5">
                 <AnimatedCollapse isOpen={isSignUp}>
@@ -961,8 +988,9 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                         dispatchFields({ type: "set-name", name: e.target.value })
                       }
                       required={isSignUp}
-                      disabled={emailLoading}
+                      readOnly={emailLoading}
                       className="h-11 rounded-lg"
+                      {...fieldErrorProps("name")}
                     />
                   </div>
                 </AnimatedCollapse>
@@ -978,7 +1006,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                     <div
                       className={`flex h-11 overflow-hidden rounded-lg border bg-background transition-colors ${
                         emailAvailability === null
-                          ? "border-input"
+                          ? "border-input-border"
                           : emailAvailability.available
                             ? "border-success ring-1 ring-success/30"
                             : "border-destructive ring-1 ring-destructive/30"
@@ -1000,20 +1028,26 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                           })
                         }
                         required={isSignUp}
-                        disabled={emailLoading}
+                        readOnly={emailLoading}
                         className="h-full flex-1 rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                        {...fieldErrorProps(
+                          "desired-email",
+                          "desired-email-hint",
+                          emailAvailability?.available === false,
+                        )}
                       />
                       <span className="flex items-center border-l border-input px-3 text-sm text-muted-foreground">
                         @{signupDomain}
                       </span>
                     </div>
                     {emailChecking && (
-                      <p className="text-xs text-muted-foreground">
+                      <p id="desired-email-hint" className="text-xs text-muted-foreground">
                         Checking availability…
                       </p>
                     )}
                     {!emailChecking && emailAvailability !== null && (
                       <p
+                        id="desired-email-hint"
                         className={`text-xs ${
                           emailAvailability.available
                             ? "text-success"
@@ -1031,7 +1065,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                       </p>
                     )}
                     {!emailChecking && !emailAvailability && (
-                      <p className="text-xs text-muted-foreground">
+                      <p id="desired-email-hint" className="text-xs text-muted-foreground">
                         This becomes your Solace account email and mailbox
                         address.
                       </p>
@@ -1048,7 +1082,10 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                       Invite token
                     </Label>
                     <div className="relative">
-                      <Ticket className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Ticket
+                        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden="true"
+                      />
                       <Input
                         id="invite-token"
                         name="invite-token"
@@ -1064,7 +1101,12 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                             inviteToken: e.target.value,
                           })
                         }
-                        disabled={emailLoading}
+                        readOnly={emailLoading}
+                        {...fieldErrorProps(
+                          "invite-token",
+                          "invite-token-hint",
+                          inviteValidation?.valid === false,
+                        )}
                         className={`h-11 rounded-lg pl-9 transition-colors ${
                           inviteValidation === null
                             ? ""
@@ -1075,12 +1117,13 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                       />
                     </div>
                     {inviteValidating && (
-                      <p className="text-xs text-muted-foreground">
+                      <p id="invite-token-hint" className="text-xs text-muted-foreground">
                         Validating token…
                       </p>
                     )}
                     {!inviteValidating && inviteValidation !== null && (
                       <p
+                        id="invite-token-hint"
                         className={`text-xs ${
                           inviteValidation.valid
                             ? "text-success"
@@ -1100,7 +1143,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                       </p>
                     )}
                     {!inviteValidating && inviteValidation === null && (
-                      <p className="text-xs text-muted-foreground">
+                      <p id="invite-token-hint" className="text-xs text-muted-foreground">
                         Solace is invite-only. Enter the token shared with you.
                       </p>
                     )}
@@ -1116,7 +1159,9 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                       id="email"
                       name="email"
                       type="email"
-                      autoComplete="email"
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       placeholder={`you@${signupDomain}`}
                       value={email}
                       onChange={(e) =>
@@ -1126,8 +1171,9 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                         })
                       }
                       required={!isSignUp}
-                      disabled={emailLoading}
+                      readOnly={emailLoading}
                       className="h-11 rounded-lg"
+                      {...fieldErrorProps("email")}
                     />
                   </div>
                 </AnimatedCollapse>
@@ -1146,7 +1192,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                             notice: FORGOT_PASSWORD_NOTICE,
                           })
                         }
-                        className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                        className="text-xs font-medium text-accent transition-colors hover:text-accent/80"
                       >
                         Forgot password?
                       </button>
@@ -1169,23 +1215,27 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                         })
                       }
                       required
-                      disabled={emailLoading}
+                      readOnly={emailLoading}
                       className="h-11 rounded-lg pr-10"
+                      {...fieldErrorProps(
+                        "password",
+                        isSignUp ? "password-hint" : undefined,
+                      )}
                     />
                     <button
                       type="button"
                       onClick={() =>
                         dispatchFields({ type: "toggle-show-password" })
                       }
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                      className="absolute right-1.5 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
                       aria-label={
                         showPassword ? "Hide password" : "Show password"
                       }
                     >
                       {showPassword ? (
-                        <EyeOff className="size-4" />
+                        <EyeOff className="size-4" aria-hidden="true" />
                       ) : (
-                        <Eye className="size-4" />
+                        <Eye className="size-4" aria-hidden="true" />
                       )}
                     </button>
                   </div>
@@ -1193,7 +1243,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                     <PasswordRequirements password={password} />
                   )}
                   {isSignUp && password.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p id="password-hint" className="text-xs text-muted-foreground">
                       Min. 8 characters with uppercase, lowercase, number
                       &amp; special character.
                     </p>
@@ -1202,14 +1252,14 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
                 <Button
                   type="submit"
-                  disabled={emailLoading}
+                  aria-disabled={emailLoading}
                   className="mt-2 h-11 w-full rounded-lg font-medium"
                   aria-busy={emailLoading}
                 >
                   {emailLoading ? (
                     <>
                       <div
-                        className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
+                        className="size-4 animate-spin rounded-full border-2 border-accent-foreground/30 border-t-accent-foreground"
                         aria-hidden="true"
                       />
                       <span>{primaryLoadingLabel}</span>
@@ -1217,7 +1267,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                   ) : (
                     <>
                       <span>{primaryButtonLabel}</span>
-                      <ArrowRight className="size-4" />
+                      <ArrowRight className="size-4" aria-hidden="true" />
                     </>
                   )}
                 </Button>
@@ -1236,7 +1286,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
                     <Button
                       onClick={handlePasskeyStepUp}
-                      disabled={passkeyLoading}
+                      aria-disabled={passkeyLoading}
                       variant="outline"
                       className="h-11 w-full rounded-lg"
                       aria-busy={passkeyLoading}
@@ -1255,7 +1305,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                         </>
                       ) : (
                         <>
-                          <Key className="size-4" />
+                          <Key className="size-4" aria-hidden="true" />
                           <span>Use passkey</span>
                         </>
                       )}
@@ -1271,17 +1321,17 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                 <button
                   type="button"
                   onClick={() => switchMode(isSignUp ? "sign-in" : "sign-up")}
-                  className="font-medium text-primary transition-colors hover:text-primary/80 underline-offset-4 hover:underline"
+                  className="font-medium text-accent underline underline-offset-4 transition-colors hover:text-accent/80"
                 >
                   {isSignUp ? "Sign in" : "Sign up"}
                 </button>
               </p>
 
               <p className="mt-6 text-center text-xs text-muted-foreground">
-                Before continuing, please read Solace&apos;s{" "}
+                Before continuing, read Solace&apos;s{" "}
                 <Link
                   href="/privacy"
-                  className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  className="font-medium text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
                 >
                   privacy commitments
                 </Link>
@@ -1294,7 +1344,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           <div className="absolute inset-4 overflow-hidden rounded-2xl shadow-2xl">
             <Image
               src="/wallpaper.jpg"
-              alt="Solace, collaborate better"
+              alt=""
               className="size-full object-cover"
               fill
               sizes="50vw"
@@ -1305,7 +1355,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
           </div>
         </div>
-      </section>
+      </main>
 
       {overlayVisible ? (
         <PageLoadingOverlay

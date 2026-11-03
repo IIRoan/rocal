@@ -100,9 +100,9 @@ export function MailDisplaySettingsPanel({
       <PaletteSection label="Attachments">
         <SettingToggleRow
           icon={Paperclip}
-          label="Hide inline image attachments"
-          description="Do not list CID inline images in the attachment chips above the body"
-          checked={settings.hideInlineImageAttachments}
+          label="List inline images as attachments"
+          description="Show CID inline images in the attachment chips above the body"
+          checked={!settings.hideInlineImageAttachments}
           onToggle={() =>
             updateSettings({
               hideInlineImageAttachments: !settings.hideInlineImageAttachments,

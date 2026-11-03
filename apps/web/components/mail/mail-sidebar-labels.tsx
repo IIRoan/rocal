@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type ReactElement } from "react";
 import { ChevronRight, CirclePlus, Plus, Tag } from "lucide-react";
 import {
   SidebarMenu,
@@ -10,7 +10,38 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import type { LabelDef } from "@/lib/mail/types";
 import { resolveLabelDisplayColor } from "@workspace/calendar-core";
-import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
+import {
+  SimpleTooltip,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/ui/tooltip";
+
+/** Full name on hover or keyboard focus, only when the `data-sidebar-name` child is cut short. */
+export function TruncatedNameTooltip({
+  name,
+  children,
+}: {
+  name: string;
+  children: ReactElement;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  return (
+    <Tooltip
+      open={open}
+      onOpenChange={(next) => {
+        const label = triggerRef.current?.querySelector("[data-sidebar-name]");
+        setOpen(next && !!label && label.scrollWidth > label.clientWidth);
+      }}
+    >
+      <TooltipTrigger ref={triggerRef} asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side="right">{name}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function MailSidebarLabels({
   labels,
@@ -30,19 +61,24 @@ export function MailSidebarLabels({
   return (
     <div className="mt-4">
       <div data-sidebar-heading className="pl-1">
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-[var(--text-primary)]"
-        >
-          <ChevronRight
-            size={12}
-            strokeWidth={2.5}
-            className={cn("shrink-0 transition-transform duration-150", expanded && "rotate-90")}
-          />
-          Labels
-        </button>
+        <h2 className="flex min-w-0 flex-1 font-medium tracking-normal">
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-expanded={expanded}
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-[var(--text-primary)]"
+          >
+            <ChevronRight
+              size={12}
+              strokeWidth={2.5}
+              className={cn(
+                "shrink-0 transition-transform duration-150 motion-reduce:transition-none",
+                expanded && "rotate-90",
+              )}
+            />
+            Labels
+          </button>
+        </h2>
         {onOpenLabels ? (
           <SimpleTooltip content="Manage labels">
             <button
@@ -63,17 +99,22 @@ export function MailSidebarLabels({
             const isSelected = activeLabelId === label.id;
             return (
               <SidebarMenuItem key={label.id}>
-                <SidebarMenuButton
-                  isActive={isSelected}
-                  onClick={() => onSelectLabel(label.id)}
-                >
-                  <Tag
-                    size={16}
-                    strokeWidth={2}
-                    style={{ color: resolveLabelDisplayColor(label.color) }}
-                  />
-                  <span className="truncate">{label.name}</span>
-                </SidebarMenuButton>
+                <TruncatedNameTooltip name={label.name}>
+                  <SidebarMenuButton
+                    isActive={isSelected}
+                    aria-current={isSelected ? "page" : undefined}
+                    onClick={() => onSelectLabel(label.id)}
+                  >
+                    <Tag
+                      size={16}
+                      strokeWidth={2}
+                      style={{ color: resolveLabelDisplayColor(label.color) }}
+                    />
+                    <span data-sidebar-name className="truncate">
+                      {label.name}
+                    </span>
+                  </SidebarMenuButton>
+                </TruncatedNameTooltip>
               </SidebarMenuItem>
             );
           })}

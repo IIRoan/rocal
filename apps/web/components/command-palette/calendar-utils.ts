@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { createLogger } from "@workspace/logger";
 import {
   getErrorMessage,
@@ -47,13 +47,13 @@ export const validateCalendarForm = (
   );
 
   if (nameExists) {
-    errors.name = "A calendar with this name already exists";
+    errors.name = "A calendar with this name already exists. Choose another name.";
   }
 
   // Validate color format (named colors or hex)
   const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(calendarColor);
   if (!isHexColor && !ALLOWED_COLOR_VALUES.includes(calendarColor)) {
-    errors.color = "Please select a valid color";
+    errors.color = "Choose one of the preset colors";
   }
 
   return errors;
@@ -100,10 +100,12 @@ export const handleCalendarCreate = async (
     log.error("Failed to create calendar:", error);
     if (getErrorMessage(error, "").includes("already exists")) {
       setters.setCalendarValidationErrors({
-        name: "A calendar with this name already exists",
+        name: "A calendar with this name already exists. Choose another name.",
       });
     } else {
-      toast.error("Failed to create calendar");
+      toast.error(
+        "Calendar not created. Check your connection and try again.",
+      );
     }
   } finally {
     setters.setCalendarSaving(false);
@@ -156,14 +158,16 @@ export const handleCalendarUpdate = async (
     const message = getErrorMessage(error, "");
     if (message.includes("already exists")) {
       setters.setCalendarValidationErrors({
-        name: "A calendar with this name already exists",
+        name: "A calendar with this name already exists. Choose another name.",
       });
     } else if (message.includes("Color must be")) {
       setters.setCalendarValidationErrors({
-        color: "Please select a valid color",
+        color: "Choose one of the preset colors",
       });
     } else {
-      toast.error("Failed to update calendar");
+      toast.error(
+        "Calendar not updated. Check your connection and try again.",
+      );
     }
   } finally {
     setters.setCalendarSaving(false);
@@ -184,7 +188,9 @@ export const handleCalendarDelete = async (
     goBack();
   } catch (error: unknown) {
     log.error("Failed to delete calendar:", error);
-    toast.error("Failed to delete calendar");
+    toast.error(
+      "Calendar not deleted. Check your connection and try again.",
+    );
   } finally {
     setCalendarSaving(false);
   }

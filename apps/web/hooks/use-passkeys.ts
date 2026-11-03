@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage } from "@workspace/calendar-core";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { authClient } from "@/lib/auth-client";
 import { webQueryKeys } from "@/lib/query-keys";
 
@@ -70,7 +70,7 @@ export function useAddPasskey(input: { onAdded: () => void }) {
     },
     onSuccess: (result: { success: boolean; name: string }) => {
       queryClient.invalidateQueries({ queryKey: webQueryKeys.passkeys() });
-      toast.success(`Passkey '${result.name}' added successfully`);
+      toast.success(`Passkey “${result.name}” added`);
       onAdded();
     },
     onError: (err: unknown) => {
@@ -91,7 +91,7 @@ export function useDeletePasskey() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: webQueryKeys.passkeys() });
-      toast.success("Passkey deleted successfully!");
+      toast.success("Passkey deleted");
     },
     onError: (err: unknown) => {
       toast.error(getErrorMessage(err, "Failed to delete passkey"));

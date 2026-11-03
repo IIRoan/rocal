@@ -55,8 +55,8 @@ export const validateEventForm = (
   eventEndTime: string,
   timezone?: string,
 ) => {
-  if (!eventTitle.trim()) return "Title is required";
-  if (!eventCalendarId) return "Please select a calendar";
+  if (!eventTitle.trim()) return "Add a title to save this event.";
+  if (!eventCalendarId) return "Choose a calendar to save this event.";
 
   const resolvedTimezone = resolveTimezone(timezone);
   let start: Date;

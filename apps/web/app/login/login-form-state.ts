@@ -17,10 +17,19 @@ export type LoginFormFieldsState = {
   signupDomain: string;
 };
 
+/** The id of the input an error belongs to. */
+export type LoginField =
+  | "name"
+  | "desired-email"
+  | "invite-token"
+  | "email"
+  | "password";
+
 export type LoginFormChromeState = {
   passkeyLoading: boolean;
   emailLoading: boolean;
   error: string | null;
+  errorField: LoginField | null;
   notice: string | null;
 };
 
@@ -60,10 +69,11 @@ export function createInitialLoginFormFields(
   };
 }
 
-export const initialLoginFormChrome: LoginFormChromeState = {
+const initialLoginFormChrome: LoginFormChromeState = {
   passkeyLoading: false,
   emailLoading: false,
   error: null,
+  errorField: null,
   notice: null,
 };
 
@@ -138,7 +148,7 @@ export function loginFormFieldsReducer(
 export type LoginFormChromeAction =
   | { type: "set-passkey-loading"; value: boolean }
   | { type: "set-email-loading"; value: boolean }
-  | { type: "set-error"; error: string | null }
+  | { type: "set-error"; error: string | null; field?: LoginField }
   | { type: "set-notice"; notice: string | null }
   | { type: "clear-messages" }
   | { type: "start-email-auth" }
@@ -156,16 +166,17 @@ export function loginFormChromeReducer(
     case "set-email-loading":
       return { ...state, emailLoading: action.value };
     case "set-error":
-      return { ...state, error: action.error };
+      return { ...state, error: action.error, errorField: action.field ?? null };
     case "set-notice":
       return { ...state, notice: action.notice };
     case "clear-messages":
-      return { ...state, error: null, notice: null };
+      return { ...state, error: null, errorField: null, notice: null };
     case "start-email-auth":
       return {
         ...state,
         emailLoading: true,
         error: null,
+        errorField: null,
         notice: null,
       };
     case "finish-email-auth":
@@ -175,6 +186,7 @@ export function loginFormChromeReducer(
         ...state,
         passkeyLoading: true,
         error: null,
+        errorField: null,
         notice: null,
       };
     case "finish-passkey-auth":

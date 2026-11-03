@@ -107,10 +107,40 @@ describe("LabelManager", () => {
     });
 
     act(() => button("Work").click());
-    act(() => button("Delete label").click());
+    const status = container.querySelector('[role="status"]');
+    expect(status?.textContent).toBe("");
+    act(() => button("Delete label…").click());
     expect(onDeleteLabel).not.toHaveBeenCalled();
-    await act(async () => button("Confirm delete").click());
+    expect(status?.textContent).toContain("Delete “Work”?");
+    act(() => button("Keep label").click());
+    expect(status?.textContent).toBe("");
+    act(() => button("Delete label…").click());
+    await act(async () => button("Delete label").click());
     expect(onDeleteLabel).toHaveBeenCalledWith("l1");
+  });
+
+  it("explains an empty name on save instead of disabling the button", async () => {
+    const onUpdateLabel = jest.fn(async () => undefined);
+    act(() => {
+      root.render(
+        <Harness
+          onCreateLabel={jest.fn(async () => null)}
+          onUpdateLabel={onUpdateLabel}
+          onDeleteLabel={jest.fn(async () => undefined)}
+        />,
+      );
+    });
+
+    act(() => button("Work").click());
+    const input = container.querySelector<HTMLInputElement>("#label-name")!;
+    act(() => typeInto(input, "  "));
+    await act(async () => button("Save").click());
+
+    expect(onUpdateLabel).not.toHaveBeenCalled();
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(container.querySelector("#label-name-error")?.textContent).toBe(
+      "Enter a label name.",
+    );
   });
 
   it("shows an error in the form when saving fails", async () => {
@@ -130,8 +160,8 @@ describe("LabelManager", () => {
     act(() => typeInto(container.querySelector("#label-name")!, "Travel"));
     await act(async () => button("Create").click());
 
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      "Something went wrong",
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      "Label not saved. Check your connection and try again.",
     );
     expect(container.querySelector("#label-name")).not.toBeNull();
   });

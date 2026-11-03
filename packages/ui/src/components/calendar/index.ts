@@ -24,16 +24,16 @@ export {
   resolveEncryptionState,
 } from "./encryption-status-utils";
 export { formatEventDescription } from "./event-description-formatter";
-export {
-  CalendarSkeleton,
-  EventDialogSkeleton,
-  SidebarCalendarSkeleton,
-} from "./calendar-skeleton";
+export { CalendarSkeleton } from "./calendar-skeleton";
 export { EventLoadingSkeleton } from "./event-loading-skeleton";
 
 // Context providers
 export { CalendarDndProvider, useCalendarDnd } from "./calendar-dnd-context";
-export { CalendarProvider, useCalendarContext } from "./calendar-context";
+export {
+  CalendarProvider,
+  useBootstrapCalendarDate,
+  useCalendarContext,
+} from "./calendar-context";
 
 // Constants and utilities
 export * from "./constants";

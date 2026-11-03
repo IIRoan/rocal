@@ -1,5 +1,4 @@
 import {
-  roundToNextHour,
   toLocalISOString,
   mapErrorToField,
   buildEventRequest,
@@ -68,36 +67,6 @@ describe("shiftEndWithStart", () => {
         timezone,
       ),
     ).toBe("2025-03-31T23:59");
-  });
-});
-
-describe("roundToNextHour", () => {
-  it("rounds up when minutes are non-zero", () => {
-    const d = new Date(2025, 5, 15, 9, 30, 0, 0);
-    const result = roundToNextHour(d);
-    expect(result.getHours()).toBe(10);
-    expect(result.getMinutes()).toBe(0);
-    expect(result.getSeconds()).toBe(0);
-  });
-
-  it("does not round when already on the hour", () => {
-    const d = new Date(2025, 5, 15, 9, 0, 0, 0);
-    const result = roundToNextHour(d);
-    expect(result.getHours()).toBe(9);
-    expect(result.getMinutes()).toBe(0);
-  });
-
-  it("rounds up when only seconds are non-zero", () => {
-    const d = new Date(2025, 5, 15, 9, 0, 15, 0);
-    const result = roundToNextHour(d);
-    expect(result.getHours()).toBe(10);
-    expect(result.getMinutes()).toBe(0);
-  });
-
-  it("does not mutate the original date", () => {
-    const d = new Date(2025, 5, 15, 9, 30, 0, 0);
-    roundToNextHour(d);
-    expect(d.getMinutes()).toBe(30);
   });
 });
 

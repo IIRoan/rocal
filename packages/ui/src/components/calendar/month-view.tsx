@@ -1,17 +1,13 @@
 "use client";
 
 import React, { useMemo, useSyncExternalStore } from "react";
-import { resolveTimezone, type TimeFormat } from "@workspace/calendar-core";
 import {
-  addDays,
-  eachDayOfInterval,
-  endOfMonth,
-  endOfWeek,
-  format,
-  getWeek,
-  startOfMonth,
-  startOfWeek,
-} from "date-fns";
+  getMonthGridWeeks,
+  resolveTimezone,
+  utcToPickerDate,
+  type TimeFormat,
+} from "@workspace/calendar-core";
+import { addDays, format, getWeek, startOfWeek } from "date-fns";
 
 import { MonthDayCell } from "./month-day-cell";
 import {
@@ -58,18 +54,14 @@ export function MonthView({
   onEventView,
 }: MonthViewProps) {
   const resolvedTimezone = resolveTimezone(timezone);
-  const days = useMemo(() => {
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(monthStart);
-    const calendarStart = startOfWeek(monthStart, {
-      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-    });
-    const calendarEnd = endOfWeek(monthEnd, {
-      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-    });
-
-    return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-  }, [currentDate, weekStartDay]);
+  const calendarDay = useMemo(
+    () => utcToPickerDate(currentDate, resolvedTimezone),
+    [currentDate, resolvedTimezone],
+  );
+  const weeks = useMemo(
+    () => getMonthGridWeeks(calendarDay, weekStartDay),
+    [calendarDay, weekStartDay],
+  );
 
   const weekdays = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
@@ -82,21 +74,6 @@ export function MonthView({
       return format(date, "EEE");
     });
   }, [weekStartDay]);
-
-  const weeks = useMemo(() => {
-    const result = [];
-    let week = [];
-
-    for (let i = 0; i < days.length; i++) {
-      week.push(days[i]);
-      if (week.length === 7 || i === days.length - 1) {
-        result.push(week);
-        week = [];
-      }
-    }
-
-    return result;
-  }, [days]);
 
   const isMounted = useSyncExternalStore(
     subscribeToNothing,
@@ -146,14 +123,14 @@ export function MonthView({
         className={`border-border/70 grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} border-y uppercase`}
       >
         {showWeekNumbers && (
-          <div className="text-muted-foreground/70 py-2 text-center text-xs font-medium">
+          <div className="text-muted-foreground py-2 text-center text-xs font-medium">
             W
           </div>
         )}
         {weekdays.map((day) => (
           <div
             key={day}
-            className="text-muted-foreground/70 py-2 text-center text-xs"
+            className="text-muted-foreground py-2 text-center text-xs"
           >
             {day}
           </div>
@@ -170,7 +147,7 @@ export function MonthView({
             >
               {showWeekNumbers && (
                 <div className="border-border/70 border-r border-b bg-muted/10 flex items-center justify-center">
-                  <span className="text-muted-foreground/60 text-xs font-medium">
+                  <span className="text-muted-foreground text-xs font-medium tabular-nums">
                     {getWeek(weekStart)}
                   </span>
                 </div>
@@ -184,7 +161,7 @@ export function MonthView({
                   <MonthDayCell
                     key={day.toString()}
                     day={day}
-                    currentDate={currentDate}
+                    currentDate={calendarDay}
                     buckets={buckets}
                     weekIndex={weekIndex}
                     dayIndex={dayIndex}

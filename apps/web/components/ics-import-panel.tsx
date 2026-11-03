@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useId, useRef, useState, type ChangeEvent } from "react";
 import {
   getErrorMessage,
   partitionCalendarsByKind,
@@ -34,6 +34,7 @@ function isIcsFileName(fileName: string): boolean {
 export function IcsImportPanel({ calendars, onBack }: IcsImportPanelProps) {
   const importIcs = useImportIcs();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const calendarRadioName = useId();
   const [pickedFile, setPickedFile] = useState<PickedIcsFile | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [importCalendarId, setImportCalendarId] = useState<string>();
@@ -59,7 +60,9 @@ export function IcsImportPanel({ calendars, onBack }: IcsImportPanelProps) {
       setFileError(null);
       importIcs.reset();
     } catch (error) {
-      setFileError(getErrorMessage(error, "Failed to read the selected file"));
+      setFileError(
+        getErrorMessage(error, "Unable to read that file. Choose it again."),
+      );
     }
   };
 
@@ -78,7 +81,10 @@ export function IcsImportPanel({ calendars, onBack }: IcsImportPanelProps) {
   const errorMessage =
     fileError ??
     (importIcs.error
-      ? getErrorMessage(importIcs.error, "Failed to import .ics file")
+      ? getErrorMessage(
+          importIcs.error,
+          "Events not imported. Check the file and try again.",
+        )
       : null);
 
   return (
@@ -102,7 +108,7 @@ export function IcsImportPanel({ calendars, onBack }: IcsImportPanelProps) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={!hasOwnedCalendars || importIcs.isPending}
-            className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors cursor-pointer disabled:cursor-default disabled:opacity-60"
+            className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-hover/30 outline-none focus-visible:bg-hover/50 focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer disabled:cursor-default disabled:opacity-60"
           >
             <FileText className="size-4 text-muted-foreground shrink-0" />
             <div className="flex-1 min-w-0">
@@ -135,22 +141,26 @@ export function IcsImportPanel({ calendars, onBack }: IcsImportPanelProps) {
         ) : null}
 
         {pickedFile && hasOwnedCalendars ? (
-          <>
-            <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+          <fieldset className="mt-1 min-w-0">
+            <legend className="w-full px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50">
               Import into
-            </div>
-            <div role="radiogroup" aria-label="Import into" className="p-1">
+            </legend>
+            <div className="p-1">
               {ownedCalendars.map((calendar) => {
                 const selected = calendar.id === selectedCalendarId;
                 return (
-                  <button
+                  <label
                     key={calendar.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setImportCalendarId(calendar.id)}
-                    className="flex items-center gap-2.5 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors cursor-pointer"
+                    className="flex items-center gap-2.5 px-3 py-2 w-full rounded-md text-left hover:bg-hover/30 has-focus-visible:bg-hover/50 has-focus-visible:ring-2 has-focus-visible:ring-ring transition-colors cursor-pointer"
                   >
+                    <input
+                      type="radio"
+                      name={calendarRadioName}
+                      value={calendar.id}
+                      checked={selected}
+                      onChange={() => setImportCalendarId(calendar.id)}
+                      className="sr-only"
+                    />
                     <span
                       className="size-3.5 rounded-sm shrink-0"
                       style={{
@@ -161,18 +171,18 @@ export function IcsImportPanel({ calendars, onBack }: IcsImportPanelProps) {
                       {calendar.name}
                     </span>
                     {calendar.isDefault ? (
-                      <span className="text-xs text-muted-foreground/70 shrink-0">
+                      <span className="text-xs text-muted-foreground shrink-0">
                         Default
                       </span>
                     ) : null}
                     {selected ? (
-                      <Check className="size-3.5 text-primary shrink-0" />
+                      <Check className="size-3.5 text-accent shrink-0" />
                     ) : null}
-                  </button>
+                  </label>
                 );
               })}
             </div>
-          </>
+          </fieldset>
         ) : null}
       </div>
 

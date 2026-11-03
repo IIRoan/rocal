@@ -183,6 +183,59 @@ describe("useComposeDraftAutosave", () => {
     );
   });
 
+  it("keeps a failed save visible until the next save starts", async () => {
+    let compose: ReturnType<typeof useMailCompose> | null = null;
+    let chrome: ReturnType<typeof useMailComposeChrome> | null = null;
+    const flush = async () => {
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    };
+    const status = () =>
+      container.querySelector('[data-testid="status"]')?.textContent;
+    saveDraft.mockRejectedValueOnce(new Error("offline"));
+
+    await act(async () => {
+      root.render(
+        <MailComposeProvider
+          identities={[
+            { id: "identity-1", email: "alice@solace.onl", name: "Alice" },
+          ]}
+          mailServerLimits={fallbackMailServerLimits}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
+          <ChromeProbe onReady={(value) => { chrome = value; }} />
+          <ComposeProbe onReady={(value) => { compose = value; }} />
+          <AutosaveProbe onReady={() => {}} />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      chrome!.setIsComposeOpen(true);
+      compose!.setComposeTo("bob@example.com");
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+      await flush();
+    });
+    expect(status()).toBe("error");
+
+    await act(async () => {
+      jest.advanceTimersByTime(10_000);
+      await flush();
+    });
+    expect(status()).toBe("error");
+
+    await act(async () => {
+      compose!.setComposeTo("bob@example.com, carol@example.com");
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+      await flush();
+    });
+    expect(saveDraft).toHaveBeenCalledTimes(2);
+    expect(status()).toBe("saved");
+  });
+
   it("settles before a send without sealing a throwaway draft", async () => {
     let compose: ReturnType<typeof useMailCompose> | null = null;
     let chrome: ReturnType<typeof useMailComposeChrome> | null = null;

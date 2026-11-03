@@ -20,7 +20,7 @@ import {
   type EventCategory,
   type UpdateCategoryRequest,
 } from "@workspace/calendar-core";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { useSession } from "@/lib/auth-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { EVENTS_QUERY_KEY } from "./use-calendar-events-loader";

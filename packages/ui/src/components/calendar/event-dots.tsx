@@ -18,6 +18,10 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { useNumberedShortcuts } from "../../hooks/use-keyboard-shortcuts";
+import {
+  formatShortcut,
+  useIsApplePlatform,
+} from "../../hooks/use-shortcut-label";
 import { SimpleTooltip } from "../ui/tooltip";
 
 interface EventDotsProps {
@@ -42,6 +46,7 @@ export function EventDots({
   timezone,
 }: EventDotsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const isApplePlatform = useIsApplePlatform();
 
   // Must run before any early return (rules of hooks).
   useNumberedShortcuts(
@@ -88,7 +93,7 @@ export function EventDots({
             <button
               type="button"
               className={cn(
-                "group/evdots focus-visible:border-ring focus-visible:ring-ring/50 relative flex h-full w-full cursor-pointer overflow-hidden text-left font-medium transition-[box-shadow,filter,z-index] duration-200 ease-out outline-none select-none focus-visible:ring-[3px] hover:brightness-[1.07] hover:shadow-md hover:z-10 rounded shadow-sm",
+                "group/evdots focus-visible:border-ring focus-visible:ring-ring relative flex h-full w-full cursor-pointer overflow-hidden text-left font-medium transition-[box-shadow,filter,z-index] duration-200 ease-out outline-none select-none focus-visible:ring-[3px] hover:brightness-[1.07] hover:shadow-md hover:z-10 rounded shadow-sm",
                 "min-h-[20px] sm:min-h-[24px]",
               )}
               onClick={(e) => {
@@ -186,7 +191,7 @@ export function EventDots({
                 </div>
                 {showShortcut && (
                   <DropdownMenuShortcut>
-                    ⌘+{shortcutNumber}
+                    {formatShortcut(String(shortcutNumber), isApplePlatform)}
                   </DropdownMenuShortcut>
                 )}
               </DropdownMenuItem>

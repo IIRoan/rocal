@@ -84,6 +84,8 @@ interface CalendarProviderProps {
     updates: Partial<Calendar>,
   ) => Promise<Calendar>;
   onRefreshCalendars?: () => Promise<Calendar[]>;
+  /** Told about every date the calendar moves to, so a data layer above the provider can follow without an effect. */
+  onCurrentDateChange?: (date: Date) => void;
 }
 
 function getBootstrapCalendarDate(): Date {
@@ -125,7 +127,7 @@ function getServerBootstrapCalendarDate(): Date {
   return PRERENDER_CALENDAR_DATE;
 }
 
-function useBootstrapCalendarDate(): Date {
+export function useBootstrapCalendarDate(): Date {
   const clientDateRef = useRef<Date | null>(null);
   const getClientSnapshot = useCallback(() => {
     clientDateRef.current ??= getBootstrapCalendarDate();
@@ -259,6 +261,7 @@ export function CalendarProvider({
   onCreateCalendar,
   onUpdateCalendar,
   onRefreshCalendars,
+  onCurrentDateChange,
 }: CalendarProviderProps) {
   const bootstrappedDate = useBootstrapCalendarDate();
   const [overrideDate, setOverrideDate] = useState<Date | null>(null);
@@ -418,13 +421,20 @@ export function CalendarProvider({
     [visibleColors],
   );
 
-  const setCurrentDateWithPersistence = useCallback((date: Date) => {
-    setOverrideDate(validateCalendarDate(date));
-  }, []);
+  const setCurrentDateWithPersistence = useCallback(
+    (date: Date) => {
+      const nextDate = validateCalendarDate(date);
+      setOverrideDate(nextDate);
+      onCurrentDateChange?.(nextDate);
+    },
+    [onCurrentDateChange],
+  );
 
   const clearSavedDate = useCallback(() => {
-    setOverrideDate(new Date());
-  }, []);
+    const now = new Date();
+    setOverrideDate(now);
+    onCurrentDateChange?.(now);
+  }, [onCurrentDateChange]);
 
   const value = useMemo(
     () => ({

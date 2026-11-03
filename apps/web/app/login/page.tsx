@@ -4,7 +4,7 @@ import { LoginLoading } from "./_content";
 import { LoginForm } from "./login-form-entry";
 
 export const metadata: Metadata = {
-  title: "Sign in – Solace",
+  title: "Sign in",
   description: "Sign in to Solace to access your calendar and mail.",
 };
 

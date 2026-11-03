@@ -7,6 +7,7 @@ import {
   createVisibleCalendarIdSet,
   transformCalendarEvents,
   resolveTimezone,
+  wallClockToUtc,
 } from "@workspace/calendar-core";
 import { useSheet } from "../../src/providers/SheetProvider";
 import { isTimelineCalendarView } from "../../src/lib/calendar-views";
@@ -22,6 +23,7 @@ import {
 } from "../../src/hooks/use-calendar-screen-queries";
 import { getSurroundingCalendarDateRange } from "../../src/components/calendar/navigation-utils";
 import { AppScreen } from "@workspace/native-core/components/layout";
+import { CenteredLoader } from "@workspace/native-core/components/ui/loading";
 import { CalendarTopToolbar } from "../../src/components/calendar/CalendarTopToolbar";
 import { CalendarDrawerSheet } from "../../src/components/calendar/CalendarDrawerSheet";
 import { CalendarAccountSheet } from "../../src/components/CalendarAccountSheet";
@@ -35,8 +37,10 @@ import { NativeAgendaView } from "../../src/components/calendar/NativeAgendaView
 import type { KitEventMove } from "../../src/components/calendar/calendar-kit-adapter";
 import { useNativeRiftboundAutoSync } from "../../src/hooks/use-riftbound";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
+import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 
 export default function CalendarScreen() {
+  const { theme } = useTheme();
   const { openEventSheet } = useSheet();
   const queryClient = useQueryClient();
   const {
@@ -58,8 +62,11 @@ export default function CalendarScreen() {
   const closeCalendars = useCallback(() => setCalendarsOpen(false), []);
   const closeAccount = useCallback(() => setAccountOpen(false), []);
 
-  const { data: settings, isPending: settingsPending } =
-    useCalendarScreenSettings();
+  const {
+    data: settings,
+    isPending: settingsPending,
+    isLoading: settingsFirstLoad,
+  } = useCalendarScreenSettings();
   const settingsLoading = settingsPending && !settings;
   useNativeRiftboundAutoSync(settings?.riftbound);
   const resolvedTimezone = resolveTimezone(settings?.timezone);
@@ -84,7 +91,8 @@ export default function CalendarScreen() {
   const detailDateRange = useMemo(
     () =>
       getSurroundingCalendarDateRange({
-        currentDate: selectedDate,
+        // The range helper takes an instant; noon keeps the selected picker day in the account zone.
+        currentDate: wallClockToUtc(selectedDate, 12, 0, resolvedTimezone),
         view: activeView,
         weekStartDay: settings?.weekStartDay ?? 1,
         pageRadius: 2,
@@ -229,7 +237,14 @@ export default function CalendarScreen() {
           />
         }
       >
-        {isTimelineCalendarView(activeView) ? (
+        {settingsFirstLoad ? (
+          // Views wait for the account time zone so they never paint a day in the wrong zone first.
+          <CenteredLoader
+            theme={theme}
+            size="small"
+            color={theme.colors.mutedForeground}
+          />
+        ) : isTimelineCalendarView(activeView) ? (
           <NativeTimelineCalendar
             ref={timelineRef}
             view={activeView}

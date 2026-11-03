@@ -586,6 +586,15 @@ describe("LoginForm", () => {
     expect(container.textContent).toContain(
       "That Solace email is already in use.",
     );
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+    expect(document.activeElement).toBe(desiredEmailInput);
+    expect(desiredEmailInput?.getAttribute("aria-invalid")).toBe("true");
+    expect(desiredEmailInput?.getAttribute("aria-describedby")).toContain(
+      "login-error",
+    );
     expect(mockEmailSignUp).not.toHaveBeenCalled();
     expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
     expect(mockUnlockWithSignInPassword).not.toHaveBeenCalled();

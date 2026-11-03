@@ -49,58 +49,62 @@ function RecipientSuggestionsList({
 }: RecipientSuggestionsListProps) {
   const headingId = `${listboxId}-heading`;
   return (
-    <div
-      id={listboxId}
-      aria-labelledby={headingId}
-      className="max-h-64 overflow-y-auto overscroll-contain"
-    >
+    <div className="max-h-64 overflow-y-auto overscroll-contain">
       <div
         id={headingId}
         className="px-2 pt-1.5 pb-1 text-[13px] font-medium text-[var(--text-tertiary,var(--muted-foreground))]"
       >
         {heading}
       </div>
-      {suggestions.map((entry, index) => {
-        const label = getContactDisplayLabel(entry);
-        return (
-          <button
-            key={entry.email}
-            id={`${listboxId}-option-${index}`}
-            type="button"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              onSelect(entry);
-            }}
-            className={cn(
-              "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
-              index === highlightedIndex
-                ? "bg-[var(--bg-cell-hover,var(--accent))]"
-                : "hover:bg-[var(--bg-cell-hover,var(--accent))]",
-            )}
-          >
-            <SenderAvatar
-              name={label}
-              email={entry.email}
-              className="size-7 shrink-0"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] leading-[130%] text-[var(--text-primary,var(--foreground))]">
-                {label}
-              </span>
-              {entry.displayName ? (
-                <span className="block truncate text-[13px] leading-[130%] text-[var(--text-secondary,var(--muted-foreground))]">
-                  {entry.email}
+      <div id={listboxId} role="listbox" aria-labelledby={headingId}>
+        {suggestions.map((entry, index) => {
+          const label = getContactDisplayLabel(entry);
+          return (
+            <button
+              key={entry.email}
+              id={`${listboxId}-option-${index}`}
+              type="button"
+              role="option"
+              aria-selected={index === highlightedIndex}
+              tabIndex={-1}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                onSelect(entry);
+              }}
+              className={cn(
+                "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
+                index === highlightedIndex
+                  ? "bg-[var(--bg-cell-hover,var(--hover))]"
+                  : "hover:bg-[var(--bg-cell-hover,var(--hover))]",
+              )}
+            >
+              <SenderAvatar
+                name={label}
+                email={entry.email}
+                className="size-7 shrink-0"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] leading-[130%] text-[var(--text-primary,var(--foreground))]">
+                  {label}
                 </span>
-              ) : null}
-            </span>
-          </button>
-        );
-      })}
+                {entry.displayName ? (
+                  <span className="block truncate text-[13px] leading-[130%] text-[var(--text-secondary,var(--muted-foreground))]">
+                    {entry.email}
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 export type RecipientSuggestInputProps = {
+  id?: string;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
   value: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
@@ -117,6 +121,9 @@ export type RecipientSuggestInputProps = {
 };
 
 export function RecipientSuggestInput({
+  id,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedBy,
   value,
   onChange,
   onBlur,
@@ -163,6 +170,7 @@ export function RecipientSuggestInput({
     open &&
     isAvailable &&
     (isLoading || suggestions.length > 0 || activeToken.trim().length > 0);
+  const listboxVisible = showSuggestions && !isLoading && suggestions.length > 0;
 
   if (
     highlightState.activeToken !== activeToken ||
@@ -257,6 +265,9 @@ export function RecipientSuggestInput({
   };
 
   const sharedInputProps = {
+    id,
+    "aria-invalid": ariaInvalid,
+    "aria-describedby": ariaDescribedBy,
     value,
     autoFocus,
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -281,13 +292,12 @@ export function RecipientSuggestInput({
     disabled,
     autoComplete: "off" as const,
     role: "combobox" as const,
-    "aria-expanded": showSuggestions,
-    "aria-controls": showSuggestions ? listboxId : undefined,
+    "aria-expanded": listboxVisible,
+    "aria-controls": listboxVisible ? listboxId : undefined,
     "aria-autocomplete": "list" as const,
-    "aria-activedescendant":
-      showSuggestions && suggestions.length > 0
-        ? `${listboxId}-option-${highlightedIndex}`
-        : undefined,
+    "aria-activedescendant": listboxVisible
+      ? `${listboxId}-option-${highlightedIndex}`
+      : undefined,
   };
 
   return (
@@ -312,7 +322,7 @@ export function RecipientSuggestInput({
               type="text"
               {...sharedInputProps}
               className={cn(
-                "w-full h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40",
+                "w-full h-8 bg-transparent border-0 text-sm placeholder:text-muted-foreground",
                 inputClassName,
               )}
             />

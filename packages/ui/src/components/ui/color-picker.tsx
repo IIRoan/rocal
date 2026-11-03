@@ -35,6 +35,7 @@ export function ColorPicker({
 }: ColorPickerProps) {
   const [customHex, setCustomHex] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);
+  const customHexId = React.useId();
 
   const handleHexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -75,7 +76,7 @@ export function ColorPicker({
           <div className="space-y-3">
             <div>
               <Label className="text-sm font-medium mb-2 block">
-                Preset Colors
+                Preset colors
               </Label>
               <div className="grid grid-cols-6 gap-2">
                 {presetColors.map((preset) => (
@@ -83,7 +84,7 @@ export function ColorPicker({
                     <button
                       type="button"
                       className={cn(
-                        "w-8 h-8 rounded border-2 transition-[border-color,box-shadow,transform] duration-200 ease-out hover:scale-110 hover:shadow-sm focus-visible:scale-110 focus-visible:ring-2 focus-visible:ring-ring/50 outline-none",
+                        "w-8 h-8 rounded border-2 transition-[border-color,box-shadow] duration-200 ease-out hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring outline-none",
                         value === preset.value
                           ? "border-foreground ring-2 ring-ring"
                           : "border-border hover:border-foreground",
@@ -93,6 +94,7 @@ export function ColorPicker({
                       }}
                       onClick={() => handlePresetClick(preset.value)}
                       aria-label={preset.label}
+                      aria-pressed={value === preset.value}
                     >
                       <span className="sr-only">{preset.label}</span>
                     </button>
@@ -101,10 +103,14 @@ export function ColorPicker({
               </div>
             </div>
             <div>
-              <Label className="text-sm font-medium mb-2 block">
-                Custom Color
+              <Label
+                htmlFor={customHexId}
+                className="text-sm font-medium mb-2 block"
+              >
+                Custom color
               </Label>
               <Input
+                id={customHexId}
                 type="text"
                 value={customHex}
                 onChange={handleHexInputChange}

@@ -26,6 +26,7 @@ export function MobileCalendarOverlays({
   prefetchRange,
   user,
   weekStartDay,
+  timezone,
 }: {
   getCachedEventsForRange?: (range: {
     start: Date;
@@ -44,6 +45,7 @@ export function MobileCalendarOverlays({
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   user?: User;
   weekStartDay?: number;
+  timezone?: string;
 }) {
   return (
     <>
@@ -58,7 +60,7 @@ export function MobileCalendarOverlays({
           className="w-full p-0 sm:max-w-none overflow-hidden safe-area-inset-bottom"
         >
           <VisuallyHidden>
-            <DrawerTitle>Quick Date Navigation</DrawerTitle>
+            <DrawerTitle>Quick date navigation</DrawerTitle>
             <DrawerDescription>
               Select a date from the mini calendar.
             </DrawerDescription>
@@ -70,6 +72,7 @@ export function MobileCalendarOverlays({
               onDateSelect={onCloseQuickNav}
               isMobile={true}
               weekStartDay={weekStartDay}
+              timezone={timezone}
             />
           </div>
         </DrawerContent>
@@ -83,7 +86,7 @@ export function MobileCalendarOverlays({
           className="h-[100dvh] max-w-[92vw] rounded-none border-r border-border p-0 safe-area-inset-bottom"
         >
           <VisuallyHidden>
-            <SheetTitle>Calendar Sidebar</SheetTitle>
+            <SheetTitle>Calendar sidebar</SheetTitle>
             <SheetDescription>
               Access your calendars, mini calendar, and account settings
             </SheetDescription>
@@ -100,6 +103,7 @@ export function MobileCalendarOverlays({
               prefetchRange={prefetchRange}
               isMobile={true}
               weekStartDay={weekStartDay}
+              timezone={timezone}
             />
           </SidebarProvider>
         </SheetContent>

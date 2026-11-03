@@ -4,17 +4,15 @@ import { createLogger } from "@workspace/logger";
 import {
   getZonedDateParts,
   isTodayInTimezone,
-  navigateCalendarDate,
+  navigateCalendarInstant,
   resolveTimezone,
   wallClockToUtc,
   type TimeFormat,
 } from "@workspace/calendar-core";
-import { addDays } from "date-fns";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
+import { toast } from "../../lib/toast";
 
 import { useIsMobile } from "../../hooks/use-mobile";
-import { useDropdownShortcuts } from "../../hooks/use-keyboard-shortcuts";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -22,7 +20,6 @@ import { useCalendarContext } from "./calendar-context";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { CalendarSkeleton } from "./calendar-skeleton";
 import {
-  AgendaDaysToShow,
   EventGap,
   EventHeight,
   WeekCellsHeight,
@@ -33,6 +30,7 @@ import {
 } from "./event-calendar-mutations";
 import { MobileEventCalendarToolbar } from "./mobile-event-calendar-toolbar";
 import { MobileEventCalendarViews } from "./mobile-event-calendar-views";
+import { useCalendarViewShortcuts } from "./use-calendar-view-shortcuts";
 import type { EventNotification } from "./notification-manager";
 import type { CalendarEvent, CalendarView, User } from "./types";
 import { addMinutesToDate } from "./utils";
@@ -125,32 +123,18 @@ export function MobileEventCalendar({
     onViewChange?.(nextView);
   };
 
-  useDropdownShortcuts([
-    { key: "m", action: () => setView("month") },
-    { key: "w", action: () => setView("week") },
-    { key: "d", action: () => setView("day") },
-    { key: "a", action: () => setView("agenda") },
-    { key: "t", action: () => setView("3day") },
-  ]);
+  useCalendarViewShortcuts(setView);
 
   const navigateTo = (newDate: Date) => {
     setCurrentDate(newDate);
   };
 
   const handlePrevious = () => {
-    navigateTo(
-      view === "agenda"
-        ? addDays(currentDate, -AgendaDaysToShow)
-        : navigateCalendarDate(currentDate, view, -1),
-    );
+    navigateTo(navigateCalendarInstant(currentDate, view, -1, resolvedTimezone));
   };
 
   const handleNext = () => {
-    navigateTo(
-      view === "agenda"
-        ? addDays(currentDate, AgendaDaysToShow)
-        : navigateCalendarDate(currentDate, view, 1),
-    );
+    navigateTo(navigateCalendarInstant(currentDate, view, 1, resolvedTimezone));
   };
 
   const handleEventSelect = (event: CalendarEvent) => {
@@ -205,7 +189,7 @@ export function MobileEventCalendar({
           <p className="text-destructive mb-2">Failed to load calendar</p>
           <p className="text-sm text-muted-foreground">{error.message}</p>
           <Button variant="outline" className="mt-4" onClick={reloadWindow}>
-            <Loader2 className="size-4 mr-2" />
+            <RefreshCw className="size-4 mr-2" aria-hidden="true" />
             Retry
           </Button>
         </div>
@@ -217,7 +201,7 @@ export function MobileEventCalendar({
     <ErrorBoundary
       onError={(caughtError, errorInfo) => {
         log.error("Calendar error:", caughtError, errorInfo);
-        toast.error("Calendar encountered an error. Please refresh the page.");
+        toast.error("Calendar encountered an error. Refresh the page to try again.");
       }}
     >
       <div

@@ -21,12 +21,12 @@ export function ToggleIndicator({ checked }: { checked: boolean }) {
       aria-hidden="true"
       className={cn(
         "inline-flex h-5 w-8 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ease-out",
-        checked ? "bg-primary" : "bg-muted-foreground/25",
+        checked ? "bg-accent" : "bg-input-border",
       )}
     >
       <span
         className={cn(
-          "block size-4 rounded-full bg-primary-foreground shadow-sm transition-transform",
+          "block size-4 rounded-full bg-accent-foreground shadow-sm transition-transform",
           checked ? "translate-x-3" : "translate-x-0",
         )}
       />

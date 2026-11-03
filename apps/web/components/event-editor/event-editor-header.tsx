@@ -27,7 +27,7 @@ export function EventEditorDesktopHeader({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="ml-auto flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="ml-auto flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors cursor-pointer outline-none hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             <X className="size-4" />
           </button>

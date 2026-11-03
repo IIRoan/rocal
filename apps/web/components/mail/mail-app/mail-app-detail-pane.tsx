@@ -86,7 +86,7 @@ export function MailAppDetailPane({
     <>
       {selectedMessage && !selectedIsDraft ? (
         <div
-          className="absolute inset-0 flex flex-col transition-[transform,opacity] duration-200 ease-in-out"
+          className="absolute inset-0 flex flex-col transition-[transform,opacity] duration-200 ease-in-out motion-reduce:transition-opacity"
           style={{
             opacity: isFullCompose ? 0 : 1,
             transform: isFullCompose ? "translateX(-16px)" : "translateX(0)",
@@ -217,17 +217,17 @@ export function MailAppDetailPane({
         </div>
       ) : !isFullCompose ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-8">
-          <Typography color="disabled" size={TypographySize.H4}>
+          <Typography color="secondary" size={TypographySize.H4}>
             Select a conversation
           </Typography>
-          <Typography color="disabled" size={TypographySize.SMALL}>
+          <Typography color="tertiary" size={TypographySize.SMALL}>
             Choose a message from the list to read it
           </Typography>
         </div>
       ) : null}
 
       <div
-        className="absolute inset-0 flex flex-col transition-[transform,opacity] duration-200 ease-in-out"
+        className="absolute inset-0 flex flex-col transition-[transform,opacity] duration-200 ease-in-out motion-reduce:transition-opacity"
         style={{
           opacity: isFullCompose ? 1 : 0,
           transform: isFullCompose ? "translateX(0)" : "translateX(16px)",

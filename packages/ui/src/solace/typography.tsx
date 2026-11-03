@@ -13,14 +13,14 @@ import {
 } from "./typography.constants";
 
 const SIZE_CLASS: Record<TypographySize, string> = {
-  h1: "text-[34px] leading-[120%] tracking-[-0.02em]",
-  h2: "text-[28px] leading-[120%] tracking-[-0.02em]",
-  h3: "text-[22px] leading-7 tracking-[-0.02em]",
-  h4: "text-[19px] leading-[130%] tracking-[-0.02em]",
-  large: "text-[17px] leading-[130%] tracking-[-0.01em]",
-  medium: "text-[15px] leading-[130%] tracking-[0]",
-  small: "text-[13px] leading-[130%] tracking-[0]",
-  caption: "text-[11px] leading-[130%] tracking-[0.01em]",
+  h1: "text-[34px] leading-[1.2] tracking-[-0.02em]",
+  h2: "text-[28px] leading-[1.2] tracking-[-0.02em]",
+  h3: "text-[22px] leading-[1.27] tracking-[-0.02em]",
+  h4: "text-[19px] leading-[1.3] tracking-[-0.02em]",
+  large: "text-[17px] leading-[1.3] tracking-[-0.01em]",
+  medium: "text-[15px] leading-[1.3] tracking-[0]",
+  small: "text-[13px] leading-[1.3] tracking-[0]",
+  caption: "text-[11px] leading-[1.3] tracking-[0.01em]",
 };
 
 const WEIGHT_VALUE: Record<TypographyWeight, number> = {
@@ -53,7 +53,7 @@ function typographyClassName({
 }) {
   return cn(
     inline ? "inline-flex" : "flex",
-    "min-w-0 break-words antialiased",
+    "min-w-0 break-words",
     SIZE_CLASS[size],
     capitalize && "capitalize",
     uppercase && "uppercase",

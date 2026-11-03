@@ -25,6 +25,7 @@ jest.mock("lucide-react", () => {
 });
 
 import { MobileTopNav } from "./mobile-top-nav";
+import type { CalendarView } from "../calendar/types";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -76,7 +77,7 @@ describe("MobileTopNav", () => {
       '[aria-label="Add new event"]',
     ) as HTMLButtonElement | null;
     const quickNavButton = document.querySelector(
-      '[aria-label="Open calendar quick navigation"]',
+      '[aria-label="May 18 – May 24, 2026, open quick navigation"]',
     ) as HTMLButtonElement | null;
     const previousButton = document.querySelector(
       '[aria-label="Previous period"]',
@@ -85,7 +86,7 @@ describe("MobileTopNav", () => {
       '[aria-label="Next period"]',
     ) as HTMLButtonElement | null;
     const actionsButton = document.querySelector(
-      '[aria-label="Open calendar actions"]',
+      '[aria-label="Week, open calendar actions"]',
     ) as HTMLButtonElement | null;
     const header = container.firstElementChild as HTMLDivElement | null;
 
@@ -109,4 +110,27 @@ describe("MobileTopNav", () => {
     expect(onPrevious).toHaveBeenCalledTimes(1);
     expect(onNext).toHaveBeenCalledTimes(1);
   });
+
+  // Noon on March 1 in Kiritimati is still February 28 in every zone west of UTC+12.
+  it.each([
+    ["day", "Sunday, Mar 1"],
+    ["3day", "Feb 28 – Mar 2"],
+    ["month", "March 2026"],
+    ["agenda", "March 2026"],
+  ] as Array<[CalendarView, string]>)(
+    "titles the %s view with the account-zone day",
+    (view, title) => {
+      act(() => {
+        root.render(
+          <MobileTopNav
+            currentDate={new Date("2026-02-28T22:00:00.000Z")}
+            currentView={view}
+            timezone="Pacific/Kiritimati"
+          />,
+        );
+      });
+
+      expect(document.body.textContent).toContain(title);
+    },
+  );
 });

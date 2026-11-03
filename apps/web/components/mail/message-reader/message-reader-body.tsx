@@ -143,7 +143,7 @@ export function MessageReaderBody({
             }
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1"
           >
-            <span className="tracking-widest leading-none">···</span>
+            <span aria-hidden className="tracking-widest leading-none">···</span>
             {showQuote ? "Hide quoted text" : "Show quoted text"}
           </button>
         </div>
@@ -175,7 +175,7 @@ export function MessageReaderBody({
                 onClick={() =>
                   dispatchChrome({ type: "toggle", field: "isBodyExpanded" })
                 }
-                className="mt-3 text-xs font-medium text-primary/70 hover:text-primary transition-colors"
+                className="mt-3 text-xs font-medium text-accent hover:underline"
               >
                 {isBodyExpanded
                   ? "Show less"
@@ -184,7 +184,7 @@ export function MessageReaderBody({
             )}
           </>
         ) : (
-          <span className="text-sm italic text-[var(--text-disabled)]">No message body</span>
+          <span className="text-sm italic text-[var(--text-tertiary)]">No message body</span>
         )}
       </div>
       {plaintextQuote && (
@@ -199,7 +199,7 @@ export function MessageReaderBody({
             }
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1"
           >
-            <span className="tracking-widest leading-none">···</span>
+            <span aria-hidden className="tracking-widest leading-none">···</span>
             {showQuote ? "Hide quoted text" : "Show quoted text"}
           </button>
         </div>
@@ -213,6 +213,7 @@ export function MessageReaderBody({
         <EventReminderBanner
           eventId={linkedCalendarEvent.eventId}
           loading={linkedCalendarEvent.loading}
+          deleted={linkedCalendarEvent.deleted}
           error={linkedCalendarEvent.error}
           reminder={eventReminderView}
           className="mb-3 shrink-0"

@@ -4,6 +4,7 @@ TracingStore
 DataRetention
 NetworkListener
 Http
+Asn
 DnsServer
 AcmeProvider
 Domain

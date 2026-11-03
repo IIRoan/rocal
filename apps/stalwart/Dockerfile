@@ -38,8 +38,8 @@ RUN sed -i 's/\r$//' /usr/local/bin/railway-entrypoint.sh \
 
 USER root
 
-# The binary's network capability disables jemalloc environment configuration.
-RUN ln -sfn 'background_thread:true' /etc/malloc.conf
+# The binary's network capability disables jemalloc environment configuration; eight arenas match the CPU quota, not the 48 host CPUs.
+RUN ln -sfn 'background_thread:true,narenas:8' /etc/malloc.conf
 
 EXPOSE 25 8080 8081 8082 8090
 

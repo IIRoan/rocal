@@ -210,7 +210,7 @@ export function useCommandPaletteController({
     newPassword: string;
   }) => {
     if (!sessionUserId || !sessionEmail) {
-      throw new Error("Your session is unavailable. Please try again.");
+      throw new Error("Your session is unavailable. Reload the page and try again.");
     }
 
     dispatchBusy({ type: "setChangingPassword", value: true });

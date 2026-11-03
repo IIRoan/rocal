@@ -60,7 +60,12 @@ export function SidebarShell({
     />
   ) : (
     <Link className="inline-flex items-center gap-2 p-1" href="/">
-      <LogoSvg width="26" height="26" className="shrink-0 text-primary" />
+      <LogoSvg
+        width="26"
+        height="26"
+        className="shrink-0 text-accent"
+        aria-label="Solace"
+      />
       {isCollapsed ? null : (
         <span className="text-[15px] tracking-[-0.04em] text-foreground">
           {appName}
@@ -72,7 +77,13 @@ export function SidebarShell({
     "size-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground";
 
   return (
-    <Sidebar variant="inset" collapsible="icon" {...props}>
+    <Sidebar
+      variant="inset"
+      collapsible="icon"
+      role="navigation"
+      aria-label={`${appName} sidebar`}
+      {...props}
+    >
       <SidebarHeader
         className={
           isCollapsed

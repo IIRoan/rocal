@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SUBSCRIPTIONS_QUERY_KEY } from "@workspace/calendar-core";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { getErrorMessage } from "@/lib/calendar-ui-helpers";
 import { EVENTS_QUERY_KEY } from "@/hooks/use-calendar-events-loader";
@@ -51,7 +51,7 @@ export function useCreateSubscriptionMutation(
       calendarApiService.createSubscription(data),
     onSuccess: async () => {
       await refreshSubscriptionViews(queryClient, refetchCalendars);
-      toast.success("Read-only calendar added successfully.");
+      toast.success("Read-only calendar added");
       onCreated();
     },
     onError: (error: ApiError) =>
@@ -69,7 +69,7 @@ export function useDeleteSubscriptionMutation(
     mutationFn: (id: string) => calendarApiService.deleteSubscription(id),
     onSuccess: async () => {
       await refreshSubscriptionViews(queryClient, refetchCalendars);
-      toast.success("Subscription removed.");
+      toast.success("Subscription removed");
       onDeleted();
     },
     onError: (error: ApiError) =>
@@ -90,7 +90,7 @@ export function useSyncSubscriptionMutation(
     onSuccess: async (_: SyncSubscriptionResponse, id: string) => {
       await refreshSubscriptionViews(queryClient, refetchCalendars);
       const sub = subscriptions.find((subscription) => subscription.id === id);
-      toast.success(`Synced "${sub?.name || "subscription"}"`);
+      toast.success(`Synced “${sub?.name || "subscription"}”`);
     },
     onError: (error: ApiError) =>
       toast.error(getErrorMessage(error, "Failed to sync subscription")),
@@ -112,7 +112,7 @@ export function useUpdateSubscriptionMutation(
       calendarApiService.updateSubscription(id, request),
     onSuccess: async () => {
       await refreshSubscriptionViews(queryClient, refetchCalendars);
-      toast.success("Calendar updated.");
+      toast.success("Calendar updated");
       onUpdated();
     },
     onError: (error: ApiError) =>

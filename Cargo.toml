@@ -48,22 +48,22 @@ unicode-normalization = "0.1"
 # Prisma `cuid()` ids.
 cuid = { version = "2", default-features = false, features = ["v1"] }
 subtle = "2"
-# Passkeys: WebAuthn ceremonies over the stored COSE keys; pinned because its expert API may change in minor versions. Needs OpenSSL.
-webauthn-rs-core = "=0.5.5"
-# Compiles the OpenSSL webauthn-rs-core links, so no build needs system headers; the Dockerfiles set OPENSSL_NO_VENDOR and link Debian's.
-openssl-sys = { version = "0.9", features = ["vendored"] }
+# Passkeys: WebAuthn ceremonies over the stored COSE keys; pinned because its expert API may change in minor versions.
+webauthn-rs-core = "=0.6.2"
 # The CBOR crate webauthn-rs-core reads COSE keys with.
 serde_cbor_2 = "0.13"
 anyhow = "1"
 # Local runs of the notifications worker read the shared dev `.env` files.
 dotenvy = "0.15"
-base64 = "0.22"
+base64 = "0.23"
 ciborium = "0.2"
 cookie = "0.18"
 hmac = "0.13"
 # `localeCompare(…, { sensitivity: "base" })`: ICU4X has the same CLDR root collation as Bun's ICU, and its base crates are already in the tree through `url`.
 icu_collator = "2"
 p256 = { version = "0.14", features = ["ecdsa"] }
+# RS256 passkeys in the API suite's software authenticator; the version webauthn-rs-core already pulls in.
+rsa = "0.10.0-rc.19"
 percent-encoding = "2"
 # Mailbox key fingerprints: `readKey` from openpgp.js, which `lib/mail-key-utils.ts` used.
 pgp = { version = "0.21", default-features = false }
@@ -78,7 +78,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # Lossy WebP (quality 80, as Bun.Image wrote it); `image` only encodes lossless WebP.
 webp = { version = "0.3", default-features = false }
 # SigV4-presigned requests to the S3-compatible avatar bucket over the existing reqwest client.
-rusty-s3 = { version = "0.10", default-features = false, features = ["rustcrypto"] }
+rusty-s3 = { version = "0.11", default-features = false, features = ["rustcrypto"] }
 # Time zones (validation, ICS feeds, recurrence, reminders) with the tzdb bundled, so results don't depend on the image's zoneinfo.
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
 serde = { version = "1", features = ["derive"] }

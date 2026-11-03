@@ -16,6 +16,7 @@ import {
   getErrorMessage,
   getMailThreadParticipants,
   isDecryptedEventReminderContent,
+  isEventNotFoundError,
   pickOutgoingAttachmentFiles,
   resolveMailServerLimits,
   resolveTimezone,
@@ -24,7 +25,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Clock, MapPin } from "lucide-react";
 import { slideFadeIn } from "@workspace/ui/lib/motion";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { useIsMobile, usePrefersReducedMotion } from "@workspace/ui/hooks";
 import type { CalendarEvent } from "@workspace/calendar-core";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
@@ -70,6 +71,7 @@ type LinkedCalendarEventState = {
   eventId: string;
   event: CalendarEvent | null;
   loading: boolean;
+  deleted: boolean;
   error: string | null;
 };
 
@@ -255,6 +257,8 @@ export function useMessageReaderController(props: MessageReaderProps) {
     enabled: Boolean(isEventReminderEmail && linkedCalendarEventId),
     // TanStack only runs queryFn while enabled, so linkedCalendarEventId is guaranteed set here.
     queryFn: () => calendarApiService.getEvent(linkedCalendarEventId!),
+    retry: (failureCount, error) =>
+      failureCount < 3 && !isEventNotFoundError(error),
   });
   const linkedCalendarEvent = ((): LinkedCalendarEventState | null => {
     if (!isEventReminderEmail || !linkedCalendarEventId) {
@@ -265,24 +269,27 @@ export function useMessageReaderController(props: MessageReaderProps) {
         eventId: linkedCalendarEventId,
         event: null,
         loading: true,
+        deleted: false,
         error: null,
       };
     }
     if (isLinkedEventError) {
+      const deleted = isEventNotFoundError(linkedEventQueryError);
       return {
         eventId: linkedCalendarEventId,
         event: null,
         loading: false,
-        error: getErrorMessage(
-          linkedEventQueryError,
-          "Unable to load linked event details.",
-        ),
+        deleted,
+        error: deleted
+          ? null
+          : "Event details not loaded. Check your connection and try again, or open the event in Calendar.",
       };
     }
     return {
       eventId: linkedCalendarEventId,
       event: linkedEventData ?? null,
       loading: false,
+      deleted: false,
       error: null,
     };
   })();
@@ -345,7 +352,9 @@ export function useMessageReaderController(props: MessageReaderProps) {
     isEventReminderEmail &&
       linkedCalendarEvent &&
       (linkedCalendarEvent.loading ||
-        (!shouldReplaceBodyWithEventReminder && !linkedCalendarEvent.error)),
+        (!shouldReplaceBodyWithEventReminder &&
+          !linkedCalendarEvent.error &&
+          !linkedCalendarEvent.deleted)),
   );
 
   const showAttachment = (attachment: MailAttachment) =>
@@ -419,7 +428,12 @@ export function useMessageReaderController(props: MessageReaderProps) {
           },
         });
       } catch (error) {
-        toast.error(getErrorMessage(error, "Could not send reply."));
+        toast.error(
+          getErrorMessage(
+            error,
+            "Reply not sent. Check your connection and try again.",
+          ),
+        );
         dispatchMessageUi({ type: "patch", patch: { isSendingReply: false } });
       }
     } else {

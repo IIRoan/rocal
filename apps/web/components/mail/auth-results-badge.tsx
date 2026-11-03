@@ -1,11 +1,7 @@
 "use client";
 
 import { ShieldCheck, ShieldX, Shield } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/ui/tooltip";
+import { DropdownPanel } from "@workspace/ui/solace";
 import {
   formatAuthResultsSummary,
   getTrustedAuthResultsHeader,
@@ -34,22 +30,31 @@ export function AuthResultsBadge({
         ? "text-destructive"
         : "text-muted-foreground";
 
-  const tooltipText = formatAuthResultsSummary(results, { simpleLoginForward });
+  const summary = formatAuthResultsSummary(results, { simpleLoginForward });
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className={`inline-flex shrink-0 items-center ${color}`} aria-label="Authentication results">
-          <Icon className="size-3.5" strokeWidth={2.25} />
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <div className="space-y-0.5">
-          {tooltipText.map((line) => (
-            <div key={line}>{line}</div>
-          ))}
-        </div>
-      </TooltipContent>
-    </Tooltip>
+    <DropdownPanel
+      align="start"
+      trigger={
+        <button
+          type="button"
+          className={`relative inline-flex shrink-0 cursor-pointer items-center rounded-sm after:absolute after:-inset-[5px] ${color}`}
+          aria-label={`Authentication results: ${summary.join(", ")}`}
+        >
+          <Icon className="size-3.5" strokeWidth={2.25} aria-hidden />
+        </button>
+      }
+    >
+      <div className="flex flex-col gap-1 p-3">
+        <p className="text-sm font-medium leading-tight text-[var(--text-primary)]">
+          Authentication results
+        </p>
+        {summary.map((line) => (
+          <p key={line} className="text-xs leading-snug text-[var(--text-secondary)]">
+            {line}
+          </p>
+        ))}
+      </div>
+    </DropdownPanel>
   );
 }

@@ -102,3 +102,11 @@ export function resolveEventColorValue(color?: EventColor | string): string {
 export function getColorSwatchValue(color: string): string {
   return resolveInlineColorValue(color);
 }
+
+/** A 3:1 outline for a swatch: the colour's own text token, or a picked hex pulled toward the sidebar text. */
+export function getColorSwatchBorderValue(color: string): string {
+  if (isHexColor(color)) {
+    return `color-mix(in oklab, ${color} 40%, var(--sidebar-foreground))`;
+  }
+  return `var(--event-${normalizeNamedEventColorToken(color)}-foreground)`;
+}

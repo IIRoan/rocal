@@ -68,7 +68,7 @@ export function EventReminderMessageBody({
     >
       <Link
         href="/calendar"
-        className="mb-7 inline-block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        className="mb-7 inline-block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Image
           src="/favicon-192x192.png"
@@ -93,7 +93,7 @@ export function EventReminderMessageBody({
         className={cn(
           "mt-1.5 text-[15px] leading-[130%]",
           // repo-rules-allow theme-tokens-only: replica of the outgoing reminder email document; mail clients ignore CSS variables.
-          isDark ? "text-white/55" : "text-black/50",
+          isDark ? "text-white/55" : "text-black/55",
         )}
       >
         {reminder.timeUntilEvent}
@@ -153,7 +153,7 @@ export function EventReminderMessageBody({
       <p
         className={cn(
           "mb-1.5 text-xs font-semibold leading-snug",
-          isDark ? "text-[#666]" : "text-[#a8a8a8]",
+          isDark ? "text-[#8c8c8c]" : "text-[#737373]",
         )}
       >
         Solace
@@ -161,7 +161,7 @@ export function EventReminderMessageBody({
       <p
         className={cn(
           "mb-1 text-xs leading-normal",
-          isDark ? "text-[#666]" : "text-[#a8a8a8]",
+          isDark ? "text-[#8c8c8c]" : "text-[#737373]",
         )}
       >
         This reminder was sent because email notifications are enabled for your
@@ -170,14 +170,14 @@ export function EventReminderMessageBody({
       <p
         className={cn(
           "m-0 text-xs leading-normal",
-          isDark ? "text-[#666]" : "text-[#a8a8a8]",
+          isDark ? "text-[#8c8c8c]" : "text-[#737373]",
         )}
       >
         <Link
           href="/settings"
           className={cn(
             "underline",
-            isDark ? "text-[#666]" : "text-[#a8a8a8]",
+            isDark ? "text-[#8c8c8c]" : "text-[#737373]",
           )}
         >
           Settings
@@ -187,7 +187,7 @@ export function EventReminderMessageBody({
           href="/privacy"
           className={cn(
             "underline",
-            isDark ? "text-[#666]" : "text-[#a8a8a8]",
+            isDark ? "text-[#8c8c8c]" : "text-[#737373]",
           )}
         >
           Privacy
@@ -197,7 +197,7 @@ export function EventReminderMessageBody({
           href="/calendar"
           className={cn(
             "underline",
-            isDark ? "text-[#666]" : "text-[#a8a8a8]",
+            isDark ? "text-[#8c8c8c]" : "text-[#737373]",
           )}
         >
           Calendar
@@ -224,8 +224,8 @@ export function EventReminderMessageBodyLoading({
       isDark={isDark}
       className={className}
       aria-busy
-      aria-label="Loading event reminder"
     >
+      <output className="sr-only">Loading event reminder…</output>
       <div className={cn("mb-7 size-9 animate-pulse rounded-md", skeleton)} />
       <div className={cn("h-7 w-3/5 max-w-[280px] animate-pulse rounded-md", skeleton)} />
       <div
@@ -271,7 +271,7 @@ function ReminderDetail({
         className={cn(
           "mb-1 text-[11px] font-semibold uppercase leading-[14px] tracking-[0.06em]",
           // repo-rules-allow theme-tokens-only: replica of the outgoing reminder email document; mail clients ignore CSS variables.
-          isDark ? "text-white/40" : "text-[#999]",
+          isDark ? "text-white/55" : "text-[#737373]",
         )}
       >
         {label}

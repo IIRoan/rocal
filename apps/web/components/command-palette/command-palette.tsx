@@ -1,7 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
-import { EventEditor } from "../event-editor";
+import { EventEditor, type EventEditorCloseHandle } from "../event-editor";
 import { TransitionContainer } from "./transition-container";
 import { CommandPaletteViewContent } from "./command-palette-view-content";
 import { CommandPaletteDesktopDialog } from "./command-palette-desktop-dialog";
@@ -54,7 +55,7 @@ function CommandPaletteLoadingDialog({
         <VisuallyHidden>
           <DialogTitle>Loading Settings</DialogTitle>
         </VisuallyHidden>
-        <div className="flex items-center justify-center min-h-[200px]">
+        <div className="flex items-center justify-center min-h-[200px] p-6">
           <div className="text-center">
             <Loader2 className="size-6 animate-spin mx-auto mb-2 text-muted-foreground" />
             <p className="text-xs text-muted-foreground">Loading…</p>
@@ -109,6 +110,17 @@ export function CommandPalette({
     initialView,
     initialSearchQuery,
   });
+  const eventEditorCloseRef = useRef<EventEditorCloseHandle>(null);
+
+  // Escape, outside clicks and swipes on the palette go through the embedded editor so unsaved changes ask first.
+  const handleShellOpenChange = (nextOpen: boolean) => {
+    const editor = eventEditorCloseRef.current;
+    if (!nextOpen && c.currentView === "events" && editor) {
+      editor.requestClose();
+      return;
+    }
+    onOpenChange(nextOpen);
+  };
 
   if (c.loading || !c.localSettings) {
     return (
@@ -170,6 +182,7 @@ export function CommandPalette({
           popoverAnchorPosition={popoverAnchorPosition}
           updatePreviewEvent={updatePreviewEvent}
           calendars={c.calendars}
+          eventEditorCloseRef={eventEditorCloseRef}
         />
       </TransitionContainer>
       {c.currentView !== "events" && !c.isMobile && (
@@ -181,7 +194,13 @@ export function CommandPalette({
   if (c.isMobile) {
     return (
       <>
-        <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
+        <Drawer
+          open={open}
+          onOpenChange={handleShellOpenChange}
+          // vaul slides the drawer away before onOpenChange, so a refused close would strand it; the editor's back and close ask instead.
+          dismissible={c.currentView !== "events"}
+          direction="bottom"
+        >
           <DrawerContent
             responsive
             responsiveHeight="90svh"
@@ -205,7 +224,7 @@ export function CommandPalette({
     <>
       <CommandPaletteDesktopDialog
         open={open}
-        onOpenChange={onOpenChange}
+        onOpenChange={handleShellOpenChange}
         title={c.title}
         hasBothResults={c.hasBothResults}
       >

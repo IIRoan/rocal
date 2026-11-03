@@ -136,7 +136,7 @@ export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
           >
             <input
               id="mail-reminder-keyword"
-              aria-label="Add attachment reminder keyword"
+              aria-label="Reminder keywords"
               value={newKeyword}
               onChange={(event) => setNewKeyword(event.target.value)}
               placeholder="Add keyword…"
@@ -146,7 +146,6 @@ export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
               type="submit"
               variant="primary"
               className="h-9 shrink-0"
-              disabled={!newKeyword.trim()}
             >
               Add
             </PaletteButton>

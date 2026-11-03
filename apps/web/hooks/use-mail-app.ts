@@ -37,7 +37,7 @@ import {
 } from "@workspace/calendar-core";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 import { createLogger } from "@workspace/logger";
 import { useSession } from "@/lib/auth-client";
 import { signOutAndClearLocalState } from "@/lib/auth-local-state";
@@ -929,7 +929,7 @@ export function useMailApp() {
           );
           if (!blobId) {
             setSelectedMessageDecryptError(
-              "Could not locate PGP/MIME ciphertext blob.",
+              "Message not decrypted: its encrypted part is missing. Ask the sender to send it again.",
             );
             setSelectedMessageIsDecrypting(false);
             return;
@@ -1000,7 +1000,7 @@ export function useMailApp() {
         );
         setSelectedMessageSignatureVerificationState("not_signed");
         setSelectedMessageDecryptError(
-          "Could not decrypt this message on this device.",
+          "Message not decrypted on this device. Reload and try again, or open it on a device that holds your key.",
         );
         setSelectedMessageIsDecrypting(false);
       });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { toast } from "sonner";
+import { toast } from "@workspace/ui/lib/toast";
 
 export type UndoableAction = {
   messageIds: string[];

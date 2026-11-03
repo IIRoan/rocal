@@ -84,6 +84,7 @@ export function AccountSettings({
       <AccountDangerZone
         isBusy={isBusy}
         deletingAccount={deletingAccount}
+        accountEmail={displayEmail}
         handleReset={handleReset}
         handleDeleteAccount={handleDeleteAccount}
       />

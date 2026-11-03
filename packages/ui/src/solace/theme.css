@@ -16,13 +16,13 @@ html:has([data-solace]:not([data-solace-scoped])),
   --dark-blue-700: 13, 72, 191;
 
   --text-primary: rgb(0, 0, 0);
-  --text-secondary: rgba(0, 0, 0, 0.56);
-  --text-tertiary: rgba(0, 0, 0, 0.44);
+  --text-secondary: rgba(0, 0, 0, 0.64);
+  --text-tertiary: rgba(0, 0, 0, 0.58);
   --text-disabled: rgba(0, 0, 0, 0.32);
   --text-always-white: rgb(255, 255, 255);
   --text-always-black: rgb(0, 0, 0);
-  --text-link: var(--primary);
-  --text-destructive: rgb(215, 40, 40);
+  --text-link: var(--accent);
+  --text-destructive: rgb(203, 22, 29);
   --text-inverse: rgb(255, 255, 255);
 
   --icon-primary: rgb(0, 0, 0);
@@ -31,7 +31,7 @@ html:has([data-solace]:not([data-solace-scoped])),
   --icon-disabled: rgba(0, 0, 0, 0.32);
   --icon-always-white: rgb(255, 255, 255);
   --icon-always-black: rgb(0, 0, 0);
-  --icon-link: var(--primary);
+  --icon-link: var(--accent);
   --icon-destructive: rgb(215, 40, 40);
   --icon-inverse: rgb(255, 255, 255);
 
@@ -75,17 +75,17 @@ html:has([data-solace]:not([data-solace-scoped])),
   --bg-overlay-tertiary: rgba(0, 0, 0, 0.04);
   --bg-overlay-destructive: rgba(255, 143, 143, 0.24);
 
-  --accent-orange-primary: rgb(199, 64, 37);
+  --accent-orange-primary: rgb(188, 53, 25);
   --accent-orange-secondary: rgba(255, 142, 120, 0.36);
-  --accent-green-primary: rgb(0, 160, 94);
+  --accent-green-primary: rgb(0, 118, 55);
   --accent-green-secondary: rgba(25, 199, 127, 0.28);
-  --accent-pink-primary: rgb(175, 88, 131);
+  --accent-pink-primary: rgb(157, 73, 115);
   --accent-pink-secondary: rgba(239, 149, 194, 0.36);
-  --accent-yellow-primary: rgb(183, 137, 0);
+  --accent-yellow-primary: rgb(137, 93, 0);
   --accent-yellow-secondary: rgba(223, 171, 14, 0.48);
-  --accent-blue-primary: rgb(11, 121, 175);
+  --accent-blue-primary: rgb(0, 108, 162);
   --accent-blue-secondary: rgba(74, 183, 238, 0.36);
-  --accent-red-primary: rgb(215, 40, 40);
+  --accent-red-primary: rgb(203, 22, 29);
   --accent-red-secondary: rgba(255, 143, 143, 0.36);
   --accent-dark-blue-primary: rgb(13, 72, 191);
   --accent-dark-blue-secondary: rgba(135, 175, 255, 0.36);
@@ -105,14 +105,14 @@ html:has([data-solace]:not([data-solace-scoped])),
   --popover-foreground: var(--text-primary);
   --muted: var(--bg-overlay-tertiary);
   --muted-foreground: var(--text-secondary);
-  --accent: var(--bg-overlay-tertiary);
-  --accent-foreground: var(--text-primary);
+  --hover: var(--bg-overlay-tertiary);
+  --hover-foreground: var(--text-primary);
   --border: var(--border-secondary);
   --input: var(--border-secondary);
   --sidebar: var(--bg-sidepanel);
   --sidebar-foreground: var(--text-primary);
-  --sidebar-accent: var(--bg-overlay-tertiary);
-  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-hover: var(--bg-overlay-tertiary);
+  --sidebar-hover-foreground: var(--text-primary);
   --sidebar-border: var(--border-tertiary);
   --radius: 8px;
 
@@ -125,7 +125,8 @@ html.dark:has([data-solace]:not([data-solace-scoped])),
 .dark [data-solace] {
   --text-primary: rgb(255, 255, 255);
   --text-secondary: rgba(255, 255, 255, 0.54);
-  --text-tertiary: rgba(255, 255, 255, 0.42);
+  /* 0.5 keeps 4.5:1 on a selected or hovered cell (--bg-cell-active over --bg-l2-solid). */
+  --text-tertiary: rgba(255, 255, 255, 0.5);
   --text-disabled: rgba(255, 255, 255, 0.28);
   --text-destructive: rgb(255, 143, 143);
   --text-inverse: rgb(0, 0, 0);
@@ -197,14 +198,14 @@ html.dark:has([data-solace]:not([data-solace-scoped])),
   --popover-foreground: var(--text-primary);
   --muted: var(--bg-overlay-tertiary);
   --muted-foreground: var(--text-secondary);
-  --accent: var(--bg-overlay-tertiary);
-  --accent-foreground: var(--text-primary);
+  --hover: var(--bg-overlay-tertiary);
+  --hover-foreground: var(--text-primary);
   --border: var(--border-secondary);
   --input: var(--border-secondary);
   --sidebar: var(--bg-sidepanel);
   --sidebar-foreground: var(--text-primary);
-  --sidebar-accent: var(--bg-overlay-tertiary);
-  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-hover: var(--bg-overlay-tertiary);
+  --sidebar-hover-foreground: var(--text-primary);
   --sidebar-border: var(--border-tertiary);
 }
 
@@ -322,9 +323,15 @@ html:has([data-solace]:not([data-solace-scoped]))
   color: var(--icon-secondary);
 }
 
-[data-solace] [data-sidebar="menu-button"]:hover {
-  background: var(--bg-cell-hover);
-  color: var(--text-primary);
+@media (hover: hover) {
+  [data-solace] [data-sidebar="menu-button"]:hover {
+    background: var(--bg-cell-hover);
+    color: var(--text-primary);
+  }
+
+  [data-solace] [data-sidebar="menu-button"]:hover > svg {
+    color: var(--icon-primary);
+  }
 }
 
 [data-solace] [data-sidebar="menu-button"][data-active="true"] {
@@ -333,9 +340,7 @@ html:has([data-solace]:not([data-solace-scoped]))
   font-weight: 400;
 }
 
-[data-solace]
-  [data-sidebar="menu-button"]:is(:hover, [data-active="true"])
-  > svg {
+[data-solace] [data-sidebar="menu-button"][data-active="true"] > svg {
   color: var(--icon-primary);
 }
 

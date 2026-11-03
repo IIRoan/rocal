@@ -43,6 +43,30 @@ function onlyIconChildren(children: ts.NodeArray<ts.JsxChild>) {
   );
 }
 
+const MODAL_CONTENT = /^(Dialog|Sheet|Drawer)Content$/;
+const SELF_PADDED_SLOT = /^(Dialog|Sheet|Drawer)(Header|Footer)$/;
+const TEXT_SLOT = /^(Dialog|Sheet|Drawer)(Title|Description)$/;
+const INSET_CLASS = /(^|[\s"'`])(?:[\w-]+:)*px?-(?!0\b)[\w[]/;
+const ZEROED_CLASS = /(^|[\s"'`])(?:[\w-]+:)*px?-0\b/;
+
+/** Direct children of a modal content surface that would render flush against its edge. */
+function flushModalChildren(children: ts.NodeArray<ts.JsxChild>, dialog: boolean): string[] {
+  return children.flatMap((child) => {
+    if (ts.isJsxFragment(child)) return flushModalChildren(child.children, dialog);
+    if (!ts.isJsxElement(child) && !ts.isJsxSelfClosingElement(child)) return [];
+    const opening = ts.isJsxElement(child) ? child.openingElement : child;
+    const tag = jsxTagName(opening);
+    const className = textOf(jsxAttribute(opening, "className"));
+    const intrinsic = /^[a-z]/.test(tag);
+    if (intrinsic && /display:\s*["']contents["']/.test(textOf(jsxAttribute(opening, "style")))) {
+      return ts.isJsxElement(child) ? flushModalChildren(child.children, dialog) : [];
+    }
+    if (SELF_PADDED_SLOT.test(tag)) return ZEROED_CLASS.test(className) && !INSET_CLASS.test(className) ? [tag] : [];
+    if (!TEXT_SLOT.test(tag) && !(dialog && intrinsic)) return [];
+    return /\bsr-only\b/.test(className) || INSET_CLASS.test(className) ? [] : [tag];
+  });
+}
+
 function hasAccessibleName(node: ts.JsxOpeningLikeElement, names: string[]) {
   return hasSpreadAttributes(node) || names.some((name) => jsxAttribute(node, name));
 }
@@ -169,7 +193,7 @@ export const uiRules: Rule[] = [
       const findings = matchLines(
         file,
         /["'`(\s:,]#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|(?=[0-9a-fA-F]*[a-fA-F])[0-9a-fA-F]{4}|[0-9a-fA-F]{3})\b(?![-\w])|\b(?:rgba?|hsla?|oklch|oklab)\(\s*\d/,
-        (match) => `raw color ${match[0].trim()}; use a theme token (bg-primary, theme.colors.*)`,
+        (match) => `raw color ${match[0].trim()}; use a theme token (bg-accent, theme.colors.*)`,
       );
       findings.push(
         ...matchLines(file, RAW_PALETTE, (match) => `raw palette class ${match[0]}; use a semantic token (bg-background, text-muted-foreground, ...)`),
@@ -187,12 +211,40 @@ export const uiRules: Rule[] = [
         "const c = { backgroundColor: 'rgba(0, 0, 0, 0.4)' };",
         'const d = <div className="bg-gradient-to-r backdrop-blur-md" />;',
       ],
-      good: ['const a = <span className="bg-primary text-primary-foreground" />;', "const b = { color: theme.colors.primaryBase };", 'const c = <a href="#main" />;', "// Upstream issue #9151 forced this fallback."],
+      good: ['const a = <span className="bg-accent text-accent-foreground" />;', "const b = { color: theme.colors.primaryBase };", 'const c = <a href="#main" />;', "// Upstream issue #9151 forced this fallback."],
+    },
+  },
+  {
+    id: "modal-content-padding",
+    summary: "Modal surfaces inset their content: Header/Footer slots pad themselves, so a title, description or raw element placed directly in DialogContent (or a title in SheetContent/DrawerContent) needs px-*/p-* padding or sr-only.",
+    files: WEB_UI,
+    check: (file) =>
+      find(file, (node) => {
+        if (!ts.isJsxElement(node) || !MODAL_CONTENT.test(jsxTagName(node.openingElement))) return null;
+        const content = jsxTagName(node.openingElement);
+        const flush = flushModalChildren(node.children, content === "DialogContent");
+        return flush.length > 0 ? `${flush.map((tag) => `<${tag}>`).join(", ")} sits flush against the ${content} edge; put it in a Header/Footer slot or give it px-*/p-* padding` : null;
+      }),
+    examples: {
+      path: "apps/web/components/confirm.tsx",
+      bad: [
+        "const a = <DialogContent><DialogTitle>Delete?</DialogTitle><DialogFooter><Button>Delete</Button></DialogFooter></DialogContent>;",
+        'const b = <DialogContent><DialogHeader className="p-0"><DialogTitle>Delete?</DialogTitle></DialogHeader></DialogContent>;',
+        'const c = <DialogContent><div className="flex flex-col gap-2"><Button>Save</Button></div></DialogContent>;',
+        "const d = <DrawerContent><DrawerTitle>Pick a time</DrawerTitle></DrawerContent>;",
+        'const e = <DialogContent><div style={{ display: "contents" }}><p>Body</p></div></DialogContent>;',
+      ],
+      good: [
+        "const a = <DialogContent><DialogHeader><DialogTitle>Delete?</DialogTitle></DialogHeader><DialogFooter><Button>Delete</Button></DialogFooter></DialogContent>;",
+        'const b = <DialogContent className="p-0"><VisuallyHidden><DialogTitle>Search</DialogTitle></VisuallyHidden><Palette /></DialogContent>;',
+        'const c = <DialogContent><DialogHeader className="px-6 pt-6 pr-12" /><div className="sm:px-6 py-4">Body</div></DialogContent>;',
+        'const d = <DrawerContent><DrawerTitle className="sr-only">Pick a time</DrawerTitle><div className="flex h-full flex-col" /></DrawerContent>;',
+      ],
     },
   },
   {
     id: "motion-compositor-only",
-    summary: "Cross-browser motion animates only transform/opacity: no transition-all or layout-property transitions/keyframes, dvh instead of 100vh/h-screen, no press-scale.",
+    summary: "Cross-browser motion animates only transform/opacity: no transition-all or layout-property transitions/keyframes, dvh instead of 100vh/h-screen, press scale exactly 0.96 (better-ui).",
     files: (file) => ALL_UI_CODE(file) || WEB_STYLES(file),
     check(file) {
       const findings = matchLines(
@@ -203,12 +255,12 @@ export const uiRules: Rule[] = [
       findings.push(
         ...matchLines(file, new RegExp(`\\btransition(?:-property)?\\s*:[^;\n]*\\b(?:${LAYOUT_PROPERTIES})\\b`), () => "CSS transition on a layout property; animate transform/opacity"),
         ...matchLines(file, /\b(?:min-|max-)?h-screen\b|\b100vh\b/, (match) => `${match[0]} breaks under mobile browser toolbars; use dvh (h-dvh)`),
-        ...matchLines(file, /\bactive:scale-|\bwhileTap\b/, (match) => `${match[0]} press-scale; give feedback with color/opacity`),
+        ...matchLines(file, /\bactive:(?:[\w-]+:)*scale-(?!\[0\.96\])[\w[\].-]+|\bwhileTap\b/, (match) => `${match[0]} press scale; buttons scale to exactly 0.96 (motion-safe:active:not-disabled:scale-[0.96])`),
       );
       if (file.path.endsWith(".css")) {
         for (const { index, body } of cssBlocks(file.text, /@keyframes\s+[\w-]+/g)) {
           const properties = [...body.matchAll(/([a-z-]+)\s*:/g)].map((match) => match[1] ?? "");
-          const layout = properties.filter((property) => !/^(transform|opacity|visibility|translate|scale|rotate|offset|animation-timing-function|--[\w-]+)$/.test(property));
+          const layout = properties.filter((property) => !/^(transform|opacity|visibility|translate|scale|rotate|filter|offset|animation-timing-function|--[\w-]+)$/.test(property));
           if (layout.length > 0) findings.push({ line: file.lineOf(index), message: `@keyframes animates ${[...new Set(layout)].join(", ")}; keyframes may only animate transform/opacity` });
         }
       }
@@ -217,7 +269,7 @@ export const uiRules: Rule[] = [
     examples: {
       path: "apps/web/components/drawer.tsx",
       bad: ['const a = <div className="transition-all" />;', 'const b = <div className="transition-[height] duration-200" />;', 'const c = <main className="h-screen" />;', 'const d = <button className="active:scale-95" />;'],
-      good: ['const a = <div className="transition-transform duration-200" />;', 'const c = <main className="h-dvh" />;', 'const a = { color: "[transition-property:color,opacity]",\nlayout: "inset-0" };'],
+      good: ['const a = <div className="transition-transform duration-200" />;', 'const c = <main className="h-dvh" />;', 'const d = <button className="motion-safe:active:not-disabled:scale-[0.96]" />;', 'const a = { color: "[transition-property:color,opacity]",\nlayout: "inset-0" };'],
     },
   },
   {
@@ -250,6 +302,23 @@ export const uiRules: Rule[] = [
       path: "apps/web/components/drawer.tsx",
       bad: ['import { gsap } from "gsap";', 'import { motion } from "motion/react";', "element.animate([{ opacity: 0 }, { opacity: 1 }], 200);", "LayoutAnimation.easeInEaseOut();", "Animated.timing(value, { toValue: 1 }).start();"],
       good: ["loopMotion(element, PULSE, { duration: 1200 });", "slideFadeIn(element, { y: 8 }, { duration: 200 });", "Animated.timing(value, { toValue: 1, useNativeDriver: true }).start();"],
+    },
+  },
+  {
+    id: "toast-until-dismissed",
+    summary: "Web toasts come from @workspace/ui/lib/toast, which keeps error and action toasts open until dismissed (WCAG 2.2.1).",
+    files: (file) => appSourceUnder(["apps/web/", "packages/ui/src/"])(file) && file !== "packages/ui/src/lib/toast.ts",
+    check: (file) =>
+      find(file, (node) => {
+        if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier) || node.moduleSpecifier.text !== "sonner") return null;
+        const bindings = node.importClause?.namedBindings;
+        const importsToast = bindings && ts.isNamedImports(bindings) && bindings.elements.some((element) => (element.propertyName ?? element.name).text === "toast");
+        return importsToast ? 'toast from "sonner" closes errors on a timer; import it from @workspace/ui/lib/toast' : null;
+      }),
+    examples: {
+      path: "apps/web/components/panel.tsx",
+      bad: ['import { toast } from "sonner";', 'import { Toaster, toast as notify } from "sonner";'],
+      good: ['import { toast } from "@workspace/ui/lib/toast";', 'import { Toaster } from "sonner";'],
     },
   },
   {

@@ -1,4 +1,12 @@
-import { useState, useRef, useEffect, useCallback, useId, useMemo } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useId,
+  useMemo,
+} from "react";
 import { Clock } from "lucide-react";
 import type { TimeFormat } from "@workspace/calendar-core";
 import { cn } from "@workspace/ui/lib/utils";
@@ -11,7 +19,7 @@ import { useAutocompleteTimepicker } from "@workspace/ui/hooks/use-autocomplete-
 const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const INPUT_STYLES =
-  "w-7 bg-transparent text-center text-sm font-medium border-none shadow-none outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:text-primary " +
+  "w-7 bg-transparent text-center text-sm font-medium border-none shadow-none outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:text-accent " +
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
 interface TimePickerProps {
@@ -21,6 +29,8 @@ interface TimePickerProps {
   locale?: string;
   timeZone?: string;
   placeholder?: string;
+  /** Names the field, such as "Start time"; the accessible name then reads "Start time, 09:00". */
+  label?: string;
   className?: string;
   inline?: boolean;
   variant?: "outline" | "ghost";
@@ -95,15 +105,15 @@ function TimeGrid({
                 "flex items-center justify-center rounded-lg text-sm font-semibold transition-colors relative cursor-pointer",
                 compact ? "h-11 min-w-[80px]" : "h-12",
                 isSelected
-                  ? "bg-primary text-primary-foreground shadow-sm"
+                  ? "bg-accent text-accent-foreground shadow-sm"
                   : isCurrentTime
-                    ? "bg-primary/20 text-primary ring-2 ring-primary hover:bg-primary/30"
-                    : "bg-accent hover:bg-accent/80 text-accent-foreground",
+                    ? "bg-accent/20 text-accent ring-2 ring-accent hover:bg-accent/30"
+                    : "bg-hover hover:bg-hover/80 text-hover-foreground",
               )}
             >
               {timeString}
               {isCurrentTime && !isSelected && (
-                <span className="absolute -top-1 -right-1 size-2 bg-primary rounded-full" />
+                <span className="absolute -top-1 -right-1 size-2 bg-accent rounded-full" />
               )}
             </button>
           );
@@ -123,20 +133,21 @@ function TimeList({
 }: Omit<TimeGridProps, "compact">) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => {
-      containerRef.current
-        ?.querySelector<HTMLElement>(`[data-time-index="${scrollToIndex}"]`)
-        ?.scrollIntoView({ block: "center" });
-    });
-    return () => cancelAnimationFrame(frame);
+  // Sets scrollTop before paint: scrollIntoView also scrolls the smooth-scrolling page, and a later focus move cancels that scroll.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const option = container?.querySelector<HTMLElement>(
+      `[data-time-index="${scrollToIndex}"]`,
+    );
+    if (!open || !container || !option) return;
+    container.scrollTop =
+      option.offsetTop - (container.clientHeight - option.offsetHeight) / 2;
   }, [open, scrollToIndex]);
 
   return (
     <div
       ref={containerRef}
-      className="max-h-64 overflow-y-auto overscroll-contain p-1"
+      className="relative max-h-64 overflow-y-auto overscroll-contain p-1"
     >
       {timeOptions.map((time, index) => {
         const timeString = formatTime(time);
@@ -151,10 +162,10 @@ function TimeList({
             aria-pressed={isSelected}
             onClick={() => handleSelect(time)}
             className={cn(
-              "flex h-8 w-full items-center rounded-md px-2.5 text-sm tabular-nums transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              "flex h-8 w-full items-center rounded-md px-2.5 text-sm tabular-nums transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isSelected
-                ? "bg-primary text-primary-foreground"
-                : "text-popover-foreground hover:bg-accent",
+                ? "bg-accent text-accent-foreground"
+                : "text-popover-foreground hover:bg-hover",
             )}
           >
             {timeString}
@@ -270,7 +281,8 @@ export function ShadcnAutocomleteTimePicker({
   timeFormat,
   locale = "en-US",
   timeZone = currentTimezone,
-  placeholder = "Select time...",
+  placeholder = "Select time…",
+  label,
   className,
   inline = false,
   variant = "outline",
@@ -337,15 +349,16 @@ export function ShadcnAutocomleteTimePicker({
   };
 
   const currentTimeString = formatTime(selectedTime);
+  const triggerLabel = label ? `${label}, ${currentTimeString}` : undefined;
 
   const triggerButton = inline ? (
     <button
       type="button"
-      role="combobox"
       aria-expanded={open}
+      aria-label={triggerLabel}
       aria-controls={timePickerContentId}
       className={cn(
-        "outline-none text-foreground font-semibold active:opacity-70 transition-opacity focus-visible:ring-ring/50 focus-visible:ring-[3px] rounded-sm",
+        "outline-none text-foreground font-semibold active:opacity-70 transition-opacity focus-visible:ring-ring focus-visible:ring-[3px] rounded-sm",
         className,
       )}
     >
@@ -354,8 +367,8 @@ export function ShadcnAutocomleteTimePicker({
   ) : (
     <Button
       variant={variant}
-      role="combobox"
       aria-expanded={open}
+      aria-label={triggerLabel}
       aria-controls={timePickerContentId}
       className={cn(
         "w-full justify-start font-normal cursor-pointer",
@@ -408,7 +421,7 @@ export function ShadcnAutocomleteTimePicker({
               className={cn(
                 "h-11 min-w-[80px] flex items-center justify-center rounded-lg text-sm font-medium transition-colors",
                 customTimeInput.length === 5
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  ? "bg-accent text-accent-foreground hover:bg-accent/90"
                   : "bg-muted/30 text-muted-foreground",
               )}
             >
@@ -444,7 +457,7 @@ export function ShadcnAutocomleteTimePicker({
               }
             }}
             disabled={customTimeInput.length !== 5}
-            className="h-8 flex-1 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground transition-colors cursor-pointer hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-accent disabled:text-muted-foreground"
+            className="h-8 flex-1 rounded-md bg-accent px-2 text-xs font-medium text-accent-foreground transition-colors cursor-pointer hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-hover disabled:text-muted-foreground"
           >
             Set
           </button>

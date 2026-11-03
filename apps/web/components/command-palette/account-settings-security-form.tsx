@@ -5,7 +5,6 @@ import type { Dispatch } from "react";
 import { AnimatedCollapse } from "@workspace/ui/components/ui/animated-collapse";
 
 import { FieldInput } from "./account-settings-field-input";
-import { InlineMessage } from "./account-settings-inline-message";
 import { submitAccountSecurityPassword } from "./account-settings-security-submit";
 import type {
   SecurityForm,
@@ -43,11 +42,6 @@ export function AccountSecurityForm({
           });
         }}
       >
-        {security.message ? (
-          <div className="px-2 py-1">
-            <InlineMessage msg={security.message} />
-          </div>
-        ) : null}
         <p className="p-2 text-[13px] leading-[130%] text-muted-foreground">
           Update your sign-in password. It also unlocks your encrypted data, so
           your keys are rewrapped to the new one.

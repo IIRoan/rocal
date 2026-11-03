@@ -5,7 +5,7 @@ import {
   resolveRecurringEventTarget,
   type TimeFormat,
 } from "@workspace/calendar-core";
-import { toast } from "sonner";
+import { toast } from "../../lib/toast";
 
 import type { CalendarEvent } from "./types";
 
@@ -38,7 +38,7 @@ export function toastEventMutationError(
 
   if (isNetworkError) {
     toast.error("Network error", {
-      description: "Please check your connection and try again",
+      description: "Check your connection and try again",
       position: "bottom-left",
     });
     return;
@@ -46,7 +46,7 @@ export function toastEventMutationError(
 
   if (error?.statusCode === 401) {
     toast.error("Authentication required", {
-      description: "Please log in again to continue",
+      description: "Sign in again to continue",
       position: "bottom-left",
     });
     return;
@@ -150,41 +150,6 @@ export async function persistDraggedCalendarEvent({
       error as EventMutationError,
       "Failed to move event",
       "You don't have permission to move this event",
-    );
-  }
-}
-
-export async function persistDeletedCalendarEvent({
-  deleteEvent,
-  eventId,
-  events,
-  timezone,
-}: {
-  deleteEvent: (id: string) => Promise<void>;
-  eventId: string;
-  events: CalendarEvent[];
-  timezone: string;
-}) {
-  try {
-    const deletedEvent = events.find((event) => event.id === eventId);
-    await deleteEvent(eventId);
-
-    if (deletedEvent) {
-      toast.success(`Event "${deletedEvent.title}" deleted`, {
-        description: formatInUserTimezone(
-          new Date(deletedEvent.start),
-          timezone,
-          "MMM d, yyyy",
-        ),
-        position: "bottom-left",
-      });
-    }
-  } catch (error: unknown) {
-    log.error("Failed to delete event:", error);
-    toastEventMutationError(
-      error as EventMutationError,
-      "Failed to delete event",
-      "You don't have permission to delete this event",
     );
   }
 }

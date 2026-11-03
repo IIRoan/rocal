@@ -91,7 +91,7 @@ jobs:
           bun ../../scripts/native-store-metadata.ts prepare "$APP" "$PROFILE" "$RUNNER_TEMP/eas-config.json" "$RUNNER_TEMP/release"
           # Signing credentials and the remote build number come from EAS; the archive is built on this runner.
           eas build --platform ios --profile "$PROFILE" --local --non-interactive --output "$RUNNER_TEMP/solace.ipa" 2>&1 | sed -E -f "$GITHUB_WORKSPACE/scripts/eas-build-log.sed"
-      - uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
+      - uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
         with:
           name: ${{ matrix.app }}-ios-store-build
           path: ${{ runner.temp }}/release/*.json

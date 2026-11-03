@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   format,
   isSameDay,
   isSameMonth,
-  isToday,
   addMonths,
   subMonths,
-  startOfMonth,
-  endOfMonth,
 } from "date-fns";
+import {
+  getPaddedCalendarMonthRange,
+  isTodayInTimezone,
+  resolveTimezone,
+  utcToPickerDate,
+  wallClockToUtc,
+} from "@workspace/calendar-core";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent } from "../calendar/types";
@@ -32,6 +36,7 @@ interface SidebarCalendarProps {
   className?: string;
   isMobile?: boolean;
   weekStartDay?: number;
+  timezone?: string;
 }
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -43,10 +48,22 @@ export function SidebarCalendar({
   className,
   isMobile = false,
   weekStartDay = 1,
+  timezone,
 }: SidebarCalendarProps) {
   const { currentDate, setCurrentDate, calendars, getVisibleCalendars } =
     useCalendarContext();
-  const [calendarMonth, setCalendarMonth] = useState<Date>(currentDate);
+  const resolvedTimezone = resolveTimezone(timezone);
+  const selectedDay = useMemo(
+    () => utcToPickerDate(currentDate, resolvedTimezone),
+    [currentDate, resolvedTimezone],
+  );
+  // A browsed month holds only until the selected date or zone changes.
+  const [browsedMonth, setBrowsedMonth] = useState<{
+    selectedDay: Date;
+    month: Date;
+  } | null>(null);
+  const calendarMonth =
+    browsedMonth?.selectedDay === selectedDay ? browsedMonth.month : selectedDay;
   const slideDirectionRef = useRef<1 | -1>(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const monthStageRef = useRef<HTMLDivElement>(null);
@@ -58,16 +75,6 @@ export function SidebarCalendar({
     [getVisibleCalendars],
   );
 
-  useEffect(() => {
-    if (currentDate && !isNaN(currentDate.getTime())) {
-      setCalendarMonth(currentDate);
-    } else {
-      const now = new Date();
-      setCalendarMonth(now);
-      setCurrentDate(now);
-    }
-  }, [currentDate, setCurrentDate]);
-
   const weekdayLabels = WEEKDAY_LABELS.map(
     (_, index) => WEEKDAY_LABELS[(weekStartDay + index) % 7],
   );
@@ -78,13 +85,14 @@ export function SidebarCalendar({
     getCachedEventsForRange,
     prefetchRange,
     weekStartDay,
+    timezone: resolvedTimezone,
   });
 
   const goToPreviousMonth = () => {
     if (swipeLockRef.current) return;
     swipeLockRef.current = true;
     slideDirectionRef.current = -1;
-    setCalendarMonth((prev) => subMonths(prev, 1));
+    setBrowsedMonth({ selectedDay, month: subMonths(calendarMonth, 1) });
     window.setTimeout(() => {
       swipeLockRef.current = false;
     }, 100);
@@ -94,7 +102,7 @@ export function SidebarCalendar({
     if (swipeLockRef.current) return;
     swipeLockRef.current = true;
     slideDirectionRef.current = 1;
-    setCalendarMonth((prev) => addMonths(prev, 1));
+    setBrowsedMonth({ selectedDay, month: addMonths(calendarMonth, 1) });
     window.setTimeout(() => {
       swipeLockRef.current = false;
     }, 100);
@@ -103,7 +111,7 @@ export function SidebarCalendar({
   const hoverPrefetchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefetchMonth = (month: Date) => {
     if (!prefetchRange) return;
-    prefetchRange({ start: startOfMonth(month), end: endOfMonth(month) });
+    prefetchRange(getPaddedCalendarMonthRange(month, 0, resolvedTimezone));
   };
   const schedulePrefetch = (month: Date) => {
     if (hoverPrefetchRef.current) clearTimeout(hoverPrefetchRef.current);
@@ -115,9 +123,9 @@ export function SidebarCalendar({
 
   const goToToday = () => {
     const now = new Date();
-    const isGoingForward = now.getTime() >= calendarMonth.getTime();
+    const today = utcToPickerDate(now, resolvedTimezone);
+    const isGoingForward = today.getTime() >= calendarMonth.getTime();
     slideDirectionRef.current = isGoingForward ? 1 : -1;
-    setCalendarMonth(now);
     setCurrentDate(now);
     onDateSelect?.(now);
   };
@@ -148,6 +156,7 @@ export function SidebarCalendar({
         <button
           type="button"
           onClick={goToToday}
+          aria-label={`${format(calendarMonth, "MMMM yyyy")}, go to today`}
           className="text-sm tracking-tight text-left hover:opacity-80 transition-opacity cursor-pointer"
         >
           <span className="font-semibold text-foreground">
@@ -163,7 +172,7 @@ export function SidebarCalendar({
             onClick={goToPreviousMonth}
             onMouseEnter={() => schedulePrefetch(subMonths(calendarMonth, 1))}
             onMouseLeave={cancelPrefetch}
-            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
+            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground transition-colors cursor-pointer"
             aria-label="Previous month"
           >
             <ChevronLeft size={16} strokeWidth={2} />
@@ -173,7 +182,7 @@ export function SidebarCalendar({
             onClick={goToNextMonth}
             onMouseEnter={() => schedulePrefetch(addMonths(calendarMonth, 1))}
             onMouseLeave={cancelPrefetch}
-            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
+            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground transition-colors cursor-pointer"
             aria-label="Next month"
           >
             <ChevronRight size={16} strokeWidth={2} />
@@ -183,11 +192,11 @@ export function SidebarCalendar({
 
       <div className="relative overflow-hidden">
         <div key={monthKey} ref={monthStageRef}>
-          <div className="grid grid-cols-7 mb-0.5">
+          <div className="grid grid-cols-7 mb-0.5" aria-hidden>
             {weekdayLabels.map((label, index) => (
               <div
                 key={`${label}-${index}`}
-                className="h-7 flex items-center justify-center text-[11px] font-medium text-muted-foreground/50 uppercase"
+                className="h-7 flex items-center justify-center text-[11px] font-medium text-muted-foreground uppercase"
               >
                 {label}
               </div>
@@ -196,34 +205,38 @@ export function SidebarCalendar({
 
           <div className="grid grid-cols-7">
             {grid.days.map((day) => {
-              const isSelected = isSameDay(day, currentDate);
+              const isSelected = isSameDay(day, selectedDay);
               const isCurrentMonth = isSameMonth(day, calendarMonth);
-              const isCurrentDay = isToday(day);
+              const isCurrentDay = isTodayInTimezone(day, resolvedTimezone);
               const dayEvents = dayEventsMap.get(toDayKey(day)) || [];
 
               return (
                 <button
                   type="button"
                   key={day.toISOString()}
+                  aria-label={format(day, "EEEE, MMMM d, yyyy")}
+                  aria-current={isCurrentDay ? "date" : undefined}
+                  aria-pressed={isSelected}
                   onClick={() => {
-                    setCurrentDate(day);
-                    onDateSelect?.(day);
+                    const date = wallClockToUtc(day, 12, 0, resolvedTimezone);
+                    setCurrentDate(date);
+                    onDateSelect?.(date);
                   }}
                   onMouseEnter={() => schedulePrefetch(day)}
                   onMouseLeave={cancelPrefetch}
                   className={cn(
-                    "relative flex items-center justify-center",
+                    "relative flex items-center justify-center tabular-nums",
                     isMobile
                       ? "aspect-square rounded-[12px] text-[14px] flex-col gap-1 cursor-pointer"
                       : "aspect-square rounded-lg text-[13px] font-medium cursor-pointer",
-                    !isCurrentMonth && "text-muted-foreground/30",
+                    !isCurrentMonth && "text-muted-foreground",
                     isCurrentMonth &&
                       !isSelected &&
                       !isCurrentDay &&
-                      "text-foreground hover:bg-accent/60",
+                      "text-foreground hover:bg-hover/60",
                     isCurrentDay &&
                       !isSelected &&
-                      "ring-2 ring-inset ring-foreground/20 text-foreground font-bold hover:bg-accent/60",
+                      "ring-2 ring-inset ring-foreground/20 text-foreground font-bold hover:bg-hover/60",
                     isCurrentDay &&
                       isSelected &&
                       "ring-2 ring-inset ring-foreground/40",
@@ -232,14 +245,14 @@ export function SidebarCalendar({
                   {isSelected && (
                     <div
                       className={cn(
-                        "absolute inset-0.5 rounded-md bg-primary shadow-sm",
+                        "absolute inset-0.5 rounded-md bg-accent shadow-sm",
                         isMobile && "inset-0 rounded-[12px]",
                       )}
                     />
                   )}
-                  <span className="relative z-10 text-inherit data-[selected=true]:text-primary-foreground">
+                  <span className="relative z-10 text-inherit data-[selected=true]:text-accent-foreground">
                     <span
-                      className={cn(isSelected && "text-primary-foreground")}
+                      className={cn(isSelected && "text-accent-foreground")}
                     >
                       {format(day, "d")}
                     </span>
@@ -259,7 +272,7 @@ export function SidebarCalendar({
                           className={cn(
                             "rounded-full",
                             isMobile ? "w-1 h-1" : "w-1 h-1",
-                            isSelected && "bg-primary-foreground",
+                            isSelected && "bg-accent-foreground",
                           )}
                           style={{
                             backgroundColor: isSelected

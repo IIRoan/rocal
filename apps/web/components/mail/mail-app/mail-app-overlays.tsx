@@ -19,6 +19,13 @@ import type { MailAppContentController } from "../use-mail-app-content-controlle
 
 const log = createLogger("mail-app-overlays");
 
+// Only the first page is loaded, so the count is exact only once every message is.
+function emptyFolderConsequence(folder: string, loadedCount: number, hasMore: boolean) {
+  if (hasMore) return `Every message in ${folder} is permanently deleted. You can’t undo this.`;
+  if (loadedCount === 1) return `The 1 message in ${folder} is permanently deleted. You can’t undo this.`;
+  return `All ${loadedCount} messages in ${folder} are permanently deleted. You can’t undo this.`;
+}
+
 export function MailAppOverlays({
   controller,
 }: {
@@ -33,6 +40,7 @@ export function MailAppOverlays({
     handleCreateMailbox,
     handleDeleteMailbox,
     handleRenameMailbox,
+    handleReorderMailboxes,
     labels,
     handleCreateLabel,
     handleUpdateLabel,
@@ -51,6 +59,7 @@ export function MailAppOverlays({
     emptyFolderLabel,
     selectedMailbox,
     handleEmptyMailbox,
+    hasMoreMessages,
     isOverlayLoading,
   } = controller;
 
@@ -65,6 +74,11 @@ export function MailAppOverlays({
         onCreateMailbox={(name) => handleCreateMailbox(name)}
         onDeleteMailbox={(id) => handleDeleteMailbox(id)}
         onRenameMailbox={(id, name) => handleRenameMailbox(id, name)}
+        onReorderMailboxes={(reordered) =>
+          void handleReorderMailboxes(reordered).catch((error) =>
+            log.error("Failed to reorder mailboxes", error),
+          )
+        }
         labels={labels}
         onCreateLabel={(name, color) => handleCreateLabel(name, color)}
         onUpdateLabel={(id, updates) =>
@@ -119,12 +133,11 @@ export function MailAppOverlays({
           <DialogHeader className="px-5 pt-5 pb-3">
             <DialogTitle>{emptyFolderLabel}?</DialogTitle>
             <DialogDescription>
-              Permanently delete all {activeMailbox?.messages.length ?? 0}{" "}
-              messages in{" "}
-              {selectedMailbox
-                ? getMailboxDisplayName(selectedMailbox)
-                : "this folder"}
-              . This cannot be undone.
+              {emptyFolderConsequence(
+                selectedMailbox ? getMailboxDisplayName(selectedMailbox) : "this folder",
+                activeMailbox?.messages.length ?? 0,
+                hasMoreMessages,
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">

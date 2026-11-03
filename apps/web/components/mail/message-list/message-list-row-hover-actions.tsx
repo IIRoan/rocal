@@ -38,7 +38,7 @@ export function MessageListRowHoverActions({
 }) {
   return (
     <WarmTooltipGroup lean={8}>
-    <div className="hidden h-6 items-center gap-1.5 transition-opacity duration-150 ease-in-out group-hover/row:flex starting:opacity-0">
+    <div className="relative z-2 hidden h-6 items-center gap-1.5 transition-opacity duration-150 ease-in-out group-hover/row:flex starting:opacity-0">
       {isRead
         ? onMarkAsUnread && (
             <IconButton

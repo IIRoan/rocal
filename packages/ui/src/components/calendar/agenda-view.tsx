@@ -1,11 +1,18 @@
 "use client";
 
 import { useMemo } from "react";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Plus } from "lucide-react";
 import { addDays, format } from "date-fns";
-import { isTodayInTimezone, resolveTimezone, type TimeFormat } from "@workspace/calendar-core";
+import {
+  isTodayInTimezone,
+  resolveTimezone,
+  utcToPickerDate,
+  wallClockToUtc,
+  type TimeFormat,
+} from "@workspace/calendar-core";
 
-import { AgendaDaysToShow } from "./constants";
+import { Button } from "../ui/button";
+import { AgendaDaysToShow, DefaultStartHour } from "./constants";
 import { CalendarEvent } from "./types";
 import { EventItem } from "./event-item";
 import { getAgendaEventsForDay } from "./utils";
@@ -27,6 +34,7 @@ export function AgendaView({
   currentDate,
   events,
   onEventSelect,
+  onEventCreate,
   timeFormat,
   timezone,
   onEventEdit,
@@ -34,11 +42,15 @@ export function AgendaView({
   onEventView,
 }: AgendaViewProps) {
   const resolvedTimezone = resolveTimezone(timezone);
+  const firstDay = useMemo(
+    () => utcToPickerDate(currentDate, resolvedTimezone),
+    [currentDate, resolvedTimezone],
+  );
   const days = useMemo(() => {
     return Array.from({ length: AgendaDaysToShow }, (_, i) =>
-      addDays(new Date(currentDate), i),
+      addDays(firstDay, i),
     );
-  }, [currentDate]);
+  }, [firstDay]);
 
   const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -56,10 +68,30 @@ export function AgendaView({
           <span className="text-muted-foreground/50 mb-2">
             <CalendarIcon size={32} />
           </span>
-          <h3 className="text-lg font-medium">No events found</h3>
+          <h3 className="text-lg font-medium">No events scheduled</h3>
           <p className="text-muted-foreground">
-            There are no events scheduled for this time period.
+            Events in this {AgendaDaysToShow}-day range show up here, grouped
+            by day.
           </p>
+          {onEventCreate && (
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() =>
+                onEventCreate(
+                  wallClockToUtc(
+                    firstDay,
+                    DefaultStartHour,
+                    0,
+                    resolvedTimezone,
+                  ),
+                )
+              }
+            >
+              <Plus aria-hidden="true" />
+              Create event
+            </Button>
+          )}
         </div>
       ) : (
         <div className="px-3 sm:px-6 py-4 space-y-6">
@@ -84,7 +116,7 @@ export function AgendaView({
                     <span
                       className={cn(
                         "text-2xl font-light tabular-nums leading-none tracking-tight",
-                        today ? "text-primary" : "text-foreground",
+                        today ? "text-accent" : "text-foreground",
                       )}
                     >
                       {format(day, "d")}
@@ -92,7 +124,7 @@ export function AgendaView({
                     <span
                       className={cn(
                         "text-[11px] font-semibold uppercase tracking-wider",
-                        today ? "text-primary" : "text-muted-foreground",
+                        today ? "text-accent" : "text-muted-foreground",
                       )}
                     >
                       {format(day, "EEE")}
@@ -102,7 +134,7 @@ export function AgendaView({
                     {format(day, "MMMM")}
                   </span>
                   {today && (
-                    <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                    <span className="ml-auto rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-accent">
                       Today
                     </span>
                   )}

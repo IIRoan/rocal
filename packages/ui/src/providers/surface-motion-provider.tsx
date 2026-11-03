@@ -279,7 +279,6 @@ export function SurfaceMotionProvider() {
       }
 
       revealed.add(node);
-      if (prefersReducedMotion) return;
 
       const preserveTransform = shouldPreserveTransformAnimation(
         node,

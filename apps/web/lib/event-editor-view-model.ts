@@ -1,11 +1,44 @@
 import { format } from "date-fns";
-import { getPickerDateRangeDisplay } from "@workspace/calendar-core";
+import {
+  getPickerDateRangeDisplay,
+  type RecurrenceDeleteScope,
+} from "@workspace/calendar-core";
 import type {
   CalendarEvent,
   EventNotification,
 } from "@workspace/ui/components/calendar";
 
 import type { RecurrenceRule } from "./types/calendar";
+
+export const RECURRING_DELETE_SUCCESS_MESSAGES: Record<RecurrenceDeleteScope, string> =
+  {
+    this_only: "Event occurrence deleted",
+    this_and_future: "This and following events deleted",
+    all: "Entire event series deleted",
+  };
+
+export const RECURRING_DELETE_FAILURE_MESSAGES: Record<RecurrenceDeleteScope, string> =
+  {
+    this_only: "Failed to delete event occurrence",
+    this_and_future: "Failed to delete following events",
+    all: "Failed to delete event series",
+  };
+
+/** A cancelled event the user cannot edit is only removed from their calendar, not deleted. */
+export function getEventDeleteConfirmCopy(eventTitle: string, removeOnly: boolean) {
+  const title = eventTitle || "Untitled event";
+  return removeOnly
+    ? {
+        title: `Remove “${title}” from your calendar?`,
+        description: "The cancelled event leaves your calendar. You can’t undo this.",
+        confirmLabel: "Remove event",
+      }
+    : {
+        title: `Delete “${title}”?`,
+        description: "This permanently deletes the event. You can’t undo this.",
+        confirmLabel: "Delete event",
+      };
+}
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -115,17 +148,5 @@ export function isRecurringEventDeleteCandidate(
     event?.isRecurringInstance ||
     event?.parentEventId ||
     (event?.id && event.id.includes("_")),
-  );
-}
-
-export function canSaveEventEditor(input: {
-  eventCalendarId: string;
-  eventSaving: boolean;
-  eventTitle: string;
-}) {
-  return (
-    !input.eventSaving &&
-    Boolean(input.eventCalendarId) &&
-    input.eventTitle.trim().length > 0
   );
 }

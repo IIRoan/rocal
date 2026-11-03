@@ -101,7 +101,9 @@ export function EventEditorBody({
     }
 
     if (isReservedSystemEmail(email)) {
-      setParticipantError("Cannot invite system or administrative addresses.");
+      setParticipantError(
+        "System and administrative addresses can’t be invited. Enter a personal address.",
+      );
       return;
     }
 
@@ -183,7 +185,7 @@ export function EventEditorBody({
             placeholder="Add title"
             aria-label="Event title"
             autoFocus={desktop && !eventForm.selectedEvent?.id}
-            className="-mx-2 h-11 w-[calc(100%+1rem)] rounded-md border-0 bg-transparent px-2 text-xl font-semibold text-foreground shadow-none placeholder:text-muted-foreground/70 hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:ring-0"
+            className="-mx-2 h-11 w-[calc(100%+1rem)] rounded-md border-0 bg-transparent px-2 text-xl font-semibold text-foreground shadow-none placeholder:text-muted-foreground hover:bg-hover/40 focus-visible:bg-hover/40 focus-visible:ring-2 focus-visible:ring-ring"
           />
 
           <EventEditorDateTimeFields
@@ -258,7 +260,7 @@ export function EventEditorBody({
                       type="button"
                       aria-label="Remove category"
                       onClick={() => eventForm.setEventCategoryId("")}
-                      className="tap-target flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                      className="tap-target flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <X className="size-3.5" />
                     </button>

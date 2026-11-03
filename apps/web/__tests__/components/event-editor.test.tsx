@@ -21,11 +21,64 @@ jest.mock("../../components/command-palette/recurring-scope-modal", () => ({
 }));
 
 jest.mock("../../components/event-editor/event-editor-body", () => ({
-  EventEditorBody: () => <div data-testid="event-editor-body" />,
+  EventEditorBody: ({
+    eventForm,
+    isViewMode,
+  }: {
+    eventForm: { eventTitle: string; setEventTitle: (title: string) => void };
+    isViewMode: boolean;
+  }) => (
+    <div
+      data-testid="event-editor-body"
+      data-title={eventForm.eventTitle}
+      data-view-mode={String(isViewMode)}
+    >
+      <button type="button" onClick={() => eventForm.setEventTitle("Lunch")}>
+        Type title
+      </button>
+    </div>
+  ),
 }));
 
 jest.mock("../../components/event-editor/event-editor-footer", () => ({
-  EventEditorFooter: () => <div data-testid="event-editor-footer" />,
+  EventEditorFooter: ({
+    handleEventDelete,
+    onCancelEdit,
+    onClose,
+  }: {
+    handleEventDelete: () => void;
+    onCancelEdit?: () => void;
+    onClose?: () => void;
+  }) => (
+    <div data-testid="event-editor-footer">
+      <button type="button" onClick={handleEventDelete}>
+        Delete
+      </button>
+      <button type="button" onClick={onClose}>
+        Cancel
+      </button>
+      <button type="button" onClick={onCancelEdit}>
+        Cancel edit
+      </button>
+    </div>
+  ),
+}));
+
+jest.mock("../../components/event-editor/event-confirm-dialog", () => ({
+  EventConfirmDialog: ({
+    confirmLabel,
+    open,
+    onConfirm,
+  }: {
+    confirmLabel: string;
+    open: boolean;
+    onConfirm: () => void;
+  }) =>
+    open ? (
+      <button type="button" onClick={onConfirm}>
+        {confirmLabel}
+      </button>
+    ) : null,
 }));
 
 jest.mock("../../components/event-editor/event-editor-header", () => ({
@@ -143,11 +196,15 @@ jest.mock("lucide-react", () => {
 jest.mock("sonner", () => ({
   toast: {
     error: jest.fn(),
+    success: jest.fn(),
   },
 }));
 
 import { useSharedCalendarData } from "../../components/calendar-data-provider";
-import { EventEditor } from "../../components/event-editor";
+import {
+  EventEditor,
+  type EventEditorCloseHandle,
+} from "../../components/event-editor";
 import { calendarApiService } from "../../lib/calendar-api-service";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
 
@@ -275,7 +332,7 @@ describe("EventEditor", () => {
     });
 
     expect(mockGetEventNotifications).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain("Edit Event");
+    expect(container.textContent).toContain("Edit event");
     expect(
       consoleErrorSpy.mock.calls
         .flat()
@@ -320,6 +377,171 @@ describe("EventEditor", () => {
     expect(drawerMain).not.toBeNull();
     expect(drawerContent?.dataset.responsive).toBe("true");
     expect(drawerContent?.dataset.responsiveHeight).toBe("92dvh");
-    expect(drawerContent?.textContent).toContain("Edit Event");
+    expect(drawerContent?.textContent).toContain("Edit event");
+  });
+
+  it("asks for confirmation before deleting an event", async () => {
+    const deleteEvent = jest.fn(async () => {});
+    mockUseSharedCalendarData.mockReturnValue({
+      calendars: [...calendars],
+      deleteEvent,
+    } as any);
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <EventEditor
+            open={true}
+            onOpenChange={() => {}}
+            eventToEdit={existingEvent as any}
+            onBack={() => {}}
+            localSettings={localSettings as any}
+          />
+        </QueryClientProvider>,
+      );
+
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const deleteButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Delete",
+    );
+    await act(async () => {
+      deleteButton?.click();
+    });
+
+    expect(deleteEvent).not.toHaveBeenCalled();
+    expect(findButton("Delete event")).toBeDefined();
+
+    await act(async () => {
+      findButton("Delete event").click();
+      await Promise.resolve();
+    });
+
+    expect(deleteEvent).toHaveBeenCalledWith("event-1");
+    expect(findButton("Delete event")).toBeUndefined();
+  });
+  it("asks before discarding a new event with input and closes a clean one at once", async () => {
+    const onOpenChange = jest.fn();
+    const draft = { ...existingEvent, id: undefined, title: "" };
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <EventEditor
+            open={true}
+            onOpenChange={onOpenChange}
+            eventToEdit={draft as any}
+            onBack={() => {}}
+            localSettings={localSettings as any}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      findButton("Cancel").click();
+    });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    onOpenChange.mockClear();
+
+    await act(async () => {
+      findButton("Type title").click();
+    });
+    await act(async () => {
+      findButton("Cancel").click();
+    });
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(findButton("Discard event")).toBeDefined();
+
+    await act(async () => {
+      findButton("Discard event").click();
+    });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(findButton("Discard event")).toBeUndefined();
+  });
+
+  it("routes a host's close request through the discard check", async () => {
+    const onOpenChange = jest.fn();
+    const closeHandle = React.createRef<EventEditorCloseHandle>();
+    const draft = { ...existingEvent, id: undefined, title: "" };
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <EventEditor
+            open={true}
+            onOpenChange={onOpenChange}
+            eventToEdit={draft as any}
+            onBack={() => {}}
+            localSettings={localSettings as any}
+            closeHandleRef={closeHandle}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      closeHandle.current?.requestClose();
+    });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    onOpenChange.mockClear();
+
+    await act(async () => {
+      findButton("Type title").click();
+    });
+    await act(async () => {
+      closeHandle.current?.requestClose();
+    });
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(findButton("Discard event")).toBeDefined();
+  });
+
+  it("restores the stored event when edits are cancelled", async () => {
+    mockUseIsMobile.mockReturnValue(true);
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <EventEditor
+            open={true}
+            onOpenChange={() => {}}
+            eventToEdit={existingEvent as any}
+            onBack={() => {}}
+            localSettings={localSettings as any}
+            initialEventViewMode="edit"
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const body = () =>
+      container.querySelector('[data-testid="event-editor-body"]') as HTMLElement;
+    await act(async () => {
+      findButton("Type title").click();
+    });
+    expect(body().dataset.title).toBe("Lunch");
+
+    await act(async () => {
+      findButton("Cancel edit").click();
+    });
+    expect(findButton("Discard changes")).toBeDefined();
+
+    await act(async () => {
+      findButton("Discard changes").click();
+      await Promise.resolve();
+    });
+    expect(body().dataset.title).toBe("Planning");
+    expect(body().dataset.viewMode).toBe("true");
   });
 });
+
+function findButton(label: string): HTMLButtonElement {
+  return Array.from(container.querySelectorAll("button")).find(
+    (candidate) => candidate.textContent === label,
+  ) as HTMLButtonElement;
+}
