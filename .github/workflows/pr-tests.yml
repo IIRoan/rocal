@@ -86,7 +86,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Cache Rust builds
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        uses: chainguard-actions/Swatinem-rust-cache@203beff8e447695cdc59f7c4f322178a54ec6be4 # v2.9.3
 
       - name: Setup Node.js
         uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
