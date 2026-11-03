@@ -8,7 +8,9 @@ use axum::response::{IntoResponse, Response};
 use crate::error::AppError;
 use crate::state::AppState;
 
-const JSON_API_CSP: &str = "default-src 'none'; frame-ancestors 'none'";
+/// `default-src` does not cover forms or `<base>`, which a relayed HTML attachment could otherwise use for phishing on this origin.
+const JSON_API_CSP: &str =
+    "default-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'";
 /// Better Auth's `/error` page is the only HTML the API serves, and it uses an inline `<style>`.
 const AUTH_ERROR_PAGE_CSP: &str =
     "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'";

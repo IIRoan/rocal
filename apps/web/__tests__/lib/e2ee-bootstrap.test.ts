@@ -305,6 +305,31 @@ describe("e2ee bootstrap guards", () => {
     );
   });
 
+  it("unwraps the device's own copy of the keys, never the server's", async () => {
+    const remote = createRemoteBootstrap("user-1");
+    mockGetBootstrap.mockResolvedValue({
+      ...remote,
+      devices: remote.devices.map((device) => ({
+        ...device,
+        wrappedAccountKey: "server-chosen-account-key",
+        wrappedSearchKey: "server-chosen-search-key",
+      })),
+    });
+
+    await expect(ensureE2eeBootstrap("user-1")).resolves.toEqual(
+      expect.objectContaining({ activated: true }),
+    );
+
+    expect(mockUnwrapAccountKey).toHaveBeenCalledWith(
+      "wrapped-account-user-1",
+      expect.anything(),
+    );
+    expect(mockUnwrapBlindIndexKey).toHaveBeenCalledWith(
+      "wrapped-search-user-1",
+      expect.anything(),
+    );
+  });
+
   it("discards a stale bootstrap result after reset", async () => {
     let resolveBootstrap!: (
       value: ReturnType<typeof createRemoteBootstrap>,

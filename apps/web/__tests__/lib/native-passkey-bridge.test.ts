@@ -14,19 +14,34 @@ import {
 describe("native passkey bridge helpers", () => {
   it("recognizes supported native callback schemes", () => {
     expect(isValidNativePasskeyCallbackURL("solace://calendar")).toBe(true);
-    expect(
-      isValidNativePasskeyCallbackURL("exp://192.168.1.1:8081/--/calendar"),
-    ).toBe(true);
-    expect(
-      isValidNativePasskeyCallbackURL("exps://192.168.1.1:8081/--/calendar"),
-    ).toBe(true);
     expect(isValidNativePasskeyCallbackURL("solace-dev://calendar")).toBe(true);
     expect(isValidNativePasskeyCallbackURL("solace-mail://mail")).toBe(true);
+    expect(isValidNativePasskeyCallbackURL("exp+solace://calendar")).toBe(true);
     expect(isValidNativePasskeyCallbackURL("https://app.example.com")).toBe(
       false,
     );
     expect(isValidNativePasskeyCallbackURL("javascript:alert(1)")).toBe(false);
     expect(isValidNativePasskeyCallbackURL(null)).toBe(false);
+  });
+
+  it("refuses schemes another app could use to send the sign-in token elsewhere", () => {
+    for (const url of [
+      "ms-word:ofe|u|https://evil.example/x",
+      "intent://evil.example#Intent;scheme=https;end",
+      "evil-app://callback",
+      "exp://evil.example:8081/--/calendar",
+    ]) {
+      expect(isValidNativePasskeyCallbackURL(url)).toBe(false);
+    }
+  });
+
+  it("accepts Expo Go callbacks only in local development", () => {
+    const expoGo = "exp://192.168.1.1:8081/--/calendar";
+    expect(isValidNativePasskeyCallbackURL(expoGo, true)).toBe(true);
+    expect(
+      isValidNativePasskeyCallbackURL("exps://192.168.1.1:8081/--/calendar", true),
+    ).toBe(true);
+    expect(isValidNativePasskeyCallbackURL(expoGo, false)).toBe(false);
   });
 
   it("defaults bridge mode to sign-in", () => {

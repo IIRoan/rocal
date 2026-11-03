@@ -19,6 +19,7 @@ const FORBIDDEN_DEPENDENCIES: Array<[RegExp, string]> = [
 ];
 
 const ALLOWED_ENV_FILES = new Set(["apps/web/.env.production"]);
+const PRIVATE_KEY_FILE = /\.(p8|pem|key|p12|pfx|jks|keystore|ppk|private)$|(^|\/)id_(rsa|dsa|ecdsa|ed25519)$/;
 
 export const repositoryRules: Rule[] = [
   {
@@ -93,12 +94,12 @@ export const repositoryRules: Rule[] = [
     summary: "Only .env*.example files (and the public web production env) and no private keys may be committed.",
     files: (file) => {
       const base = path.basename(file);
-      return (base.startsWith(".env") && !base.endsWith(".example") && !ALLOWED_ENV_FILES.has(file)) || /\.(p8|pem|key)$/.test(file);
+      return (base.startsWith(".env") && !base.endsWith(".example") && !ALLOWED_ENV_FILES.has(file)) || PRIVATE_KEY_FILE.test(file);
     },
     check: (file) => [
       {
         line: 1,
-        message: /\.(p8|pem|key)$/.test(file.path)
+        message: PRIVATE_KEY_FILE.test(file.path)
           ? "private key material must not be committed"
           : "env files must not be committed (use .env*.example)",
       },

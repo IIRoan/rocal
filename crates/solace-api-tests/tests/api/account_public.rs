@@ -96,6 +96,38 @@ async fn email_availability_normalizes_and_explains() {
 }
 
 #[tokio::test]
+async fn email_availability_allows_sixty_lookups_a_minute_per_client() {
+    let app = TestApp::spawn().await;
+    let mut agent = app.anonymous();
+    for attempt in 0..60 {
+        ok(agent
+            .get(&format!(
+                "/api/account/email-availability?email=probe{attempt}"
+            ))
+            .await
+            .expect_status(200));
+    }
+    let limited = ok(agent
+        .get("/api/account/email-availability?email=probe")
+        .await);
+    assert_eq!(limited.status.as_u16(), 429);
+    let body = ok(limited.value());
+    assert_eq!(body["statusCode"], json!(429));
+    let message = body["message"].as_str().expect("message");
+    assert!(
+        message.starts_with("Rate limit exceeded. Try again in "),
+        "{message}"
+    );
+
+    // Another client keeps its own budget.
+    ok(app
+        .anonymous()
+        .get("/api/account/email-availability?email=probe")
+        .await
+        .expect_status(200));
+}
+
+#[tokio::test]
 async fn auth_status_reports_the_session_and_is_never_cached() {
     let app = TestApp::spawn().await;
     let response = ok(app

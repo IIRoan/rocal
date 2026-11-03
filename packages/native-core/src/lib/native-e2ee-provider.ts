@@ -28,6 +28,7 @@ import type {
 } from "@workspace/calendar-core";
 import type { PasswordEnvelopeRequest } from "@workspace/calendar-client";
 import { createLogger } from "@workspace/logger";
+import { z } from "@workspace/calendar-core/zod";
 import { createNativeCryptoProvider } from "./native-crypto-provider";
 import { encryptReminderLead, encryptReminderTitle } from "./notification-title-crypto";
 import { SECURE_STORE_KEYS } from "./constants";
@@ -176,6 +177,7 @@ export async function registerDeviceForSession({
     SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
     exportedPrivateKeyJson,
   );
+  await rememberOwnDeviceKeys({ deviceId, wrappedAccountKey, wrappedSearchKey });
   if (envelopeSalt) {
     await rememberDeviceEnvelopeSalt(envelopeSalt);
   }
@@ -205,14 +207,42 @@ export async function clearRecoverableStoredDevice(): Promise<void> {
   await Promise.all([
     SecureStore.deleteItemAsync(SECURE_STORE_KEYS.E2EE_DEVICE_ID),
     deleteChunkedSecureValue(SECURE_STORE_KEYS.E2EE_PRIVATE_KEY),
+    deleteChunkedSecureValue(SECURE_STORE_KEYS.E2EE_DEVICE_KEYS),
   ]);
   await rememberDeviceEnvelopeSalt(null);
 }
 
+const ownDeviceKeysSchema = z.object({
+  deviceId: z.string(),
+  wrappedAccountKey: z.string(),
+  wrappedSearchKey: z.string(),
+});
+
+type OwnDeviceKeys = z.infer<typeof ownDeviceKeysSchema>;
+
+async function rememberOwnDeviceKeys(keys: OwnDeviceKeys): Promise<void> {
+  await writeChunkedSecureValue(
+    SECURE_STORE_KEYS.E2EE_DEVICE_KEYS,
+    JSON.stringify(keys),
+  );
+}
+
+async function readOwnDeviceKeys(deviceId: string): Promise<OwnDeviceKeys | null> {
+  const raw = await readChunkedSecureValue(SECURE_STORE_KEYS.E2EE_DEVICE_KEYS);
+  if (!raw) return null;
+  try {
+    const parsed = ownDeviceKeysSchema.safeParse(JSON.parse(raw));
+    return parsed.success && parsed.data.deviceId === deviceId ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Opens this device's own wrapped keys; installs from before that copy existed trust the server's once and keep it. */
 export async function unwrapStoredDeviceKeys(
   e2ee: E2eeModule,
   privateKeyJwk: string,
-  device: { wrappedAccountKey: string; wrappedSearchKey: string },
+  device: OwnDeviceKeys,
 ): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }> {
   const crypto = createNativeCryptoProvider();
   if (!crypto) {
@@ -227,14 +257,28 @@ export async function unwrapStoredDeviceKeys(
     ["unwrapKey"],
   );
 
+  const own = await readOwnDeviceKeys(device.deviceId);
+  const wrapped = own ?? device;
   const accountKey = await e2ee.unwrapAccountKey(
-    device.wrappedAccountKey,
+    wrapped.wrappedAccountKey,
     privateKey,
   );
   const blindIndexKey = await e2ee.unwrapBlindIndexKey(
-    device.wrappedSearchKey,
+    wrapped.wrappedSearchKey,
     privateKey,
   );
+  if (!own) {
+    // A failed write only means the next start trusts the server's copy again, never a lost key.
+    await rememberOwnDeviceKeys({
+      deviceId: device.deviceId,
+      wrappedAccountKey: device.wrappedAccountKey,
+      wrappedSearchKey: device.wrappedSearchKey,
+    }).catch((error: unknown) => {
+      log.warn("Failed to keep this device's wrapped keys", {
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
+    });
+  }
   return { accountKey, blindIndexKey };
 }
 

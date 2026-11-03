@@ -136,14 +136,15 @@ pub async fn change_password(
         else {
             return Err(codes::credential_account_not_found());
         };
-        let new_hash = password::hash(&body.new_password, &active.user.email)
-            .await
-            .map_err(|_| ApiError::internal())?;
+        // A wrong current password must not cost one of the two hashing slots every sign-in shares.
         require_match(
             password::verify(&stored, &body.current_password, &active.user.email)
                 .await
                 .map_err(|_| ApiError::internal())?,
         )?;
+        let new_hash = password::hash(&body.new_password, &active.user.email)
+            .await
+            .map_err(|_| ApiError::internal())?;
         let envelope_stored = envelope.is_some();
         store::change_password(&state.db, credential, new_hash, envelope).await?;
         let mut token = None;

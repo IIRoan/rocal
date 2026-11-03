@@ -112,5 +112,7 @@ jobs:
         uses: chainguard-actions/actions-upload-artifact@ebf8f2543b7189e9a67dcac1af8cabbc5d7a3fd6 # v7.0.2
         with:
           name: mail-app-store-screenshots
-          path: ${{ runner.temp }}/maestro-output
+          # Maestro's logs record every typed character, App Review password included, and artifacts here are public.
+          path: ${{ runner.temp }}/maestro-output/**/*.png
           if-no-files-found: warn
+          retention-days: 7

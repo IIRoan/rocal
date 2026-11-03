@@ -90,6 +90,7 @@ describe("persistPasswordChange", () => {
       newPassword: "new-pw",
       email: "person@solace.test",
       passwordEnvelope: { kdfSalt: "new-salt" },
+      revokeOtherSessions: true,
     });
     expect(mockUploadEnvelope).not.toHaveBeenCalled();
     expect(mockRememberSalt).toHaveBeenCalledWith("user-1", "device-1", "new-salt");

@@ -25,6 +25,8 @@ use crate::request_schema;
 use crate::state::AppState;
 
 const PUBLIC_INVITE_LIMIT: Limit = Limit::per_minute(30);
+/// Each answer says whether an address has an account, so the public lookup is budgeted per client.
+const EMAIL_AVAILABILITY_LIMIT: Limit = Limit::per_minute(60);
 
 request_schema!(EmailAvailabilityQuery => zod::object([("email", zod::string().min(1).max(320))]).strict());
 
@@ -66,8 +68,14 @@ pub async fn signup_config(State(state): State<AppState>) -> Json<SignupConfig> 
 #[tracing::instrument(skip_all)]
 pub async fn email_availability(
     State(state): State<AppState>,
+    headers: HeaderMap,
     ValidQuery(query): ValidQuery<EmailAvailabilityQuery>,
 ) -> Result<Json<EmailAvailability>, AppError> {
+    rate_limit::enforce(
+        "account-email-availability",
+        &client_ip(&headers),
+        EMAIL_AVAILABILITY_LIMIT,
+    )?;
     Ok(Json(service::availability(&state, &query.email).await?))
 }
 

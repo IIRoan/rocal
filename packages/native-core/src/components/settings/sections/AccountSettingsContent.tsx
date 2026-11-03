@@ -102,6 +102,8 @@ export function AccountPasswordForm({ onClose }: { onClose: () => void }) {
           newPassword: form.newPassword,
           email: user?.email ?? "",
           passwordEnvelope,
+          // A changed password must also end a session someone else may hold.
+          revokeOtherSessions: true,
         });
         if (result.error) {
           throw new Error(
@@ -111,9 +113,10 @@ export function AccountPasswordForm({ onClose }: { onClose: () => void }) {
         return result.data;
       },
       upload: uploadPasswordEnvelope,
-    });
-    await rememberDeviceEnvelopeSalt(envelope.kdfSalt).catch(() => undefined);
-    toast("Password updated");
+    }).then(() =>
+      rememberDeviceEnvelopeSalt(envelope.kdfSalt).catch(() => undefined),
+    );
+    toast("Password updated. You're signed out everywhere else");
     onClose();
   };
 

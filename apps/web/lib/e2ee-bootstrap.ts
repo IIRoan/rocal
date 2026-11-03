@@ -102,9 +102,10 @@ async function activateFromRemote(
     return createAttempt(false, bootstrap);
   }
 
+  // The local copy, never the server's: anyone can wrap a key to this device's public key.
   const [accountKey, blindIndexKey] = await Promise.all([
-    unwrapAccountKey(remoteRecord.wrappedAccountKey, localRecord.privateKey),
-    unwrapBlindIndexKey(remoteRecord.wrappedSearchKey, localRecord.privateKey),
+    unwrapAccountKey(localRecord.wrappedAccountKey, localRecord.privateKey),
+    unwrapBlindIndexKey(localRecord.wrappedSearchKey, localRecord.privateKey),
   ]);
 
   if (!isBootstrapCurrent(userId, generation)) {

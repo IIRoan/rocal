@@ -54,6 +54,33 @@ describe("runNativePasskeyBridgeAction", () => {
     });
   });
 
+  it.each([
+    ["the hand-off token's own account", "user-1", "redirect"],
+    ["another account", "user-2", "error"],
+  ])("hands back a session only when the passkey belongs to %s", async (_case, passkeyUser, status) => {
+    mockAuthClient.$fetch.mockImplementation(async (path: unknown) =>
+      path === "/one-time-token/verify"
+        ? { data: { user: { id: "user-1" } }, error: null }
+        : { data: { token: "fresh-token" }, error: null },
+    );
+    mockAuthClient.signIn.passkey.mockResolvedValue({
+      data: { session: {}, user: { id: passkeyUser } },
+      error: null,
+    });
+
+    const result = await runNativePasskeyBridgeAction({
+      mode: "sign-in",
+      callbackURL: "solace://calendar",
+      bridgeToken: "bridge-token",
+      passkeyName: "This device",
+      cancelMessage: "Passkey authentication was cancelled.",
+      failureMessage: "Unable to finish passkey verification.",
+    });
+
+    expect(result.status).toBe(status);
+    expect(mockAuthClient.$fetch).toHaveBeenCalledTimes(status === "redirect" ? 2 : 1);
+  });
+
   it("returns a cancelled result when WebAuthn throws NotAllowedError", async () => {
     mockAuthClient.$fetch.mockResolvedValue({
       data: { token: "session-token" },

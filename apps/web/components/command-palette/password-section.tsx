@@ -68,7 +68,10 @@ export function PasswordSection({
         currentPassword: currentPwd,
         newPassword: newPwd,
       });
-      setMsg({ kind: "success", text: "Password updated." });
+      setMsg({
+        kind: "success",
+        text: "Password updated. You're signed out everywhere else.",
+      });
       dispatch({ type: "finishForm" });
     } catch (err) {
       setMsg({

@@ -18,6 +18,7 @@ use axum::Router;
 use axum::routing::any;
 use sea_orm::sqlx::PgPool;
 use sea_orm::sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
+use solace_server::telemetry::redact_pii;
 use tokio::sync::watch;
 use tokio::task::{JoinError, JoinSet};
 
@@ -221,14 +222,14 @@ async fn run_tests(cli: Cli, settings: Settings) -> anyhow::Result<()> {
             .await
             .unwrap_or_else(|_| Err("the test push timed out".into()));
         if let Err(error) = outcome {
-            tracing::error!(%error, "Failed to send test push");
+            tracing::error!(error = %redact_pii(&error.to_string()), "Failed to send test push");
             failed = true;
         }
     }
     if cli.test_email
         && let Err(error) = worker::send_test_email(&settings, &recipient).await
     {
-        tracing::error!(%error, "Failed to send test email");
+        tracing::error!(error = %redact_pii(&error.to_string()), "Failed to send test email");
         failed = true;
     }
     if failed {

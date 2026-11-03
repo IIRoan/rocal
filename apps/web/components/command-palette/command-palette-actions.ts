@@ -107,6 +107,8 @@ async function changePassword(input: {
         newPassword: input.newPassword,
         email: input.email,
         passwordEnvelope,
+        // A changed password must also end a session someone else may hold.
+        revokeOtherSessions: true,
       });
       if (result.error) {
         throw new Error(

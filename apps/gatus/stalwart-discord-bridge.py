@@ -2,6 +2,7 @@
 """Front Gatus and forward Stalwart telemetry.alert webhooks to Discord."""
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import sys
@@ -96,7 +97,7 @@ def _authorized(handler: BaseHTTPRequestHandler) -> bool:
     if not BEARER:
         return False
     auth = handler.headers.get("Authorization", "")
-    return auth == f"Bearer {BEARER}"
+    return hmac.compare_digest(auth.encode(), f"Bearer {BEARER}".encode())
 
 
 def _discord_payload(events: list[dict[str, Any]]) -> dict[str, Any]:
