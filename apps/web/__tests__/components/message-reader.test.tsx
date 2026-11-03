@@ -475,9 +475,9 @@ describe("MessageReader — linked calendar event", () => {
 
   it("says a reminder's event was deleted when it no longer exists", async () => {
     mockCalendarApiService.getEvent.mockRejectedValue({
-      error: "Not Found",
-      message: "Event not found",
-      statusCode: 404,
+      error: "Validation Error",
+      message: "Event not found or access denied",
+      statusCode: 400,
     });
     const reminderText = [
       "Event reminder",
