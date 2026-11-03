@@ -78,7 +78,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # Lossy WebP (quality 80, as Bun.Image wrote it); `image` only encodes lossless WebP.
 webp = { version = "0.3", default-features = false }
 # SigV4-presigned requests to the S3-compatible avatar bucket over the existing reqwest client.
-rusty-s3 = { version = "0.10", default-features = false, features = ["rustcrypto"] }
+rusty-s3 = { version = "0.11", default-features = false, features = ["rustcrypto"] }
 # Time zones (validation, ICS feeds, recurrence, reminders) with the tzdb bundled, so results don't depend on the image's zoneinfo.
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
 serde = { version = "1", features = ["derive"] }
