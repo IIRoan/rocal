@@ -1,32 +1,23 @@
 import {
-  getThreeDayCalendarDays,
+  getThreeDayCalendarDays as getThreeDaysAroundPickerDay,
   getZonedDateParts,
   resolveTimezone,
   utcToPickerDate,
 } from "@workspace/calendar-core";
-import { endOfDay, startOfDay } from "date-fns";
 
-import type { CalendarEvent } from "./types";
-import {
-  eventOverlapsRange,
-  isAllDayRowEvent,
-  sortEvents,
-} from "./utils";
 import { WeekCellsHeight } from "./constants";
 
-export { getThreeDayCalendarDays };
+/** Account-zone days around the selected instant, like getWeekCalendarDays. */
+export function getThreeDayCalendarDays(
+  currentDate: Date,
+  timezone?: string | null,
+): [Date, Date, Date] {
+  return getThreeDaysAroundPickerDay(
+    utcToPickerDate(currentDate, resolveTimezone(timezone)),
+  );
+}
 
 export const THREE_DAY_GRID_COLS = "grid-cols-[3rem_repeat(3,minmax(0,1fr))]";
-
-export function getThreeDayLocalRangeBounds(days: [Date, Date, Date]): {
-  rangeStart: Date;
-  rangeEnd: Date;
-} {
-  return {
-    rangeStart: startOfDay(days[0]),
-    rangeEnd: endOfDay(days[2]),
-  };
-}
 
 export function getThreeDayTimelineScrollTop(
   days: Date[],
@@ -58,40 +49,4 @@ export function getThreeDayTimelineScrollTop(
   }
 
   return Math.max(0, targetHour * cellHeight - leadingCellOffset * cellHeight);
-}
-
-export function getThreeDayAllDayEvents(events: CalendarEvent[], baseDate: Date, timezone?: string | null) {
-  const days = getThreeDayCalendarDays(baseDate);
-  const { rangeStart, rangeEnd } = getThreeDayLocalRangeBounds(days);
-  const resolvedTimezone = resolveTimezone(timezone);
-
-  const matching: CalendarEvent[] = [];
-  for (const event of events) {
-    if (
-      isAllDayRowEvent(event, resolvedTimezone) &&
-      eventOverlapsRange(event, rangeStart, rangeEnd, "day", resolvedTimezone)
-    ) {
-      matching.push(event);
-    }
-  }
-  return matching;
-}
-
-export function groupThreeDayAllDayEventsByDay(
-  events: CalendarEvent[],
-  baseDate: Date,
-  timezone?: string | null,
-): CalendarEvent[][] {
-  const days = getThreeDayCalendarDays(baseDate);
-  const allDayEvents = getThreeDayAllDayEvents(events, baseDate, timezone);
-  const resolvedTimezone = resolveTimezone(timezone);
-
-  return days.map((day) =>
-    sortEvents(
-      allDayEvents.filter((event) =>
-        eventOverlapsRange(event, day, day, "day", resolvedTimezone),
-      ),
-      resolvedTimezone,
-    ),
-  );
 }

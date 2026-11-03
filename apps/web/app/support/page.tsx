@@ -95,8 +95,8 @@ export default function SupportPage() {
           >
             report a bug or request a feature
           </a>{" "}
-          on GitHub. Reports are public: never include passwords, recovery keys,
-          session tokens, message content or private event details.
+          on GitHub. Reports are public: never include passwords, session
+          tokens, message content or private event details.
         </p>
         <p className="mt-3">
           Read the{" "}

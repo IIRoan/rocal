@@ -25,7 +25,6 @@ import Animated, {
   type WithSpringConfig,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   addMonths,
   differenceInCalendarMonths,
@@ -35,37 +34,27 @@ import {
   startOfMonth,
 } from "date-fns";
 import {
-  buildPaddedCalendarMonthRanges,
   formatCalendarMonthKey,
-  getPaddedCalendarMonthRange,
   resolveTimezone,
   utcToPickerDate,
   type DecoratedCalendarEvent,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
-import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
-import { calendarApiService } from "@workspace/native-core/lib/api";
 import {
   MAX_DOTS,
-  generateGridDates,
   getMonthDayEvents,
   getOrderedDayLabels,
-  groupEventsByDay,
   resolveEventDotColor,
 } from "./calendar/month-grid-utils";
 import { useCurrentDateTime } from "./calendar/useCurrentDateTime";
 import { useCalendars } from "../hooks/use-calendar-management";
-import { useMiniCalendarMonthEvents } from "../hooks/use-mini-calendar-month-events";
+import { useMiniCalendarPages } from "../hooks/use-mini-calendar-pages";
 import {
-  getMiniCalendarPagerWindow,
   rubberBandPagerPosition,
   MINI_CALENDAR_WINDOW_RADIUS,
 } from "./sidebar-mini-calendar-pager";
-import {
-  getMiniCalendarSwipeTarget,
-  retainMonthEvents,
-} from "./sidebar-mini-calendar-utils";
+import { getMiniCalendarSwipeTarget } from "./sidebar-mini-calendar-utils";
 
 interface SidebarMiniCalendarProps {
   weekStartDay?: number;
@@ -86,7 +75,6 @@ const PAGE_SPRING: WithSpringConfig = {
   stiffness: 320,
   mass: 0.8,
 };
-const MINI_CALENDAR_STALE_TIME = 1000 * 60 * 2;
 
 interface MiniCalendarMonthPageProps {
   monthDate: Date;
@@ -111,8 +99,8 @@ const MiniCalendarMonthPage = React.memo(function MiniCalendarMonthPage({
 }: MiniCalendarMonthPageProps) {
   return (
     <View>
-      {weeks.map((week, weekIndex) => (
-        <View key={weekIndex} style={styles.weekRow}>
+      {weeks.map((week) => (
+        <View key={week[0]?.toISOString()} style={styles.weekRow}>
           {week.map((date) => {
             const inCurrentMonth = isSameMonth(date, monthDate);
             const isSelected = inCurrentMonth && isSameDay(date, selectedDate);
@@ -189,11 +177,14 @@ export function SidebarMiniCalendar({
   timezone,
 }: SidebarMiniCalendarProps) {
   const { theme } = useTheme();
-  const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const today = useCurrentDateTime();
+  const now = useCurrentDateTime();
   const { data: calendars } = useCalendars();
   const resolvedTimezone = resolveTimezone(timezone);
+  const today = useMemo(
+    () => utcToPickerDate(now, resolvedTimezone),
+    [now, resolvedTimezone],
+  );
   const fallbackSelectedDate = useMemo(() => new Date(), []);
   const effectiveSelectedDate = selectedDate ?? fallbackSelectedDate;
 
@@ -209,10 +200,6 @@ export function SidebarMiniCalendar({
   const committedIndexShared = useSharedValue(0);
   // pageIndex captured when the active gesture began.
   const dragStartPageIndex = useSharedValue(0);
-
-  const retainedEventsByMonthRef = useRef(
-    new Map<string, DecoratedCalendarEvent[]>(),
-  );
 
   const calendarMonth = useMemo(
     () => addMonths(epochMonth, committedIndex),
@@ -245,103 +232,19 @@ export function SidebarMiniCalendar({
     jumpToMonth(selectedDate);
   }, [jumpToMonth, selectedDate]);
 
-  const { start: windowStartIndex, end: windowEndIndex } = useMemo(
-    () => getMiniCalendarPagerWindow(committedIndex, MINI_CALENDAR_WINDOW_RADIUS),
-    [committedIndex],
-  );
-
-  const monthWindow = useMemo(() => {
-    const indices: number[] = [];
-    for (let index = windowStartIndex; index <= windowEndIndex; index++) {
-      indices.push(index);
-    }
-
-    return indices.map((absoluteIndex) => {
-      const monthDate = addMonths(epochMonth, absoluteIndex);
-      const range = getPaddedCalendarMonthRange(
-        monthDate,
-        undefined,
-        resolvedTimezone,
-      );
-
-      return {
-        key: formatCalendarMonthKey(monthDate),
-        monthDate,
-        range,
-        weeks: Array.from({ length: 6 }, (_, weekIndex) =>
-          generateGridDates(monthDate, weekStartDay).slice(
-            weekIndex * 7,
-            weekIndex * 7 + 7,
-          ),
-        ),
-      };
-    });
-  }, [epochMonth, resolvedTimezone, weekStartDay, windowEndIndex, windowStartIndex]);
-
-  const eventQueries = useMiniCalendarMonthEvents(
-    monthWindow,
-    MINI_CALENDAR_STALE_TIME,
-  );
-  const secondPreviousMonthEvents = eventQueries[0]?.data;
-  const previousMonthEvents = eventQueries[1]?.data;
-  const currentMonthEvents = eventQueries[2]?.data;
-  const nextMonthEvents = eventQueries[3]?.data;
-  const secondNextMonthEvents = eventQueries[4]?.data;
-
-  useEffect(() => {
-    for (const range of buildPaddedCalendarMonthRanges(calendarMonth, {
-      adjacentMonthDepth: MINI_CALENDAR_WINDOW_RADIUS + 1,
-      timezone: resolvedTimezone,
-    })) {
-      void queryClient.prefetchQuery({
-        queryKey: QUERY_KEYS.events(
-          range.start.toISOString(),
-          range.end.toISOString(),
-        ),
-        queryFn: () => calendarApiService.getEvents(range.start, range.end),
-        staleTime: MINI_CALENDAR_STALE_TIME,
-      });
-    }
-  }, [calendarMonth, queryClient, resolvedTimezone]);
+  const { pages, windowStartIndex } = useMiniCalendarPages({
+    epochMonth,
+    committedIndex,
+    calendarMonth,
+    weekStartDay,
+    timezone: resolvedTimezone,
+    calendars,
+  });
 
   const dayLabels = useMemo(
     () => getOrderedDayLabels(weekStartDay).map((label) => label.charAt(0)),
     [weekStartDay],
   );
-
-  const pages = useMemo(() => {
-    const queryData = [
-      secondPreviousMonthEvents,
-      previousMonthEvents,
-      currentMonthEvents,
-      nextMonthEvents,
-      secondNextMonthEvents,
-    ];
-
-    return monthWindow.map((page, index) => ({
-      key: page.key,
-      monthDate: page.monthDate,
-      weeks: page.weeks,
-      eventsByDay: groupEventsByDay(
-        retainMonthEvents(
-          retainedEventsByMonthRef.current,
-          page.key,
-          queryData[index],
-          calendars,
-        ),
-        resolvedTimezone,
-      ),
-    }));
-  }, [
-    calendars,
-    currentMonthEvents,
-    monthWindow,
-    nextMonthEvents,
-    previousMonthEvents,
-    resolvedTimezone,
-    secondNextMonthEvents,
-    secondPreviousMonthEvents,
-  ]);
 
   useLayoutEffect(() => {
     pageWidthShared.value = pageWidth;

@@ -87,7 +87,7 @@ export function MailMailboxHeader({
               onChange={(event) => onSearchChange(event.target.value)}
               onKeyDown={onSearchKeyDown}
               aria-label="Search messages"
-              placeholder="Search all messages…"
+              placeholder={`Search ${title}…`}
               className="h-8 w-full rounded-md border-0 bg-[var(--bg-overlay-tertiary)] pl-7 pr-8 text-[13px] shadow-none placeholder:text-[var(--text-tertiary)] focus-visible:ring-1 focus-visible:ring-ring"
             />
             {searchBusy ? (

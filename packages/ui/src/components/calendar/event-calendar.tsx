@@ -5,11 +5,10 @@ import { createLogger } from "@workspace/logger";
 import {
   getCalendarViewAnimationKey,
   getPrefetchCalendarDateRange,
-  navigateCalendarDate,
+  navigateCalendarInstant,
   resolveTimezone,
   type TimeFormat,
 } from "@workspace/calendar-core";
-import { addDays } from "date-fns";
 import { RefreshCw } from "lucide-react";
 import { toast } from "../../lib/toast";
 
@@ -24,7 +23,6 @@ import { EventCalendarToolbar } from "./event-calendar-toolbar";
 import { EventCalendarViewStage } from "./event-calendar-views";
 import { CalendarSkeleton } from "./calendar-skeleton";
 import {
-  AgendaDaysToShow,
   EventGap,
   EventHeight,
   WeekCellsHeight,
@@ -149,20 +147,12 @@ export function EventCalendar({
 
   const handlePrevious = () => {
     navDirectionRef.current = -1;
-    navigateTo(
-      view === "agenda"
-        ? addDays(currentDate, -AgendaDaysToShow)
-        : navigateCalendarDate(currentDate, view, -1),
-    );
+    navigateTo(navigateCalendarInstant(currentDate, view, -1, resolvedTimezone));
   };
 
   const handleNext = () => {
     navDirectionRef.current = 1;
-    navigateTo(
-      view === "agenda"
-        ? addDays(currentDate, AgendaDaysToShow)
-        : navigateCalendarDate(currentDate, view, 1),
-    );
+    navigateTo(navigateCalendarInstant(currentDate, view, 1, resolvedTimezone));
   };
 
   const prefetchAdjacentRange = (direction: "prev" | "next") => {

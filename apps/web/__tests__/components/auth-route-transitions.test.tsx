@@ -121,7 +121,6 @@ jest.mock("@/components/command-palette-context", () => ({
 }));
 jest.mock("@/components/calendar-data-provider", () => ({
   CalendarDataProvider: MockContainer,
-  CalendarDateSync: () => null,
   useSharedCalendarData: () => ({ calendars: [], events: [] }),
 }));
 jest.mock("@/components/riftbound-calendar-sync", () => ({

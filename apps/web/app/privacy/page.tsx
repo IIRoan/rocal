@@ -46,7 +46,7 @@ export default function PrivacyPage() {
                 Encrypted event content and readable metadata
               </caption>
               <tbody className="divide-y divide-border/30">
-                <tr>
+                <tr className="align-top">
                   <th
                     scope="row"
                     className="px-3 py-2 text-left font-medium text-foreground"
@@ -57,7 +57,7 @@ export default function PrivacyPage() {
                     {EVENT_ENCRYPTED_FIELDS.join(", ")}
                   </td>
                 </tr>
-                <tr>
+                <tr className="align-top">
                   <th
                     scope="row"
                     className="px-3 py-2 text-left font-medium text-foreground"
@@ -75,9 +75,9 @@ export default function PrivacyPage() {
             The names of your calendars and categories are encrypted the same way,
             including the calendars a new account starts with. Calendar colors
             and which calendar an event belongs to remain readable. Events saved
-            by older app versions keep a readable color and category until they
-            are next saved. Calendar search runs on your device, so your search
-            words are not sent to Solace.
+            by older app versions keep a readable color and category until one
+            of your devices opens Solace, which encrypts them. Calendar search
+            runs on your device, so your search words are not sent to Solace.
           </p>
           <p className="mt-3">
             Reminder emails show only the event&apos;s date and time, and their
@@ -259,8 +259,9 @@ export default function PrivacyPage() {
           <p className="mt-2">
             The native apps keep authentication and encryption material in
             secure storage. Mail’s offline snapshot is encrypted with a key
-            bound to that device. Signing out clears app sessions, encryption
-            keys and saved app caches. An optional on-device search index is
+            bound to that device. Signing out clears app sessions and saved app
+            caches, and removes encryption keys unless the device may hold their
+            only copy. An optional on-device search index is
             encrypted; Solace does not persist its query cache as a separate
             unencrypted store.
           </p>
@@ -330,7 +331,7 @@ function PrivacyOverview() {
       >
         Overview
       </h2>
-      <p className="mt-2">Last updated 29 October 2026.</p>
+      <p className="mt-2">Last updated 3 November 2026.</p>
       <p className="mt-3">
         This policy covers the Solace website and the Solace Calendar and
         Solace Mail apps. Solace is run by Roan van Westerop, the controller
@@ -359,34 +360,39 @@ function PrivacyDataUse() {
         with.
       </p>
       <div className="mt-3 overflow-x-auto rounded-lg border border-border/50">
-        <table className="w-full text-[13px] leading-5">
+        <table className="w-full table-fixed text-[13px] leading-5">
           <caption className="sr-only">
             Personal data, purposes and legal bases
           </caption>
+          <colgroup>
+            <col className="w-[45%]" />
+            <col />
+          </colgroup>
           <thead>
             <tr className="text-left text-foreground">
               <th scope="col" className="px-3 py-2 font-medium">
                 Data
               </th>
               <th scope="col" className="px-3 py-2 font-medium">
-                Purpose
-              </th>
-              <th scope="col" className="px-3 py-2 font-medium">
-                Legal basis
+                Purpose and legal basis
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/30">
             {DATA_USES.map(([data, purpose, basis]) => (
-              <tr key={data}>
+              <tr key={data} className="align-top">
                 <th
                   scope="row"
                   className="px-3 py-2 text-left font-medium text-foreground"
                 >
                   {data}
                 </th>
-                <td className="px-3 py-2">{purpose}</td>
-                <td className="px-3 py-2">{basis}</td>
+                <td className="px-3 py-2">
+                  {purpose}
+                  <span className="mt-1 block text-xs">
+                    Legal basis: {basis}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -396,11 +402,12 @@ function PrivacyDataUse() {
         Solace does not make automated decisions about you that have legal
         or similarly significant effects. The website&apos;s cookies keep you
         signed in, protect sign-in and remember interface choices such as the
-        sidebar. One holds your password, encrypted with a key that only that
-        browser has, for up to 30 days so it can open your encrypted data
-        again; signing out removes it. There are no tracking or advertising
-        cookies. The apps keep their session in the device&apos;s secure
-        storage.
+        sidebar; there are no tracking or advertising cookies. Your password is
+        never stored: the website holds it in memory only while it opens your
+        encryption keys at sign-in. Your browser keeps those keys in its own
+        storage as keys that cannot be exported, and signing out removes them
+        unless this browser may hold their only copy. The apps keep their
+        session in the device&apos;s secure storage.
       </p>
     </section>
   );
@@ -500,15 +507,16 @@ function PrivacySubprocessors() {
         connection metadata needed for routing and security.
       </p>
       <div className="mt-3 overflow-x-auto rounded-lg border border-border/50">
-        <table className="w-full text-[13px] leading-5">
+        <table className="w-full table-fixed text-[13px] leading-5">
           <caption className="sr-only">Subprocessors</caption>
+          <colgroup>
+            <col className="w-[40%]" />
+            <col />
+          </colgroup>
           <thead>
             <tr className="text-left text-foreground">
               <th scope="col" className="px-3 py-2 font-medium">
-                Subprocessor
-              </th>
-              <th scope="col" className="px-3 py-2 font-medium">
-                Location
+                Subprocessor and location
               </th>
               <th scope="col" className="px-3 py-2 font-medium">
                 Role
@@ -517,14 +525,16 @@ function PrivacySubprocessors() {
           </thead>
           <tbody className="divide-y divide-border/30">
             {SUBPROCESSORS.map(([name, location, role]) => (
-              <tr key={name}>
+              <tr key={name} className="align-top">
                 <th
                   scope="row"
                   className="px-3 py-2 text-left font-medium text-foreground"
                 >
                   {name}
+                  <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                    {location}
+                  </span>
                 </th>
-                <td className="px-3 py-2">{location}</td>
                 <td className="px-3 py-2">{role}</td>
               </tr>
             ))}

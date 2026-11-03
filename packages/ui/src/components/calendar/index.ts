@@ -29,7 +29,11 @@ export { EventLoadingSkeleton } from "./event-loading-skeleton";
 
 // Context providers
 export { CalendarDndProvider, useCalendarDnd } from "./calendar-dnd-context";
-export { CalendarProvider, useCalendarContext } from "./calendar-context";
+export {
+  CalendarProvider,
+  useBootstrapCalendarDate,
+  useCalendarContext,
+} from "./calendar-context";
 
 // Constants and utilities
 export * from "./constants";

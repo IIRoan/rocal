@@ -3,6 +3,7 @@ import {
   isCancelledCalendarEvent,
 } from "@workspace/calendar-core";
 import { Button } from "@workspace/ui/components/ui/button";
+import { useShortcutLabel } from "@workspace/ui/hooks";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,8 +30,10 @@ export function EventEditorFooter({
   isViewMode,
   onInvitationResponse,
   onBack,
+  onCancelEdit,
   onClose,
 }: EventEditorFooterProps) {
+  const saveShortcut = useShortcutLabel("↵");
   const isCancelledEvent = eventForm.selectedEvent
     ? isCancelledCalendarEvent(eventForm.selectedEvent)
     : false;
@@ -210,7 +213,7 @@ export function EventEditorFooter({
           <>
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <kbd className="rounded bg-hover px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
-                ⌘↵
+                {saveShortcut}
               </kbd>
               to save
             </span>
@@ -276,11 +279,7 @@ export function EventEditorFooter({
         <>
           <Button
             variant="outline"
-            onClick={
-              eventForm.selectedEvent?.id
-                ? () => eventForm.setEventViewMode("view")
-                : onBack
-            }
+            onClick={eventForm.selectedEvent?.id ? onCancelEdit : onBack}
           >
             Cancel
           </Button>

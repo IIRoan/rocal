@@ -95,8 +95,12 @@ export function EventEditorPopover({
         return;
       }
 
-      // Nested pickers and menus dismiss themselves first.
-      if (document.querySelector("[data-radix-popper-content-wrapper]")) {
+      // Nested pickers, menus and confirm dialogs dismiss themselves first.
+      if (
+        document.querySelector(
+          "[data-radix-popper-content-wrapper], [data-slot='dialog-content'][data-state='open']",
+        )
+      ) {
         return;
       }
 
@@ -128,7 +132,8 @@ export function EventEditorPopover({
       if (
         target.closest("[data-radix-popper-content-wrapper]") ||
         target.closest("[role='listbox']") ||
-        target.closest("[role='dialog']")
+        target.closest("[role='dialog']") ||
+        target.closest("[data-slot='dialog-overlay']")
       ) {
         return;
       }

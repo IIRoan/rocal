@@ -6,8 +6,8 @@ import {
 } from "@workspace/calendar-core/product-info";
 import {
   THIRD_PARTY_LICENSE_GROUPS,
-  licenseGroupCount,
   licenseGroupKey,
+  licenseGroupLabel,
 } from "@workspace/calendar-core/third-party-notices";
 import { PublicInformationPage } from "@/components/public-information-page";
 
@@ -57,46 +57,51 @@ export default function LicensesPage() {
           its packages, their copyright notices and the license.
         </p>
         <div className="mt-4 flex flex-col gap-2">
-          {THIRD_PARTY_LICENSE_GROUPS.map((group) => (
-            <details
-              key={licenseGroupKey(group)}
-              className="rounded-lg border border-border"
-            >
-              <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3 text-foreground">
-                <span className="font-medium">{group.license}</span>
-                <span className="text-xs text-muted-foreground">
-                  {licenseGroupCount(group)}
-                </span>
-              </summary>
-              <div className="border-t border-border p-3 text-xs leading-5">
-                <ul className="flex flex-col gap-2">
-                  {group.packages.map((pkg) => (
-                    <li key={`${pkg.name}@${pkg.version}`}>
-                      <span className="font-medium text-foreground">
-                        {pkg.name}
-                      </span>{" "}
-                      {pkg.version}
-                      {pkg.copyright.map((line) => (
-                        <span key={line} className="block">
-                          {line}
-                        </span>
-                      ))}
-                      {pkg.notice ? (
-                        <span className="mt-1 block whitespace-pre-wrap">
-                          {pkg.notice}
-                        </span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-                {group.text ? (
-                  <p className="mt-4 whitespace-pre-wrap break-words">
-                    {group.text}
-                  </p>
-                ) : null}
-              </div>
-            </details>
-          ))}
+          {THIRD_PARTY_LICENSE_GROUPS.map((group) => {
+            const label = licenseGroupLabel(group);
+            return (
+              <details
+                key={licenseGroupKey(group)}
+                className="rounded-lg border border-border"
+              >
+                <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3 py-2 text-foreground">
+                  <span className="min-w-0 break-words font-medium">
+                    {label.title}
+                  </span>
+                  <span className="text-right text-xs text-muted-foreground">
+                    {label.detail}
+                  </span>
+                </summary>
+                <div className="border-t border-border p-3 text-xs leading-5">
+                  <ul className="flex flex-col gap-2">
+                    {group.packages.map((pkg) => (
+                      <li key={`${pkg.name}@${pkg.version}`}>
+                        <span className="font-medium text-foreground">
+                          {pkg.name}
+                        </span>{" "}
+                        {pkg.version}
+                        {pkg.copyright.map((line) => (
+                          <span key={line} className="block">
+                            {line}
+                          </span>
+                        ))}
+                        {pkg.notice ? (
+                          <span className="mt-1 block whitespace-pre-wrap">
+                            {pkg.notice}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                  {group.text ? (
+                    <p className="mt-4 whitespace-pre-wrap break-words">
+                      {group.text}
+                    </p>
+                  ) : null}
+                </div>
+              </details>
+            );
+          })}
         </div>
       </section>
     </PublicInformationPage>

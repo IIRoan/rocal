@@ -3,7 +3,8 @@
 import React, { act } from "react";
 import { afterEach, beforeEach, expect, it, jest } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
-import { EventDeleteConfirmDialog } from "../../components/event-editor/event-delete-confirm-dialog";
+import { EventConfirmDialog } from "../../components/event-editor/event-confirm-dialog";
+import { getEventDeleteConfirmCopy } from "../../lib/event-editor-view-model";
 
 jest.mock("lucide-react", () => ({
   XIcon: () => null,
@@ -33,12 +34,11 @@ const classesOf = (selector: string) =>
 it("insets the title, description and buttons from the dialog edges", async () => {
   await act(async () =>
     root.render(
-      <EventDeleteConfirmDialog
-        eventTitle="Planning"
+      <EventConfirmDialog
+        {...getEventDeleteConfirmCopy("Planning", false)}
         onConfirm={jest.fn()}
         onOpenChange={jest.fn()}
         open
-        removeOnly={false}
       />,
     ),
   );

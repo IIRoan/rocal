@@ -1,3 +1,4 @@
+import { roundUpToQuarterHour } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 
 type CreateDraftCalendarEventInput = {
@@ -14,7 +15,7 @@ export function createDraftCalendarEvent(
     defaultCalendarId,
     fallbackCalendarId,
     durationMinutes = 60,
-    start = new Date(),
+    start = roundUpToQuarterHour(new Date()),
   } = input;
   const startTime = new Date(start);
 

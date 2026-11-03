@@ -174,6 +174,7 @@ export function ParticipantPickerSheet({
             onSelectSuggestion={handleSelectSuggestion}
             onSubmitEditing={() => invite(draft)}
             placeholder="Add participant"
+            accessibilityLabel="Participants"
             style={styles.input}
             hasError={Boolean(error)}
             autoFocus

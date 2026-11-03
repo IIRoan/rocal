@@ -57,6 +57,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   activeApp?: "calendar" | "mail";
   weekStartDay?: number;
+  timezone?: string;
 }
 
 export function AppSidebar({
@@ -71,6 +72,7 @@ export function AppSidebar({
   prefetchRange,
   activeApp = "calendar",
   weekStartDay,
+  timezone,
   ...props
 }: AppSidebarProps) {
   if (isMobile) {
@@ -86,6 +88,7 @@ export function AppSidebar({
           getCachedEventsForRange,
           prefetchRange,
           weekStartDay,
+          timezone,
         }}
       />
     );
@@ -104,6 +107,7 @@ export function AppSidebar({
         prefetchRange,
         activeApp,
         weekStartDay,
+        timezone,
         props,
       }}
     />
@@ -120,6 +124,7 @@ function AppSidebarMobile({
   getCachedEventsForRange,
   prefetchRange,
   weekStartDay,
+  timezone,
 }: Omit<AppSidebarProps, "isMobile" | "activeApp">) {
   const { calendars, isCalendarVisible, toggleCalendarVisibility } =
     useCalendarContext();
@@ -228,6 +233,7 @@ function AppSidebarMobile({
             prefetchRange={prefetchRange}
             isMobile={true}
             weekStartDay={weekStartDay}
+            timezone={timezone}
           />
         </div>
 
@@ -416,6 +422,7 @@ function AppSidebarDesktop({
   prefetchRange,
   activeApp,
   weekStartDay,
+  timezone,
   props,
 }: {
   user?: User;
@@ -431,6 +438,7 @@ function AppSidebarDesktop({
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   activeApp: "calendar" | "mail";
   weekStartDay?: number;
+  timezone?: string;
   props: React.ComponentProps<typeof Sidebar>;
 }) {
   const { calendars, isCalendarVisible, toggleCalendarVisibility } =
@@ -457,6 +465,7 @@ function AppSidebarDesktop({
                 getCachedEventsForRange={getCachedEventsForRange}
                 prefetchRange={prefetchRange}
                 weekStartDay={weekStartDay}
+                timezone={timezone}
               />
             </SidebarGroup>
           )}

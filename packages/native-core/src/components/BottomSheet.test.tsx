@@ -8,6 +8,7 @@ import {
   BottomSheet,
   BottomSheetScrollView,
   SheetScrollFocusProvider,
+  type BottomSheetHandle,
 } from "./BottomSheet";
 
 let mockSheetProps: GorhomProps;
@@ -16,6 +17,7 @@ const mockRegisterScroll = jest.fn();
 const mockUnregisterScroll = jest.fn();
 const mockRegisterView = jest.fn();
 const mockForceClose = jest.fn();
+const mockSnapToIndex = jest.fn();
 const mockInternal = {
   animatedLayoutState: {
     get: () => ({ containerHeight: 800, handleHeight: 28 }),
@@ -91,7 +93,10 @@ jest.mock("@gorhom/bottom-sheet", () => ({
     props: GorhomProps & { ref?: React.Ref<unknown> },
   ) {
     const { useImperativeHandle } = jest.requireActual<typeof React>("react");
-    useImperativeHandle(props.ref, () => ({ forceClose: mockForceClose }));
+    useImperativeHandle(props.ref, () => ({
+      forceClose: mockForceClose,
+      snapToIndex: mockSnapToIndex,
+    }));
     mockSheetProps = props;
     return props.children;
   },
@@ -226,6 +231,26 @@ it("slides out on a tap close and unmounts once Gorhom settles, but drops a swip
   expect(container.textContent).toBe("");
   expect(mockForceClose).toHaveBeenCalledTimes(1);
   expect(onCloseComplete).toHaveBeenCalledTimes(2);
+});
+
+it("slides out again after a swiped-away sheet is snapped back open", async () => {
+  const sheetRef = React.createRef<BottomSheetHandle>();
+  const renderSheet = (visible: boolean) =>
+    act(async () => {
+      root.render(
+        <BottomSheet ref={sheetRef} visible={visible} onDismiss={jest.fn()}>
+          <Text>Sheet body</Text>
+        </BottomSheet>,
+      );
+    });
+  await renderSheet(true);
+  act(() => mockSheetProps.onClose?.());
+  act(() => sheetRef.current?.snapTo(0));
+  expect(mockSnapToIndex).toHaveBeenCalledWith(0);
+
+  await renderSheet(false);
+  expect(mockForceClose).toHaveBeenCalledTimes(1);
+  expect(container.textContent).toBe("Sheet body");
 });
 
 it("leaves the controls inside the sheet reachable by VoiceOver", async () => {

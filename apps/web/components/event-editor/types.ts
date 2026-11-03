@@ -37,6 +37,7 @@ export type EventEditorFooterProps = {
   isViewMode: boolean;
   onInvitationResponse: (status: EventEditorInvitationResponseStatus) => void;
   onBack?: () => void;
+  onCancelEdit?: () => void;
   onClose?: () => void;
 };
 
@@ -64,6 +65,7 @@ export type EventEditorViewProps = {
   badgeItem: EventEditorBadgeItem;
   calendars: Calendar[];
   categories: EventCategory[];
+  confirmsDiscard: boolean;
   dialogTitle: string;
   eventForm: EventEditorFormState;
   flags: EventEditorViewFlags;
@@ -78,6 +80,7 @@ export type EventEditorViewProps = {
   layout: EventEditorViewLayout;
   localSettings: UserSettings;
   onBack: () => void;
+  onCancelEdit: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   recurringModal: ReactNode;

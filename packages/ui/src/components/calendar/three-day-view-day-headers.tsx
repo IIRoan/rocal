@@ -2,7 +2,9 @@
 
 import {
   formatCalendarDayKey,
+  isSamePickerDay,
   isTodayInTimezone,
+  utcToPickerDate,
 } from "@workspace/calendar-core";
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
@@ -19,10 +21,12 @@ export function ThreeDayViewDayHeaders({
   days: Date[];
   timezone: string;
 }) {
+  const selectedDay = utcToPickerDate(currentDate, timezone);
+
   return (
     <div
       className={cn(
-        "z-40 grid shrink-0 border-b border-border/40 bg-background",
+        "z-40 grid shrink-0 overflow-hidden border-b border-border/40 bg-background [scrollbar-gutter:stable]",
         THREE_DAY_GRID_COLS,
       )}
     >
@@ -31,10 +35,7 @@ export function ThreeDayViewDayHeaders({
       </div>
 
       {days.map((day) => {
-        const isSelected =
-          day.getFullYear() === currentDate.getFullYear() &&
-          day.getMonth() === currentDate.getMonth() &&
-          day.getDate() === currentDate.getDate();
+        const isSelected = isSamePickerDay(day, selectedDay);
         const today = isTodayInTimezone(day, timezone);
 
         return (

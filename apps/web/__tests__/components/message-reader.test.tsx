@@ -473,6 +473,46 @@ describe("MessageReader — linked calendar event", () => {
     ).not.toBeNull();
   });
 
+  it("says a reminder's event was deleted when it no longer exists", async () => {
+    mockCalendarApiService.getEvent.mockRejectedValue({
+      error: "Not Found",
+      message: "Event not found",
+      statusCode: 404,
+    });
+    const reminderText = [
+      "Event reminder",
+      "30 minutes",
+      "Event ID: event-1",
+      "Open event: https://solace.onl/calendar?eventId=event-1",
+    ].join("\n");
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "Event reminder in 30 minutes",
+                bodyValues: { "1": { value: reminderText } },
+              } as any
+            }
+            plaintext={reminderText}
+          />
+        </QueryClientProvider>,
+      );
+    });
+
+    await waitForText("Event deleted");
+
+    expect(container.textContent).toContain(
+      "This event is no longer in your calendar.",
+    );
+    expect(container.textContent).not.toContain("Couldn't load event");
+    expect(container.textContent).not.toContain("Open in calendar");
+  });
+
   it("shows decrypted ICS invitation details without importing before acceptance", async () => {
     const icsContent = [
       "BEGIN:VCALENDAR",

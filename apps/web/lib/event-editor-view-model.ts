@@ -24,6 +24,22 @@ export const RECURRING_DELETE_FAILURE_MESSAGES: Record<RecurrenceDeleteScope, st
     all: "Failed to delete event series",
   };
 
+/** A cancelled event the user cannot edit is only removed from their calendar, not deleted. */
+export function getEventDeleteConfirmCopy(eventTitle: string, removeOnly: boolean) {
+  const title = eventTitle || "Untitled event";
+  return removeOnly
+    ? {
+        title: `Remove “${title}” from your calendar?`,
+        description: "The cancelled event leaves your calendar. You can’t undo this.",
+        confirmLabel: "Remove event",
+      }
+    : {
+        title: `Delete “${title}”?`,
+        description: "This permanently deletes the event. You can’t undo this.",
+        confirmLabel: "Delete event",
+      };
+}
+
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type EventEditorEncryptionPreviewInput = {

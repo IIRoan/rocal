@@ -285,7 +285,7 @@ export const SEARCH_INDEX = [
   },
   {
     id: "month-view",
-    label: "Month View",
+    label: "Month",
     icon: Calendar,
     description: "Set default view to month",
     targetView: "appearance",
@@ -295,7 +295,7 @@ export const SEARCH_INDEX = [
   },
   {
     id: "week-view",
-    label: "Week View",
+    label: "Week",
     icon: Calendar,
     description: "Set default view to week",
     targetView: "appearance",
@@ -304,8 +304,18 @@ export const SEARCH_INDEX = [
     parentLabel: "Appearance",
   },
   {
+    id: "3day-view",
+    label: "3 Days",
+    icon: Calendar,
+    description: "Set default view to 3 days",
+    targetView: "appearance",
+    keywords: ["3 day", "three day", "view", "default view", "appearance"],
+    parent: "appearance",
+    parentLabel: "Appearance",
+  },
+  {
     id: "day-view",
-    label: "Day View",
+    label: "Day",
     icon: Calendar,
     description: "Set default view to day",
     targetView: "appearance",
@@ -315,7 +325,7 @@ export const SEARCH_INDEX = [
   },
   {
     id: "agenda-view",
-    label: "Agenda View",
+    label: "Agenda",
     icon: Calendar,
     description: "Set default view to agenda",
     targetView: "appearance",

@@ -17,9 +17,14 @@ import {
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 import { format, addDays, isSameMonth } from "date-fns";
-import { getWeekCalendarRange, resolveTimezone } from "@workspace/calendar-core";
+import {
+  getWeekCalendarRange,
+  resolveTimezone,
+  utcToPickerDate,
+} from "@workspace/calendar-core";
 import { CalendarView } from "../calendar/types";
 import { AgendaDaysToShow } from "../calendar/constants";
+import { getThreeDayCalendarDays } from "../calendar/three-day-view-utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,16 +78,21 @@ export function MobileTopNav({
   appSwitcher,
   className,
 }: MobileTopNavProps) {
+  const resolvedTimezone = resolveTimezone(timezone);
+  // Titles name the account-zone day; formatting the instant would use the browser's zone.
+  const day = utcToPickerDate(currentDate, resolvedTimezone);
   const getDisplayText = () => {
     switch (currentView) {
       case "day":
         return {
-          main: format(currentDate, "EEEE, MMM d"),
-          sub: format(currentDate, "yyyy"),
+          main: format(day, "EEEE, MMM d"),
+          sub: format(day, "yyyy"),
         };
       case "3day": {
-        const start = addDays(currentDate, -1);
-        const end = addDays(currentDate, 1);
+        const [start, , end] = getThreeDayCalendarDays(
+          currentDate,
+          resolvedTimezone,
+        );
         if (isSameMonth(start, end)) {
           return {
             main: `${format(start, "MMM d")} – ${format(end, "d, yyyy")}`,
@@ -99,28 +109,28 @@ export function MobileTopNav({
         const { start: weekStart, end: weekEnd } = getWeekCalendarRange(
           currentDate,
           weekStartDay,
-          resolveTimezone(timezone),
+          resolvedTimezone,
         );
         return {
           main: `${format(weekStart, "MMM d")} – ${format(weekEnd, "MMM d, yyyy")}`,
-          sub: `Week ${format(currentDate, "w")}`,
+          sub: `Week ${format(day, "w")}`,
         };
       }
       case "month":
         return {
-          main: format(currentDate, "MMMM yyyy"),
+          main: format(day, "MMMM yyyy"),
           sub: "",
         };
       case "agenda":
-        const agendaEnd = addDays(currentDate, AgendaDaysToShow - 1);
-        if (isSameMonth(currentDate, agendaEnd)) {
+        const agendaEnd = addDays(day, AgendaDaysToShow - 1);
+        if (isSameMonth(day, agendaEnd)) {
           return {
-            main: format(currentDate, "MMMM yyyy"),
+            main: format(day, "MMMM yyyy"),
             sub: `${AgendaDaysToShow} days`,
           };
         } else {
           return {
-            main: `${format(currentDate, "MMM")} – ${format(agendaEnd, "MMM yyyy")}`,
+            main: `${format(day, "MMM")} – ${format(agendaEnd, "MMM yyyy")}`,
             sub: `${AgendaDaysToShow} days`,
           };
         }
@@ -129,11 +139,11 @@ export function MobileTopNav({
           getWeekCalendarRange(
             currentDate,
             weekStartDay,
-            resolveTimezone(timezone),
+            resolvedTimezone,
           );
         return {
           main: `${format(defaultWeekStart, "MMM d")} – ${format(defaultWeekEnd, "MMM d, yyyy")}`,
-          sub: `Week ${format(currentDate, "w")}`,
+          sub: `Week ${format(day, "w")}`,
         };
       }
     }

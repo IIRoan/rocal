@@ -31,11 +31,34 @@ jest.mock("@/hooks/use-recent-contacts", () => ({
   }),
 }));
 
-jest.mock("../../components/mail/rich-text-editor", () => ({
-  RichTextEditor: ({ errorId }: { errorId?: string }) => (
-    <div data-testid="editor" aria-describedby={errorId} />
-  ),
+const mockEditorFocus = jest.fn();
+
+jest.mock("../../components/mail/quoted-html", () => ({
+  ...jest.requireActual<object>("../../components/mail/quoted-html"),
+  serializeEditorContent: () => "",
 }));
+
+jest.mock("../../components/mail/rich-text-editor", () => {
+  const { useEffect, useRef } = jest.requireActual<typeof import("react")>("react");
+  return {
+    RichTextEditor: ({
+      errorId,
+      onEditorReady,
+    }: {
+      errorId?: string;
+      onEditorReady?: (editor: { commands: { focus: typeof mockEditorFocus } }) => void;
+    }) => {
+      const onEditorReadyRef = useRef(onEditorReady);
+      useEffect(() => {
+        onEditorReadyRef.current = onEditorReady;
+      });
+      useEffect(() => {
+        onEditorReadyRef.current?.({ commands: { focus: mockEditorFocus } });
+      }, []);
+      return <div data-testid="editor" aria-describedby={errorId} />;
+    },
+  };
+});
 
 import { ComposeForm } from "../../components/mail/compose-dialog";
 import { MailComposeProvider } from "../../components/mail/mail-compose-context";
@@ -44,27 +67,37 @@ let container: HTMLDivElement;
 let root: Root;
 let onSend: jest.Mock<() => Promise<void>>;
 
-beforeEach(() => {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  onSend = jest.fn(async () => undefined);
+function renderForms(autoFocusForm: boolean) {
+  const form = (autoFocus: boolean) => (
+    <ComposeForm
+      identities={[]}
+      fallbackFromEmail="me@solace.onl"
+      onClose={jest.fn()}
+      onSend={onSend}
+      isBusy={false}
+      autoFocus={autoFocus}
+    />
+  );
   act(() => {
     root.render(
       <MailComposeProvider
         mailServerLimits={resolveMailServerLimits({})}
         quoteDateOptions={{ timeFormat: "24h" }}
       >
-        <ComposeForm
-          identities={[]}
-          fallbackFromEmail="me@solace.onl"
-          onClose={jest.fn()}
-          onSend={onSend}
-          isBusy={false}
-        />
+        {form(false)}
+        {autoFocusForm ? form(true) : null}
       </MailComposeProvider>,
     );
   });
+}
+
+beforeEach(() => {
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  onSend = jest.fn(async () => undefined);
+  mockEditorFocus.mockClear();
+  renderForms(false);
 });
 
 afterEach(() => {
@@ -142,5 +175,46 @@ describe("ComposeForm", () => {
 
     act(() => button("Clear message").click());
     expect(field("Subject").value).toBe("");
+  });
+
+  it("shows the send shortcut the way this platform writes it", () => {
+    expect(container.textContent).toContain("Ctrl+↵to send");
+  });
+});
+
+describe("ComposeForm autoFocus", () => {
+  function waitForFrame() {
+    return act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  }
+
+  it("starts a new message in the To field", async () => {
+    renderForms(true);
+    await waitForFrame();
+
+    const toFields = container.querySelectorAll<HTMLInputElement>('input[placeholder="recipient@example.com"]');
+    expect(document.activeElement).toBe(toFields[1]);
+    expect(mockEditorFocus).not.toHaveBeenCalled();
+  });
+
+  it("starts a reply at the top of the body", async () => {
+    type(field("To"), "alice@example.com");
+    renderForms(true);
+    await waitForFrame();
+
+    expect(mockEditorFocus).toHaveBeenCalledWith("start");
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("leaves the caret alone when a mode switch re-creates the editor", async () => {
+    type(field("To"), "alice@example.com");
+    renderForms(true);
+    await waitForFrame();
+    mockEditorFocus.mockClear();
+
+    act(() => button("Plain text").click());
+    act(() => button("Plain text").click());
+    await waitForFrame();
+
+    expect(mockEditorFocus).not.toHaveBeenCalled();
   });
 });
