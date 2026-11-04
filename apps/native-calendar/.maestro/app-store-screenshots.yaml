@@ -46,28 +46,28 @@ appId: onl.solace.calendar
 - runFlow:
     file: select-view.yaml
     env:
-      VIEW: "3 Days"
-- takeScreenshot: 02-three-days
-- runFlow:
-    file: select-view.yaml
-    env:
-      VIEW: "Day"
-- takeScreenshot: 03-day
-- runFlow:
-    file: select-view.yaml
-    env:
       VIEW: "Month"
 - takeScreenshot: 04-month
 - runFlow:
     file: select-view.yaml
     env:
       VIEW: "Agenda"
+# Only the agenda shows event locations, so one appearing means the agenda has painted.
+- extendedWaitUntil:
+    visible: "Studio 4"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
 - takeScreenshot: 05-agenda
 - tapOn: "Settings"
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: 06-settings
-- tapOn: "Close"
+# The account sheet has no close button; a tap on the backdrop above it dismisses it.
+- tapOn:
+    point: "50%,8%"
+- waitForAnimationToEnd:
+    timeout: 5000
 - runFlow:
     file: select-view.yaml
     env:
