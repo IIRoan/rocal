@@ -1,0 +1,88 @@
+# Signs in to the App Review account and captures the App Store screenshots; run by app-store-screenshots.yml.
+appId: onl.solace.calendar
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 120000
+- tapOn: "Email address"
+- runFlow:
+    file: type-slowly.yaml
+    env:
+      TEXT: ${EMAIL}
+# Return moves focus to the password field, and Return there signs in.
+- pressKey: Enter
+- runFlow:
+    file: type-slowly.yaml
+    env:
+      TEXT: ${PASSWORD}
+- pressKey: Enter
+# iOS offers to save the password after sign-in; its sheet hides the calendar from Maestro.
+- extendedWaitUntil:
+    visible: "Not Now"
+    timeout: 180000
+    optional: true
+- tapOn:
+    text: "Not Now"
+    optional: true
+- extendedWaitUntil:
+    visible: "Create new event"
+    timeout: 120000
+# The review account's sample week repeats weekly, so these events are on screen whatever day the run lands on.
+- runFlow:
+    file: select-view.yaml
+    env:
+      VIEW: "Week"
+- extendedWaitUntil:
+    visible: "Team standup.*"
+    timeout: 90000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 01-week
+- runFlow:
+    file: select-view.yaml
+    env:
+      VIEW: "3 Days"
+- takeScreenshot: 02-three-days
+- runFlow:
+    file: select-view.yaml
+    env:
+      VIEW: "Day"
+- takeScreenshot: 03-day
+- runFlow:
+    file: select-view.yaml
+    env:
+      VIEW: "Month"
+- takeScreenshot: 04-month
+- runFlow:
+    file: select-view.yaml
+    env:
+      VIEW: "Agenda"
+- takeScreenshot: 05-agenda
+- tapOn: "Settings"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 06-settings
+- tapOn: "Close"
+- runFlow:
+    file: select-view.yaml
+    env:
+      VIEW: "Week"
+- tapOn: "Design review.*"
+- extendedWaitUntil:
+    visible: "Edit"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 07-event
+- tapOn: "Edit"
+- extendedWaitUntil:
+    visible: "Save"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 08-edit
