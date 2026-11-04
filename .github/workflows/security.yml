@@ -13,6 +13,9 @@ permissions:
 
 env:
   DOCKER_BUILD_RECORD_UPLOAD: "false"
+  # Installed from the GitHub release with a pinned checksum; setup-trivy's get.trivy.dev download fails on hosted runners.
+  TRIVY_VERSION: 0.76.1
+  TRIVY_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
 
 concurrency:
   group: security-${{ github.event.pull_request.number || github.ref }}
@@ -85,10 +88,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Trivy
-        uses: chainguard-actions/aquasecurity-setup-trivy@deb1161fd2f15201014bca22c580972ef4c71b0e # v0.3.1
-        with:
-          version: v0.76.1
+      - name: Install Trivy
+        run: |
+          set -euo pipefail
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$archive"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/trivy-bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/trivy-bin" trivy
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
 
       - name: Scan Cargo dependencies and Dockerfiles
         run: >-
@@ -152,10 +160,15 @@ jobs:
           cache-from: type=gha,scope=security-${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=security-${{ matrix.image }}
 
-      - name: Setup Trivy
-        uses: chainguard-actions/aquasecurity-setup-trivy@deb1161fd2f15201014bca22c580972ef4c71b0e # v0.3.1
-        with:
-          version: v0.76.1
+      - name: Install Trivy
+        run: |
+          set -euo pipefail
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$archive"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/trivy-bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/trivy-bin" trivy
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
 
       - name: Scan the application image
         env:
