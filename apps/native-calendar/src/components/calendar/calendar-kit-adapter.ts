@@ -196,8 +196,9 @@ export function toKitHourFormat(timeFormat: TimeFormat): string {
   return timeFormat === "24h" ? "HH:mm" : "h a";
 }
 
+/** The kit pages only whole weeks; a paged 3-day view snaps to week-aligned windows, so 3-day scrolls by day like day view. */
 export function kitScrollByDay(view: TimelineKitView): boolean {
-  return view === "day";
+  return view !== "week";
 }
 
 /** Calendar-kit starts a 3-day window at `selectedDate`; Solace (and web) center yesterday through tomorrow on it. */

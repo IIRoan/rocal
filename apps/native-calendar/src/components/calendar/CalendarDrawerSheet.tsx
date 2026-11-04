@@ -46,9 +46,14 @@ export function CalendarDrawerSheet({
     [runAfterClose, setCurrentDate, setSelectedDate],
   );
 
+  // The new view opens on the selected day, so the date bar must follow it before the kit reports its first page.
   const handleViewChange = useCallback(
-    (view: NativeCalendarView) => runAfterClose(() => setActiveView(view)),
-    [runAfterClose, setActiveView],
+    (view: NativeCalendarView) =>
+      runAfterClose(() => {
+        setCurrentDate(selectedDate);
+        setActiveView(view);
+      }),
+    [runAfterClose, selectedDate, setActiveView, setCurrentDate],
   );
 
   return (

@@ -66,9 +66,9 @@ describe("kit view mapping", () => {
     expect(KIT_NUMBER_OF_DAYS.week).toBe(7);
   });
 
-  it("pages 3-day and week by the visible window, not one day", () => {
+  it("pages only the week view, since the kit snaps paged 3-day windows to weeks", () => {
     expect(kitScrollByDay("day")).toBe(true);
-    expect(kitScrollByDay("3day")).toBe(false);
+    expect(kitScrollByDay("3day")).toBe(true);
     expect(kitScrollByDay("week")).toBe(false);
   });
 
