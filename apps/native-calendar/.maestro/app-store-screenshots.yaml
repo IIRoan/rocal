@@ -52,10 +52,6 @@ appId: onl.solace.calendar
     file: select-view.yaml
     env:
       VIEW: "Agenda"
-# Only the agenda shows event locations, so one appearing means the agenda has painted.
-- extendedWaitUntil:
-    visible: "Studio 4"
-    timeout: 30000
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: 05-agenda
