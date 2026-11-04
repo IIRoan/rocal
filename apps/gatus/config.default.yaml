@@ -7,8 +7,6 @@ web:
   address: 0.0.0.0
   port: ${PORT}
 
-metrics: true
-
 alerting:
   discord:
     webhook-url: "${DISCORD_WEBHOOK_URL}"
@@ -19,64 +17,19 @@ alerting:
       success-threshold: 2
       description: "Service monitor failed"
 
-ui:
-  title: "Solace Status"
-  header: "Solace"
-  description: "Uptime for Solace (solace.onl) and mail (mail.solace.onl)."
-  # Non-empty (Gatus falls back to "Health Dashboard" on empty); hidden via theme.css.
-  dashboard-heading: " "
-  dashboard-subheading: " "
-  logo: /solace-logo.png
-  link: "https://solace.onl"
-  # Default when no cookie / OS preference; prefers-color-scheme still wins.
-  dark-mode: false
-  default-sort-by: group
-  favicon:
-    default: /favicon.ico
-    size16x16: /favicon-16x16.png
-    size32x32: /favicon-32x32.png
-  buttons: []
-  custom-css: |
-    __THEME_CSS_PLACEHOLDER__
-
-.endpoint-ui: &endpoint-ui
-  period: 90d
-
+# Endpoint names are storage keys: renaming one drops its 90-day history. Display names live in status.html.
 .discord-alerts: &discord-alerts
   alerts:
     - type: discord
 
-# Mail / VPS: alert after 2 fails (≈1m at 30s interval). Soft enough to ignore blips.
-.discord-alerts-soft: &discord-alerts-soft
-  alerts:
-    - type: discord
-      failure-threshold: 2
-      success-threshold: 2
-      send-on-resolved: true
-
-# Stalwart's own exporter through the public edge (Basic auth from prometheus_user/prometheus_password).
-# Keep a single shared URL — do not add more endpoints that scrape this same path.
-.prometheus: &prometheus
-  <<: *discord-alerts
-  url: https://mail.solace.onl/metrics/prometheus
-  headers:
-    Authorization: "Basic __PROMETHEUS_BASIC_AUTH__"
-  client:
-    timeout: 15s
-  ui:
-    <<: *endpoint-ui
-    hide-url: true
-
 endpoints:
-  # Vercel: HEAD keeps Fluid bandwidth low; 2m ≈ 720 checks/day (status + TLS only).
+  # Vercel: HEAD keeps Fluid bandwidth low (status + TLS only).
   - name: website
     <<: *discord-alerts
     group: Application
     url: https://solace.onl/
     method: HEAD
     interval: 2m
-    ui:
-      <<: *endpoint-ui
     client:
       timeout: 10s
     conditions:
@@ -84,14 +37,12 @@ endpoints:
       - "[RESPONSE_TIME] < 3000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
-  # Cheap JSON liveness on the API — primary backend signal; 1m ≈ 1440/day.
+  # Cheap JSON liveness on the API; the primary backend signal.
   - name: api-health
     <<: *discord-alerts
     group: Application
     url: https://api.solace.onl/api/health
     interval: 1m
-    ui:
-      <<: *endpoint-ui
     client:
       timeout: 10s
     conditions:
@@ -100,30 +51,25 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
-  # API -> Stalwart reachability: one unauthenticated request, so it stays cheap on Vercel.
+  # API -> Stalwart over the private network; one unauthenticated request.
   - name: api-mail-jmap
     <<: *discord-alerts
     group: Application
     url: https://api.solace.onl/api/health/mail-jmap
     interval: 1m
-    ui:
-      <<: *endpoint-ui
     client:
       timeout: 15s
     conditions:
       - "[STATUS] == 200"
       - "[BODY].status == ok"
       - "[RESPONSE_TIME] < 10000"
-      - "[CERTIFICATE_EXPIRATION] > 336h"
 
-  # Public JMAP goes directly through Railway HTTPS.
+  # Public JMAP through Railway HTTPS.
   - name: jmap-session
-    <<: *discord-alerts-soft
+    <<: *discord-alerts
     group: Mail
     url: https://mail.solace.onl/jmap/session
     interval: 30s
-    ui:
-      <<: *endpoint-ui
     client:
       timeout: 10s
     conditions:
@@ -131,38 +77,45 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
-  # Combined Prometheus scrapes (not Vercel). 2m keeps exporter shape fresh without spam.
-  - name: stalwart-metrics
-    <<: *prometheus
-    group: Stalwart Metrics
-    interval: 2m
+  # Stalwart's ACME certificate (the one SMTP STARTTLS presents) via the VPS :443 passthrough; starttls:// fails, Go sends EHLO localhost.
+  - name: mta-sts
+    <<: *discord-alerts
+    group: Mail
+    url: https://mta-sts.solace.onl/.well-known/mta-sts.txt
+    interval: 10m
+    client:
+      timeout: 15s
     conditions:
       - "[STATUS] == 200"
-      - "[BODY] == pat(*# HELP server_memory*)"
-      - "[BODY] == pat(*# TYPE server_memory*)"
-      - "[BODY] == pat(*# HELP smtp_active_connections*)"
+      - "[BODY] == pat(*mx: mx.solace.onl*)"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+
+  # One scrape of Stalwart's exporter; Stalwart Enterprise Alerts handle counter values and thresholds.
+  - name: stalwart-metrics
+    <<: *discord-alerts
+    group: Stalwart Metrics
+    url: https://mail.solace.onl/metrics/prometheus
+    interval: 2m
+    headers:
+      Authorization: "Basic __PROMETHEUS_BASIC_AUTH__"
+    client:
+      timeout: 15s
+    ui:
+      hide-url: true
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*server_memory*)"
       - "[BODY] == pat(*smtp_active_connections*)"
-      - "[BODY] == pat(*# TYPE smtp_request_time*)"
-      - "[BODY] == pat(*# HELP delivery_active_connections*)"
+      - "[BODY] == pat(*smtp_request_time*)"
       - "[BODY] == pat(*delivery_active_connections*)"
-      - "[BODY] == pat(*# HELP imap_active_connections*)"
       - "[BODY] == pat(*imap_active_connections*)"
       - "[BODY] == pat(*http_active_connections*)"
       - "[BODY] == pat(*http_request_time_count*)"
-      - "[BODY] == pat(*# HELP user_count*)"
       - "[BODY] == pat(*user_count*)"
-      - "[BODY] == pat(*# HELP domain_count*)"
       - "[BODY] == pat(*domain_count*)"
-
-  - name: stalwart-error-counters
-    <<: *prometheus
-    group: Stalwart Metrics
-    interval: 2m
-    conditions:
-      # Store I/O must be present; error counters are unhealthy only when exported (>0).
-      - "[STATUS] == 200"
       - "[BODY] == pat(*store_blob_read*)"
       - "[BODY] == pat(*store_data_write*)"
+      # Error counters are exported only once they are non-zero.
       - "[BODY] != pat(*store_unexpected_error*)"
       - "[BODY] != pat(*store_s3_error*)"
       - "[BODY] != pat(*smtp_concurrency_limit_exceeded*)"
