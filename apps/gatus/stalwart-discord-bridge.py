@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Front Gatus and forward Stalwart telemetry.alert webhooks to Discord."""
+"""Serve the status page, front the Gatus API and forward Stalwart telemetry.alert webhooks to Discord."""
 from __future__ import annotations
 
 import hmac
@@ -9,6 +9,7 @@ import sys
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 
@@ -17,6 +18,15 @@ GATUS_PORT = int(os.environ.get("GATUS_INTERNAL_PORT", "8081"))
 DISCORD_WEBHOOK_URL = (os.environ.get("DISCORD_WEBHOOK_URL") or "").strip()
 BEARER = (os.environ.get("STALWART_WEBHOOK_BEARER") or "").strip()
 HOOK_PATH = "/hooks/stalwart"
+STATUS_PAGE = Path(__file__).with_name("status.html")
+STATUS_PAGE_HEADERS = {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-cache",
+    "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+    "img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+}
 # Drop hop-by-hop + length/encoding: we buffer the body and set Content-Length ourselves.
 _SKIP_RESPONSE_HEADERS = {
     "connection",
@@ -32,9 +42,9 @@ _SKIP_RESPONSE_HEADERS = {
 }
 
 
-def _no_store_static(path: str) -> bool:
-    p = path.split("?", 1)[0]
-    return p in {"/css/custom.css", "/js/expand-groups.js"}
+def _is_status_page(path: str) -> bool:
+    # Gatus's own SPA routes get the Solace page too, so its unthemed UI is never shown.
+    return path == "/" or path.startswith(("/endpoints/", "/suites/"))
 
 
 def _proxy(handler: BaseHTTPRequestHandler) -> None:
@@ -66,12 +76,7 @@ def _proxy(handler: BaseHTTPRequestHandler) -> None:
             for key, value in resp.headers.items():
                 if key.lower() in _SKIP_RESPONSE_HEADERS:
                     continue
-                if _no_store_static(handler.path) and key.lower() == "cache-control":
-                    continue
                 handler.send_header(key, value)
-            # Theme CSS/JS iterate often; don't let Cloudflare pin an old file.
-            if _no_store_static(handler.path):
-                handler.send_header("Cache-Control", "no-cache, max-age=0, must-revalidate")
             handler.send_header("Content-Length", str(len(payload)))
             handler.end_headers()
             if handler.command != "HEAD":
@@ -192,7 +197,20 @@ class Handler(BaseHTTPRequestHandler):
         if path.rstrip("/") == HOOK_PATH.rstrip("/") and self.command == "POST":
             self._handle_stalwart()
             return
+        if self.command in ("GET", "HEAD") and _is_status_page(path):
+            self._send_status_page()
+            return
         _proxy(self)
+
+    def _send_status_page(self) -> None:
+        body = STATUS_PAGE.read_bytes()
+        self.send_response(200)
+        for key, value in STATUS_PAGE_HEADERS.items():
+            self.send_header(key, value)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
 
     def _handle_stalwart(self) -> None:
         if not _authorized(self):

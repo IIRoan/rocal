@@ -3,4 +3,3 @@
 .env
 .env.*
 *.md
-config.vps-ssh.endpoints.yaml

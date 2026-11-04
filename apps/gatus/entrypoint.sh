@@ -1,5 +1,5 @@
 #!/bin/sh
-# Railway entrypoint: Gatus on :8081, public PORT proxies Gatus plus /hooks/stalwart.
+# Railway entrypoint: Gatus on :8081; public PORT serves status.html and /hooks/stalwart, and proxies the rest to Gatus.
 set -eu
 umask 077
 
@@ -15,27 +15,6 @@ write_base_config() {
 	fi
 
 	cp /etc/gatus/config.default.yaml /data/config.yaml
-}
-
-inject_theme_css() {
-	if [ ! -f /etc/gatus/theme.css ]; then
-		return 0
-	fi
-
-	python3 - <<'PY'
-import pathlib
-
-config_path = pathlib.Path("/data/config.yaml")
-theme_path = pathlib.Path("/etc/gatus/theme.css")
-marker = "__THEME_CSS_PLACEHOLDER__"
-config = config_path.read_text()
-theme = theme_path.read_text().rstrip("\n")
-if marker not in config:
-    raise SystemExit("theme placeholder missing from config")
-indented = "\n".join(f"    {line}" for line in theme.splitlines())
-config = config.replace(f"    {marker}", indented)
-config_path.write_text(config)
-PY
 }
 
 inject_basic_auth() {
@@ -115,7 +94,6 @@ append_vps_ssh_endpoints() {
 		echo "    url: ssh://${VPS_MONITOR_SSH_HOST}:${VPS_MONITOR_SSH_PORT}"
 		echo "    interval: 1m"
 		echo "    ui:"
-		echo "      period: 90d"
 		echo "      hide-url: true"
 		echo "    client:"
 		echo "      timeout: 25s"
@@ -141,7 +119,6 @@ append_vps_ssh_endpoints() {
 
 write_base_config
 chmod 600 /data/config.yaml
-inject_theme_css
 inject_basic_auth
 inject_prometheus_auth
 
@@ -169,4 +146,4 @@ if ! kill -0 "$GATUS_PID" 2>/dev/null; then
 fi
 
 export PORT="${PUBLIC_PORT}"
-exec python3 /usr/local/bin/stalwart-discord-bridge.py
+exec python3 /usr/local/lib/solace/stalwart-discord-bridge.py
