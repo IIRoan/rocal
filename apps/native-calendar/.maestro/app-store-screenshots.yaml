@@ -75,10 +75,3 @@ appId: onl.solace.calendar
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: 07-event
-- tapOn: "Edit"
-- extendedWaitUntil:
-    visible: "Save"
-    timeout: 30000
-- waitForAnimationToEnd:
-    timeout: 5000
-- takeScreenshot: 08-edit
