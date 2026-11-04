@@ -269,3 +269,13 @@ Audit of both apps' resolved production config (`expo config --type introspect`,
 - The reviewer's "Studio walkthrough" thread was re-sent after #135 shipped, so both sides carry display names (Avery Collins, Maya Lindqvist) in the captures.
 - Nothing has been submitted: Add for Review and Submit for Review are left to the owner.
 
+
+### Calendar product page (2026-11-04)
+
+- Version 1.0.4 (renamed from 1.0.2) uses the newest master build. Build 11 brought the text-free icon (#162); the view-switch fix (#163) ships in the build after it. Release is manual.
+- App Information: Productivity and Business; content rights "yes, with rights" (subscribed and holiday feeds, invitations); age rating 4+ with only Messaging and Chat (invitations to chosen people), no user-generated content because events are private; not a regulated medical device; EU non-trader. Price is free, France stays excluded, and Mac and Vision Pro availability is off for both apps (iPhone only, untested elsewhere). App Privacy was already published.
+- Review information matches Mail's: the same reviewer account, contact and manual release, with Calendar-specific notes. The review account's Work, Personal and Family calendars hold a sample week that repeats weekly until 2027-03-01 (`plans/fixtures/apple-review-week-*.ics`, imported through the web Import .ics File flow so it is encrypted on the device), plus Maya's unanswered "Studio walkthrough" invitation on 2026-11-05.
+- Screenshots come from `app-store-screenshots.yml` dispatched with `app: calendar` (the workflow runs one job per app, so Calendar captures never sign Mail's review account in). Four frames in Mail's style alternate light and dark: week ("Your week at a glance"), event detail ("Private by design"), agenda ("Everything coming up") and Settings ("No ads. No tracking."), in both the required 6.3" and the 6.9" slots.
+- App Accessibility drafts for both apps declare Dark Interface and Reduced Motion on iPhone only; VoiceOver, Voice Control, Larger Text, contrast and colour wait for device testing. Apple publishes accessibility support only after a version is released.
+- Native Calendar's command palette has no entry point, so the listing makes no search claim.
+- Nothing has been submitted: Add for Review and Submit for Review are left to the owner.
