@@ -189,8 +189,12 @@ jobs:
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
-      - name: Check Android build storage
-        run: df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP" /tmp
+      # The runner starts with about 19 GB free, which RN 0.86's native Android build now outgrows; these toolchains are unused here.
+      - name: Free Android build storage
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force > /dev/null
+          df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP" /tmp
 
       - name: Setup Node.js
         uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
