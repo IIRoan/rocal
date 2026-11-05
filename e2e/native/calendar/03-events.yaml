@@ -19,6 +19,9 @@ appId: ${APP_ID}
     env:
       TEXT: Maestro meeting room
 - hideKeyboard
+- scrollUntilVisible:
+    element: Description
+    direction: DOWN
 - tapOn: Description
 - runFlow:
     file: ../common/type.yaml

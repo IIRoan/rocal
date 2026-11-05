@@ -1,8 +1,9 @@
 # Gatus status page (Solace)
 
 [Gatus](https://github.com/TwiN/gatus) monitors Solace and mail from Railway. The image is
-built from a pinned commit of [CarmJos/gatus](https://github.com/CarmJos/gatus) for its
-`period-statuses` API (upstream PR #1651), which the page uses for one bar per day over 90 days.
+built from a pinned commit of [CarmJos/gatus](https://github.com/CarmJos/gatus) (upstream PR
+#1651, 90-day retention) with the three patches below; the page reads history from its own
+`/timeline` endpoint, not Gatus's `period-statuses`.
 Deploy as a **separate Railway service** (root directory `apps/gatus`, volume at `/data`).
 `apps/gatus` must be on the GitHub `master` branch before Railway can build it.
 
@@ -15,19 +16,45 @@ and System clears it.
 The Python front (`stalwart-discord-bridge.py`) serves it at `/` and `/endpoints/<key>`
 (also `/suites/*`, so the stock Gatus UI is never shown) and proxies `/api/*` to Gatus.
 
-`/` is the overview; each service links to `/endpoints/<key>`, a detail view with uptime
-(24 hours to 90 days), a response-time chart (24 hours, 7 days, 30 days; Gatus keeps hourly
-points for 48 hours and daily ones before that), the 90-day bars, the last 30 checks, the
-latest check's conditions and errors, and every recorded incident.
+`/` is the overview: per service, 90 daily bars and uptime over 24 hours, 7 days, 30 days and
+90 days. Each service links to `/endpoints/<key>`, a detail view where the whole page follows
+one period: the chart's range (24 hours, 7 days, 30 days, 90 days), a day, or an hour. For that
+period it shows a summary (uptime, checks passed, average response), its outages, the
+response-time chart, and its checks: one bar per bucket (hours for 24 hours, 7 days and a day;
+six-hour blocks for 30 days; days for 90 days), or for an hour every individual check, opening
+on the first failure with its conditions and errors.
 
-The page reads the Gatus API from the browser and skips refreshes while the tab is hidden:
+Day bars are calendar days in the viewer's time zone (green at 99% or more, amber from 90%,
+red below). Clicking a day (on the overview, the 30- or 90-day chart, or a check bar) opens it,
+and clicking an hour (on a chart or a check bar) opens its individual checks. A breadcrumb
+(`Overview / Wed, Nov 4 / …`) steps back out, the range buttons return to a range, and the
+URL carries the zoom (`?day=2026-11-04&hour=16`). With a chart or bar strip focused, arrow
+keys browse and Enter opens.
+Charts scale to healthy points and pin failing hours or checks to the top edge, since a
+failed check reports its timeout; outages from the recorded status changes are shaded red
+across the chart, and a zoomed view lists each one with its exact window.
+
+**Timeline endpoint.** `GET /timeline/<key>?from=<unix s>&to=<unix s>&step=3600|21600|86400&tz=<IANA zone>`
+in the Python front reads Gatus's SQLite read-only and returns uptime buckets (checks,
+successes, average response) for windows up to 92 days, with daily buckets starting at
+midnight in `tz`, plus individual checks for windows of two hours or less. Gatus's own API
+can't answer "hours of a past day".
+
+**History kept:** hourly uptime for 90 days (`uptime-hourly-retention.patch`; upstream merges
+anything older than 48 hours into days, so days from before this patch only have a daily
+total), and the last 2,880 checks per endpoint (`maximum-number-of-results`), a day at the
+30-second JMAP interval and longer for slower checks. About 2,200 uptime rows and 2,880
+results per endpoint; the SQLite file stays in the tens of MB.
+
+The page skips refreshes while the tab is hidden:
 
 | View | Request | When | Size |
 |------|---------|------|------|
 | Overview | `/api/v1/endpoints/statuses?pageSize=1` | load, then every minute | ~5 KB |
-| Overview | `period-statuses/90d/90` + `statuses?pageSize=1` (events) per endpoint | load, then every 15 minutes | ~8 KB each |
-| Detail | `statuses?pageSize=30` | load, then every minute | ~13 KB |
-| Detail | `period-statuses/90d/90` + `response-times/<range>/history` | load, range change, every 15 minutes | ~6 KB |
+| Overview | `/timeline` (90 days, daily) + `statuses?pageSize=1` (events) per endpoint | load, then every 15 minutes | ~8 KB each |
+| Detail | `statuses?pageSize=10` (header state) | load, then every minute | ~6 KB |
+| Detail | `/timeline` for the chart range (24 to 168 buckets) | load, range change, every 15 minutes | ~8 KB |
+| Detail | `/timeline` for the selected day or hour | on selection, every 15 minutes | ~2–6 KB |
 
 Display names and descriptions live in `SERVICES` at the top of the page script, keyed by
 the Gatus key (`group_name`, lowercased). Endpoint names and groups in the config are storage

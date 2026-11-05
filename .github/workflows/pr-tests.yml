@@ -33,6 +33,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Validate native E2E workflow semantics
+        env:
+          SOLACE_E2E: "1"
+          SOLACE_E2E_DIR: ${{ runner.temp }}/solace-e2e
+        run: python3 -B scripts/e2e/check_workflow.py
+
       - name: Run lint checks
         run: bun run lint
 

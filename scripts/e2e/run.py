@@ -36,13 +36,13 @@ def publish(results):
             destination.write(summary + "\n")
 
 
-def run_journey(platform, app, flow, results):
+def run_journey(platform, app, flow, results, name=None):
     root = directory()
     device = json.loads((root / "private/device.json").read_text())
     fixture = json.loads((root / "private/fixture.json").read_text())
     tool = (root / "private/maestro-path").read_text()
     home = "Create new event" if app == "calendar" else "Compose message"
-    name = flow.stem
+    name = name or flow.stem
     started = time.monotonic()
     screenshots = root / f"private/maestro/{app}-{name}"
     screenshots.mkdir(parents=True, exist_ok=True)
@@ -81,7 +81,7 @@ def main(platform):
             run_journey(platform, "mail", scenarios / "mail/offline.yaml", results)
         finally:
             os.kill(backend, signal.SIGCONT)
-        run_journey(platform, "mail", scenarios / "mail/02-delivery-and-reader.yaml", results)
+        run_journey(platform, "mail", scenarios / "mail/02-delivery-and-reader.yaml", results, name="online-recovery")
     run_journey(platform, "mail", scenarios / "mail/sign-out.yaml", results)
     publish(results)
     expected = sum(len(list((scenarios / app).glob("*.yaml"))) for app in APPS) + 1

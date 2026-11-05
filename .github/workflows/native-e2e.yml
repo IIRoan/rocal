@@ -75,8 +75,10 @@ jobs:
       CARGO_BUILD_JOBS: "3"
       MAESTRO_CLI_NO_ANALYTICS: "1"
       MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
-      SOLACE_E2E_DIR: ${{ runner.temp }}/solace-e2e
     steps:
+      - name: Prepare isolated test directory
+        shell: bash
+        run: echo "SOLACE_E2E_DIR=$RUNNER_TEMP/solace-e2e" >> "$GITHUB_ENV"
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
       - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
         with:
@@ -127,7 +129,7 @@ jobs:
         id: binaries
         with:
           path: ${{ runner.temp }}/solace-e2e/binaries
-          key: native-e2e-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.SOLACE_E2E_TOOLCHAIN }}-${{ hashFiles('bun.lock', 'patches/**', 'packages/**', 'apps/native-*/app/**', 'apps/native-*/src/**', 'apps/native-*/assets/**', 'apps/native-*/*.json', 'apps/native-*/*.ts', 'apps/native-*/*.js', 'apps/native-*/*.cts', 'babel.config.cts', 'scripts/e2e/build.py', '.github/workflows/native-e2e.yml') }}
+          key: native-e2e-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.SOLACE_E2E_TOOLCHAIN }}-${{ hashFiles('bun.lock', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/*.ts', 'packages/*/*.js', 'packages/*/*.cts', 'packages/*/src/**', 'packages/*/assets/**', 'packages/native-core/plugins/**', 'apps/native-*/app/**', 'apps/native-*/src/**', 'apps/native-*/assets/**', 'apps/native-*/*.json', 'apps/native-*/*.ts', 'apps/native-*/*.js', 'apps/native-*/*.cjs', 'apps/native-*/*.cts', 'babel.config.cts', 'scripts/e2e/build.py', '.github/workflows/native-e2e.yml') }}
       - name: Build both release apps for the simulator or emulator
         if: steps.binaries.outputs.cache-hit != 'true'
         shell: bash
