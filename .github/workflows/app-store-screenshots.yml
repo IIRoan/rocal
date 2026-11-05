@@ -2,17 +2,27 @@ name: App Store screenshots
 
 on:
   workflow_dispatch:
+    inputs:
+      app:
+        description: App to capture (each run signs in to the App Review account and changes what it sees)
+        type: choice
+        options: [calendar, mail, all]
+        default: calendar
 
 permissions:
   contents: read
 
 jobs:
-  mail:
+  capture:
     runs-on: macos-latest
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(inputs.app == 'all' && '["calendar","mail"]' || format('["{0}"]', inputs.app)) }}
     defaults:
       run:
-        working-directory: apps/native-mail
+        working-directory: apps/native-${{ matrix.app }}
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
       # Flow-only changes reuse the last simulator build; the key covers everything that goes into the app.
@@ -20,7 +30,7 @@ jobs:
         uses: chainguard-actions/actions-cache/restore@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0
         with:
           path: ${{ runner.temp }}/build/Build/Products/Release-iphonesimulator
-          key: mail-simulator-app-v2-${{ hashFiles('bun.lock', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/src/**', 'packages/native-core/plugins/**', 'apps/native-mail/app/**', 'apps/native-mail/src/**', 'apps/native-mail/assets/**', 'apps/native-mail/*.json', 'apps/native-mail/*.ts', 'apps/native-mail/*.js', 'apps/native-mail/*.cts') }}
+          key: ${{ matrix.app }}-simulator-app-v2-${{ hashFiles('bun.lock', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/src/**', 'packages/native-core/plugins/**', format('apps/native-{0}/app/**', matrix.app), format('apps/native-{0}/src/**', matrix.app), format('apps/native-{0}/assets/**', matrix.app), format('apps/native-{0}/*.json', matrix.app), format('apps/native-{0}/*.ts', matrix.app), format('apps/native-{0}/*.js', matrix.app), format('apps/native-{0}/*.cts', matrix.app)) }}
       - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
         with:
           node-version-file: .node-version
@@ -93,7 +103,7 @@ jobs:
           set -uo pipefail
           capture() {
             for attempt in 1 2 3; do
-              maestro --device "$DEVICE" test --env EMAIL="$EMAIL" --env PASSWORD="$PASSWORD" --test-output-dir "$RUNNER_TEMP/maestro-output/$1-$attempt" "$GITHUB_WORKSPACE/apps/native-mail/.maestro/app-store-screenshots.yaml" && return 0
+              maestro --device "$DEVICE" test --env EMAIL="$EMAIL" --env PASSWORD="$PASSWORD" --test-output-dir "$RUNNER_TEMP/maestro-output/$1-$attempt" "$GITHUB_WORKSPACE/apps/native-${{ matrix.app }}/.maestro/app-store-screenshots.yaml" && return 0
             done
             return 1
           }
@@ -106,7 +116,7 @@ jobs:
       - if: always()
         uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
         with:
-          name: mail-app-store-screenshots
+          name: ${{ matrix.app }}-app-store-screenshots
           # Maestro's logs record every typed character, App Review password included, and artifacts here are public.
           path: ${{ runner.temp }}/maestro-output/**/*.png
           if-no-files-found: warn

@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import {
   formatCalendarDayKey,
   getAgendaPageDate,
+  navigateCalendarDate,
   utcToPickerDate,
 } from "@workspace/calendar-core";
 import { isTimelineCalendarView } from "../../lib/calendar-views";
@@ -33,6 +34,14 @@ export function useCalendarViewNavigation(timezone: string) {
 
   const navigate = useCallback(
     (direction: 1 | -1) => {
+      // The kit scrolls 3-day by single days, so its pager would step one day; web steps the whole window.
+      if (activeView === "3day") {
+        timelineRef.current?.goToDate(
+          navigateCalendarDate(selectedDate, activeView, direction),
+          { animated: true },
+        );
+        return;
+      }
       if (isTimelineCalendarView(activeView)) {
         if (direction === 1) timelineRef.current?.goToNextPage(true);
         else timelineRef.current?.goToPrevPage(true);

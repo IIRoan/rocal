@@ -3813,19 +3813,19 @@
     },
     {
      "name": "react-native-nitro-modules",
-     "version": "0.35.9",
+     "version": "0.37.1",
      "copyright": []
     },
     {
      "name": "react-native-quick-base64",
-     "version": "3.0.0",
+     "version": "3.0.1",
      "copyright": [
       "Copyright (c) 2026 Takuya Matsuyama"
      ]
     },
     {
      "name": "react-native-quick-crypto",
-     "version": "1.1.5",
+     "version": "1.1.9",
      "copyright": []
     },
     {

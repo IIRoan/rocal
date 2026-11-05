@@ -239,6 +239,57 @@ async fn the_session_or_a_bearer_opens_the_callers_own_mailbox() {
 }
 
 #[tokio::test]
+async fn a_revoked_client_bearer_cannot_keep_the_same_revoked_token_cached() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    let account_id = owner.account_id().to_owned();
+    let token = access_token(&mut owner.user).await.access_token;
+    let bearer = format!("Bearer {token}");
+    set_bridge_password(&app, owner.account_id(), &owner.user.id, &owner.user.email).await;
+
+    let recovered = send(
+        &mut owner.user,
+        Method::GET,
+        "/api/mail/jmap/jmap/session",
+        None,
+        &[("authorization", &bearer)],
+    )
+    .await;
+    assert_eq!(recovered.status.as_u16(), 200, "{}", recovered.text());
+    assert_eq!(auth_source(&recovered), ("session".into(), "1".into()));
+    assert_eq!(ok(recovered.value())["username"], json!(owner.user.email));
+
+    let fresh = access_token(&mut owner.user).await.access_token;
+    assert_ne!(
+        fresh, token,
+        "the token endpoint must stop returning the revoked bearer"
+    );
+    let fresh_bearer = format!("Bearer {fresh}");
+    let relayed = send(
+        &mut owner.user,
+        Method::POST,
+        "/api/mail/jmap/jmap",
+        Some(json!({"using": JMAP_MAIL, "methodCalls": [["Mailbox/get", {"accountId": account_id, "properties": ["role"]}, "m"]]})),
+        &[("authorization", &fresh_bearer)],
+    )
+    .await;
+    assert_eq!(relayed.status.as_u16(), 200, "{}", relayed.text());
+    assert_eq!(auth_source(&relayed), ("client-bearer".into(), "0".into()));
+    assert!(method(&ok(relayed.value()), "m")["list"].is_array());
+
+    let unrelated = send(
+        &mut owner.user,
+        Method::GET,
+        "/api/mail/jmap/jmap/session",
+        None,
+        &[("authorization", "Bearer unrelated-stale-token")],
+    )
+    .await;
+    assert_eq!(unrelated.status.as_u16(), 200);
+    assert_eq!(access_token(&mut owner.user).await.access_token, fresh);
+}
+
+#[tokio::test]
 async fn mail_flows_between_users_and_tokens_stay_in_their_own_account() {
     let app = TestApp::spawn().await;
     let mut sender = mailbox(&app).await;

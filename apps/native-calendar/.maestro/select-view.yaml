@@ -1,0 +1,15 @@
+# Switches the calendar to VIEW through the date and view drawer; the drawer only closes itself when the view changes.
+appId: onl.solace.calendar
+---
+- tapOn: "Choose date and view"
+- tapOn: ${VIEW}
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible: "3 Days"
+    commands:
+      - tapOn:
+          point: "50%,15%"
+      - waitForAnimationToEnd:
+          timeout: 5000

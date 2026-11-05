@@ -148,6 +148,26 @@ pub fn invalidate_access_token(state: &AppState, user_id: &str) {
         .remove(user_id);
 }
 
+/// Drops only the rejected bearer, keeping newer tokens and the slot that serializes concurrent mints.
+pub async fn invalidate_rejected_access_token(state: &AppState, user_id: &str, rejected: &str) {
+    let slot = state
+        .mail_cache
+        .tokens
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get(user_id)
+        .cloned();
+    if let Some(slot) = slot {
+        let mut cached = slot.lock().await;
+        if cached
+            .as_ref()
+            .is_some_and(|entry| entry.token.access_token == rejected)
+        {
+            *cached = None;
+        }
+    }
+}
+
 /// `issueAccessTokenForUser`: logs in with the derived bridge secret, setting it as the account password only after a refused login.
 async fn issue_access_token(
     state: &AppState,
