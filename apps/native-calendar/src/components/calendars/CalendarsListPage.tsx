@@ -74,7 +74,7 @@ export function CalendarsListPage() {
               key={calendar.id}
               label={calendar.name}
               detail={ownedCalendarDetail(calendar)}
-              leading={
+              leadingAction={
                 <CalendarVisibilityCheck
                   color={calendar.color}
                   visible={calendar.isVisible}
@@ -153,7 +153,8 @@ function ReadOnlyCalendarRow({
       label={subscription.calendar.name}
       detail={readOnlyCalendarDetail(entry)}
       detailTone={subscription.lastErrorMessage ? "destructive" : "muted"}
-      leading={
+      leading={!calendar ? <SheetSwatch color={resolveCalendarSwatchColor(subscription.calendar.color, theme)} /> : undefined}
+      leadingAction={
         calendar ? (
           <CalendarVisibilityCheck
             color={calendar.color}
@@ -162,9 +163,7 @@ function ReadOnlyCalendarRow({
             calendarName={subscription.calendar.name}
             onToggle={() => onToggle(calendar)}
           />
-        ) : (
-          <SheetSwatch color={resolveCalendarSwatchColor(subscription.calendar.color, theme)} />
-        )
+        ) : undefined
       }
       chevron
       onPress={onOpen}

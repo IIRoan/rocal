@@ -87,8 +87,8 @@ function rowDividerInset(row: ReactNode): number {
   if (!isValidElement<Partial<SheetItemProps>>(row)) {
     return ROW_PADDING_X;
   }
-  const { icon, swatch, leading } = row.props;
-  if (icon || swatch || leading) {
+  const { icon, swatch, leading, leadingAction } = row.props;
+  if (icon || swatch || leading || leadingAction) {
     return ROW_PADDING_X + MAIL_ICON.sheet + ROW_GAP;
   }
   return ROW_PADDING_X;
@@ -124,6 +124,7 @@ export function SheetGroupBlock({ children }: { children: ReactNode }) {
 }
 
 export interface SheetItemProps {
+  testID?: string;
   label: string;
   detail?: string;
   detailTone?: "muted" | "destructive";
@@ -133,6 +134,7 @@ export interface SheetItemProps {
   /** Leading color chip, e.g. a calendar or label color. */
   swatch?: string;
   leading?: ReactNode;
+  leadingAction?: ReactNode;
   /** Accent-colored trailing icon; `checked` is shorthand for a check. */
   accessory?: FeatherName;
   checked?: boolean;
@@ -154,6 +156,7 @@ export interface SheetItemProps {
 
 /** One 48pt drawer row: leading icon or node, label with optional detail, trailing slot. */
 export function SheetItem({
+  testID,
   label,
   detail,
   detailTone = "muted",
@@ -161,6 +164,7 @@ export function SheetItem({
   icon,
   swatch,
   leading,
+  leadingAction,
   accessory,
   checked = false,
   trailing,
@@ -182,17 +186,9 @@ export function SheetItem({
         : theme.colors.foreground;
   const iconColor = tone === "default" ? skin.textSecondary : toneColor;
 
-  const leadingIcon = swatch ? (
-    <SheetSwatch color={swatch} />
-  ) : icon ? (
-    <View style={styles.iconSlot}>
-      <Feather name={icon} size={MAIL_ICON.sheetAccessory} color={iconColor} />
-    </View>
-  ) : null;
-
   const body = (
     <>
-      {leading ?? leadingIcon}
+      <SheetItemLeading leading={leading} swatch={swatch} icon={icon} color={iconColor} />
       <View style={styles.rowCopy}>
         <Text style={[styles.rowLabel, { color: toneColor }]} numberOfLines={1}>
           {label}
@@ -222,16 +218,20 @@ export function SheetItem({
 
   if (!onPress) {
     return (
-      <View style={[styles.row, disabled && styles.disabled]}>{body}</View>
+      <View testID={testID} style={[styles.row, disabled && styles.disabled]}>
+        {body}
+      </View>
     );
   }
 
-  return (
+  const button = (
     <Pressable
+      testID={testID}
       onPress={onPress}
       disabled={disabled || pending}
       style={({ pressed }) => [
         styles.row,
+        leadingAction ? styles.actionRowCopy : undefined,
         pressed && styles.rowPressed,
         disabled && styles.disabled,
       ]}
@@ -244,6 +244,25 @@ export function SheetItem({
       {body}
     </Pressable>
   );
+  return leadingAction ? (
+    <View style={styles.actionRow}>
+      <View style={styles.leadingAction}>{leadingAction}</View>
+      {button}
+    </View>
+  ) : button;
+}
+
+function SheetItemLeading({
+  leading, swatch, icon, color,
+}: Pick<SheetItemProps, "leading" | "swatch" | "icon"> & { color: string }) {
+  const { styles } = useSheetListStyles();
+  if (leading !== null && leading !== undefined) return leading;
+  if (swatch) return <SheetSwatch color={swatch} />;
+  return icon ? (
+    <View style={styles.iconSlot}>
+      <Feather name={icon} size={MAIL_ICON.sheetAccessory} color={color} />
+    </View>
+  ) : null;
 }
 
 function SheetItemTrailing({
@@ -510,6 +529,17 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       minHeight: 48,
       paddingHorizontal: ROW_PADDING_X,
       paddingVertical: theme.spacing["2"],
+    },
+    actionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    leadingAction: {
+      marginLeft: ROW_PADDING_X,
+    },
+    actionRowCopy: {
+      flex: 1,
+      paddingLeft: ROW_GAP,
     },
     search: {
       flexDirection: "row" as const,

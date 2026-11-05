@@ -185,6 +185,7 @@ export function AccountSheet({
               {group.rows.map((row) => (
                 <SheetItem
                   key={row.id}
+                  testID={`settings-page-${row.id}`}
                   label={row.label}
                   detail={searching ? row.description : undefined}
                   icon={config.icons[row.id] ?? "settings"}

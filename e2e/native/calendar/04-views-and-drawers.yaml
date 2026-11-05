@@ -22,7 +22,10 @@ appId: ${APP_ID}
     timeout: 30000
 - tapOn: Settings
 - assertVisible: Search settings
-- tapOn: Appearance
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: appearance
 - assertVisible: "(?i)Theme"
 - tapOn: Dark
 - assertVisible:
@@ -34,7 +37,10 @@ appId: ${APP_ID}
     text: Light
     selected: true
 - tapOn: Back to settings
-- tapOn: Time & Region
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: time-region
 - assertVisible: "(?i)Time format"
 - tapOn: Timezone
 - tapOn: Search timezones

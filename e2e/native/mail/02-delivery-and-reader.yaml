@@ -23,7 +23,7 @@ appId: ${APP_ID}
 - tapOn: Reply
 - assertVisible: Send
 - assertVisible: ".*Maestro body survives encrypted draft storage.*"
-- tapOn: Close
+- runFlow: ../common/close-compose.yaml
 - tapOn: Go back
 - assertVisible: ".*Maestro round trip.*"
 - tapOn: ".*Switch mailbox"

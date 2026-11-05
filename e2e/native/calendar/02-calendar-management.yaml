@@ -2,7 +2,10 @@ appId: ${APP_ID}
 ---
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings
-- tapOn: Calendars
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
 - assertVisible: "(?i)My calendars"
 - tapOn: New calendar
 - assertVisible: Calendar name
@@ -48,7 +51,10 @@ appId: ${APP_ID}
 - takeScreenshot: ${SCREENSHOT_DIR}/calendar-created-and-renamed
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings
-- tapOn: Calendars
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
 - assertVisible: "Maestro renamed calendar.*"
 - tapOn: "Maestro renamed calendar.*"
 - scrollUntilVisible:

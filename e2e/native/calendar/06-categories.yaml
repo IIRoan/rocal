@@ -2,7 +2,10 @@ appId: ${APP_ID}
 ---
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings
-- tapOn: Calendars
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
 - tapOn: Categories
 - tapOn: New category
 - tapOn: Category name
@@ -32,7 +35,10 @@ appId: ${APP_ID}
     timeout: 30000
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings
-- tapOn: Calendars
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
 - tapOn: Categories
 - tapOn: "Maestro category.*"
 - tapOn: Category name

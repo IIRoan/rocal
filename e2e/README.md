@@ -1,8 +1,8 @@
 # Native end-to-end tests
 
-`Native end-to-end` builds **both native apps in Release mode** and drives them with the pinned Maestro CLI on an iOS Simulator and an Android emulator. It runs on relevant pull requests, default-branch/testing pushes and manual dispatches. Each platform installs both apps and uses one newly invited account, so Mail must unlock the account key created by Calendar. This supplements the workspace unit tests and black-box API suite; it does not replace them.
+`Native end-to-end` builds **both native apps in Release mode** and drives them with the pinned Maestro CLI on an iOS Simulator and an Android emulator. Four build jobs compile the apps independently, then each device job installs both apps and uses one newly invited account, so Mail must unlock the account key created by Calendar. It runs on relevant pull requests, default-branch/testing pushes and manual dispatches. This supplements the workspace unit tests and black-box API suite; it does not replace them.
 
-Every job owns a disposable `solace_test_e2e` database, the real Rust API, Stalwart 1.0.0 and the same avatar S3 mock used by the API suite. Linux uses the existing Podman test services. macOS runs PostgreSQL, checksum-pinned Stalwart/CLI binaries and the checksum-pinned S3Mock JAR directly. Mail delivery stays within `solace.test`; the test mail plan blackholes external delivery. No EAS, Apple signing, App Review or production-service secrets are used.
+Each device job owns a disposable `solace_test_e2e` database, the real Rust API, Stalwart 1.0.0 and the same avatar S3 mock used by the API suite. Linux uses the existing Podman test services. macOS runs PostgreSQL, checksum-pinned Stalwart/CLI binaries and the checksum-pinned S3Mock JAR directly. Mail delivery stays within `solace.test`; the test mail plan blackholes external delivery. No EAS, Apple signing, App Review or production-service secrets are used.
 
 The apps use separate `.e2e` bundle IDs, App Groups and keychains. `SOLACE_E2E=1` is accepted only for a locally configured preview build pointing at a loopback HTTP API; remote updates are disabled. The test-only transport settings cannot be enabled for an EAS or production build. Android Release builds exercise minification as well as the real native modules.
 
@@ -27,15 +27,15 @@ The apps use separate `.e2e` bundle IDs, App Groups and keychains. `SOLACE_E2E=1
 | Sign-out | End the session, hide mailbox content, sign in again, unwrap the existing keys and decrypt the same message. |
 | Server postconditions | UI-created calendars/events/preferences exist as ciphertext and journey event content is absent from readable database columns. |
 
-Assertions wait for specific UI states. A failed case is recorded and fails the job; there are no retries that turn a failing journey green. A failed authentication/content prerequisite stops dependent cases immediately. A successful run requires every case, including offline recovery, to execute. Theme, dates and test content are controlled by the journeys rather than a production account's existing data.
+Assertions wait for specific UI states. A failed case is recorded and fails the job; there are no retries that turn a failing journey green. Every process restart must restore the existing session without another sign-in. A failed authentication/content prerequisite stops dependent cases immediately. A successful run requires every case, including offline recovery, to execute. Theme, dates and test content are controlled by the journeys rather than a production account's existing data.
 
 Native push delivery/NSE execution on a real device, associated-domain passkeys, biometric prompts, App Store distribution and external providers are outside simulator coverage. Attachment selection is currently tested through opening/canceling the system picker; attachment delivery is covered by the existing API/component tests rather than this native journey. These boundaries should stay explicit as new journeys are added.
 
 ## Evidence and diagnosis
 
-Each platform uploads `junit.xml`, `results.json`, a Markdown summary and screenshots. Maestro's full command traces, credentials, session data and service databases stay under `private/` and are never uploaded. The evidence exporter rejects symlinks and is regression-tested with a secret sentinel. Account credentials are freshly seeded local test values, not the App Review account. Test failures show the case name in the Actions log and the report; screenshots preserve the actual failure screen.
+Each platform uploads `junit.xml`, `results.json`, a Markdown summary and screenshots. Maestro's raw command output and traces, credentials, session data and service databases stay under `private/` and are never uploaded. Regression tests check command-output isolation, evidence export and symlink escapes with a secret sentinel. Account credentials are freshly seeded local test values, not the App Review account. Test failures show the case name in the Actions log and the report; screenshots preserve the actual failure screen.
 
-The binary cache covers application/package source, patches, the lockfile, build helper and runner image/toolchain. Journey-only edits reuse the compiled binaries; app source changes rebuild them. Native animations remain enabled.
+The binary cache covers application/package source, patches, the lockfile, pinned Bun/Node versions, root manifest, build helper/workflow and runner image/toolchain. Journey-only edits reuse the compiled binaries; app source changes rebuild them. Build artifacts transfer the apps in tar archives to preserve executable bits and framework symlinks, with a regression test for that contract. These archives contain compiled test apps before any account signs in. Native animations remain enabled.
 
 ## Local execution
 

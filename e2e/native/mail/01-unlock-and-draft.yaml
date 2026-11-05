@@ -1,6 +1,13 @@
 appId: ${APP_ID}
 ---
-- runFlow: ../common/open-app.yaml
+- launchApp:
+    stopApp: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: Welcome back
+    timeout: 120000
+- runFlow: ../common/sign-in.yaml
 - assertNotVisible: Welcome back
 - tapOn: Compose message
 - assertVisible: Send
@@ -11,18 +18,26 @@ appId: ${APP_ID}
     env:
       TEXT: ${EMAIL}
 - pressKey: Enter
-- tapOn: Subject
+- tapOn:
+    id: compose-subject
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro retained draft
+- pressKey: Enter
+- waitForAnimationToEnd
 - tapOn: Message body
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro body survives encrypted draft storage
-- hideKeyboard
-- tapOn: Close
+- tapOn:
+    id: compose-subject
+- pressKey: Enter
+- waitForAnimationToEnd
+- assertVisible: Maestro retained draft
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- runFlow: ../common/close-compose.yaml
 - tapOn: ".*Switch mailbox"
 - tapOn: Drafts
 - extendedWaitUntil:
@@ -35,13 +50,15 @@ appId: ${APP_ID}
 - tapOn: ".*Maestro retained draft.*"
 - assertVisible: ".*Maestro retained draft.*"
 - assertVisible: ".*Maestro body survives encrypted draft storage.*"
-- tapOn: Subject
+- tapOn:
+    id: compose-subject
 - eraseText
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro round trip
-- hideKeyboard
+- pressKey: Enter
+- waitForAnimationToEnd
 - tapOn: Send
 - extendedWaitUntil:
     visible: Compose message

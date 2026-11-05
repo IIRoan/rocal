@@ -2,14 +2,15 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import tarfile
 
 from common import APPS, REPO, directory, output, run
 
 
-def build(platform):
+def build(platform, app_names=APPS):
     binaries = directory() / "binaries"
     binaries.mkdir(exist_ok=True)
-    for app in APPS:
+    for app in app_names:
         project = REPO / f"apps/native-{app}"
         run(["bunx", "expo", "prebuild", "--platform", platform, "--clean", "--no-install"], cwd=project)
         if platform == "ios":
@@ -38,8 +39,31 @@ def build(platform):
         print(f"Built {app}: release {platform} binary against the isolated loopback API", flush=True)
 
 
+def restore_binaries(platform):
+    root = directory()
+    binaries = root / "binaries"
+    binaries.mkdir(exist_ok=True)
+    archives = sorted((root / "private/binary-archives").glob("*.tar.gz"))
+    if not archives:
+        raise RuntimeError("No native build archives were downloaded")
+    for archive in archives:
+        with tarfile.open(archive) as package:
+            package.extractall(binaries, filter="data")
+    extension = "app" if platform == "ios" else "apk"
+    if any(not (binaries / f"{app}.{extension}").exists() for app in APPS):
+        raise RuntimeError("The native build did not produce both Calendar and Mail")
+
+
 if __name__ == "__main__":
     target = sys.argv[1]
-    if target not in ("ios", "android"):
-        raise RuntimeError("Choose ios or android")
-    build(target)
+    if target == "restore":
+        if len(sys.argv) != 3 or sys.argv[2] not in ("ios", "android"):
+            raise RuntimeError("Choose the ios or android archives to restore")
+        restore_binaries(sys.argv[2])
+    else:
+        if target not in ("ios", "android"):
+            raise RuntimeError("Choose ios, android or restore")
+        apps = [sys.argv[2]] if len(sys.argv) > 2 else APPS
+        if any(app not in APPS for app in apps):
+            raise RuntimeError("Choose calendar or mail")
+        build(target, apps)

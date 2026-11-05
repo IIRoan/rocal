@@ -356,7 +356,7 @@ export const ComposeBodyEditor = forwardRef<
   }
 
   return (
-    <View style={styles.container} accessibilityLabel="Message body">
+    <View style={styles.container}>
       <WebView
         ref={(instance) => {
           injectJavaScriptRef.current =

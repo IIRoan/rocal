@@ -8,7 +8,8 @@ appId: ${APP_ID}
     file: ../common/type.yaml
     env:
       TEXT: Maestro retained event
-- hideKeyboard
+- pressKey: Enter
+- waitForAnimationToEnd
 - tapOn: All day
 - scrollUntilVisible:
     element: Location
@@ -18,7 +19,8 @@ appId: ${APP_ID}
     file: ../common/type.yaml
     env:
       TEXT: Maestro meeting room
-- hideKeyboard
+- pressKey: Enter
+- waitForAnimationToEnd
 - scrollUntilVisible:
     element: Description
     direction: DOWN
@@ -27,7 +29,6 @@ appId: ${APP_ID}
     file: ../common/type.yaml
     env:
       TEXT: Maestro event notes stay encrypted
-- hideKeyboard
 - tapOn: Save
 - extendedWaitUntil:
     notVisible: Event title
@@ -52,7 +53,8 @@ appId: ${APP_ID}
     file: ../common/type.yaml
     env:
       TEXT: Maestro updated event
-- hideKeyboard
+- pressKey: Enter
+- waitForAnimationToEnd
 - tapOn: Save
 - extendedWaitUntil:
     notVisible: Event title
@@ -89,7 +91,8 @@ appId: ${APP_ID}
     file: ../common/type.yaml
     env:
       TEXT: Maestro disposable event
-- hideKeyboard
+- pressKey: Enter
+- waitForAnimationToEnd
 - tapOn: All day
 - tapOn: Save
 - extendedWaitUntil:

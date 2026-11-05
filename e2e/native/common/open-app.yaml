@@ -7,10 +7,7 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "(Welcome back|Create new event|Compose message)"
     timeout: 120000
-- runFlow:
-    when:
-      visible: Welcome back
-    file: sign-in.yaml
+- assertNotVisible: Welcome back
 - extendedWaitUntil:
     visible: ${HOME_LABEL}
     timeout: 180000

@@ -2,7 +2,10 @@ appId: ${APP_ID}
 ---
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings
-- tapOn: Mailboxes
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: mailboxes
 - tapOn: New mailbox name
 - runFlow:
     file: ../common/type.yaml
@@ -38,7 +41,10 @@ appId: ${APP_ID}
     notVisible: Maestro renamed folder
     timeout: 30000
 - tapOn: Back to settings
-- tapOn: Labels
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: labels
 - tapOn: Label name
 - runFlow:
     file: ../common/type.yaml
@@ -51,7 +57,10 @@ appId: ${APP_ID}
     timeout: 30000
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings
-- tapOn: Labels
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: labels
 - assertVisible: Maestro mail label
 - tapOn: Delete Maestro mail label
 - assertVisible: "Delete label\\?"

@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: settings-page-${PAGE}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: settings-page-${PAGE}
+- extendedWaitUntil:
+    visible: Back to settings
+    timeout: 30000

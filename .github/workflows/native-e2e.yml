@@ -6,8 +6,7 @@ on:
     paths:
       - "apps/native-*/**"
       - "apps/backend/**"
-      - "apps/stalwart/test-env/**"
-      - "apps/stalwart/stalwart/plan/**"
+      - "apps/stalwart/**"
       - "crates/**"
       - "xtask/**"
       - "packages/**"
@@ -17,18 +16,18 @@ on:
       - "*.json"
       - "bun.lock"
       - "Cargo.*"
+      - ".cargo/**"
       - "rust-toolchain.toml"
       - ".bun-version"
       - ".node-version"
       - "babel.config.cts"
-      - ".github/workflows/native-e2e.yml"
+      - ".github/workflows/native-e2e*.yml"
   push:
     branches: [master, testing]
     paths:
       - "apps/native-*/**"
       - "apps/backend/**"
-      - "apps/stalwart/test-env/**"
-      - "apps/stalwart/stalwart/plan/**"
+      - "apps/stalwart/**"
       - "crates/**"
       - "xtask/**"
       - "packages/**"
@@ -37,12 +36,13 @@ on:
       - "patches/**"
       - "bun.lock"
       - "Cargo.*"
+      - ".cargo/**"
       - "*.json"
       - ".bun-version"
       - ".node-version"
       - "rust-toolchain.toml"
       - "babel.config.cts"
-      - ".github/workflows/native-e2e.yml"
+      - ".github/workflows/native-e2e*.yml"
   workflow_dispatch:
 
 permissions:
@@ -53,114 +53,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  journeys:
-    name: Native E2E (${{ matrix.platform }})
-    timeout-minutes: 150
+  build-ios:
+    name: Build ${{ matrix.app }} (ios)
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: ios
-            runner: macos-latest
-          - platform: android
-            runner: ubuntu-latest
-    runs-on: ${{ matrix.runner }}
-    env:
-      SOLACE_E2E: "1"
-      APP_VARIANT: preview
-      EXPO_PUBLIC_API_URL: http://127.0.0.1:4001
-      EXPO_PUBLIC_APP_URL: http://localhost:4100
-      EXPO_NO_DOTENV: "1"
-      CI: "1"
-      CARGO_BUILD_JOBS: "3"
-      MAESTRO_CLI_NO_ANALYTICS: "1"
-      MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
-    steps:
-      - name: Prepare isolated test directory
-        shell: bash
-        run: echo "SOLACE_E2E_DIR=$RUNNER_TEMP/solace-e2e" >> "$GITHUB_ENV"
-      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
-      - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
-        with:
-          node-version-file: .node-version
-      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-      - uses: chainguard-actions/actions-setup-java@4abbff4c3bfc93084ea2ff1796c8b4e0c255e47d # v6.1.0
-        with:
-          distribution: temurin
-          java-version: "21"
-      - run: bun install --frozen-lockfile
-      - name: Install native test prerequisites
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$SOLACE_E2E_DIR/private" "$SOLACE_E2E_DIR/artifacts"
-          chmod 700 "$SOLACE_E2E_DIR/private"
-          echo "SOLACE_E2E_TOOLCHAIN=${ImageOS:-runner}-${ImageVersion:-current}" >> "$GITHUB_ENV"
-          if [ "${{ matrix.platform }}" = ios ]; then
-            brew install postgresql@18 python@3.13
-            echo "$(brew --prefix python@3.13)/libexec/bin" >> "$GITHUB_PATH"
-            echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
-          else
-            sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq podman libssl-dev pkg-config
-            sudo chmod 666 /dev/kvm
-          fi
-          rustup toolchain install
-      - uses: chainguard-actions/Swatinem-rust-cache@203beff8e447695cdc59f7c4f322178a54ec6be4 # v2.9.3
-        with:
-          shared-key: native-e2e-${{ runner.os }}
-          cache-on-failure: "true"
-      - name: Build the guarded test harness
-        run: cargo build -p xtask
-      - name: Start disposable Postgres, Stalwart and avatar storage
-        shell: bash
-        run: python3 scripts/e2e/services.py start
-      - name: Start the real API and create a fresh test account
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./target/debug/xtask e2e serve > "$SOLACE_E2E_DIR/private/backend.log" 2>&1 &
-          echo "$!" > "$SOLACE_E2E_DIR/private/backend.pid"
-          python3 scripts/e2e/services.py wait-api
-          ./target/debug/xtask e2e seed
-      - uses: chainguard-actions/actions-cache/restore@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0
-        id: binaries
-        with:
-          path: ${{ runner.temp }}/solace-e2e/binaries
-          key: native-e2e-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.SOLACE_E2E_TOOLCHAIN }}-${{ hashFiles('bun.lock', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/*.ts', 'packages/*/*.js', 'packages/*/*.cts', 'packages/*/src/**', 'packages/*/assets/**', 'packages/native-core/plugins/**', 'apps/native-*/app/**', 'apps/native-*/src/**', 'apps/native-*/assets/**', 'apps/native-*/*.json', 'apps/native-*/*.ts', 'apps/native-*/*.js', 'apps/native-*/*.cjs', 'apps/native-*/*.cts', 'babel.config.cts', 'scripts/e2e/build.py', '.github/workflows/native-e2e.yml') }}
-      - name: Build both release apps for the simulator or emulator
-        if: steps.binaries.outputs.cache-hit != 'true'
-        shell: bash
-        run: python3 scripts/e2e/build.py ${{ matrix.platform }}
-      - uses: chainguard-actions/actions-cache/save@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0
-        if: steps.binaries.outputs.cache-hit != 'true'
-        with:
-          path: ${{ runner.temp }}/solace-e2e/binaries
-          key: ${{ steps.binaries.outputs.cache-primary-key }}
-      - name: Boot the device and install both apps and Maestro
-        shell: bash
-        run: python3 scripts/e2e/device.py ${{ matrix.platform }}
-      - name: Exercise real Calendar and Mail journeys
-        shell: bash
-        run: python3 scripts/e2e/run.py ${{ matrix.platform }}
-      - name: Check persisted encryption and account state
-        run: ./target/debug/xtask e2e verify
-      - name: Publish test evidence
-        if: always()
-        shell: bash
-        run: python3 scripts/e2e/run.py collect
-      - name: Upload test evidence
-        if: always()
-        uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
-        with:
-          name: native-e2e-${{ matrix.platform }}
-          path: ${{ runner.temp }}/solace-e2e/artifacts
-          if-no-files-found: error
-          retention-days: 7
-      - name: Stop disposable services and device
-        if: always()
-        shell: bash
-        run: python3 scripts/e2e/services.py stop
+        app: [calendar, mail]
+    uses: ./.github/workflows/native-e2e-build.yml
+    with:
+      platform: ios
+      app: ${{ matrix.app }}
+
+  build-android:
+    name: Build ${{ matrix.app }} (android)
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [calendar, mail]
+    uses: ./.github/workflows/native-e2e-build.yml
+    with:
+      platform: android
+      app: ${{ matrix.app }}
+
+  ios:
+    name: iOS
+    needs: build-ios
+    if: ${{ always() && !cancelled() }}
+    uses: ./.github/workflows/native-e2e-journeys.yml
+    with:
+      platform: ios
+
+  android:
+    name: Android
+    needs: build-android
+    if: ${{ always() && !cancelled() }}
+    uses: ./.github/workflows/native-e2e-journeys.yml
+    with:
+      platform: android

@@ -315,6 +315,7 @@ function ComposeSession({
                   autoCorrect
                   autoFocus={false}
                   accessibilityLabel="Subject"
+                  testID="compose-subject"
                 />
               </View>
 

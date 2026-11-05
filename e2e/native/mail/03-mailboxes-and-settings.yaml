@@ -10,7 +10,10 @@ appId: ${APP_ID}
 - assertVisible: ".*Maestro round trip.*"
 - tapOn: Settings
 - assertVisible: Search settings
-- tapOn: Appearance
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: appearance
 - assertVisible: "(?i)Theme"
 - tapOn: Dark
 - assertVisible:

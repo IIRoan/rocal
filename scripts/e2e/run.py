@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 from common import APPS, REPO, directory
 
 
-def publish(results):
+def publish(results, summary=False):
     root = directory()
     artifacts = root / "artifacts"
     cases = ET.Element("testsuite", name="Native user journeys", tests=str(len(results)), failures=str(sum(not result["passed"] for result in results)))
@@ -29,11 +29,10 @@ def publish(results):
             target = artifacts / "screenshots" / source.relative_to(raw)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
-    summary = "| App | Journey | Result |\n| --- | --- | --- |\n" + "\n".join(f"| {result['app']} | {result['name']} | {'PASS' if result['passed'] else 'FAIL'} |" for result in results)
-    (artifacts / "summary.md").write_text(summary + "\n")
-    if os.environ.get("GITHUB_STEP_SUMMARY"):
-        with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as destination:
-            destination.write(summary + "\n")
+    table = "| App | Journey | Result |\n| --- | --- | --- |\n" + "\n".join(f"| {result['app']} | {result['name']} | {'PASS' if result['passed'] else 'FAIL'} |" for result in results)
+    (artifacts / "summary.md").write_text(table + "\n")
+    if summary and os.environ.get("GITHUB_STEP_SUMMARY"):
+        Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(table + "\n")
 
 
 def run_journey(platform, app, flow, results, name=None):
@@ -54,10 +53,12 @@ def run_journey(platform, app, flow, results, name=None):
                "--env", f"EMAIL={fixture['email']}", "--env", f"PASSWORD={fixture['password']}", str(flow)]
     print(f"Running {platform}: {app}/{name}", flush=True)
     try:
-        completed = subprocess.run(command, cwd=REPO, check=False, timeout=600)
+        with (root / f"private/{app}-{name}.log").open("wb") as log:
+            completed = subprocess.run(command, cwd=REPO, check=False, timeout=600, stdout=log, stderr=subprocess.STDOUT)
         passed = completed.returncode == 0
     except subprocess.TimeoutExpired:
         passed = False
+    print(f"{'PASS' if passed else 'FAIL'}: {app}/{name}; inspect the journey report and screenshots", flush=True)
     results.append({"app": app, "name": name, "passed": passed, "seconds": round(time.monotonic() - started, 2)})
     publish(results)
     return passed
@@ -98,6 +99,6 @@ if __name__ == "__main__":
         results = json.loads(saved.read_text())["results"] if saved.exists() else [
             {"app": "setup", "name": "setup-did-not-complete", "passed": False, "seconds": 0},
         ]
-        publish(results)
+        publish(results, summary=True)
     else:
         main(sys.argv[1])

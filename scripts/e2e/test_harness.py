@@ -1,13 +1,18 @@
 import importlib.util
+import io
+import json
 import os
 from pathlib import Path
 import sys
+import tarfile
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import directory
+from build import restore_binaries
 
 specification = importlib.util.spec_from_file_location("native_journeys", Path(__file__).with_name("run.py"))
 journeys = importlib.util.module_from_spec(specification)
@@ -15,6 +20,29 @@ specification.loader.exec_module(journeys)
 
 
 class HarnessTests(unittest.TestCase):
+    def test_native_command_output_stays_private(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                private = directory() / "private"
+                (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+                (private / "fixture.json").write_text(json.dumps({"email": "journey@solace.test", "password": "secret-output-sentinel"}))
+                (private / "maestro-path").write_text("synthetic-maestro")
+                def command_output(*_args, **options):
+                    if "stdout" in options:
+                        options["stdout"].write(b"secret-output-sentinel")
+                    else:
+                        print("secret-output-sentinel")
+                    return journeys.subprocess.CompletedProcess([], 0)
+                console = io.StringIO()
+                with patch.object(journeys.subprocess, "run", side_effect=command_output), redirect_stdout(console):
+                    self.assertTrue(journeys.run_journey("ios", "mail", Path("synthetic.yaml"), []))
+                self.assertNotIn("secret-output-sentinel", console.getvalue())
+                self.assertEqual((private / "mail-synthetic.log").read_text(), "secret-output-sentinel")
+                for path in (root / "artifacts").rglob("*"):
+                    if path.is_file():
+                        self.assertNotIn(b"secret-output-sentinel", path.read_bytes())
+
     def test_missing_explicit_test_environment_cannot_create_a_runtime(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(RuntimeError, "isolated"):
@@ -51,6 +79,30 @@ class HarnessTests(unittest.TestCase):
                 (private / "maestro").symlink_to(unrelated, target_is_directory=True)
                 journeys.publish([])
                 self.assertFalse((root / "artifacts/screenshots").exists())
+
+    def test_app_transfer_preserves_executable_bits_and_internal_framework_links(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            source = Path(temporary) / "source"
+            framework = source / "calendar.app/Frameworks/Fixture.framework/Versions"
+            (framework / "A").mkdir(parents=True)
+            (framework / "A/Fixture").write_bytes(b"synthetic framework")
+            (framework / "Current").symlink_to("A", target_is_directory=True)
+            binary = source / "calendar.app/calendar"
+            binary.write_bytes(b"synthetic executable")
+            binary.chmod(0o755)
+            (source / "mail.app").mkdir()
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                archives = directory() / "private/binary-archives"
+                archives.mkdir()
+                with tarfile.open(archives / "apps.tar.gz", "w:gz") as package:
+                    package.add(source, arcname=".")
+                restore_binaries("ios")
+                restored = root / "binaries/calendar.app"
+                self.assertTrue((restored / "calendar").stat().st_mode & 0o100)
+                link = restored / "Frameworks/Fixture.framework/Versions/Current"
+                self.assertTrue(link.is_symlink())
+                self.assertEqual((link / "Fixture").read_bytes(), b"synthetic framework")
 
 if __name__ == "__main__":
     unittest.main()
