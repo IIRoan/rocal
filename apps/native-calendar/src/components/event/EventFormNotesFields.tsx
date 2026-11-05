@@ -62,6 +62,7 @@ export function EventFormNotesFields({
             textAlignVertical="top"
             onFocus={() => onFieldFocus(descriptionInputRef.current)}
             accessibilityLabel="Description"
+            testID="event-description"
           />
         </EventEditorField>
         <FieldError message={descriptionError} style={styles.fieldError} />

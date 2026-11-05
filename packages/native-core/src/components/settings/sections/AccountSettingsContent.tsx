@@ -339,6 +339,7 @@ export function AccountSettingsContent() {
         ? [
             <SheetItem
               key={action.key}
+              testID={`account-action-${action.key}`}
               icon={action.icon}
               label={action.label}
               detail={action.description}

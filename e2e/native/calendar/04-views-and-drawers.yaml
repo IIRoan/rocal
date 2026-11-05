@@ -47,9 +47,39 @@ appId: ${APP_ID}
 - runFlow:
     file: ../common/type.yaml
     env:
+      TEXT: London
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: "London \\(Europe/London\\)"
+- assertVisible: "Timezone, Europe/London"
+- tapOn: Back to settings
+- runFlow: ../common/close-sheet.yaml
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: time-region
+- assertVisible: "Timezone, Europe/London"
+- tapOn: Timezone
+- tapOn: Search timezones
+- runFlow:
+    file: ../common/type.yaml
+    env:
       TEXT: Amsterdam
-- hideKeyboard
-- tapOn: ".*Amsterdam.*"
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: "Amsterdam \\(Europe/Amsterdam\\)"
+- assertVisible: "Timezone, Europe/Amsterdam"
+- tapOn: Back to settings
+- runFlow: ../common/close-sheet.yaml
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: time-region
+- assertVisible: "Timezone, Europe/Amsterdam"
 - tapOn: Back to settings
 - runFlow: ../common/close-sheet.yaml
 - assertVisible: "Maestro updated event.*"

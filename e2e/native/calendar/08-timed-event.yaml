@@ -9,10 +9,18 @@ appId: ${APP_ID}
       TEXT: Maestro timed event
 - pressKey: Enter
 - waitForAnimationToEnd
+- copyTextFrom: "Start time:.*"
+- evalScript: ${output.originalStart = maestro.copiedText}
 - tapOn: "Start time:.*"
 - assertVisible: "Hour.*"
 - assertVisible: "Minute.*"
+- tapOn:
+    text: "Minute.*"
+    point: 50%,70%
+- waitForAnimationToEnd
 - tapOn: Done
+- copyTextFrom: "Start time:.*"
+- assertTrue: ${maestro.copiedText !== output.originalStart}
 - tapOn: "End time:.*"
 - assertVisible: "Hour.*"
 - assertVisible: "Minute.*"

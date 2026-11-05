@@ -31,8 +31,15 @@ appId: ${APP_ID}
 - tapOn: Maestro category
 - tapOn: Save
 - extendedWaitUntil:
-    visible: "Maestro category.*"
+    notVisible: Event title
     timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: "Maestro updated event.*"
+- tapOn: Edit
+- scrollUntilVisible:
+    element: "Category: Maestro category"
+    direction: DOWN
+- assertVisible: "Category: Maestro category"
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings
 - runFlow:

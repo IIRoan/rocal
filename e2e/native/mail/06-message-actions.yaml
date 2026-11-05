@@ -9,24 +9,31 @@ appId: ${APP_ID}
     timeout: 30000
 - tapOn: Unread
 - extendedWaitUntil:
+    visible:
+      text: Move
+      enabled: true
+    timeout: 30000
+- tapOn: Go back
+- extendedWaitUntil:
     visible: Compose message
     timeout: 30000
+- assertVisible: "Unread, .*Maestro round trip.*"
 - tapOn: ".*Maestro round trip.*"
 - tapOn: Move
 - assertVisible: Move to
-- tapOn: Archive
+- tapOn: Maestro renamed folder
 - extendedWaitUntil:
     visible: Compose message
     timeout: 30000
 - assertNotVisible: ".*Maestro round trip.*"
 - tapOn: ".*Switch mailbox"
-- tapOn: Archive
+- tapOn: Maestro renamed folder
 - extendedWaitUntil:
     visible: ".*Maestro round trip.*"
     timeout: 30000
 - runFlow: ../common/open-app.yaml
 - tapOn: ".*Switch mailbox"
-- tapOn: Archive
+- tapOn: Maestro renamed folder
 - tapOn: ".*Maestro round trip.*"
 - assertVisible: ".*Maestro body survives encrypted draft storage.*"
 - tapOn: Trash
@@ -35,7 +42,7 @@ appId: ${APP_ID}
     timeout: 30000
 - assertNotVisible: ".*Maestro round trip.*"
 - tapOn: ".*Switch mailbox"
-- tapOn: Trash
+- tapOn: Deleted Items
 - extendedWaitUntil:
     visible: ".*Maestro round trip.*"
     timeout: 30000
@@ -55,3 +62,28 @@ appId: ${APP_ID}
 - tapOn: ".*Maestro round trip.*"
 - assertVisible: ".*Maestro body survives encrypted draft storage.*"
 - takeScreenshot: ${SCREENSHOT_DIR}/restored-from-trash
+- tapOn: Go back
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: mailboxes
+- scrollUntilVisible:
+    element: Delete Maestro renamed folder
+    direction: DOWN
+- tapOn: Delete Maestro renamed folder
+- assertVisible: "Delete mailbox\\?"
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: Maestro renamed folder
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: mailboxes
+- scroll
+- assertNotVisible: Maestro renamed folder
+- tapOn: Back to settings
+- runFlow: ../common/close-sheet.yaml

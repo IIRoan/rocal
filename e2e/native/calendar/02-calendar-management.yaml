@@ -40,16 +40,50 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Maestro renamed calendar.*"
     timeout: 30000
-- tapOn: Show Maestro renamed calendar
-- assertVisible:
-    text: Show Maestro renamed calendar
-    checked: false
-- tapOn: Show Maestro renamed calendar
-- assertVisible:
-    text: Show Maestro renamed calendar
-    checked: true
 - takeScreenshot: ${SCREENSHOT_DIR}/calendar-created-and-renamed
+- runFlow: ../common/close-sheet.yaml
+- tapOn: Create new event
+- tapOn: Event title
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro visibility event
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: All day
+- tapOn: "Calendar:.*"
+- tapOn: "Maestro renamed calendar.*"
+- tapOn: Save
+- extendedWaitUntil:
+    notVisible: Event title
+    timeout: 30000
+- assertVisible: "Maestro visibility event.*"
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
+- tapOn:
+    text: Show Maestro renamed calendar
+    retryTapIfNoChange: false
+- runFlow: ../common/close-sheet.yaml
+- extendedWaitUntil:
+    notVisible: "Maestro visibility event.*"
+    timeout: 30000
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
+- tapOn:
+    text: Show Maestro renamed calendar
+    retryTapIfNoChange: false
+- runFlow: ../common/close-sheet.yaml
+- extendedWaitUntil:
+    visible: "Maestro visibility event.*"
+    timeout: 30000
 - runFlow: ../common/open-app.yaml
+- assertVisible: "Maestro visibility event.*"
 - tapOn: Settings
 - runFlow:
     file: ../common/select-settings-page.yaml
@@ -67,3 +101,5 @@ appId: ${APP_ID}
     notVisible: "Maestro renamed calendar.*"
     timeout: 30000
 - assertVisible: New calendar
+- runFlow: ../common/close-sheet.yaml
+- assertNotVisible: "Maestro visibility event.*"

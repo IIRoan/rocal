@@ -18,7 +18,9 @@ appId: ${APP_ID}
     timeout: 30000
 - tapOn: "Maestro recurring event.*"
 - tapOn: Edit
-- assertVisible: All occurrences
+- extendedWaitUntil:
+    visible: All occurrences
+    timeout: 30000
 - tapOn: All occurrences
 - tapOn: Event title
 - eraseText
@@ -35,8 +37,13 @@ appId: ${APP_ID}
 - runFlow: ../common/open-app.yaml
 - tapOn: "Maestro edited series.*"
 - tapOn: Delete
+- extendedWaitUntil:
+    visible: All occurrences
+    timeout: 30000
 - tapOn: All occurrences
-- assertVisible: "Delete event\\?"
+- extendedWaitUntil:
+    visible: "Delete event\\?"
+    timeout: 30000
 - tapOn: Delete
 - extendedWaitUntil:
     notVisible: "Maestro edited series.*"

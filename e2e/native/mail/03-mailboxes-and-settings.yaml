@@ -4,8 +4,8 @@ appId: ${APP_ID}
 - tapOn: ".*Switch mailbox"
 - assertVisible: Inbox
 - assertVisible: Drafts
-- assertVisible: Sent
-- assertVisible: Trash
+- assertVisible: Sent Items
+- assertVisible: Deleted Items
 - tapOn: Inbox
 - assertVisible: ".*Maestro round trip.*"
 - tapOn: Settings

@@ -7,14 +7,15 @@ appId: ${APP_ID}
     env:
       PAGE: account
 - scrollUntilVisible:
-    element: Sign Out
+    element:
+      id: account-action-sign-out
     direction: DOWN
+- tapOn:
+    id: account-action-sign-out
+- extendedWaitUntil:
+    visible: "Sign out\\?"
+    timeout: 30000
 - tapOn: Sign Out
-- runFlow:
-    when:
-      visible: "Sign out\\?"
-    commands:
-      - tapOn: Sign Out
 - extendedWaitUntil:
     visible: Welcome back
     timeout: 30000

@@ -20,6 +20,22 @@ specification.loader.exec_module(journeys)
 
 
 class HarnessTests(unittest.TestCase):
+    def test_failure_hierarchies_preserve_selectors_and_states_without_credentials(self):
+        fixture = {"email": "journey@solace.test", "password": "private-password-sentinel"}
+        tree = {"attributes": {"text": "Maestro folder", "value": fixture["email"], "sessionCookie": "private-cookie-sentinel"},
+                "selected": True, "checked": False,
+                "children": [{"attributes": {"resource-id": "sign-in-password", "value": fixture["password"], "text": "another-private-value"},
+                              "children": [{"attributes": {"text": "nested-private-value"}}]},
+                             {"attributes": {"className": "SecureTextField", "value": "private-secure-field-value"}}]}
+        exported = journeys.sanitized_hierarchy(tree, fixture)
+        encoded = json.dumps(exported)
+        for value in (*fixture.values(), "private-cookie-sentinel", "another-private-value", "nested-private-value", "private-secure-field-value"):
+            self.assertNotIn(value, encoded)
+        self.assertTrue(exported["selected"])
+        self.assertFalse(exported["checked"])
+        self.assertEqual(exported["attributes"]["text"], "Maestro folder")
+        self.assertEqual(exported["children"][0]["attributes"]["resource-id"], "sign-in-password")
+
     def test_native_command_output_stays_private(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "solace-e2e"

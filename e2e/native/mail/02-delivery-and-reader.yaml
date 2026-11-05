@@ -22,12 +22,14 @@ appId: ${APP_ID}
 - assertVisible: Star
 - tapOn: Reply
 - assertVisible: Send
-- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- extendedWaitUntil:
+    visible: ".*Maestro body survives encrypted draft storage.*"
+    timeout: 60000
 - runFlow: ../common/close-compose.yaml
 - tapOn: Go back
 - assertVisible: ".*Maestro round trip.*"
 - tapOn: ".*Switch mailbox"
-- tapOn: Sent
+- tapOn: Sent Items
 - extendedWaitUntil:
     visible: ".*Maestro round trip.*"
     timeout: 60000

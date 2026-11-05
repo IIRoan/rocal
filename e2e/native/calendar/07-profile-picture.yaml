@@ -7,9 +7,11 @@ appId: ${APP_ID}
     env:
       PAGE: account
 - scrollUntilVisible:
-    element: Add Profile Picture
+    element:
+      id: account-action-change-profile-picture
     direction: DOWN
-- tapOn: Add Profile Picture
+- tapOn:
+    id: account-action-change-profile-picture
 - runFlow:
     when:
       visible: Allow Full Access
@@ -30,10 +32,10 @@ appId: ${APP_ID}
       platform: Android
     commands:
       - tapOn:
-          id: ".*:id/icon_thumbnail"
+          text: "(Photo taken on .*|Media)"
           index: 0
 - extendedWaitUntil:
-    visible: "(Choose|Done|Crop|Save|Change Profile Picture)"
+    visible: "(Choose|Done|Crop|Save|Change Profile Picture.*)"
     timeout: 30000
 - runFlow:
     when:
@@ -56,11 +58,12 @@ appId: ${APP_ID}
     commands:
       - tapOn: Save
 - extendedWaitUntil:
-    visible: Change Profile Picture
+    visible: "Change Profile Picture.*"
     timeout: 60000
 - takeScreenshot: ${SCREENSHOT_DIR}/uploaded-private-profile-picture
-- tapOn: Change Profile Picture
+- tapOn:
+    id: account-action-change-profile-picture
 - tapOn: Remove Photo
 - extendedWaitUntil:
-    visible: Add Profile Picture
+    visible: "Add Profile Picture.*"
     timeout: 30000

@@ -11,3 +11,9 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: ${HOME_LABEL}
     timeout: 180000
+- runFlow:
+    when:
+      true: ${APP_ID === "onl.solace.calendar.e2e"}
+    commands:
+      - tapOn: Choose date and view
+      - tapOn: Agenda

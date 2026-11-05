@@ -22,9 +22,13 @@ appId: ${APP_ID}
 - pressKey: Enter
 - waitForAnimationToEnd
 - scrollUntilVisible:
-    element: Description
+    element:
+      id: event-description
     direction: DOWN
-- tapOn: Description
+    visibilityPercentage: 50
+- tapOn:
+    id: event-description
+    point: 50%,20%
 - runFlow:
     file: ../common/type.yaml
     env:

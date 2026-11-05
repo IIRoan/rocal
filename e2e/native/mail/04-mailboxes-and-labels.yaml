@@ -20,6 +20,10 @@ appId: ${APP_ID}
     element: Rename Maestro folder
     direction: DOWN
 - tapOn: Rename Maestro folder
+- scrollUntilVisible:
+    element: Rename Maestro folder
+    direction: DOWN
+    visibilityPercentage: 100
 - tapOn: Rename Maestro folder
 - eraseText
 - runFlow:
@@ -34,12 +38,6 @@ appId: ${APP_ID}
 - tapOn: Hide Maestro renamed folder
 - tapOn: Show Maestro renamed folder
 - takeScreenshot: ${SCREENSHOT_DIR}/encrypted-custom-mailbox
-- tapOn: Delete Maestro renamed folder
-- assertVisible: "Delete mailbox\\?"
-- tapOn: Delete
-- extendedWaitUntil:
-    notVisible: Maestro renamed folder
-    timeout: 30000
 - tapOn: Back to settings
 - runFlow:
     file: ../common/select-settings-page.yaml

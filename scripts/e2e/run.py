@@ -11,6 +11,61 @@ import xml.etree.ElementTree as ET
 from common import APPS, REPO, directory
 
 
+def maestro_environment():
+    maestro_home = directory() / "private/maestro-home"
+    maestro_home.mkdir(exist_ok=True)
+    options = os.environ.get("JAVA_TOOL_OPTIONS", "")
+    return {**os.environ, "MAESTRO_CLI_NO_ANALYTICS": "1", "JAVA_TOOL_OPTIONS": f'{options} -Duser.home="{maestro_home}"'.strip()}
+
+
+def sanitized_hierarchy(node, fixture, hidden=False):
+    attributes = node.get("attributes", {})
+    if not isinstance(attributes, dict):
+        attributes = {}
+    identifier = str(attributes.get("resource-id", "")).lower()
+    hidden = hidden or "password" in identifier or attributes.get("password") in (True, "true")
+    hidden = hidden or "securetext" in f'{attributes.get("class", "")} {attributes.get("className", "")}'.lower()
+    names = ("resource-id", "bounds", "class", "className") if hidden else (
+        "resource-id", "bounds", "class", "className", "text", "title", "accessibilityText", "hintText", "value",
+    )
+    exported = {}
+    for key in names:
+        value = attributes.get(key)
+        if not isinstance(value, str):
+            continue
+        for secret in fixture.values():
+            if isinstance(secret, str) and secret:
+                value = value.replace(secret, "[redacted]")
+        exported[key] = value[:512]
+    result = {"attributes": exported}
+    for key in ("checked", "selected", "enabled", "focused", "clickable"):
+        if isinstance(node.get(key), bool):
+            result[key] = node[key]
+    children = node.get("children", [])
+    if isinstance(children, list):
+        result["children"] = [sanitized_hierarchy(child, fixture, hidden) for child in children if isinstance(child, dict)]
+    return result
+
+
+def capture_failure_hierarchy(tool, device, fixture, name):
+    root = directory()
+    source = root / f"private/{name}-hierarchy.json"
+    try:
+        with source.open("wb") as output, (root / f"private/{name}-hierarchy.log").open("wb") as log:
+            completed = subprocess.run([tool, "--device", device["id"], "hierarchy", "--no-reinstall-driver", "--no-ansi"],
+                                       cwd=REPO, env=maestro_environment(), check=False, timeout=60, stdout=output, stderr=log)
+        if completed.returncode != 0:
+            return
+        tree = json.loads(source.read_text())
+        if not isinstance(tree, dict):
+            return
+        target = root / "artifacts/hierarchy"
+        target.mkdir(exist_ok=True)
+        (target / f"{name}.json").write_text(json.dumps(sanitized_hierarchy(tree, fixture), indent=2))
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        print(f"Failure hierarchy unavailable: {name}", flush=True)
+
+
 def publish(results, summary=False):
     root = directory()
     artifacts = root / "artifacts"
@@ -51,13 +106,17 @@ def run_journey(platform, app, flow, results, name=None):
                "--env", f"APP_ID=onl.solace.{app}.e2e", "--env", f"HOME_LABEL={home}",
                "--env", "SCREENSHOT_DIR=journey",
                "--env", f"EMAIL={fixture['email']}", "--env", f"PASSWORD={fixture['password']}", str(flow)]
+    if results:
+        command.insert(4, "--no-reinstall-driver")
     print(f"Running {platform}: {app}/{name}", flush=True)
     try:
         with (root / f"private/{app}-{name}.log").open("wb") as log:
-            completed = subprocess.run(command, cwd=REPO, check=False, timeout=600, stdout=log, stderr=subprocess.STDOUT)
+            completed = subprocess.run(command, cwd=REPO, env=maestro_environment(), check=False, timeout=600, stdout=log, stderr=subprocess.STDOUT)
         passed = completed.returncode == 0
     except subprocess.TimeoutExpired:
         passed = False
+    if not passed:
+        capture_failure_hierarchy(tool, device, fixture, f"{app}-{name}")
     print(f"{'PASS' if passed else 'FAIL'}: {app}/{name}; inspect the journey report and screenshots", flush=True)
     results.append({"app": app, "name": name, "passed": passed, "seconds": round(time.monotonic() - started, 2)})
     publish(results)
