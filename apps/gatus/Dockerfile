@@ -17,6 +17,10 @@ COPY discord-field-limit.patch /tmp/discord-field-limit.patch
 RUN git apply /tmp/discord-field-limit.patch
 COPY discord-field-limit_test.go alerting/provider/discord/solace_field_limit_test.go
 RUN go test ./alerting/provider/discord -count=1
+COPY uptime-hourly-retention.patch /tmp/uptime-hourly-retention.patch
+RUN git apply /tmp/uptime-hourly-retention.patch
+COPY uptime-hourly-retention_test.go storage/store/sql/solace_uptime_test.go
+RUN go test ./storage/store/sql -run '^TestSolace' -count=1
 COPY assets/solace-logo.png web/static/solace-logo.png
 COPY assets/favicon.ico web/static/favicon.ico
 COPY assets/favicon-32x32.png web/static/favicon-32x32.png
