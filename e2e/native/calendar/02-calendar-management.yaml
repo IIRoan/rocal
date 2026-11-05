@@ -6,6 +6,7 @@ appId: ${APP_ID}
 - assertVisible: "(?i)My calendars"
 - tapOn: New calendar
 - assertVisible: Calendar name
+- hideKeyboard
 - tapOn: Create calendar
 - assertVisible: Calendar name is required
 - tapOn: Calendar name
@@ -37,7 +38,13 @@ appId: ${APP_ID}
     visible: "Maestro renamed calendar.*"
     timeout: 30000
 - tapOn: Show Maestro renamed calendar
+- assertVisible:
+    text: Show Maestro renamed calendar
+    checked: false
 - tapOn: Show Maestro renamed calendar
+- assertVisible:
+    text: Show Maestro renamed calendar
+    checked: true
 - takeScreenshot: ${SCREENSHOT_DIR}/calendar-created-and-renamed
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings

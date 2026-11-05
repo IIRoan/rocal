@@ -112,6 +112,7 @@ jobs:
       - uses: chainguard-actions/Swatinem-rust-cache@203beff8e447695cdc59f7c4f322178a54ec6be4 # v2.9.3
         with:
           shared-key: native-e2e-${{ runner.os }}
+          cache-on-failure: "true"
       - name: Build the guarded test harness
         run: cargo build -p xtask
       - name: Start disposable Postgres, Stalwart and avatar storage

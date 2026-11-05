@@ -13,8 +13,14 @@ appId: ${APP_ID}
 - tapOn: Appearance
 - assertVisible: "(?i)Theme"
 - tapOn: Dark
+- assertVisible:
+    text: Dark
+    selected: true
 - takeScreenshot: ${SCREENSHOT_DIR}/mail-dark-settings
 - tapOn: Light
+- assertVisible:
+    text: Light
+    selected: true
 - tapOn: Back to settings
 - runFlow: ../common/close-sheet.yaml
 - tapOn: Search messages

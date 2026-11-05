@@ -7,9 +7,15 @@ appId: ${APP_ID}
 - tapOn: Month
 - assertVisible: Create new event
 - tapOn: Choose date and view
+- assertVisible:
+    text: Month
+    selected: true
 - tapOn: Week
 - assertVisible: Create new event
 - tapOn: Choose date and view
+- assertVisible:
+    text: Week
+    selected: true
 - tapOn: Agenda
 - extendedWaitUntil:
     visible: "Maestro updated event.*"
@@ -19,8 +25,14 @@ appId: ${APP_ID}
 - tapOn: Appearance
 - assertVisible: "(?i)Theme"
 - tapOn: Dark
+- assertVisible:
+    text: Dark
+    selected: true
 - takeScreenshot: ${SCREENSHOT_DIR}/dark-appearance-drawer
 - tapOn: Light
+- assertVisible:
+    text: Light
+    selected: true
 - tapOn: Back to settings
 - tapOn: Time & Region
 - assertVisible: "(?i)Time format"

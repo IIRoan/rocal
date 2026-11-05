@@ -50,7 +50,7 @@ def run_journey(platform, app, flow, results, name=None):
                "--output", str(root / f"private/{app}-{name}.xml"),
                "--test-output-dir", str(root / f"private/maestro/{app}-{name}"),
                "--env", f"APP_ID=onl.solace.{app}.e2e", "--env", f"HOME_LABEL={home}",
-               "--env", f"SCREENSHOT_DIR={screenshots}",
+               "--env", "SCREENSHOT_DIR=journey",
                "--env", f"EMAIL={fixture['email']}", "--env", f"PASSWORD={fixture['password']}", str(flow)]
     print(f"Running {platform}: {app}/{name}", flush=True)
     try:

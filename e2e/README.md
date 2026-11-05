@@ -13,6 +13,7 @@ The apps use separate `.e2e` bundle IDs, App Groups and keychains. `SOLACE_E2E=1
 | Authentication | A wrong password is rejected; correct sign-in initializes real encryption; process restart restores the session. |
 | Calendars | Empty-name validation, create, rename, visibility toggles, persistence across restart and delete confirmation. |
 | Events | Create an all-day event, persist title/location/description, edit, reopen after process restart, open native ICS sharing, delete a separate event and retain the original. |
+| Timed events | Open both native time wheels, save a timed event, restart, reopen the editor and verify both time values survived before deleting it. |
 | Recurrence | Create a weekly series, edit all occurrences, restart, delete the entire series and preserve unrelated events. |
 | Categories | Create, assign to an event, rename and delete; re-opening the event must retain its other encrypted fields. |
 | Navigation | Agenda/week/month views, account drawer, nested settings pages, timezone search, theme changes and drawer dismissal. |
@@ -38,7 +39,7 @@ The binary cache covers application/package source, patches, the lockfile, build
 
 ## Local execution
 
-The helpers require `SOLACE_E2E=1` and an absolute `SOLACE_E2E_DIR` whose final directory is `solace-e2e`. Use a new temporary directory. Do not share it with another run. Ports 4001, 55432, 58080 and 59000 must be free; Android also uses the isolated emulator port 5580.
+The helpers require `SOLACE_E2E=1` and an absolute `SOLACE_E2E_DIR` whose final directory is `solace-e2e`. Use a new temporary directory. Do not share it with another run. Ports 4001, 55432, 58080 and 59000 must be free; macOS also uses SMTP port 2525 and Android uses the isolated emulator port 5580.
 
 Use the repository's pinned Bun, Node and Rust. Linux needs Podman, Android SDK tools and Java 21. macOS needs Xcode with an iOS runtime, CocoaPods, Java 21 and Homebrew `postgresql@18`/Python 3.13. The workflow contains the reproducible setup sequence.
 

@@ -37,9 +37,13 @@ def start_macos():
     binary = unpack("stalwart-" + architecture, "stalwart")
     cli = unpack("stalwart-cli-" + architecture, "stalwart-cli")
     start_stalwart(private, binary, cli)
+    start_s3(private)
+
+
+def start_s3(private, port=59000):
     s3_environment = {**os.environ, "COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS": "solace-test-avatars", "COM_ADOBE_TESTING_S3MOCK_STORE_ROOT": str(private / "avatars"), "SERVER_ADDRESS": "127.0.0.1"}
-    spawn("s3", ["java", "-Xmx512m", "-jar", download("s3mock"), "--server.port=0", "--http.port=59000"], s3_environment)
-    wait_url("http://127.0.0.1:59000/solace-test-avatars")
+    spawn("s3", ["java", "-Xmx512m", "-jar", download("s3mock"), "--server.port=0", f"--com.adobe.testing.s3mock.http-port={port}"], s3_environment)
+    wait_url(f"http://127.0.0.1:{port}/solace-test-avatars")
 
 
 def start_stalwart(private, binary, cli):
