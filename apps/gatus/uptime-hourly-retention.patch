@@ -1,0 +1,17 @@
+diff --git a/storage/store/sql/sql.go b/storage/store/sql/sql.go
+index 9b3aabe..3016730 100644
+--- a/storage/store/sql/sql.go
++++ b/storage/store/sql/sql.go
+@@ -33,10 +33,10 @@ const (
+ 	eventsAboveMaximumCleanUpThreshold  = 10 // Maximum number of events above the configured maximum before triggering a cleanup
+ 	resultsAboveMaximumCleanUpThreshold = 10 // Maximum number of results above the configured maximum before triggering a cleanup
+ 
+-	uptimeTotalEntriesMergeThreshold = 100                 // Maximum number of uptime entries before triggering a merge
++	uptimeTotalEntriesMergeThreshold = 24*92 + 100         // Solace: hourly entries are kept for the whole retention, so merge only past it
+ 	uptimeAgeCleanUpThreshold        = 92 * 24 * time.Hour // Maximum uptime age before triggering a cleanup
+ 	uptimeRetention                  = 90 * 24 * time.Hour // Minimum duration that must be kept to operate as intended
+-	uptimeHourlyBuffer               = 48 * time.Hour      // Number of hours to buffer from now when determining which hourly uptime entries can be merged into daily uptime entries
++	uptimeHourlyBuffer               = uptimeRetention     // Solace: keep hourly uptime entries for all 90 days so the status page can zoom into any day
+ 
+ 	cacheTTL = 10 * time.Minute
+ )

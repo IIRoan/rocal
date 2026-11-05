@@ -22,12 +22,15 @@
   --accent: light-dark(oklch(0.4341 0.0392 41.9938), oklch(0.9247 0.0524 66.1732));
   --up: light-dark(oklch(0.49 0.12 150), oklch(0.68 0.15 150));
   --down: light-dark(oklch(0.53 0.1936 33.339), oklch(0.677 0.1936 33.339));
+  --partial: light-dark(oklch(0.52 0.14 85), oklch(0.72 0.16 85));
+  --outage: light-dark(oklch(0.53 0.1936 33.339 / 0.2), oklch(0.677 0.1936 33.339 / 0.34));
   --none: light-dark(oklch(0.9 0 0), oklch(0.28 0 0));
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
@@ -84,8 +87,11 @@ main.wrap { flex: 1; }
 .bars > span { flex: 1; min-width: 1px; border-radius: 2px; background: var(--none); cursor: pointer; }
 .bars > .empty { cursor: default; }
 .bars > .up { background: var(--up); }
+.bars > .partial { background: var(--partial); }
 .bars > .down { background: var(--down); }
 .bars > span:hover, .bars > .active { opacity: 0.7; }
+.bars.dense { gap: 1px; }
+.bars.dense > span { border-radius: 1px; }
 .bars > .selected { position: relative; z-index: 1; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--fg); }
 .scale { display: flex; justify-content: space-between; gap: 0.5rem; margin-top: 0.375rem; color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .scale strong { color: var(--fg); font-weight: 500; }
@@ -103,11 +109,12 @@ main.wrap { flex: 1; }
 .back:hover { color: var(--fg); }
 .detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; }
 .detail-intro { padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
-.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin: 0; padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
-.stats dt { color: var(--muted); font-size: 0.75rem; }
-.stats dd { margin: 0.125rem 0 0; font-size: 1.125rem; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.uptimes { display: flex; flex-wrap: wrap; gap: 0.125rem 1.25rem; margin: 0.25rem 0 0; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.uptimes div { display: flex; gap: 0.375rem; }
+.uptimes dt { color: var(--muted); }
+.uptimes dd { margin: 0; color: var(--fg); font-weight: 600; }
 .block { padding: 1.5rem 0; border-bottom: 1px solid var(--border); }
-.block:last-child { border-bottom: 0; }
+.block:last-child, #d-body > .block:not(:has(~ .block:not([hidden]))) { border-bottom: 0; }
 .block-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 1rem; margin: -0.75rem 0 0.25rem; }
 .block-head .label { margin: 0; }
 .range { display: flex; gap: 0.125rem; margin-right: -0.5rem; }
@@ -115,23 +122,38 @@ main.wrap { flex: 1; }
 .range button:hover { color: var(--fg); }
 .range button[aria-pressed="true"] { background: var(--hover); color: var(--fg); }
 .chart { position: relative; height: 11rem; }
+.chart[data-zoomable] { cursor: pointer; }
 .plot { position: absolute; top: 0.5rem; right: 0; bottom: 1.75rem; left: 3.25rem; }
 .plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .plot .grid { stroke: var(--hover); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .plot .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .plot .area { fill: var(--accent); fill-opacity: 0.1; }
-.plot .band { fill: var(--hover); }
+.plot .outage { fill: var(--outage); }
 .ytick { position: absolute; left: -3.25rem; width: 2.75rem; color: var(--muted); font-size: 0.6875rem; font-variant-numeric: tabular-nums; text-align: right; transform: translateY(-50%); }
 .xticks { position: absolute; right: 0; bottom: 0; left: 3.25rem; display: flex; justify-content: space-between; color: var(--muted); font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 .cross { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); pointer-events: none; }
 .mark, .point { position: absolute; width: 0.5rem; height: 0.5rem; margin: -0.25rem 0 0 -0.25rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); pointer-events: none; }
+.point.failed { background: var(--down); }
+.point.partial { background: var(--partial); }
 .chart .empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); font-size: 0.8125rem; }
 .sub { margin: 0; font-size: 0.8125rem; font-weight: 600; }
-.selected-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 0.75rem; }
-.selected-period { margin-top: 1rem; border-top: 1px solid var(--border); }
-.selected-period .incident-list { margin: 0.5rem 0 0; }
-.text-button { min-height: 2.75rem; margin-right: -0.5rem; padding: 0 0.5rem; border: 0; border-radius: 0.375rem; background: transparent; color: var(--muted); font-size: 0.75rem; font-weight: 500; }
-.text-button:hover { color: var(--fg); }
+.check-title { margin-top: 1rem; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0 0.375rem; min-height: 2.75rem; margin: -0.75rem 0 0.25rem; }
+.crumbs .label { margin: 0; }
+.crumbs > span { display: contents; }
+.crumbs button { min-height: 2.75rem; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+.crumbs button:hover { color: var(--fg); text-decoration-color: currentColor; }
+.crumbs .sep { color: var(--muted); font-size: 0.6875rem; }
+#d-crumbs:not(:empty) ~ .label { color: var(--fg); }
+.level-meta { margin-top: 0.75rem; }
+.level-meta strong { color: var(--fg); font-weight: 600; }
+.level-meta strong.partial { color: var(--partial); }
+.level-meta strong.down { color: var(--down); }
+.level-incidents { margin: 0.75rem 0 0; }
+.incident-list .outage { align-items: center; font-size: 0.875rem; }
+.incident-list .outage svg { flex: none; color: var(--down); }
+.incident-list .outage .what { font-weight: 600; }
+.incident-list .outage time { color: var(--fg); }
 .conditions { margin: 0.5rem 0 0; padding: 0; list-style: none; }
 .conditions li { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.1875rem 0; font-size: 0.8125rem; }
 .conditions svg { flex: none; margin-top: 0.1875rem; }
@@ -147,7 +169,6 @@ footer a:hover { color: var(--fg); }
 @media (max-width: 32rem) {
   .bars { gap: 1px; height: 1.5rem; }
   .bars > span { border-radius: 1px; }
-  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>
 </head>
@@ -185,18 +206,14 @@ footer a:hover { color: var(--fg); }
       <p id="d-meta" class="meta" aria-live="polite"></p>
     </div>
     <div id="d-body" hidden>
-      <dl id="d-uptime" class="stats"></dl>
-      <section class="block" aria-labelledby="d-days-title">
-        <h2 id="d-days-title" class="label">Last 90 days</h2>
+      <section id="d-history" class="block" aria-labelledby="d-days-title">
+        <nav class="crumbs" aria-label="Zoom level">
+          <span id="d-crumbs"></span>
+          <h2 id="d-days-title" class="label" tabindex="-1" aria-live="polite"></h2>
+        </nav>
         <div id="d-days"></div>
-        <div id="d-selected" class="selected-period" aria-live="polite" hidden>
-          <div class="selected-head">
-            <h3 id="d-selected-title" class="sub"></h3>
-            <button id="d-selected-clear" class="text-button" type="button">Clear</button>
-          </div>
-          <p id="d-selected-meta" class="meta"></p>
-          <ul id="d-selected-incidents" class="incident-list"></ul>
-        </div>
+        <p id="d-level-meta" class="meta level-meta" hidden></p>
+        <ul id="d-level-incidents" class="incident-list level-incidents"></ul>
       </section>
       <section class="block" aria-labelledby="d-chart-title">
         <div class="block-head">
@@ -212,19 +229,13 @@ footer a:hover { color: var(--fg); }
         <p id="d-chart-meta" class="meta"></p>
       </section>
       <section class="block" aria-labelledby="d-checks-title">
-        <h2 id="d-checks-title" class="label">Recent checks</h2>
+        <h2 id="d-checks-title" class="label">Checks</h2>
         <div id="d-checks"></div>
-        <div class="selected-head">
-          <h3 id="d-check-title" class="sub">Latest check</h3>
-          <button id="d-check-latest" class="text-button" type="button" hidden>Show latest</button>
+        <div id="d-check-detail" hidden>
+          <h3 id="d-check-title" class="sub check-title"></h3>
+          <p id="d-latest" class="meta"></p>
+          <ul id="d-conditions" class="conditions"></ul>
         </div>
-        <p id="d-latest" class="meta"></p>
-        <ul id="d-conditions" class="conditions"></ul>
-      </section>
-      <section class="block" aria-labelledby="d-incidents-title">
-        <h2 id="d-incidents-title" class="label">Incidents</h2>
-        <ul id="d-incidents" class="incident-list"></ul>
-        <p class="meta">Every recorded interruption, including short ones.</p>
       </section>
     </div>
   </div>
@@ -251,7 +262,8 @@ footer a:hover { color: var(--fg); }
   };
   const GROUPS = { "Stalwart Metrics": "Mail server", VPS: "Mail relay" };
   const DAYS = 90;
-  const RECENT_CHECKS = 30;
+  // The service header only needs the latest few results, for its state and check interval.
+  const HEADER_RESULTS = 10;
   const CURRENT_MS = 60e3;
   const HISTORY_MS = 15 * 60e3;
   const INCIDENT_DAYS = 30;
@@ -260,13 +272,20 @@ footer a:hover { color: var(--fg); }
   const THEME_KEY = "solace-status-theme";
   const STATE_TEXT = { up: "Operational", down: "Down", unknown: "No data" };
   const DATES = { month: "short", day: "numeric" };
-  const RANGES = { "24h": ["24 hours", { hour: "numeric" }, 864e5], "7d": ["7 days", DATES, 7 * 864e5], "30d": ["30 days", DATES, 30 * 864e5], "90d": ["90 days", DATES, 90 * 864e5] };
+  // Range: [label, tick format, length in ms, bucket size in seconds]; wide ranges use coarser buckets so the line stays readable.
+  const RANGES = {
+    "24h": ["24 hours", { hour: "numeric" }, 864e5, 3600],
+    "7d": ["7 days", DATES, 7 * 864e5, 3600],
+    "30d": ["30 days", DATES, 30 * 864e5, 6 * 3600],
+    "90d": ["90 days", DATES, 90 * 864e5, 24 * 3600],
+  };
 
   const icon = (paths, size) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
   const ICONS = {
     next: icon('<path d="m9 18 6-6-6-6"/>', 16),
     pass: icon('<path d="M20 6 9 17l-5-5"/>', 14),
     fail: icon('<path d="M18 6 6 18M6 6l12 12"/>', 14),
+    alert: icon('<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>', 16),
   };
 
   const $ = (id) => document.getElementById(id);
@@ -275,10 +294,29 @@ footer a:hover { color: var(--fg); }
   const clock = format({ hour: "numeric", minute: "2-digit" });
   const clockSeconds = format({ hour: "numeric", minute: "2-digit", second: "2-digit" });
   const dayTime = format({ month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const dateOnly = format(DATES);
+  const weekday = format({ weekday: "short", month: "short", day: "numeric" });
+  const longDay = format({ weekday: "long", month: "long", day: "numeric" });
   const api = (key, path) => `/api/v1/endpoints/${encodeURIComponent(key)}/${path}`;
   const link = (key) => `/endpoints/${encodeURIComponent(key)}`;
-  const minute = (at) => `${new Date(at).toISOString().slice(0, 16)}Z`;
-  const periodLink = (key, day) => `${link(key)}?from=${minute(day.from)}&to=${minute(day.to)}`;
+  // Days are calendar days in the viewer's time zone; the server buckets them at the same midnights.
+  const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const pad = (n) => String(n).padStart(2, "0");
+  const dateKey = (at) => {
+    const d = new Date(at);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+  const dayOf = (y, m, d) => ({ from: new Date(y, m, d).getTime(), to: new Date(y, m, d + 1).getTime() });
+  const periodLink = (key, day, hour) => `${link(key)}?day=${dateKey(day.from)}${hour == null ? "" : `&hour=${new Date(hour).getHours()}`}`;
+  const timelineUrl = (key, from, to, step = 3600) =>
+    `/timeline/${encodeURIComponent(key)}?from=${Math.floor(from / 1000)}&to=${Math.ceil(to / 1000)}&step=${step}&tz=${encodeURIComponent(ZONE)}`;
+
+  function lastDays() {
+    const today = new Date();
+    return Array.from({ length: DAYS }, (_, i) => dayOf(today.getFullYear(), today.getMonth(), today.getDate() - (DAYS - 1 - i)));
+  }
+
+  const daysUrl = (key) => timelineUrl(key, lastDays()[0].from, Date.now(), 86400);
   const route = /^\/endpoints\/([^/]+)\/?$/.exec(location.pathname);
   let detailKey = null;
   try {
@@ -287,8 +325,8 @@ footer a:hover { color: var(--fg); }
     detailKey = null;
   }
   const query = new URLSearchParams(location.search);
-  const queryFrom = Date.parse(query.get("from") || "");
-  const queryTo = Date.parse(query.get("to") || "");
+  const queryDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(query.get("day") || "");
+  const queryHour = Number(query.get("hour") ?? "x");
 
   const order = Object.keys(SERVICES);
   const rank = (key) => (order.includes(key) ? order.indexOf(key) : order.length);
@@ -313,12 +351,14 @@ footer a:hover { color: var(--fg); }
   let endpoints = [];
   let history = {};
   let detail = null;
-  let period = null;
-  // A day picked from the 90-day bars, kept in the URL; the chart opens on the range that contains it.
-  let selected = detailKey && queryFrom < queryTo ? { from: queryFrom, to: queryTo } : null;
+  // The day and hour picked from the bars live in the URL; while one is set, the chart shows it instead of a range.
+  let selected = detailKey && queryDay ? dayOf(Number(queryDay[1]), Number(queryDay[2]) - 1, Number(queryDay[3])) : null;
+  let selectedHour = selected && Number.isInteger(queryHour) && queryHour >= 0 && queryHour < 24
+    ? new Date(Number(queryDay[1]), Number(queryDay[2]) - 1, Number(queryDay[3]), queryHour).getTime()
+    : null;
   let selectedCheck = null;
-  const rangeFor = (from) => Object.keys(RANGES).find((range) => Date.now() - from <= RANGES[range][2] + 36e5) || "90d";
-  const chart = { range: selected ? rangeFor(selected.from) : "24h", data: null, error: false, valid: [], index: null };
+  const zoom = { day: null, hour: null, error: false };
+  const chart = { range: "24h", data: null, error: false, valid: [], index: null };
   let slowAt = 0;
   let updatedAt = null;
   let failed = false;
@@ -327,7 +367,11 @@ footer a:hover { color: var(--fg); }
 
   async function getJSON(url) {
     const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
+    if (!response.ok) {
+      // An unread error body keeps the connection busy, so drain it before failing.
+      await response.text();
+      throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
+    }
     return response.json();
   }
 
@@ -337,27 +381,45 @@ footer a:hover { color: var(--fg); }
     if (!slow) return;
     const entries = await Promise.all(endpoints.map(async (e) => {
       const [days, statuses] = await Promise.allSettled([
-        getJSON(api(e.key, `period-statuses/${DAYS}d/${DAYS}`)),
+        getJSON(daysUrl(e.key)),
         getJSON(api(e.key, "statuses?page=1&pageSize=1")),
       ]);
       const previous = history[e.key] || {};
       return [e.key, {
-        period: days.status === "fulfilled" ? days.value : previous.period,
+        days: days.status === "fulfilled" ? days.value : previous.days,
         events: statuses.status === "fulfilled" ? statuses.value.events || [] : previous.events,
       }];
     }));
     history = Object.fromEntries(entries);
   }
 
+  const rangeUrl = (range) => timelineUrl(detailKey, Date.now() - RANGES[range][2], Date.now(), RANGES[range][3]);
+
+  async function loadZoom() {
+    const day = selected;
+    const hour = selectedHour;
+    try {
+      if (day && !zoom.day) {
+        const data = await getJSON(timelineUrl(detailKey, day.from, day.to));
+        if (selected === day) zoom.day = data;
+      }
+      if (hour !== null && !zoom.hour) {
+        const data = await getJSON(timelineUrl(detailKey, hour, hour + 36e5));
+        if (selectedHour === hour) zoom.hour = data;
+      }
+      zoom.error = false;
+    } catch {
+      zoom.error = true;
+    }
+  }
+
   async function loadDetail(slow) {
-    detail = await getJSON(api(detailKey, `statuses?page=1&pageSize=${RECENT_CHECKS}`));
+    detail = await getJSON(api(detailKey, `statuses?page=1&pageSize=${HEADER_RESULTS}`));
+    if (slow) Object.assign(zoom, { day: null, hour: null });
+    await loadZoom();
     if (!slow) return;
     const range = chart.range;
-    const [days, times] = await Promise.allSettled([
-      getJSON(api(detailKey, `period-statuses/${DAYS}d/${DAYS}`)),
-      getJSON(api(detailKey, `response-times/${range}/history`)),
-    ]);
-    if (days.status === "fulfilled") period = days.value;
+    const [times] = await Promise.allSettled([getJSON(rangeUrl(range))]);
     if (chart.range === range) {
       chart.data = times.status === "fulfilled" ? times.value : chart.data;
       chart.error = times.status === "rejected" && !chart.data;
@@ -385,18 +447,17 @@ footer a:hover { color: var(--fg); }
   async function setRange(range) {
     if (range === chart.range) return;
     Object.assign(chart, { range, data: null, error: false });
-    renderChart();
+    render();
     try {
-      const data = await getJSON(api(detailKey, `response-times/${range}/history`));
+      const data = await getJSON(rangeUrl(range));
       if (chart.range === range) chart.data = data;
     } catch {
       if (chart.range === range) chart.error = true;
     }
-    renderChart();
+    render();
   }
 
   const tips = {};
-
   const activeBar = {};
 
   function strip(id, items, aria, selectedIndex) {
@@ -405,43 +466,49 @@ footer a:hover { color: var(--fg); }
     return `<div class="bars" role="group" tabindex="0" aria-label="${esc(aria)}" data-tip="${esc(id)}">${bars}</div>`;
   }
 
-  function dayItems(days) {
-    const results = (days && days.results) || [];
-    return Array.from({ length: DAYS }, (_, i) => {
-      const s = results[i - (DAYS - results.length)];
-      if (!s) return null;
-      const to = Date.parse(s.timestamp);
-      const from = to - 864e5;
-      const status = s.missing ? "No data" : s.success ? "99% uptime or more" : "Below 99% uptime";
-      const speed = !s.missing && s.duration > 0 ? `Average response ${ms(s.duration / 1e6)}` : "";
+  const checksText = (ok, total) => `${ok.toLocaleString()} of ${total.toLocaleString()} checks passed`;
+
+  function totals(buckets) {
+    const sum = { ok: 0, total: 0, ms: 0 };
+    for (const b of buckets) {
+      sum.ok += b.ok;
+      sum.total += b.total;
+      sum.ms += b.ms * b.total;
+    }
+    return sum.total ? { share: sum.ok / sum.total, ok: sum.ok, total: sum.total, ms: sum.ms / sum.total } : null;
+  }
+
+  function dayItems(data) {
+    if (!data) return Array(DAYS).fill(null);
+    const buckets = new Map(data.buckets.map((b) => [b.at * 1000, b]));
+    return lastDays().map((window) => {
+      const b = buckets.get(window.from);
+      const label = esc(weekday.format(window.from));
+      if (!b || !b.total) return { cls: "none", window, tip: `${label}<span>No data</span>` };
+      const share = b.ok / b.total;
       return {
-        cls: s.missing ? "none" : s.success ? "up" : "down",
-        window: { from, to },
-        summary: [status, speed].filter(Boolean).join(" · "),
-        tip: `${esc(dayTime.format(from))} – ${esc(dayTime.format(to))}<span>${status}</span>${speed ? `<span>${speed}</span>` : ""}`,
+        cls: share >= 0.99 ? "up" : share >= 0.9 ? "partial" : "down",
+        window,
+        tip: `${label}<span>${percent(share)} uptime · ${checksText(b.ok, b.total)}</span><span>Average response ${ms(b.ms)}</span>`,
       };
     });
   }
 
-  function dayStrip(key, name, days, items, selectedTo) {
-    const bad = items.filter((item) => item && item.cls === "down").length;
-    const uptime = days ? percent(days.uptime) : "–";
-    const aria = days
-      ? `${name}: ${uptime} uptime over ${DAYS} days${bad ? `, ${bad} ${bad === 1 ? "day" : "days"} below 99%` : ""}. Arrow keys browse days, Enter opens one.`
+  function dayStrip(key, name, data) {
+    const items = dayItems(data);
+    const sum = data && totals(data.buckets);
+    const bad = items.filter((item) => item && item.cls !== "up" && item.cls !== "none").length;
+    const aria = sum
+      ? `${name}: ${percent(sum.share)} uptime over ${DAYS} days${bad ? `, ${bad} ${bad === 1 ? "day" : "days"} below 99%` : ""}. Arrow keys browse days, Enter opens one.`
       : `${name}: no history yet.`;
-    const selectedIndex = items.findIndex((item) => item && item.window.to === selectedTo);
-    return `${strip(`days:${key}`, items, aria, selectedIndex)}<div class="scale"><span>${DAYS} days ago</span><span><strong>${uptime}</strong> uptime</span><span>Today</span></div>`;
+    return `${strip(`days:${key}`, items, aria, -1)}<div class="scale"><span>${DAYS} days ago</span><span>Today</span></div>`;
   }
 
-  function checkItems(results) {
-    const recent = results.slice(-RECENT_CHECKS);
-    return Array.from({ length: RECENT_CHECKS }, (_, i) => {
-      const r = recent[i - (RECENT_CHECKS - recent.length)];
-      if (!r) return null;
-      const http = r.status ? `<span>HTTP ${r.status}</span>` : "";
-      return { cls: r.success ? "up" : "down", at: r.timestamp, tip: `${esc(clockSeconds.format(new Date(r.timestamp)))}<span>${r.success ? "Passed" : "Failed"} in ${ms(r.duration / 1e6)}</span>${http}` };
-    });
-  }
+  const checkItem = (c) => ({
+    cls: c.ok ? "up" : "down",
+    at: c.at,
+    tip: `${esc(clockSeconds.format(c.at))}<span>${c.ok ? "Passed" : "Failed"} in ${ms(c.ms)}</span>${c.status ? `<span>HTTP ${c.status}</span>` : ""}`,
+  });
 
   function incidentsOf(e, events) {
     const found = [];
@@ -465,6 +532,17 @@ footer a:hover { color: var(--fg); }
     return `<li>${name}<span class="what${ongoing ? " down" : ""}">${what}</span><time datetime="${new Date(incident.start).toISOString()}">${esc(dayTime.format(incident.start))}</time></li>`;
   }
 
+  // Zoomed in, an outage is the point of the view, so it gets the alert colour and its exact window.
+  function outageRow(incident) {
+    const end = incident.end === null ? null : incident.end;
+    const sameDay = end !== null && dateKey(end) === dateKey(incident.start);
+    const window = end === null ? `since ${dayTime.format(incident.start)}` : `${dayTime.format(incident.start)} – ${sameDay ? clock.format(end) : dayTime.format(end)}`;
+    const what = end === null ? "Down now" : `Down for ${duration(end - incident.start)}`;
+    return `<li class="outage">${ICONS.alert}<span class="what down">${what}</span><time datetime="${new Date(incident.start).toISOString()}">${esc(window)}</time></li>`;
+  }
+
+  const shareClass = (share) => (share >= 1 ? "" : share >= 0.9 ? "partial" : "down");
+
   function renderSummary() {
     const down = endpoints.filter((e) => stateOf(e) === "down");
     let state = "up";
@@ -485,12 +563,21 @@ footer a:hover { color: var(--fg); }
     $("summary-meta").textContent = meta;
   }
 
+  function uptimeLine(e, days) {
+    const uptime = e.uptime || {};
+    const ninety = days && totals(days.buckets);
+    const cells = [["24 hours", uptime.day], ["7 days", uptime.week], ["30 days", uptime.month], ["90 days", ninety && ninety.share]];
+    return `<dl class="uptimes">${cells.map(([label, value]) => `<div><dt>${label}</dt><dd>${typeof value === "number" ? percent(value) : "–"}</dd></div>`).join("")}</dl>`;
+  }
+
   function renderService(e) {
     const [name, about] = describe(e.key, e.name);
     const state = stateOf(e);
+    const days = (history[e.key] || {}).days;
     return `<article class="svc">
       <a class="svc-head" href="${link(e.key)}"><h3>${esc(name)}</h3><span class="detail">${esc(about)}</span><span class="state ${state}">${STATE_TEXT[state]}</span>${ICONS.next}</a>
-      ${dayStrip(e.key, name, (history[e.key] || {}).period, dayItems((history[e.key] || {}).period), null)}
+      ${dayStrip(e.key, name, days)}
+      ${uptimeLine(e, days)}
     </article>`;
   }
 
@@ -549,53 +636,129 @@ footer a:hover { color: var(--fg); }
     $("d-state").textContent = STATE_TEXT[state];
     $("d-meta").textContent = [about, checkInterval(results), last && `Last check ${clockSeconds.format(new Date(last.timestamp))}`, failed && "Refresh failed, retrying"]
       .filter(Boolean).join(" · ");
-    const uptime = detail.uptime || {};
-    $("d-uptime").innerHTML = [["24 hours", uptime.day], ["7 days", uptime.week], ["30 days", uptime.month], ["90 days", period && period.uptime]]
-      .map(([label, value]) => `<div><dt>${label}</dt><dd>${typeof value === "number" ? percent(value) : "–"}</dd></div>`).join("");
-    const days = dayItems(period);
-    if (selected) {
-      // Slices move with the clock, so a shared link snaps to the closest current day.
-      const nearest = days.filter(Boolean).sort((a, b) => Math.abs(a.window.to - selected.to) - Math.abs(b.window.to - selected.to))[0];
-      if (nearest && Math.abs(nearest.window.to - selected.to) < 12 * 36e5) selected = nearest.window;
-    }
-    $("d-days").innerHTML = dayStrip(detailKey, name, period, days, selected && selected.to);
-    renderSelected(days);
-    const incidents = incidentsOf(detail, detail.events);
-    $("d-incidents").innerHTML = incidents.length ? incidents.map((i) => incidentRow(i, false)).join("") : `<li class="empty">No incidents recorded.</li>`;
-    renderChecks(results);
+    renderHistory();
+    renderChecks();
     renderChart();
   }
 
-  function renderSelected(days) {
-    $("d-selected").hidden = !selected;
-    if (!selected) return;
-    const day = days.find((item) => item && item.window.to === selected.to);
-    $("d-selected-title").textContent = `${dayTime.format(selected.from)} – ${dayTime.format(selected.to)}`;
-    $("d-selected-meta").textContent = day ? day.summary : "No data for this period.";
-    const events = detail.events || [];
-    const overlapping = incidentsOf(detail, events).filter((i) => i.start < selected.to && (i.end === null ? Date.now() : i.end) > selected.from);
-    const coversPeriod = events.length > 0 && Date.parse(events[0].timestamp) <= selected.from;
-    const rows = overlapping.map((i) => incidentRow(i, false));
-    if (!rows.length) rows.push(`<li class="empty">${coversPeriod ? "No incidents in this period." : "No incidents recorded. Older status changes are not kept."}</li>`);
-    $("d-selected-incidents").innerHTML = rows.join("");
+  const hourLabel = (at) => `${clock.format(at)} – ${clock.format(at + 36e5)}`;
+  const note = (text) => `<p class="meta">${esc(text)}</p>`;
+
+  // Every part of the detail view follows one period: the chart's range, a selected day, or a selected hour.
+  function period() {
+    if (selectedHour !== null) {
+      return { kind: "hour", from: selectedHour, to: selectedHour + 36e5, data: zoom.hour, error: zoom.error, title: `${weekday.format(selectedHour)}, ${hourLabel(selectedHour)}` };
+    }
+    if (selected) return { kind: "day", from: selected.from, to: selected.to, step: 3600, data: zoom.day, error: zoom.error, title: longDay.format(selected.from) };
+    const [label, , span, step] = RANGES[chart.range];
+    const now = Date.now();
+    return { kind: "range", from: now - span, to: now, step, data: chart.data, error: chart.error, title: `Last ${label}`, ago: `${label} ago` };
   }
 
-  function renderChecks(results) {
-    const items = checkItems(results);
-    const index = items.findIndex((item) => item && item.at === selectedCheck);
-    if (index < 0) selectedCheck = null;
-    const failures = results.filter((r) => !r.success).length;
-    $("d-checks").innerHTML = strip("checks", items, `Last ${results.length} checks, ${failures} failed. Arrow keys browse checks, Enter shows one.`, index)
-      + `<div class="scale"><span>${RECENT_CHECKS} checks ago</span><span>Now</span></div>`;
-    const check = selectedCheck ? results.find((r) => r.timestamp === selectedCheck) : results[results.length - 1];
-    $("d-check-title").textContent = selectedCheck ? `Check at ${clockSeconds.format(new Date(check.timestamp))}` : "Latest check";
-    $("d-check-latest").hidden = !selectedCheck;
-    $("d-latest").textContent = check
-      ? [clockSeconds.format(new Date(check.timestamp)), check.success ? "Passed" : "Failed", ms(check.duration / 1e6), check.status && `HTTP ${check.status}`].filter(Boolean).join(" · ")
-      : "No checks yet.";
-    $("d-conditions").innerHTML = check
-      ? [...(check.conditionResults || []).map((c) => condition(c.success, `<code>${esc(c.condition)}</code>`)), ...(check.errors || []).map((error) => condition(false, esc(error)))].join("")
-      : "";
+  function summaryOf(p) {
+    if (!p.data) return { note: p.error ? "History is unavailable right now." : "Loading…" };
+    if (p.kind === "hour") {
+      const checks = p.data.checks;
+      if (!checks.length) {
+        const since = p.data.checksSince;
+        return { note: since && since > p.from ? `Individual checks are kept for about a day; the oldest is from ${dayTime.format(since)}.` : "No checks were recorded in this hour." };
+      }
+      const passed = checks.filter((c) => c.ok);
+      const average = passed.length ? passed.reduce((sum, c) => sum + c.ms, 0) / passed.length : 0;
+      return { meta: `<strong class="${shareClass(passed.length / checks.length)}">${checksText(passed.length, checks.length)}</strong>${passed.length ? ` · average response ${ms(average)}` : ""}` };
+    }
+    const sum = totals(p.data.buckets);
+    const meta = sum ? `<strong class="${shareClass(sum.share)}">${percent(sum.share)} uptime</strong> · ${checksText(sum.ok, sum.total)} · average response ${ms(sum.ms)}` : "No checks were recorded in this period.";
+    const merged = p.kind === "day" && p.data.buckets.some((b) => b.span > 3600);
+    return { meta, note: merged ? "This day was recorded before hourly history was kept, so only its daily total exists." : null };
+  }
+
+  // The period's title (with a breadcrumb when zoomed), its summary and its outages.
+  function renderHistory() {
+    const p = period();
+    const crumbs = selected ? [["overview", "Overview"]] : [];
+    if (selectedHour !== null) crumbs.push(["day", weekday.format(selected.from)]);
+    $("d-crumbs").innerHTML = crumbs.map(([level, text]) => `<button type="button" data-level="${level}">${esc(text)}</button><span class="sep" aria-hidden="true">/</span>`).join("");
+    $("d-days-title").textContent = p.title;
+    const summary = summaryOf(p);
+    // An hour's notes (loading, checks no longer kept) already stand in for its checks below.
+    const notice = p.kind === "hour" ? null : summary.note;
+    $("d-days").innerHTML = notice ? note(notice) : "";
+    $("d-days").hidden = !notice;
+    $("d-level-meta").innerHTML = summary.meta || "";
+    $("d-level-meta").hidden = !summary.meta;
+    const events = detail.events || [];
+    const rows = incidentsOf(detail, events)
+      .filter((i) => i.start < p.to && (i.end === null ? Date.now() : i.end) > p.from)
+      .map(outageRow);
+    const covered = events.length > 0 && Date.parse(events[0].timestamp) <= p.from;
+    if (!rows.length) rows.push(`<li class="empty">${covered ? "No incidents in this period." : "No incidents recorded. Older status changes are not kept."}</li>`);
+    $("d-level-incidents").innerHTML = rows.join("");
+  }
+
+  function slotsOf(p) {
+    const slots = [];
+    if (p.step >= 86400) {
+      for (let at = dayAt(p.from).from; at < p.to; at = dayAt(at).to) slots.push([at, dayAt(at).to]);
+    } else {
+      const size = p.step * 1000;
+      for (let at = Math.floor(p.from / size) * size; at < p.to; at += size) slots.push([at, at + size]);
+    }
+    return slots;
+  }
+
+  // One bar per bucket of the period, coloured by its checks; a bar opens its hour, or its day when that is finer than the view.
+  function periodItems(p) {
+    return slotsOf(p).map(([start, end]) => {
+      if (start > Date.now()) return null;
+      const bucket = p.data.buckets.find((b) => b.at * 1000 <= start && start < (b.at + b.span) * 1000);
+      const merged = bucket && bucket.span * 1000 > end - start;
+      const hour = end - start === 36e5 && !merged ? { day: dayAt(start), hour: start } : null;
+      const open = hour || (p.kind === "range" ? { day: dayAt(start), hour: null } : null);
+      const label = merged ? `${dateOnly.format(bucket.at * 1000)}, daily total` : end - start >= 864e5 ? weekday.format(start) : `${dayTime.format(start)} – ${clock.format(end)}`;
+      if (!bucket || !bucket.total) return { cls: "none", open, tip: `${esc(label)}<span>No data</span>` };
+      const share = bucket.ok / bucket.total;
+      const strict = bucket.span <= 3600;
+      return {
+        cls: share === 1 || (!strict && share >= 0.99) ? "up" : share >= (strict ? 0.5 : 0.9) ? "partial" : "down",
+        open,
+        tip: `${esc(label)}<span>${percent(share)} uptime · ${checksText(bucket.ok, bucket.total)}</span><span>Average response ${ms(bucket.ms)}</span>`,
+      };
+    });
+  }
+
+  // The checks follow the period: one bar per bucket, or every check of a selected hour with its details.
+  function renderChecks() {
+    const p = period();
+    const box = $("d-checks");
+    $("d-checks-title").textContent = p.kind === "hour" ? "Checks in this hour" : "Checks";
+    $("d-check-detail").hidden = true;
+    const summary = summaryOf(p);
+    if (!p.data || (p.kind === "hour" && !p.data.checks.length)) {
+      box.innerHTML = note(p.data ? summary.note : p.error ? "Checks are unavailable right now." : "Loading…");
+      return;
+    }
+    if (p.kind !== "hour") {
+      const items = periodItems(p);
+      box.innerHTML = strip("periods", items, `${p.title}. Arrow keys browse, Enter opens one.`, -1)
+        + `<div class="scale"><span>${esc(p.ago || clock.format(p.from))}</span><span>${esc(p.ago ? "Now" : clock.format(p.to))}</span></div>`;
+      box.querySelector(".bars").classList.toggle("dense", items.length > 100);
+      return;
+    }
+    const checks = p.data.checks;
+    if (selectedCheck !== null && !checks.some((c) => c.at === selectedCheck)) selectedCheck = null;
+    const check = selectedCheck !== null ? checks.find((c) => c.at === selectedCheck) : checks.find((c) => !c.ok) || checks[checks.length - 1];
+    const items = checks.map(checkItem);
+    const failures = checks.filter((c) => !c.ok).length;
+    box.innerHTML = strip("checks", items, `${checks.length} checks in this hour, ${failures} failed. Arrow keys browse checks, Enter shows one.`, items.findIndex((item) => item.at === check.at))
+      + `<div class="scale"><span>${esc(clock.format(p.from))}</span><span>${esc(clock.format(p.to))}</span></div>`;
+    $("d-check-detail").hidden = false;
+    $("d-check-title").textContent = `Check at ${clockSeconds.format(check.at)}`;
+    $("d-latest").textContent = [check.ok ? "Passed" : "Failed", ms(check.ms), check.status && `HTTP ${check.status}`].filter(Boolean).join(" · ");
+    $("d-conditions").innerHTML = [
+      ...check.conditions.map(([text, ok]) => condition(ok, `<code>${esc(text)}</code>`)),
+      ...check.errors.map((error) => condition(false, esc(error))),
+    ].join("");
   }
 
   function niceCeil(value) {
@@ -603,26 +766,81 @@ footer a:hover { color: var(--fg); }
     return [1, 2, 4, 5, 10].map((step) => step * power).find((step) => step >= value);
   }
 
+  const dayAt = (at) => {
+    const d = new Date(at);
+    return dayOf(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+
+  // Points open the hour they cover (hourly buckets) or their day (wider ones); days Gatus merged before hourly retention open nothing finer.
+  function bucketPoints(buckets, from, to, inDay) {
+    return buckets.filter((b) => b.total).map((b) => {
+      const at = b.at * 1000;
+      const span = b.span * 1000;
+      const share = b.ok / b.total;
+      const label = span >= 864e5 ? dateOnly.format(at) : `${dayTime.format(at)} – ${clock.format(at + span)}`;
+      const open = span === 36e5 ? { day: inDay || dayAt(at), hour: at } : !inDay ? { day: dayAt(at), hour: null } : null;
+      return {
+        t: Math.min(to, Math.max(from, at + span / 2)),
+        v: b.ms,
+        failed: share < 0.5,
+        partial: share >= 0.5 && share < 1,
+        reach: span * 2.5,
+        open,
+        tip: `${esc(label)}<span>Average response ${ms(b.ms)}</span><span>${b.ok} of ${b.total} checks passed</span>`,
+      };
+    });
+  }
+
+  function rangeModel() {
+    const [label, ticks, span, step] = RANGES[chart.range];
+    const now = Date.now();
+    const points = chart.data ? bucketPoints(chart.data.buckets, now - span, now, null) : [];
+    const unit = step === 3600 ? ["hour", "hours"] : step === 86400 ? ["day", "days"] : ["six-hour block", "six-hour blocks"];
+    const empty = chart.error ? "Response times are unavailable." : chart.data ? "No response times recorded in this range." : "Loading…";
+    return { points, from: now - span, to: now, label: `the last ${label}`, ticks, unit, empty };
+  }
+
+  function dayModel() {
+    const points = zoom.day ? bucketPoints(zoom.day.buckets, selected.from, selected.to, selected) : [];
+    const empty = zoom.error ? "Hourly detail is unavailable right now." : zoom.day ? "No response times recorded for this day." : "Loading…";
+    return { points, from: selected.from, to: selected.to, label: `${dayTime.format(selected.from)} – ${dayTime.format(selected.to)}`, ticks: { hour: "numeric" }, unit: ["hour", "hours"], empty };
+  }
+
+  function hourModel() {
+    const checks = zoom.hour ? zoom.hour.checks || [] : [];
+    const points = checks.map((c) => ({
+      t: c.at,
+      v: Math.max(1, c.ms),
+      failed: !c.ok,
+      reach: 15 * 60e3,
+      tip: `${esc(clockSeconds.format(c.at))}<span>${c.ok ? "Passed" : "Failed"} in ${ms(c.ms)}</span>${c.status ? `<span>HTTP ${c.status}</span>` : ""}`,
+    }));
+    const empty = zoom.error ? "Checks are unavailable right now." : zoom.hour ? "No individual checks were kept for this hour." : "Loading…";
+    return { points, from: selectedHour, to: selectedHour + 36e5, label: `${dayTime.format(selectedHour)} – ${clock.format(selectedHour + 36e5)}`, ticks: { hour: "numeric", minute: "2-digit" }, unit: ["check", "checks"], empty };
+  }
+
   function renderChart() {
     const box = $("d-chart");
-    for (const button of document.querySelectorAll("[data-range]")) button.setAttribute("aria-pressed", String(button.dataset.range === chart.range));
-    const data = chart.data || { timestamps: [], values: [] };
-    const points = data.timestamps.map((t, i) => ({ t, v: data.values[i] || 0 }));
-    chart.valid = points.filter((p) => p.v > 0);
+    for (const button of document.querySelectorAll("[data-range]")) button.setAttribute("aria-pressed", String(!selected && button.dataset.range === chart.range));
+    const model = selectedHour !== null ? hourModel() : selected ? dayModel() : rangeModel();
+    const points = model.points;
+    chart.valid = points;
     chart.index = null;
-    if (!chart.valid.length) {
-      const text = chart.error ? "Response times are unavailable." : chart.data ? "No response times recorded in this range." : "Loading…";
-      box.innerHTML = `<p class="empty">${text}</p>`;
-      box.setAttribute("aria-label", `Response time: ${text}`);
-      $("d-chart-meta").textContent = "";
+    box.toggleAttribute("data-zoomable", points.some((p) => p.open));
+    if (!points.length) {
+      box.innerHTML = `<p class="empty">${model.empty}</p>`;
+      box.setAttribute("aria-label", `Response time: ${model.empty}`);
+      $("d-chart-meta").textContent = selected ? model.label : "";
       return;
     }
-    const values = chart.valid.map((p) => p.v);
+    // Failed checks report their timeout, so the scale follows healthy points and failures are pinned to the top edge.
+    const healthy = points.filter((p) => !p.failed && !p.partial);
+    const values = (healthy.length ? healthy : points).map((p) => p.v);
     const top = niceCeil(Math.max(1, ...values) * 1.15);
-    chart.t0 = points[0].t;
-    chart.span = points[points.length - 1].t - chart.t0 || 1;
+    chart.t0 = model.from;
+    chart.span = model.to - model.from || 1;
     chart.x = (t) => ((t - chart.t0) / chart.span) * 100;
-    chart.y = (v) => 100 - (v / top) * 100;
+    chart.y = (v) => 100 - (Math.min(v, top) / top) * 100;
     const xy = (p) => `${chart.x(p.t).toFixed(2)},${chart.y(p.v).toFixed(2)}`;
     let line = "";
     let area = "";
@@ -637,28 +855,37 @@ footer a:hover { color: var(--fg); }
       }
       run = [];
     };
-    for (const p of points) {
-      if (p.v > 0) run.push(p);
-      else flush();
-    }
+    points.forEach((p, i) => {
+      const previous = points[i - 1];
+      if (previous && p.t - previous.t > Math.max(previous.reach, p.reach)) flush();
+      run.push(p);
+    });
     flush();
-    const clamp = (x) => Math.min(100, Math.max(0, x));
-    const bandFrom = selected ? clamp(chart.x(selected.from)) : 0;
-    const bandTo = selected ? clamp(chart.x(selected.to)) : 0;
-    const band = bandTo > bandFrom ? `<rect class="band" x="${bandFrom.toFixed(2)}" y="0" width="${(bandTo - bandFrom).toFixed(2)}" height="100"/>` : "";
-    const [rangeLabel, tickFormat] = RANGES[chart.range];
-    const tick = format(tickFormat);
+    const markers = [...lone, ...points.filter((p) => (p.failed || p.partial) && !lone.includes(p))];
+    const tick = format(model.ticks);
     const average = values.reduce((sum, v) => sum + v, 0) / values.length;
-    const summary = `Average ${ms(average)} · fastest ${ms(Math.min(...values))} · slowest ${ms(Math.max(...values))}`;
-    box.setAttribute("aria-label", `Response time over the last ${rangeLabel}. ${summary}.`);
+    const degraded = points.length - healthy.length;
+    // Outages from the recorded status changes are shaded across the chart so downtime reads at a glance.
+    const outages = incidentsOf(detail, detail.events)
+      .map((i) => [Math.max(model.from, i.start), Math.min(model.to, i.end === null ? Date.now() : i.end)])
+      .filter(([start, end]) => end > start);
+    const downFor = outages.reduce((sum, [start, end]) => sum + end - start, 0);
+    const bands = outages.map(([start, end]) => {
+      const x = chart.x(start);
+      return `<rect class="outage" x="${x.toFixed(2)}" y="0" width="${Math.max(0.6, chart.x(end) - x).toFixed(2)}" height="100"/>`;
+    }).join("");
+    const summary = `${downFor ? `Down ${duration(downFor)} · ` : ""}Average ${ms(average)} · fastest ${ms(Math.min(...values))} · slowest ${ms(Math.max(...values))}`
+      + (degraded && healthy.length ? ` · ${degraded} ${model.unit[degraded === 1 ? 0 : 1]} with failures left out` : "");
+    const zoomable = box.hasAttribute("data-zoomable");
+    box.setAttribute("aria-label", `Response time, ${model.label}. ${summary}.${zoomable ? " Arrow keys browse points, Enter opens one." : ""}`);
     box.innerHTML = `<div class="plot">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${band}${[0, 50, 100].map((y) => `<line class="grid" x1="0" x2="100" y1="${y}" y2="${y}"/>`).join("")}<path class="area" d="${area}"/><path class="line" d="${line}"/></svg>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${bands}${[0, 50, 100].map((y) => `<line class="grid" x1="0" x2="100" y1="${y}" y2="${y}"/>`).join("")}<path class="area" d="${area}"/><path class="line" d="${line}"/></svg>
       ${[top, top / 2, 0].map((v, i) => `<span class="ytick" style="top:${i * 50}%">${ms(v)}</span>`).join("")}
-      ${lone.map((p) => `<span class="point" style="left:${chart.x(p.t)}%;top:${chart.y(p.v)}%"></span>`).join("")}
+      ${markers.map((p) => `<span class="point${p.failed ? " failed" : p.partial ? " partial" : ""}" style="left:${chart.x(p.t)}%;top:${chart.y(p.v)}%"></span>`).join("")}
       <span class="cross" hidden></span><span class="mark" hidden></span>
     </div>
     <div class="xticks" aria-hidden="true">${[0, 0.5, 1].map((f) => `<span>${esc(tick.format(chart.t0 + f * chart.span))}</span>`).join("")}</div>`;
-    $("d-chart-meta").textContent = summary;
+    $("d-chart-meta").textContent = selected ? `${model.label} · ${summary}` : summary;
   }
 
   const tip = $("tip");
@@ -687,11 +914,19 @@ footer a:hover { color: var(--fg); }
     placeTip(item.tip, bar.getBoundingClientRect());
   }
 
-  function selectPeriod(day) {
+  async function zoomTo(day, hour) {
+    // The bars a keyboard user acted on are replaced, so focus moves to the new level's heading.
+    const refocus = $("d-history").contains(document.activeElement);
+    if (!day || !selected || day.from !== selected.from) zoom.day = null;
+    zoom.hour = null;
+    selectedCheck = null;
     selected = day;
-    globalThis.history.replaceState(null, "", day ? periodLink(detailKey, day) : link(detailKey));
+    selectedHour = day ? hour : null;
+    globalThis.history.replaceState(null, "", day ? periodLink(detailKey, day, selectedHour) : link(detailKey));
     render();
-    if (day) setRange(rangeFor(day.from));
+    if (refocus) $("d-days-title").focus({ preventScroll: true });
+    await loadZoom();
+    render();
   }
 
   function activate(strip, index) {
@@ -701,10 +936,10 @@ footer a:hover { color: var(--fg); }
     if (id === "checks") {
       selectedCheck = item.at;
       render();
-    } else if (!detailKey) {
-      location.href = periodLink(id.slice("days:".length), item.window);
+    } else if (id === "periods") {
+      if (item.open) zoomTo(item.open.day, item.open.hour);
     } else {
-      selectPeriod(item.window);
+      location.href = periodLink(id.slice("days:".length), item.window);
     }
   }
 
@@ -725,7 +960,7 @@ footer a:hover { color: var(--fg); }
     const box = plot.getBoundingClientRect();
     const px = box.left + (x / 100) * box.width;
     const py = box.top + (y / 100) * box.height;
-    placeTip(`${esc(dayTime.format(p.t))}<span>Average response ${ms(p.v)}</span>`, { left: px, right: px, top: py, bottom: py });
+    placeTip(p.tip, { left: px, right: px, top: py, bottom: py });
   }
 
   const main = document.querySelector("main");
@@ -782,38 +1017,60 @@ footer a:hover { color: var(--fg); }
     const position = Math.min(filled.length - 1, Math.max(0, filled.indexOf(current) + step));
     showBar(strip, filled[position]);
   });
-  $("d-selected-clear").addEventListener("click", () => selectPeriod(null));
-  $("d-check-latest").addEventListener("click", () => {
-    selectedCheck = null;
-    render();
+  $("d-crumbs").addEventListener("click", (event) => {
+    const crumb = event.target.closest("[data-level]");
+    if (crumb) zoomTo(crumb.dataset.level === "day" ? selected : null, null);
   });
 
   const chartBox = $("d-chart");
-  chartBox.addEventListener("pointermove", (event) => {
+
+  function nearestPoint(clientX) {
     const plot = chartBox.querySelector(".plot");
-    if (!plot || !chart.valid.length) return;
+    if (!plot || !chart.valid.length) return -1;
     const box = plot.getBoundingClientRect();
-    const t = chart.t0 + ((event.clientX - box.left) / box.width) * chart.span;
+    const t = chart.t0 + ((clientX - box.left) / box.width) * chart.span;
     let nearest = 0;
     chart.valid.forEach((p, i) => {
       if (Math.abs(p.t - t) < Math.abs(chart.valid[nearest].t - t)) nearest = i;
     });
-    showPoint(nearest);
+    return nearest;
+  }
+
+  function openPoint(index) {
+    const p = chart.valid[index];
+    if (p && p.open) zoomTo(p.open.day, p.open.hour);
+  }
+
+  chartBox.addEventListener("pointermove", (event) => {
+    const index = nearestPoint(event.clientX);
+    if (index >= 0) showPoint(index);
   });
+  chartBox.addEventListener("click", (event) => openPoint(nearestPoint(event.clientX)));
   chartBox.addEventListener("pointerleave", () => {
     if (document.activeElement !== chartBox) hideTip();
   });
   chartBox.addEventListener("focus", () => showPoint(chart.valid.length - 1));
   chartBox.addEventListener("blur", hideTip);
   chartBox.addEventListener("keydown", (event) => {
-    const step = { ArrowLeft: -1, ArrowRight: 1, Home: -Infinity, End: Infinity }[event.key];
-    if (step === undefined || !chart.valid.length) return;
-    event.preventDefault();
+    if (!chart.valid.length) return;
     const last = chart.valid.length - 1;
-    showPoint(Math.min(last, Math.max(0, (chart.index === null ? last : chart.index) + step)));
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openPoint(chart.index === null ? last : chart.index);
+      return;
+    }
+    const step = { ArrowLeft: -1, ArrowRight: 1, Home: -Infinity, End: Infinity }[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    // With no point picked yet, moving right starts at the first point and moving left at the last.
+    const current = chart.index === null ? (step > 0 ? -1 : last + 1) : chart.index;
+    showPoint(Math.min(last, Math.max(0, current + step)));
   });
   for (const button of document.querySelectorAll("[data-range]")) {
-    button.addEventListener("click", () => setRange(button.dataset.range));
+    button.addEventListener("click", () => {
+      if (selected) zoomTo(null, null);
+      setRange(button.dataset.range);
+    });
   }
 
   const root = document.documentElement;
