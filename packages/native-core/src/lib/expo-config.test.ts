@@ -161,6 +161,55 @@ describe("shared native Expo configuration", () => {
     ).toBe("0.9.0");
   });
 
+  it.each(["calendar", "mail"])(
+    "isolates the %s E2E binary and disables remote updates",
+    (app) => {
+      const config = createNativeExpoConfig(app as "calendar" | "mail", {
+        APP_VARIANT: "preview",
+        SOLACE_E2E: "1",
+        EXPO_PUBLIC_API_URL: "http://127.0.0.1:4001",
+      });
+      expect(config.ios?.bundleIdentifier).toBe(`onl.solace.${app}.e2e`);
+      expect(config.android?.package).toBe(`onl.solace.${app}.e2e`);
+      expect(config.extra?.notificationExtension.appGroup).toBe(
+        `group.onl.solace.${app}.e2e`,
+      );
+      expect(config.updates?.enabled).toBe(false);
+      expect(
+        config.ios?.infoPlist?.NSAppTransportSecurity.NSAllowsArbitraryLoads,
+      ).toBe(true);
+      expect(config.plugins).toContainEqual([
+        "expo-build-properties",
+        {
+          ios: { deploymentTarget: "16.4" },
+          android: { usesCleartextTraffic: true },
+        },
+      ]);
+    },
+  );
+
+  it.each([
+    { APP_VARIANT: "production", EXPO_PUBLIC_API_URL: "http://127.0.0.1:4001" },
+    { APP_VARIANT: "preview", EXPO_PUBLIC_API_URL: "https://api.solace.onl" },
+    {
+      APP_VARIANT: "preview",
+      EXPO_PUBLIC_API_URL: "http://localhost.evil.test:4001",
+    },
+    {
+      APP_VARIANT: "preview",
+      EXPO_PUBLIC_API_URL: "http://localhost:4001",
+      SOLACE_ENV_SOURCE: "eas",
+    },
+    { APP_VARIANT: "preview" },
+  ])(
+    "refuses an E2E binary outside the local isolated setup: %j",
+    (environment) => {
+      expect(() =>
+        createNativeExpoConfig("calendar", { ...environment, SOLACE_E2E: "1" }),
+      ).toThrow("E2E");
+    },
+  );
+
   it("rejects an unknown variant rather than silently creating a production identity", () => {
     expect(() =>
       createNativeExpoConfig("calendar", { APP_VARIANT: "developmnt" }),

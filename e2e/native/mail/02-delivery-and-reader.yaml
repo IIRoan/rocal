@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: ".*Switch mailbox"
+- tapOn: Inbox
+- swipe:
+    start: 50%,30%
+    end: 50%,80%
+    duration: 500
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 120000
+- tapOn: ".*Maestro round trip.*"
+- extendedWaitUntil:
+    visible: ".*Maestro body survives encrypted draft storage.*"
+    timeout: 60000
+- assertVisible: Reply
+- takeScreenshot: ${SCREENSHOT_DIR}/encrypted-message-decrypted-in-reader
+- tapOn: Star
+- assertVisible: Unstar
+- tapOn: Unstar
+- assertVisible: Star
+- tapOn: Reply
+- assertVisible: Send
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- tapOn: Close
+- tapOn: Go back
+- assertVisible: ".*Maestro round trip.*"
+- tapOn: ".*Switch mailbox"
+- tapOn: Sent
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 60000
+- tapOn: ".*Maestro round trip.*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"

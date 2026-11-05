@@ -1,0 +1,48 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- assertNotVisible: Welcome back
+- tapOn: Compose message
+- assertVisible: Send
+- tapOn:
+    id: compose-recipient-to
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: ${EMAIL}
+- pressKey: Enter
+- tapOn: Subject
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro retained draft
+- tapOn: Message body
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro body survives encrypted draft storage
+- hideKeyboard
+- tapOn: Close
+- tapOn: ".*Switch mailbox"
+- tapOn: Drafts
+- extendedWaitUntil:
+    visible: ".*Maestro retained draft.*"
+    timeout: 60000
+- takeScreenshot: ${SCREENSHOT_DIR}/encrypted-draft-list
+- runFlow: ../common/open-app.yaml
+- tapOn: ".*Switch mailbox"
+- tapOn: Drafts
+- tapOn: ".*Maestro retained draft.*"
+- assertVisible: ".*Maestro retained draft.*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- tapOn: Subject
+- eraseText
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro round trip
+- hideKeyboard
+- tapOn: Send
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 120000

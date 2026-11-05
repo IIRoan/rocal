@@ -1,0 +1,101 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Create new event
+- assertVisible: Event title
+- tapOn: Event title
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro retained event
+- hideKeyboard
+- tapOn: All day
+- scrollUntilVisible:
+    element: Location
+    direction: DOWN
+- tapOn: Location
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro meeting room
+- hideKeyboard
+- tapOn: Description
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro event notes stay encrypted
+- hideKeyboard
+- tapOn: Save
+- extendedWaitUntil:
+    notVisible: Event title
+    timeout: 30000
+- extendedWaitUntil:
+    visible: Create new event
+    timeout: 30000
+- tapOn: Choose date and view
+- tapOn: Agenda
+- extendedWaitUntil:
+    visible: "Maestro retained event.*"
+    timeout: 30000
+- tapOn: "Maestro retained event.*"
+- assertVisible: Edit
+- assertVisible: Export .ics
+- assertVisible: Maestro meeting room
+- assertVisible: Maestro event notes stay encrypted
+- tapOn: Edit
+- tapOn: Event title
+- eraseText
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro updated event
+- hideKeyboard
+- tapOn: Save
+- extendedWaitUntil:
+    notVisible: Event title
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Maestro updated event.*"
+    timeout: 30000
+- takeScreenshot: ${SCREENSHOT_DIR}/event-updated
+- runFlow: ../common/open-app.yaml
+- extendedWaitUntil:
+    visible: "Maestro updated event.*"
+    timeout: 30000
+- tapOn: "Maestro updated event.*"
+- assertVisible: Edit
+- tapOn: Export .ics
+- extendedWaitUntil:
+    visible: ".*(Copy|Save to Files|Sharing|Bluetooth|Quick Share|Nearby Share).*"
+    timeout: 30000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Close
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- assertVisible: Edit
+- tapOn: Close
+- tapOn: Create new event
+- tapOn: Event title
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro disposable event
+- hideKeyboard
+- tapOn: All day
+- tapOn: Save
+- extendedWaitUntil:
+    visible: "Maestro disposable event.*"
+    timeout: 30000
+- tapOn: "Maestro disposable event.*"
+- tapOn: Delete
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: "Maestro disposable event.*"
+    timeout: 30000
+- assertVisible: "Maestro updated event.*"

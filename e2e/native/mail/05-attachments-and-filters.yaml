@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Filter messages
+- assertVisible: Unread
+- runFlow: ../common/close-sheet.yaml
+- tapOn: Compose message
+- tapOn: Attach file
+- extendedWaitUntil:
+    visible: "(?i).*(browse|recents|recent|downloads|files).*"
+    timeout: 30000
+- takeScreenshot: ${SCREENSHOT_DIR}/native-attachment-picker
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Cancel
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- assertVisible: Send
+- tapOn: Close
+- assertVisible: Compose message

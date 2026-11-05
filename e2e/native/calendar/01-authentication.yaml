@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: Welcome back
+    timeout: 120000
+- tapOn:
+    id: sign-in-email
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: definitely-wrong-password
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: ".*(Invalid|invalid|incorrect).*"
+    timeout: 30000
+- assertNotVisible: Create new event
+- tapOn:
+    id: sign-in-email
+- eraseText
+- tapOn:
+    id: sign-in-password
+- eraseText
+- runFlow: ../common/sign-in.yaml
+- takeScreenshot: ${SCREENSHOT_DIR}/authenticated-calendar
+- runFlow: ../common/open-app.yaml
+- assertNotVisible: Welcome back

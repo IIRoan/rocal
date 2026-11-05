@@ -1,0 +1,61 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- tapOn: Mailboxes
+- tapOn: New mailbox name
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro folder
+- hideKeyboard
+- tapOn: Create mailbox
+- extendedWaitUntil:
+    visible: Maestro folder
+    timeout: 30000
+- scrollUntilVisible:
+    element: Rename Maestro folder
+    direction: DOWN
+- tapOn: Rename Maestro folder
+- tapOn: Rename Maestro folder
+- eraseText
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro renamed folder
+- hideKeyboard
+- tapOn: Save name
+- extendedWaitUntil:
+    visible: Maestro renamed folder
+    timeout: 30000
+- tapOn: Hide Maestro renamed folder
+- tapOn: Show Maestro renamed folder
+- takeScreenshot: ${SCREENSHOT_DIR}/encrypted-custom-mailbox
+- tapOn: Delete Maestro renamed folder
+- assertVisible: "Delete mailbox\\?"
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: Maestro renamed folder
+    timeout: 30000
+- tapOn: Back to settings
+- tapOn: Labels
+- tapOn: Label name
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro mail label
+- hideKeyboard
+- tapOn: Create label
+- extendedWaitUntil:
+    visible: Maestro mail label
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- tapOn: Labels
+- assertVisible: Maestro mail label
+- tapOn: Delete Maestro mail label
+- assertVisible: "Delete label\\?"
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: Maestro mail label
+    timeout: 30000

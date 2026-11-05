@@ -195,6 +195,7 @@ export function SignInScreen() {
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 editable={!isLoading}
                 accessibilityLabel="Email address"
+                testID="sign-in-email"
                 accessibilityHint="Enter your email address"
               />
               {errors.email ? (
@@ -234,6 +235,7 @@ export function SignInScreen() {
                 onSubmitEditing={handleSignIn}
                 editable={!isLoading}
                 accessibilityLabel="Password"
+                testID="sign-in-password"
                 accessibilityHint="Enter your password"
               />
               {errors.password ? (

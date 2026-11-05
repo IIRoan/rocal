@@ -1,0 +1,9 @@
+appId: ${APP_ID}
+---
+- evalScript: ${output.typed = 0}
+- repeat:
+    while:
+      true: ${output.typed < TEXT.length}
+    commands:
+      - inputText: ${TEXT.charAt(output.typed)}
+      - evalScript: ${output.typed = output.typed + 1}

@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+---
+- launchApp:
+    stopApp: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: "(Welcome back|Create new event|Compose message)"
+    timeout: 120000
+- runFlow:
+    when:
+      visible: Welcome back
+    file: sign-in.yaml
+- extendedWaitUntil:
+    visible: ${HOME_LABEL}
+    timeout: 180000

@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+---
+- tapOn:
+    id: sign-in-email
+- runFlow:
+    file: type.yaml
+    env:
+      TEXT: ${EMAIL}
+- tapOn:
+    id: sign-in-password
+- runFlow:
+    file: type.yaml
+    env:
+      TEXT: ${PASSWORD}
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "(Create new event|Compose message|Not Now)"
+    timeout: 180000
+- runFlow:
+    when:
+      visible: Not Now
+    commands:
+      - tapOn: Not Now
+- extendedWaitUntil:
+    visible: ${HOME_LABEL}
+    timeout: 180000

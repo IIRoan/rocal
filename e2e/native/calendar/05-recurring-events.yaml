@@ -1,0 +1,42 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Create new event
+- tapOn: Event title
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro recurring event
+- hideKeyboard
+- tapOn: All day
+- tapOn: "Repeat:.*"
+- tapOn: "Every week on .*"
+- tapOn: Save
+- extendedWaitUntil:
+    visible: "Maestro recurring event.*"
+    timeout: 30000
+- tapOn: "Maestro recurring event.*"
+- tapOn: Edit
+- assertVisible: All occurrences
+- tapOn: All occurrences
+- tapOn: Event title
+- eraseText
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro edited series
+- hideKeyboard
+- tapOn: Save
+- extendedWaitUntil:
+    visible: "Maestro edited series.*"
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: "Maestro edited series.*"
+- tapOn: Delete
+- tapOn: All occurrences
+- assertVisible: "Delete event\\?"
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: "Maestro edited series.*"
+    timeout: 30000
+- assertVisible: "Maestro updated event.*"

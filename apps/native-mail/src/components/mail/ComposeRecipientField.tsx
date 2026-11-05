@@ -252,6 +252,7 @@ export function ComposeRecipientField({
             </Pressable>
           ) : null}
           <TextInput
+            testID={`compose-recipient-${label.toLowerCase()}`}
             ref={inputRef}
             style={[styles.input, collapsed && styles.inputCollapsed]}
             value={draft}

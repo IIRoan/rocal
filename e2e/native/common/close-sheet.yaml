@@ -1,0 +1,6 @@
+appId: ${APP_ID}
+---
+- tapOn: Close sheet
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: ${HOME_LABEL}

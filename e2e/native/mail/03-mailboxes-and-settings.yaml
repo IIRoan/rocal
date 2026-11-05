@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: ".*Switch mailbox"
+- assertVisible: Inbox
+- assertVisible: Drafts
+- assertVisible: Sent
+- assertVisible: Trash
+- tapOn: Inbox
+- assertVisible: ".*Maestro round trip.*"
+- tapOn: Settings
+- assertVisible: Search settings
+- tapOn: Appearance
+- assertVisible: "(?i)Theme"
+- tapOn: Dark
+- takeScreenshot: ${SCREENSHOT_DIR}/mail-dark-settings
+- tapOn: Light
+- tapOn: Back to settings
+- runFlow: ../common/close-sheet.yaml
+- tapOn: Search messages
+- assertVisible: Search mail
+- runFlow: ../common/close-sheet.yaml
+- assertVisible: ".*Maestro round trip.*"
+- tapOn: ".*Maestro round trip.*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"

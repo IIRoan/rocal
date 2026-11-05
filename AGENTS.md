@@ -166,6 +166,8 @@ Verify only — **don't start dev servers, builds, tunnels, EAS builds, OTA publ
 
 CI (`.github/workflows/pr-tests.yml`) runs lint, both typechecks, the tests, and the Rust job (`cargo xtask check --skip-mem`) on every PR. Security workflows run CodeQL, Bun audit and Trivy on PRs, `master`, daily and manually; coverage and limitations are in `.github/SECURITY-SCANNING.md`.
 
+Native E2E (`.github/workflows/native-e2e.yml`, `e2e/README.md`) drives both release apps on iOS/Android against the real API and disposable local Postgres/Stalwart/S3. `cargo xtask e2e serve|seed|verify` owns only `solace_test_e2e`; the clients create real encryption keys and data. `SOLACE_E2E=1` requires a local preview build and loopback API, uses `.e2e` identities and disables OTA. Keep raw Maestro traces and credentials private; upload only reports and synthetic screenshots.
+
 ## 10. Keep this file true
 
 Update both copies in the same change when you add/rename an app or package, move a feature, change routes, or change a convention here (auth, E2EE, privacy, API contract, data layer, mail). When a known gap is fixed, delete it from §2. When a rule becomes mechanically checkable, add it to `scripts/check-repo-rules.ts`. Keep it concise — no one-off scripts or experiments.

@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Choose date and view
+- assertVisible: Week
+- assertVisible: Month
+- tapOn: Month
+- assertVisible: Create new event
+- tapOn: Choose date and view
+- tapOn: Week
+- assertVisible: Create new event
+- tapOn: Choose date and view
+- tapOn: Agenda
+- extendedWaitUntil:
+    visible: "Maestro updated event.*"
+    timeout: 30000
+- tapOn: Settings
+- assertVisible: Search settings
+- tapOn: Appearance
+- assertVisible: "(?i)Theme"
+- tapOn: Dark
+- takeScreenshot: ${SCREENSHOT_DIR}/dark-appearance-drawer
+- tapOn: Light
+- tapOn: Back to settings
+- tapOn: Time & Region
+- assertVisible: "(?i)Time format"
+- tapOn: Timezone
+- tapOn: Search timezones
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Amsterdam
+- hideKeyboard
+- tapOn: ".*Amsterdam.*"
+- tapOn: Back to settings
+- runFlow: ../common/close-sheet.yaml
+- assertVisible: "Maestro updated event.*"

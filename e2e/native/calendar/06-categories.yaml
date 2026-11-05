@@ -1,0 +1,59 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- tapOn: Calendars
+- tapOn: Categories
+- tapOn: New category
+- tapOn: Category name
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro category
+- hideKeyboard
+- tapOn: Create category
+- extendedWaitUntil:
+    notVisible: Create category
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Maestro category.*"
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: "Maestro updated event.*"
+- tapOn: Edit
+- scrollUntilVisible:
+    element: "Category:.*"
+    direction: DOWN
+- tapOn: "Category:.*"
+- tapOn: Maestro category
+- tapOn: Save
+- extendedWaitUntil:
+    visible: "Maestro category.*"
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- tapOn: Calendars
+- tapOn: Categories
+- tapOn: "Maestro category.*"
+- tapOn: Category name
+- eraseText
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro renamed category
+- hideKeyboard
+- tapOn: Save changes
+- tapOn: "Maestro renamed category.*"
+- scrollUntilVisible:
+    element: Delete category
+    direction: DOWN
+- tapOn: Delete category
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: "Maestro renamed category.*"
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: "Maestro updated event.*"
+- assertVisible: Maestro meeting room
+- assertVisible: Maestro event notes stay encrypted
+- assertNotVisible: "Maestro renamed category.*"

@@ -1,0 +1,63 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- tapOn: Account
+- scrollUntilVisible:
+    element: Add Profile Picture
+    direction: DOWN
+- tapOn: Add Profile Picture
+- runFlow:
+    when:
+      visible: Allow Full Access
+    commands:
+      - tapOn: Allow Full Access
+- extendedWaitUntil:
+    visible: "(?i).*(photos|photo library|select.*photo).*"
+    timeout: 30000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "(?i)Photo,.*"
+          index: 0
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: ".*:id/icon_thumbnail"
+          index: 0
+- extendedWaitUntil:
+    visible: "(Choose|Done|Crop|Save|Change Profile Picture)"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: Choose
+    commands:
+      - tapOn: Choose
+- runFlow:
+    when:
+      visible: Done
+    commands:
+      - tapOn: Done
+- runFlow:
+    when:
+      visible: Crop
+    commands:
+      - tapOn: Crop
+- runFlow:
+    when:
+      visible: Save
+    commands:
+      - tapOn: Save
+- extendedWaitUntil:
+    visible: Change Profile Picture
+    timeout: 60000
+- takeScreenshot: ${SCREENSHOT_DIR}/uploaded-private-profile-picture
+- tapOn: Change Profile Picture
+- tapOn: Remove Photo
+- extendedWaitUntil:
+    visible: Add Profile Picture
+    timeout: 30000

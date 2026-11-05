@@ -1,0 +1,56 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- tapOn: Calendars
+- assertVisible: "(?i)My calendars"
+- tapOn: New calendar
+- assertVisible: Calendar name
+- tapOn: Create calendar
+- assertVisible: Calendar name is required
+- tapOn: Calendar name
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro calendar
+- hideKeyboard
+- tapOn: Create calendar
+- extendedWaitUntil:
+    notVisible: Create calendar
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Maestro calendar.*"
+    timeout: 30000
+- tapOn: "Maestro calendar.*"
+- tapOn: Calendar name
+- eraseText
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro renamed calendar
+- hideKeyboard
+- tapOn: Save changes
+- extendedWaitUntil:
+    notVisible: Save changes
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Maestro renamed calendar.*"
+    timeout: 30000
+- tapOn: Show Maestro renamed calendar
+- tapOn: Show Maestro renamed calendar
+- takeScreenshot: ${SCREENSHOT_DIR}/calendar-created-and-renamed
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- tapOn: Calendars
+- assertVisible: "Maestro renamed calendar.*"
+- tapOn: "Maestro renamed calendar.*"
+- scrollUntilVisible:
+    element: Delete calendar and events
+    direction: DOWN
+- tapOn: Delete calendar and events
+- assertVisible: "Delete Maestro renamed calendar\\?"
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: "Maestro renamed calendar.*"
+    timeout: 30000
+- assertVisible: New calendar
