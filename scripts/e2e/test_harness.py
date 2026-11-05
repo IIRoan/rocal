@@ -7,6 +7,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
@@ -20,6 +21,16 @@ specification.loader.exec_module(journeys)
 
 
 class HarnessTests(unittest.TestCase):
+    def test_agenda_anchor_stays_bound_to_fixture_time_across_day_and_year_rollovers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary) / "fixture.json"
+            fixture.write_text("{}")
+            for instant, expected in [(datetime(2026, 11, 5, 23, 59, tzinfo=timezone.utc), "October 29, 2026"),
+                                      (datetime(2027, 1, 3, 0, 1, tzinfo=timezone.utc), "December 27, 2026")]:
+                with self.subTest(instant=instant):
+                    os.utime(fixture, (instant.timestamp(), instant.timestamp()))
+                    self.assertEqual(journeys.agenda_anchor_label(fixture), expected)
+
     def test_failure_reasons_do_not_publish_raw_driver_errors(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "solace-e2e"
