@@ -36,34 +36,43 @@ def start_macos():
     architecture = "arm64" if platform.machine() == "arm64" else "x86_64"
     binary = unpack("stalwart-" + architecture, "stalwart")
     cli = unpack("stalwart-cli-" + architecture, "stalwart-cli")
+    start_stalwart(private, binary, cli)
+    s3_environment = {**os.environ, "COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS": "solace-test-avatars", "COM_ADOBE_TESTING_S3MOCK_STORE_ROOT": str(private / "avatars"), "SERVER_ADDRESS": "127.0.0.1"}
+    spawn("s3", ["java", "-Xmx512m", "-jar", download("s3mock"), "--server.port=0", "--http.port=59000"], s3_environment)
+    wait_url("http://127.0.0.1:59000/solace-test-avatars")
+
+
+def start_stalwart(private, binary, cli):
     config = private / "stalwart.json"
     config.write_text(json.dumps({"@type": "RocksDb", "path": str(private / "mail-store")}))
-    environment = {**os.environ, "STALWART_RECOVERY_ADMIN": f"admin:{ADMIN}", "STALWART_RECOVERY_MODE_PORT": "58080", "STALWART_RECOVERY_MODE": "1"}
+    environment = {**os.environ, "STALWART_RECOVERY_ADMIN": f"admin:{ADMIN}", "STALWART_RECOVERY_MODE_PORT": STALWART.rsplit(":", 1)[1], "STALWART_RECOVERY_MODE": "1"}
     process = spawn("stalwart", [binary, "--config", config], environment)
     authorization = "Basic " + base64.b64encode(f"admin:{ADMIN}".encode()).decode()
     wait_url(STALWART + "/jmap/session", {"Authorization": authorization})
     if process.poll() is not None:
         raise RuntimeError("The isolated Stalwart process exited")
+    network = {"@type": "reconcile", "object": "NetworkListener", "matchOn": ["name"], "value": {
+        "e2e-http": {"name": "http", "protocol": "http", "bind": {STALWART.removeprefix("http://"): True}, "useTls": False, "implicitTls": False},
+        "e2e-smtp": {"name": "smtp", "protocol": "smtp", "bind": {"127.0.0.1:2525": True}, "useTls": False, "implicitTls": False},
+    }}
+    plan_path = private / "mail-plan.ndjson"
+    plan_path.write_text(json.dumps(network) + "\n")
+    run([cli, "--url", STALWART, "--user", "admin", "--password", ADMIN, "apply", "--file", plan_path, "--quiet"])
+    stop("stalwart")
+    environment.pop("STALWART_RECOVERY_MODE")
+    spawn("stalwart", [binary, "--config", config], environment)
+    wait_url(STALWART + "/jmap/session", {"Authorization": authorization})
     roles = jmap([["x:Role/query", {}, "q"], ["x:Role/get", {"#ids": {"resultOf": "q", "name": "x:Role/query", "path": "/ids"}, "properties": ["id", "description"]}, "g"]])
     role = next(item["id"] for item in roles["methodResponses"][1][1]["list"] if item["description"] == "User")
     substitutions = {"SOLACE_TEST_USER_ROLE_ID": role, "SOLACE_TEST_PROVISIONER_PASSWORD": "solace-test-provisioner-local", "SOLACE_TEST_NOREPLY_PASSWORD": "solace-test-noreply-local"}
     plan = "\n".join((REPO / path).read_text() for path in ["apps/stalwart/stalwart/plan/16-provisioner-role.ndjson", "apps/stalwart/test-env/plan.ndjson"])
     for key, value in substitutions.items():
         plan = plan.replace("${" + key + "}", value)
-    network = {"@type": "reconcile", "object": "NetworkListener", "matchOn": ["name"], "value": {
-        "e2e-http": {"name": "http", "protocol": "http", "bind": {"127.0.0.1:58080": True}, "useTls": False, "implicitTls": False},
-        "e2e-smtp": {"name": "smtp", "protocol": "smtp", "bind": {"127.0.0.1:2525": True}, "useTls": False, "implicitTls": False},
-    }}
-    plan_path = private / "mail-plan.ndjson"
-    plan_path.write_text(plan + "\n" + json.dumps(network) + "\n")
+    plan_path.write_text(plan + "\n")
     run([cli, "--url", STALWART, "--user", "admin", "--password", ADMIN, "apply", "--file", plan_path, "--quiet"])
     stop("stalwart")
-    environment.pop("STALWART_RECOVERY_MODE")
     spawn("stalwart", [binary, "--config", config], environment)
     wait_url(STALWART + "/jmap/session", {"Authorization": authorization})
-    s3_environment = {**os.environ, "COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS": "solace-test-avatars", "COM_ADOBE_TESTING_S3MOCK_STORE_ROOT": str(private / "avatars"), "SERVER_ADDRESS": "127.0.0.1"}
-    spawn("s3", ["java", "-Xmx512m", "-jar", download("s3mock"), "--server.port=0", "--http.port=59000"], s3_environment)
-    wait_url("http://127.0.0.1:59000/solace-test-avatars")
 
 
 def cleanup():

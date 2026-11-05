@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import socket
 import sys
@@ -39,13 +40,17 @@ def android():
     environment = {**os.environ, "ANDROID_AVD_HOME": str(avd_home), "ANDROID_USER_HOME": str(avd_home.parent)}
     run([avdmanager, "create", "avd", "--force", "--name", "solace-e2e", "--package", image, "--device", "pixel_6"], input="no\n", text=True, env=environment)
     emulator = sdk / "emulator/emulator"
-    process = spawn("emulator", [emulator, "-avd", "solace-e2e", "-port", "5580", "-no-window", "-no-audio", "-no-boot-anim", "-no-snapshot", "-gpu", "swiftshader_indirect", "-memory", "2048", "-cores", "2", "-camera-back", "none", "-camera-front", "none"], environment)
+    process = spawn("emulator", [emulator, "-avd", "solace-e2e", "-port", "5580", "-no-window", "-no-audio", "-no-boot-anim", "-no-snapshot", "-gpu", "swiftshader", "-memory", "2048", "-cores", "2", "-camera-back", "none", "-camera-front", "none"], environment)
     identifier = "emulator-5580"
     adb = [sdk / "platform-tools/adb", "-s", identifier]
     deadline = time.monotonic() + 240
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            raise RuntimeError("The isolated Android emulator exited")
+            log = (directory() / "private/emulator.log").read_text(errors="replace")
+            for line in log.splitlines()[-80:]:
+                if re.search(r"\b(ERROR|FATAL|PANIC)\s*[|:]", line):
+                    print(line, flush=True)
+            raise RuntimeError(f"The isolated Android emulator exited with status {process.returncode}")
         result = subprocess.run([*adb, "shell", "getprop", "sys.boot_completed"], text=True, capture_output=True, check=False)
         if result.stdout.strip() == "1":
             break

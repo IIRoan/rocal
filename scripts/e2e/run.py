@@ -60,6 +60,7 @@ def run_journey(platform, app, flow, results, name=None):
         passed = False
     results.append({"app": app, "name": name, "passed": passed, "seconds": round(time.monotonic() - started, 2)})
     publish(results)
+    return passed
 
 
 def main(platform):
@@ -69,8 +70,10 @@ def main(platform):
         flows = sorted(path for path in (scenarios / app).glob("*.yaml") if path.name not in ("offline.yaml", "sign-out.yaml"))
         if not flows:
             raise RuntimeError(f"No {app} user journeys found")
-        for flow in flows:
-            run_journey(platform, app, flow, results)
+        for index, flow in enumerate(flows):
+            passed = run_journey(platform, app, flow, results)
+            if index == 0 and not passed:
+                raise SystemExit(f"The {app} authentication/content prerequisite failed")
     if all(result["passed"] for result in results if result["app"] == "mail"):
         backend = int((directory() / "private/backend.pid").read_text())
         command = subprocess.run(["ps", "-p", str(backend), "-o", "args="], text=True, capture_output=True, check=True).stdout

@@ -19,7 +19,15 @@ appId: ${APP_ID}
 - runFlow: ../common/close-sheet.yaml
 - tapOn: Search messages
 - assertVisible: Search mail
-- runFlow: ../common/close-sheet.yaml
-- assertVisible: ".*Maestro round trip.*"
+- tapOn: Search mail
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: survives encrypted draft
+- hideKeyboard
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 60000
+- takeScreenshot: ${SCREENSHOT_DIR}/on-device-body-search
 - tapOn: ".*Maestro round trip.*"
 - assertVisible: ".*Maestro body survives encrypted draft storage.*"

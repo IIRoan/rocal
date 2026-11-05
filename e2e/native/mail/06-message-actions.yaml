@@ -1,0 +1,57 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: ".*Switch mailbox"
+- tapOn: Inbox
+- tapOn: ".*Maestro round trip.*"
+- extendedWaitUntil:
+    visible: Unread
+    timeout: 30000
+- tapOn: Unread
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 30000
+- tapOn: ".*Maestro round trip.*"
+- tapOn: Move
+- assertVisible: Move to
+- tapOn: Archive
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 30000
+- assertNotVisible: ".*Maestro round trip.*"
+- tapOn: ".*Switch mailbox"
+- tapOn: Archive
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: ".*Switch mailbox"
+- tapOn: Archive
+- tapOn: ".*Maestro round trip.*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- tapOn: Trash
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 30000
+- assertNotVisible: ".*Maestro round trip.*"
+- tapOn: ".*Switch mailbox"
+- tapOn: Trash
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 30000
+- tapOn: ".*Maestro round trip.*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- tapOn: More
+- tapOn: Restore to inbox
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 30000
+- assertNotVisible: ".*Maestro round trip.*"
+- tapOn: ".*Switch mailbox"
+- tapOn: Inbox
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 30000
+- tapOn: ".*Maestro round trip.*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- takeScreenshot: ${SCREENSHOT_DIR}/restored-from-trash

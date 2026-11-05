@@ -19,13 +19,14 @@ The apps use separate `.e2e` bundle IDs, App Groups and keychains. `SOLACE_E2E=1
 | Profile picture | Pick a seeded system-library image, re-encode/upload it, fetch it through the authenticated avatar route and remove it. |
 | Mail encryption and drafts | Mail unlocks Calendar's existing account, creates an encrypted draft, reopens it after restart and sends it to the same local mailbox. |
 | Delivery and reader | Receive the submitted message, decrypt both Inbox and Sent copies, star/unstar and open a quoted reply. |
+| Message actions and search | Search decrypted message bodies on-device, mark unread, move to Archive, reopen after restart, move to Trash and restore to Inbox without losing decrypted content. |
 | Mailboxes and labels | Create/rename/hide/show/delete a custom mailbox and create/reopen/delete an encrypted label. |
 | Mail controls | Open the filter drawer and native attachment picker; cancellation returns to the composer without losing navigation. |
 | Offline and recovery | Suspend the actual API process, restart Mail and read its encrypted snapshot; resume the API and repeat the online delivery/reader assertions. |
 | Sign-out | End the session, hide mailbox content, sign in again, unwrap the existing keys and decrypt the same message. |
 | Server postconditions | UI-created calendars/events/preferences exist as ciphertext and journey event content is absent from readable database columns. |
 
-Assertions wait for specific UI states. A failed case is recorded and fails the job; there are no retries that turn a failing journey green. The runner requires every case, including offline recovery, to execute. Theme, dates and test content are controlled by the journeys rather than a production account's existing data.
+Assertions wait for specific UI states. A failed case is recorded and fails the job; there are no retries that turn a failing journey green. A failed authentication/content prerequisite stops dependent cases immediately. A successful run requires every case, including offline recovery, to execute. Theme, dates and test content are controlled by the journeys rather than a production account's existing data.
 
 Native push delivery/NSE execution on a real device, associated-domain passkeys, biometric prompts, App Store distribution and external providers are outside simulator coverage. Attachment selection is currently tested through opening/canceling the system picker; attachment delivery is covered by the existing API/component tests rather than this native journey. These boundaries should stay explicit as new journeys are added.
 
