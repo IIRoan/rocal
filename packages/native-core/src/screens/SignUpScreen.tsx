@@ -11,6 +11,7 @@ import {
   View,
   type TextStyle,
   type ViewStyle,
+  type TextInputInstance,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Link, useLocalSearchParams } from "expo-router";
@@ -90,9 +91,9 @@ export function SignUpScreen() {
   const [serverError, setServerError] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const emailRef = useRef<TextInput>(null);
-  const inviteRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInputInstance>(null);
+  const inviteRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
 
   const clearErrors = useCallback(() => {
     setNameError(null);

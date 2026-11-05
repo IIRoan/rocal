@@ -7,6 +7,7 @@ import {
   View,
   type TextStyle,
   type ViewStyle,
+  type TextInputInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -119,7 +120,7 @@ function ComposeSession({
   const [draftSaveStatus, setDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
   const [bodyFocused, setBodyFocused] = useState(false);
-  const subjectInputRef = useRef<TextInput>(null);
+  const subjectInputRef = useRef<TextInputInstance>(null);
   const focusSubject = () => subjectInputRef.current?.focus();
   const bodyEditorRef = useRef<ComposeBodyEditorHandle>(null);
 

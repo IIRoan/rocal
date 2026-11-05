@@ -99,7 +99,7 @@ describe("drafts and Sent copies sealed to the account key", () => {
       bodyStructure: created.bodyStructure as JmapBodyStructure,
     };
 
-    const getBlobAsText = jest.fn(async () => stored);
+    const getBlobAsText = jest.fn(async (_session: unknown, _blobId: string) => stored);
     const opened = await decryptMessageForCompose({
       client: { getBlobAsText } as unknown as StalwartJmapClient, // Only the blob download is exercised.
       session: {} as JmapSession,

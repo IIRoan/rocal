@@ -5,6 +5,7 @@ type ChangePasswordInput = {
   newPassword: string;
   email: string;
   passwordEnvelope?: { kdfSalt: string };
+  revokeOtherSessions?: boolean;
 };
 
 const mockChangePassword = jest.fn<

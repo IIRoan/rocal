@@ -6,7 +6,13 @@ import {
   useState,
   type Ref,
 } from "react";
-import { Keyboard, ScrollView, TextInput, View } from "react-native";
+import {
+  Keyboard,
+  ScrollView,
+  type TextInputInstance,
+  View,
+  type ScrollViewInstance,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import {
@@ -94,7 +100,7 @@ export function EventForm({
   const resolvedTimezone = resolveTimezone(initialValues?.timezone ?? timezone);
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createEventFormStyles(theme), [theme]);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   const [fields, updateFields] = useEventFormFields({
     initialValues,
@@ -140,7 +146,7 @@ export function EventForm({
   );
   const activePreset = findRepeatPreset(repeatPresets, recurrenceRule);
 
-  const handleInputFocus = useCallback((input: TextInput | null) => {
+  const handleInputFocus = useCallback((input: TextInputInstance | null) => {
     if (!input || !scrollRef.current) return;
     const scrollNativeRef = scrollRef.current.getNativeScrollRef();
     if (!scrollNativeRef) return;

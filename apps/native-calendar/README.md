@@ -20,7 +20,7 @@ The device display name remains `Solace Calendar`. Canonical deep-link schemes s
 
 `APP_VARIANT=development` is what switches the binary to the Dev name, icon, scheme, and `.dev` identifiers so both builds can sit on a device at once.
 
-This app targets **Expo SDK 57** (React Native 0.86, React 19.2). EAS iOS builds use the `sdk-57` image. After upgrading Expo or native modules, rebuild the development client — OTA updates cannot replace native binaries.
+This app targets **Expo SDK 58** (React Native 0.88, React 19.3). EAS iOS builds use the `sdk-58` image. After upgrading Expo or native modules, rebuild the development client — OTA updates cannot replace native binaries.
 
 ## Update channels
 

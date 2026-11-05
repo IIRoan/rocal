@@ -12,6 +12,7 @@ import {
   View,
   type TextStyle,
   type ViewStyle,
+  type TextInputInstance,
 } from "react-native";
 import { Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -61,7 +62,7 @@ export function SignInScreen() {
   const hasStartedPasskeyPromptRef = useRef(false);
   const signInInFlightRef = useRef(false);
 
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
 
   const handleSignIn = useCallback(async () => {
     const eErr = validateEmail(email);

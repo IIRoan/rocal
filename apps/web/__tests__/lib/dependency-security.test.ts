@@ -20,13 +20,18 @@ function runDependencyCheck(source: string) {
 }
 
 describe("dependency compatibility", () => {
-  it("decodes Expo Router query strings through the patched CommonJS adapter", () => {
+  it("decodes Expo Router deep links without the retired query-string adapter", () => {
     runDependencyCheck(`
-      const queryString = require("query-string");
-      assert.equal(queryString.parse("q=hello%20world").q, "hello world");
-      assert.equal(queryString.parse("q=%E2%9C%93").q, "✓");
-      assert.equal(queryString.parse("q=%E0%A4%A").q, "%E0%A4%A");
-      assert.equal(queryString.parse("q=" + "%FE".repeat(5000)).q, "%FE".repeat(5000));
+      const { getStateFromPath } = require("expo-router/build/fork/getStateFromPath");
+      const parse = (query) => {
+        const state = getStateFromPath("/event/event-1?" + query, { screens: { event: "event/:id" } });
+        assert.equal(state.routes[0].params.id, "event-1");
+        return state.routes[0].params;
+      };
+      assert.equal(parse("q=hello%20world").q, "hello world");
+      assert.equal(parse("q=%E2%9C%93").q, "✓");
+      assert.equal(parse("q=%E0%A4%A").q, "�%A");
+      assert.equal(parse("q=" + "%FE".repeat(5000)).q, "�".repeat(5000));
     `);
   });
 

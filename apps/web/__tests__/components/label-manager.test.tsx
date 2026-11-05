@@ -74,7 +74,7 @@ function typeInto(input: HTMLInputElement, value: string) {
 
 describe("LabelManager", () => {
   it("creates a label with the chosen name and color, then returns to the list", async () => {
-    const onCreateLabel = jest.fn(async () => null);
+    const onCreateLabel = jest.fn<Parameters<typeof Harness>[0]["onCreateLabel"]>(async () => null);
     act(() => {
       root.render(
         <Harness
@@ -95,7 +95,7 @@ describe("LabelManager", () => {
   });
 
   it("requires a second click to delete a label", async () => {
-    const onDeleteLabel = jest.fn(async () => undefined);
+    const onDeleteLabel = jest.fn<Parameters<typeof Harness>[0]["onDeleteLabel"]>(async () => undefined);
     act(() => {
       root.render(
         <Harness

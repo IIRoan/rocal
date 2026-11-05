@@ -37,7 +37,7 @@ const documents = [
 
 function createClient() {
   return {
-    searchMailboxMessages: jest.fn(async () => ({ messages: [{ id: "server" }], total: 1 })),
+    searchMailboxMessages: jest.fn(async (_session: JmapSession, _mailboxId: string, _query: string, _limit?: number) => ({ messages: [{ id: "server" }], total: 1 })),
     searchMailboxMessagesWithFilter: jest.fn(async () => ({ messages: [], total: 0 })),
     getMessagesByIds: jest.fn(async (_session: JmapSession, ids: string[]) =>
       [...ids].reverse().map((id) => ({

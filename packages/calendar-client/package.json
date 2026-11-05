@@ -15,7 +15,7 @@
     "@workspace/logger": "workspace:*"
   },
   "peerDependencies": {
-    "react": "^19.2.3",
+    "react": "19.3.0",
     "@tanstack/react-query": "^5.90.0"
   },
   "devDependencies": {

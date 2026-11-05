@@ -1,8 +1,6 @@
-diff --git a/ios/ImagePickerModule.swift b/ios/ImagePickerModule.swift
-index 6d413603b378ee4b70cdd37bd48bb020ffc49755..ba7fd336b8d75464b012b2f30f0fd7b2c15f043f 100644
 --- a/ios/ImagePickerModule.swift
 +++ b/ios/ImagePickerModule.swift
-@@ -27,41 +27,19 @@ public class ImagePickerModule: Module, OnMediaPickingResultHandler {
+@@ -27,40 +27,18 @@
  
      OnCreate {
        self.appContext?.permissions?.register([
@@ -27,7 +25,7 @@ index 6d413603b378ee4b70cdd37bd48bb020ffc49755..ba7fd336b8d75464b012b2f30f0fd7b2
      AsyncFunction("requestMediaLibraryPermissionsAsync", { (writeOnly: Bool, promise: Promise) in
        self.handlePermissionRequest(requesterClass: self.getMediaLibraryPermissionRequester(writeOnly), operationType: .ask, promise: promise)
      })
- 
+-
 -    AsyncFunction("launchCameraAsync", { (options: ImagePickerOptions, promise: Promise) in
 -      guard let permissions = self.appContext?.permissions else {
 -        return promise.reject(PermissionsModuleNotFoundException())
@@ -40,14 +38,20 @@ index 6d413603b378ee4b70cdd37bd48bb020ffc49755..ba7fd336b8d75464b012b2f30f0fd7b2
 -      self.launchImagePicker(sourceType: .camera, options: options, promise: promise)
 -    })
 -    .runOnQueue(DispatchQueue.main)
--
+ 
      AsyncFunction("launchImageLibraryAsync", { (options: ImagePickerOptions, promise: Promise) in
        self.launchImagePicker(sourceType: .photoLibrary, options: options, promise: promise)
-     })
-@@ -104,26 +82,12 @@ public class ImagePickerModule: Module, OnMediaPickingResultHandler {
-     let picker = UIImagePickerController()
-     picker.fixCannotMoveEditingBox()
+@@ -103,32 +81,11 @@
  
+     let picker = UIImagePickerController()
+ 
+-    // Only the camera flow's edit screen needs this workaround. The library
+-    // picker hosts its editor in a separate system process via `_UISceneHostingView`,
+-    // so the fix is not applicable.
+-    if sourceType == .camera && options.allowsEditing {
+-      picker.fixCannotMoveEditingBox()
+-    }
+-
 -    if sourceType == .camera {
 -      picker.sourceType = .camera
 -      picker.cameraDevice = options.cameraType == .front ? .front : .rear
@@ -58,7 +62,7 @@ index 6d413603b378ee4b70cdd37bd48bb020ffc49755..ba7fd336b8d75464b012b2f30f0fd7b2
      }
  
      picker.mediaTypes = options.toMediaTypesArray()
- 
+-
 -    if options.requiresMicrophonePermission() && sourceType == .camera {
 -      do {
 -        try checkMicrophonePermissions()
@@ -67,18 +71,16 @@ index 6d413603b378ee4b70cdd37bd48bb020ffc49755..ba7fd336b8d75464b012b2f30f0fd7b2
 -        return
 -      }
 -    }
--
+ 
      picker.videoExportPreset = options.videoExportPreset.toAVAssetExportPreset()
      picker.videoQuality = options.videoQuality.toQualityType()
-     picker.videoMaximumDuration = options.videoMaxDuration
-diff --git a/ios/ImagePickerPermissionRequesters.swift b/ios/ImagePickerPermissionRequesters.swift
-index ad92115ac5af6bf0f02faed5adabe5bc0035f07a..4d58689461f58aa04eb947344641bc98f87f134a 100644
 --- a/ios/ImagePickerPermissionRequesters.swift
 +++ b/ios/ImagePickerPermissionRequesters.swift
-@@ -4,49 +4,6 @@ import Photos
+@@ -3,49 +3,6 @@
+ import Photos
  import ExpoModulesCore
  internal import React
- 
+-
 -public class CameraPermissionRequester: NSObject, EXPermissionsRequester {
 -  static public func permissionType() -> String {
 -    return "camera"
@@ -121,7 +123,6 @@ index ad92115ac5af6bf0f02faed5adabe5bc0035f07a..4d58689461f58aa04eb947344641bc98
 -    ]
 -  }
 -}
--
+ 
  public class MediaLibraryPermissionRequester: DefaultMediaLibraryPermissionRequester,
                                                EXPermissionsRequester {
-   public static func permissionType() -> String {

@@ -10,7 +10,7 @@ const FOREGROUND_NOTIFICATION_BEHAVIOR: Notifications.NotificationBehavior = {
 
 let registered = false;
 
-/** Register early: expo-notifications discards alerts when no handler responds within ~3s. */
+/** Register before navigation mounts so foreground alerts use the app's notification behavior. */
 export function registerForegroundPushNotificationHandler(): void {
   if (registered || Platform.OS !== "ios") {
     return;

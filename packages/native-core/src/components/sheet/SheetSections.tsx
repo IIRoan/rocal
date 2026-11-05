@@ -16,6 +16,7 @@ import {
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
+  type TextInputInstance,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -355,7 +356,7 @@ export function SheetSearchField({
   onChangeText: (value: string) => void;
   placeholder?: string;
   accessibilityLabel: string;
-  inputRef?: Ref<TextInput>;
+  inputRef?: Ref<TextInputInstance>;
 }) {
   const { skin, styles } = useSheetListStyles();
   return (

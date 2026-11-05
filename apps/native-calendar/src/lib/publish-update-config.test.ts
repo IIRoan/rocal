@@ -12,7 +12,7 @@ describe("EAS build profile validation", () => {
             preview: {
               channel: "preview",
               env: { APP_VARIANT: "preview" },
-              ios: { image: "sdk-57" },
+              ios: { image: "sdk-58" },
             },
           },
         },

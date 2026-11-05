@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { type TextInput } from "react-native";
+import { type TextInputInstance } from "react-native";
 import { useRouter } from "expo-router";
 import { isBodyOnlyMatch, type TimeFormat } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -39,7 +39,7 @@ export function CommandPalette() {
   const { theme } = useTheme();
   const { isOpen, close } = useCommandPalette();
   const { push } = useRouter();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const timezone = useUserTimezone();
   const timeFormat = useUserTimeFormat();
   const titleIndex = useNativeTitleIndex();

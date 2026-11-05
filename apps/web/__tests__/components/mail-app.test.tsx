@@ -11,6 +11,7 @@ import {
 } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { StalwartJmapClient } from "../../lib/mail/jmap-client";
 
 const mockToggleSidebar = jest.fn();
 let mockAuthNavigationPending = false;
@@ -265,11 +266,11 @@ const mockJmapClient = {
   getAccountSettings: jest.fn<() => Promise<any>>(),
   getStalwartPolicySingletons: jest.fn<() => Promise<any>>(),
   getMailboxes: jest.fn<() => Promise<any>>(),
-  getMailboxMessages: jest.fn<() => Promise<any>>(),
+  getMailboxMessages: jest.fn<(...args: Parameters<StalwartJmapClient["getMailboxMessages"]>) => Promise<unknown>>(),
   getMessagesByIds: jest.fn<() => Promise<any>>(),
   getThreadMessages: jest.fn<() => Promise<any>>(),
   getIdentities: jest.fn<() => Promise<any>>(),
-  sendMessage: jest.fn<() => Promise<any>>(),
+  sendMessage: jest.fn<(...args: Parameters<StalwartJmapClient["sendMessage"]>) => Promise<unknown>>(),
   uploadTextBlob: jest
     .fn<() => Promise<any>>()
     .mockResolvedValue({ blobId: "sealed-blob", size: 64, type: "text/plain" }),
@@ -293,7 +294,7 @@ const mockJmapClient = {
   setMailServerPolicy: jest.fn(),
   syncMailServerPolicy: jest.fn<() => Promise<any>>(),
   clearCachedSession: jest.fn(),
-  searchMailboxMessages: jest.fn<() => Promise<any>>().mockResolvedValue({
+  searchMailboxMessages: jest.fn<(...args: Parameters<StalwartJmapClient["searchMailboxMessages"]>) => Promise<unknown>>().mockResolvedValue({
     messages: [],
     total: 0,
   }),
@@ -504,8 +505,8 @@ import { toast } from "sonner";
 
 const mockToast = jest.mocked(toast);
 const mockUseSession = jest.mocked(useSession);
-const mockGetSession = jest.mocked(authClient.getSession);
-const mockSignOut = jest.mocked(authClient.signOut);
+const mockGetSession = jest.mocked<(...args: Parameters<typeof authClient.getSession>) => Promise<unknown>>(authClient.getSession);
+const mockSignOut = jest.mocked<(...args: Parameters<typeof authClient.signOut>) => Promise<unknown>>(authClient.signOut);
 const mockCompleteAuthNavigation = jest.mocked(completeAuthNavigation);
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
 const mockApi = jest.mocked(mailDemoApiService);

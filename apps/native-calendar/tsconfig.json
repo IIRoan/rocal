@@ -8,6 +8,7 @@
     ],
     "types": [
       "jest",
+      "node",
       "@types/react"
     ],
     "module": "ESNext",

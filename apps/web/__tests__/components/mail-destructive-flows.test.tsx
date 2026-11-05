@@ -16,7 +16,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 jest.mock("lucide-react", () => new Proxy({}, { get: () => () => null }));
 
-const mockRemoveContact = jest.fn(async () => undefined);
+const mockRemoveContact = jest.fn(async (_email: string) => undefined);
 const mockContact = { email: "ada@example.com", displayName: "Ada", contexts: [] };
 
 jest.mock("@/hooks/use-recent-contacts", () => ({
@@ -132,7 +132,7 @@ describe("mailbox manager", () => {
   }
 
   it("keeps the visibility toggle name stable and states what deleting loses", async () => {
-    const onDeleteMailbox = jest.fn(async () => undefined);
+    const onDeleteMailbox = jest.fn(async (_mailboxId: string) => undefined);
     act(() => root.render(<Harness onDeleteMailbox={onDeleteMailbox} />));
 
     const toggle = button("Show Receipts in sidebar");

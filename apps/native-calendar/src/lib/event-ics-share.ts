@@ -20,7 +20,7 @@ export async function shareEventIcs(
   const file = new File(Paths.cache, filename);
   try {
     file.create({ overwrite: true });
-    file.write(icsContent);
+    await file.write(icsContent);
     await Sharing.shareAsync(file.uri, {
       mimeType: ICS_MIME_TYPE,
       dialogTitle: filename,

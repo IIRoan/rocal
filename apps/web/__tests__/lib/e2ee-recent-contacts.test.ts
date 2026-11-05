@@ -80,7 +80,7 @@ const samplePayload: RecentContactsPayload = {
 
 const encryptedPayload = {
   version: 1,
-  algorithm: "AES-GCM",
+  algorithm: "AES-GCM" as const,
   iv: "iv",
   ciphertext: "ciphertext",
 };

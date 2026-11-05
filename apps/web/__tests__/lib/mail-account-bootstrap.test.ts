@@ -45,7 +45,7 @@ import { mailCryptoWorkerClient } from "../../lib/mail/worker-client";
 const mockBootstrapAccountMailbox = jest.mocked(
   mailDemoApiService.bootstrapAccountMailbox,
 );
-const mockGetSession = jest.mocked(authClient.getSession);
+const mockGetSession = jest.mocked<(...args: Parameters<typeof authClient.getSession>) => Promise<unknown>>(authClient.getSession);
 
 describe("bootstrapMailboxForAccount", () => {
   beforeEach(() => {

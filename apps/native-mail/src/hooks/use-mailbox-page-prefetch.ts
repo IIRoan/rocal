@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { ViewToken } from "react-native";
+import type { ListViewToken } from "react-native";
 import { shouldPrefetchNextMailboxPage } from "../lib/mail/mail-pagination";
 
 type NextPageQuery = {
@@ -43,7 +43,11 @@ export function useMailboxPagePrefetch(query: NextPageQuery, rowCount: number) {
   };
 
   // FlatList rejects a changing onViewableItemsChanged, so this stays stable and reads the latest state via ref.
-  const onViewableItemsChanged = ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  const onViewableItemsChanged = ({
+    viewableItems,
+  }: {
+    viewableItems: ListViewToken[];
+  }) => {
     let lastVisibleIndex = -1;
     for (const token of viewableItems) {
       if (token.index != null && token.index > lastVisibleIndex) {
