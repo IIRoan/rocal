@@ -20,6 +20,29 @@ specification.loader.exec_module(journeys)
 
 
 class HarnessTests(unittest.TestCase):
+    def test_failure_reasons_do_not_publish_raw_driver_errors(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                private = directory() / "private"
+                (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+                (private / "fixture.json").write_text(json.dumps({"email": "journey@solace.test", "password": "secret-output-sentinel"}))
+                (private / "maestro-path").write_text("synthetic-maestro")
+                def command_failure(*_args, **options):
+                    options["stdout"].write(b"java.net.SocketTimeoutException: secret-output-sentinel cookie-token-sentinel")
+                    return journeys.subprocess.CompletedProcess([], 1)
+                console = io.StringIO()
+                results = []
+                with patch.object(journeys.subprocess, "run", side_effect=command_failure), \
+                        patch.object(journeys, "capture_failure_screenshot") as screenshot, \
+                        patch.object(journeys, "capture_failure_hierarchy"), redirect_stdout(console):
+                    self.assertFalse(journeys.run_journey("ios", "mail", Path("synthetic.yaml"), results))
+                screenshot.assert_called_once()
+                self.assertEqual(results[0]["reason"], "driver-timeout")
+                exported = console.getvalue() + "".join(path.read_text() for path in (root / "artifacts").rglob("*") if path.is_file())
+                self.assertNotIn("secret-output-sentinel", exported)
+                self.assertNotIn("cookie-token-sentinel", exported)
+
     def test_failure_hierarchies_preserve_selectors_and_states_without_credentials(self):
         fixture = {"email": "journey@solace.test", "password": "private-password-sentinel"}
         tree = {"attributes": {"text": "Maestro folder", "value": fixture["email"], "sessionCookie": "private-cookie-sentinel"},

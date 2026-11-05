@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+    visible: "Delete event\\?"
+    timeout: 30000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: Delete
+          # iOS exposes the drawer action before the native alert's identically named button.
+          index: 1
+          retryTapIfNoChange: false
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: Delete
+          retryTapIfNoChange: false
+- extendedWaitUntil:
+    notVisible: "Delete event\\?"
+    timeout: 30000

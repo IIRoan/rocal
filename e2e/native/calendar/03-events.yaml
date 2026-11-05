@@ -40,13 +40,16 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: Create new event
     timeout: 30000
-- tapOn: Choose date and view
-- tapOn: Agenda
+- waitForAnimationToEnd
 - extendedWaitUntil:
     visible: "Maestro retained event.*"
     timeout: 30000
-- tapOn: "Maestro retained event.*"
-- assertVisible: Edit
+- tapOn:
+    text: "Maestro retained event.*"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: Edit
+    timeout: 30000
 - assertVisible: Export .ics
 - assertVisible: Maestro meeting room
 - assertVisible: Maestro event notes stay encrypted
@@ -104,7 +107,7 @@ appId: ${APP_ID}
     timeout: 30000
 - tapOn: "Maestro disposable event.*"
 - tapOn: Delete
-- tapOn: Delete
+- runFlow: ../common/confirm-event-delete.yaml
 - extendedWaitUntil:
     notVisible: "Maestro disposable event.*"
     timeout: 30000

@@ -110,6 +110,7 @@ jobs:
           name: native-e2e-${{ inputs.platform }}
           path: ${{ runner.temp }}/solace-e2e/artifacts
           if-no-files-found: error
+          overwrite: true
           retention-days: 7
       - name: Stop disposable services and device
         if: always()

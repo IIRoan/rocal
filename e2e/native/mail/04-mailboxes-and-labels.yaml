@@ -11,8 +11,8 @@ appId: ${APP_ID}
     file: ../common/type.yaml
     env:
       TEXT: Maestro folder
-- hideKeyboard
-- tapOn: Create mailbox
+- pressKey: Enter
+- waitForAnimationToEnd
 - extendedWaitUntil:
     visible: Maestro folder
     timeout: 30000
@@ -20,18 +20,14 @@ appId: ${APP_ID}
     element: Rename Maestro folder
     direction: DOWN
 - tapOn: Rename Maestro folder
-- scrollUntilVisible:
-    element: Rename Maestro folder
-    direction: DOWN
-    visibilityPercentage: 100
-- tapOn: Rename Maestro folder
+- waitForAnimationToEnd
 - eraseText
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro renamed folder
-- hideKeyboard
-- tapOn: Save name
+- pressKey: Enter
+- waitForAnimationToEnd
 - extendedWaitUntil:
     visible: Maestro renamed folder
     timeout: 30000

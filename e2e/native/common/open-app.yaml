@@ -16,4 +16,22 @@ appId: ${APP_ID}
       true: ${APP_ID === "onl.solace.calendar.e2e"}
     commands:
       - tapOn: Choose date and view
-      - tapOn: Agenda
+      - assertVisible: Agenda
+      - runFlow:
+          when:
+            visible:
+              text: Agenda
+              selected: true
+          commands:
+            - runFlow: close-sheet.yaml
+      - runFlow:
+          when:
+            visible:
+              text: Agenda
+              selected: false
+          commands:
+            - tapOn: Agenda
+      - extendedWaitUntil:
+          notVisible: Agenda
+          timeout: 30000
+      - waitForAnimationToEnd

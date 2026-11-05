@@ -13,7 +13,8 @@ import {
   AUTH_SESSION_LIFETIME_SECONDS,
   AUTH_SESSION_REFRESH_INTERVAL_SECONDS,
 } from "@workspace/calendar-core";
-import { authClient } from "../lib/auth-client";
+import { authClient, clearAuthSessionCache } from "../lib/auth-client";
+import { parseCachedAuthSession } from "../lib/cached-auth-session";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { API_BASE_URL } from "../lib/constants";
 import { calendarApiService, getAuthHeaders } from "../lib/api";
@@ -29,6 +30,7 @@ import {
 } from "../lib/passkey-browser-bridge";
 import {
   ensureSessionTokenCookie,
+  getSessionCookie,
   healAuthCookieJar,
   rememberSessionTokenFromJar,
   persistRenewedSessionCookie,
@@ -49,7 +51,7 @@ import {
 import { clearNativeTitleIndex } from "../lib/search/title-index-store";
 import { queryClient } from "./QueryProvider";
 
-const AUTH_STATUS_TIMEOUT_MS = 3_000;
+const AUTH_SESSION_CHECK_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
 
 type AuthStatusPayload = {
@@ -235,7 +237,7 @@ export function AuthProvider({
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
-      AUTH_STATUS_TIMEOUT_MS,
+      AUTH_SESSION_CHECK_TIMEOUT_MS,
     );
     let response: Response;
     const requestHeaders = new Headers(getAuthHeaders());
@@ -305,6 +307,12 @@ export function AuthProvider({
     },
     [],
   );
+
+  const restoreCachedSession = useCallback(() => {
+    if (!getSessionCookie()) return false;
+    const cached: unknown = authClient.$store.atoms.session?.get().data;
+    return applySessionData(parseCachedAuthSession(cached));
+  }, [applySessionData]);
 
   const clearPendingAuthPassword = useCallback(() => {
     pendingAuthPasswordRef.current = null;
@@ -426,7 +434,10 @@ export function AuthProvider({
   // A session the server ended (revoked, expired, 401/403) gets the sign-out wipe; a network failure keeps the device's data.
   const endSession = useCallback(() => {
     clearSession();
-    void wipeSessionData(lifecycleRef.current).catch(() => undefined);
+    void Promise.all([
+      clearAuthSessionCache(),
+      wipeSessionData(lifecycleRef.current),
+    ]).catch(() => undefined);
   }, [clearSession]);
 
   // Register the end-session callback so the HTTP layer can terminate sessions on 401/403 without a React hook.
@@ -597,6 +608,7 @@ export function AuthProvider({
     // Capture before clearing the fallback so logout requests still authenticate when the jar is empty.
     const logoutHeaders = getAuthHeaders();
     setFallbackSessionToken(null);
+    const cacheCleared = clearAuthSessionCache().catch(() => undefined);
     const leave = async () => {
       await Promise.all([
         unregisterNativePushDevice(logoutHeaders),
@@ -614,7 +626,8 @@ export function AuthProvider({
       await wipeSessionData(lifecycleRef.current);
     };
     // A failing cleanup step still ends the session, so the app is never left signed in without its keys.
-    await leave().finally(() => {
+    await leave().finally(async () => {
+      await cacheCleared;
       clearSession();
       setSignInNotice(notice ?? null);
     });
@@ -622,6 +635,8 @@ export function AuthProvider({
 
   useEffect(() => {
     let ignore = false;
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const loadId = ++sessionLoadIdRef.current;
     const isStale = () => ignore || loadId !== sessionLoadIdRef.current;
 
@@ -631,9 +646,26 @@ export function AuthProvider({
         await healAuthCookieJar();
         if (isStale()) return;
 
-        const result = await authClient.getSession({
-          query: { disableCookieCache: true },
-        });
+        const result = await Promise.race([
+          authClient.getSession({
+            query: { disableCookieCache: true },
+            fetchOptions: {
+              signal: controller.signal,
+              onSuccess() {
+                if (controller.signal.aborted || isStale()) {
+                  throw new Error("Session changed while loading.");
+                }
+              },
+            },
+          }),
+          new Promise<never>((_resolve, reject) => {
+            timeoutId = setTimeout(() => {
+              controller.abort();
+              reject(new Error("Session check timed out."));
+            }, AUTH_SESSION_CHECK_TIMEOUT_MS);
+          }),
+        ]);
+        clearTimeout(timeoutId);
         if (isStale()) return;
 
         if (applySessionData(result?.data)) {
@@ -650,14 +682,21 @@ export function AuthProvider({
             // Keep a session that Better Auth just validated.
           }
         } else if (!isStale() && !hasLiveSessionRef.current) {
-          if (result?.error) clearSession();
-          else endSession();
+          const status = result?.error?.status;
+          if (status === 0 || (typeof status === "number" && status >= 500)) {
+            if (!restoreCachedSession()) clearSession();
+          } else if (!result?.error || status === 401 || status === 403) {
+            endSession();
+          } else {
+            clearSession();
+          }
         }
       } catch {
         if (!isStale() && !hasLiveSessionRef.current) {
-          clearSession();
+          if (!restoreCachedSession()) clearSession();
         }
       } finally {
+        clearTimeout(timeoutId);
         if (!ignore) setIsLoading(false);
       }
     }
@@ -665,8 +704,10 @@ export function AuthProvider({
     void loadSession();
     return () => {
       ignore = true;
+      controller.abort();
+      clearTimeout(timeoutId);
     };
-  }, [applySessionData, clearSession, endSession, fetchAuthStatus]);
+  }, [applySessionData, clearSession, endSession, fetchAuthStatus, restoreCachedSession]);
 
   const userId = user?.id ?? null;
   useEffect(() => {

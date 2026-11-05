@@ -5,21 +5,21 @@ appId: ${APP_ID}
 - assertVisible: Week
 - assertVisible: Month
 - tapOn: Month
+- waitForAnimationToEnd
 - assertVisible: Create new event
 - tapOn: Choose date and view
 - assertVisible:
     text: Month
     selected: true
 - tapOn: Week
+- waitForAnimationToEnd
 - assertVisible: Create new event
 - tapOn: Choose date and view
 - assertVisible:
     text: Week
     selected: true
 - tapOn: Agenda
-- extendedWaitUntil:
-    visible: "Maestro updated event.*"
-    timeout: 30000
+- waitForAnimationToEnd
 - tapOn: Settings
 - assertVisible: Search settings
 - runFlow:

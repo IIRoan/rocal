@@ -18,6 +18,42 @@ def maestro_environment():
     return {**os.environ, "MAESTRO_CLI_NO_ANALYTICS": "1", "JAVA_TOOL_OPTIONS": f'{options} -Duser.home="{maestro_home}"'.strip()}
 
 
+def failure_kind(log):
+    content = log.read_text(errors="replace")[-32768:]
+    if any(marker in content for marker in ("SocketTimeoutException", "IOSDriverTimeoutException", "DEADLINE_EXCEEDED", "OperationTimeout")):
+        return "driver-timeout"
+    if any(marker in content for marker in ("Connection refused", "Failed to connect to", "UNAVAILABLE: io exception")):
+        return "driver-connection"
+    if "Assertion is false" in content:
+        return "assertion"
+    if "Element not found" in content:
+        return "selector"
+    return "maestro-failure"
+
+
+def capture_failure_screenshot(platform, device, name):
+    root = directory()
+    target = root / f"artifacts/screenshots/native/{name}.png"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with (root / f"private/{name}-native-screenshot.log").open("wb") as log:
+            if platform == "ios":
+                completed = subprocess.run(["xcrun", "simctl", "io", device["id"], "screenshot", "--type=png", str(target)],
+                                           check=False, timeout=15, stdout=subprocess.DEVNULL, stderr=log)
+            else:
+                sdk = os.environ.get("ANDROID_HOME", os.environ.get("ANDROID_SDK_ROOT"))
+                adb = str(Path(sdk) / "platform-tools/adb") if sdk else "adb"
+                with target.open("wb") as screenshot:
+                    completed = subprocess.run([adb, "-s", device["id"], "exec-out", "screencap", "-p"],
+                                               check=False, timeout=15, stdout=screenshot, stderr=log)
+        if completed.returncode != 0:
+            target.unlink(missing_ok=True)
+            print(f"Native failure screenshot unavailable: {name}", flush=True)
+    except (OSError, subprocess.TimeoutExpired):
+        target.unlink(missing_ok=True)
+        print(f"Native failure screenshot unavailable: {name}", flush=True)
+
+
 def sanitized_hierarchy(node, fixture, hidden=False):
     attributes = node.get("attributes", {})
     if not isinstance(attributes, dict):
@@ -73,7 +109,7 @@ def publish(results, summary=False):
     for result in results:
         case = ET.SubElement(cases, "testcase", classname=result["app"], name=result["name"], time=str(result["seconds"]))
         if not result["passed"]:
-            ET.SubElement(case, "failure", message="Maestro journey failed; inspect the job log and screenshots")
+            ET.SubElement(case, "failure", message=f"Journey failed ({result.get('reason', 'maestro-failure')}); inspect screenshots and hierarchy")
     ET.ElementTree(cases).write(artifacts / "junit.xml", encoding="utf-8", xml_declaration=True)
     (artifacts / "results.json").write_text(json.dumps({"results": results}, indent=2))
     raw = root / "private/maestro"
@@ -109,16 +145,22 @@ def run_journey(platform, app, flow, results, name=None):
     if results:
         command.insert(4, "--no-reinstall-driver")
     print(f"Running {platform}: {app}/{name}", flush=True)
+    reason = None
     try:
         with (root / f"private/{app}-{name}.log").open("wb") as log:
             completed = subprocess.run(command, cwd=REPO, env=maestro_environment(), check=False, timeout=600, stdout=log, stderr=subprocess.STDOUT)
         passed = completed.returncode == 0
+        if not passed:
+            reason = failure_kind(root / f"private/{app}-{name}.log")
     except subprocess.TimeoutExpired:
         passed = False
+        reason = "journey-timeout"
     if not passed:
+        capture_failure_screenshot(platform, device, f"{app}-{name}")
         capture_failure_hierarchy(tool, device, fixture, f"{app}-{name}")
-    print(f"{'PASS' if passed else 'FAIL'}: {app}/{name}; inspect the journey report and screenshots", flush=True)
-    results.append({"app": app, "name": name, "passed": passed, "seconds": round(time.monotonic() - started, 2)})
+    status = "PASS" if passed else f"FAIL ({reason})"
+    print(f"{status}: {app}/{name}; inspect the journey report and screenshots", flush=True)
+    results.append({"app": app, "name": name, "passed": passed, "seconds": round(time.monotonic() - started, 2), "reason": reason})
     publish(results)
     return passed
 
@@ -144,6 +186,7 @@ def main(platform):
             run_journey(platform, "mail", scenarios / "mail/offline.yaml", results)
         finally:
             os.kill(backend, signal.SIGCONT)
+        subprocess.run([sys.executable, REPO / "scripts/e2e/services.py", "wait-api"], check=True)
         run_journey(platform, "mail", scenarios / "mail/02-delivery-and-reader.yaml", results, name="online-recovery")
     run_journey(platform, "mail", scenarios / "mail/sign-out.yaml", results)
     publish(results)

@@ -41,10 +41,7 @@ appId: ${APP_ID}
     visible: All occurrences
     timeout: 30000
 - tapOn: All occurrences
-- extendedWaitUntil:
-    visible: "Delete event\\?"
-    timeout: 30000
-- tapOn: Delete
+- runFlow: ../common/confirm-event-delete.yaml
 - extendedWaitUntil:
     notVisible: "Maestro edited series.*"
     timeout: 30000

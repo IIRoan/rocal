@@ -51,7 +51,7 @@ appId: ${APP_ID}
     timeout: 30000
 - tapOn: "Maestro timed event.*"
 - tapOn: Delete
-- tapOn: Delete
+- runFlow: ../common/confirm-event-delete.yaml
 - extendedWaitUntil:
     notVisible: "Maestro timed event.*"
     timeout: 30000
