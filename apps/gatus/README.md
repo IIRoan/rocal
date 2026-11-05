@@ -21,8 +21,10 @@ The Python front (`stalwart-discord-bridge.py`) serves it at `/` and `/endpoints
 one period: the chart's range (24 hours, 7 days, 30 days, 90 days), a day, or an hour. For that
 period it shows a summary (uptime, checks passed, average response), its outages, the
 response-time chart, and its checks: one bar per bucket (hours for 24 hours, 7 days and a day;
-six-hour blocks for 30 days; days for 90 days), or for an hour every individual check, opening
-on the first failure with its conditions and errors.
+six-hour blocks for 30 days; days for 90 days), or for an hour every individual check. Below
+the bars, individual checks are listed newest first (on a range, the latest ones Gatus keeps,
+30 at a time with "Show more"; on an hour, all of them, opening on the first failure); each row
+expands to its conditions and errors.
 
 Day bars are calendar days in the viewer's time zone (green at 99% or more, amber from 90%,
 red below). Clicking a day (on the overview, the 30- or 90-day chart, or a check bar) opens it,
@@ -52,7 +54,7 @@ The page skips refreshes while the tab is hidden:
 |------|---------|------|------|
 | Overview | `/api/v1/endpoints/statuses?pageSize=1` | load, then every minute | ~5 KB |
 | Overview | `/timeline` (90 days, daily) + `statuses?pageSize=1` (events) per endpoint | load, then every 15 minutes | ~8 KB each |
-| Detail | `statuses?pageSize=10` (header state) | load, then every minute | ~6 KB |
+| Detail | `statuses?pageSize=30` (header and the latest checks; "Show more" fetches the next page) | load, then every minute | ~13 KB |
 | Detail | `/timeline` for the chart range (24 to 168 buckets) | load, range change, every 15 minutes | ~8 KB |
 | Detail | `/timeline` for the selected day or hour | on selection, every 15 minutes | ~2–6 KB |
 

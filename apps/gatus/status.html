@@ -137,7 +137,28 @@ main.wrap { flex: 1; }
 .point.partial { background: var(--partial); }
 .chart .empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); font-size: 0.8125rem; }
 .sub { margin: 0; font-size: 0.8125rem; font-weight: 600; }
-.check-title { margin-top: 1rem; }
+.check-title { margin-top: 1.25rem; }
+.check-list { margin: 0.5rem 0 0; padding: 0; list-style: none; }
+.check-list > li + li { border-top: 1px solid var(--border); }
+.check-list summary { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; font-size: 0.8125rem; font-variant-numeric: tabular-nums; list-style: none; cursor: pointer; }
+.check-list summary::-webkit-details-marker { display: none; }
+.check-list summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.check-list summary > svg:first-child { flex: none; color: var(--up); }
+.check-list summary > span { white-space: nowrap; }
+.check-list .when { min-width: 8.5rem; }
+.check-list .result { font-weight: 600; }
+.check-list .speed, .check-list .http { color: var(--muted); }
+.check-list .failed summary > svg:first-child, .check-list .failed .result { color: var(--down); }
+.check-list .chev { flex: none; margin-left: auto; color: var(--muted); }
+.check-list details[open] .chev { transform: rotate(90deg); }
+.check-list summary:hover .chev { color: var(--fg); }
+.check-list .conditions { margin: 0 0 0.75rem 1.625rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .check-list .chev { transition: transform 150ms ease-out; }
+}
+.more { min-height: 2.75rem; margin-top: 0.75rem; padding: 0 0.875rem; border: 1px solid var(--border); border-radius: 0.5rem; background: transparent; color: var(--fg); font-size: 0.8125rem; font-weight: 500; }
+.more:hover { background: var(--hover); }
+#d-check-more > .meta { margin-top: 0.75rem; }
 .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0 0.375rem; min-height: 2.75rem; margin: -0.75rem 0 0.25rem; }
 .crumbs .label { margin: 0; }
 .crumbs > span { display: contents; }
@@ -169,6 +190,8 @@ footer a:hover { color: var(--fg); }
 @media (max-width: 32rem) {
   .bars { gap: 1px; height: 1.5rem; }
   .bars > span { border-radius: 1px; }
+  .check-list summary { gap: 0.5rem; }
+  .check-list .when { min-width: 0; flex: 1; }
 }
 </style>
 </head>
@@ -231,11 +254,9 @@ footer a:hover { color: var(--fg); }
       <section class="block" aria-labelledby="d-checks-title">
         <h2 id="d-checks-title" class="label">Checks</h2>
         <div id="d-checks"></div>
-        <div id="d-check-detail" hidden>
-          <h3 id="d-check-title" class="sub check-title"></h3>
-          <p id="d-latest" class="meta"></p>
-          <ul id="d-conditions" class="conditions"></ul>
-        </div>
+        <h3 id="d-list-title" class="sub check-title" hidden>Latest checks</h3>
+        <ul id="d-check-list" class="check-list" hidden></ul>
+        <div id="d-check-more"></div>
       </section>
     </div>
   </div>
@@ -262,8 +283,8 @@ footer a:hover { color: var(--fg); }
   };
   const GROUPS = { "Stalwart Metrics": "Mail server", VPS: "Mail relay" };
   const DAYS = 90;
-  // The service header only needs the latest few results, for its state and check interval.
-  const HEADER_RESULTS = 10;
+  // Individual checks are listed a page at a time; the first page also feeds the service header.
+  const CHECKS_PAGE = 30;
   const CURRENT_MS = 60e3;
   const HISTORY_MS = 15 * 60e3;
   const INCIDENT_DAYS = 30;
@@ -357,6 +378,11 @@ footer a:hover { color: var(--fg); }
     ? new Date(Number(queryDay[1]), Number(queryDay[2]) - 1, Number(queryDay[3]), queryHour).getTime()
     : null;
   let selectedCheck = null;
+  // Older pages of checks loaded with "Show more", and the rows the viewer has expanded (kept across refreshes).
+  let olderResults = [];
+  let checksExhausted = false;
+  let loadingMore = false;
+  const openChecks = new Set();
   const zoom = { day: null, hour: null, error: false };
   const chart = { range: "24h", data: null, error: false, valid: [], index: null };
   let slowAt = 0;
@@ -405,7 +431,12 @@ footer a:hover { color: var(--fg); }
       }
       if (hour !== null && !zoom.hour) {
         const data = await getJSON(timelineUrl(detailKey, hour, hour + 36e5));
-        if (selectedHour === hour) zoom.hour = data;
+        if (selectedHour === hour) {
+          zoom.hour = data;
+          // An hour opens on its first failure, which is usually why someone zoomed in.
+          const failure = data.checks.find((c) => !c.ok);
+          if (failure && !openChecks.size) openChecks.add(failure.at);
+        }
       }
       zoom.error = false;
     } catch {
@@ -414,7 +445,7 @@ footer a:hover { color: var(--fg); }
   }
 
   async function loadDetail(slow) {
-    detail = await getJSON(api(detailKey, `statuses?page=1&pageSize=${HEADER_RESULTS}`));
+    detail = await getJSON(api(detailKey, `statuses?page=1&pageSize=${CHECKS_PAGE}`));
     if (slow) Object.assign(zoom, { day: null, hour: null });
     await loadZoom();
     if (!slow) return;
@@ -503,6 +534,16 @@ footer a:hover { color: var(--fg); }
       : `${name}: no history yet.`;
     return `${strip(`days:${key}`, items, aria, -1)}<div class="scale"><span>${DAYS} days ago</span><span>Today</span></div>`;
   }
+
+  // Gatus's results and the timeline's checks share one shape: { at, ok, ms, status, errors, conditions: [[text, ok]] }.
+  const fromResult = (r) => ({
+    at: Date.parse(r.timestamp),
+    ok: r.success,
+    ms: r.duration / 1e6,
+    status: r.status,
+    errors: r.errors || [],
+    conditions: (r.conditionResults || []).map((c) => [c.condition, c.success]),
+  });
 
   const checkItem = (c) => ({
     cls: c.ok ? "up" : "down",
@@ -732,33 +773,56 @@ footer a:hover { color: var(--fg); }
     const p = period();
     const box = $("d-checks");
     $("d-checks-title").textContent = p.kind === "hour" ? "Checks in this hour" : "Checks";
-    $("d-check-detail").hidden = true;
-    const summary = summaryOf(p);
     if (!p.data || (p.kind === "hour" && !p.data.checks.length)) {
-      box.innerHTML = note(p.data ? summary.note : p.error ? "Checks are unavailable right now." : "Loading…");
-      return;
-    }
-    if (p.kind !== "hour") {
+      box.innerHTML = note(p.data ? summaryOf(p).note : p.error ? "Checks are unavailable right now." : "Loading…");
+    } else if (p.kind !== "hour") {
       const items = periodItems(p);
       box.innerHTML = strip("periods", items, `${p.title}. Arrow keys browse, Enter opens one.`, -1)
         + `<div class="scale"><span>${esc(p.ago || clock.format(p.from))}</span><span>${esc(p.ago ? "Now" : clock.format(p.to))}</span></div>`;
       box.querySelector(".bars").classList.toggle("dense", items.length > 100);
-      return;
+    } else {
+      const checks = p.data.checks;
+      const failures = checks.filter((c) => !c.ok).length;
+      const items = checks.map(checkItem);
+      box.innerHTML = strip("checks", items, `${checks.length} checks in this hour, ${failures} failed. Arrow keys browse checks, Enter opens one.`, items.findIndex((item) => item.at === selectedCheck))
+        + `<div class="scale"><span>${esc(clock.format(p.from))}</span><span>${esc(clock.format(p.to))}</span></div>`;
     }
-    const checks = p.data.checks;
-    if (selectedCheck !== null && !checks.some((c) => c.at === selectedCheck)) selectedCheck = null;
-    const check = selectedCheck !== null ? checks.find((c) => c.at === selectedCheck) : checks.find((c) => !c.ok) || checks[checks.length - 1];
-    const items = checks.map(checkItem);
-    const failures = checks.filter((c) => !c.ok).length;
-    box.innerHTML = strip("checks", items, `${checks.length} checks in this hour, ${failures} failed. Arrow keys browse checks, Enter shows one.`, items.findIndex((item) => item.at === check.at))
-      + `<div class="scale"><span>${esc(clock.format(p.from))}</span><span>${esc(clock.format(p.to))}</span></div>`;
-    $("d-check-detail").hidden = false;
-    $("d-check-title").textContent = `Check at ${clockSeconds.format(check.at)}`;
-    $("d-latest").textContent = [check.ok ? "Passed" : "Failed", ms(check.ms), check.status && `HTTP ${check.status}`].filter(Boolean).join(" · ");
-    $("d-conditions").innerHTML = [
+    renderCheckList(p);
+  }
+
+  // Individual checks, newest first: the latest ones Gatus kept on a range, every check of a selected hour, none for a day.
+  function listedChecks(p) {
+    if (p.kind === "hour") return p.data ? [...p.data.checks].reverse() : [];
+    if (p.kind === "day") return [];
+    const byTime = new Map();
+    for (const result of [...(detail.results || []), ...olderResults]) byTime.set(result.timestamp, fromResult(result));
+    return [...byTime.values()].filter((c) => c.at >= p.from).sort((a, b) => b.at - a.at);
+  }
+
+  function checkRow(check) {
+    const when = dateKey(check.at) === dateKey(Date.now()) ? clockSeconds.format(check.at) : `${dateOnly.format(check.at)}, ${clockSeconds.format(check.at)}`;
+    const details = [
       ...check.conditions.map(([text, ok]) => condition(ok, `<code>${esc(text)}</code>`)),
       ...check.errors.map((error) => condition(false, esc(error))),
     ].join("");
+    return `<li><details class="${check.ok ? "passed" : "failed"}" data-at="${check.at}"${openChecks.has(check.at) ? " open" : ""}>
+      <summary>${check.ok ? ICONS.pass : ICONS.fail}<span class="when">${esc(when)}</span><span class="result">${check.ok ? "Passed" : "Failed"}</span><span class="speed">${ms(check.ms)}</span>${check.status ? `<span class="http">HTTP ${check.status}</span>` : ""}${ICONS.next}</summary>
+      <ul class="conditions">${details}</ul>
+    </details></li>`;
+  }
+
+  function renderCheckList(p) {
+    const checks = listedChecks(p);
+    const list = $("d-check-list");
+    list.hidden = !checks.length;
+    $("d-list-title").hidden = !checks.length || p.kind === "hour";
+    list.innerHTML = checks.map(checkRow).join("");
+    for (const chevron of list.querySelectorAll("summary > svg:last-child")) chevron.classList.add("chev");
+    const oldest = checks[checks.length - 1];
+    const more = $("d-check-more");
+    if (p.kind !== "range" || !checks.length) more.innerHTML = "";
+    else if (checksExhausted) more.innerHTML = note("Older checks are not kept.");
+    else more.innerHTML = oldest.at > p.from ? `<button class="more" type="button"${loadingMore ? " disabled" : ""}>${loadingMore ? "Loading…" : "Show more"}</button>` : "";
   }
 
   function niceCeil(value) {
@@ -920,6 +984,7 @@ footer a:hover { color: var(--fg); }
     if (!day || !selected || day.from !== selected.from) zoom.day = null;
     zoom.hour = null;
     selectedCheck = null;
+    openChecks.clear();
     selected = day;
     selectedHour = day ? hour : null;
     globalThis.history.replaceState(null, "", day ? periodLink(detailKey, day, selectedHour) : link(detailKey));
@@ -935,7 +1000,10 @@ footer a:hover { color: var(--fg); }
     if (!item) return;
     if (id === "checks") {
       selectedCheck = item.at;
+      openChecks.add(item.at);
       render();
+      const row = $("d-check-list").querySelector(`[data-at="${item.at}"]`);
+      if (row) row.scrollIntoView({ block: "nearest" });
     } else if (id === "periods") {
       if (item.open) zoomTo(item.open.day, item.open.hour);
     } else {
@@ -1020,6 +1088,29 @@ footer a:hover { color: var(--fg); }
   $("d-crumbs").addEventListener("click", (event) => {
     const crumb = event.target.closest("[data-level]");
     if (crumb) zoomTo(crumb.dataset.level === "day" ? selected : null, null);
+  });
+  // "toggle" doesn't bubble, so a capturing listener keeps the expanded rows in sync across re-renders.
+  $("d-check-list").addEventListener("toggle", (event) => {
+    const at = Number(event.target.dataset.at);
+    if (event.target.open) openChecks.add(at);
+    else openChecks.delete(at);
+  }, true);
+  $("d-check-more").addEventListener("click", async (event) => {
+    if (!event.target.closest(".more") || loadingMore) return;
+    loadingMore = true;
+    render();
+    try {
+      const page = 2 + Math.floor(olderResults.length / CHECKS_PAGE);
+      const data = await getJSON(api(detailKey, `statuses?page=${page}&pageSize=${CHECKS_PAGE}`));
+      olderResults = [...olderResults, ...(data.results || [])];
+      if ((data.results || []).length < CHECKS_PAGE) checksExhausted = true;
+    } catch {
+      // The button comes back, so the viewer can try again.
+    }
+    loadingMore = false;
+    render();
+    const button = $("d-check-more").querySelector(".more");
+    if (button) button.focus({ preventScroll: true });
   });
 
   const chartBox = $("d-chart");
