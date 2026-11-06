@@ -57,8 +57,12 @@ appId: ${APP_ID}
 - tapOn: "Categories(,.*)?"
 - tapOn: "Maestro category.*"
 - waitForAnimationToEnd
-- tapOn: Category name
+- tapOn:
+    text: Category name
+    point: 95%,50%
+    retryTapIfNoChange: false
 - eraseText
+- waitForAnimationToEnd
 - runFlow:
     file: ../common/type.yaml
     env:

@@ -55,12 +55,18 @@ appId: ${APP_ID}
 - assertVisible: Maestro meeting room
 - assertVisible: Maestro event notes stay encrypted
 - tapOn: Edit
-- tapOn: Event title
+- waitForAnimationToEnd
+- tapOn:
+    text: Event title
+    point: 95%,50%
+    retryTapIfNoChange: false
 - eraseText
+- waitForAnimationToEnd
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro updated event
+- assertVisible: Maestro updated event
 - pressKey: Enter
 - waitForAnimationToEnd
 - tapOn: Save

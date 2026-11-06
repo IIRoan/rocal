@@ -50,13 +50,18 @@ appId: ${APP_ID}
 - tapOn: ".*Maestro retained draft.*"
 - assertVisible: ".*Maestro retained draft.*"
 - assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- waitForAnimationToEnd
 - tapOn:
     id: compose-subject
+    point: 95%,50%
+    retryTapIfNoChange: false
 - eraseText
+- waitForAnimationToEnd
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro round trip
+- assertVisible: Maestro round trip
 - pressKey: Enter
 - waitForAnimationToEnd
 - tapOn: Send

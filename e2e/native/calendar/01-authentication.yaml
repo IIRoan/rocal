@@ -25,12 +25,19 @@ appId: ${APP_ID}
     visible: ".*(Invalid|invalid|incorrect).*"
     timeout: 30000
 - assertNotVisible: Create new event
+- waitForAnimationToEnd
 - tapOn:
     id: sign-in-email
+    point: 95%,50%
+    retryTapIfNoChange: false
 - eraseText
+- waitForAnimationToEnd
 - tapOn:
     id: sign-in-password
+    point: 95%,50%
+    retryTapIfNoChange: false
 - eraseText
+- waitForAnimationToEnd
 - runFlow: ../common/sign-in.yaml
 - takeScreenshot: ${SCREENSHOT_DIR}/authenticated-calendar
 - runFlow: ../common/open-app.yaml

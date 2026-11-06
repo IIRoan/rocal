@@ -26,12 +26,18 @@ appId: ${APP_ID}
     visible: "Maestro calendar.*"
     timeout: 30000
 - tapOn: "Maestro calendar.*"
-- tapOn: Calendar name
+- waitForAnimationToEnd
+- tapOn:
+    text: Calendar name
+    point: 95%,50%
+    retryTapIfNoChange: false
 - eraseText
+- waitForAnimationToEnd
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro renamed calendar
+- assertVisible: Maestro renamed calendar
 - hideKeyboard
 - tapOn: Save changes
 - extendedWaitUntil:

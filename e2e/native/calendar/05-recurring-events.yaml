@@ -27,12 +27,18 @@ appId: ${APP_ID}
     visible: All occurrences
     timeout: 30000
 - tapOn: All occurrences
-- tapOn: Event title
+- waitForAnimationToEnd
+- tapOn:
+    text: Event title
+    point: 95%,50%
+    retryTapIfNoChange: false
 - eraseText
+- waitForAnimationToEnd
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro edited series
+- assertVisible: Maestro edited series
 - pressKey: Enter
 - waitForAnimationToEnd
 - tapOn: Save
