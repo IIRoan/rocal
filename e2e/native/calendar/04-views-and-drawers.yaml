@@ -47,7 +47,7 @@ appId: ${APP_ID}
 - assertVisible:
     text: Light
     selected: true
-- tapOn: Back to settings
+- runFlow: ../common/back-to-settings.yaml
 - runFlow:
     file: ../common/select-settings-page.yaml
     env:
@@ -63,7 +63,7 @@ appId: ${APP_ID}
 - waitForAnimationToEnd
 - tapOn: "London \\(Europe/London\\)"
 - assertVisible: "Timezone, Europe/London"
-- tapOn: Back to settings
+- runFlow: ../common/back-to-settings.yaml
 - runFlow: ../common/close-sheet.yaml
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings
@@ -82,7 +82,7 @@ appId: ${APP_ID}
 - waitForAnimationToEnd
 - tapOn: "Amsterdam \\(Europe/Amsterdam\\)"
 - assertVisible: "Timezone, Europe/Amsterdam"
-- tapOn: Back to settings
+- runFlow: ../common/back-to-settings.yaml
 - runFlow: ../common/close-sheet.yaml
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings
@@ -91,6 +91,6 @@ appId: ${APP_ID}
     env:
       PAGE: time-region
 - assertVisible: "Timezone, Europe/Amsterdam"
-- tapOn: Back to settings
+- runFlow: ../common/back-to-settings.yaml
 - runFlow: ../common/close-sheet.yaml
 - assertVisible: "Maestro updated event.*"

@@ -59,7 +59,7 @@ appId: ${APP_ID}
 - tapOn: Hide Maestro renamed folder
 - tapOn: Show Maestro renamed folder
 - takeScreenshot: ${SCREENSHOT_DIR}/encrypted-custom-mailbox
-- tapOn: Back to settings
+- runFlow: ../common/back-to-settings.yaml
 - runFlow:
     file: ../common/select-settings-page.yaml
     env:

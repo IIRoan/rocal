@@ -85,5 +85,5 @@ appId: ${APP_ID}
       PAGE: mailboxes
 - scroll
 - assertNotVisible: Maestro renamed folder
-- tapOn: Back to settings
+- runFlow: ../common/back-to-settings.yaml
 - runFlow: ../common/close-sheet.yaml

@@ -14,6 +14,7 @@ appId: ${APP_ID}
     file: ../common/type.yaml
     env:
       TEXT: ${EMAIL}
+      VERIFY_TEXT: "true"
 - assertVisible:
     id: sign-in-email
     text: ${EMAIL}

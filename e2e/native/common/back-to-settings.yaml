@@ -1,0 +1,8 @@
+appId: ${APP_ID}
+---
+- waitForAnimationToEnd
+- tapOn:
+    text: Back to settings
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
+- assertVisible: Close sheet
