@@ -1,8 +1,7 @@
 appId: ${APP_ID}
 ---
 - runFlow: ../common/open-app.yaml
-- tapOn: Create new event
-- waitForAnimationToEnd
+- runFlow: ../common/create-event.yaml
 - assertVisible: Event title
 - tapOn: Event title
 - runFlow:
@@ -45,9 +44,10 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Maestro retained event.*"
     timeout: 30000
-- tapOn:
-    text: "Maestro retained event.*"
-    retryTapIfNoChange: false
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro retained event
 - extendedWaitUntil:
     visible: Edit
     timeout: 30000
@@ -75,7 +75,10 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Maestro updated event.*"
     timeout: 30000
-- tapOn: "Maestro updated event.*"
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro updated event
 - assertVisible: Edit
 - tapOn: Export .ics
 - extendedWaitUntil:
@@ -102,17 +105,17 @@ appId: ${APP_ID}
     when:
       notVisible: Edit
     commands:
-      - tapOn:
-          text: "Maestro updated event.*"
-          retryTapIfNoChange: false
+      - runFlow:
+          file: ../common/open-event.yaml
+          env:
+            EVENT_TITLE: Maestro updated event
 - extendedWaitUntil:
     visible: Edit
     timeout: 30000
 - assertVisible: Maestro meeting room
 - assertVisible: Maestro event notes stay encrypted
 - tapOn: Close
-- tapOn: Create new event
-- waitForAnimationToEnd
+- runFlow: ../common/create-event.yaml
 - tapOn: Event title
 - runFlow:
     file: ../common/type.yaml
@@ -125,7 +128,11 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Maestro disposable event.*"
     timeout: 30000
-- tapOn: "Maestro disposable event.*"
+- assertVisible: "Maestro updated event.*"
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro disposable event
 - tapOn: Delete
 - runFlow: ../common/confirm-event-delete.yaml
 - extendedWaitUntil:

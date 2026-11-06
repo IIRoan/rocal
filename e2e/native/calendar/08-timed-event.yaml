@@ -1,8 +1,7 @@
 appId: ${APP_ID}
 ---
 - runFlow: ../common/open-app.yaml
-- tapOn: Create new event
-- waitForAnimationToEnd
+- runFlow: ../common/create-event.yaml
 - tapOn: Event title
 - runFlow:
     file: ../common/type.yaml
@@ -39,7 +38,10 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Maestro timed event.*"
     timeout: 30000
-- tapOn: "Maestro timed event.*"
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro timed event
 - tapOn: Edit
 - copyTextFrom: "Start time:.*"
 - assertTrue: ${maestro.copiedText === output.startTime}
@@ -50,7 +52,10 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     notVisible: Event title
     timeout: 30000
-- tapOn: "Maestro timed event.*"
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro timed event
 - tapOn: Delete
 - runFlow: ../common/confirm-event-delete.yaml
 - extendedWaitUntil:

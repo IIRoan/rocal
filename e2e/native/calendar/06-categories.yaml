@@ -8,11 +8,13 @@ appId: ${APP_ID}
       PAGE: calendars
 - tapOn: "Categories(,.*)?"
 - tapOn: New category
+- waitForAnimationToEnd
 - tapOn: Category name
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro category
+- assertVisible: Maestro category
 - hideKeyboard
 - tapOn: Create category
 - extendedWaitUntil:
@@ -22,7 +24,10 @@ appId: ${APP_ID}
     visible: "Maestro category.*"
     timeout: 30000
 - runFlow: ../common/open-app.yaml
-- tapOn: "Maestro updated event.*"
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro updated event
 - tapOn: Edit
 - scrollUntilVisible:
     element: "Category:.*"
@@ -34,7 +39,10 @@ appId: ${APP_ID}
     notVisible: Event title
     timeout: 30000
 - runFlow: ../common/open-app.yaml
-- tapOn: "Maestro updated event.*"
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro updated event
 - tapOn: Edit
 - scrollUntilVisible:
     element: "Category: Maestro category"
@@ -48,12 +56,14 @@ appId: ${APP_ID}
       PAGE: calendars
 - tapOn: "Categories(,.*)?"
 - tapOn: "Maestro category.*"
+- waitForAnimationToEnd
 - tapOn: Category name
 - eraseText
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro renamed category
+- assertVisible: Maestro renamed category
 - hideKeyboard
 - tapOn: Save changes
 - tapOn: "Maestro renamed category.*"
@@ -66,7 +76,10 @@ appId: ${APP_ID}
     notVisible: "Maestro renamed category.*"
     timeout: 30000
 - runFlow: ../common/open-app.yaml
-- tapOn: "Maestro updated event.*"
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro updated event
 - assertVisible: Maestro meeting room
 - assertVisible: Maestro event notes stay encrypted
 - assertNotVisible: "Maestro renamed category.*"

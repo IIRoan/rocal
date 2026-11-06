@@ -7,7 +7,7 @@ import { AppState } from "react-native";
 import { calendarApiService } from "../lib/api";
 import { authClient, clearAuthSessionCache, readAuthSessionCache } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
-import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
+import { getSessionCookie, readSessionTokenFromJar, waitForSessionCookie } from "../lib/session-cookie";
 import { signInWithBrowserPasskey } from "../lib/passkey-browser-bridge";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
 import {
@@ -87,6 +87,7 @@ jest.mock("../lib/session-cookie", () => ({
   ensureSessionTokenCookie: jest.fn(async () => true),
   healAuthCookieJar: jest.fn(async () => undefined),
   rememberSessionTokenFromJar: jest.fn(async () => "session-token"),
+  readSessionTokenFromJar: jest.fn(async () => "existing-signed-cookie"),
   persistRenewedSessionCookie: jest.fn(async () => undefined),
 }));
 
@@ -111,6 +112,7 @@ const mockEmailSignUp = jest.mocked(authClient.signUp.email);
 const mockSignOut = jest.mocked(authClient.signOut);
 const mockGetAuthCapabilities = jest.mocked(getAuthCapabilities);
 const mockWaitForSessionCookie = jest.mocked(waitForSessionCookie);
+const mockReadSessionTokenFromJar = jest.mocked(readSessionTokenFromJar);
 const mockSignInWithBrowserPasskey = jest.mocked(signInWithBrowserPasskey);
 const mockUnregisterNativePushDevice = jest.mocked(unregisterNativePushDevice);
 const mockOnSignedOut = jest.fn(async () => {});
@@ -219,6 +221,7 @@ describe("AuthProvider", () => {
     mockSignOut.mockReset();
     mockGetAuthCapabilities.mockReset();
     mockWaitForSessionCookie.mockReset();
+    mockReadSessionTokenFromJar.mockReset().mockResolvedValue("existing-signed-cookie");
     mockSignInWithBrowserPasskey.mockReset();
     mockUnregisterNativePushDevice.mockReset();
     mockOnSignedOut.mockClear();
@@ -487,6 +490,7 @@ describe("AuthProvider", () => {
 
   it("finishes login when a lost sign-in response still created the requested session", async () => {
     await renderProvider();
+    mockReadSessionTokenFromJar.mockResolvedValueOnce("existing-signed-cookie").mockResolvedValueOnce("new-signed-cookie");
     mockEmailSignIn.mockRejectedValueOnce(new Error("response lost"));
     mockGetSession.mockResolvedValueOnce(createAuthResult());
 
@@ -499,6 +503,35 @@ describe("AuthProvider", () => {
     });
     expect(getAuth().isAuthenticated).toBe(true);
     expect(getAuth().lastAuthMethod).toBe("email-password");
+  });
+
+  it("rejects an invalid password even when an existing session belongs to the same account", async () => {
+    await renderProvider();
+    mockEmailSignIn.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Invalid email or password", status: 401, statusText: "Unauthorized" },
+    });
+    mockGetSession.mockResolvedValue(createAuthResult());
+
+    await act(async () => {
+      await expect(getAuth().signIn("roan@example.com", "wrong-password")).rejects.toThrow("Invalid email or password");
+    });
+
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().peekPendingAuthPassword()).toBeNull();
+  });
+
+  it("does not treat an unchanged session cookie as proof of a password after a network error", async () => {
+    await renderProvider();
+    mockEmailSignIn.mockRejectedValueOnce(new Error("response lost"));
+    mockGetSession.mockResolvedValueOnce(createAuthResult());
+
+    await act(async () => {
+      await expect(getAuth().signIn("roan@example.com", "unverified-password")).rejects.toThrow("response lost");
+    });
+
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().peekPendingAuthPassword()).toBeNull();
   });
 
   it("keeps an uncached validated startup session when auth status is unavailable", async () => {

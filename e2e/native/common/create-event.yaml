@@ -1,0 +1,13 @@
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+    notVisible: Close sheet
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn:
+    text: Create new event
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: Event title
+    timeout: 30000
+- waitForAnimationToEnd

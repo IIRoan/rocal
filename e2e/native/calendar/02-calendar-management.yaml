@@ -42,8 +42,7 @@ appId: ${APP_ID}
     timeout: 30000
 - takeScreenshot: ${SCREENSHOT_DIR}/calendar-created-and-renamed
 - runFlow: ../common/close-sheet.yaml
-- tapOn: Create new event
-- waitForAnimationToEnd
+- runFlow: ../common/create-event.yaml
 - tapOn: Event title
 - runFlow:
     file: ../common/type.yaml

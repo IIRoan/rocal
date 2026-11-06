@@ -35,3 +35,33 @@ appId: ${APP_ID}
 - takeScreenshot: ${SCREENSHOT_DIR}/authenticated-calendar
 - runFlow: ../common/open-app.yaml
 - assertNotVisible: Welcome back
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: account
+- scrollUntilVisible:
+    element:
+      id: account-action-sign-out
+    direction: DOWN
+- waitForAnimationToEnd
+- tapOn:
+    id: account-action-sign-out
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "Sign out\\?"
+    timeout: 30000
+- tapOn: Sign Out
+- extendedWaitUntil:
+    visible: Welcome back
+    timeout: 30000
+- runFlow: ../common/sign-in.yaml
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
+- assertVisible: "Personal.*"
+- runFlow: ../common/close-sheet.yaml
+- takeScreenshot: ${SCREENSHOT_DIR}/calendar-unlocked-after-sign-out

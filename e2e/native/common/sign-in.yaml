@@ -1,18 +1,24 @@
 appId: ${APP_ID}
 ---
+- waitForAnimationToEnd
 - tapOn:
     id: sign-in-email
 - runFlow:
     file: type.yaml
     env:
       TEXT: ${EMAIL}
+- waitForAnimationToEnd
 - tapOn:
     id: sign-in-password
 - runFlow:
     file: type.yaml
     env:
       TEXT: ${PASSWORD}
-- pressKey: Enter
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn:
+    text: Sign in
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     visible: "(Create new event|Compose message|Not Now)"
     timeout: 180000

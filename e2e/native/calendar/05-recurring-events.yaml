@@ -1,8 +1,7 @@
 appId: ${APP_ID}
 ---
 - runFlow: ../common/open-app.yaml
-- tapOn: Create new event
-- waitForAnimationToEnd
+- runFlow: ../common/create-event.yaml
 - tapOn: Event title
 - waitForAnimationToEnd
 - runFlow:
@@ -19,7 +18,10 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Maestro recurring event.*"
     timeout: 30000
-- tapOn: "Maestro recurring event.*"
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro recurring event
 - tapOn: Edit
 - extendedWaitUntil:
     visible: All occurrences
@@ -38,7 +40,10 @@ appId: ${APP_ID}
     visible: "Maestro edited series.*"
     timeout: 30000
 - runFlow: ../common/open-app.yaml
-- tapOn: "Maestro edited series.*"
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro edited series
 - tapOn: Delete
 - extendedWaitUntil:
     visible: All occurrences

@@ -33,6 +33,7 @@ import {
   getSessionCookie,
   healAuthCookieJar,
   rememberSessionTokenFromJar,
+  readSessionTokenFromJar,
   persistRenewedSessionCookie,
   waitForSessionCookie,
 } from "../lib/session-cookie";
@@ -496,25 +497,26 @@ export function AuthProvider({
       setEmailPasswordAuthHints(password);
       sessionLoadIdRef.current += 1;
       let authData: unknown;
+      let result: Awaited<ReturnType<typeof authClient.signIn.email>> | undefined;
+      let previousSessionCookie: string | null | undefined;
       try {
         await healAuthCookieJar();
-        const result = await authClient.signIn.email({ email, password });
-
-        if (result.error) {
-          throw new Error(
-            result.error.message ?? "Sign-in failed. Please try again.",
-          );
-        }
-
-        authData = result.data;
+        previousSessionCookie = await readSessionTokenFromJar();
+        result = await authClient.signIn.email({ email, password });
       } catch (error) {
+        if (previousSessionCookie === undefined) {
+          resetAuthMethodHints();
+          throw error;
+        }
         let recoveredSession: Awaited<
           ReturnType<typeof authClient.getSession>
         > | null = null;
+        let recoveredSessionCookie: string | null = null;
         try {
           recoveredSession = await authClient.getSession({
             query: { disableCookieCache: true },
           });
+          recoveredSessionCookie = await readSessionTokenFromJar();
         } catch {
           // Preserve the original sign-in error below.
         }
@@ -523,13 +525,22 @@ export function AuthProvider({
         const recoveredEmail = recoveredSession?.data?.user.email
           ?.trim()
           .toLowerCase();
-        if (!recoveredSession?.data || recoveredEmail !== requestedEmail) {
+        if (
+          !recoveredSession?.data || recoveredEmail !== requestedEmail ||
+          !recoveredSessionCookie || recoveredSessionCookie === previousSessionCookie
+        ) {
           resetAuthMethodHints();
           throw error;
         }
 
         authData = recoveredSession.data;
       }
+
+      if (result?.error) {
+        resetAuthMethodHints();
+        throw new Error(result.error.message ?? "Sign-in failed. Please try again.");
+      }
+      if (result) authData = result.data;
 
       const earlyToken =
         typeof (authData as { token?: unknown } | undefined)?.token === "string"
