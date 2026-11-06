@@ -35,6 +35,16 @@ const baseAuthClient = createAuthClient({
   ],
 });
 
+/** Read the existing secure cache before timing network validation, independently of the library's asynchronous hydration. */
+export async function readAuthSessionCache(): Promise<unknown> {
+  try {
+    const stored = await storageAdapter(authSecureStore).getItemAsync(`${AUTH_STORAGE_PREFIX}_session_data`);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Clear both copies through Better Auth's shared storage queue so late writes cannot revive a signed-out session. */
 export async function clearAuthSessionCache(): Promise<void> {
   const session = baseAuthClient.$store.atoms.session;

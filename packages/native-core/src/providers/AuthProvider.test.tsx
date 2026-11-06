@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { AppState } from "react-native";
 
 import { calendarApiService } from "../lib/api";
-import { authClient, clearAuthSessionCache } from "../lib/auth-client";
+import { authClient, clearAuthSessionCache, readAuthSessionCache } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
 import { signInWithBrowserPasskey } from "../lib/passkey-browser-bridge";
@@ -46,6 +46,7 @@ jest.mock("expo-secure-store", () => ({
 
 jest.mock("../lib/auth-client", () => ({
   clearAuthSessionCache: jest.fn(async () => undefined),
+  readAuthSessionCache: jest.fn(async (): Promise<unknown> => null),
   authClient: {
     $store: { atoms: { session: { get: jest.fn(() => ({ data: null })) } } },
     getSession: jest.fn(),
@@ -102,6 +103,7 @@ type AuthContextValue = ReturnType<typeof useAuth>;
 const mockGetSession = jest.mocked(authClient.getSession);
 const mockGetSessionState = jest.mocked(authClient.$store.atoms.session.get);
 const mockClearAuthSessionCache = jest.mocked(clearAuthSessionCache);
+const mockReadAuthSessionCache = jest.mocked(readAuthSessionCache);
 const mockEmailSignIn = jest.mocked(authClient.signIn.email);
 const mockSocialSignIn = jest.mocked(authClient.signIn.social);
 const mockPasskeySignIn = jest.mocked(authClient.signIn.passkey);
@@ -208,6 +210,7 @@ describe("AuthProvider", () => {
     mockGetSession.mockReset();
     mockGetSessionState.mockReturnValue({ data: null });
     mockClearAuthSessionCache.mockClear();
+    mockReadAuthSessionCache.mockReset().mockResolvedValue(null);
     jest.mocked(getSessionCookie).mockReturnValue("better-auth.session=token");
     mockEmailSignIn.mockReset();
     mockSocialSignIn.mockReset();
@@ -341,6 +344,47 @@ describe("AuthProvider", () => {
     })).toThrow("Session changed while loading.");
   });
 
+  it("restores the Secure Store session when library cache hydration has not finished", async () => {
+    jest.useFakeTimers();
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    mockReadAuthSessionCache.mockResolvedValue(cached);
+    mockGetSession.mockImplementationOnce(() => new Promise(() => undefined));
+    await renderProvider(false);
+    await act(async () => { await jest.advanceTimersByTimeAsync(3_000); });
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().user?.id).toBe(cached.user.id);
+    expect(mockClearAuthSessionCache).not.toHaveBeenCalled();
+  });
+
+  it("does not charge local cache loading against the network deadline", async () => {
+    jest.useFakeTimers();
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    let finishCache: ((value: unknown) => void) | undefined;
+    mockReadAuthSessionCache.mockImplementationOnce(() => new Promise((resolve) => { finishCache = resolve; }));
+    mockGetSession.mockImplementationOnce(() => new Promise(() => undefined));
+    await renderProvider(false);
+    await act(async () => { await jest.advanceTimersByTimeAsync(4_000); });
+    expect(getAuth().isLoading).toBe(true);
+    expect(mockGetSession).not.toHaveBeenCalled();
+    await act(async () => { finishCache?.(cached); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(3_000); });
+    expect(getAuth().isAuthenticated).toBe(true);
+  });
+
+  it("cannot apply a stored session read that finishes after sign-out", async () => {
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    let finishCache: ((value: unknown) => void) | undefined;
+    mockReadAuthSessionCache.mockImplementationOnce(() => new Promise((resolve) => { finishCache = resolve; }));
+    await renderProvider(false);
+    await act(async () => { await getAuth().signOut(); });
+    await act(async () => { finishCache?.(cached); });
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
   it.each([0, 503])("restores a cached session after a transport/server failure (%s)", async (status) => {
     const cached = createSessionData();
     cached.session.expiresAt = new Date(Date.now() + 60_000);
@@ -356,6 +400,7 @@ describe("AuthProvider", () => {
     const cached = createSessionData();
     cached.session.expiresAt = new Date(Date.now() + 60_000);
     mockGetSessionState.mockReturnValue({ data: cached });
+    mockReadAuthSessionCache.mockResolvedValue(cached);
     mockGetSession.mockResolvedValueOnce(status === "missing"
       ? { data: null }
       : { data: null, error: { status } } as never);

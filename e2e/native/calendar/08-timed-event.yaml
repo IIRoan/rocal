@@ -2,6 +2,7 @@ appId: ${APP_ID}
 ---
 - runFlow: ../common/open-app.yaml
 - tapOn: Create new event
+- waitForAnimationToEnd
 - tapOn: Event title
 - runFlow:
     file: ../common/type.yaml

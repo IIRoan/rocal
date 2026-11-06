@@ -2,11 +2,14 @@ appId: ${APP_ID}
 ---
 - runFlow: ../common/open-app.yaml
 - tapOn: Create new event
+- waitForAnimationToEnd
 - tapOn: Event title
+- waitForAnimationToEnd
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro recurring event
+- assertVisible: Maestro recurring event
 - pressKey: Enter
 - waitForAnimationToEnd
 - tapOn: All day

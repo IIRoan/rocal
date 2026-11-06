@@ -13,7 +13,7 @@ import {
   AUTH_SESSION_LIFETIME_SECONDS,
   AUTH_SESSION_REFRESH_INTERVAL_SECONDS,
 } from "@workspace/calendar-core";
-import { authClient, clearAuthSessionCache } from "../lib/auth-client";
+import { authClient, clearAuthSessionCache, readAuthSessionCache } from "../lib/auth-client";
 import { parseCachedAuthSession } from "../lib/cached-auth-session";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { API_BASE_URL } from "../lib/constants";
@@ -308,10 +308,10 @@ export function AuthProvider({
     [],
   );
 
-  const restoreCachedSession = useCallback(() => {
+  const restoreCachedSession = useCallback((storedSession: unknown) => {
     if (!getSessionCookie()) return false;
     const cached: unknown = authClient.$store.atoms.session?.get().data;
-    return applySessionData(parseCachedAuthSession(cached));
+    return applySessionData(parseCachedAuthSession(cached) ?? parseCachedAuthSession(storedSession));
   }, [applySessionData]);
 
   const clearPendingAuthPassword = useCallback(() => {
@@ -639,11 +639,14 @@ export function AuthProvider({
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const loadId = ++sessionLoadIdRef.current;
     const isStale = () => ignore || loadId !== sessionLoadIdRef.current;
+    let storedSession: unknown = null;
 
     async function loadSession() {
       try {
         // Legacy jars used a bare `"1"` chunk meta; Better Auth JSON.parses that to number 1 and crashes on Set-Cookie. Flatten before any auth I/O.
         await healAuthCookieJar();
+        if (isStale()) return;
+        storedSession = await readAuthSessionCache();
         if (isStale()) return;
 
         const result = await Promise.race([
@@ -684,7 +687,7 @@ export function AuthProvider({
         } else if (!isStale() && !hasLiveSessionRef.current) {
           const status = result?.error?.status;
           if (status === 0 || (typeof status === "number" && status >= 500)) {
-            if (!restoreCachedSession()) clearSession();
+            if (!restoreCachedSession(storedSession)) clearSession();
           } else if (!result?.error || status === 401 || status === 403) {
             endSession();
           } else {
@@ -693,9 +696,10 @@ export function AuthProvider({
         }
       } catch {
         if (!isStale() && !hasLiveSessionRef.current) {
-          if (!restoreCachedSession()) clearSession();
+          if (!restoreCachedSession(storedSession)) clearSession();
         }
       } finally {
+        storedSession = null;
         clearTimeout(timeoutId);
         if (!ignore) setIsLoading(false);
       }

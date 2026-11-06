@@ -43,6 +43,7 @@ appId: ${APP_ID}
 - takeScreenshot: ${SCREENSHOT_DIR}/calendar-created-and-renamed
 - runFlow: ../common/close-sheet.yaml
 - tapOn: Create new event
+- waitForAnimationToEnd
 - tapOn: Event title
 - runFlow:
     file: ../common/type.yaml

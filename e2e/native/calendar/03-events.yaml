@@ -2,6 +2,7 @@ appId: ${APP_ID}
 ---
 - runFlow: ../common/open-app.yaml
 - tapOn: Create new event
+- waitForAnimationToEnd
 - assertVisible: Event title
 - tapOn: Event title
 - runFlow:
@@ -84,15 +85,21 @@ appId: ${APP_ID}
     when:
       platform: iOS
     commands:
-      - tapOn: Close
+      - tapOn:
+          id: PopoverDismissRegion
+          point: 50%,10%
+          retryTapIfNoChange: false
 - runFlow:
     when:
       platform: Android
     commands:
       - back
-- assertVisible: Edit
+- extendedWaitUntil:
+    visible: Edit
+    timeout: 30000
 - tapOn: Close
 - tapOn: Create new event
+- waitForAnimationToEnd
 - tapOn: Event title
 - runFlow:
     file: ../common/type.yaml
