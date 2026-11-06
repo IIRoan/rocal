@@ -17,7 +17,6 @@ use crate::db::entities::calendar_event;
 use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
-use crate::integrations::ics::trimmed_text;
 use crate::state::AppState;
 use crate::telemetry::redact_pii;
 
@@ -208,17 +207,7 @@ pub async fn search(
     query: EventSearchQuery,
 ) -> Result<EventSearchResults, AppError> {
     let text = js_trim(&query.q).to_owned();
-    let tokens: Vec<String> = query
-        .blind_index_tokens
-        .as_deref()
-        .map(|tokens| {
-            tokens
-                .split(',')
-                .filter_map(|t| trimmed_text(Some(t)))
-                .collect()
-        })
-        .unwrap_or_default();
-    if (text.is_empty() || crate::http::zod::js_length(&text) < 2) && tokens.is_empty() {
+    if crate::http::zod::js_length(&text) < 2 {
         return Ok(EventSearchResults {
             events: Vec::new(),
             total: 0,
@@ -241,8 +230,7 @@ pub async fn search(
         };
         dates = Some((start, end));
     }
-    let (rows, total) =
-        queries::search(&state.db, &user.id, &text, tokens, dates, limit, offset).await?;
+    let (rows, total) = queries::search(&state.db, &user.id, &text, dates, limit, offset).await?;
     let ids: Vec<String> = rows.iter().map(|row| row.id.clone()).collect();
     let participants = participant_map(&state.db, &ids).await?;
     let mut events = Vec::new();

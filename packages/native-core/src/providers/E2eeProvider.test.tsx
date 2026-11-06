@@ -866,7 +866,6 @@ describe("E2eeProvider", () => {
       iv: "iv",
       ciphertext: "ciphertext",
     });
-    mockE2eeModule.createBlindIndexTokens.mockResolvedValue(["idx"]);
     mockE2eeModule.decryptJsonPayload.mockResolvedValue({ name: "Therapy" });
 
     await renderProvider();
@@ -895,7 +894,8 @@ describe("E2eeProvider", () => {
     expect(event.encryptedContent).toBeDefined();
     expect(calendar).not.toHaveProperty("name");
     expect(calendar.encryptedName).toBeDefined();
-    expect(JSON.stringify([event, calendar])).not.toMatch(/Therapy|Notes|Clinic/);
+    expect(JSON.stringify([event, calendar])).not.toMatch(/Therapy|Notes|Clinic|blindIndexTokens/);
+    expect(mockE2eeModule.createBlindIndexTokens).not.toHaveBeenCalled();
     await expect(provider.hasActiveSession()).resolves.toBe(true);
     await expect(
       provider.hydrateEncryptedCalendar({

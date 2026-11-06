@@ -449,9 +449,6 @@ export class CalendarApiService {
       {
         externalId: parsed.uid,
         encryptedContent: shadow.encryptedContent,
-        ...(shadow.blindIndexTokens
-          ? { blindIndexTokens: shadow.blindIndexTokens }
-          : {}),
         ...(shadow.encryptionKeyVersion
           ? { encryptionKeyVersion: shadow.encryptionKeyVersion }
           : {}),
@@ -508,9 +505,6 @@ export class CalendarApiService {
         `/api/events/${encodeURIComponent(event.id)}/seal-encryption`,
         {
           encryptedContent: shadow.encryptedContent,
-          ...(shadow.blindIndexTokens
-            ? { blindIndexTokens: shadow.blindIndexTokens }
-            : {}),
           ...(shadow.encryptionKeyVersion
             ? { encryptionKeyVersion: shadow.encryptionKeyVersion }
             : {}),
@@ -566,9 +560,6 @@ export class CalendarApiService {
     // The server stores it only over the ciphertext read here, so an edit made meanwhile wins.
     await this.client.post<Schema<"Event">>(`${path}/seal-encryption`, {
       encryptedContent: shadow.encryptedContent,
-      ...(shadow.blindIndexTokens
-        ? { blindIndexTokens: shadow.blindIndexTokens }
-        : {}),
       ...(shadow.encryptionKeyVersion
         ? { encryptionKeyVersion: shadow.encryptionKeyVersion }
         : {}),
@@ -1210,7 +1201,7 @@ export class CalendarApiService {
           occurrenceDate, excludedDates,
           start: content.start, end: content.end, allDay: Boolean(content.allDay), timezone: content.timezone,
           recurrence: content.recurrence, participants: content.participants,
-          encryptedContent: payload.encryptedContent, blindIndexTokens: payload.blindIndexTokens,
+          encryptedContent: payload.encryptedContent,
           encryptionKeyVersion: payload.encryptionKeyVersion,
         }) as EncryptedIcsImportEvent);
       }
@@ -1284,11 +1275,36 @@ export class CalendarApiService {
 
   // ─── Subscriptions ───────────────────────────────────────────────────────────
 
+  /** A feed's name is sealed as its mirrored calendar's name, so both are opened from there. */
+  private async hydrateSubscription<
+    T extends Omit<CalendarSubscription, "_count">,
+  >(subscription: T): Promise<T> {
+    const calendar = await this.hydrateCalendar(subscription.calendar as Calendar);
+    return {
+      ...subscription,
+      name: calendar.name,
+      calendar: { ...subscription.calendar, ...calendar },
+    };
+  }
+
+  /** Seals a feed name as a calendar name; throws instead of sending it readable when no session is active. */
+  private async sealSubscriptionName(
+    name: string,
+  ): Promise<Pick<Schema<"CreateSubscriptionRequest">, "encryptedName" | "encryptionKeyVersion">> {
+    const { encryptedName, encryptionKeyVersion } =
+      await this.e2ee.attachCalendarEncryptionShadow({ name });
+    if (!encryptedName) throw new Error("Calendar name is required");
+    return { encryptedName, encryptionKeyVersion };
+  }
+
   async getSubscriptions(): Promise<CalendarSubscription[]> {
     try {
-      return (await this.client.get<Schema<"CalendarSubscription">[]>(
+      const subscriptions = (await this.client.get<Schema<"CalendarSubscription">[]>(
         "/api/subscriptions",
       )) as CalendarSubscription[];
+      return await Promise.all(
+        subscriptions.map((subscription) => this.hydrateSubscription(subscription)),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to load subscriptions");
     }
@@ -1298,10 +1314,12 @@ export class CalendarApiService {
     request: CreateSubscriptionRequest,
   ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
-      return (await this.client.post<Schema<"CalendarSubscription">>(
+      const { name, ...rest } = request;
+      const created = (await this.client.post<Schema<"CalendarSubscription">>(
         "/api/subscriptions",
-        request satisfies Schema<"CreateSubscriptionRequest">,
+        { ...rest, ...(await this.sealSubscriptionName(name)) } satisfies Schema<"CreateSubscriptionRequest">,
       )) as Omit<CalendarSubscription, "_count">;
+      return await this.hydrateSubscription(created);
     } catch (error) {
       throw this.transformError(error, "Failed to create subscription");
     }
@@ -1312,10 +1330,15 @@ export class CalendarApiService {
     request: UpdateSubscriptionRequest,
   ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
-      return (await this.client.put<Schema<"CalendarSubscription">>(
+      const { name, ...rest } = request;
+      const updated = (await this.client.put<Schema<"CalendarSubscription">>(
         `/api/subscriptions/${encodeURIComponent(id)}`,
-        request satisfies Schema<"UpdateSubscriptionRequest">,
+        {
+          ...rest,
+          ...(name === undefined ? {} : await this.sealSubscriptionName(name)),
+        } satisfies Schema<"UpdateSubscriptionRequest">,
       )) as Omit<CalendarSubscription, "_count">;
+      return await this.hydrateSubscription(updated);
     } catch (error) {
       throw this.transformError(error, "Failed to update subscription");
     }

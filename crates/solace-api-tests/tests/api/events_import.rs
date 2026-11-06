@@ -107,7 +107,7 @@ async fn imports_store_only_ciphertext() {
             description: None,
             location: None,
             encrypted_content: Some(ciphertext),
-            blind_index_tokens: Some(r#"["keyed-token"]"#.into()),
+            blind_index_tokens: None,
             encryption_state: "encrypted".into(),
             encryption_key_version: 3,
         }
@@ -139,11 +139,9 @@ async fn imports_store_only_ciphertext() {
     );
     let second = event_id(&app, &calendar, "opaque-two").await;
     assert_eq!(
-        stored_content(&app.db, &second)
-            .await
-            .blind_index_tokens
-            .as_deref(),
-        Some("[]")
+        stored_content(&app.db, &second).await.blind_index_tokens,
+        None,
+        "tokens are never stored, sent or not"
     );
 }
 

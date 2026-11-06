@@ -20,7 +20,9 @@ use crate::request_schema;
 use crate::state::AppState;
 
 request_schema!(CreateSubscriptionRequest => zod::object([
-    ("name", zod::string().min(1)),
+    ("name", zod::string().optional()),
+    ("encryptedName", zod::string().optional()),
+    ("encryptionKeyVersion", key_version_schema()),
     ("url", zod::string().url()),
     ("color", calendar_color_schema().optional()),
 ])
@@ -28,11 +30,17 @@ request_schema!(CreateSubscriptionRequest => zod::object([
 
 request_schema!(UpdateSubscriptionRequest => zod::object([
     ("name", zod::string().optional()),
+    ("encryptedName", zod::string().optional()),
+    ("encryptionKeyVersion", key_version_schema()),
     ("color", calendar_color_schema().optional()),
     ("isActive", zod::boolean().optional()),
     ("syncIntervalMinutes", zod::number().int().min(5).max(1440).optional()),
 ])
 .strict());
+
+fn key_version_schema() -> zod::Schema {
+    zod::number().int().gte(1.0).max(zod::I32_MAX).optional()
+}
 
 request_schema!(DeleteSubscriptionQuery => zod::object([
     ("deleteEvents", zod::optional_query_boolean()),
