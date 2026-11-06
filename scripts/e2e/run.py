@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import re
 import shutil
 import signal
 import subprocess
@@ -28,17 +29,58 @@ def agenda_anchor_label(fixture_path):
     return f"{anchor.strftime('%B')} {anchor.day}, {anchor.year}"
 
 
-def failure_kind(log):
+def failure_content(log, report=None):
     content = log.read_text(errors="replace")[-32768:]
-    if any(marker in content for marker in ("SocketTimeoutException", "IOSDriverTimeoutException", "DEADLINE_EXCEEDED", "OperationTimeout")):
+    if report and report.is_file():
+        try:
+            for failure in ET.parse(report).getroot().iter():
+                if failure.tag in ("failure", "error"):
+                    content = (failure.get("type", "") + " " + failure.get("message", "") + " " + (failure.text or ""))[-32768:] + "\n" + content
+        except (OSError, ET.ParseError):
+            pass
+    return content
+
+
+def failure_kind(log, report=None):
+    content = failure_content(log, report)
+    if any(marker in content for marker in ("AppCrash", "AppCrashed")):
+        return "app-crash"
+    if any(marker in content for marker in ("TimeoutException", "DEADLINE_EXCEEDED", "OperationTimeout")):
         return "driver-timeout"
-    if any(marker in content for marker in ("Connection refused", "Failed to connect to", "UNAVAILABLE: io exception")):
+    if any(marker in content for marker in ("Connection refused", "Failed to connect to", "UNAVAILABLE: io exception", "DeviceServerDiedException")):
         return "driver-connection"
     if "Assertion is false" in content:
         return "assertion"
-    if "Element not found" in content:
+    if any(marker in content for marker in ("Element not found", "No visible element found")):
         return "selector"
     return "maestro-failure"
+
+
+def failure_details(log, report, traces, reason, exit_code=None):
+    exception = re.search(r"\b((?:maestro|java|javax|io|org|com|kotlin)\.(?:[A-Za-z_$][\w$]*\.)*[A-Za-z_$][\w$]*(?:Exception|Error))\b", failure_content(log, report))
+    details = {"reason": reason, "exceptionType": exception.group(1)[:200] if exception else None, "command": None, "exitCode": exit_code}
+    commands = {"launchApp", "clearState", "tapOnElement", "inputText", "eraseText", "pressKey", "assertCondition", "scrollUntilVisible",
+                "waitForAnimation", "runFlow", "takeScreenshot", "swipe", "hideKeyboard", "evalScript"}
+    if traces.is_symlink():
+        return details
+    for source in sorted(traces.rglob("commands.json")):
+        if source.is_symlink() or not source.resolve().is_relative_to(traces.resolve()):
+            continue
+        try:
+            if source.stat().st_size > 8 * 1024 * 1024:
+                continue
+            entries = json.loads(source.read_text())
+        except (OSError, ValueError):
+            continue
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get("metadata"), dict) or entry["metadata"].get("status") != "FAILED":
+                continue
+            command = entry.get("command", {})
+            if isinstance(command, dict):
+                details["command"] = next((kind for kind in command if kind in commands), details["command"])
+    return details
 
 
 def capture_failure_screenshot(platform, device, name):
@@ -154,20 +196,26 @@ def run_journey(platform, app, flow, results, name=None):
                "--env", f"AGENDA_DATE_LABEL={agenda_anchor_label(root / 'private/fixture.json')}",
                "--env", f"AGENDA_DATE_KEY={agenda_anchor_date(root / 'private/fixture.json').isoformat()}",
                "--env", f"EMAIL={fixture['email']}", "--env", f"PASSWORD={fixture['password']}", str(flow)]
-    if results:
+    if results and platform == "android":
         command.insert(4, "--no-reinstall-driver")
     print(f"Running {platform}: {app}/{name}", flush=True)
     reason = None
+    exit_code = None
     try:
         with (root / f"private/{app}-{name}.log").open("wb") as log:
             completed = subprocess.run(command, cwd=REPO, env=maestro_environment(), check=False, timeout=1200 if platform == "ios" else 600, stdout=log, stderr=subprocess.STDOUT)
         passed = completed.returncode == 0
+        exit_code = completed.returncode
         if not passed:
-            reason = failure_kind(root / f"private/{app}-{name}.log")
+            reason = failure_kind(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml")
     except subprocess.TimeoutExpired:
         passed = False
         reason = "journey-timeout"
     if not passed:
+        failures = root / "artifacts/failures"
+        failures.mkdir(exist_ok=True)
+        details = failure_details(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml", screenshots, reason, exit_code)
+        (failures / f"{app}-{name}.json").write_text(json.dumps(details, indent=2))
         capture_failure_screenshot(platform, device, f"{app}-{name}")
         capture_failure_hierarchy(tool, device, fixture, f"{app}-{name}")
     status = "PASS" if passed else f"FAIL ({reason})"

@@ -14,6 +14,9 @@ appId: ${APP_ID}
     file: ../common/type.yaml
     env:
       TEXT: ${EMAIL}
+- assertVisible:
+    id: sign-in-email
+    text: ${EMAIL}
 - tapOn:
     id: sign-in-password
 - runFlow:

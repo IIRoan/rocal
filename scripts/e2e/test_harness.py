@@ -71,6 +71,81 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(exported["attributes"]["text"], "Maestro folder")
         self.assertEqual(exported["children"][0]["attributes"]["resource-id"], "sign-in-password")
 
+    def test_junit_driver_failure_is_reported_without_its_credentials_or_command_text(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                private = directory() / "private"
+                (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+                (private / "fixture.json").write_text(json.dumps({"email": "journey@solace.test", "password": "secret-output-sentinel"}))
+                (private / "maestro-path").write_text("synthetic-maestro")
+                def fail_with_report(command, **options):
+                    options["stdout"].write(b"1/1 Flow Failed")
+                    Path(command[command.index("--output") + 1]).write_text(
+                        '<testsuite><testcase><failure>java.net.SocketTimeoutException: secret-output-sentinel cookie-token-sentinel</failure></testcase></testsuite>')
+                    trace = private / "maestro/mail-synthetic/commands.json"
+                    trace.write_text(json.dumps([{"command": {"inputText": {"text": "secret-output-sentinel"}}, "metadata": {"status": "FAILED"}}]))
+                    return journeys.subprocess.CompletedProcess([], 1)
+                results = []
+                console = io.StringIO()
+                with patch.object(journeys.subprocess, "run", side_effect=fail_with_report), \
+                        patch.object(journeys, "capture_failure_screenshot"), \
+                        patch.object(journeys, "capture_failure_hierarchy"), redirect_stdout(console):
+                    self.assertFalse(journeys.run_journey("ios", "mail", Path("synthetic.yaml"), results))
+                self.assertEqual(results[0]["reason"], "driver-timeout")
+                details = json.loads((root / "artifacts/failures/mail-synthetic.json").read_text())
+                self.assertEqual(details["exceptionType"], "java.net.SocketTimeoutException")
+                self.assertEqual(details["command"], "inputText")
+                self.assertEqual(details["exitCode"], 1)
+                exported = console.getvalue() + "".join(path.read_text() for path in (root / "artifacts").rglob("*") if path.is_file())
+                self.assertNotIn("secret-output-sentinel", exported)
+                self.assertNotIn("cookie-token-sentinel", exported)
+
+    def test_ios_driver_is_reinstalled_between_journeys_without_resetting_the_test_app(self):
+        for platform in ("ios", "android"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "solace-e2e"
+                with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                    private = directory() / "private"
+                    (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+                    (private / "fixture.json").write_text(json.dumps({"email": "journey@solace.test", "password": "private-fixture"}))
+                    (private / "maestro-path").write_text("synthetic-maestro")
+                    results = [{"app": "calendar", "name": "previous", "passed": True, "seconds": 1}]
+                    with patch.object(journeys.subprocess, "run", return_value=journeys.subprocess.CompletedProcess([], 0)) as execute, redirect_stdout(io.StringIO()):
+                        self.assertTrue(journeys.run_journey(platform, "mail", Path("synthetic.yaml"), results))
+                    command = execute.call_args.args[0]
+                    self.assertEqual("--no-reinstall-driver" in command, platform == "android")
+                    self.assertNotIn("clearState", command)
+
+    def test_failure_metadata_rejects_unknown_commands_and_external_trace_links(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            log = root / "log.txt"
+            log.write_text("Unrecognized failure")
+            report = root / "report.xml"
+            report.write_text("<invalid")
+            traces = root / "traces"
+            traces.mkdir()
+            unknown = {"command": {"secret-output-sentinel": {"text": "private-cookie-sentinel"}}, "metadata": {"status": "FAILED"}}
+            (traces / "commands.json").write_text(json.dumps([unknown]))
+            details = journeys.failure_details(log, report, traces, "maestro-failure")
+            self.assertIsNone(details["command"])
+            self.assertIsNone(details["exceptionType"])
+            outside = root / "outside.json"
+            outside.write_text(json.dumps([{"command": {"inputText": {}}, "metadata": {"status": "FAILED"}}]))
+            (traces / "commands.json").unlink()
+            (traces / "commands.json").symlink_to(outside)
+            self.assertIsNone(journeys.failure_details(log, report, traces, "maestro-failure")["command"])
+            self.assertNotIn("sentinel", json.dumps(details))
+
+    def test_junit_infrastructure_error_type_is_recognized(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "console.log"
+            log.write_text("Flow failed")
+            report = Path(temporary) / "junit.xml"
+            report.write_text('<testsuite><testcase><error type="java.net.SocketTimeoutException" message="private-token-sentinel" /></testcase></testsuite>')
+            self.assertEqual(journeys.failure_kind(log, report), "driver-timeout")
+
     def test_native_command_output_stays_private(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "solace-e2e"

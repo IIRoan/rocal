@@ -7,6 +7,9 @@ appId: ${APP_ID}
     file: type.yaml
     env:
       TEXT: ${EMAIL}
+- assertVisible:
+    id: sign-in-email
+    text: ${EMAIL}
 - waitForAnimationToEnd
 - tapOn:
     id: sign-in-password
