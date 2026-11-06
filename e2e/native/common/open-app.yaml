@@ -16,10 +16,15 @@ appId: ${APP_ID}
       true: ${APP_ID === "onl.solace.calendar.e2e"}
     commands:
       - tapOn: Choose date and view
-      - scrollUntilVisible:
-          element: ${AGENDA_DATE_LABEL}
-          direction: RIGHT
-          visibilityPercentage: 100
+      - runFlow:
+          when:
+            notVisible: ${AGENDA_DATE_LABEL}
+          commands:
+            - tapOn: Previous month
+            - waitForAnimationToEnd
+      - extendedWaitUntil:
+          visible: ${AGENDA_DATE_LABEL}
+          timeout: 30000
       - tapOn: ${AGENDA_DATE_LABEL}
       - extendedWaitUntil:
           notVisible: Close sheet

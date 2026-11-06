@@ -25,11 +25,12 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = Path(temporary) / "fixture.json"
             fixture.write_text("{}")
-            for instant, expected in [(datetime(2026, 11, 5, 23, 59, tzinfo=timezone.utc), "October 29, 2026"),
-                                      (datetime(2027, 1, 3, 0, 1, tzinfo=timezone.utc), "December 27, 2026")]:
+            for instant, expected, key in [(datetime(2026, 11, 5, 23, 59, tzinfo=timezone.utc), "October 29, 2026", "2026-10-29"),
+                                           (datetime(2027, 1, 3, 0, 1, tzinfo=timezone.utc), "December 27, 2026", "2026-12-27")]:
                 with self.subTest(instant=instant):
                     os.utime(fixture, (instant.timestamp(), instant.timestamp()))
                     self.assertEqual(journeys.agenda_anchor_label(fixture), expected)
+                    self.assertEqual(journeys.agenda_anchor_date(fixture).isoformat(), key)
 
     def test_failure_reasons_do_not_publish_raw_driver_errors(self):
         with tempfile.TemporaryDirectory() as temporary:

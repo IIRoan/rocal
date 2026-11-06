@@ -19,8 +19,12 @@ def maestro_environment():
     return {**os.environ, "MAESTRO_CLI_NO_ANALYTICS": "1", "JAVA_TOOL_OPTIONS": f'{options} -Duser.home="{maestro_home}"'.strip()}
 
 
+def agenda_anchor_date(fixture_path):
+    return (datetime.fromtimestamp(fixture_path.stat().st_mtime, timezone.utc) - timedelta(days=7)).date()
+
+
 def agenda_anchor_label(fixture_path):
-    anchor = datetime.fromtimestamp(fixture_path.stat().st_mtime, timezone.utc) - timedelta(days=7)
+    anchor = agenda_anchor_date(fixture_path)
     return f"{anchor.strftime('%B')} {anchor.day}, {anchor.year}"
 
 
@@ -148,6 +152,7 @@ def run_journey(platform, app, flow, results, name=None):
                "--env", f"APP_ID=onl.solace.{app}.e2e", "--env", f"HOME_LABEL={home}",
                "--env", "SCREENSHOT_DIR=journey",
                "--env", f"AGENDA_DATE_LABEL={agenda_anchor_label(root / 'private/fixture.json')}",
+               "--env", f"AGENDA_DATE_KEY={agenda_anchor_date(root / 'private/fixture.json').isoformat()}",
                "--env", f"EMAIL={fixture['email']}", "--env", f"PASSWORD={fixture['password']}", str(flow)]
     if results:
         command.insert(4, "--no-reinstall-driver")

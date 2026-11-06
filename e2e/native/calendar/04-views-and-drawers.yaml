@@ -11,6 +11,17 @@ appId: ${APP_ID}
 - assertVisible:
     text: Month
     selected: true
+- runFlow: ../common/close-sheet.yaml
+- assertVisible: ${AGENDA_DATE_KEY}
+- takeScreenshot: ${SCREENSHOT_DIR}/accessible-month-view
+- tapOn:
+    text: ${AGENDA_DATE_KEY}
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
+- tapOn: Choose date and view
+- assertVisible:
+    text: Day
+    selected: true
 - tapOn: Week
 - waitForAnimationToEnd
 - assertVisible: Create new event
