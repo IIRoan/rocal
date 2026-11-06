@@ -304,6 +304,49 @@ describe("hydrateMailOfflineSnapshot", () => {
 
     expect(queryClient.getQueryData(QUERY_KEYS.mailMessages("inbox"))).toBe(live);
   });
+
+  it("retains restored reader bodies when a background refresh replaces the list rows", () => {
+    const queryClient = new QueryClient();
+    hydrateMailOfflineSnapshot(queryClient, snapshot(), 9_000);
+    const { bodyValues: _bodyValues, ...row } = message("a");
+    queryClient.setQueryData(QUERY_KEYS.mailMessages("inbox"), listData([row]));
+
+    const resaved = captureMailOfflineSnapshot(queryClient, {
+      userId: "u1",
+      emailState: "s2",
+    });
+
+    expect(resaved?.lists[0]?.messages[0]?.bodyValues).toEqual(message("a").bodyValues);
+    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("a"))).toEqual(message("a"));
+  });
+
+  it("restores complete thread bodies without treating missing or capped bodies as reader data", () => {
+    const queryClient = new QueryClient();
+    const saved = snapshot();
+    const [inbox] = saved.lists;
+    if (!inbox) throw new Error("expected an inbox snapshot");
+    inbox.messages = [
+      { ...message("a"), bodyValues: { "1": { value: "partial", isTruncated: true } } },
+      { ...message("missing"), bodyValues: undefined },
+    ];
+    saved.threads = [{ threadId: "t-a", messages: [message("sibling")] }];
+
+    hydrateMailOfflineSnapshot(queryClient, saved);
+
+    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("a"))).toBeUndefined();
+    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("missing"))).toBeUndefined();
+    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("sibling"))).toEqual(message("sibling"));
+  });
+
+  it("keeps a live reader detail when restoring an older body", () => {
+    const queryClient = new QueryClient();
+    const live = message("a", "current body");
+    queryClient.setQueryData(QUERY_KEYS.mailMessage("a"), live);
+
+    hydrateMailOfflineSnapshot(queryClient, snapshot());
+
+    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("a"))).toBe(live);
+  });
 });
 
 describe("snapshot guards", () => {

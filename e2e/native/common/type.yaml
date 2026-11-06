@@ -1,10 +1,10 @@
 appId: ${APP_ID}
 ---
+- waitForAnimationToEnd
 - runFlow:
     when:
       platform: iOS
     commands:
-      - waitForAnimationToEnd
       - evalScript: ${output.nativeTextIndex = 0}
       - repeat:
           times: 1000

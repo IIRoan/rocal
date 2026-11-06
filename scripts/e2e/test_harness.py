@@ -84,7 +84,7 @@ class HarnessTests(unittest.TestCase):
                     Path(command[command.index("--output") + 1]).write_text(
                         '<testsuite><testcase><failure>java.net.SocketTimeoutException: secret-output-sentinel cookie-token-sentinel</failure></testcase></testsuite>')
                     trace = private / "maestro/mail-synthetic/commands.json"
-                    trace.write_text(json.dumps([{"command": {"inputText": {"text": "secret-output-sentinel"}}, "metadata": {"status": "FAILED"}}]))
+                    trace.write_text(json.dumps([{"command": {"inputTextCommand": {"text": "secret-output-sentinel"}}, "metadata": {"status": "FAILED"}}]))
                     return journeys.subprocess.CompletedProcess([], 1)
                 results = []
                 console = io.StringIO()

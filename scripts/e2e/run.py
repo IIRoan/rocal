@@ -79,7 +79,8 @@ def failure_details(log, report, traces, reason, exit_code=None):
                 continue
             command = entry.get("command", {})
             if isinstance(command, dict):
-                details["command"] = next((kind for kind in command if kind in commands), details["command"])
+                kinds = (kind.removesuffix("Command") for kind in command)
+                details["command"] = next((kind for kind in kinds if kind in commands), details["command"])
     return details
 
 
