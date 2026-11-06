@@ -14,7 +14,11 @@ appId: ${APP_ID}
     file: type.yaml
     env:
       TEXT: ${PASSWORD}
-- hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - waitForAnimationToEnd
 - tapOn:
     text: Sign in

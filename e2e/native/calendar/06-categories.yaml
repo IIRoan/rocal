@@ -66,7 +66,12 @@ appId: ${APP_ID}
 - assertVisible: Maestro renamed category
 - hideKeyboard
 - tapOn: Save changes
+- extendedWaitUntil:
+    notVisible: Save changes
+    timeout: 30000
+- waitForAnimationToEnd
 - tapOn: "Maestro renamed category.*"
+- waitForAnimationToEnd
 - scrollUntilVisible:
     element: Delete category
     direction: DOWN
