@@ -7,6 +7,11 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: ${HOME_LABEL}
     timeout: 180000
+- extendedWaitUntil:
+    notVisible:
+      id: workspace-loading-screen
+    timeout: 180000
+- waitForAnimationToEnd
 - assertNotVisible: Welcome back
 - runFlow:
     when:
