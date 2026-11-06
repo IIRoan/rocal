@@ -16,7 +16,18 @@ appId: ${APP_ID}
                 when:
                   true: ${typeof VERIFY_TEXT !== "undefined" && VERIFY_TEXT === "true"}
                 commands:
-                  - assertVisible: ${String(TEXT).slice(0, output.nativeTextIndex + 1)}
+                  - runFlow:
+                      when:
+                        true: ${typeof VERIFY_ID !== "undefined"}
+                      commands:
+                        - assertVisible:
+                            id: ${VERIFY_ID}
+                            text: ${String(TEXT).slice(0, output.nativeTextIndex + 1)}
+                  - runFlow:
+                      when:
+                        true: ${typeof VERIFY_ID === "undefined"}
+                      commands:
+                        - assertVisible: ${String(TEXT).slice(0, output.nativeTextIndex + 1)}
             - evalScript: ${output.nativeTextIndex = output.nativeTextIndex + 1}
       - waitForAnimationToEnd
 - runFlow:

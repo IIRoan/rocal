@@ -1,19 +1,24 @@
 appId: ${APP_ID}
 ---
 - waitForAnimationToEnd
-- tapOn:
-    id: sign-in-email
+- runFlow:
+    file: focus-input.yaml
+    env:
+      INPUT_ID: sign-in-email
 - runFlow:
     file: type.yaml
     env:
       TEXT: ${EMAIL}
       VERIFY_TEXT: "true"
+      VERIFY_ID: sign-in-email
 - assertVisible:
     id: sign-in-email
     text: ${EMAIL}
 - waitForAnimationToEnd
-- tapOn:
-    id: sign-in-password
+- runFlow:
+    file: focus-input.yaml
+    env:
+      INPUT_ID: sign-in-password
 - runFlow:
     file: type.yaml
     env:

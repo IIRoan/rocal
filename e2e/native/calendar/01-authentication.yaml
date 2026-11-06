@@ -8,18 +8,23 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: Welcome back
     timeout: 120000
-- tapOn:
-    id: sign-in-email
+- runFlow:
+    file: ../common/focus-input.yaml
+    env:
+      INPUT_ID: sign-in-email
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: ${EMAIL}
       VERIFY_TEXT: "true"
+      VERIFY_ID: sign-in-email
 - assertVisible:
     id: sign-in-email
     text: ${EMAIL}
-- tapOn:
-    id: sign-in-password
+- runFlow:
+    file: ../common/focus-input.yaml
+    env:
+      INPUT_ID: sign-in-password
 - runFlow:
     file: ../common/type.yaml
     env:
