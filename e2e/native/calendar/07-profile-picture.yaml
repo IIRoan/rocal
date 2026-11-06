@@ -10,8 +10,10 @@ appId: ${APP_ID}
     element:
       id: account-action-change-profile-picture
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn:
     id: account-action-change-profile-picture
+    retryTapIfNoChange: false
 - runFlow:
     when:
       visible: Allow Full Access
@@ -63,6 +65,7 @@ appId: ${APP_ID}
 - takeScreenshot: ${SCREENSHOT_DIR}/uploaded-private-profile-picture
 - tapOn:
     id: account-action-change-profile-picture
+    retryTapIfNoChange: false
 - tapOn: Remove Photo
 - extendedWaitUntil:
     visible: "Add Profile Picture.*"

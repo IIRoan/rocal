@@ -6,7 +6,7 @@ appId: ${APP_ID}
     file: ../common/select-settings-page.yaml
     env:
       PAGE: calendars
-- tapOn: Categories
+- tapOn: "Categories(,.*)?"
 - tapOn: New category
 - tapOn: Category name
 - runFlow:
@@ -46,7 +46,7 @@ appId: ${APP_ID}
     file: ../common/select-settings-page.yaml
     env:
       PAGE: calendars
-- tapOn: Categories
+- tapOn: "Categories(,.*)?"
 - tapOn: "Maestro category.*"
 - tapOn: Category name
 - eraseText

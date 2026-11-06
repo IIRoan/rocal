@@ -89,14 +89,27 @@ appId: ${APP_ID}
           id: PopoverDismissRegion
           point: 50%,10%
           retryTapIfNoChange: false
+      - extendedWaitUntil:
+          notVisible: Save to Files
+          timeout: 30000
 - runFlow:
     when:
       platform: Android
     commands:
       - back
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      notVisible: Edit
+    commands:
+      - tapOn:
+          text: "Maestro updated event.*"
+          retryTapIfNoChange: false
 - extendedWaitUntil:
     visible: Edit
     timeout: 30000
+- assertVisible: Maestro meeting room
+- assertVisible: Maestro event notes stay encrypted
 - tapOn: Close
 - tapOn: Create new event
 - waitForAnimationToEnd

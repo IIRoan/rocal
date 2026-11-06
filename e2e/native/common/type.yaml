@@ -1,3 +1,21 @@
 appId: ${APP_ID}
 ---
-- inputText: ${TEXT}
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - waitForAnimationToEnd
+      - evalScript: ${output.nativeTextIndex = 0}
+      - repeat:
+          times: 1000
+          while:
+            true: ${output.nativeTextIndex < String(TEXT).length}
+          commands:
+            - inputText: ${String(TEXT).charAt(output.nativeTextIndex)}
+            - evalScript: ${output.nativeTextIndex = output.nativeTextIndex + 1}
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - inputText: ${TEXT}

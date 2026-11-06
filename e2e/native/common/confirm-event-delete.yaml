@@ -3,14 +3,14 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Delete event\\?"
     timeout: 30000
+- waitForAnimationToEnd
 - runFlow:
     when:
       platform: iOS
     commands:
       - tapOn:
           text: Delete
-          # iOS exposes the drawer action before the native alert's identically named button.
-          index: 1
+          rightOf: Cancel
           retryTapIfNoChange: false
 - runFlow:
     when:

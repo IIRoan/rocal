@@ -160,7 +160,7 @@ def run_journey(platform, app, flow, results, name=None):
     reason = None
     try:
         with (root / f"private/{app}-{name}.log").open("wb") as log:
-            completed = subprocess.run(command, cwd=REPO, env=maestro_environment(), check=False, timeout=600, stdout=log, stderr=subprocess.STDOUT)
+            completed = subprocess.run(command, cwd=REPO, env=maestro_environment(), check=False, timeout=1200 if platform == "ios" else 600, stdout=log, stderr=subprocess.STDOUT)
         passed = completed.returncode == 0
         if not passed:
             reason = failure_kind(root / f"private/{app}-{name}.log")

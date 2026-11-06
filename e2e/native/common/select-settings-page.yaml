@@ -10,3 +10,4 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: Back to settings
     timeout: 30000
+- waitForAnimationToEnd
