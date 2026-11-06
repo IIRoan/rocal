@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::{CalendarId, CategoryId, EventId, Timestamp, UserId};
+use crate::common::{CalendarId, CategoryId, EventId, SubscriptionId, Timestamp, UserId};
 
 /// What the caller's account still stores in an older form, which the client re-seals in the background after unlock.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -17,6 +17,8 @@ pub struct EncryptionUpgrades {
     pub readable_invitations: i64,
     /// Whether the app preferences are still stored readable.
     pub unsealed_settings: bool,
+    /// Feeds whose name is still stored readable.
+    pub subscriptions_with_readable_names: Vec<SubscriptionId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

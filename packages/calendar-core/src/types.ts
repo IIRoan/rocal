@@ -68,13 +68,11 @@ export type {
 
 export interface NameEncryptionShadowRequest {
   encryptedName?: string;
-  blindIndexTokens?: string[];
   encryptionKeyVersion?: number;
 }
 
 export interface EventContentEncryptionShadowRequest {
   encryptedContent?: string;
-  blindIndexTokens?: string[];
   encryptionKeyVersion?: number;
   /** Colour and category travel inside `encryptedContent`, so the server clears its plaintext copies. */
   attributesEncrypted?: boolean;

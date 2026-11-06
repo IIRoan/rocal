@@ -812,7 +812,7 @@
         "tags": [
           "Events"
         ],
-        "summary": "Plaintext full-text search, with blind-index tokens for encrypted events.",
+        "summary": "Plaintext full-text search kept for shipped binaries; their `blindIndexTokens` are ignored, since the server keeps none.",
         "operationId": "searchEvents",
         "parameters": [
           {
@@ -3267,13 +3267,21 @@
       },
       "CreateSubscriptionRequest": {
         "type": "object",
+        "description": "Current clients send `encryptedName`; a readable `name` is only accepted from shipped binaries.",
         "required": [
-          "name",
           "url"
         ],
         "properties": {
           "color": {
             "type": "string"
+          },
+          "encryptedName": {
+            "type": "string",
+            "description": "The name sealed as a calendar name; stored on the mirrored calendar."
+          },
+          "encryptionKeyVersion": {
+            "type": "integer",
+            "format": "int32"
           },
           "name": {
             "type": "string"
@@ -3968,7 +3976,8 @@
           "eventsWithReadableAttributes",
           "eventsWithUnsealedReminders",
           "readableInvitations",
-          "unsealedSettings"
+          "unsealedSettings",
+          "subscriptionsWithReadableNames"
         ],
         "properties": {
           "eventsWithReadableAttributes": {
@@ -3989,6 +3998,13 @@
             "type": "integer",
             "format": "int64",
             "description": "Invitation copies the server still stores readable."
+          },
+          "subscriptionsWithReadableNames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionId"
+            },
+            "description": "Feeds whose name is still stored readable."
           },
           "unsealedSettings": {
             "type": "boolean",
@@ -7847,11 +7863,19 @@
             "type": "string",
             "description": "Recolors the mirrored calendar."
           },
+          "encryptedName": {
+            "type": "string"
+          },
+          "encryptionKeyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
           "isActive": {
             "type": "boolean"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "A readable rename from a shipped binary; refused once the name is sealed."
           },
           "syncIntervalMinutes": {
             "type": "integer",

@@ -102,6 +102,7 @@ describe("upgradeStoredEncryption", () => {
     eventsWithUnsealedReminders?: string[];
     readableInvitations?: number;
     unsealedSettings?: boolean;
+    subscriptionsWithReadableNames?: string[];
   }) {
     return {
       getEncryptionUpgrades: jest.fn(async () => ({
@@ -109,6 +110,7 @@ describe("upgradeStoredEncryption", () => {
         eventsWithUnsealedReminders: [],
         readableInvitations: 0,
         unsealedSettings: false,
+        subscriptionsWithReadableNames: [],
         ...report,
       })),
       ensureSealedUserSettings: jest.fn(async () => true),
@@ -119,6 +121,11 @@ describe("upgradeStoredEncryption", () => {
         return true;
       }),
       sealPendingReminders: jest.fn(async () => true),
+      getSubscriptions: jest.fn(async () => [
+        { id: "s1", name: " Therapy practice " },
+        { id: "s2", name: "" },
+      ] as never),
+      updateSubscription: jest.fn(async () => ({}) as never),
     };
   }
 
@@ -131,6 +138,16 @@ describe("upgradeStoredEncryption", () => {
     expect(api.getEventSearchCorpus).not.toHaveBeenCalled();
     expect(api.resealEventAttributes).not.toHaveBeenCalled();
     expect(api.sealPendingReminders).not.toHaveBeenCalled();
+    expect(api.getSubscriptions).not.toHaveBeenCalled();
+  });
+
+  it("seals readable feed names by renaming each feed to its own name", async () => {
+    const api = fakeApi({ subscriptionsWithReadableNames: ["s1", "s2", "gone"] });
+
+    await upgradeStoredEncryption(api);
+
+    expect(api.getSubscriptions).toHaveBeenCalledTimes(1);
+    expect(api.updateSubscription.mock.calls).toEqual([["s1", { name: "Therapy practice" }]]);
   });
 
   it("runs each reported fix, and one failure does not stop the rest", async () => {

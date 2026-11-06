@@ -14,6 +14,7 @@ use crate::db::entities::{
     calendar, calendar_event, calendar_subscription, calendar_sync_log, recurrence_exception,
     user_settings,
 };
+use crate::entity_metadata::{EncryptedName, apply_name};
 use crate::events::queries as events;
 use crate::instant;
 use crate::integrations::ics::parse::{NewEvent, ParsedEvent};
@@ -82,15 +83,16 @@ pub async fn by_url<C: ConnectionTrait>(
         .await
 }
 
-/// The read-only calendar a new feed mirrors into.
+/// The read-only calendar a new feed mirrors into; a sealed name replaces the readable one.
 pub async fn insert_feed_calendar<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
     name: &str,
+    sealed: Option<EncryptedName>,
     color: &str,
     public_holiday: bool,
 ) -> Result<calendar::Model, sea_orm::DbErr> {
-    calendar::ActiveModel {
+    let mut row = calendar::ActiveModel {
         name: Set(name.to_owned()),
         color: Set(color.to_owned()),
         kind: Set(if public_holiday {
@@ -104,9 +106,9 @@ pub async fn insert_feed_calendar<C: ConnectionTrait>(
         is_default: Set(false),
         user_id: Set(user_id.to_owned()),
         ..Default::default()
-    }
-    .insert(db)
-    .await
+    };
+    apply_name!(row, sealed);
+    row.insert(db).await
 }
 
 pub async fn insert_feed<C: ConnectionTrait>(
@@ -133,12 +135,13 @@ pub async fn insert_feed<C: ConnectionTrait>(
 /// What `PUT /api/subscriptions/:id` changes; `None` leaves a column alone.
 pub struct FeedChanges<'a> {
     pub name: Option<&'a str>,
+    pub sealed: Option<EncryptedName>,
     pub color: Option<&'a str>,
     pub is_active: Option<bool>,
     pub sync_interval_minutes: Option<i32>,
 }
 
-/// Renames and recolors the calendar, then updates the feed, in one transaction.
+/// Renames and recolors the calendar, then updates the feed, in one transaction; a sealed name blanks both readable copies.
 pub async fn update_feed(
     db: &DatabaseConnection,
     feed: calendar_subscription::Model,
@@ -146,11 +149,17 @@ pub async fn update_feed(
     changes: FeedChanges<'_>,
 ) -> Result<(calendar_subscription::Model, calendar::Model), sea_orm::DbErr> {
     let transaction = db.begin().await?;
-    let calendar = if changes.name.is_some() || changes.color.is_some() {
+    let name = if changes.sealed.is_some() {
+        Some("")
+    } else {
+        changes.name
+    };
+    let calendar = if name.is_some() || changes.color.is_some() {
         let mut row: calendar::ActiveModel = calendar.into();
-        if let Some(name) = changes.name {
+        if let Some(name) = name {
             row.name = Set(name.to_owned());
         }
+        apply_name!(row, changes.sealed);
         if let Some(color) = changes.color {
             row.color = Set(color.to_owned());
         }
@@ -159,7 +168,7 @@ pub async fn update_feed(
         calendar
     };
     let mut row: calendar_subscription::ActiveModel = feed.into();
-    if let Some(name) = changes.name {
+    if let Some(name) = name {
         row.name = Set(name.to_owned());
     }
     if let Some(is_active) = changes.is_active {
