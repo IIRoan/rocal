@@ -17,10 +17,10 @@ import type {
   UpdateEventRequest,
 } from "./types/calendar";
 import { waitForPendingE2eeBootstrap } from "./e2ee-bootstrap";
-import { createBlindIndexTokens, encryptJsonPayload } from "./e2ee-crypto";
+import { encryptJsonPayload } from "./e2ee-crypto";
 import { getActiveE2eeSession } from "./e2ee-session";
 
-const contentEncrypter = { encryptJsonPayload, createBlindIndexTokens };
+const contentEncrypter = { encryptJsonPayload };
 
 export async function getEncryptionSession() {
   let session = getActiveE2eeSession();

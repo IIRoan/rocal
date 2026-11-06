@@ -46,7 +46,7 @@ describe("parseEncryptedJsonPayload", () => {
 });
 
 describe("encryptEventContentRequest", () => {
-  it("emits ciphertext and blind-index tokens without plaintext content", async () => {
+  it("emits only ciphertext, with no plaintext content or search tokens", async () => {
     const wire = await encryptEventContentRequest(e2ee, keys, {
       title: " Therapy ",
       description: "Session notes",
@@ -63,7 +63,7 @@ describe("encryptEventContentRequest", () => {
     }
     expect(wire).not.toHaveProperty("invitationContent");
     expect(JSON.stringify(wire)).not.toMatch(/Therapy|Session notes|Clinic|rose|category-1/);
-    expect(wire.blindIndexTokens?.length).toBeGreaterThan(0);
+    expect(wire).not.toHaveProperty("blindIndexTokens");
     expect(wire).toMatchObject({
       start: "2026-06-01T09:00:00.000Z",
       calendarId: "calendar-1",
@@ -196,6 +196,7 @@ describe("encrypted names", () => {
     });
 
     expect(wire).not.toHaveProperty("name");
+    expect(wire).not.toHaveProperty("blindIndexTokens");
     expect(JSON.stringify(wire)).not.toContain("Therapy");
     expect(wire.color).toBe("blue");
 

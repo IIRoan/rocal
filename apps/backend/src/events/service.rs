@@ -214,10 +214,6 @@ fn checked_reminder(minutes: Option<i32>) -> Result<Option<i32>, AppError> {
     Ok(minutes)
 }
 
-fn tokens_json(tokens: &[String]) -> Result<String, AppError> {
-    serde_json::to_string(tokens).map_err(AppError::internal)
-}
-
 /// `isAttendeeCopyForUser`: the caller is on the event as an attendee.
 fn attendee_copy(
     user_id: &str,
@@ -400,9 +396,6 @@ pub async fn create(
         ..Default::default()
     };
     clear_plaintext(&mut row);
-    if let Some(tokens) = &request.blind_index_tokens {
-        row.blind_index_tokens = Set(Some(tokens_json(tokens)?));
-    }
     if let Some(version) = request.encryption_key_version {
         row.encryption_key_version = Set(version);
     }
@@ -588,9 +581,7 @@ pub async fn update(
     }
     if let Some(content) = &request.encrypted_content {
         row.encrypted_content = Set(Some(content.clone()));
-    }
-    if let Some(tokens) = &request.blind_index_tokens {
-        row.blind_index_tokens = Set(Some(tokens_json(tokens)?));
+        row.blind_index_tokens = Set(None);
     }
     if let Some(version) = request.encryption_key_version {
         row.encryption_key_version = Set(version);
@@ -885,7 +876,6 @@ async fn duplicate(
                 title: Set(title),
                 description: Set(event.description.clone()),
                 encrypted_content: Set(event.encrypted_content.clone()),
-                blind_index_tokens: Set(event.blind_index_tokens.clone()),
                 encryption_state: Set(event.encryption_state.clone()),
                 encryption_key_version: Set(event.encryption_key_version),
                 start: Set(event.start),
@@ -979,9 +969,7 @@ pub async fn seal(
     let mut row = existing.into_active_model();
     clear_plaintext(&mut row);
     row.encrypted_content = Set(Some(request.encrypted_content));
-    if let Some(tokens) = &request.blind_index_tokens {
-        row.blind_index_tokens = Set(Some(tokens_json(tokens)?));
-    }
+    row.blind_index_tokens = Set(None);
     row.encryption_key_version = Set(request.encryption_key_version.unwrap_or(1));
     let updated = queries::update(&state.db, row).await?;
     view::one(&state.db, &updated).await
@@ -999,12 +987,10 @@ async fn reseal(
         encrypted_content: Set(Some(request.encrypted_content)),
         color: Set(None),
         category_id: Set(None),
+        blind_index_tokens: Set(None),
         updated_at: Set(instant::now()),
         ..Default::default()
     };
-    if let Some(tokens) = &request.blind_index_tokens {
-        row.blind_index_tokens = Set(Some(tokens_json(tokens)?));
-    }
     if let Some(version) = request.encryption_key_version {
         row.encryption_key_version = Set(version);
     }

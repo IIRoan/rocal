@@ -3,7 +3,6 @@ import type { CalendarEvent } from "./types";
 export type InvitationImportEncryptionPayload = {
   externalId: string;
   encryptedContent: string;
-  blindIndexTokens?: string[];
   encryptionKeyVersion?: number;
 };
 

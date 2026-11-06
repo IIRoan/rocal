@@ -416,7 +416,6 @@ struct Target<'a> {
 /// The ciphertext a client sealed for one UID.
 struct Sealed {
     encrypted_content: String,
-    blind_index_tokens: Option<String>,
     encryption_key_version: i32,
 }
 
@@ -462,10 +461,6 @@ fn local_data(
     data.content = Some((String::new(), None, None));
     data.sealed = Some(Sealed {
         encrypted_content: entry.encrypted_content.clone(),
-        blind_index_tokens: entry
-            .blind_index_tokens
-            .as_ref()
-            .map(|tokens| serde_json::to_string(tokens).unwrap_or_default()),
         encryption_key_version: entry.encryption_key_version.unwrap_or(1),
     });
     data
@@ -491,9 +486,7 @@ impl LocalData {
         }
         if let Some(sealed) = &self.sealed {
             row.encrypted_content = Set(Some(sealed.encrypted_content.clone()));
-            if let Some(tokens) = &sealed.blind_index_tokens {
-                row.blind_index_tokens = Set(Some(tokens.clone()));
-            }
+            row.blind_index_tokens = Set(None);
             row.encryption_state = Set("encrypted".into());
             row.encryption_key_version = Set(sealed.encryption_key_version);
         }

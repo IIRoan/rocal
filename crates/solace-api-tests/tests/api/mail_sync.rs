@@ -639,7 +639,7 @@ async fn client_encrypted_invitation_imports_store_only_ciphertext() {
             Value::Null,
             json!("encrypted"),
             json!(ciphertext),
-            json!(json!([token]).to_string()),
+            Value::Null,
         )
     );
     assert_eq!(

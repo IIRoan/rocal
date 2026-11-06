@@ -11,6 +11,8 @@ type UpgradeApi = Pick<
   | "sealImportedInvitationIfNeeded"
   | "resealEventAttributes"
   | "sealPendingReminders"
+  | "getSubscriptions"
+  | "updateSubscription"
 >;
 
 /** Small batches keep a large backlog from flooding the API; a failed id waits for the next start. */
@@ -23,6 +25,20 @@ async function inBatches(
       ids.slice(index, index + BATCH_SIZE).map((id) => run(id).catch(() => false)),
     );
   }
+}
+
+/** Renaming a feed to its own name stores it sealed; one list read finds every name. */
+async function sealSubscriptionNames(api: UpgradeApi, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const names = new Map(
+    (await api.getSubscriptions()).map((subscription) => [subscription.id, subscription.name.trim()]),
+  );
+  await inBatches(ids, async (id) => {
+    const name = names.get(id);
+    if (!name) return false;
+    await api.updateSubscription(id, { name });
+    return true;
+  });
 }
 
 /** Re-seals what the server reports this account still stores in an older form; true when the settings were sealed. */
@@ -39,6 +55,9 @@ export async function upgradeStoredEncryption(api: UpgradeApi): Promise<boolean>
   );
   await inBatches(report.eventsWithUnsealedReminders, (id) =>
     api.sealPendingReminders(id),
+  );
+  await sealSubscriptionNames(api, report.subscriptionsWithReadableNames).catch(
+    () => undefined,
   );
   return settingsSealed;
 }

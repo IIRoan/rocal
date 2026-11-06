@@ -672,23 +672,39 @@ async fn declined_invitation_copies_are_hidden_everywhere() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let calendar = calendar_id(&mut user, "Work").await;
-    let mut visible_request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
-    visible_request.blind_index_tokens = Some(vec!["shared-token".into()]);
-    let visible = create_event(&mut user, &visible_request).await;
-    let mut declined_request = encrypted_event(
-        &calendar,
-        "2099-03-02T11:00:00.000Z",
-        "2099-03-02T12:00:00.000Z",
-    );
-    declined_request.blind_index_tokens = Some(vec!["shared-token".into()]);
-    let declined = create_event(&mut user, &declined_request).await;
-    let mut organizer_request = encrypted_event(
-        &calendar,
-        "2099-03-02T13:00:00.000Z",
-        "2099-03-02T14:00:00.000Z",
-    );
-    organizer_request.blind_index_tokens = Some(vec!["shared-token".into()]);
-    let own = create_event(&mut user, &organizer_request).await;
+    let visible = create_event(
+        &mut user,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    let declined = create_event(
+        &mut user,
+        &encrypted_event(
+            &calendar,
+            "2099-03-02T11:00:00.000Z",
+            "2099-03-02T12:00:00.000Z",
+        ),
+    )
+    .await;
+    let own = create_event(
+        &mut user,
+        &encrypted_event(
+            &calendar,
+            "2099-03-02T13:00:00.000Z",
+            "2099-03-02T14:00:00.000Z",
+        ),
+    )
+    .await;
+    // The old search reads only readable titles, as an older client stored them.
+    sqlx::query("UPDATE calendar_event SET title = 'Shared plan' WHERE id = ANY($1)")
+        .bind(vec![
+            visible.id.0.clone(),
+            declined.id.0.clone(),
+            own.id.0.clone(),
+        ])
+        .execute(&app.db)
+        .await
+        .expect("readable titles");
     sqlx::query("DELETE FROM event_participant WHERE event_id = $1")
         .bind(&declined.id.0)
         .execute(&app.db)
@@ -724,7 +740,7 @@ async fn declined_invitation_copies_are_hidden_everywhere() {
         [visible.id.0.clone(), own.id.0.clone()],
         "only attendee declines hide an event"
     );
-    let found = search(&mut user, "q=zz&blindIndexTokens=shared-token").await;
+    let found = search(&mut user, "q=shared").await;
     assert_eq!(found.total, 3, "the count still includes the declined copy");
     let mut found_ids: Vec<String> = found.events.iter().map(|e| e.id.0.clone()).collect();
     found_ids.sort();
@@ -771,66 +787,31 @@ async fn categories_are_active_ones_by_name() {
 }
 
 #[tokio::test]
-async fn search_finds_encrypted_events_by_blind_index_token() {
+async fn search_ignores_blind_index_tokens_and_the_server_keeps_none() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let mut other = app.user().await;
     let calendar = calendar_id(&mut user, "Work").await;
-    let other_calendar = calendar_id(&mut other, "Work").await;
-    let token_a = format!("tok-a-{}", hex(6));
-    let token_c = format!("tok-c-{}", hex(6));
-    let mut first = encrypted_event(
-        &calendar,
-        "2099-03-02T09:00:00.000Z",
-        "2099-03-02T10:00:00.000Z",
-    );
-    first.blind_index_tokens = Some(vec![token_a.clone(), "tok-b".into()]);
-    let first = create_event(&mut user, &first).await;
-    let mut second = encrypted_event(
-        &calendar,
-        "2099-03-05T09:00:00.000Z",
-        "2099-03-05T10:00:00.000Z",
-    );
-    second.blind_index_tokens = Some(vec![token_c.clone()]);
-    let second = create_event(&mut user, &second).await;
-    let mut foreign = encrypted_event(&other_calendar, FUTURE_START, FUTURE_END);
-    foreign.blind_index_tokens = Some(vec![token_a.clone()]);
-    create_event(&mut other, &foreign).await;
+    let token = format!("tok-a-{}", hex(6));
+    let mut request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
+    request.blind_index_tokens = Some(vec![token.clone(), "tok-b".into()]);
+    let created = create_event(&mut user, &request).await;
+    assert_eq!(created.blind_index_tokens, None);
 
-    let found = search(&mut user, &format!("q=zz&blindIndexTokens={token_a}")).await;
-    assert_eq!(found.total, 1);
-    let hit = &found.events[0];
-    assert_eq!(hit.id, first.id);
-    assert_eq!(hit.encrypted_content, first.encrypted_content);
-    assert_eq!(hit.blind_index_tokens, first.blind_index_tokens);
-    assert_eq!(hit.title, "");
-    let label = hit.calendar.as_ref().expect("calendar label");
-    assert_eq!(
-        (label.id.as_str(), label.name.as_str(), label.color.as_str()),
-        (calendar.as_str(), "", "#3b82f6")
-    );
-    assert_eq!(hit.category, None);
-    assert_eq!(hit.participants.len(), 1);
-    assert_eq!(hit.participants[0].email, user.email);
-
-    let both = search(
-        &mut user,
-        &format!("q=zz&blindIndexTokens=%20{token_a}%20,,{token_c}"),
-    )
-    .await;
-    assert_eq!(
-        both.events.iter().map(|e| e.id.clone()).collect::<Vec<_>>(),
-        [second.id.clone(), first.id.clone()],
-        "tokens are trimmed; equal rank sorts by start, newest first"
-    );
-    let blank = search(&mut user, &format!("q=%20%20&blindIndexTokens={token_c}")).await;
-    assert_eq!(
-        (blank.total, blank.events.len()),
-        (1, 1),
-        "a blank query adds no match-all plaintext clause"
-    );
-    let nothing = search(&mut user, "q=%20%20").await;
-    assert_eq!((nothing.total, nothing.events.len()), (0, 0));
+    for query in [
+        format!("q=zz&blindIndexTokens={token}"),
+        format!("q=%20%20&blindIndexTokens={token}"),
+        "q=%20%20".to_owned(),
+    ] {
+        let found = search(&mut user, &query).await;
+        assert_eq!((found.total, found.events.len()), (0, 0), "{query}");
+    }
+    let stored: Option<String> =
+        sqlx::query_scalar("SELECT blind_index_tokens FROM calendar_event WHERE id = $1")
+            .bind(&created.id.0)
+            .fetch_one(&app.db)
+            .await
+            .expect("tokens");
+    assert_eq!(stored, None);
 }
 
 #[tokio::test]
