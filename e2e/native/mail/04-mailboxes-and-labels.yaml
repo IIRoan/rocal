@@ -18,6 +18,14 @@ appId: ${APP_ID}
 - assertVisible: Maestro folder
 - pressKey: Enter
 - waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: Android
+      visible:
+        id: com.google.android.inputmethod.latin:id/keyboard_holder
+    commands:
+      - hideKeyboard
+- waitForAnimationToEnd
 - extendedWaitUntil:
     visible: Maestro folder
     timeout: 30000
@@ -25,8 +33,10 @@ appId: ${APP_ID}
     element: Rename Maestro folder
     direction: DOWN
 - tapOn: Rename Maestro folder
-- extendedWaitUntil:
-    visible: Save name
+- scrollUntilVisible:
+    element: Save name
+    direction: DOWN
+    centerElement: true
     timeout: 30000
 - waitForAnimationToEnd
 - tapOn:
