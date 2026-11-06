@@ -12,6 +12,11 @@ appId: ${APP_ID}
             true: ${output.nativeTextIndex < String(TEXT).length}
           commands:
             - inputText: ${String(TEXT).charAt(output.nativeTextIndex)}
+            - runFlow:
+                when:
+                  true: ${typeof VERIFY_TEXT !== "undefined" && VERIFY_TEXT === "true"}
+                commands:
+                  - assertVisible: ${String(TEXT).slice(0, output.nativeTextIndex + 1)}
             - evalScript: ${output.nativeTextIndex = output.nativeTextIndex + 1}
       - waitForAnimationToEnd
 - runFlow:

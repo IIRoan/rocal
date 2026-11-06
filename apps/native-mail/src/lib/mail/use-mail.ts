@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
+import { useE2ee } from "@workspace/native-core/providers/E2eeProvider";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { getMailAccountStatus, getMailConfig } from "./mail-api";
 import { bootstrapMailboxForAccount } from "./account-bootstrap";
@@ -84,10 +85,11 @@ export function useMailConfig() {
 
 export function useMailRuntime(enabled: boolean) {
   const queryClient = useQueryClient();
+  const { isReady: isE2eeReady } = useE2ee();
   return useQuery<MailRuntime>({
     queryKey: QUERY_KEYS.mailRuntime(),
     queryFn: buildMailRuntime,
-    enabled,
+    enabled: enabled && isE2eeReady,
     staleTime: RUNTIME_STALE_MS,
     retry: 1,
     placeholderData: () =>

@@ -6,11 +6,16 @@ appId: ${APP_ID}
     file: ../common/select-settings-page.yaml
     env:
       PAGE: mailboxes
-- tapOn: New mailbox name
+- tapOn:
+    text: New mailbox name
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro folder
+      VERIFY_TEXT: "true"
+- assertVisible: Maestro folder
 - pressKey: Enter
 - waitForAnimationToEnd
 - extendedWaitUntil:
@@ -20,12 +25,22 @@ appId: ${APP_ID}
     element: Rename Maestro folder
     direction: DOWN
 - tapOn: Rename Maestro folder
+- extendedWaitUntil:
+    visible: Save name
+    timeout: 30000
 - waitForAnimationToEnd
+- tapOn:
+    text: Rename Maestro folder
+    point: 95%,50%
+    retryTapIfNoChange: false
 - eraseText
+- waitForAnimationToEnd
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro renamed folder
+      VERIFY_TEXT: "true"
+- assertVisible: Maestro renamed folder
 - pressKey: Enter
 - waitForAnimationToEnd
 - extendedWaitUntil:
@@ -39,11 +54,16 @@ appId: ${APP_ID}
     file: ../common/select-settings-page.yaml
     env:
       PAGE: labels
-- tapOn: Label name
+- tapOn:
+    text: Label name
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro mail label
+      VERIFY_TEXT: "true"
+- assertVisible: Maestro mail label
 - hideKeyboard
 - tapOn: Create label
 - extendedWaitUntil:
