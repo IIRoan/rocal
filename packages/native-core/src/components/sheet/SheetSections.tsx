@@ -10,7 +10,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type AccessibilityRole,
   type TextInputProps,
@@ -22,7 +21,7 @@ import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
-import { BottomSheetScrollView } from "../BottomSheet";
+import { BottomSheetScrollView, BottomSheetTextInput } from "../BottomSheet";
 import { MAIL_ICON, useMailSkin, type MailSkin } from "../mail/mail-ui";
 import { Switch } from "../ui/Switch";
 
@@ -355,7 +354,7 @@ export function SheetSwatch({ color }: { color: string }) {
 export function SheetTextField(props: TextInputProps) {
   const { skin, styles } = useSheetListStyles();
   return (
-    <TextInput
+    <BottomSheetTextInput
       placeholderTextColor={skin.textTertiary}
       {...props}
       style={[styles.field, props.style]}
@@ -381,7 +380,7 @@ export function SheetSearchField({
   return (
     <View style={styles.search}>
       <Feather name="search" size={16} color={skin.textTertiary} />
-      <TextInput
+      <BottomSheetTextInput
         ref={inputRef}
         value={value}
         onChangeText={onChangeText}
