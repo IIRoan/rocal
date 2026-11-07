@@ -60,12 +60,20 @@ appId: ${APP_ID}
     commands:
       - tapOn: Save
 - extendedWaitUntil:
-    visible: "Change Profile Picture.*"
+    visible:
+      id: account-action-change-profile-picture
+      text: "Change Profile Picture.*"
+      enabled: true
     timeout: 60000
 - takeScreenshot: ${SCREENSHOT_DIR}/uploaded-private-profile-picture
+- waitForAnimationToEnd
 - tapOn:
     id: account-action-change-profile-picture
-    retryTapIfNoChange: false
+    enabled: true
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: Remove Photo
+    timeout: 30000
 - tapOn: Remove Photo
 - extendedWaitUntil:
     visible: "Add Profile Picture.*"
