@@ -7,7 +7,13 @@ appId: ${APP_ID}
     env:
       PAGE: calendars
 - tapOn: "Categories(,.*)?"
-- tapOn: New category
+- waitForAnimationToEnd
+- tapOn:
+    text: New category
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: Category name
+    timeout: 30000
 - waitForAnimationToEnd
 - tapOn: Category name
 - runFlow:

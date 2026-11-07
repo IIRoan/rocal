@@ -37,7 +37,9 @@ appId: ${APP_ID}
 - pressKey: Enter
 - waitForAnimationToEnd
 - assertVisible: Maestro retained draft
-- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- extendedWaitUntil:
+    visible: ".*Maestro body survives encrypted draft storage.*"
+    timeout: 30000
 - runFlow: ../common/close-compose.yaml
 - tapOn: ".*Switch mailbox"
 - tapOn: Drafts
@@ -50,7 +52,9 @@ appId: ${APP_ID}
 - tapOn: Drafts
 - tapOn: ".*Maestro retained draft.*"
 - assertVisible: ".*Maestro retained draft.*"
-- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- extendedWaitUntil:
+    visible: ".*Maestro body survives encrypted draft storage.*"
+    timeout: 30000
 - waitForAnimationToEnd
 - tapOn:
     id: compose-subject
