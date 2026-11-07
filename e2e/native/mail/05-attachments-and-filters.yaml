@@ -5,7 +5,12 @@ appId: ${APP_ID}
 - assertVisible: Unread
 - runFlow: ../common/close-sheet.yaml
 - tapOn: Compose message
-- tapOn: Attach file
+- assertVisible: Send
+- waitForAnimationToEnd
+- tapOn:
+    text: Attach file
+    enabled: true
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     visible: "(?i).*(browse|recents|recent|downloads|files).*"
     timeout: 30000

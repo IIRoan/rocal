@@ -24,7 +24,7 @@ iOS journeys use Xcode 26.6 and the iOS 26.5 runtime. Setup opens Simulator with
 | Delivery and reader | Receive the submitted message, decrypt both Inbox and Sent copies, star/unstar and open a quoted reply. |
 | Message actions and search | Search decrypted message bodies on-device, mark unread, move to the UI-created custom mailbox, reopen after restart, move to Trash and restore to Inbox without losing decrypted content. |
 | Mailboxes and labels | Create/rename/hide/show/delete a custom mailbox and create/reopen/delete an encrypted label. |
-| Mail controls | Open the filter drawer and native attachment picker; cancellation returns to the composer without losing navigation. |
+| Mail controls | Open the filter drawer, wait for the composer drawer to settle and open the native attachment picker; cancellation returns to the composer without losing navigation. |
 | Offline and recovery | Suspend the actual API process, restart Mail and read its encrypted snapshot; resume the API, check its health route and repeat the online delivery/reader assertions. |
 | Sign-out | End the session, hide mailbox content, sign in again, unwrap the existing keys and decrypt the same message. |
 | Server postconditions | UI-created calendars/events/preferences exist as ciphertext and journey event content is absent from readable database columns. |
