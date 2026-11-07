@@ -44,7 +44,7 @@ def collect_reader_timings(traces):
             if not isinstance(condition, dict):
                 continue
             visible = condition.get("visible", {})
-            if not isinstance(visible, dict) or visible.get("idRegex") != "mail-expanded-message":
+            if not isinstance(visible, dict) or visible.get("idRegex") != "mail-message-text":
                 continue
             budget = assertion.get("timeout")
             if budget not in ("5000", "10000") or tap is None:

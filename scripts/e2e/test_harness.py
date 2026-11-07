@@ -57,7 +57,7 @@ class HarnessTests(unittest.TestCase):
                               "evaluatedCommand": {"tapOnElement": {"selector": "private-sender-sentinel"}}}},
                 {"metadata": {"status": "COMPLETED", "timestamp": 1400, "duration": 200,
                               "evaluatedCommand": {"assertConditionCommand": {
-                                  "condition": {"visible": {"idRegex": "mail-expanded-message", "containsDescendants": [{"textRegex": "private-body-sentinel"}]}},
+                                  "condition": {"visible": {"idRegex": "mail-message-text", "textRegex": "private-body-sentinel"}},
                                   "timeout": "5000"}}}},
                 {"metadata": {"status": "COMPLETED", "timestamp": 1700, "duration": 100,
                               "evaluatedCommand": {"assertConditionCommand": {
@@ -77,7 +77,7 @@ class HarnessTests(unittest.TestCase):
                                 "evaluatedCommand": {"tapOnElement": {}}}}
             assertion = {"metadata": {"status": "COMPLETED", "timestamp": 1100, "duration": 20,
                                       "evaluatedCommand": {"assertConditionCommand": {
-                                          "condition": {"visible": {"idRegex": "mail-expanded-message"}}, "timeout": "5000"}}}}
+                                          "condition": {"visible": {"idRegex": "mail-message-text"}}, "timeout": "5000"}}}}
             for update in ({"status": "FAILED"}, {"timestamp": True}, {"duration": -1}, {"duration": "private-sentinel"}):
                 with self.subTest(update=update):
                     changed = {"metadata": {**assertion["metadata"], **update}}
