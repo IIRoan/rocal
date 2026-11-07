@@ -370,6 +370,16 @@ export function hydrateMailOfflineSnapshot(
     );
   }
 
+  // Fresh list rows omit bodies; keep restored reader data when a background list refresh replaces them.
+  for (const message of [
+    ...snapshot.lists.flatMap((list) => list.messages),
+    ...snapshot.threads.flatMap((thread) => thread.messages),
+  ]) {
+    if (!hasIncompleteBody(message)) {
+      seed(QUERY_KEYS.mailMessage(message.id), message, listUpdatedAt);
+    }
+  }
+
   // Labels keep their saved age; the session refreshes them once the vault unlocks.
   if (snapshot.labels) {
     seed(QUERY_KEYS.mailLabels(), snapshot.labels, snapshot.savedAt);

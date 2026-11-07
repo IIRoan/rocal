@@ -21,7 +21,22 @@ function createNativeExpoConfig(app, environment = process.env) {
     throw new Error("APP_VARIANT must be development, preview or production");
   }
   const isDev = variant === "development";
-  const bundleIdentifier = `${identity.bundleIdentifier}${isDev ? ".dev" : ""}`;
+  const isE2e = environment.SOLACE_E2E === "1";
+  if (isE2e) {
+    const testApi = new URL(environment.EXPO_PUBLIC_API_URL || "about:blank");
+    if (
+      variant !== "preview" ||
+      environment.SOLACE_ENV_SOURCE === "eas" ||
+      testApi.protocol !== "http:" ||
+      !["localhost", "127.0.0.1"].includes(testApi.hostname) ||
+      testApi.username ||
+      testApi.password
+    )
+      throw new Error(
+        "E2E builds require preview, a loopback API and local build configuration",
+      );
+  }
+  const bundleIdentifier = `${identity.bundleIdentifier}${isE2e ? ".e2e" : isDev ? ".dev" : ""}`;
   const projectId = environment.EXPO_PROJECT_ID?.trim() || identity.projectId;
   const owner = environment.EXPO_OWNER?.trim() || settings.owner;
   const slug = environment.EXPO_PROJECT_SLUG?.trim() || identity.slug;
@@ -78,7 +93,7 @@ function createNativeExpoConfig(app, environment = process.env) {
       policy: "appVersion",
     },
     updates: {
-      enabled: true,
+      enabled: !isE2e,
       checkAutomatically: "NEVER",
       fallbackToCacheTimeout: 0,
       url: `https://u.expo.dev/${projectId}`,
@@ -89,6 +104,9 @@ function createNativeExpoConfig(app, environment = process.env) {
       buildNumber: String(settings.initialBuildNumber),
       infoPlist: {
         ITSAppUsesNonExemptEncryption: settings.iosUsesNonExemptEncryption,
+        ...(isE2e
+          ? { NSAppTransportSecurity: { NSAllowsArbitraryLoads: true } }
+          : {}),
         ...(complianceCode
           ? { ITSEncryptionExportComplianceCode: complianceCode }
           : {}),
@@ -153,7 +171,10 @@ function createNativeExpoConfig(app, environment = process.env) {
       "expo-web-browser",
       [
         "expo-build-properties",
-        { ios: { deploymentTarget: settings.iosDeploymentTarget } },
+        {
+          ios: { deploymentTarget: settings.iosDeploymentTarget },
+          ...(isE2e ? { android: { usesCleartextTraffic: true } } : {}),
+        },
       ],
     ],
     experiments: {

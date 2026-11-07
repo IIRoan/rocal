@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: mail-message-text
+      text: ${BODY_TEXT}
+    timeout: ${OPEN_TIMEOUT_MS}
+- assertVisible: Signature verified
+- assertNotVisible: This message has no content.
+- runFlow:
+    when:
+      true: ${typeof EXCLUDED_TEXT !== "undefined"}
+    commands:
+      - assertNotVisible:
+          id: mail-message-text
+          text: ${EXCLUDED_TEXT}
+- waitForAnimationToEnd:
+    timeout: 3000

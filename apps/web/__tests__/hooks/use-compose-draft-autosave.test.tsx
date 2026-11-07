@@ -27,7 +27,7 @@ import type { JmapSession, UserKeyVault } from "@/lib/mail/types";
 const saveDraft = jest.fn(
   async (_session: JmapSession, _input: Record<string, unknown>) => "draft-2",
 );
-const uploadTextBlob = jest.fn(async () => ({
+const uploadTextBlob = jest.fn(async (_session: JmapSession, _content: string, _type?: string) => ({
   blobId: "sealed-draft",
   size: 128,
   type: "text/plain",

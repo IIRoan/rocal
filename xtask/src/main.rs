@@ -4,6 +4,7 @@
 
 mod check;
 mod dev;
+mod e2e;
 mod entities;
 mod mem_budget;
 mod migrate;
@@ -20,6 +21,8 @@ tasks:
   dev notifications       run the worker beside it; apps/backend/.env overrides any value for both
   dev demo                create the demo account in the dev database through the running API
   dev outdate             rewrite the demo account's data in the form older apps left it, to test the background upgrade
+  e2e serve | seed | verify
+                          run an isolated loopback backend and verify real native UI journeys
   test-env up             start local Postgres 18 and the test Stalwart (podman)
   test-env down           stop and remove them
   test-env template       rebuild solace_test_template with the API's migrations
@@ -41,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     match args.as_slice() {
         ["dev", rest @ ..] => dev::run(rest).await,
+        ["e2e", rest @ ..] => e2e::run(rest).await,
         ["test-env", rest @ ..] => test_env::run(rest).await,
         ["migrate", rest @ ..] => migrate::run(rest).await,
         ["entities", rest @ ..] => entities::run(rest).await,

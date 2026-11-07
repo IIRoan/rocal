@@ -1,9 +1,13 @@
 import { useEffect, useRef } from "react";
-import type { ViewToken } from "react-native";
+import type { ListViewToken } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import type { MailConversation } from "../lib/mail/conversation-thread";
 import { prefetchReaderData } from "../lib/mail/mail-reader-prefetch";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
+
+type ConversationViewToken = Omit<ListViewToken, "item"> & {
+  item: MailConversation;
+};
 
 // Rows must stay on screen briefly, so a fling past a page of mail does not fetch all of it.
 const READER_PREFETCH_VIEWABILITY = {
@@ -21,7 +25,11 @@ export function useMailReaderPrefetch(runtime: MailRuntime | undefined) {
   }, [runtime]);
 
   // FlatList rejects a changing viewability callback, so this reads the runtime through a ref.
-  const onViewableItemsChanged = ({ viewableItems }: { viewableItems: ViewToken<MailConversation>[] }) => {
+  const onViewableItemsChanged = ({
+    viewableItems,
+  }: {
+    viewableItems: ConversationViewToken[];
+  }) => {
     const current = runtimeRef.current;
     if (!current) return;
     const messages = [...viewableItems]
@@ -30,5 +38,8 @@ export function useMailReaderPrefetch(runtime: MailRuntime | undefined) {
     prefetchReaderData(queryClient, current, messages);
   };
 
-  return ({ viewabilityConfig: READER_PREFETCH_VIEWABILITY, onViewableItemsChanged });
+  return {
+    viewabilityConfig: READER_PREFETCH_VIEWABILITY,
+    onViewableItemsChanged,
+  };
 }

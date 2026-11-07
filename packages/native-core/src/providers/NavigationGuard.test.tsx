@@ -7,11 +7,14 @@ import {
   UNLOCK_FAILED_NOTICE,
 } from "@workspace/calendar-core/product-info";
 import { NavigationGuard } from "./NavigationGuard";
+import { QUERY_KEYS } from "../lib/query-keys";
 
 const mockQueryClient = { invalidateQueries: jest.fn(async () => undefined) };
 const mockSignOut = jest.fn(async (_notice?: string) => undefined);
 const mockUpgradeStoredEncryption = jest.fn(async () => true);
 let mockBootstrap = jest.fn(() => new Promise<string | null>(() => undefined));
+let mockPlatform: "ios" | "android" = "ios";
+let mockE2eeReady = false;
 let mockAuth: {
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -20,7 +23,11 @@ let mockAuth: {
 };
 
 jest.mock("react-native", () => ({
-  View: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  View: ({ children, accessibilityElementsHidden, importantForAccessibility }: {
+    children?: ReactNode;
+    accessibilityElementsHidden?: boolean;
+    importantForAccessibility?: string;
+  }) => <div aria-hidden={mockPlatform === "ios" ? accessibilityElementsHidden : importantForAccessibility === "no-hide-descendants"}>{children}</div>,
 }));
 
 jest.mock("expo-router", () => ({
@@ -36,7 +43,7 @@ jest.mock("./AuthProvider", () => ({ useAuth: () => mockAuth }));
 
 jest.mock("./E2eeProvider", () => {
   const e2ee = {
-    isReady: false,
+    get isReady() { return mockE2eeReady; },
     bootstrap: (...args: unknown[]) => mockBootstrap(...(args as [])),
     clearSession: () => undefined,
     provider: null,
@@ -109,7 +116,7 @@ const renderGuard = async () => {
         pushTapHandler={{ route: () => null, invalidate: () => undefined }}
         notificationExtensionSecrets={{ mailAuth: false, notificationKey: false }}
       >
-        {null}
+        <button data-testid="workspace-action">Create event</button>
       </NavigationGuard>,
     );
   });
@@ -119,6 +126,8 @@ beforeEach(() => {
   mockSignOut.mockClear();
   mockUpgradeStoredEncryption.mockClear();
   mockBootstrap = jest.fn(() => new Promise<string | null>(() => undefined));
+  mockPlatform = "ios";
+  mockE2eeReady = false;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -127,6 +136,32 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+});
+
+it.each(["ios", "android"] as const)("hides workspace actions from accessibility while preparing encryption on %s", async (platform) => {
+  mockPlatform = platform;
+  signIn("fresh");
+  await renderGuard();
+
+  expect(container.querySelector('[data-testid="workspace-action"]')).not.toBeNull();
+  expect(container.querySelector('[data-testid="workspace-action"]')?.closest('[aria-hidden="true"]')).not.toBeNull();
+});
+
+it("keeps a restored encrypted workspace accessible during background startup", async () => {
+  signIn("restored");
+  await renderGuard();
+
+  expect(container.querySelector('[data-testid="workspace-action"]')?.closest('[aria-hidden="true"]')).toBeNull();
+});
+
+it("exposes workspace actions after encryption startup completes", async () => {
+  mockE2eeReady = true;
+  mockBootstrap = jest.fn(() => Promise.resolve(null));
+  signIn("ready");
+  await renderGuard();
+
+  expect(container.querySelector('[role="status"]')).toBeNull();
+  expect(container.querySelector('[data-testid="workspace-action"]')?.closest('[aria-hidden="true"]')).toBeNull();
 });
 
 it("drops the previous user's restored workspace when another user signs in", async () => {
@@ -179,6 +214,6 @@ it("refetches settings once the upgrade sealed them", async () => {
 
   expect(mockUpgradeStoredEncryption).toHaveBeenCalled();
   expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
-    queryKey: ["settings"],
+    queryKey: QUERY_KEYS.settings(),
   });
 });

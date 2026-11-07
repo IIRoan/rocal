@@ -143,6 +143,8 @@ export function WorkspaceLoadingScreen({
 
   return (
     <Animated.View
+      testID="workspace-loading-screen"
+      accessibilityViewIsModal
       style={[
         StyleSheet.absoluteFill,
         styles.screen,

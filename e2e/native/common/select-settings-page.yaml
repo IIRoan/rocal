@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+---
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: settings-page-${PAGE}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: settings-page-${PAGE}
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: Back to settings
+    timeout: 30000
+- waitForAnimationToEnd

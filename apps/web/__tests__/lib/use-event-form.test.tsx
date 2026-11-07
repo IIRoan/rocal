@@ -799,7 +799,7 @@ describe("useEventForm reminder hydration", () => {
     it("saves through editRecurringEvent with the selected scope and pre-edit occurrence", async () => {
       const calendarData = {
         createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
-        editRecurringEvent: jest.fn(async () => ({
+        editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(async () => ({
           ...occurrence,
           id: "series-2",
         })),
@@ -889,7 +889,7 @@ describe("useEventForm reminder hydration", () => {
 
       const calendarData = {
         createEvent: jest.fn<UseCalendarDataReturn["createEvent"]>(),
-        editRecurringEvent: jest.fn(async () => ({ ...occurrence })),
+        editRecurringEvent: jest.fn<UseCalendarDataReturn["editRecurringEvent"]>(async () => ({ ...occurrence })),
         updateEvent: jest.fn<UseCalendarDataReturn["updateEvent"]>(),
       };
 
@@ -909,7 +909,7 @@ describe("useEventForm reminder hydration", () => {
       "deletes with the %s scope",
       async (scope) => {
         const calendarData = {
-          deleteRecurringEvent: jest.fn(async () => undefined),
+          deleteRecurringEvent: jest.fn<UseCalendarDataReturn["deleteRecurringEvent"]>(async () => undefined),
         };
 
         await act(async () => {

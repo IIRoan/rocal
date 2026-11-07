@@ -191,7 +191,9 @@ export function MailMessageBody({
       ) : plainContent ? (
         <>
           {signatureBadge}
-          <Text style={styles.bodyText}>{plainContent}</Text>
+          <Text testID="mail-message-text" style={styles.bodyText}>
+            {plainContent}
+          </Text>
         </>
       ) : (
         <Text style={styles.mutedText}>This message has no content.</Text>

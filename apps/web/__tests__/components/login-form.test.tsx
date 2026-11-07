@@ -14,7 +14,7 @@ import { createRoot, type Root } from "react-dom/client";
 const mockRouterReplace = jest.fn();
 const mockStartRouteTransition = jest.fn();
 const mockCompleteAuthNavigation = jest.fn();
-const mockRefetchSession = jest.fn(async () => undefined);
+const mockRefetchSession = jest.fn(async (_options?: unknown) => undefined);
 let mockSearchParams = new URLSearchParams();
 let mockAuthNavigationPending = false;
 
@@ -211,10 +211,10 @@ import {
 } from "@/lib/auth-local-state";
 
 const mockUseSession = jest.mocked(useSession);
-const mockGetSession = jest.mocked(authClient.getSession);
+const mockGetSession = jest.mocked<(...args: Parameters<typeof authClient.getSession>) => Promise<unknown>>(authClient.getSession);
 const mockPasskeySignIn = jest.mocked(authClient.signIn.passkey);
-const mockEmailSignIn = jest.mocked(signIn.email);
-const mockEmailSignUp = jest.mocked(signUp.email);
+const mockEmailSignIn = jest.mocked<(...args: Parameters<typeof signIn.email>) => Promise<unknown>>(signIn.email);
+const mockEmailSignUp = jest.mocked<(...args: Parameters<typeof signUp.email>) => Promise<unknown>>(signUp.email);
 const mockCheckEmailAvailability = jest.mocked(
   accountApiService.checkEmailAvailability,
 );

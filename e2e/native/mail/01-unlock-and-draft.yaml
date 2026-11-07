@@ -1,0 +1,75 @@
+appId: ${APP_ID}
+---
+- launchApp:
+    stopApp: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: Welcome back
+    timeout: 120000
+- runFlow: ../common/sign-in.yaml
+- assertNotVisible: Welcome back
+- tapOn: Compose message
+- assertVisible: Send
+- tapOn:
+    id: compose-recipient-to
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: ${EMAIL}
+      VERIFY_TEXT: "true"
+- pressKey: Enter
+- tapOn:
+    id: compose-subject
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro retained draft
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: Message body
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro body survives encrypted draft storage
+- tapOn:
+    id: compose-subject
+- pressKey: Enter
+- waitForAnimationToEnd
+- assertVisible: Maestro retained draft
+- extendedWaitUntil:
+    visible: ".*Maestro body survives encrypted draft storage.*"
+    timeout: 30000
+- runFlow: ../common/close-compose.yaml
+- tapOn: ".*Switch mailbox"
+- tapOn: Drafts
+- extendedWaitUntil:
+    visible: ".*Maestro retained draft.*"
+    timeout: 60000
+- takeScreenshot: ${SCREENSHOT_DIR}/encrypted-draft-list
+- runFlow: ../common/open-app.yaml
+- tapOn: ".*Switch mailbox"
+- tapOn: Drafts
+- tapOn: ".*Maestro retained draft.*"
+- assertVisible: ".*Maestro retained draft.*"
+- extendedWaitUntil:
+    visible: ".*Maestro body survives encrypted draft storage.*"
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn:
+    id: compose-subject
+    point: 95%,50%
+    retryTapIfNoChange: false
+- eraseText
+- waitForAnimationToEnd
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro round trip
+- assertVisible: Maestro round trip
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: Send
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 120000

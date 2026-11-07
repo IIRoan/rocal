@@ -90,7 +90,7 @@ describe("AccountSettings", () => {
 
   it("renders account info and delete-account confirmation flow", async () => {
     const handleDeleteAccount = jest.fn();
-    const handleChangePassword = jest.fn<() => Promise<void>>(
+    const handleChangePassword = jest.fn<NonNullable<React.ComponentProps<typeof AccountSettings>["handleChangePassword"]>>(
       async () => undefined,
     );
 
@@ -259,7 +259,7 @@ describe("AccountSettings", () => {
   });
 
   it("shows the clarified success message after a password change", async () => {
-    const handleChangePassword = jest.fn<() => Promise<void>>(
+    const handleChangePassword = jest.fn<NonNullable<React.ComponentProps<typeof AccountSettings>["handleChangePassword"]>>(
       async () => undefined,
     );
 

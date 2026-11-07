@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/sign-out.yaml
+- assertNotVisible: ".*Maestro round trip.*"
+- runFlow: ../common/sign-in.yaml
+- tapOn: ".*Switch mailbox"
+- tapOn: Inbox
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 60000
+- tapOn: ".*Maestro round trip.*"
+- extendedWaitUntil:
+    visible: ".*Maestro body survives encrypted draft storage.*"
+    timeout: 60000
+- takeScreenshot: ${SCREENSHOT_DIR}/signed-in-and-unlocked-again

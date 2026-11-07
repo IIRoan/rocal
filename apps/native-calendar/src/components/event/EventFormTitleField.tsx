@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { TextInput, View } from "react-native";
+import { TextInput, View, type TextInputInstance } from "react-native";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { FieldError } from "./FieldError";
 import type { EventFormStyles } from "./event-form-styles";
@@ -15,10 +15,10 @@ export function EventFormTitleField({
   error?: string;
   styles: EventFormStyles;
   onChange: (title: string) => void;
-  onFieldFocus: (input: TextInput | null) => void;
+  onFieldFocus: (input: TextInputInstance | null) => void;
 }) {
   const { theme } = useTheme();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   return (
     <View>
       <TextInput

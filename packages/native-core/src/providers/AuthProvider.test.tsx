@@ -5,9 +5,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { AppState } from "react-native";
 
 import { calendarApiService } from "../lib/api";
-import { authClient } from "../lib/auth-client";
+import { authClient, clearAuthSessionCache, readAuthSessionCache } from "../lib/auth-client";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
-import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
+import { getSessionCookie, readSessionTokenFromJar, waitForSessionCookie } from "../lib/session-cookie";
 import { signInWithBrowserPasskey } from "../lib/passkey-browser-bridge";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
 import {
@@ -45,7 +45,10 @@ jest.mock("expo-secure-store", () => ({
 }));
 
 jest.mock("../lib/auth-client", () => ({
+  clearAuthSessionCache: jest.fn(async () => undefined),
+  readAuthSessionCache: jest.fn(async (): Promise<unknown> => null),
   authClient: {
+    $store: { atoms: { session: { get: jest.fn(() => ({ data: null })) } } },
     getSession: jest.fn(),
     signIn: {
       email: jest.fn(),
@@ -84,6 +87,7 @@ jest.mock("../lib/session-cookie", () => ({
   ensureSessionTokenCookie: jest.fn(async () => true),
   healAuthCookieJar: jest.fn(async () => undefined),
   rememberSessionTokenFromJar: jest.fn(async () => "session-token"),
+  readSessionTokenFromJar: jest.fn(async () => "existing-signed-cookie"),
   persistRenewedSessionCookie: jest.fn(async () => undefined),
 }));
 
@@ -98,6 +102,9 @@ jest.mock("../lib/push-notifications", () => ({
 type AuthContextValue = ReturnType<typeof useAuth>;
 
 const mockGetSession = jest.mocked(authClient.getSession);
+const mockGetSessionState = jest.mocked(authClient.$store.atoms.session.get);
+const mockClearAuthSessionCache = jest.mocked(clearAuthSessionCache);
+const mockReadAuthSessionCache = jest.mocked(readAuthSessionCache);
 const mockEmailSignIn = jest.mocked(authClient.signIn.email);
 const mockSocialSignIn = jest.mocked(authClient.signIn.social);
 const mockPasskeySignIn = jest.mocked(authClient.signIn.passkey);
@@ -105,6 +112,7 @@ const mockEmailSignUp = jest.mocked(authClient.signUp.email);
 const mockSignOut = jest.mocked(authClient.signOut);
 const mockGetAuthCapabilities = jest.mocked(getAuthCapabilities);
 const mockWaitForSessionCookie = jest.mocked(waitForSessionCookie);
+const mockReadSessionTokenFromJar = jest.mocked(readSessionTokenFromJar);
 const mockSignInWithBrowserPasskey = jest.mocked(signInWithBrowserPasskey);
 const mockUnregisterNativePushDevice = jest.mocked(unregisterNativePushDevice);
 const mockOnSignedOut = jest.fn(async () => {});
@@ -167,7 +175,7 @@ describe("AuthProvider", () => {
     return <div data-testid="auth-method">{capturedAuth.lastAuthMethod}</div>;
   }
 
-  async function renderProvider() {
+  async function renderProvider(expectLoaded = true) {
     await act(async () => {
       root.render(
         <AuthProvider
@@ -181,7 +189,7 @@ describe("AuthProvider", () => {
       await Promise.resolve();
     });
 
-    expect(capturedAuth?.isLoading).toBe(false);
+    if (expectLoaded) expect(capturedAuth?.isLoading).toBe(false);
   }
 
   function getAuth() {
@@ -202,6 +210,10 @@ describe("AuthProvider", () => {
     root = createRoot(container);
 
     mockGetSession.mockReset();
+    mockGetSessionState.mockReturnValue({ data: null });
+    mockClearAuthSessionCache.mockClear();
+    mockReadAuthSessionCache.mockReset().mockResolvedValue(null);
+    jest.mocked(getSessionCookie).mockReturnValue("better-auth.session=token");
     mockEmailSignIn.mockReset();
     mockSocialSignIn.mockReset();
     mockPasskeySignIn.mockReset();
@@ -209,6 +221,7 @@ describe("AuthProvider", () => {
     mockSignOut.mockReset();
     mockGetAuthCapabilities.mockReset();
     mockWaitForSessionCookie.mockReset();
+    mockReadSessionTokenFromJar.mockReset().mockResolvedValue("existing-signed-cookie");
     mockSignInWithBrowserPasskey.mockReset();
     mockUnregisterNativePushDevice.mockReset();
     mockOnSignedOut.mockClear();
@@ -309,6 +322,128 @@ describe("AuthProvider", () => {
     expect(mockOnSignedOut).toHaveBeenCalledTimes(wipes);
   });
 
+  it("opens a valid cached session when the startup request never answers", async () => {
+    jest.useFakeTimers();
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    mockGetSessionState.mockReturnValue({ data: cached });
+    mockGetSession.mockImplementationOnce(() => new Promise(() => undefined));
+
+    await renderProvider(false);
+    expect(getAuth().isLoading).toBe(true);
+    await act(async () => { await jest.advanceTimersByTimeAsync(3_000); });
+
+    expect(getAuth().isLoading).toBe(false);
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().user?.id).toBe(cached.user.id);
+    expect(mockOnSignedOut).not.toHaveBeenCalled();
+    expect(mockClearAuthSessionCache).not.toHaveBeenCalled();
+    const request = mockGetSession.mock.calls[0]?.[0]?.fetchOptions;
+    expect(request?.signal?.aborted).toBe(true);
+    expect(() => request?.onSuccess?.({
+      data: createSessionData(),
+      response: {} as Response,
+      request: { url: "https://api.solace.test/api/auth/get-session", headers: new Headers(), body: null, method: "GET", signal: new AbortController().signal },
+    })).toThrow("Session changed while loading.");
+  });
+
+  it("restores the Secure Store session when library cache hydration has not finished", async () => {
+    jest.useFakeTimers();
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    mockReadAuthSessionCache.mockResolvedValue(cached);
+    mockGetSession.mockImplementationOnce(() => new Promise(() => undefined));
+    await renderProvider(false);
+    await act(async () => { await jest.advanceTimersByTimeAsync(3_000); });
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().user?.id).toBe(cached.user.id);
+    expect(mockClearAuthSessionCache).not.toHaveBeenCalled();
+  });
+
+  it("does not charge local cache loading against the network deadline", async () => {
+    jest.useFakeTimers();
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    let finishCache: ((value: unknown) => void) | undefined;
+    mockReadAuthSessionCache.mockImplementationOnce(() => new Promise((resolve) => { finishCache = resolve; }));
+    mockGetSession.mockImplementationOnce(() => new Promise(() => undefined));
+    await renderProvider(false);
+    await act(async () => { await jest.advanceTimersByTimeAsync(4_000); });
+    expect(getAuth().isLoading).toBe(true);
+    expect(mockGetSession).not.toHaveBeenCalled();
+    await act(async () => { finishCache?.(cached); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(3_000); });
+    expect(getAuth().isAuthenticated).toBe(true);
+  });
+
+  it("cannot apply a stored session read that finishes after sign-out", async () => {
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    let finishCache: ((value: unknown) => void) | undefined;
+    mockReadAuthSessionCache.mockImplementationOnce(() => new Promise((resolve) => { finishCache = resolve; }));
+    await renderProvider(false);
+    await act(async () => { await getAuth().signOut(); });
+    await act(async () => { finishCache?.(cached); });
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 503])("restores a cached session after a transport/server failure (%s)", async (status) => {
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    mockGetSessionState.mockReturnValue({ data: cached });
+    mockGetSession.mockResolvedValueOnce({ data: null, error: { status } } as never);
+
+    await renderProvider();
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(mockOnSignedOut).not.toHaveBeenCalled();
+  });
+
+  it.each(["missing", 401, 403])("never restores cached authentication when the server rejects it (%s)", async (status) => {
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    mockGetSessionState.mockReturnValue({ data: cached });
+    mockReadAuthSessionCache.mockResolvedValue(cached);
+    mockGetSession.mockResolvedValueOnce(status === "missing"
+      ? { data: null }
+      : { data: null, error: { status } } as never);
+
+    await renderProvider();
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().user).toBeNull();
+    expect(mockClearAuthSessionCache).toHaveBeenCalled();
+  });
+
+  it("cannot restore an expired cached session or one without a stored cookie", async () => {
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() - 1);
+    mockGetSessionState.mockReturnValue({ data: cached });
+    mockGetSession.mockRejectedValueOnce(new Error("Offline"));
+    await renderProvider();
+    expect(getAuth().isAuthenticated).toBe(false);
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    jest.mocked(getSessionCookie).mockReturnValueOnce("");
+    mockGetSession.mockRejectedValueOnce(new Error("Offline"));
+    await renderProvider();
+    expect(getAuth().isAuthenticated).toBe(false);
+  });
+
+  it("cannot restore cached authentication after sign-out during a pending startup request", async () => {
+    jest.useFakeTimers();
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    mockGetSessionState.mockReturnValue({ data: cached });
+    mockGetSession.mockImplementationOnce(() => new Promise(() => undefined));
+    await renderProvider(false);
+    await act(async () => { await getAuth().signOut(); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(3_000); });
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().user).toBeNull();
+  });
+
   it("accepts a successful sign-in response while cookie persistence catches up", async () => {
     mockWaitForSessionCookie.mockResolvedValue(false);
     mockGetSession.mockResolvedValue({ data: null });
@@ -353,8 +488,64 @@ describe("AuthProvider", () => {
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
+  it("restores a password session offline immediately after the first sign-in", async () => {
+    await renderProvider();
+    const saved = createSessionData();
+    saved.session.expiresAt = new Date(Date.now() + 60_000);
+    mockEmailSignIn.mockResolvedValue(createEmailSignInResult());
+    mockGetSession.mockImplementation(async () => {
+      mockReadAuthSessionCache.mockResolvedValue(saved);
+      return { data: saved, error: null };
+    });
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    expect(getAuth().isAuthenticated).toBe(true);
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    mockGetSessionState.mockReturnValue({ data: null });
+    mockGetSession.mockRejectedValue(new Error("Offline"));
+    await renderProvider();
+
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().session?.token).toBe(saved.session.token);
+  });
+
+  it("keeps an accepted password sign-in when the restart cache refresh fails", async () => {
+    await renderProvider();
+    mockEmailSignIn.mockResolvedValue(createEmailSignInResult());
+    mockGetSession.mockRejectedValueOnce(new Error("Offline"));
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().user?.email).toBe("roan@example.com");
+  });
+
+  it("does not replace the accepted account with a stale session for another user", async () => {
+    await renderProvider();
+    mockEmailSignIn.mockResolvedValue(createEmailSignInResult());
+    const stale = createSessionData();
+    stale.user.id = "another-user";
+    stale.user.email = "another@example.com";
+    stale.session.userId = stale.user.id;
+    mockGetSession.mockResolvedValueOnce({ data: stale, error: null });
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(getAuth().user?.id).toBe("user-1");
+    expect(getAuth().user?.email).toBe("roan@example.com");
+  });
+
   it("finishes login when a lost sign-in response still created the requested session", async () => {
     await renderProvider();
+    mockReadSessionTokenFromJar.mockResolvedValueOnce("existing-signed-cookie").mockResolvedValueOnce("new-signed-cookie");
     mockEmailSignIn.mockRejectedValueOnce(new Error("response lost"));
     mockGetSession.mockResolvedValueOnce(createAuthResult());
 
@@ -369,15 +560,44 @@ describe("AuthProvider", () => {
     expect(getAuth().lastAuthMethod).toBe("email-password");
   });
 
+  it("rejects an invalid password even when an existing session belongs to the same account", async () => {
+    await renderProvider();
+    mockEmailSignIn.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Invalid email or password", status: 401, statusText: "Unauthorized" },
+    });
+    mockGetSession.mockResolvedValue(createAuthResult());
+
+    await act(async () => {
+      await expect(getAuth().signIn("roan@example.com", "wrong-password")).rejects.toThrow("Invalid email or password");
+    });
+
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().peekPendingAuthPassword()).toBeNull();
+  });
+
+  it("does not treat an unchanged session cookie as proof of a password after a network error", async () => {
+    await renderProvider();
+    mockEmailSignIn.mockRejectedValueOnce(new Error("response lost"));
+    mockGetSession.mockResolvedValueOnce(createAuthResult());
+
+    await act(async () => {
+      await expect(getAuth().signIn("roan@example.com", "unverified-password")).rejects.toThrow("response lost");
+    });
+
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().peekPendingAuthPassword()).toBeNull();
+  });
+
   it("keeps an uncached validated startup session when auth status is unavailable", async () => {
     mockGetSession.mockResolvedValue(createAuthResult());
     mockFetch.mockRejectedValueOnce(new Error("network"));
 
     await renderProvider();
 
-    expect(mockGetSession).toHaveBeenCalledWith({
+    expect(mockGetSession).toHaveBeenCalledWith(expect.objectContaining({
       query: { disableCookieCache: true },
-    });
+    }));
     expect(getAuth().isAuthenticated).toBe(true);
     expect(mockSignOut).not.toHaveBeenCalled();
   });

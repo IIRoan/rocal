@@ -1,0 +1,96 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Choose date and view
+- assertVisible: Week
+- assertVisible: Month
+- tapOn: Month
+- waitForAnimationToEnd
+- assertVisible: Create new event
+- tapOn: Choose date and view
+- assertVisible:
+    text: Month
+    selected: true
+- runFlow: ../common/close-sheet.yaml
+- assertVisible: ${AGENDA_DATE_KEY}
+- takeScreenshot: ${SCREENSHOT_DIR}/accessible-month-view
+- tapOn:
+    text: ${AGENDA_DATE_KEY}
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
+- tapOn: Choose date and view
+- assertVisible:
+    text: Day
+    selected: true
+- tapOn: Week
+- waitForAnimationToEnd
+- assertVisible: Create new event
+- tapOn: Choose date and view
+- assertVisible:
+    text: Week
+    selected: true
+- tapOn: Agenda
+- waitForAnimationToEnd
+- tapOn: Settings
+- assertVisible: Search settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: appearance
+- assertVisible: "(?i)Theme"
+- tapOn: Dark
+- assertVisible:
+    text: Dark
+    selected: true
+- takeScreenshot: ${SCREENSHOT_DIR}/dark-appearance-drawer
+- tapOn: Light
+- assertVisible:
+    text: Light
+    selected: true
+- runFlow: ../common/back-to-settings.yaml
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: time-region
+- assertVisible: "(?i)Time format"
+- tapOn: "Timezone,.*"
+- tapOn: Search timezones
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: London
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: "London \\(Europe/London\\)"
+- assertVisible: "Timezone, Europe/London"
+- runFlow: ../common/back-to-settings.yaml
+- runFlow: ../common/close-sheet.yaml
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: time-region
+- assertVisible: "Timezone, Europe/London"
+- tapOn: "Timezone,.*"
+- tapOn: Search timezones
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Amsterdam
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: "Amsterdam \\(Europe/Amsterdam\\)"
+- assertVisible: "Timezone, Europe/Amsterdam"
+- runFlow: ../common/back-to-settings.yaml
+- runFlow: ../common/close-sheet.yaml
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: time-region
+- assertVisible: "Timezone, Europe/Amsterdam"
+- runFlow: ../common/back-to-settings.yaml
+- runFlow: ../common/close-sheet.yaml
+- assertVisible: "Maestro updated event.*"

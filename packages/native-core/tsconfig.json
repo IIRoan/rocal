@@ -3,7 +3,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["DOM", "ES2022"],
-    "types": ["jest", "@types/react"],
+    "types": ["jest", "node", "@types/react"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,

@@ -1,0 +1,86 @@
+name: Build native E2E app
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        required: true
+        type: string
+      app:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Release app
+    runs-on: ${{ inputs.platform == 'ios' && 'macos-latest' || 'ubuntu-latest' }}
+    timeout-minutes: 100
+    env:
+      SOLACE_E2E: "1"
+      APP_VARIANT: preview
+      EXPO_PUBLIC_API_URL: http://127.0.0.1:4001
+      EXPO_PUBLIC_APP_URL: http://localhost:4100
+      EXPO_NO_DOTENV: "1"
+      CI: "1"
+      E2E_PLATFORM: ${{ inputs.platform }}
+      E2E_APP: ${{ inputs.app }}
+    steps:
+      - name: Prepare isolated build directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$E2E_PLATFORM:$E2E_APP" in
+            ios:calendar|ios:mail|android:calendar|android:mail) ;;
+            *) echo "Choose an iOS or Android Calendar or Mail build." >&2; exit 1 ;;
+          esac
+          echo "SOLACE_E2E_DIR=$RUNNER_TEMP/solace-e2e" >> "$GITHUB_ENV"
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        with:
+          node-version-file: .node-version
+      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: chainguard-actions/actions-setup-java@4abbff4c3bfc93084ea2ff1796c8b4e0c255e47d # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: bun install --frozen-lockfile
+      - name: Prepare native build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "SOLACE_E2E_TOOLCHAIN=${ImageOS:-runner}-${ImageVersion:-current}" >> "$GITHUB_ENV"
+          if [ "$E2E_PLATFORM" = ios ]; then
+            brew install python@3.13
+            echo "$(brew --prefix python@3.13)/libexec/bin" >> "$GITHUB_PATH"
+          else
+            sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          fi
+      - uses: chainguard-actions/actions-cache/restore@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0
+        id: binary
+        with:
+          path: ${{ runner.temp }}/solace-e2e/binaries
+          key: native-e2e-app-v2-${{ inputs.platform }}-${{ inputs.app }}-${{ runner.arch }}-${{ env.SOLACE_E2E_TOOLCHAIN }}-${{ hashFiles('bun.lock', 'package.json', '.bun-version', '.node-version', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/*.ts', 'packages/*/*.js', 'packages/*/*.cts', 'packages/*/src/**', 'packages/*/assets/**', 'packages/native-core/plugins/**', 'apps/native-*/app/**', 'apps/native-*/src/**', 'apps/native-*/assets/**', 'apps/native-*/*.json', 'apps/native-*/*.ts', 'apps/native-*/*.js', 'apps/native-*/*.cjs', 'apps/native-*/*.cts', 'babel.config.cts', 'scripts/e2e/build.py', 'scripts/e2e/common.py', '.github/workflows/native-e2e-build.yml') }}
+      - name: Compile release app
+        if: steps.binary.outputs.cache-hit != 'true'
+        shell: bash
+        run: python3 scripts/e2e/build.py "$E2E_PLATFORM" "$E2E_APP"
+      - uses: chainguard-actions/actions-cache/save@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0
+        if: steps.binary.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/solace-e2e/binaries
+          key: ${{ steps.binary.outputs.cache-primary-key }}
+      - name: Preserve app executable modes and framework symlinks
+        shell: bash
+        run: COPYFILE_DISABLE=1 tar -C "$SOLACE_E2E_DIR/binaries" -czf "$RUNNER_TEMP/$E2E_APP.tar.gz" .
+      - uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
+        with:
+          name: native-e2e-binary-${{ inputs.platform }}-${{ inputs.app }}
+          path: ${{ runner.temp }}/${{ inputs.app }}.tar.gz
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7

@@ -1,3 +1,7 @@
+Native apps use Expo SDK 58 / React Native 0.88 and share React 19.3 with web. Native dependency upgrades advance the shared app version so older binaries do not receive incompatible OTAs; strict native fingerprints include version changes and native patches.
+
+Native UI journeys run through `native-e2e.yml` against a disposable real backend (`e2e/README.md`). Test builds have `.e2e` identities, a loopback API and OTA disabled; the harness never uses App Review or production credentials and never uploads raw Maestro traces.
+
 Auth uses rolling 14-day app and passkey sessions; Better Auth checks hourly and on focus/reconnect, with renewal cookies forwarded by the API.
 
 Calendar’s Riftbound palette settings also ship in native Calendar’s account drawer. Preferences stay sealed; `/api/riftbound` returns public store/events and registered-identity hashes, never accepts a Riot ID or login. Matching and encryption run on-device for the past 30 days and upcoming events while Calendar is open; the existing ICS import skips duplicates for Riftbound and a sealed ledger of imported IDs keeps deleted copies gone; existing imports are not automatically edited or deleted. Registered-only matching is opt-in because imported times can reveal the Riot ID to the server.

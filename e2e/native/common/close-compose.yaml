@@ -1,0 +1,11 @@
+appId: ${APP_ID}
+---
+- tapOn: Close
+- runFlow:
+    when:
+      visible: "(?i)Save Draft"
+    commands:
+      - tapOn: "(?i)Save Draft"
+- extendedWaitUntil:
+    notVisible: Send
+    timeout: 60000

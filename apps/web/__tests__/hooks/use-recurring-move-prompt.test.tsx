@@ -58,7 +58,7 @@ let container: HTMLDivElement;
 let root: Root;
 let queryClient: QueryClient;
 let prompt: Prompt;
-const editRecurringEvent = jest.fn(async () => undefined);
+const editRecurringEvent = jest.fn<Parameters<typeof useRecurringMovePrompt>[0]>(async () => undefined);
 
 function Harness({ onReady }: { onReady: (value: Prompt) => void }) {
   const value = useRecurringMovePrompt(editRecurringEvent);

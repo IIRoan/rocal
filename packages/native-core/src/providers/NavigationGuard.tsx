@@ -100,6 +100,19 @@ function startupReducer(
   }
 }
 
+function WorkspaceContent({ blocked, children }: { blocked: boolean; children: ReactNode }) {
+  return (
+    <View
+      style={{ flex: 1 }}
+      accessibilityElementsHidden={blocked}
+      importantForAccessibility={blocked ? "no-hide-descendants" : "auto"}
+      pointerEvents={blocked ? "none" : "auto"}
+    >
+      {children}
+    </View>
+  );
+}
+
 /** Shared auth gate: redirects by session state and blocks the UI while E2EE and app startup run. */
 export function NavigationGuard({
   children,
@@ -269,7 +282,9 @@ export function NavigationGuard({
 
   return (
     <View style={{ flex: 1 }}>
-      {children}
+      <WorkspaceContent blocked={isPreparingWorkspace}>
+        {children}
+      </WorkspaceContent>
       <PushNotificationNavigation
         navigationReady={isPushNavigationReady}
         handler={pushTapHandler}

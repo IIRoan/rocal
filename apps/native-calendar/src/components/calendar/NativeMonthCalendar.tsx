@@ -96,6 +96,7 @@ interface MonthPageModel {
 
 interface MonthPageProps {
   page: MonthPageModel;
+  isActive: boolean;
   width: number;
   height: number;
   selectedDate: Date;
@@ -112,6 +113,7 @@ interface MonthPageProps {
 
 const MonthPage = memo(function MonthPage({
   page,
+  isActive,
   width,
   height,
   selectedDate,
@@ -130,7 +132,11 @@ const MonthPage = memo(function MonthPage({
   );
 
   return (
-    <View style={{ width, height }}>
+    <View
+      style={{ width, height }}
+      accessibilityElementsHidden={!isActive}
+      importantForAccessibility={isActive ? "auto" : "no-hide-descendants"}
+    >
       {page.weeks.map((week) => (
         <View key={formatCalendarDayKey(week[0] ?? page.monthDate)} style={styles.weekRow}>
           {week.map((day) => {
@@ -426,28 +432,33 @@ export function NativeMonthCalendar({
           style={styles.gridViewport}
           onLayout={handleGridLayout}
         >
-          <View style={{ left: windowOffsetPx }}>
-            <Animated.View style={[styles.pagesStrip, pagesAnimatedStyle]}>
-              {pages.map((page) => (
-                <MonthPage
-                  key={page.key}
-                  page={page}
-                  width={pageSize.width}
-                  height={pageSize.height}
-                  selectedDate={selectedDate}
-                  today={today}
-                  timeFormat={timeFormat}
-                  timezone={resolvedTimezone}
-                  workingDays={workingDays}
-                  onDayPress={onDayPress}
-                  onCreateAtDay={onCreateAtDay}
-                  onEventPress={onEventPress}
-                  theme={theme}
-                  styles={styles}
-                />
-              ))}
-            </Animated.View>
-          </View>
+          <Animated.View
+            style={[
+              styles.pagesStrip,
+              { left: windowOffsetPx, width: pages.length * pageSize.width },
+              pagesAnimatedStyle,
+            ]}
+          >
+            {pages.map((page) => (
+              <MonthPage
+                key={page.key}
+                page={page}
+                isActive={page.key === formatCalendarMonthKey(selectedDate)}
+                width={pageSize.width}
+                height={pageSize.height}
+                selectedDate={selectedDate}
+                today={today}
+                timeFormat={timeFormat}
+                timezone={resolvedTimezone}
+                workingDays={workingDays}
+                onDayPress={onDayPress}
+                onCreateAtDay={onCreateAtDay}
+                onEventPress={onEventPress}
+                theme={theme}
+                styles={styles}
+              />
+            ))}
+          </Animated.View>
           {isLoading && events.length === 0 && (
             <View style={styles.loadingOverlay} pointerEvents="none">
               <ActivityIndicator color={theme.colors.mutedForeground} />
