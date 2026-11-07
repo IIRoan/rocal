@@ -11,6 +11,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from common import APPS, REPO, directory
+from reader_timings import CONVERSATION_JOURNEYS, collect_reader_timings
 
 
 def maestro_environment():
@@ -197,6 +198,9 @@ def run_journey(platform, app, flow, results, name=None):
                "--env", f"AGENDA_DATE_LABEL={agenda_anchor_label(root / 'private/fixture.json')}",
                "--env", f"AGENDA_DATE_KEY={agenda_anchor_date(root / 'private/fixture.json').isoformat()}",
                "--env", f"EMAIL={fixture['email']}", "--env", f"PASSWORD={fixture['password']}", str(flow)]
+    for key, variable in (("peerEmail", "PEER_EMAIL"), ("peerPassword", "PEER_PASSWORD")):
+        if key in fixture:
+            command[-1:-1] = ["--env", f"{variable}={fixture[key]}"]
     if results and platform == "android":
         command.insert(4, "--no-reinstall-driver")
     print(f"Running {platform}: {app}/{name}", flush=True)
@@ -212,6 +216,14 @@ def run_journey(platform, app, flow, results, name=None):
     except subprocess.TimeoutExpired:
         passed = False
         reason = "journey-timeout"
+    if app == "mail" and name in CONVERSATION_JOURNEYS:
+        timings = collect_reader_timings(screenshots)
+        target = root / "artifacts/reader-timings"
+        target.mkdir(exist_ok=True)
+        (target / f"{name}.json").write_text(json.dumps({"openings": timings}, indent=2))
+        if passed and not timings:
+            passed = False
+            reason = "missing-reader-timings"
     if not passed:
         failures = root / "artifacts/failures"
         failures.mkdir(exist_ok=True)
@@ -230,7 +242,8 @@ def main(platform):
     results = []
     scenarios = REPO / "e2e/native"
     for app in APPS:
-        flows = sorted(path for path in (scenarios / app).glob("*.yaml") if path.name not in ("offline.yaml", "sign-out.yaml"))
+        flows = sorted(path for path in (scenarios / app).glob("*.yaml")
+                       if path.name not in ("offline.yaml", "sign-out.yaml") and path.stem not in CONVERSATION_JOURNEYS)
         if not flows:
             raise RuntimeError(f"No {app} user journeys found")
         for index, flow in enumerate(flows):
@@ -249,6 +262,9 @@ def main(platform):
             os.kill(backend, signal.SIGCONT)
         subprocess.run([sys.executable, REPO / "scripts/e2e/services.py", "wait-api"], check=True)
         run_journey(platform, "mail", scenarios / "mail/02-delivery-and-reader.yaml", results, name="online-recovery")
+    for flow in sorted((scenarios / "mail").glob("*.yaml")):
+        if flow.stem in CONVERSATION_JOURNEYS:
+            run_journey(platform, "mail", flow, results)
     run_journey(platform, "mail", scenarios / "mail/sign-out.yaml", results)
     publish(results)
     expected = sum(len(list((scenarios / app).glob("*.yaml"))) for app in APPS) + 1

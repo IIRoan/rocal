@@ -14,6 +14,8 @@ const DATABASE: &str = "solace_test_e2e";
 const PORT: u16 = 4001;
 const EMAIL: &str = "journey@solace.test";
 const PASSWORD: &str = "solace-test-ui-password";
+const PEER_EMAIL: &str = "correspondent@solace.test";
+const PEER_PASSWORD: &str = "solace-test-peer-password";
 
 pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let env = TestEnv::from_env()?;
@@ -76,34 +78,39 @@ async fn serve(env: &TestEnv) -> anyhow::Result<()> {
 async fn seed(env: &TestEnv) -> anyhow::Result<()> {
     let mut db = database(env).await?;
     db.execute("INSERT INTO \"user\" (id, name, email, email_verified, created_at, updated_at) VALUES ('e2einviter', 'E2E Inviter', 'inviter@solace.test', true, now(), now())").await?;
-    let token = hex(32);
-    insert_invite(
-        &mut db,
-        &format!("e2e{}", hex(8)),
-        &token,
-        "e2einviter",
-        EMAIL,
-    )
-    .await?;
-    let mut agent = Agent::new(
-        &format!("http://localhost:{PORT}"),
-        DEVELOPMENT_FRONTEND_URL,
-        ClientKind::Browser,
-    )?;
-    agent
-        .post(
-            "/api/account/invite/claim",
-            json!({"token": token, "chosenEmail": EMAIL}),
+    for (email, password, name) in [
+        (EMAIL, PASSWORD, "Maestro Journey"),
+        (PEER_EMAIL, PEER_PASSWORD, "Maestro Correspondent"),
+    ] {
+        let token = hex(32);
+        insert_invite(
+            &mut db,
+            &format!("e2e{}", hex(8)),
+            &token,
+            "e2einviter",
+            email,
         )
-        .await?
-        .expect_status(200)?;
-    agent
-        .post(
-            "/api/auth/sign-up/email",
-            json!({"email": EMAIL, "password": PASSWORD, "name": "Maestro Journey"}),
-        )
-        .await?
-        .expect_status(200)?;
+        .await?;
+        let mut agent = Agent::new(
+            &format!("http://localhost:{PORT}"),
+            DEVELOPMENT_FRONTEND_URL,
+            ClientKind::Browser,
+        )?;
+        agent
+            .post(
+                "/api/account/invite/claim",
+                json!({"token": token, "chosenEmail": email}),
+            )
+            .await?
+            .expect_status(200)?;
+        agent
+            .post(
+                "/api/auth/sign-up/email",
+                json!({"email": email, "password": password, "name": name}),
+            )
+            .await?
+            .expect_status(200)?;
+    }
     let root = std::path::PathBuf::from(std::env::var("SOLACE_E2E_DIR")?);
     ensure!(
         root.is_absolute() && root.file_name().is_some_and(|name| name == "solace-e2e"),
@@ -112,9 +119,14 @@ async fn seed(env: &TestEnv) -> anyhow::Result<()> {
     std::fs::create_dir_all(root.join("private"))?;
     std::fs::write(
         root.join("private/fixture.json"),
-        serde_json::to_vec(&json!({"email": EMAIL, "password": PASSWORD}))?,
+        serde_json::to_vec(&json!({
+            "email": EMAIL,
+            "password": PASSWORD,
+            "peerEmail": PEER_EMAIL,
+            "peerPassword": PEER_PASSWORD,
+        }))?,
     )?;
-    println!("Created the disposable journey account; encryption is initialized by the apps");
+    println!("Created two disposable journey accounts; encryption is initialized by the apps");
     Ok(())
 }
 
@@ -139,8 +151,24 @@ async fn verify(env: &TestEnv) -> anyhow::Result<()> {
         "UI left readable event content in the database"
     );
     ensure!(preferences.is_some(), "UI did not seal account settings");
+    let mail_accounts: i64 = sqlx::query_scalar(
+        "SELECT count(DISTINCT u.id) FROM \"user\" u \
+         JOIN user_encryption_password p ON p.user_id = u.id \
+         JOIN mail_directory_entry d ON d.user_id = u.id \
+         JOIN mail_vault_backup v ON v.directory_entry_id = d.id \
+         WHERE u.email IN ($1, $2) AND u.mailbox_approved_at IS NOT NULL \
+         AND p.wrapped_account_key <> '' AND v.wrapped_secret IS NOT NULL",
+    )
+    .bind(EMAIL)
+    .bind(PEER_EMAIL)
+    .fetch_one(&mut db)
+    .await?;
+    ensure!(
+        mail_accounts == 2,
+        "UI did not initialize two independently sealed mail accounts"
+    );
     println!(
-        "E2E postconditions passed: encrypted calendars, events and settings; no readable journey content"
+        "E2E postconditions passed: encrypted calendars, events and settings; two sealed mail accounts; no readable journey content"
     );
     Ok(())
 }

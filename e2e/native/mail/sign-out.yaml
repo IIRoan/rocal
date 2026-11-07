@@ -1,24 +1,6 @@
 appId: ${APP_ID}
 ---
-- runFlow: ../common/open-app.yaml
-- tapOn: Settings
-- runFlow:
-    file: ../common/select-settings-page.yaml
-    env:
-      PAGE: account
-- scrollUntilVisible:
-    element:
-      id: account-action-sign-out
-    direction: DOWN
-- tapOn:
-    id: account-action-sign-out
-- extendedWaitUntil:
-    visible: "Sign out\\?"
-    timeout: 30000
-- tapOn: Sign Out
-- extendedWaitUntil:
-    visible: Welcome back
-    timeout: 30000
+- runFlow: ../common/sign-out.yaml
 - assertNotVisible: ".*Maestro round trip.*"
 - runFlow: ../common/sign-in.yaml
 - tapOn: ".*Switch mailbox"

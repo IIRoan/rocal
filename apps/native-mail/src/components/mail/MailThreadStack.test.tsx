@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import React, { act, type ReactNode } from "react";
+import React, { act, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Text } from "react-native";
 import { MailThreadStack } from "./MailThreadStack";
@@ -24,7 +24,9 @@ jest.mock("react-native", () => ({
     hairlineWidth: 1,
   },
   Text: ({ children }: { children: ReactNode }) => <span>{children}</span>,
-  View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  View: ({ children, testID }: { children: ReactNode; testID?: string }) => (
+    <div data-testid={testID}>{children}</div>
+  ),
 }));
 jest.mock("@expo/vector-icons", () => ({ Feather: () => null }));
 jest.mock("@workspace/native-core/providers/ThemeProvider", () => ({
@@ -56,6 +58,40 @@ const thread: JmapEmailMessage[] = ["a", "b", "c", "d", "e", "f", "g"].map(
     keywords: { $seen: id !== "a" },
   }),
 );
+
+const conversation: JmapEmailMessage[] = ["peer-first", "own-reply", "peer-last"].map(
+  (id, index) => ({
+    id,
+    threadId: "conversation",
+    receivedAt: `2026-11-07T10:0${index}:00Z`,
+    from: [{ email: index === 1 ? "self@example.com" : "peer@example.com", name: index === 1 ? "Self" : "Peer" }],
+    keywords: { $seen: true },
+  }),
+);
+
+const conversationBodies: Record<string, string> = {
+  "peer-first": "Peer opening note",
+  "own-reply": "Own reply quoting Peer opening note",
+  "peer-last": "Peer final note quoting Own reply and Peer opening note",
+};
+
+function ConversationReader() {
+  const [activeMessageId, setActiveMessageId] = useState("peer-last");
+  return (
+    <MailThreadStack
+      messages={conversation}
+      activeMessageId={activeMessageId}
+      accountEmail="self@example.com"
+      previews={conversationBodies}
+      loading={false}
+      showAll={false}
+      onShowAll={() => undefined}
+      onSelectMessage={setActiveMessageId}
+    >
+      <Text>{conversationBodies[activeMessageId]}</Text>
+    </MailThreadStack>
+  );
+}
 
 describe("native mail thread stack", () => {
   let container: HTMLDivElement;
@@ -112,5 +148,24 @@ describe("native mail thread stack", () => {
         ?.click(),
     );
     expect(onShowAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("switches between both senders without mistaking quoted text or collapsed previews for the open body", () => {
+    act(() => root.render(<ConversationReader />));
+    const openBody = () => {
+      const bodies = container.querySelectorAll('[data-testid="mail-expanded-message"]');
+      expect(bodies).toHaveLength(1);
+      return bodies[0]?.textContent;
+    };
+    expect(openBody()).toBe(conversationBodies["peer-last"]);
+    for (let index = 0; index < 2; index += 1) {
+      act(() => container.querySelector<HTMLButtonElement>('[aria-label="Open message from Peer"]')?.click());
+      expect(openBody()).toBe("Peer opening note");
+      expect(container.textContent).toContain("Peer final note");
+      act(() => container.querySelector<HTMLButtonElement>('[aria-label="Open message from Self"]')?.click());
+      expect(openBody()).toBe(conversationBodies["own-reply"]);
+      act(() => container.querySelectorAll<HTMLButtonElement>('[aria-label="Open message from Peer"]')[1]?.click());
+      expect(openBody()).toBe(conversationBodies["peer-last"]);
+    }
   });
 });

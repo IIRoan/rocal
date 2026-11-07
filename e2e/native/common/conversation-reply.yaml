@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+---
+- tapOn: Reply
+- assertVisible: Send
+- waitForAnimationToEnd
+- tapOn: Message body
+- runFlow:
+    file: type.yaml
+    env:
+      TEXT: ${REPLY_TEXT}
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn:
+    text: Send
+    enabled: true
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    notVisible: Send
+    timeout: 120000
+- waitForAnimationToEnd

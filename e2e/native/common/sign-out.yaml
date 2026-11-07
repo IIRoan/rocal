@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+---
+- runFlow: open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: select-settings-page.yaml
+    env:
+      PAGE: account
+- scrollUntilVisible:
+    element:
+      id: account-action-sign-out
+    direction: DOWN
+- waitForAnimationToEnd
+- tapOn:
+    id: account-action-sign-out
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "Sign out\\?"
+    timeout: 30000
+- tapOn:
+    text: Sign Out
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: Welcome back
+    timeout: 30000
+- waitForAnimationToEnd

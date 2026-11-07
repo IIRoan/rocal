@@ -14,6 +14,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import directory
 from build import restore_binaries
+from reader_timings import collect_reader_timings
 
 specification = importlib.util.spec_from_file_location("native_journeys", Path(__file__).with_name("run.py"))
 journeys = importlib.util.module_from_spec(specification)
@@ -21,6 +22,112 @@ specification.loader.exec_module(journeys)
 
 
 class HarnessTests(unittest.TestCase):
+    def test_offline_read_finishes_before_conversation_account_switches_clear_the_snapshot(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            repository = Path(temporary) / "repository"
+            for app, names in (("calendar", ["01-authentication"]),
+                               ("mail", ["01-unlock-and-draft", "07-conversation-first-message", "offline", "sign-out"])):
+                parent = repository / "e2e/native" / app
+                parent.mkdir(parents=True)
+                for name in names:
+                    (parent / f"{name}.yaml").write_text("synthetic")
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                (directory() / "private/backend.pid").write_text("4242")
+                steps = []
+                def journey(_platform, app, flow, results, name=None):
+                    case = name or flow.stem
+                    steps.append(case)
+                    results.append({"app": app, "name": case, "passed": True, "seconds": 1})
+                    return True
+                def backend_signal(_pid, value):
+                    steps.append("suspended" if value == journeys.signal.SIGSTOP else "resumed")
+                with patch.object(journeys, "REPO", repository), patch.object(journeys, "run_journey", side_effect=journey), \
+                        patch.object(journeys.os, "kill", side_effect=backend_signal), \
+                        patch.object(journeys.subprocess, "run", return_value=journeys.subprocess.CompletedProcess([], 0, stdout="xtask e2e serve")):
+                    journeys.main("android")
+                self.assertLess(steps.index("offline"), steps.index("07-conversation-first-message"))
+                self.assertLess(steps.index("resumed"), steps.index("07-conversation-first-message"))
+
+    def test_reader_timings_export_only_numeric_observations_from_the_expanded_body(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            traces = Path(temporary)
+            entries = [
+                {"metadata": {"status": "COMPLETED", "timestamp": 1000, "duration": 300,
+                              "evaluatedCommand": {"tapOnElement": {"selector": "private-sender-sentinel"}}}},
+                {"metadata": {"status": "COMPLETED", "timestamp": 1400, "duration": 200,
+                              "evaluatedCommand": {"assertConditionCommand": {
+                                  "condition": {"visible": {"idRegex": "mail-expanded-message", "containsDescendants": [{"textRegex": "private-body-sentinel"}]}},
+                                  "timeout": "5000"}}}},
+                {"metadata": {"status": "COMPLETED", "timestamp": 1700, "duration": 100,
+                              "evaluatedCommand": {"assertConditionCommand": {
+                                  "condition": {"visible": {"textRegex": "private-password-sentinel"}}, "timeout": "10000"}}}},
+            ]
+            (traces / "commands.json").write_text(json.dumps(entries))
+            readings = collect_reader_timings(traces)
+            self.assertEqual(readings, [{"opening": 1, "tapToBodyMs": 600, "bodyAssertionMs": 200, "bodyWaitBudgetMs": 5000}])
+            self.assertNotIn("sentinel", json.dumps(readings))
+
+    def test_reader_timings_reject_failed_unbounded_and_external_trace_records(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            traces = root / "traces"
+            traces.mkdir()
+            tap = {"metadata": {"status": "COMPLETED", "timestamp": 1000, "duration": 20,
+                                "evaluatedCommand": {"tapOnElement": {}}}}
+            assertion = {"metadata": {"status": "COMPLETED", "timestamp": 1100, "duration": 20,
+                                      "evaluatedCommand": {"assertConditionCommand": {
+                                          "condition": {"visible": {"idRegex": "mail-expanded-message"}}, "timeout": "5000"}}}}
+            for update in ({"status": "FAILED"}, {"timestamp": True}, {"duration": -1}, {"duration": "private-sentinel"}):
+                with self.subTest(update=update):
+                    changed = {"metadata": {**assertion["metadata"], **update}}
+                    (traces / "commands.json").write_text(json.dumps([tap, changed]))
+                    self.assertEqual(collect_reader_timings(traces), [])
+            (traces / "commands.json").write_text(json.dumps([assertion]))
+            self.assertEqual(collect_reader_timings(traces), [])
+            (traces / "commands.json").unlink()
+            (root / "outside.json").write_text(json.dumps([tap, assertion]))
+            (traces / "commands.json").symlink_to(root / "outside.json")
+            self.assertEqual(collect_reader_timings(traces), [])
+            link = root / "linked-traces"
+            link.symlink_to(traces, target_is_directory=True)
+            self.assertEqual(collect_reader_timings(link), [])
+
+    def test_peer_credentials_are_passed_privately_and_removed_from_exported_hierarchies(self):
+        fixture = {"email": "journey@solace.test", "password": "primary-private-sentinel",
+                   "peerEmail": "peer-private-sentinel@solace.test", "peerPassword": "peer-private-sentinel"}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                private = directory() / "private"
+                (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+                (private / "fixture.json").write_text(json.dumps(fixture))
+                (private / "maestro-path").write_text("synthetic-maestro")
+                with patch.object(journeys.subprocess, "run", return_value=journeys.subprocess.CompletedProcess([], 0)) as execute, redirect_stdout(io.StringIO()):
+                    self.assertTrue(journeys.run_journey("android", "mail", Path("synthetic.yaml"), []))
+                command = execute.call_args.args[0]
+                self.assertIn(f"PEER_EMAIL={fixture['peerEmail']}", command)
+                self.assertIn(f"PEER_PASSWORD={fixture['peerPassword']}", command)
+                tree = {"attributes": {"text": fixture["peerEmail"], "value": fixture["peerPassword"]}}
+                self.assertNotIn("peer-private-sentinel", json.dumps(journeys.sanitized_hierarchy(tree, fixture)))
+                for path in (root / "artifacts").rglob("*"):
+                    if path.is_file():
+                        self.assertNotIn("private-sentinel", path.read_text())
+
+    def test_a_successful_conversation_cannot_skip_its_reader_timing_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                private = directory() / "private"
+                (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+                (private / "fixture.json").write_text(json.dumps({"email": "journey@solace.test", "password": "private-fixture"}))
+                (private / "maestro-path").write_text("synthetic-maestro")
+                results = []
+                with patch.object(journeys.subprocess, "run", return_value=journeys.subprocess.CompletedProcess([], 0)), \
+                        patch.object(journeys, "capture_failure_screenshot"), patch.object(journeys, "capture_failure_hierarchy"), redirect_stdout(io.StringIO()):
+                    self.assertFalse(journeys.run_journey("ios", "mail", Path("09-conversation-reader.yaml"), results))
+                self.assertEqual(results[0]["reason"], "missing-reader-timings")
+
     def test_agenda_anchor_stays_bound_to_fixture_time_across_day_and_year_rollovers(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = Path(temporary) / "fixture.json"
