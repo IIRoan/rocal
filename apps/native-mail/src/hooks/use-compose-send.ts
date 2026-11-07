@@ -1,6 +1,7 @@
 import { Alert } from "react-native";
 import {
   appendPlainTextSignature,
+  buildReplyContext,
   canSendCompose,
   composeTextToPlain,
   getErrorMessage,
@@ -20,11 +21,14 @@ import type { ComposeFormState } from "../lib/mail/compose-form";
 import { validateComposeInput } from "../lib/mail/mail-helpers";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
 import { resolveOutgoingMessageBody } from "../lib/mail/outgoing-message-crypto";
-import type { JmapIdentity } from "../lib/mail/types";
+import type { JmapEmailMessage, JmapIdentity } from "../lib/mail/types";
+import type { ComposeMode } from "../lib/mail/compose-request";
 import { useSendMessage, type resolveComposeContext } from "../lib/mail/use-mail";
 
 type ComposeSendInput = {
   runtime: MailRuntime | undefined;
+  mode: ComposeMode | undefined;
+  sourceMessage: JmapEmailMessage | null;
   form: ComposeFormState;
   identity: JmapIdentity | null;
   identityId: string | null;
@@ -38,6 +42,8 @@ type ComposeSendInput = {
 
 export function useComposeSend({
   runtime,
+  mode,
+  sourceMessage,
   form,
   identity,
   identityId,
@@ -52,6 +58,9 @@ export function useComposeSend({
   const { recordUsage } = useRecentContacts();
   const sendMessage = useSendMessage(runtime);
   const { to, cc, bcc, subject, body, attachments } = form;
+  const replyContext = sourceMessage && (mode === "reply" || mode === "reply-all")
+    ? buildReplyContext(sourceMessage)
+    : null;
 
   const sendNow = async () => {
     const validation = validateComposeInput({ to, cc, bcc, subject });
@@ -126,6 +135,8 @@ export function useComposeSend({
             uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           pgpMimeCiphertext,
           sentCopyCiphertext,
+          inReplyTo: replyContext?.inReplyTo,
+          references: replyContext?.references,
         },
         {
           onSuccess: () => {

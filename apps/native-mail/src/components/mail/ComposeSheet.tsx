@@ -175,6 +175,8 @@ function ComposeSession({
 
   const { send, sending, canSend } = useComposeSend({
     runtime,
+    mode: params.mode,
+    sourceMessage,
     form,
     identity: selectedIdentity,
     identityId: selectedIdentityId,

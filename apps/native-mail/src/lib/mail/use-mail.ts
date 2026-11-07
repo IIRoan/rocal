@@ -652,6 +652,8 @@ export interface ComposeMessageInput {
   attachments?: JmapAttachmentInput[];
   pgpMimeCiphertext?: JmapPgpMimeCiphertext;
   sentCopyCiphertext: JmapPgpMimeCiphertext | null;
+  inReplyTo?: string[];
+  references?: string[];
 }
 
 /** Identity plus drafts/sent mailboxes for sending, or `null` when the runtime is not ready or has no usable identity. */
@@ -806,6 +808,8 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
         attachments: input.attachments,
         pgpMimeCiphertext: input.pgpMimeCiphertext,
         sentCopyCiphertext: input.sentCopyCiphertext,
+        inReplyTo: input.inReplyTo,
+        references: input.references,
       });
     },
     onSuccess: (_data, variables) => {
