@@ -358,15 +358,33 @@ export function AuthProvider({
         });
       }
 
-      if (applySessionData(data)) {
+      if (
+        typeof data === "object" && data !== null &&
+        "session" in data && data.session && applySessionData(data)
+      ) {
         return;
       }
 
       await waitForSessionCookie();
+      // Expo persists the complete restart cache when get-session finishes, before the workspace can be closed.
       const sessionResult = await authClient.getSession({
         query: { disableCookieCache: true },
-      });
-      if (applySessionData(sessionResult?.data)) return;
+        fetchOptions: { timeout: AUTH_SESSION_CHECK_TIMEOUT_MS },
+      }).catch(() => null);
+      const acceptedUser =
+        typeof data === "object" && data !== null && "user" in data
+          ? data.user
+          : null;
+      const expectedUserId =
+        typeof acceptedUser === "object" && acceptedUser !== null &&
+        "id" in acceptedUser && typeof acceptedUser.id === "string"
+          ? acceptedUser.id
+          : null;
+      if (
+        (!expectedUserId || sessionResult?.data?.user.id === expectedUserId) &&
+        applySessionData(sessionResult?.data)
+      ) return;
+      if (applySessionData(data)) return;
 
       if (authToken) {
         await ensureSessionTokenCookie(authToken, {

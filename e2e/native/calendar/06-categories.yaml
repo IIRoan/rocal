@@ -11,6 +11,15 @@ appId: ${APP_ID}
 - waitForAnimationToEnd
 - tapOn: Category name
 - runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: Category name
+            focused: true
+          timeout: 15000
+- runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro category
@@ -63,6 +72,15 @@ appId: ${APP_ID}
     retryTapIfNoChange: false
 - eraseText
 - waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: Category name
+            focused: true
+          timeout: 15000
 - runFlow:
     file: ../common/type.yaml
     env:

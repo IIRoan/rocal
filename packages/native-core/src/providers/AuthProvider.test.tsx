@@ -488,6 +488,61 @@ describe("AuthProvider", () => {
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
+  it("restores a password session offline immediately after the first sign-in", async () => {
+    await renderProvider();
+    const saved = createSessionData();
+    saved.session.expiresAt = new Date(Date.now() + 60_000);
+    mockEmailSignIn.mockResolvedValue(createEmailSignInResult());
+    mockGetSession.mockImplementation(async () => {
+      mockReadAuthSessionCache.mockResolvedValue(saved);
+      return { data: saved, error: null };
+    });
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    expect(getAuth().isAuthenticated).toBe(true);
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    mockGetSessionState.mockReturnValue({ data: null });
+    mockGetSession.mockRejectedValue(new Error("Offline"));
+    await renderProvider();
+
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().session?.token).toBe(saved.session.token);
+  });
+
+  it("keeps an accepted password sign-in when the restart cache refresh fails", async () => {
+    await renderProvider();
+    mockEmailSignIn.mockResolvedValue(createEmailSignInResult());
+    mockGetSession.mockRejectedValueOnce(new Error("Offline"));
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(getAuth().isAuthenticated).toBe(true);
+    expect(getAuth().user?.email).toBe("roan@example.com");
+  });
+
+  it("does not replace the accepted account with a stale session for another user", async () => {
+    await renderProvider();
+    mockEmailSignIn.mockResolvedValue(createEmailSignInResult());
+    const stale = createSessionData();
+    stale.user.id = "another-user";
+    stale.user.email = "another@example.com";
+    stale.session.userId = stale.user.id;
+    mockGetSession.mockResolvedValueOnce({ data: stale, error: null });
+
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+
+    expect(getAuth().user?.id).toBe("user-1");
+    expect(getAuth().user?.email).toBe("roan@example.com");
+  });
+
   it("finishes login when a lost sign-in response still created the requested session", async () => {
     await renderProvider();
     mockReadSessionTokenFromJar.mockResolvedValueOnce("existing-signed-cookie").mockResolvedValueOnce("new-signed-cookie");

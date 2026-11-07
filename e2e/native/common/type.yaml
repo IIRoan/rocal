@@ -34,4 +34,9 @@ appId: ${APP_ID}
     when:
       platform: Android
     commands:
+      - extendedWaitUntil:
+          visible:
+            id: android:id/input_method_nav_back
+          timeout: 15000
+      - waitForAnimationToEnd
       - inputText: ${TEXT}
