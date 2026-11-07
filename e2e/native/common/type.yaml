@@ -5,6 +5,9 @@ appId: ${APP_ID}
     when:
       platform: iOS
     commands:
+      - extendedWaitUntil:
+          visible: "(q|Q)"
+          timeout: 15000
       - evalScript: ${output.nativeTextIndex = 0}
       - repeat:
           times: 1000

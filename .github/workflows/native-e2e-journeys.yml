@@ -26,6 +26,8 @@ jobs:
       CARGO_BUILD_JOBS: "3"
       MAESTRO_CLI_NO_ANALYTICS: "1"
       MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
+      DEVELOPER_DIR: ${{ inputs.platform == 'ios' && '/Applications/Xcode_26.6.app/Contents/Developer' || '' }}
+      SOLACE_E2E_IOS_RUNTIME: "26.5"
     steps:
       - name: Prepare isolated test directory
         shell: bash
