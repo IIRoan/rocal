@@ -19,7 +19,7 @@ iOS journeys use Xcode 26.6 and the iOS 26.5 runtime. Setup opens Simulator with
 | Recurrence | Create a weekly series, edit all occurrences, restart, delete the entire series and preserve unrelated events. |
 | Categories | Create, assign to an event, rename and delete; re-opening the event must retain its other encrypted fields. |
 | Navigation | Agenda/week/month views, accessible month-day selection opening Day view, account drawer, nested settings pages, timezone search and changes retained after restart, theme changes and drawer dismissal. |
-| Profile picture | Pick a seeded system-library image, re-encode/upload it, fetch it through the authenticated avatar route and remove it. |
+| Profile picture | Pick a seeded system-library image, re-encode/upload it, wait up to three minutes for the authenticated image to load and the change action to become enabled, then remove it. |
 | Mail encryption and drafts | Mail unlocks Calendar's existing account, creates an encrypted draft, reopens it after restart and sends it to the same local mailbox. |
 | Delivery and reader | Receive the submitted message, decrypt both Inbox and Sent copies, star/unstar and open a quoted reply. |
 | Message actions and search | Search decrypted message bodies on-device, mark unread, move to the UI-created custom mailbox, reopen after restart, move to Trash and restore to Inbox without losing decrypted content. |

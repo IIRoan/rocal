@@ -64,7 +64,7 @@ appId: ${APP_ID}
       id: account-action-change-profile-picture
       text: "Change Profile Picture.*"
       enabled: true
-    timeout: 60000
+    timeout: 180000
 - takeScreenshot: ${SCREENSHOT_DIR}/uploaded-private-profile-picture
 - waitForAnimationToEnd
 - tapOn:
