@@ -43,7 +43,9 @@ export interface E2eeContextValue {
   /** Resolves to a lock when this device cannot open the account key, else null. */
   bootstrap: (userId: string, apiBaseUrl: string) => Promise<E2eeLock | null>;
   /** Wraps the active session's keys to a new sign-in password, once a startup unlock has finished; throws without an unlocked session. */
-  createPasswordEnvelope: (password: string) => Promise<PasswordEnvelopePayload>;
+  createPasswordEnvelope: (
+    password: string,
+  ) => Promise<PasswordEnvelopePayload>;
   /** Stores an envelope a password change could not, when the API predates storing it with the change. */
   uploadPasswordEnvelope: (envelope: PasswordEnvelopeRequest) => Promise<void>;
   clearSession: () => void;
@@ -141,22 +143,13 @@ export function E2eeProvider({
         const e2ee = await getModule();
 
         if (!e2ee) {
-          log.warn(
-            "E2EE is unavailable in the current runtime. Encryption is disabled for this session.",
-          );
-          if (!isStale()) {
-            setIsReady(true);
-          }
-          return null;
+          throw new Error("Encryption is unavailable in the current runtime.");
         }
 
         const bootstrapData = await fetchE2eeBootstrap(apiBaseUrl);
 
         if (!bootstrapData) {
-          if (!isStale()) {
-            setIsReady(true);
-          }
-          return null;
+          return isStale() ? null : "sign-in-again";
         }
 
         if (isStale()) {
@@ -171,18 +164,20 @@ export function E2eeProvider({
         // A stored key that no longer opens counts as no key, so the envelope decides; its server row goes.
         const deviceKeys =
           existingDevice && privateKeyJwk
-            ? await unwrapStoredDeviceKeys(e2ee, privateKeyJwk, existingDevice).catch(
-                (error: unknown) => {
-                  log.warn("Stored E2EE device key no longer opens", {
-                    userId,
-                    errorName: error instanceof Error ? error.name : typeof error,
-                  });
-                  void calendarApiService
-                    .deleteE2eeDevice(existingDevice.deviceId)
-                    .catch(() => undefined);
-                  return null;
-                },
-              )
+            ? await unwrapStoredDeviceKeys(
+                e2ee,
+                privateKeyJwk,
+                existingDevice,
+              ).catch((error: unknown) => {
+                log.warn("Stored E2EE device key no longer opens", {
+                  userId,
+                  errorName: error instanceof Error ? error.name : typeof error,
+                });
+                void calendarApiService
+                  .deleteE2eeDevice(existingDevice.deviceId)
+                  .catch(() => undefined);
+                return null;
+              })
             : null;
 
         if (existingDevice && deviceKeys) {
@@ -317,17 +312,12 @@ export function E2eeProvider({
         sessionRef.current = nextSession;
         setActiveE2eeSession(nextSession);
         return null;
-      } catch (error) {
-        if (!isStale()) {
-          log.error("E2EE bootstrap failed:", error);
-        }
       } finally {
         if (!isStale()) {
           finishPendingBootstrap();
-          setIsReady(true);
+          setIsReady(sessionRef.current !== null);
         }
       }
-      return null;
     },
     [
       peekPendingAuthPassword,
@@ -430,11 +420,7 @@ export function E2eeProvider({
     ],
   );
 
-  return (
-    <E2eeContext.Provider value={value}>
-      {children}
-    </E2eeContext.Provider>
-  );
+  return <E2eeContext.Provider value={value}>{children}</E2eeContext.Provider>;
 }
 
 export function useE2ee(): E2eeContextValue {

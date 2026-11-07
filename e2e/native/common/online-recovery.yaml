@@ -1,0 +1,30 @@
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: workspace-ready
+    timeout: 90000
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- runFlow:
+    file: conversation-reply.yaml
+    env:
+      REPLY_TEXT: Maestro online recovery reply
+- tapOn: Go back
+- tapOn: ".*Switch mailbox"
+- tapOn: Inbox
+- waitForAnimationToEnd
+- swipe:
+    start: 50%,30%
+    end: 50%,80%
+    duration: 500
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 120000
+- tapOn: ".*Maestro round trip.*"
+- extendedWaitUntil:
+    visible:
+      id: mail-message-text
+      text: ".*Maestro online recovery reply.*"
+    timeout: 60000
+- assertVisible: Signature verified
+- takeScreenshot: ${SCREENSHOT_DIR}/mail-recovered-without-restart

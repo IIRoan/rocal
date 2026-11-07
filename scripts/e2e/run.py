@@ -261,7 +261,7 @@ def main(platform):
         finally:
             os.kill(backend, signal.SIGCONT)
         subprocess.run([sys.executable, REPO / "scripts/e2e/services.py", "wait-api"], check=True)
-        run_journey(platform, "mail", scenarios / "mail/02-delivery-and-reader.yaml", results, name="online-recovery")
+        run_journey(platform, "mail", scenarios / "common/online-recovery.yaml", results, name="online-recovery")
     for flow in sorted((scenarios / "mail").glob("*.yaml")):
         if flow.stem in CONVERSATION_JOURNEYS:
             run_journey(platform, "mail", flow, results)

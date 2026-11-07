@@ -37,7 +37,7 @@ function bytesToBase64Url(bytes: Uint8Array): string {
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
   }
-  return global
+  return globalThis
     .btoa(binary)
     .replace(/\+/g, "-")
     .replace(/\//g, "_")

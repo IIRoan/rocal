@@ -24,8 +24,13 @@ export function isNativeCryptoReady(): boolean {
 
 function assignGlobalCrypto(cryptoImpl: object): boolean {
   const targets: object[] = [globalThis];
-  if (typeof global !== "undefined" && global !== globalThis) {
-    targets.push(global);
+  const legacyGlobal: unknown = Reflect.get(globalThis, "global");
+  if (
+    legacyGlobal &&
+    typeof legacyGlobal === "object" &&
+    legacyGlobal !== globalThis
+  ) {
+    targets.push(legacyGlobal);
   }
 
   for (const target of targets) {

@@ -7,8 +7,6 @@
       "ES2022"
     ],
     "types": [
-      "jest",
-      "node",
       "@types/react"
     ],
     "module": "ESNext",
@@ -68,6 +66,9 @@
     "node_modules",
     "dist",
     ".expo",
-    "scripts"
+    "scripts",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**"
   ]
 }

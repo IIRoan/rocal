@@ -37,6 +37,8 @@ class HarnessTests(unittest.TestCase):
                 steps = []
                 def journey(_platform, app, flow, results, name=None):
                     case = name or flow.stem
+                    if name == "online-recovery":
+                        self.assertEqual(flow, repository / "e2e/native/common/online-recovery.yaml")
                     steps.append(case)
                     results.append({"app": app, "name": case, "passed": True, "seconds": 1})
                     return True

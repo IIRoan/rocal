@@ -24,7 +24,7 @@
     "submit:ios": "eas submit --platform ios --profile production",
     "submit:android": "eas submit --platform android --profile production",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.jest.json",
     "test": "jest -c jest.config.cjs",
     "test:coverage": "jest -c jest.config.cjs --coverage",
     "android": "APP_VARIANT=development expo run:android",

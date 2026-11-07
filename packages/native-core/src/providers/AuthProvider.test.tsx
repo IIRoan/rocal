@@ -203,7 +203,7 @@ describe("AuthProvider", () => {
   beforeEach(() => {
     setFallbackSessionToken(null);
     AppState.currentState = "active";
-    global.fetch = mockFetch as typeof fetch;
+    globalThis.fetch = mockFetch as typeof fetch;
     capturedAuth = null;
     container = document.createElement("div");
     document.body.appendChild(container);
