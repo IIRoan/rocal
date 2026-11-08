@@ -1,0 +1,29 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: ${HOME_LABEL}
+          timeout: 180000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # A delayed system password prompt can cover the already authenticated workspace.
+      - retry:
+          maxRetries: 3
+          commands:
+            - runFlow:
+                when:
+                  visible: "Save Password\\?"
+                commands:
+                  - tapOn:
+                      text: Not Now
+                      retryTapIfNoChange: false
+            - extendedWaitUntil:
+                visible: ${HOME_LABEL}
+                timeout: 45000
+            - waitForAnimationToEnd
+            - assertNotVisible: "Save Password\\?"

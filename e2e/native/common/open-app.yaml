@@ -4,9 +4,7 @@ appId: ${APP_ID}
     stopApp: true
     permissions:
       notifications: allow
-- extendedWaitUntil:
-    visible: ${HOME_LABEL}
-    timeout: 180000
+- runFlow: wait-for-home.yaml
 - extendedWaitUntil:
     notVisible:
       id: workspace-loading-screen
