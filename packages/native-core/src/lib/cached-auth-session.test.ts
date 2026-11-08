@@ -26,14 +26,14 @@ function cachedSession() {
 
 it("opens Better Auth's stored dates as dates without extending the session", () => {
   const cached = cachedSession();
-  const parsed = parseCachedAuthSession(cached);
+  const parsed = parseCachedAuthSession(cached, "better-auth.session_token=offline-token.signature");
   expect(parsed?.user.id).toBe("offline-user");
   expect(parsed?.session.expiresAt).toEqual(new Date(cached.session.expiresAt));
 });
 
 it("accepts the already-decoded in-memory session", () => {
-  const parsed = parseCachedAuthSession(cachedSession());
-  expect(parseCachedAuthSession(parsed)).toEqual(parsed);
+  const parsed = parseCachedAuthSession(cachedSession(), "better-auth.session_token=offline-token.signature");
+  expect(parseCachedAuthSession(parsed, "better-auth.session_token=offline-token.signature")).toEqual(parsed);
 });
 
 it("ignores additive response metadata without copying it into auth state", () => {
@@ -44,7 +44,7 @@ it("ignores additive response metadata without copying it into auth state", () =
     user: { ...cached.user, futureUserField: "private-user-sentinel" },
     session: { ...cached.session, futureSessionField: "private-session-sentinel" },
   };
-  const parsed = parseCachedAuthSession(extended);
+  const parsed = parseCachedAuthSession(extended, "better-auth.session_token=offline-token.signature");
   expect(parsed?.user.id).toBe(cached.user.id);
   expect(JSON.stringify(parsed)).not.toContain("private-");
 });
@@ -62,6 +62,36 @@ it.each(["expired", "invalid expiry", "different owner", "missing token", "blank
       case "missing owner": cached.session.userId = ""; break;
       case "invalid user": cached.user.email = "invalid"; break;
     }
-    expect(parseCachedAuthSession(cached)).toBeNull();
+    expect(parseCachedAuthSession(cached, "better-auth.session_token=offline-token.signature")).toBeNull();
   },
 );
+
+it.each([
+  "better-auth.session_token=offline-token",
+  "__Secure-better-auth.session_token=offline-token.signature%2B%2F%3D",
+  "solace-passkey-step-up=step-up; better-auth.session_token=offline-token.signature",
+  "better-auth.session_token=offline-token.signature; __Secure-better-auth.session_token=offline-token.signature",
+])("restores a cache with its matching signed or fallback cookie (%s)", (cookie) => {
+  expect(parseCachedAuthSession(cachedSession(), cookie)?.user.id).toBe("offline-user");
+});
+
+it.each([
+  "",
+  "solace-passkey-step-up=step-up",
+  "better-auth.session_data=offline-token",
+  "better-auth.session_token_hint=offline-token.signature",
+  "__Secure-better-auth.session_token=other-token.signature",
+  "better-auth.session_token=offline-token-extra.signature",
+  "better-auth.session_token=offline-token.",
+  "better-auth.session_token=%ZZ",
+  "better-auth.session_token=offline-token.signature; __Secure-better-auth.session_token=other-token.signature",
+])("refuses missing, malformed or conflicting session cookies (%s)", (cookie) => {
+  expect(parseCachedAuthSession(cachedSession(), cookie)).toBeNull();
+});
+
+it("compares the complete token when the stored token contains a dot", () => {
+  const cached = cachedSession();
+  cached.session.token = "offline.token";
+  expect(parseCachedAuthSession(cached, "better-auth.session_token=offline.token.signature")?.user.id).toBe(cached.user.id);
+  expect(parseCachedAuthSession(cached, "better-auth.session_token=offline.token-extra.signature")).toBeNull();
+});

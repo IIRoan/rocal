@@ -294,7 +294,6 @@ export function E2eeProvider({
           : null;
         if (firstEnvelope) {
           await uploadPasswordEnvelopeToApi(apiBaseUrl, firstEnvelope);
-          clearPendingAuthPassword();
         }
         const nextSession = await registerDeviceForSession({
           e2ee,
@@ -311,6 +310,7 @@ export function E2eeProvider({
 
         sessionRef.current = nextSession;
         setActiveE2eeSession(nextSession);
+        clearPendingAuthPassword();
         return null;
       } finally {
         if (!isStale()) {

@@ -82,7 +82,7 @@ jest.mock("../lib/passkey-browser-bridge", () => ({
 }));
 
 jest.mock("../lib/session-cookie", () => ({
-  getSessionCookie: jest.fn(() => "better-auth.session=token"),
+  getSessionCookie: jest.fn(() => "__Secure-better-auth.session_token=session-token.signature"),
   waitForSessionCookie: jest.fn(),
   ensureSessionTokenCookie: jest.fn(async () => true),
   healAuthCookieJar: jest.fn(async () => undefined),
@@ -213,7 +213,7 @@ describe("AuthProvider", () => {
     mockGetSessionState.mockReturnValue({ data: null });
     mockClearAuthSessionCache.mockClear();
     mockReadAuthSessionCache.mockReset().mockResolvedValue(null);
-    jest.mocked(getSessionCookie).mockReturnValue("better-auth.session=token");
+    jest.mocked(getSessionCookie).mockReturnValue("__Secure-better-auth.session_token=session-token.signature");
     mockEmailSignIn.mockReset();
     mockSocialSignIn.mockReset();
     mockPasskeySignIn.mockReset();
@@ -397,6 +397,40 @@ describe("AuthProvider", () => {
     await renderProvider();
     expect(getAuth().isAuthenticated).toBe(true);
     expect(mockOnSignedOut).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "solace-passkey-step-up=step-up-cookie",
+    "__Secure-better-auth.session_token=another-session.signature",
+  ])("refuses offline authentication with an unrelated cookie (%s)", async (cookie) => {
+    const cached = createSessionData();
+    cached.session.expiresAt = new Date(Date.now() + 60_000);
+    mockReadAuthSessionCache.mockResolvedValue(cached);
+    jest.mocked(getSessionCookie).mockReturnValue(cookie);
+    mockGetSession.mockRejectedValueOnce(new Error("Offline"));
+
+    await renderProvider();
+
+    expect(getAuth().isAuthenticated).toBe(false);
+    expect(getAuth().user).toBeNull();
+  });
+
+  it("restores only the cache matching the current cookie when hydration holds another account", async () => {
+    const stale = createSessionData();
+    stale.session.expiresAt = new Date(Date.now() + 60_000);
+    const matching = {
+      user: { ...stale.user, id: "other-user", email: "other@solace.test" },
+      session: { ...stale.session, userId: "other-user", token: "other-token" },
+    };
+    mockGetSessionState.mockReturnValue({ data: stale });
+    mockReadAuthSessionCache.mockResolvedValue(matching);
+    jest.mocked(getSessionCookie).mockReturnValue("__Secure-better-auth.session_token=other-token.signature");
+    mockGetSession.mockRejectedValueOnce(new Error("Offline"));
+
+    await renderProvider();
+
+    expect(getAuth().user?.id).toBe("other-user");
+    expect(getAuth().session?.token).toBe("other-token");
   });
 
   it.each(["missing", 401, 403])("never restores cached authentication when the server rejects it (%s)", async (status) => {

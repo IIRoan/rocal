@@ -420,6 +420,103 @@ describe("E2eeProvider", () => {
     expect(getActiveE2eeSession()).toBeNull();
   });
 
+  it.each(["device", "password"])("aborts a stalled %s write and can unlock on the next attempt", async (endpoint) => {
+    peekPendingAuthPassword.mockReturnValue("secret-password");
+    const bootstrap = createBootstrapResponse({
+      passwordEnvelope: endpoint === "device" ? createPasswordRecord() : null,
+    });
+    mockE2eeModule.wrapSymmetricKey.mockReset().mockImplementation(async (key: CryptoKey) =>
+      key === accountKey ? "wrapped-account-key" : "wrapped-search-key",
+    );
+    let signal: AbortSignal | null | undefined;
+    mockFetch.mockImplementation(async (url: string, options: RequestInit) => {
+      if (url.endsWith(`/${endpoint}`)) {
+        signal = options.signal;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(new Error("Request timed out")));
+        });
+      }
+      return jsonResponse(bootstrap);
+    });
+    await renderProvider();
+    let outcome = "pending";
+    await act(async () => {
+      getE2ee().bootstrap("user-1", "https://api.solace.test")
+        .then(() => { outcome = "resolved"; })
+        .catch(() => { outcome = "rejected"; });
+    });
+    expect(mockFetch.mock.calls.some(([url]) => String(url).endsWith(`/${endpoint}`))).toBe(true);
+    await act(async () => { await jest.advanceTimersByTimeAsync(9_999); });
+    expect(outcome).toBe("pending");
+    await act(async () => { await jest.advanceTimersByTimeAsync(1); });
+    expect(outcome).toBe("rejected");
+    expect(signal?.aborted).toBe(true);
+    expect(getE2ee().isReady).toBe(false);
+    expect(getActiveE2eeSession()).toBeNull();
+    expect(clearPendingAuthPassword).not.toHaveBeenCalled();
+
+    mockFetch.mockImplementation(async (url: string) => jsonResponse(
+      url.endsWith("/bootstrap") ? bootstrap : {},
+    ));
+    await act(async () => {
+      await expect(getE2ee().bootstrap("user-1", "https://api.solace.test")).resolves.toBeNull();
+    });
+    expect(getE2ee().isReady).toBe(true);
+    expect(getActiveE2eeSession()?.accountKey).toBe(accountKey);
+  });
+
+  it.each(["device 503", "lost envelope response"])("retains the password after %s without replacing the stored account keys", async (failure) => {
+    let pendingPassword: string | null = "secret-password";
+    let envelopeStored = false;
+    let registrations = 0;
+    peekPendingAuthPassword.mockImplementation(() => pendingPassword);
+    clearPendingAuthPassword.mockImplementation(() => { pendingPassword = null; });
+    mockE2eeModule.wrapSymmetricKey.mockReset().mockImplementation(async (key: CryptoKey) =>
+      key === accountKey ? "wrapped-account-key" : "wrapped-search-key",
+    );
+    mockFetch.mockImplementation(async (url: string, options: RequestInit) => {
+      if (url.endsWith("/bootstrap")) {
+        return jsonResponse(createBootstrapResponse({
+          passwordEnvelope: envelopeStored ? createPasswordRecord() : null,
+        }));
+      }
+      if (url.endsWith("/password")) {
+        envelopeStored = true;
+        if (failure === "lost envelope response") {
+          return new Promise((_resolve, reject) => {
+            options.signal?.addEventListener("abort", () => reject(new Error("Request timed out")));
+          });
+        }
+        return jsonResponse({});
+      }
+      if (url.endsWith("/device")) {
+        registrations += 1;
+        return jsonResponse({}, failure === "device 503" && registrations === 1 ? 503 : 200);
+      }
+      throw new Error("Unexpected fixture request");
+    });
+    await renderProvider();
+    await act(async () => {
+      const attempt = expect(getE2ee().bootstrap("user-1", "https://api.solace.test")).rejects.toThrow(
+        failure === "device 503" ? "503" : "Request timed out",
+      );
+      if (failure === "lost envelope response") await jest.advanceTimersByTimeAsync(10_000);
+      await attempt;
+    });
+    expect(clearPendingAuthPassword).not.toHaveBeenCalled();
+    expect(getE2ee().isReady).toBe(false);
+
+    await act(async () => {
+      await expect(getE2ee().bootstrap("user-1", "https://api.solace.test")).resolves.toBeNull();
+    });
+    expect(mockE2eeModule.unwrapPasswordEnvelope).toHaveBeenCalledWith("secret-password", expect.anything());
+    expect(mockE2eeModule.generateAccountKey).toHaveBeenCalledTimes(1);
+    expect(mockE2eeModule.createPasswordEnvelope).toHaveBeenCalledTimes(1);
+    expect(getE2ee().isReady).toBe(true);
+    expect(clearPendingAuthPassword).toHaveBeenCalledTimes(1);
+    expect(pendingPassword).toBeNull();
+  });
+
   it.each([401, 403])(
     "ends a rejected bootstrap session (%s) without exposing a ready runtime",
     async (status) => {

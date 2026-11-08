@@ -310,9 +310,9 @@ export function AuthProvider({
   );
 
   const restoreCachedSession = useCallback((storedSession: unknown) => {
-    if (!getSessionCookie()) return false;
+    const cookie = getSessionCookie();
     const cached: unknown = authClient.$store.atoms.session?.get().data;
-    return applySessionData(parseCachedAuthSession(cached) ?? parseCachedAuthSession(storedSession));
+    return applySessionData(parseCachedAuthSession(cached, cookie) ?? parseCachedAuthSession(storedSession, cookie));
   }, [applySessionData]);
 
   const clearPendingAuthPassword = useCallback(() => {
