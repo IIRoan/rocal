@@ -22,34 +22,48 @@ specification.loader.exec_module(journeys)
 
 
 class HarnessTests(unittest.TestCase):
-    def test_offline_read_finishes_before_conversation_account_switches_clear_the_snapshot(self):
+    def test_mail_recovery_order_and_prerequisite_failures(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "solace-e2e"
             repository = Path(temporary) / "repository"
             for app, names in (("calendar", ["01-authentication"]),
-                               ("mail", ["01-unlock-and-draft", "07-conversation-first-message", "offline", "sign-out"])):
+                               ("mail", ["01-unlock-and-draft", "04-mailboxes-and-labels", "07-conversation-first-message",
+                                         "08-conversation-replies", "09-conversation-reader", "offline", "sign-out"])):
                 parent = repository / "e2e/native" / app
                 parent.mkdir(parents=True)
                 for name in names:
                     (parent / f"{name}.yaml").write_text("synthetic")
             with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
                 (directory() / "private/backend.pid").write_text("4242")
-                steps = []
-                def journey(_platform, app, flow, results, name=None):
-                    case = name or flow.stem
-                    if name == "online-recovery":
-                        self.assertEqual(flow, repository / "e2e/native/common/online-recovery.yaml")
-                    steps.append(case)
-                    results.append({"app": app, "name": case, "passed": True, "seconds": 1})
-                    return True
-                def backend_signal(_pid, value):
-                    steps.append("suspended" if value == journeys.signal.SIGSTOP else "resumed")
-                with patch.object(journeys, "REPO", repository), patch.object(journeys, "run_journey", side_effect=journey), \
-                        patch.object(journeys.os, "kill", side_effect=backend_signal), \
-                        patch.object(journeys.subprocess, "run", return_value=journeys.subprocess.CompletedProcess([], 0, stdout="xtask e2e serve")):
-                    journeys.main("android")
-                self.assertLess(steps.index("offline"), steps.index("07-conversation-first-message"))
-                self.assertLess(steps.index("resumed"), steps.index("07-conversation-first-message"))
+                expected = ["01-authentication", "01-unlock-and-draft", "04-mailboxes-and-labels", "suspended",
+                            "offline", "resumed", "online-recovery", "07-conversation-first-message",
+                            "08-conversation-replies", "09-conversation-reader", "sign-out"]
+                for failed_case in (None, "04-mailboxes-and-labels", "offline", "online-recovery",
+                                    "07-conversation-first-message", "08-conversation-replies", "09-conversation-reader"):
+                    with self.subTest(failed_case=failed_case):
+                        steps = []
+                        def journey(_platform, app, flow, results, name=None):
+                            case = name or flow.stem
+                            if name == "online-recovery":
+                                self.assertEqual(flow, repository / "e2e/native/common/online-recovery.yaml")
+                            steps.append(case)
+                            passed = case != failed_case
+                            results.append({"app": app, "name": case, "passed": passed, "seconds": 1})
+                            return passed
+                        def backend_signal(_pid, value):
+                            steps.append("suspended" if value == journeys.signal.SIGSTOP else "resumed")
+                        with patch.object(journeys, "REPO", repository), patch.object(journeys, "run_journey", side_effect=journey), \
+                                patch.object(journeys.os, "kill", side_effect=backend_signal), \
+                                patch.object(journeys.subprocess, "run", return_value=journeys.subprocess.CompletedProcess([], 0, stdout="xtask e2e serve")):
+                            if failed_case is None:
+                                journeys.main("android")
+                            else:
+                                with self.assertRaises(SystemExit):
+                                    journeys.main("android")
+                        end = len(expected) if failed_case is None else expected.index(failed_case) + 1
+                        if failed_case == "offline":
+                            end += 1
+                        self.assertEqual(steps, expected[:end])
 
     def test_reader_timings_export_only_numeric_observations_from_the_expanded_body(self):
         with tempfile.TemporaryDirectory() as temporary:

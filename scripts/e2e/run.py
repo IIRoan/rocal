@@ -257,14 +257,20 @@ def main(platform):
             raise RuntimeError("Refusing to suspend a process outside the disposable backend")
         os.kill(backend, signal.SIGSTOP)
         try:
-            run_journey(platform, "mail", scenarios / "mail/offline.yaml", results)
+            offline_passed = run_journey(platform, "mail", scenarios / "mail/offline.yaml", results)
         finally:
             os.kill(backend, signal.SIGCONT)
+        if not offline_passed:
+            raise SystemExit("The mail offline-read prerequisite failed")
         subprocess.run([sys.executable, REPO / "scripts/e2e/services.py", "wait-api"], check=True)
-        run_journey(platform, "mail", scenarios / "common/online-recovery.yaml", results, name="online-recovery")
+        if not run_journey(platform, "mail", scenarios / "common/online-recovery.yaml", results, name="online-recovery"):
+            raise SystemExit("The mail online-recovery prerequisite failed")
+    else:
+        raise SystemExit("The mail content prerequisites failed")
     for flow in sorted((scenarios / "mail").glob("*.yaml")):
         if flow.stem in CONVERSATION_JOURNEYS:
-            run_journey(platform, "mail", flow, results)
+            if not run_journey(platform, "mail", flow, results):
+                raise SystemExit("The mail conversation prerequisite failed")
     run_journey(platform, "mail", scenarios / "mail/sign-out.yaml", results)
     publish(results)
     expected = sum(len(list((scenarios / app).glob("*.yaml"))) for app in APPS) + 1

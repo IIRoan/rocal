@@ -18,11 +18,23 @@ appId: ${APP_ID}
             VERIFY_TEXT: "true"
             VERIFY_ID: compose-recipient-to
       - pressKey: Enter
-- tapOn: Message body
+      - waitForAnimationToEnd
+# The editor frame can extend behind the keyboard, so its center is not always tappable.
+- tapOn:
+    text: Message body
+    point: 20%,5%
+    retryTapIfNoChange: false
 - runFlow:
     file: type.yaml
     env:
       TEXT: ${REPLY_TEXT}
+- assertVisible:
+    text: ${"(?s).*" + REPLY_TEXT + ".*"}
+    below:
+      text: Subject
+- assertNotVisible:
+    id: compose-recipient-to
+    text: ${"(?s).*" + REPLY_TEXT + ".*"}
 - pressKey: Enter
 - waitForAnimationToEnd
 - tapOn:
