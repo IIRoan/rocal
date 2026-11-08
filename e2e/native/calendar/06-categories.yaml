@@ -16,9 +16,10 @@ appId: ${APP_ID}
     timeout: 30000
 - waitForAnimationToEnd
 - runFlow:
-    file: ../common/focus-input.yaml
+    file: ../common/refocus-input.yaml
     env:
       INPUT_ID: category-name
+      BLUR_TARGET: Name
 - runFlow:
     when:
       platform: Android
@@ -83,6 +84,11 @@ appId: ${APP_ID}
     retryTapIfNoChange: false
 - eraseText
 - waitForAnimationToEnd
+- runFlow:
+    file: ../common/refocus-input.yaml
+    env:
+      INPUT_ID: category-name
+      BLUR_TARGET: Name
 - runFlow:
     when:
       platform: Android
