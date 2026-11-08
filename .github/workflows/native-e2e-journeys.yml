@@ -98,6 +98,7 @@ jobs:
           python3 scripts/e2e/services.py wait-api
           ./target/debug/xtask e2e seed
       - name: Boot the device and install both apps and Maestro
+        timeout-minutes: 20
         shell: bash
         run: python3 scripts/e2e/device.py "$E2E_PLATFORM"
       - name: Exercise real Calendar and Mail journeys

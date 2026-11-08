@@ -59,7 +59,7 @@ def failure_kind(log, report=None):
 
 def failure_details(log, report, traces, reason, exit_code=None):
     exception = re.search(r"\b((?:maestro|java|javax|io|org|com|kotlin)\.(?:[A-Za-z_$][\w$]*\.)*[A-Za-z_$][\w$]*(?:Exception|Error))\b", failure_content(log, report))
-    details = {"reason": reason, "exceptionType": exception.group(1)[:200] if exception else None, "command": None, "assertionTarget": None, "exitCode": exit_code}
+    details = {"reason": reason, "exceptionType": exception.group(1)[:200] if exception else None, "command": None, "step": None, "assertionTarget": None, "exitCode": exit_code}
     commands = {"launchApp", "clearState", "tapOnElement", "inputText", "eraseText", "pressKey", "assertCondition", "scrollUntilVisible",
                 "waitForAnimation", "runFlow", "takeScreenshot", "swipe", "hideKeyboard", "evalScript"}
     if traces.is_symlink():
@@ -75,16 +75,20 @@ def failure_details(log, report, traces, reason, exit_code=None):
             continue
         if not isinstance(entries, list):
             continue
-        for entry in entries:
+        for step, entry in enumerate(entries, start=1):
             if not isinstance(entry, dict) or not isinstance(entry.get("metadata"), dict) or entry["metadata"].get("status") != "FAILED":
                 continue
             command = entry.get("command", {})
             if isinstance(command, dict):
                 kinds = (kind.removesuffix("Command") for kind in command)
-                details["command"] = next((kind for kind in kinds if kind in commands), details["command"])
+                kind = next((kind for kind in kinds if kind in commands), None)
+                if kind is None:
+                    continue
+                details["command"] = kind
+                details["step"] = step
+                details["assertionTarget"] = None
                 assertion = command.get("assertConditionCommand", command.get("assertCondition"))
-                if isinstance(assertion, dict):
-                    details["assertionTarget"] = None
+                if kind == "assertCondition" and isinstance(assertion, dict):
                     encoded = json.dumps(assertion)
                     for selector, target in (("(q|Q)", "software-keyboard"), ("sign-in-email", "sign-in-email"), ("Welcome back", "sign-in-screen")):
                         if selector in encoded:

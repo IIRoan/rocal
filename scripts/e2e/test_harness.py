@@ -51,13 +51,25 @@ class HarnessTests(unittest.TestCase):
                 (traces / "commands.json").write_text(json.dumps([{"command": {"assertConditionCommand": assertion}, "metadata": {"status": "FAILED"}}]))
                 details = journeys.failure_details(log, None, traces, "maestro-failure")
                 self.assertEqual(details["assertionTarget"], expected)
+                self.assertEqual(details["step"], 1)
                 self.assertNotIn("secret-sentinel", json.dumps(details))
                 self.assertNotIn("private-unknown", json.dumps(details))
             (traces / "commands.json").write_text(json.dumps([
                 {"command": {"assertConditionCommand": {"selector": "(q|Q)"}}, "metadata": {"status": "FAILED"}},
                 {"command": {"assertConditionCommand": {"selector": "private-unknown"}}, "metadata": {"status": "FAILED"}},
             ]))
-            self.assertIsNone(journeys.failure_details(log, None, traces, "maestro-failure")["assertionTarget"])
+            details = journeys.failure_details(log, None, traces, "maestro-failure")
+            self.assertIsNone(details["assertionTarget"])
+            self.assertEqual(details["step"], 2)
+            (traces / "commands.json").write_text(json.dumps([
+                {"command": {"assertConditionCommand": {"selector": "(q|Q)"}}, "metadata": {"status": "FAILED"}},
+                {"command": {"inputTextCommand": {"text": "password-secret-sentinel"}}, "metadata": {"status": "FAILED"}},
+            ]))
+            details = journeys.failure_details(log, None, traces, "maestro-failure")
+            self.assertEqual(details["command"], "inputText")
+            self.assertEqual(details["step"], 2)
+            self.assertIsNone(details["assertionTarget"])
+            self.assertNotIn("secret-sentinel", json.dumps(details))
 
     def test_mail_recovery_order_and_prerequisite_failures(self):
         with tempfile.TemporaryDirectory() as temporary:
