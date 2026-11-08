@@ -59,7 +59,7 @@ def failure_kind(log, report=None):
 
 def failure_details(log, report, traces, reason, exit_code=None):
     exception = re.search(r"\b((?:maestro|java|javax|io|org|com|kotlin)\.(?:[A-Za-z_$][\w$]*\.)*[A-Za-z_$][\w$]*(?:Exception|Error))\b", failure_content(log, report))
-    details = {"reason": reason, "exceptionType": exception.group(1)[:200] if exception else None, "command": None, "exitCode": exit_code}
+    details = {"reason": reason, "exceptionType": exception.group(1)[:200] if exception else None, "command": None, "assertionTarget": None, "exitCode": exit_code}
     commands = {"launchApp", "clearState", "tapOnElement", "inputText", "eraseText", "pressKey", "assertCondition", "scrollUntilVisible",
                 "waitForAnimation", "runFlow", "takeScreenshot", "swipe", "hideKeyboard", "evalScript"}
     if traces.is_symlink():
@@ -82,6 +82,14 @@ def failure_details(log, report, traces, reason, exit_code=None):
             if isinstance(command, dict):
                 kinds = (kind.removesuffix("Command") for kind in command)
                 details["command"] = next((kind for kind in kinds if kind in commands), details["command"])
+                assertion = command.get("assertConditionCommand", command.get("assertCondition"))
+                if isinstance(assertion, dict):
+                    details["assertionTarget"] = None
+                    encoded = json.dumps(assertion)
+                    for selector, target in (("(q|Q)", "software-keyboard"), ("sign-in-email", "sign-in-email"), ("Welcome back", "sign-in-screen")):
+                        if selector in encoded:
+                            details["assertionTarget"] = target
+                            break
     return details
 
 
@@ -238,9 +246,17 @@ def run_journey(platform, app, flow, results, name=None):
     return passed
 
 
-def main(platform):
+def main(platform, diagnostic=False):
     results = []
     scenarios = REPO / "e2e/native"
+    if diagnostic:
+        if platform != "ios":
+            raise SystemExit("The focused diagnostic supports iOS only")
+        for name in ("01-authentication", "07-profile-picture"):
+            if not run_journey(platform, "calendar", scenarios / f"calendar/{name}.yaml", results):
+                raise SystemExit("The focused iOS diagnostic failed")
+        publish(results)
+        return
     for app in APPS:
         flows = sorted(path for path in (scenarios / app).glob("*.yaml")
                        if path.name not in ("offline.yaml", "sign-out.yaml") and path.stem not in CONVERSATION_JOURNEYS)
@@ -286,4 +302,6 @@ if __name__ == "__main__":
         ]
         publish(results, summary=True)
     else:
-        main(sys.argv[1])
+        if sys.argv[2:] not in ([], ["--diagnostic"]):
+            raise SystemExit("Unknown journey arguments")
+        main(sys.argv[1], diagnostic=sys.argv[2:] == ["--diagnostic"])

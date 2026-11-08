@@ -6,18 +6,22 @@ on:
       platform:
         required: true
         type: string
+      diagnostic:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   journeys:
-    name: Native E2E (${{ inputs.platform }})
+    name: ${{ inputs.diagnostic && 'Native E2E diagnostics' || 'Native E2E' }} (${{ inputs.platform }})
     timeout-minutes: 180
     runs-on: ${{ inputs.platform == 'ios' && 'macos-latest' || 'ubuntu-latest' }}
     env:
       SOLACE_E2E: "1"
       E2E_PLATFORM: ${{ inputs.platform }}
+      E2E_DIAGNOSTIC: ${{ inputs.diagnostic }}
       APP_VARIANT: preview
       EXPO_PUBLIC_API_URL: http://127.0.0.1:4001
       EXPO_PUBLIC_APP_URL: http://localhost:4100
@@ -98,8 +102,14 @@ jobs:
         run: python3 scripts/e2e/device.py "$E2E_PLATFORM"
       - name: Exercise real Calendar and Mail journeys
         shell: bash
-        run: python3 scripts/e2e/run.py "$E2E_PLATFORM"
+        run: |
+          if [ "$E2E_DIAGNOSTIC" = true ]; then
+            python3 scripts/e2e/run.py "$E2E_PLATFORM" --diagnostic
+          else
+            python3 scripts/e2e/run.py "$E2E_PLATFORM"
+          fi
       - name: Check persisted encryption and account state
+        if: ${{ !inputs.diagnostic }}
         run: ./target/debug/xtask e2e verify
       - name: Publish test evidence
         if: always()
@@ -109,7 +119,7 @@ jobs:
         if: always()
         uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
         with:
-          name: native-e2e-${{ inputs.platform }}
+          name: native-e2e-${{ inputs.platform }}${{ inputs.diagnostic && '-diagnostics' || '' }}
           path: ${{ runner.temp }}/solace-e2e/artifacts
           if-no-files-found: error
           overwrite: true

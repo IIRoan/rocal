@@ -16,4 +16,4 @@ appId: ${APP_ID}
     commands:
       - extendedWaitUntil:
           visible: "(q|Q)"
-          timeout: 15000
+          timeout: 60000

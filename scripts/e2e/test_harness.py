@@ -22,6 +22,43 @@ specification.loader.exec_module(journeys)
 
 
 class HarnessTests(unittest.TestCase):
+    def test_focused_ios_diagnostic_runs_authentication_before_photo_selection(self):
+        with patch.object(journeys, "run_journey", return_value=True) as execute, patch.object(journeys, "publish"):
+            journeys.main("ios", diagnostic=True)
+        self.assertEqual([(call.args[0], call.args[1], call.args[2].stem) for call in execute.call_args_list],
+                         [("ios", "calendar", "01-authentication"), ("ios", "calendar", "07-profile-picture")])
+
+    def test_focused_diagnostic_stops_on_failure_and_rejects_other_platforms(self):
+        with patch.object(journeys, "run_journey", return_value=False) as execute, patch.object(journeys, "publish") as publish:
+            with self.assertRaisesRegex(SystemExit, "failed"):
+                journeys.main("ios", diagnostic=True)
+            execute.assert_called_once()
+            publish.assert_not_called()
+            execute.reset_mock()
+            with self.assertRaisesRegex(SystemExit, "iOS only"):
+                journeys.main("android", diagnostic=True)
+            execute.assert_not_called()
+
+    def test_failure_assertion_target_exports_only_known_labels_without_credentials(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            log = root / "log.txt"
+            log.write_text("Flow failed")
+            traces = root / "traces"
+            traces.mkdir()
+            for selector, expected in (("(q|Q)", "software-keyboard"), ("sign-in-email", "sign-in-email"), ("Welcome back", "sign-in-screen"), ("private-unknown", None)):
+                assertion = {"selector": selector, "text": "password-secret-sentinel"}
+                (traces / "commands.json").write_text(json.dumps([{"command": {"assertConditionCommand": assertion}, "metadata": {"status": "FAILED"}}]))
+                details = journeys.failure_details(log, None, traces, "maestro-failure")
+                self.assertEqual(details["assertionTarget"], expected)
+                self.assertNotIn("secret-sentinel", json.dumps(details))
+                self.assertNotIn("private-unknown", json.dumps(details))
+            (traces / "commands.json").write_text(json.dumps([
+                {"command": {"assertConditionCommand": {"selector": "(q|Q)"}}, "metadata": {"status": "FAILED"}},
+                {"command": {"assertConditionCommand": {"selector": "private-unknown"}}, "metadata": {"status": "FAILED"}},
+            ]))
+            self.assertIsNone(journeys.failure_details(log, None, traces, "maestro-failure")["assertionTarget"])
+
     def test_mail_recovery_order_and_prerequisite_failures(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "solace-e2e"
