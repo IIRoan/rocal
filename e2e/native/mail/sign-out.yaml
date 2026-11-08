@@ -9,7 +9,18 @@ appId: ${APP_ID}
     visible: ".*Maestro round trip.*"
     timeout: 60000
 - tapOn: ".*Maestro round trip.*"
+- runFlow:
+    when:
+      visible:
+        id: mail-thread-message-0
+    commands:
+      - tapOn:
+          id: mail-thread-message-0
+          retryTapIfNoChange: false
 - extendedWaitUntil:
-    visible: ".*Maestro body survives encrypted draft storage.*"
+    visible:
+      id: mail-message-text
+      text: ".*Maestro body survives encrypted draft storage.*"
     timeout: 60000
+- assertVisible: Signature verified
 - takeScreenshot: ${SCREENSHOT_DIR}/signed-in-and-unlocked-again

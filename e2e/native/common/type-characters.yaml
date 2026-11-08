@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+---
+- evalScript: ${output.nativeTextIndex = 0}
+- repeat:
+    times: 1000
+    while:
+      true: ${output.nativeTextIndex < String(TEXT).length}
+    commands:
+      - inputText: ${String(TEXT).charAt(output.nativeTextIndex)}
+      - runFlow:
+          when:
+            true: ${typeof VERIFY_TEXT !== "undefined" && VERIFY_TEXT === "true"}
+          commands:
+            - runFlow:
+                when:
+                  true: ${typeof VERIFY_ID !== "undefined"}
+                commands:
+                  - assertVisible:
+                      id: ${VERIFY_ID}
+                      text: ${String(TEXT).slice(0, output.nativeTextIndex + 1)}
+            - runFlow:
+                when:
+                  true: ${typeof VERIFY_ID === "undefined"}
+                commands:
+                  - assertVisible: ${String(TEXT).slice(0, output.nativeTextIndex + 1)}
+      - evalScript: ${output.nativeTextIndex = output.nativeTextIndex + 1}

@@ -1,6 +1,18 @@
 appId: ${APP_ID}
 ---
-- runFlow: open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: workspace-ready
+    timeout: 90000
+- runFlow:
+    when:
+      visible: Go back
+    commands:
+      - tapOn: Go back
+      - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: ${HOME_LABEL}
+    timeout: 30000
 - tapOn: Settings
 - runFlow:
     file: select-settings-page.yaml

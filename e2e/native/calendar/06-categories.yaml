@@ -15,20 +15,25 @@ appId: ${APP_ID}
     visible: Category name
     timeout: 30000
 - waitForAnimationToEnd
-- tapOn: Category name
+- runFlow:
+    file: ../common/focus-input.yaml
+    env:
+      INPUT_ID: category-name
 - runFlow:
     when:
       platform: Android
     commands:
       - extendedWaitUntil:
           visible:
-            text: Category name
+            id: category-name
             focused: true
           timeout: 15000
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro category
+      VERIFY_TEXT: "true"
+      VERIFY_ID: category-name
 - assertVisible: Maestro category
 - hideKeyboard
 - tapOn: Create category
@@ -73,7 +78,7 @@ appId: ${APP_ID}
 - tapOn: "Maestro category.*"
 - waitForAnimationToEnd
 - tapOn:
-    text: Category name
+    id: category-name
     point: 95%,50%
     retryTapIfNoChange: false
 - eraseText
@@ -84,13 +89,15 @@ appId: ${APP_ID}
     commands:
       - extendedWaitUntil:
           visible:
-            text: Category name
+            id: category-name
             focused: true
           timeout: 15000
 - runFlow:
     file: ../common/type.yaml
     env:
       TEXT: Maestro renamed category
+      VERIFY_TEXT: "true"
+      VERIFY_ID: category-name
 - assertVisible: Maestro renamed category
 - hideKeyboard
 - tapOn: Save changes

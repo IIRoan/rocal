@@ -3,6 +3,21 @@ appId: ${APP_ID}
 - tapOn: Reply
 - assertVisible: Send
 - waitForAnimationToEnd
+- runFlow:
+    when:
+      true: ${typeof RECIPIENT_EMAIL !== "undefined"}
+    commands:
+      - runFlow:
+          file: focus-input.yaml
+          env:
+            INPUT_ID: compose-recipient-to
+      - runFlow:
+          file: type.yaml
+          env:
+            TEXT: ${RECIPIENT_EMAIL}
+            VERIFY_TEXT: "true"
+            VERIFY_ID: compose-recipient-to
+      - pressKey: Enter
 - tapOn: Message body
 - runFlow:
     file: type.yaml

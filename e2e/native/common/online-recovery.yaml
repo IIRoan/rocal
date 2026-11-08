@@ -9,6 +9,7 @@ appId: ${APP_ID}
     file: conversation-reply.yaml
     env:
       REPLY_TEXT: Maestro online recovery reply
+      RECIPIENT_EMAIL: ${EMAIL}
 - tapOn: Go back
 - tapOn: ".*Switch mailbox"
 - tapOn: Inbox
