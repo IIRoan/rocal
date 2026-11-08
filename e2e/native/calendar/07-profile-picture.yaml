@@ -19,13 +19,13 @@ appId: ${APP_ID}
       visible: Allow Full Access
     commands:
       - tapOn: Allow Full Access
-- extendedWaitUntil:
-    visible: "(?i).*(photos|photo library|select.*photo).*"
-    timeout: 30000
 - runFlow:
     when:
       platform: iOS
     commands:
+      - extendedWaitUntil:
+          visible: "(?i)Photo,.*"
+          timeout: 180000
       - tapOn:
           text: "(?i)Photo,.*"
           index: 0
@@ -33,6 +33,9 @@ appId: ${APP_ID}
     when:
       platform: Android
     commands:
+      - extendedWaitUntil:
+          visible: "(Photo taken on .*|Media)"
+          timeout: 30000
       - tapOn:
           text: "(Photo taken on .*|Media)"
           index: 0
