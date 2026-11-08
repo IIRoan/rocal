@@ -13,6 +13,8 @@ import xml.etree.ElementTree as ET
 from common import APPS, REPO, directory
 from reader_timings import CONVERSATION_JOURNEYS, collect_reader_timings
 
+CALENDAR_START = ("01-authentication", "02-calendar-management")
+
 
 def maestro_environment():
     maestro_home = directory() / "private/maestro-home"
@@ -250,13 +252,45 @@ def run_journey(platform, app, flow, results, name=None):
     return passed
 
 
-def main(platform, diagnostic=False):
+def run_calendar_start(platform):
     results = []
+    for index, name in enumerate(CALENDAR_START):
+        passed = run_journey(platform, "calendar", REPO / f"e2e/native/calendar/{name}.yaml", results)
+        if index == 0 and not passed:
+            raise SystemExit("The calendar authentication prerequisite failed")
+    output = os.environ.get("GITHUB_OUTPUT")
+    if output:
+        with Path(output).open("a") as destination:
+            destination.write("ready=true\n")
+    if not all(result["passed"] for result in results):
+        raise SystemExit("The calendar management journey failed")
+
+
+def calendar_checkpoint():
+    try:
+        saved = json.loads((directory() / "artifacts/results.json").read_text())
+        results = saved.get("results") if isinstance(saved, dict) else None
+    except (OSError, ValueError):
+        raise SystemExit("The calendar checkpoint is unavailable") from None
+    if not isinstance(results, list) or len(results) != len(CALENDAR_START):
+        raise SystemExit("The calendar checkpoint is incomplete")
+    if any(not isinstance(result, dict) or result.get("app") != "calendar" or result.get("name") != name
+           or type(result.get("passed")) is not bool for result, name in zip(results, CALENDAR_START)):
+        raise SystemExit("The calendar checkpoint is invalid")
+    if results[0]["passed"] is not True:
+        raise SystemExit("The calendar authentication prerequisite failed")
+    return results
+
+
+def main(platform, diagnostic=False, resume=False):
+    if diagnostic and resume:
+        raise SystemExit("Choose a diagnostic or a continued full suite")
+    results = calendar_checkpoint() if resume else []
     scenarios = REPO / "e2e/native"
     if diagnostic:
         if platform != "ios":
             raise SystemExit("The focused diagnostic supports iOS only")
-        for name in ("01-authentication", "07-profile-picture"):
+        for name in (*CALENDAR_START, "07-profile-picture"):
             if not run_journey(platform, "calendar", scenarios / f"calendar/{name}.yaml", results):
                 raise SystemExit("The focused iOS diagnostic failed")
         publish(results)
@@ -267,6 +301,8 @@ def main(platform, diagnostic=False):
         if not flows:
             raise RuntimeError(f"No {app} user journeys found")
         for index, flow in enumerate(flows):
+            if resume and app == "calendar" and flow.stem in CALENDAR_START:
+                continue
             passed = run_journey(platform, app, flow, results)
             if index == 0 and not passed:
                 raise SystemExit(f"The {app} authentication/content prerequisite failed")
@@ -306,6 +342,9 @@ if __name__ == "__main__":
         ]
         publish(results, summary=True)
     else:
-        if sys.argv[2:] not in ([], ["--diagnostic"]):
+        if sys.argv[2:] not in ([], ["--diagnostic"], ["--calendar-start"], ["--continue"]):
             raise SystemExit("Unknown journey arguments")
-        main(sys.argv[1], diagnostic=sys.argv[2:] == ["--diagnostic"])
+        if sys.argv[2:] == ["--calendar-start"]:
+            run_calendar_start(sys.argv[1])
+        else:
+            main(sys.argv[1], diagnostic=sys.argv[2:] == ["--diagnostic"], resume=sys.argv[2:] == ["--continue"])

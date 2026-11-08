@@ -10,6 +10,10 @@ appId: ${APP_ID}
 - tapOn: New calendar
 - assertVisible: Calendar name
 - hideKeyboard
+- waitForAnimationToEnd
+- assertVisible:
+    text: Create calendar
+    enabled: true
 - tapOn: Create calendar
 - assertVisible: Calendar name is required
 - tapOn: Calendar name
@@ -18,6 +22,10 @@ appId: ${APP_ID}
     env:
       TEXT: Maestro calendar
 - hideKeyboard
+- waitForAnimationToEnd
+- assertVisible:
+    text: Create calendar
+    enabled: true
 - tapOn: Create calendar
 - extendedWaitUntil:
     notVisible: Create calendar
@@ -39,6 +47,10 @@ appId: ${APP_ID}
       TEXT: Maestro renamed calendar
 - assertVisible: Maestro renamed calendar
 - hideKeyboard
+- waitForAnimationToEnd
+- assertVisible:
+    text: Save changes
+    enabled: true
 - tapOn: Save changes
 - extendedWaitUntil:
     notVisible: Save changes
@@ -57,8 +69,16 @@ appId: ${APP_ID}
 - pressKey: Enter
 - waitForAnimationToEnd
 - tapOn: All day
+- waitForAnimationToEnd
+- assertVisible: "Calendar:.*"
 - tapOn: "Calendar:.*"
+- waitForAnimationToEnd
+- assertVisible: "Maestro renamed calendar.*"
 - tapOn: "Maestro renamed calendar.*"
+- waitForAnimationToEnd
+- assertVisible:
+    text: Save
+    enabled: true
 - tapOn: Save
 - extendedWaitUntil:
     notVisible: Event title
