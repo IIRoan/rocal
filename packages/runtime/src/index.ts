@@ -302,6 +302,12 @@ function unique(values: Array<string | null | undefined>): string[] {
   );
 }
 
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charAt(end - 1) === "/") end -= 1;
+  return value.slice(0, end);
+}
+
 function normalizeTrustedOrigin(value?: string | null): string | null {
   const trimmed = value?.trim();
 
@@ -315,10 +321,10 @@ function normalizeTrustedOrigin(value?: string | null): string | null {
       return url.origin;
     }
   } catch {
-    return trimmed.replace(/\/+$/, "");
+    return trimTrailingSlashes(trimmed);
   }
 
-  return trimmed.replace(/\/+$/, "");
+  return trimTrailingSlashes(trimmed);
 }
 
 function extractHttpOrigin(value?: string | null): string | null {
