@@ -5,11 +5,6 @@ appId: ${APP_ID}
     permissions:
       notifications: allow
 - runFlow: wait-for-home.yaml
-- extendedWaitUntil:
-    notVisible:
-      id: workspace-loading-screen
-    timeout: 180000
-- waitForAnimationToEnd
 - assertNotVisible: Welcome back
 - runFlow:
     when:

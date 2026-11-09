@@ -4,7 +4,7 @@ run-name: ${{ inputs.diagnostic && 'iOS authentication, calendar and photo diagn
 on:
   pull_request:
     branches: [master, main, testing]
-    paths:
+    paths: &paths
       - "apps/native-*/**"
       - "apps/backend/**"
       - "apps/stalwart/**"
@@ -25,25 +25,7 @@ on:
       - ".github/workflows/native-e2e*.yml"
   push:
     branches: [master, testing]
-    paths:
-      - "apps/native-*/**"
-      - "apps/backend/**"
-      - "apps/stalwart/**"
-      - "crates/**"
-      - "xtask/**"
-      - "packages/**"
-      - "scripts/e2e/**"
-      - "e2e/**"
-      - "patches/**"
-      - "bun.lock"
-      - "Cargo.*"
-      - ".cargo/**"
-      - "*.json"
-      - ".bun-version"
-      - ".node-version"
-      - "rust-toolchain.toml"
-      - "babel.config.cts"
-      - ".github/workflows/native-e2e*.yml"
+    paths: *paths
   workflow_dispatch:
     inputs:
       diagnostic:

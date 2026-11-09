@@ -128,4 +128,7 @@ appId: ${APP_ID}
     timeout: 30000
 - assertVisible: New calendar
 - runFlow: ../common/close-sheet.yaml
+- extendedWaitUntil:
+    visible: No events found
+    timeout: 30000
 - assertNotVisible: "Maestro visibility event.*"

@@ -371,17 +371,9 @@ export function AuthProvider({
         query: { disableCookieCache: true },
         fetchOptions: { timeout: AUTH_SESSION_CHECK_TIMEOUT_MS },
       }).catch(() => null);
-      const acceptedUser =
-        typeof data === "object" && data !== null && "user" in data
-          ? data.user
-          : null;
-      const expectedUserId =
-        typeof acceptedUser === "object" && acceptedUser !== null &&
-        "id" in acceptedUser && typeof acceptedUser.id === "string"
-          ? acceptedUser.id
-          : null;
+      const expectedUserId = (data as { user?: { id?: unknown } } | null | undefined)?.user?.id;
       if (
-        (!expectedUserId || sessionResult?.data?.user.id === expectedUserId) &&
+        (typeof expectedUserId !== "string" || sessionResult?.data?.user.id === expectedUserId) &&
         applySessionData(sessionResult?.data)
       ) return;
       if (applySessionData(data)) return;

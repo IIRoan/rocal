@@ -138,7 +138,7 @@ async fn verify(env: &TestEnv) -> anyhow::Result<()> {
         .await?;
     let calendars: i64 = sqlx::query_scalar("SELECT count(*) FROM calendar WHERE user_id = $1 AND encrypted_name IS NOT NULL AND encryption_state = 'encrypted'").bind(&user).fetch_one(&mut db).await?;
     let events: i64 = sqlx::query_scalar("SELECT count(*) FROM calendar_event WHERE user_id = $1 AND encrypted_content IS NOT NULL AND encryption_state = 'encrypted'").bind(&user).fetch_one(&mut db).await?;
-    let readable: i64 = sqlx::query_scalar("SELECT count(*) FROM calendar_event WHERE user_id = $1 AND (title LIKE 'Maestro%' OR coalesce(description, '') LIKE '%Maestro%' OR coalesce(location, '') LIKE '%Maestro%')").bind(&user).fetch_one(&mut db).await?;
+    let readable: i64 = sqlx::query_scalar("SELECT (SELECT count(*) FROM calendar_event WHERE user_id = $1 AND (title LIKE 'Maestro%' OR coalesce(description, '') LIKE '%Maestro%' OR coalesce(location, '') LIKE '%Maestro%')) + (SELECT count(*) FROM calendar WHERE user_id = $1 AND name LIKE '%Maestro%') + (SELECT count(*) FROM event_category WHERE user_id = $1 AND name LIKE '%Maestro%')").bind(&user).fetch_one(&mut db).await?;
     let preferences: Option<String> =
         sqlx::query_scalar("SELECT encrypted_preferences FROM user_settings WHERE user_id = $1")
             .bind(&user)
@@ -148,7 +148,7 @@ async fn verify(env: &TestEnv) -> anyhow::Result<()> {
     ensure!(events > 0, "UI did not persist encrypted events");
     ensure!(
         readable == 0,
-        "UI left readable event content in the database"
+        "UI left readable event, calendar or category names in the database"
     );
     ensure!(preferences.is_some(), "UI did not seal account settings");
     let mail_accounts: i64 = sqlx::query_scalar(

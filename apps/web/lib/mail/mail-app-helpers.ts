@@ -199,8 +199,6 @@ export function buildAttachmentPreviewCacheKey(attachment: MailAttachment): stri
   ].join("::");
 }
 
-export { buildReplyContext } from "@workspace/calendar-core";
-
 export function createOptimisticReplyMessage(input: {
   fromEmail: string;
   to: string[];

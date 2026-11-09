@@ -21,13 +21,8 @@ jobs:
     env:
       SOLACE_E2E: "1"
       E2E_PLATFORM: ${{ inputs.platform }}
-      APP_VARIANT: preview
-      EXPO_PUBLIC_API_URL: http://127.0.0.1:4001
-      EXPO_PUBLIC_APP_URL: http://localhost:4100
-      EXPO_NO_DOTENV: "1"
       CI: "1"
       CARGO_BUILD_JOBS: "3"
-      MAESTRO_CLI_NO_ANALYTICS: "1"
       MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
       DEVELOPER_DIR: ${{ inputs.platform == 'ios' && '/Applications/Xcode_26.6.app/Contents/Developer' || '' }}
       SOLACE_E2E_IOS_RUNTIME: "26.5"
@@ -36,10 +31,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          case "$E2E_PLATFORM" in
-            ios|android) ;;
-            *) echo "Choose iOS or Android journeys." >&2; exit 1 ;;
-          esac
           echo "SOLACE_E2E_DIR=$RUNNER_TEMP/solace-e2e" >> "$GITHUB_ENV"
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
       - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
@@ -57,9 +48,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$SOLACE_E2E_DIR/private" "$SOLACE_E2E_DIR/artifacts"
-          chmod 700 "$SOLACE_E2E_DIR/private"
-          echo "SOLACE_E2E_TOOLCHAIN=${ImageOS:-runner}-${ImageVersion:-current}" >> "$GITHUB_ENV"
           if [ "$E2E_PLATFORM" = ios ]; then
             brew install postgresql@18 python@3.13
             echo "$(brew --prefix python@3.13)/libexec/bin" >> "$GITHUB_PATH"

@@ -5,8 +5,9 @@ const cachedDate = z.union([z.iso.datetime(), z.date()]).transform((value) =>
   typeof value === "string" ? new Date(value) : value,
 );
 
-const cachedSessionSchema = z.strictObject({
-  user: z.strictObject({
+// Plain objects drop additive response metadata so a server update cannot invalidate an installed app's cache.
+const cachedSessionSchema = z.object({
+  user: z.object({
     id: z.string().min(1),
     name: z.string(),
     email: z.email(),
@@ -15,7 +16,7 @@ const cachedSessionSchema = z.strictObject({
     createdAt: cachedDate,
     updatedAt: cachedDate,
   }),
-  session: z.strictObject({
+  session: z.object({
     id: z.string().min(1),
     userId: z.string().min(1),
     token: z.string().regex(/^\S+$/),
@@ -26,14 +27,6 @@ const cachedSessionSchema = z.strictObject({
     userAgent: z.null().optional(),
   }),
 });
-
-function pickCachedFields(value: unknown, fields: string[]): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  const candidate = value as Record<string, unknown>;
-  const selected: Record<string, unknown> = {};
-  for (const field of fields) selected[field] = candidate[field];
-  return selected;
-}
 
 function matchesSessionCookie(cookie: string, token: string): boolean {
   const cookies = cookie.split(";").map((entry) => entry.trim()).filter((entry) =>
@@ -55,13 +48,7 @@ function matchesSessionCookie(cookie: string, token: string): boolean {
 
 /** Only an unexpired session whose owner and stored cookie match can open the encrypted offline copy. */
 export function parseCachedAuthSession(value: unknown, cookie: string): typeof authClient.$Infer.Session | null {
-  const candidate = pickCachedFields(value, Object.keys(cachedSessionSchema.shape));
-  if (!candidate) return null;
-  // Ignore additive response metadata so a server update cannot invalidate an installed app's cache.
-  const parsed = cachedSessionSchema.safeParse({
-    user: pickCachedFields(candidate.user, Object.keys(cachedSessionSchema.shape.user.shape)),
-    session: pickCachedFields(candidate.session, Object.keys(cachedSessionSchema.shape.session.shape)),
-  });
+  const parsed = cachedSessionSchema.safeParse(value);
   if (!parsed.success) return null;
   const { session, user } = parsed.data;
   if (session.expiresAt.getTime() <= Date.now() || session.userId !== user.id) return null;

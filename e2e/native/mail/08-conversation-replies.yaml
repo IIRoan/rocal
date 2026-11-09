@@ -18,8 +18,8 @@ appId: ${APP_ID}
     env:
       EMAIL: ${PEER_EMAIL}
       PASSWORD: ${PEER_PASSWORD}
-- assertNotVisible: ".*Maestro round trip.*"
 - runFlow: ../common/conversation-inbox.yaml
+- assertNotVisible: ".*Maestro round trip.*"
 - tapOn: ".*Maestro conversation.*"
 - runFlow:
     file: ../common/conversation-body.yaml

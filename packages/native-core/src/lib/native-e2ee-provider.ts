@@ -30,10 +30,7 @@ import type { PasswordEnvelopeRequest } from "@workspace/calendar-client";
 import { createLogger } from "@workspace/logger";
 import { z } from "@workspace/calendar-core/zod";
 import { createNativeCryptoProvider } from "./native-crypto-provider";
-import {
-  encryptReminderLead,
-  encryptReminderTitle,
-} from "./notification-title-crypto";
+import { encryptReminderLead, encryptReminderTitle } from "./notification-title-crypto";
 import { SECURE_STORE_KEYS } from "./constants";
 import { getE2eeApiUrl } from "./e2ee-api-url";
 import { getAuthHeaders } from "./api";
@@ -54,9 +51,7 @@ export interface E2eeSession {
 }
 
 /** Validate the bootstrap before trusting its device list. */
-function isE2eeBootstrapResponse(
-  value: unknown,
-): value is E2eeBootstrapResponse {
+function isE2eeBootstrapResponse(value: unknown): value is E2eeBootstrapResponse {
   if (typeof value !== "object" || value === null) {
     return false;
   }
@@ -202,11 +197,7 @@ export async function registerDeviceForSession({
     SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
     exportedPrivateKeyJson,
   );
-  await rememberOwnDeviceKeys({
-    deviceId,
-    wrappedAccountKey,
-    wrappedSearchKey,
-  });
+  await rememberOwnDeviceKeys({ deviceId, wrappedAccountKey, wrappedSearchKey });
   if (envelopeSalt) {
     await rememberDeviceEnvelopeSalt(envelopeSalt);
   }
@@ -256,9 +247,7 @@ async function rememberOwnDeviceKeys(keys: OwnDeviceKeys): Promise<void> {
   );
 }
 
-async function readOwnDeviceKeys(
-  deviceId: string,
-): Promise<OwnDeviceKeys | null> {
+async function readOwnDeviceKeys(deviceId: string): Promise<OwnDeviceKeys | null> {
   const raw = await readChunkedSecureValue(SECURE_STORE_KEYS.E2EE_DEVICE_KEYS);
   if (!raw) return null;
   try {
@@ -511,9 +500,7 @@ export function createNativeE2eeProvider({
       return encryptWith(
         "settings",
         async (e2ee, session) =>
-          JSON.stringify(
-            await e2ee.encryptJsonPayload(session.accountKey, value, aad),
-          ),
+          JSON.stringify(await e2ee.encryptJsonPayload(session.accountKey, value, aad)),
         () => {
           throw new Error("Encrypted data is not unlocked on this device.");
         },

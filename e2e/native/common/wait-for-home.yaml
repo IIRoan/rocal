@@ -27,3 +27,8 @@ appId: ${APP_ID}
                 timeout: 45000
             - waitForAnimationToEnd
             - assertNotVisible: "Save Password\\?"
+- extendedWaitUntil:
+    notVisible:
+      id: workspace-loading-screen
+    timeout: 180000
+- waitForAnimationToEnd

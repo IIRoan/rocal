@@ -7,7 +7,7 @@ import tarfile
 from common import APPS, REPO, directory, output, run
 
 
-def build(platform, app_names=APPS):
+def build(platform, app_names):
     binaries = directory() / "binaries"
     binaries.mkdir(exist_ok=True)
     for app in app_names:

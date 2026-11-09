@@ -32,10 +32,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          case "$E2E_PLATFORM:$E2E_APP" in
-            ios:calendar|ios:mail|android:calendar|android:mail) ;;
-            *) echo "Choose an iOS or Android Calendar or Mail build." >&2; exit 1 ;;
-          esac
           echo "SOLACE_E2E_DIR=$RUNNER_TEMP/solace-e2e" >> "$GITHUB_ENV"
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
       - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
@@ -64,7 +60,7 @@ jobs:
         id: binary
         with:
           path: ${{ runner.temp }}/solace-e2e/binaries
-          key: native-e2e-app-v2-${{ inputs.platform }}-${{ inputs.app }}-${{ runner.arch }}-${{ env.SOLACE_E2E_TOOLCHAIN }}-${{ hashFiles('bun.lock', 'package.json', '.bun-version', '.node-version', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/*.ts', 'packages/*/*.js', 'packages/*/*.cts', 'packages/*/src/**', 'packages/*/assets/**', 'packages/native-core/plugins/**', 'apps/native-*/app/**', 'apps/native-*/src/**', 'apps/native-*/assets/**', 'apps/native-*/*.json', 'apps/native-*/*.ts', 'apps/native-*/*.js', 'apps/native-*/*.cjs', 'apps/native-*/*.cts', 'babel.config.cts', 'scripts/e2e/build.py', 'scripts/e2e/common.py', '.github/workflows/native-e2e-build.yml') }}
+          key: native-e2e-app-v2-${{ inputs.platform }}-${{ inputs.app }}-${{ runner.arch }}-${{ env.SOLACE_E2E_TOOLCHAIN }}-${{ hashFiles('bun.lock', 'package.json', '.bun-version', '.node-version', 'patches/**', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/*.ts', 'packages/*/*.js', 'packages/*/*.cts', 'packages/*/src/**', 'packages/*/assets/**', 'packages/native-core/plugins/**', 'apps/native-*/app/**', 'apps/native-*/src/**', 'apps/native-*/assets/**', 'apps/native-*/*.json', 'apps/native-*/*.ts', 'apps/native-*/*.js', 'apps/native-*/*.cjs', 'apps/native-*/*.cts', 'babel.config.cts', 'scripts/e2e/build.py', 'scripts/e2e/common.py', '.github/workflows/native-e2e-build.yml') }}
       - name: Compile release app
         if: steps.binary.outputs.cache-hit != 'true'
         shell: bash

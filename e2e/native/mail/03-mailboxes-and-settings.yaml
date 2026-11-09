@@ -35,8 +35,8 @@ appId: ${APP_ID}
       TEXT: survives encrypted draft
 - hideKeyboard
 - extendedWaitUntil:
-    visible: ".*Maestro round trip.*"
+    visible: "Maestro round trip, .*"
     timeout: 60000
 - takeScreenshot: ${SCREENSHOT_DIR}/on-device-body-search
-- tapOn: ".*Maestro round trip.*"
+- tapOn: "Maestro round trip, .*"
 - assertVisible: ".*Maestro body survives encrypted draft storage.*"

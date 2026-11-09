@@ -25,6 +25,9 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: Compose message
     timeout: 30000
+- extendedWaitUntil:
+    visible: "No messages (here|match this filter)"
+    timeout: 30000
 - assertNotVisible: ".*Maestro round trip.*"
 - tapOn: ".*Switch mailbox"
 - tapOn: Maestro renamed folder
@@ -39,6 +42,9 @@ appId: ${APP_ID}
 - tapOn: Trash
 - extendedWaitUntil:
     visible: Compose message
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "No messages (here|match this filter)"
     timeout: 30000
 - assertNotVisible: ".*Maestro round trip.*"
 - tapOn: ".*Switch mailbox"

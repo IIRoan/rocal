@@ -8,18 +8,16 @@ import subprocess
 import sys
 import urllib.request
 
-from common import REPO, directory, download, output, run, spawn, stop, unpack, wait_url
+from common import REPO, backend_pid, directory, download, output, run, spawn, stop, unpack, wait_url
 
 STALWART = "http://127.0.0.1:58080"
 ADMIN = "solace-test-admin-local"
+AUTHORIZATION = {"Authorization": "Basic " + base64.b64encode(f"admin:{ADMIN}".encode()).decode()}
 
 
 def jmap(methods):
     payload = json.dumps({"using": ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"], "methodCalls": methods}).encode()
-    request = urllib.request.Request(STALWART + "/jmap/", payload, {
-        "Content-Type": "application/json",
-        "Authorization": "Basic " + base64.b64encode(f"admin:{ADMIN}".encode()).decode(),
-    })
+    request = urllib.request.Request(STALWART + "/jmap/", payload, {"Content-Type": "application/json", **AUTHORIZATION})
     with urllib.request.urlopen(request, timeout=15) as response:
         return json.load(response)
 
@@ -51,43 +49,39 @@ def start_stalwart(private, binary, cli):
     config.write_text(json.dumps({"@type": "RocksDb", "path": str(private / "mail-store")}))
     environment = {**os.environ, "STALWART_RECOVERY_ADMIN": f"admin:{ADMIN}", "STALWART_RECOVERY_MODE_PORT": STALWART.rsplit(":", 1)[1], "STALWART_RECOVERY_MODE": "1"}
     process = spawn("stalwart", [binary, "--config", config], environment)
-    authorization = "Basic " + base64.b64encode(f"admin:{ADMIN}".encode()).decode()
-    wait_url(STALWART + "/jmap/session", {"Authorization": authorization})
+    wait_url(STALWART + "/jmap/session", AUTHORIZATION)
     if process.poll() is not None:
         raise RuntimeError("The isolated Stalwart process exited")
+    # The running recovery-mode process applies the first plan; every restart after it leaves recovery mode.
+    environment.pop("STALWART_RECOVERY_MODE")
+    plan_path = private / "mail-plan.ndjson"
+
+    def apply(plan):
+        plan_path.write_text(plan + "\n")
+        run([cli, "--url", STALWART, "--user", "admin", "--password", ADMIN, "apply", "--file", plan_path, "--quiet"])
+        stop("stalwart")
+        spawn("stalwart", [binary, "--config", config], environment)
+        wait_url(STALWART + "/jmap/session", AUTHORIZATION)
+
     network = {"@type": "reconcile", "object": "NetworkListener", "matchOn": ["name"], "value": {
         "e2e-http": {"name": "http", "protocol": "http", "bind": {STALWART.removeprefix("http://"): True}, "useTls": False, "implicitTls": False},
         "e2e-smtp": {"name": "smtp", "protocol": "smtp", "bind": {"127.0.0.1:2525": True}, "useTls": False, "implicitTls": False},
     }}
-    plan_path = private / "mail-plan.ndjson"
-    plan_path.write_text(json.dumps(network) + "\n")
-    run([cli, "--url", STALWART, "--user", "admin", "--password", ADMIN, "apply", "--file", plan_path, "--quiet"])
-    stop("stalwart")
-    environment.pop("STALWART_RECOVERY_MODE")
-    spawn("stalwart", [binary, "--config", config], environment)
-    wait_url(STALWART + "/jmap/session", {"Authorization": authorization})
+    apply(json.dumps(network))
     roles = jmap([["x:Role/query", {}, "q"], ["x:Role/get", {"#ids": {"resultOf": "q", "name": "x:Role/query", "path": "/ids"}, "properties": ["id", "description"]}, "g"]])
     role = next(item["id"] for item in roles["methodResponses"][1][1]["list"] if item["description"] == "User")
     substitutions = {"SOLACE_TEST_USER_ROLE_ID": role, "SOLACE_TEST_PROVISIONER_PASSWORD": "solace-test-provisioner-local", "SOLACE_TEST_NOREPLY_PASSWORD": "solace-test-noreply-local"}
     plan = "\n".join((REPO / path).read_text() for path in ["apps/stalwart/stalwart/plan/16-provisioner-role.ndjson", "apps/stalwart/test-env/plan.ndjson"])
     for key, value in substitutions.items():
         plan = plan.replace("${" + key + "}", value)
-    plan_path.write_text(plan + "\n")
-    run([cli, "--url", STALWART, "--user", "admin", "--password", ADMIN, "apply", "--file", plan_path, "--quiet"])
-    stop("stalwart")
-    spawn("stalwart", [binary, "--config", config], environment)
-    wait_url(STALWART + "/jmap/session", {"Authorization": authorization})
+    apply(plan)
 
 
 def cleanup():
     private = directory() / "private"
-    backend = private / "backend.pid"
-    if backend.exists():
-        pid = int(backend.read_text())
-        command = subprocess.run(["ps", "-p", str(pid), "-o", "args="], text=True, capture_output=True, check=False).stdout
-        if pid > 1 and "xtask e2e serve" in command:
-            os.kill(pid, signal.SIGCONT)
-            os.kill(pid, signal.SIGTERM)
+    if (private / "backend.pid").exists() and (pid := backend_pid()):
+        os.kill(pid, signal.SIGCONT)
+        os.kill(pid, signal.SIGTERM)
     for name in ["emulator", "s3", "stalwart"]:
         stop(name)
     device = private / "device.json"
@@ -113,9 +107,7 @@ if __name__ == "__main__":
         else:
             run([REPO / "target/debug/xtask", "test-env", "up"])
     elif command == "wait-api":
-        backend = int((directory() / "private/backend.pid").read_text())
-        command_line = subprocess.run(["ps", "-p", str(backend), "-o", "args="], text=True, capture_output=True, check=True).stdout
-        if "xtask e2e serve" not in command_line:
+        if backend_pid() is None:
             raise RuntimeError("The disposable backend did not start")
         wait_url("http://127.0.0.1:4001/api/health")
     elif command == "stop":

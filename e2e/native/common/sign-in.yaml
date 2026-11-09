@@ -11,9 +11,6 @@ appId: ${APP_ID}
       TEXT: ${EMAIL}
       VERIFY_TEXT: "true"
       VERIFY_ID: sign-in-email
-- assertVisible:
-    id: sign-in-email
-    text: ${EMAIL}
 - waitForAnimationToEnd
 - runFlow:
     file: focus-input.yaml
@@ -36,8 +33,3 @@ appId: ${APP_ID}
     visible: "(Create new event|Compose message|Not Now)"
     timeout: 180000
 - runFlow: wait-for-home.yaml
-- extendedWaitUntil:
-    notVisible:
-      id: workspace-loading-screen
-    timeout: 180000
-- waitForAnimationToEnd

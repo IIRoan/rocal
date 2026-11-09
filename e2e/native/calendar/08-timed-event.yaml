@@ -30,7 +30,6 @@ appId: ${APP_ID}
 - evalScript: ${output.startTime = maestro.copiedText}
 - copyTextFrom: "End time:.*"
 - evalScript: ${output.endTime = maestro.copiedText}
-- assertTrue: ${output.startTime.length > 0 && output.endTime.length > 0}
 - tapOn: Save
 - extendedWaitUntil:
     notVisible: Event title

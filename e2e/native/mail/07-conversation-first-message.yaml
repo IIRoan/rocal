@@ -6,6 +6,9 @@ appId: ${APP_ID}
     env:
       EMAIL: ${PEER_EMAIL}
       PASSWORD: ${PEER_PASSWORD}
+- extendedWaitUntil:
+    visible: "No messages (here|match this filter)"
+    timeout: 120000
 - assertNotVisible: ".*Maestro round trip.*"
 - tapOn: Compose message
 - assertVisible: Send

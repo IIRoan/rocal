@@ -43,9 +43,7 @@ export interface E2eeContextValue {
   /** Resolves to a lock when this device cannot open the account key, else null. */
   bootstrap: (userId: string, apiBaseUrl: string) => Promise<E2eeLock | null>;
   /** Wraps the active session's keys to a new sign-in password, once a startup unlock has finished; throws without an unlocked session. */
-  createPasswordEnvelope: (
-    password: string,
-  ) => Promise<PasswordEnvelopePayload>;
+  createPasswordEnvelope: (password: string) => Promise<PasswordEnvelopePayload>;
   /** Stores an envelope a password change could not, when the API predates storing it with the change. */
   uploadPasswordEnvelope: (envelope: PasswordEnvelopeRequest) => Promise<void>;
   clearSession: () => void;
@@ -164,20 +162,18 @@ export function E2eeProvider({
         // A stored key that no longer opens counts as no key, so the envelope decides; its server row goes.
         const deviceKeys =
           existingDevice && privateKeyJwk
-            ? await unwrapStoredDeviceKeys(
-                e2ee,
-                privateKeyJwk,
-                existingDevice,
-              ).catch((error: unknown) => {
-                log.warn("Stored E2EE device key no longer opens", {
-                  userId,
-                  errorName: error instanceof Error ? error.name : typeof error,
-                });
-                void calendarApiService
-                  .deleteE2eeDevice(existingDevice.deviceId)
-                  .catch(() => undefined);
-                return null;
-              })
+            ? await unwrapStoredDeviceKeys(e2ee, privateKeyJwk, existingDevice).catch(
+                (error: unknown) => {
+                  log.warn("Stored E2EE device key no longer opens", {
+                    userId,
+                    errorName: error instanceof Error ? error.name : typeof error,
+                  });
+                  void calendarApiService
+                    .deleteE2eeDevice(existingDevice.deviceId)
+                    .catch(() => undefined);
+                  return null;
+                },
+              )
             : null;
 
         if (existingDevice && deviceKeys) {
@@ -420,7 +416,11 @@ export function E2eeProvider({
     ],
   );
 
-  return <E2eeContext.Provider value={value}>{children}</E2eeContext.Provider>;
+  return (
+    <E2eeContext.Provider value={value}>
+      {children}
+    </E2eeContext.Provider>
+  );
 }
 
 export function useE2ee(): E2eeContextValue {

@@ -19,8 +19,6 @@ export type ComposeSnapshot = {
   identityId: string | null;
 };
 
-export { buildReplyContext } from "@workspace/calendar-core";
-
 export function addressesToCsv(
   addresses: Array<{ email?: string | null }> | undefined,
 ): string {

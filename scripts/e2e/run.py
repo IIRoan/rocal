@@ -10,10 +10,10 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
-from common import APPS, REPO, directory
-from reader_timings import CONVERSATION_JOURNEYS, collect_reader_timings
+from common import APPS, REPO, backend_pid, directory
 
 CALENDAR_START = ("01-authentication", "02-calendar-management")
+CONVERSATION_JOURNEYS = frozenset(("07-conversation-first-message", "08-conversation-replies", "09-conversation-reader"))
 
 
 def maestro_environment():
@@ -46,7 +46,7 @@ def failure_content(log, report=None):
 
 def failure_kind(log, report=None):
     content = failure_content(log, report)
-    if any(marker in content for marker in ("AppCrash", "AppCrashed")):
+    if "AppCrash" in content:
         return "app-crash"
     if any(marker in content for marker in ("TimeoutException", "DEADLINE_EXCEEDED", "OperationTimeout")):
         return "driver-timeout"
@@ -59,24 +59,54 @@ def failure_kind(log, report=None):
     return "maestro-failure"
 
 
+def trace_entries(traces):
+    if traces.is_symlink():
+        return
+    for source in sorted(traces.rglob("commands.json")):
+        if source.is_symlink() or not source.resolve().is_relative_to(traces.resolve()):
+            continue
+        try:
+            entries = json.loads(source.read_text()) if source.stat().st_size <= 8 * 1024 * 1024 else None
+        except (OSError, ValueError):
+            continue
+        if isinstance(entries, list):
+            yield entries
+
+
+def collect_reader_timings(traces):
+    measurements = []
+    observed = set()
+    for entries in trace_entries(traces):
+        tap = None
+        for entry in entries:
+            try:
+                metadata = entry["metadata"]
+                timestamp, duration = metadata["timestamp"], metadata["duration"]
+                if metadata["status"] != "COMPLETED" or type(timestamp) is not int or type(duration) is not int or timestamp <= 0 or not 0 <= duration <= 1_200_000:
+                    continue
+                command = metadata.get("evaluatedCommand", entry.get("command", {}))
+                if "tapOnElement" in command.keys():
+                    tap = timestamp
+                assertion = command["assertConditionCommand"]
+                budget = assertion.get("timeout")
+                if assertion["condition"]["visible"]["idRegex"] != "mail-message-text" or budget not in ("5000", "10000") or tap is None:
+                    continue
+            except (AttributeError, KeyError, TypeError):
+                continue
+            opening = timestamp + duration - tap
+            if not 0 <= opening <= 1_200_000 or (timestamp, duration) in observed:
+                continue
+            observed.add((timestamp, duration))
+            measurements.append({"opening": len(measurements) + 1, "tapToBodyMs": opening, "bodyAssertionMs": duration, "bodyWaitBudgetMs": int(budget)})
+    return measurements
+
+
 def failure_details(log, report, traces, reason, exit_code=None):
     exception = re.search(r"\b((?:maestro|java|javax|io|org|com|kotlin)\.(?:[A-Za-z_$][\w$]*\.)*[A-Za-z_$][\w$]*(?:Exception|Error))\b", failure_content(log, report))
     details = {"reason": reason, "exceptionType": exception.group(1)[:200] if exception else None, "command": None, "step": None, "assertionTarget": None, "exitCode": exit_code}
     commands = {"launchApp", "clearState", "tapOnElement", "inputText", "eraseText", "pressKey", "assertCondition", "scrollUntilVisible",
                 "waitForAnimation", "runFlow", "takeScreenshot", "swipe", "hideKeyboard", "evalScript"}
-    if traces.is_symlink():
-        return details
-    for source in sorted(traces.rglob("commands.json")):
-        if source.is_symlink() or not source.resolve().is_relative_to(traces.resolve()):
-            continue
-        try:
-            if source.stat().st_size > 8 * 1024 * 1024:
-                continue
-            entries = json.loads(source.read_text())
-        except (OSError, ValueError):
-            continue
-        if not isinstance(entries, list):
-            continue
+    for entries in trace_entries(traces):
         for step, entry in enumerate(entries, start=1):
             if not isinstance(entry, dict) or not isinstance(entry.get("metadata"), dict) or entry["metadata"].get("status") != "FAILED":
                 continue
@@ -194,19 +224,19 @@ def publish(results, summary=False):
         Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(table + "\n")
 
 
-def run_journey(platform, app, flow, results, name=None):
+def run_journey(platform, app, flow, results):
     root = directory()
     device = json.loads((root / "private/device.json").read_text())
     fixture = json.loads((root / "private/fixture.json").read_text())
     tool = (root / "private/maestro-path").read_text()
     home = "Create new event" if app == "calendar" else "Compose message"
-    name = name or flow.stem
+    name = flow.stem
     started = time.monotonic()
     screenshots = root / f"private/maestro/{app}-{name}"
     screenshots.mkdir(parents=True, exist_ok=True)
     command = [tool, "--device", device["id"], "test", "--format", "JUNIT",
                "--output", str(root / f"private/{app}-{name}.xml"),
-               "--test-output-dir", str(root / f"private/maestro/{app}-{name}"),
+               "--test-output-dir", str(screenshots),
                "--env", f"APP_ID=onl.solace.{app}.e2e", "--env", f"HOME_LABEL={home}",
                "--env", "SCREENSHOT_DIR=journey",
                "--env", f"AGENDA_DATE_LABEL={agenda_anchor_label(root / 'private/fixture.json')}",
@@ -268,23 +298,18 @@ def run_calendar_start(platform):
 
 def calendar_checkpoint():
     try:
-        saved = json.loads((directory() / "artifacts/results.json").read_text())
-        results = saved.get("results") if isinstance(saved, dict) else None
-    except (OSError, ValueError):
-        raise SystemExit("The calendar checkpoint is unavailable") from None
-    if not isinstance(results, list) or len(results) != len(CALENDAR_START):
-        raise SystemExit("The calendar checkpoint is incomplete")
-    if any(not isinstance(result, dict) or result.get("app") != "calendar" or result.get("name") != name
-           or type(result.get("passed")) is not bool for result, name in zip(results, CALENDAR_START)):
-        raise SystemExit("The calendar checkpoint is invalid")
+        results = json.loads((directory() / "artifacts/results.json").read_text())["results"]
+        valid = [(result["app"], result["name"], type(result["passed"])) for result in results] == [("calendar", name, bool) for name in CALENDAR_START]
+    except (OSError, ValueError, LookupError, TypeError):
+        valid = False
+    if not valid:
+        raise SystemExit("The calendar checkpoint is missing, incomplete or invalid")
     if results[0]["passed"] is not True:
         raise SystemExit("The calendar authentication prerequisite failed")
     return results
 
 
 def main(platform, diagnostic=False, resume=False):
-    if diagnostic and resume:
-        raise SystemExit("Choose a diagnostic or a continued full suite")
     results = calendar_checkpoint() if resume else []
     scenarios = REPO / "e2e/native"
     if diagnostic:
@@ -297,19 +322,17 @@ def main(platform, diagnostic=False, resume=False):
         return
     for app in APPS:
         flows = sorted(path for path in (scenarios / app).glob("*.yaml")
-                       if path.name not in ("offline.yaml", "sign-out.yaml") and path.stem not in CONVERSATION_JOURNEYS)
+                       if path.name not in ("offline.yaml", "sign-out.yaml") and path.stem not in CONVERSATION_JOURNEYS
+                       and not (resume and app == "calendar" and path.stem in CALENDAR_START))
         if not flows:
             raise RuntimeError(f"No {app} user journeys found")
         for index, flow in enumerate(flows):
-            if resume and app == "calendar" and flow.stem in CALENDAR_START:
-                continue
             passed = run_journey(platform, app, flow, results)
             if index == 0 and not passed:
                 raise SystemExit(f"The {app} authentication/content prerequisite failed")
     if all(result["passed"] for result in results if result["app"] == "mail"):
-        backend = int((directory() / "private/backend.pid").read_text())
-        command = subprocess.run(["ps", "-p", str(backend), "-o", "args="], text=True, capture_output=True, check=True).stdout
-        if backend <= 1 or "xtask e2e serve" not in command:
+        backend = backend_pid()
+        if backend is None:
             raise RuntimeError("Refusing to suspend a process outside the disposable backend")
         os.kill(backend, signal.SIGSTOP)
         try:
@@ -319,7 +342,7 @@ def main(platform, diagnostic=False, resume=False):
         if not offline_passed:
             raise SystemExit("The mail offline-read prerequisite failed")
         subprocess.run([sys.executable, REPO / "scripts/e2e/services.py", "wait-api"], check=True)
-        if not run_journey(platform, "mail", scenarios / "common/online-recovery.yaml", results, name="online-recovery"):
+        if not run_journey(platform, "mail", scenarios / "common/online-recovery.yaml", results):
             raise SystemExit("The mail online-recovery prerequisite failed")
     else:
         raise SystemExit("The mail content prerequisites failed")
@@ -341,10 +364,8 @@ if __name__ == "__main__":
             {"app": "setup", "name": "setup-did-not-complete", "passed": False, "seconds": 0},
         ]
         publish(results, summary=True)
+    elif (mode := {(): main, ("--calendar-start",): run_calendar_start, ("--diagnostic",): lambda platform: main(platform, diagnostic=True),
+                   ("--continue",): lambda platform: main(platform, resume=True)}.get(tuple(sys.argv[2:]))) is None:
+        raise SystemExit("Unknown journey arguments")
     else:
-        if sys.argv[2:] not in ([], ["--diagnostic"], ["--calendar-start"], ["--continue"]):
-            raise SystemExit("Unknown journey arguments")
-        if sys.argv[2:] == ["--calendar-start"]:
-            run_calendar_start(sys.argv[1])
-        else:
-            main(sys.argv[1], diagnostic=sys.argv[2:] == ["--diagnostic"], resume=sys.argv[2:] == ["--continue"])
+        mode(sys.argv[1])

@@ -26,12 +26,10 @@ appId: ${APP_ID}
     commands:
       - hideKeyboard
 - waitForAnimationToEnd
-- extendedWaitUntil:
-    visible: Maestro folder
-    timeout: 30000
 - scrollUntilVisible:
     element: Rename Maestro folder
     direction: DOWN
+    timeout: 30000
 - tapOn: Rename Maestro folder
 - scrollUntilVisible:
     element: Save name
@@ -54,7 +52,7 @@ appId: ${APP_ID}
 - pressKey: Enter
 - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible: Maestro renamed folder
+    visible: Hide Maestro renamed folder
     timeout: 30000
 - tapOn: Hide Maestro renamed folder
 - tapOn: Show Maestro renamed folder
@@ -77,7 +75,7 @@ appId: ${APP_ID}
 - hideKeyboard
 - tapOn: Create label
 - extendedWaitUntil:
-    visible: Maestro mail label
+    visible: Delete Maestro mail label
     timeout: 30000
 - runFlow: ../common/open-app.yaml
 - tapOn: Settings

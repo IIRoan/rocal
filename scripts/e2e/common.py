@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import signal
 import subprocess
 import tarfile
@@ -42,8 +43,7 @@ def download(name):
     target = tools / Path(specification["url"]).name
     if not target.exists():
         with urllib.request.urlopen(specification["url"], timeout=120) as source, target.open("wb") as destination:
-            while block := source.read(1024 * 1024):
-                destination.write(block)
+            shutil.copyfileobj(source, destination)
     with target.open("rb") as source:
         digest = hashlib.file_digest(source, "sha256").hexdigest()
     if digest != specification["sha256"]:
@@ -58,13 +58,9 @@ def unpack(name, executable):
     destination.mkdir(exist_ok=True)
     if zipfile.is_zipfile(archive):
         with zipfile.ZipFile(archive) as bundle:
-            for member in bundle.infolist():
-                if not (destination / member.filename).resolve().is_relative_to(destination.resolve()):
-                    raise RuntimeError("Unsafe tool archive path")
+            if any(not (destination / name).resolve().is_relative_to(destination.resolve()) for name in bundle.namelist()):
+                raise RuntimeError("Unsafe tool archive path")
             bundle.extractall(destination)
-            for member in bundle.infolist():
-                if not member.is_dir():
-                    (destination / member.filename).chmod((member.external_attr >> 16) & 0o755 or 0o644)
     else:
         with tarfile.open(archive) as bundle:
             bundle.extractall(destination, filter="data")
@@ -73,6 +69,12 @@ def unpack(name, executable):
         raise RuntimeError(f"Could not locate {executable}")
     matches[0].chmod(0o755)
     return matches[0]
+
+
+def backend_pid():
+    pid = int((directory() / "private/backend.pid").read_text())
+    command = subprocess.run(["ps", "-p", str(pid), "-o", "args="], text=True, capture_output=True, check=False).stdout
+    return pid if pid > 1 and "xtask e2e serve" in command else None
 
 
 def spawn(name, command, environment=None):
