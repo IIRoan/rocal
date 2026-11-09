@@ -59,14 +59,25 @@ it("retains the latest edit when encryption finishes out of order", async () => 
   expect(readLocalTrustedSenders()).toEqual(["new@example.com"]);
 });
 
-it("keeps another account from reading the local list", async () => {
+it("drops another account's list instead of reading or keeping it", async () => {
   writeLocalTrustedSenders(["alice@example.com"]);
   await restoreLocalTrustedSenders();
   const session = getActiveE2eeSession();
   if (!session) throw new Error("Test session missing");
   setActiveE2eeSession({ ...session, userId: "user-2" });
   expect(readLocalTrustedSenders()).toEqual([]);
-  await expect(restoreLocalTrustedSenders()).rejects.toThrow();
+  await restoreLocalTrustedSenders();
+  expect(readLocalTrustedSenders()).toEqual([]);
+  expect(localStorage.getItem(MAIL_TRUSTED_SENDERS_STORAGE_KEY)).toBeNull();
+});
+
+it("seals new edits over a list it cannot open instead of blocking sync", async () => {
+  localStorage.setItem(MAIL_TRUSTED_SENDERS_STORAGE_KEY, "not a sealed list");
+  writeLocalTrustedSenders(["bob@example.com"]);
+  await restoreLocalTrustedSenders();
+  clearLocalTrustedSendersMemory();
+  await restoreLocalTrustedSenders();
+  expect(readLocalTrustedSenders()).toEqual(["bob@example.com"]);
 });
 
 it("does not apply a stale decrypt over a new user edit", async () => {
