@@ -90,3 +90,18 @@ describe("sanitizeContext", () => {
     expect(() => sanitizeContext(cyclic)).not.toThrow();
   });
 });
+
+describe("redaction of hostile mail-derived text", () => {
+  it("handles long non-address tokens without backtracking", () => {
+    const token = "%".repeat(100_000);
+    const start = performance.now();
+    expect(redactPII(`${token} alice@example.com`)).toBe(`${token} [email]`);
+    expect(performance.now() - start).toBeLessThan(1_000);
+  });
+
+  it("redacts raw and encoded addresses embedded in punctuation", () => {
+    expect(redactPII("(a+b@example.co.uk), bob%40example.com; x@y.z")).toBe(
+      "([email]), [email]; x@y.z",
+    );
+  });
+});

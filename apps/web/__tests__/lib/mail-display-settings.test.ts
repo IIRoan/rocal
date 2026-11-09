@@ -12,9 +12,11 @@ import {
   resolveReaderRemoteContent,
 } from "@/lib/mail/mail-display-settings";
 import { emailHtmlHasRemoteContent } from "@workspace/calendar-core/mail-html";
+import { clearLocalMailSettings } from "@/lib/mail/mail-settings-storage";
 
 describe("mail-display-settings", () => {
   beforeEach(() => {
+    clearLocalMailSettings();
     localStorage.clear();
   });
 
@@ -143,6 +145,20 @@ describe("mail-display-settings", () => {
     addTrustedSender("alice@example.com");
     const again = addTrustedSender("Alice@Example.com");
     expect(again.trustedSenders).toEqual(["alice@example.com"]);
+  });
+
+  it("never persists trusted sender addresses as plaintext", () => {
+    addTrustedSender("alice@example.com");
+    expect(localStorage.getItem("mail:displaySettings")).not.toContain("alice@example.com");
+    expect(readMailDisplaySettings().trustedSenders).toEqual(["alice@example.com"]);
+    clearLocalMailSettings();
+    expect(readMailDisplaySettings().trustedSenders).toEqual([]);
+  });
+
+  it("removes the old plaintext copy while retaining legacy trusted senders", () => {
+    localStorage.setItem("mail:displaySettings", JSON.stringify({ trustedSenders: ["legacy@example.com"] }));
+    expect(readMailDisplaySettings().trustedSenders).toEqual(["legacy@example.com"]);
+    expect(localStorage.getItem("mail:displaySettings")).not.toContain("legacy@example.com");
   });
 
   it("removes trusted senders case-insensitively", () => {

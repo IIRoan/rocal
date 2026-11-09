@@ -61,3 +61,11 @@ describe("calendar-event-link", () => {
     expect(isSolaceEventReminderEmail(source)).toBe(false);
   });
 });
+
+it("keeps punctuation inside event ids without retrying every suffix", () => {
+  const id = `event${")".repeat(100_000)}x`;
+  const start = performance.now();
+  expect(extractLinkedCalendarEventId({ bodies: [`?eventId=${id}`] })).toBe(id);
+  expect(performance.now() - start).toBeLessThan(1_000);
+  expect(extractLinkedCalendarEventId({ bodies: ["?eventId=event).,;]"] })).toBe("event");
+});

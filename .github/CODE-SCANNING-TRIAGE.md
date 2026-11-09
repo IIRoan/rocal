@@ -1,0 +1,41 @@
+# Code-scanning triage, 2026-11-09
+
+Reviewed against master `2d22c616`. The starting inventory was 4,349 open alerts: 31 CodeQL and 4,318 Trivy. Decisions are recorded on the individual GitHub alerts with a reason; these are snapshot decisions, not advisory-wide exclusions. Current scanners and all severity levels remain enabled.
+
+## Retired configurations
+
+| Configuration                    | Open alerts | Decision                                                                                                                                                                                                                                         |
+| -------------------------------- | ----------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/trivy/container/backend/build` |       3,732 | Dismiss as won't fix: retired build-image inventory. Only the Rust executable is copied into the current Chainguard runtime; build tools and kernel headers are absent there. This does not certify the build environment as vulnerability-free. |
+| `/trivy/container/errex/runtime` |          12 | Dismiss as won't fix: the image and application were removed.                                                                                                                                                                                    |
+
+These reports stopped receiving analyses when the workflow changed, leaving historical findings open. The current backend and notifications runtime scans reported zero findings. Historical analyses are retained; no scan history is deleted.
+
+## Source findings
+
+| Alerts                                                                 | Decision and evidence                                                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 4199, 4203, 4204, 4206, 4207                                           | Confirmed and fixed: quadratic matching in event-link cleanup, recipient validation and PII redaction. Hostile-input regressions reproduced multi-second stalls. Shared fixes cover web and native.                                                                                           |
+| 4218                                                                   | Confirmed and fixed: trusted sender email addresses were plaintext in browser storage. Store the local list sealed with the unlocked account key, migrate the legacy copy, restore before sync, and guard late crypto completions after sign-out or an edit. Native already uses SecureStore. |
+| 4198                                                                   | Confirmed and fixed: the Gatus proxy followed upstream redirects. Use a fixed loopback HTTP connection and relay the redirect without following it.                                                                                                                                           |
+| 4222, 4226, 4227, 4230, 4232, 4233, 4234, 4243, 4244, 4245, 4248, 4249 | Dismiss as used in tests: disposable black-box fixtures or Rust `#[cfg(test)]` modules; no shipped secret or production log sink.                                                                                                                                                             |
+| 4220                                                                   | Dismiss as false positive: private dedicated module Worker, not a cross-origin Window message listener.                                                                                                                                                                                       |
+| 4214                                                                   | Dismiss as false positive: decoded text goes to React Native `Text`, never an HTML sink.                                                                                                                                                                                                      |
+| 4215, 4216, 4217, 4369                                                 | Dismiss as false positive: transformations/detection are not the sanitizer. The rendering pipeline sanitizes last, reserializes allowed tags/attributes, escapes raw `<` in CSS, and uses a scriptless sandbox/CSP.                                                                           |
+| 4201, 4209, 4210, 4211                                                 | Dismiss as false positive: regex input is operator-configured app/API origins, not incoming mail or the separately encoded token/avatar path.                                                                                                                                                 |
+| 4205                                                                   | Dismiss as false positive for remote attack: wildcard suffixes come from the local user's search filter, not incoming mail.                                                                                                                                                                   |
+| 4200                                                                   | Dismiss as false positive: the preceding replacement collapses every repeated dash before the flagged edge-trimming expression runs.                                                                                                                                                          |
+
+## Containers
+
+Gatus now builds with pinned Go 1.27.3 and Alpine 3.24 images and a checked-in dependency patch. Its existing SSH, Discord and retention patches remain. The GitHub SDK update is required because the patched `x/crypto` removed the obsolete OpenPGP package used by the old SDK. Patched Go modules have zero findings in the local Trivy database; upstream module tests and Solace's retention/SSH tests exercise compatibility.
+
+frpc now builds from the pinned upstream 0.72.0 commit with a checked-in patch for its remaining `go-jose` and `x/crypto` advisories. The official 0.72.0 binary still reported four advisories, so a binary-version bump alone was insufficient. Configuration/client tests pass against the patched source. This change concerns the container client; it does not upgrade the separate VPS server.
+
+Stalwart upgrades the packages available in its existing Debian release while building. The vendor base currently offers updates for `apt`, `libapt-pkg7.0`, `tzdata` and `zlib1g`. Its server version and database/mail contract remain unchanged.
+
+Gatus drops root after preparing the existing `/data` volume. Stalwart's health listener and frpc now join Stalwart/HAProxy under the `stalwart` user. Root bootstrap remains necessary for existing volume ownership and process supervision. Alerts 5 and 4432 remain open with the real findings until the fix is merged and activated; the Dockerfile-only USER heuristic cannot inspect the privilege drop.
+
+Alerts 1, 6 and 8 are dismissed as won't fix: Railway already checks the configured health endpoints. Alerts 9 and 10 are used in tests: the disposable Stalwart fixture has its own readiness harness.
+
+Remaining affected-package alerts stay open. Many Debian advisories have no packaged fix, and a package match alone does not prove a production exploit path. They are not dismissed merely for being low/unknown severity, transitive, or currently unfixed. The PR image scans establish the candidate inventory; they do not certify the installed production image, VPS, or managed databases. Confirmed fixes stay open on master until the change lands and scans reconcile them.

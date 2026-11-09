@@ -1,18 +1,24 @@
+FROM golang:1.27.3-alpine3.24@sha256:fa3d596898d9f126af7c01d14ee7597bab3f39cccf392ef36b69fe77cd681f18 AS frpc-builder
+
+ARG FRPC_COMMIT=bafec21abce5f91ae4a05b4bd19c55543c263128
+RUN apk add --no-cache git
+WORKDIR /src
+RUN git init && git remote add origin https://github.com/fatedier/frp.git \
+    && git fetch --depth 1 origin "$FRPC_COMMIT" && git checkout FETCH_HEAD
+COPY frpc-security.patch /tmp/frpc-security.patch
+RUN git apply /tmp/frpc-security.patch \
+    && CGO_ENABLED=0 GOOS=linux go build -mod=readonly -trimpath -ldflags="-s -w" -o /frpc ./cmd/frpc
+
 FROM stalwartlabs/stalwart:v1.0.0@sha256:baafeacd6cbde77acdd94af49972d41c6709e54a376df48e18a9fe3f445eb3d5
 
-ARG FRPC_VERSION=0.69.1
 ARG STALWART_CLI_VERSION=1.0.14
 ARG BUILD_TIMESTAMP=2026-10-26-v1.0.0
 
 USER root
 
 RUN apt-get update \
+    && apt-get upgrade -yq \
     && apt-get install -yq --no-install-recommends curl haproxy iproute2 postgresql-client python3 util-linux xz-utils \
-    && curl -fsSL "https://github.com/fatedier/frp/releases/download/v${FRPC_VERSION}/frp_${FRPC_VERSION}_linux_amd64.tar.gz" \
-        | tar xz -C /tmp \
-    && mv "/tmp/frp_${FRPC_VERSION}_linux_amd64/frpc" /usr/local/bin/frpc \
-    && chmod 755 /usr/local/bin/frpc \
-    && rm -rf /tmp/frp_* \
     && curl -fsSL "https://github.com/stalwartlabs/cli/releases/download/v${STALWART_CLI_VERSION}/stalwart-cli-x86_64-unknown-linux-gnu.tar.xz" \
         | tar xJ -C /tmp \
     && mv /tmp/stalwart-cli-x86_64-unknown-linux-gnu/stalwart-cli /usr/local/bin/stalwart-cli \
@@ -21,6 +27,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /var/log/stalwart /etc/stalwart /usr/local/share/stalwart \
     && chown -R stalwart:stalwart /var/log/stalwart /etc/stalwart /usr/local/share/stalwart
+
+COPY --from=frpc-builder --chmod=755 /frpc /usr/local/bin/frpc
 
 COPY railway-entrypoint.sh /usr/local/bin/railway-entrypoint.sh
 COPY backend-gate.cfg /usr/local/share/stalwart/backend-gate.cfg
