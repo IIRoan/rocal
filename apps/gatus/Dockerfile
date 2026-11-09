@@ -30,7 +30,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -mod=readonly -ldflags="-s -w" -o /gatus .
 
 FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 
-RUN apk add --no-cache ca-certificates apache2-utils tzdata wget python3 su-exec \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache ca-certificates apache2-utils tzdata wget python3 su-exec \
     && addgroup -S -g 10001 gatus && adduser -S -D -H -u 10001 -G gatus gatus \
     && mkdir -p /etc/gatus /data \
     && rm -rf /var/cache/apk/*
@@ -40,7 +41,7 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY stalwart-discord-bridge.py status.html /usr/local/lib/solace/
 COPY config.default.yaml /etc/gatus/config.default.yaml
 
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/gatus \
+RUN chmod 755 /usr/local/bin/entrypoint.sh /usr/local/bin/gatus \
     && chmod 644 /usr/local/lib/solace/*
 
 ENV GATUS_CONFIG_PATH=/data/config.yaml

@@ -11,6 +11,7 @@ import tempfile
 import threading
 import tomllib
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRYPOINT = (ROOT / "railway-entrypoint.sh").read_text()
@@ -207,6 +208,15 @@ class EntrypointTests(unittest.TestCase):
         alive.add(2)
         state["ready"] = False
         self.assertFalse(namespace["ready"]())
+
+    def test_health_recognizes_a_live_root_owned_supervisor(self):
+        code = "def pid_alive(pid):" + ENTRYPOINT.split("def pid_alive(pid):", 1)[1].split("\ndef port_open(port):", 1)[0]
+        namespace = {"os": os}
+        exec(code, namespace)
+        with mock.patch.object(os, "kill", side_effect=PermissionError):
+            self.assertTrue(namespace["pid_alive"](123))
+        with mock.patch.object(os, "kill", side_effect=ProcessLookupError):
+            self.assertFalse(namespace["pid_alive"](123))
 
     def test_health_stays_ready_while_the_relay_listener_reconnects(self):
         code = "def ready():" + ENTRYPOINT.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]

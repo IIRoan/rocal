@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   DEFAULT_MAIL_DISPLAY_SETTINGS,
   parseMailDisplaySettings,
-  serializeMailDisplaySettings,
   withTrustedSender,
   withoutTrustedSender,
   type MailDisplaySettings,
@@ -31,6 +30,17 @@ export {
 
 const STORAGE_KEY = MAIL_DISPLAY_SETTINGS_STORAGE_KEY;
 
+function serializeDisplayPreferences(settings: MailDisplaySettings): string {
+  const preferences = {
+    externalContentPolicy: settings.externalContentPolicy,
+    emailAppearance: settings.emailAppearance,
+    blockTrackingPixels: settings.blockTrackingPixels,
+    hideInlineImageAttachments: settings.hideInlineImageAttachments,
+    attachmentImagePreviewsEnabled: settings.attachmentImagePreviewsEnabled,
+  } satisfies Omit<MailDisplaySettings, "trustedSenders">;
+  return JSON.stringify(preferences);
+}
+
 export function readMailDisplaySettings(): MailDisplaySettings {
   if (typeof window === "undefined") {
     return DEFAULT_MAIL_DISPLAY_SETTINGS;
@@ -42,7 +52,7 @@ export function readMailDisplaySettings(): MailDisplaySettings {
   });
   if (settings.trustedSenders.length > 0) {
     writeLocalTrustedSenders(settings.trustedSenders);
-    localStorage.setItem(STORAGE_KEY, serializeMailDisplaySettings({ ...settings, trustedSenders: [] }));
+    localStorage.setItem(STORAGE_KEY, serializeDisplayPreferences(settings));
   }
   return { ...settings, trustedSenders: readLocalTrustedSenders() };
 }
@@ -60,7 +70,7 @@ export function writeMailDisplaySettings(
       resolved.trustedSenders.some((email, index) => email !== current.trustedSenders[index])) {
       writeLocalTrustedSenders(resolved.trustedSenders);
     }
-    localStorage.setItem(STORAGE_KEY, serializeMailDisplaySettings({ ...resolved, trustedSenders: [] }));
+    localStorage.setItem(STORAGE_KEY, serializeDisplayPreferences(resolved));
     window.dispatchEvent(new CustomEvent("mail-display-settings-changed"));
     if (options?.sync !== false) {
       scheduleMailSettingsServerSync();
