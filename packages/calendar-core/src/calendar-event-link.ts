@@ -19,7 +19,9 @@ function cleanEventId(value: string): string | null {
   } catch {
     decoded = value.trim();
   }
-  const cleaned = decoded.replace(/[),.;\]]+$/g, "");
+  let end = decoded.length;
+  while (end > 0 && "),.;]".includes(decoded.charAt(end - 1))) end -= 1;
+  const cleaned = decoded.slice(0, end);
   return cleaned.length > 0 ? cleaned : null;
 }
 

@@ -31,3 +31,5 @@ trivy convert --format table --scanners vuln,misconfig --table-mode summary /tmp
 ```
 
 Native `bun audit` returns exit code 1 for advisories. CI accepts that result only with a valid nonempty advisory response; missing, malformed or error responses still fail. Reports need not be committed. Secrets are handled by GitHub secret protection, and no raw secret-scan output is uploaded as a public artifact. The workflows use SHA-pinned Chainguard hardened Actions; Dependabot proposes updates. If the repository becomes private, revisit GitHub feature eligibility and runner billing before retaining this setup.
+
+Reviewed alert decisions and the boundary between retired inventories, false positives and open findings are recorded in [the code-scanning triage](CODE-SCANNING-TRIAGE.md). Dismissals require a specific, evidence-backed reason; unfixed or low-severity advisories are not automatically accepted.

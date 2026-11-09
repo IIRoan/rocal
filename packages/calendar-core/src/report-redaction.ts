@@ -23,9 +23,7 @@ export const LOG_REDACTED_QUERY_PLACEHOLDER = "?[redacted]" as const;
 
 /** Order matters: bearer tokens before URLs avoids partial leaks. */
 export const LOG_PII_TEXT_PATTERNS = {
-  email: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
-  /** encodeURIComponent emails appear in URL path params (mail key lookups take an email). */
-  encodedEmail: /[a-zA-Z0-9._%+-]+%40[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi,
+  emailCandidate: /[a-zA-Z0-9._%+@-]+/g,
   bearer: /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
   url: /https?:\/\/[^\s"'<>]+/gi,
 } as const;
@@ -41,14 +39,18 @@ const OMIT_KEYS = new Set(LOG_OMIT_FIELD_KEYS.map((key) => key.toLowerCase()));
 const HASH_KEYS = new Set(LOG_HASH_FIELD_KEYS.map((key) => key.toLowerCase()));
 const MAX_CONTEXT_DEPTH = 6;
 
+/** Scan each complete token once; retrying a local-part match at every character was quadratic. */
+function redactEmailAddresses(text: string): string {
+  return text.replace(LOG_PII_TEXT_PATTERNS.emailCandidate, (token) =>
+    /(?:@|%40)[a-zA-Z0-9.-]+\.[a-zA-Z]{2}/i.test(token)
+      ? LOG_REDACTED_EMAIL_PLACEHOLDER
+      : token,
+  );
+}
+
 /** Redact emails, bearer tokens and URLs from free-form text. */
 export function redactPII(text: string): string {
-  return text
-    .replace(LOG_PII_TEXT_PATTERNS.email, LOG_REDACTED_EMAIL_PLACEHOLDER)
-    .replace(
-      LOG_PII_TEXT_PATTERNS.encodedEmail,
-      LOG_REDACTED_EMAIL_PLACEHOLDER,
-    )
+  return redactEmailAddresses(text)
     .replace(LOG_PII_TEXT_PATTERNS.bearer, LOG_REDACTED_BEARER_PLACEHOLDER)
     .replace(LOG_PII_TEXT_PATTERNS.url, LOG_REDACTED_URL_PLACEHOLDER);
 }
@@ -61,12 +63,7 @@ export function sanitizeRequestUrl(url: string): string {
       parsed.search = LOG_REDACTED_QUERY_PLACEHOLDER;
     }
     // Path params can carry PII (mail key lookups take an email); redact before logging.
-    parsed.pathname = parsed.pathname
-      .replace(LOG_PII_TEXT_PATTERNS.email, LOG_REDACTED_EMAIL_PLACEHOLDER)
-      .replace(
-        LOG_PII_TEXT_PATTERNS.encodedEmail,
-        LOG_REDACTED_EMAIL_PLACEHOLDER,
-      );
+    parsed.pathname = redactEmailAddresses(parsed.pathname);
     return parsed.toString();
   } catch {
     const queryStart = url.indexOf("?");

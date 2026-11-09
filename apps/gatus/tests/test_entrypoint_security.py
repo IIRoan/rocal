@@ -11,6 +11,32 @@ ENTRYPOINT = Path(__file__).resolve().parents[1] / "entrypoint.sh"
 
 
 class EntrypointSecurityTests(unittest.TestCase):
+    def test_root_bootstrap_drops_privileges_before_reading_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            commands = root / "bin"
+            commands.mkdir()
+            log = root / "calls"
+            for name, body in {
+                "id": "echo 0",
+                "chown": 'printf "chown:%s\\n" "$*" >> "$CALLS"',
+                "su-exec": 'printf "su-exec:%s\\n" "$*" >> "$CALLS"',
+            }.items():
+                executable = commands / name
+                executable.write_text("#!/bin/sh\n" + body + "\n")
+                executable.chmod(0o755)
+            source = ENTRYPOINT.read_text().split("\nwrite_base_config\n", 1)[0]
+            script = root / "entrypoint.sh"
+            script.write_text(source.replace("/data", str(root / "data")) + '\nprintf "still-root"\n')
+            result = subprocess.run(["sh", str(script)], env={
+                "PATH": f"{commands}:{os.environ['PATH']}", "PORT": "8080", "CALLS": str(log),
+            }, capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("chown:gatus:gatus", log.read_text().replace("-R ", ""))
+            self.assertIn(f"su-exec:gatus {script}", log.read_text())
+            self.assertFalse((root / "data/config.yaml").exists())
+
     def prepare(self, directory, config, pin="mail.test ssh-ed25519 test-pin"):
         data = Path(directory, "data")
         source = ENTRYPOINT.read_text().split("\nwrite_base_config\n", 1)[0]

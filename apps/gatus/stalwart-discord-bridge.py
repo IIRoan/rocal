@@ -11,7 +11,9 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from contextlib import closing
 from datetime import datetime, timedelta, tzinfo
+from http.client import HTTPConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -150,7 +152,6 @@ def timeline(key: str, start: int, end: int, step: int = HOUR, zone: tzinfo | No
 def _proxy(handler: BaseHTTPRequestHandler) -> None:
     length = int(handler.headers.get("Content-Length") or 0)
     body = handler.rfile.read(length) if length else b""
-    url = f"http://127.0.0.1:{GATUS_PORT}{handler.path}"
 
     # Buffering this response means we cannot keep Content-Encoding. If we
     # forward the browser's Accept-Encoding, Gatus (Fiber) returns Brotli and
@@ -168,9 +169,10 @@ def _proxy(handler: BaseHTTPRequestHandler) -> None:
         }
     }
     headers["Accept-Encoding"] = "identity"
-    req = urllib.request.Request(url, data=body or None, headers=headers, method=handler.command)
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with closing(HTTPConnection("127.0.0.1", GATUS_PORT, timeout=60)) as connection:
+            connection.request(handler.command, handler.path, body=body or None, headers=headers)
+            resp = connection.getresponse()
             payload = resp.read()
             handler.send_response(resp.status)
             for key, value in resp.headers.items():
@@ -181,16 +183,8 @@ def _proxy(handler: BaseHTTPRequestHandler) -> None:
             handler.end_headers()
             if handler.command != "HEAD":
                 handler.wfile.write(payload)
-    except urllib.error.HTTPError as err:
-        payload = err.read()
-        handler.send_response(err.code)
-        handler.send_header("Content-Type", err.headers.get("Content-Type", "text/plain"))
-        handler.send_header("Content-Length", str(len(payload)))
-        handler.end_headers()
-        if handler.command != "HEAD":
-            handler.wfile.write(payload)
-    except Exception as exc:  # noqa: BLE001 — surface upstream failure
-        msg = f"gatus proxy error: {exc}\n".encode()
+    except Exception:  # noqa: BLE001 — surface upstream failure without internal details
+        msg = b"gatus proxy unavailable\n"
         handler.send_response(502)
         handler.send_header("Content-Type", "text/plain")
         handler.send_header("Content-Length", str(len(msg)))

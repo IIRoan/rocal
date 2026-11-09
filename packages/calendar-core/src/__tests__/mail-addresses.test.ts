@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 
 import {
   canSendCompose,
+  isValidEmailAddress,
   normalizeEmailAddress,
   parseAddressList,
   parseRecipientString,
@@ -240,4 +241,12 @@ describe("mail address parsing", () => {
     expect(isReservedSystemEmail("user@solace.onl")).toBe(false);
     expect(isReservedSystemEmail("john.doe@solace.onl")).toBe(false);
   });
+});
+
+it("rejects hostile dotted addresses without overlapping domain matches", () => {
+  const invalid = `a@${"a.".repeat(50_000)}@`;
+  const start = performance.now();
+  expect(isValidEmailAddress(invalid)).toBe(false);
+  expect(validateComposeRecipients({ to: invalid }).errors.recipients).toBeDefined();
+  expect(performance.now() - start).toBeLessThan(1_000);
 });
