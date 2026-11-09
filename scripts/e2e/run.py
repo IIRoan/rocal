@@ -268,7 +268,7 @@ def run_journey(platform, app, flow, results):
         except subprocess.TimeoutExpired:
             passed = False
             reason = "journey-timeout"
-        if reason != "driver-connection":
+        if platform != "ios" or reason != "driver-connection":
             break
     if app == "mail" and name in CONVERSATION_JOURNEYS:
         timings = collect_reader_timings(screenshots)
