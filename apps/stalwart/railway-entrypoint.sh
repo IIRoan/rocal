@@ -212,6 +212,8 @@ state = {
 }
 with open(path + ".tmp", "w", encoding="utf-8") as handle:
     json.dump(state, handle)
+# The unprivileged listener reads only non-secret process and port state.
+os.chmod(path + ".tmp", 0o644)
 os.replace(path + ".tmp", path)
 PY
 }
@@ -259,6 +261,8 @@ def pid_alive(pid):
         return False
     try:
         os.kill(int(pid), 0)
+    except PermissionError:
+        return True
     except OSError:
         return False
     return True
