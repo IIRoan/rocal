@@ -100,6 +100,7 @@ export function MailThreadStack({
           return (
             <View
               key={entry.message.id}
+              testID="mail-expanded-message"
               style={[
                 styles.expanded,
                 separated,
@@ -114,6 +115,7 @@ export function MailThreadStack({
         return (
           <CollapsedMessageRow
             key={entry.message.id}
+            testID={`mail-thread-message-${index}`}
             message={entry.message}
             accountEmail={accountEmail}
             preview={previews?.[entry.message.id]}
@@ -130,6 +132,7 @@ export function MailThreadStack({
 }
 
 function CollapsedMessageRow({
+  testID,
   message,
   accountEmail,
   preview,
@@ -139,6 +142,7 @@ function CollapsedMessageRow({
   styles,
   onSelect,
 }: {
+  testID: string;
   message: JmapEmailMessage;
   accountEmail?: string | null;
   preview?: string;
@@ -160,6 +164,7 @@ function CollapsedMessageRow({
 
   return (
     <Pressable
+      testID={testID}
       onPress={() => onSelect(message.id)}
       style={({ pressed }) => [
         styles.row,

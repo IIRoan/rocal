@@ -1,5 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
-import { MAIL_AUTH_LIFECYCLE, restoreMailSession } from "./mail-session";
+import { MAIL_AUTH_LIFECYCLE, prepareMailSession, restoreMailSession } from "./mail-session";
+import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
+import { buildMailRuntime } from "./mail/mail-runtime";
 import { clearAttachmentCache } from "./mail/attachment-cache";
 import { holdVaultUnlock } from "./mail/mail-crypto";
 import { hydrateMailOfflineSnapshot } from "./mail/mail-offline-snapshot";
@@ -28,7 +30,11 @@ jest.mock("./mail/mail-settings-store", () => ({
 jest.mock("./mail/mail-list-settings-store", () => ({
   clearMailListSettings: jest.fn(),
 }));
-jest.mock("./mail/mail-runtime", () => ({ buildMailRuntime: jest.fn() }));
+jest.mock("./mail/mail-runtime", () => ({
+  buildMailRuntime: jest.fn(async () => ({
+    mailboxes: [{ id: "folder-1", name: "Projects" }],
+  })),
+}));
 jest.mock("./mail/mail-sync", () => ({
   getMailSyncState: () => null,
   resetMailSync: jest.fn(),
@@ -48,7 +54,7 @@ jest.mock("./mail/mail-crypto", () => ({
   holdVaultUnlock: jest.fn(),
   releaseVaultUnlock: jest.fn(),
   clearVaultCache: jest.fn(),
-  ensureVaultLoaded: jest.fn(),
+  ensureVaultLoaded: jest.fn(async () => ({})),
 }));
 
 describe("restoreMailSession", () => {
@@ -57,6 +63,7 @@ describe("restoreMailSession", () => {
   const snapshot = { emailState: "s1" };
 
   beforeEach(() => jest.clearAllMocks());
+  afterEach(() => queryClient.clear());
 
   it("hydrates the current session", async () => {
     mockLoadSnapshot.mockResolvedValueOnce(snapshot);
@@ -72,6 +79,30 @@ describe("restoreMailSession", () => {
   it("wipes decrypted attachments on sign-out", async () => {
     await MAIL_AUTH_LIFECYCLE.onSignedOut?.();
     expect(clearAttachmentCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes a recent restored runtime after unlock so locked folder placeholders do not persist", async () => {
+    queryClient.setQueryData(QUERY_KEYS.mailRuntime(), {
+      mailboxes: [{ id: "folder-1", name: "Encrypted folder" }],
+    });
+    mockLoadSnapshot.mockResolvedValueOnce(snapshot);
+    await restoreMailSession(input);
+    await prepareMailSession(input);
+
+    expect(queryClient.getQueryData(QUERY_KEYS.mailRuntime())).toEqual({
+      mailboxes: [{ id: "folder-1", name: "Projects" }],
+    });
+  });
+
+  it("retains the restored runtime when its background refresh is offline", async () => {
+    const savedRuntime = { mailboxes: [{ id: "folder-1", name: "Saved projects" }] };
+    queryClient.setQueryData(QUERY_KEYS.mailRuntime(), savedRuntime);
+    mockLoadSnapshot.mockResolvedValueOnce(snapshot);
+    await restoreMailSession(input);
+    jest.mocked(buildMailRuntime).mockRejectedValueOnce(new Error("Offline"));
+
+    await expect(prepareMailSession(input)).rejects.toThrow("Offline");
+    expect(queryClient.getQueryData(QUERY_KEYS.mailRuntime())).toBe(savedRuntime);
   });
 
   it.each(["sign-out", "cancellation", "new restore"])(

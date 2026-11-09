@@ -1,0 +1,47 @@
+appId: ${APP_ID}
+---
+- tapOn: Reply
+- assertVisible: Send
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      true: ${typeof RECIPIENT_EMAIL !== "undefined"}
+    commands:
+      - runFlow:
+          file: focus-input.yaml
+          env:
+            INPUT_ID: compose-recipient-to
+      - runFlow:
+          file: type.yaml
+          env:
+            TEXT: ${RECIPIENT_EMAIL}
+            VERIFY_TEXT: "true"
+            VERIFY_ID: compose-recipient-to
+      - pressKey: Enter
+      - waitForAnimationToEnd
+# The editor frame can extend behind the keyboard, so its center is not always tappable.
+- tapOn:
+    text: Message body
+    point: 20%,5%
+    retryTapIfNoChange: false
+- runFlow:
+    file: type.yaml
+    env:
+      TEXT: ${REPLY_TEXT}
+- assertVisible:
+    text: ${"(?s).*" + REPLY_TEXT + ".*"}
+    below:
+      text: Subject
+- assertNotVisible:
+    id: compose-recipient-to
+    text: ${"(?s).*" + REPLY_TEXT + ".*"}
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn:
+    text: Send
+    enabled: true
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    notVisible: Send
+    timeout: 120000
+- waitForAnimationToEnd

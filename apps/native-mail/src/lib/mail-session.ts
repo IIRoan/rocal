@@ -68,7 +68,7 @@ async function finishRestoredMailSession(
     queryClient.fetchQuery({
       queryKey: QUERY_KEYS.mailRuntime(),
       queryFn: buildMailRuntime,
-      staleTime: RUNTIME_STALE_MS,
+      staleTime: 0,
     }),
     restoredRuntime
       ? ensureVaultLoaded(restoredRuntime).then(() =>

@@ -1,4 +1,5 @@
 import {
+  buildReplyContext,
   formatQuotedMailDate,
   resolveMessageReplyFrom,
   resolveMessageReplyRecipients,
@@ -22,7 +23,6 @@ import type { MailComposeState } from "./mail-compose-state";
 import {
   addressesToCsv,
   buildNewComposeBodies,
-  buildReplyContext,
   mapQuotedAttachments,
   resolveSignatureIdentity,
 } from "./mail-compose-utils";

@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/react";
-import { expoClient } from "@better-auth/expo/client";
+import { expoClient, storageAdapter } from "@better-auth/expo/client";
 import { passkeyClient } from "@better-auth/passkey/client";
 import {
   createAuthKeyFetch,
@@ -34,6 +34,27 @@ const baseAuthClient = createAuthClient({
     passkeyClient(),
   ],
 });
+
+/** Read the existing secure cache before timing network validation, independently of the library's asynchronous hydration. */
+export async function readAuthSessionCache(): Promise<unknown> {
+  try {
+    const stored = await storageAdapter(authSecureStore).getItemAsync(`${AUTH_STORAGE_PREFIX}_session_data`);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Clear both copies through Better Auth's shared storage queue so late writes cannot revive a signed-out session. */
+export async function clearAuthSessionCache(): Promise<void> {
+  const session = baseAuthClient.$store.atoms.session;
+  if (session) session.set({ ...session.get(), data: null, error: null, isPending: false });
+  const storage = storageAdapter(authSecureStore);
+  await Promise.all([
+    storage.setItemAsync(`${AUTH_STORAGE_PREFIX}_cookie`, "{}"),
+    storage.setItemAsync(`${AUTH_STORAGE_PREFIX}_session_data`, "{}"),
+  ]);
+}
 
 // Better Auth types the body without `email`, which salts both auth keys, or the envelope the API stores with the new password.
 export const authClient = baseAuthClient as typeof baseAuthClient & {

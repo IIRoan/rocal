@@ -131,6 +131,7 @@ function CategoryEditForm({
             returnKeyType="done"
             onSubmitEditing={handleSave}
             accessibilityLabel="Category name"
+            testID="category-name"
           />
         </SheetGroup>
         {nameError ? <SheetMessage tone="destructive" text={nameError} /> : null}

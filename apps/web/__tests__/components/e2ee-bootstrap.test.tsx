@@ -132,7 +132,7 @@ async function flushEffects() {
   });
 }
 
-function expectSignedOutWith(reason: string) {
+function expectSignedOutWith(reason: Parameters<typeof endLockedSession>[0]) {
   expect(mockEndLockedSession).toHaveBeenCalledTimes(1);
   expect(mockEndLockedSession).toHaveBeenCalledWith(reason);
 }

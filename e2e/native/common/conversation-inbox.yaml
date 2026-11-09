@@ -1,0 +1,13 @@
+appId: ${APP_ID}
+---
+- tapOn: ".*Switch mailbox"
+- tapOn: Inbox
+- waitForAnimationToEnd
+- swipe:
+    start: 50%,30%
+    end: 50%,80%
+    duration: 500
+- extendedWaitUntil:
+    visible: ".*Maestro conversation.*"
+    timeout: 120000
+- waitForAnimationToEnd

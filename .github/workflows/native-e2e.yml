@@ -1,0 +1,87 @@
+name: Native end-to-end
+run-name: ${{ inputs.diagnostic && 'iOS authentication, calendar and photo diagnostics' || 'Native end-to-end' }}
+
+on:
+  pull_request:
+    branches: [master, main, testing]
+    paths: &paths
+      - "apps/native-*/**"
+      - "apps/backend/**"
+      - "apps/stalwart/**"
+      - "crates/**"
+      - "xtask/**"
+      - "packages/**"
+      - "scripts/e2e/**"
+      - "e2e/**"
+      - "patches/**"
+      - "*.json"
+      - "bun.lock"
+      - "Cargo.*"
+      - ".cargo/**"
+      - "rust-toolchain.toml"
+      - ".bun-version"
+      - ".node-version"
+      - "babel.config.cts"
+      - ".github/workflows/native-e2e*.yml"
+  push:
+    branches: [master, testing]
+    paths: *paths
+  workflow_dispatch:
+    inputs:
+      diagnostic:
+        description: Run only iOS authentication, calendar management and photo selection for diagnosis
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-e2e-${{ github.event.pull_request.number || github.ref }}${{ inputs.diagnostic && '-diagnostic' || '' }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    name: Build ${{ matrix.app }} (ios)
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [calendar, mail]
+    uses: ./.github/workflows/native-e2e-build.yml
+    with:
+      platform: ios
+      app: ${{ matrix.app }}
+
+  build-android:
+    if: ${{ !inputs.diagnostic }}
+    name: Build ${{ matrix.app }} (android)
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [calendar, mail]
+    uses: ./.github/workflows/native-e2e-build.yml
+    with:
+      platform: android
+      app: ${{ matrix.app }}
+
+  ios:
+    name: ${{ inputs.diagnostic && 'iOS diagnostics' || format('iOS {0}', matrix.app) }}
+    needs: build-ios
+    if: ${{ always() && !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(inputs.diagnostic && '[""]' || '["calendar", "mail"]') }}
+    uses: ./.github/workflows/native-e2e-journeys.yml
+    with:
+      platform: ios
+      diagnostic: ${{ inputs.diagnostic || false }}
+      app: ${{ matrix.app }}
+
+  android:
+    name: Android
+    needs: build-android
+    if: ${{ always() && !cancelled() && !inputs.diagnostic }}
+    uses: ./.github/workflows/native-e2e-journeys.yml
+    with:
+      platform: android

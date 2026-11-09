@@ -1,0 +1,83 @@
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible: Welcome back
+    timeout: 120000
+- runFlow:
+    file: ../common/focus-input.yaml
+    env:
+      INPUT_ID: sign-in-email
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: ${EMAIL}
+      VERIFY_TEXT: "true"
+      VERIFY_ID: sign-in-email
+- assertVisible:
+    id: sign-in-email
+    text: ${EMAIL}
+- runFlow:
+    file: ../common/focus-input.yaml
+    env:
+      INPUT_ID: sign-in-password
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: definitely-wrong-password
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: ".*(Invalid|invalid|incorrect).*"
+    timeout: 30000
+- assertNotVisible: Create new event
+- waitForAnimationToEnd
+- tapOn:
+    id: sign-in-email
+    point: 95%,50%
+    retryTapIfNoChange: false
+- eraseText
+- waitForAnimationToEnd
+- tapOn:
+    id: sign-in-password
+    point: 95%,50%
+    retryTapIfNoChange: false
+- eraseText
+- waitForAnimationToEnd
+- runFlow: ../common/sign-in.yaml
+- takeScreenshot: ${SCREENSHOT_DIR}/authenticated-calendar
+- runFlow: ../common/open-app.yaml
+- assertNotVisible: Welcome back
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: account
+- scrollUntilVisible:
+    element:
+      id: account-action-sign-out
+    direction: DOWN
+- waitForAnimationToEnd
+- tapOn:
+    id: account-action-sign-out
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "Sign out\\?"
+    timeout: 30000
+- tapOn: Sign Out
+- extendedWaitUntil:
+    visible: Welcome back
+    timeout: 30000
+- runFlow: ../common/sign-in.yaml
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
+- assertVisible: "Personal.*"
+- runFlow: ../common/close-sheet.yaml
+- takeScreenshot: ${SCREENSHOT_DIR}/calendar-unlocked-after-sign-out

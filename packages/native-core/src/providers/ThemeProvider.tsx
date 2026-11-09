@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { useColorScheme } from "react-native";
+import { StatusBar, useColorScheme } from "react-native";
 import {
   DarkTheme,
   DefaultTheme,
@@ -111,6 +111,7 @@ function ThemeContextProvider({
   return (
     <ThemeContext.Provider value={value}>
       <NavigationThemeProvider value={navigationTheme}>
+        <StatusBar barStyle={value.isDark ? "light-content" : "dark-content"} />
         {children}
       </NavigationThemeProvider>
     </ThemeContext.Provider>

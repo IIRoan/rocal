@@ -23,7 +23,11 @@ jest.mock("../../lib/calendar-api-service", () => ({
 }));
 
 import { calendarApiService } from "../../lib/calendar-api-service";
-import { useCalendarEventsLoader } from "../../hooks/use-calendar-events-loader";
+import {
+  EVENTS_QUERY_KEY,
+  getMonthQueryKey,
+  useCalendarEventsLoader,
+} from "../../hooks/use-calendar-events-loader";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -130,7 +134,7 @@ describe("useCalendarEventsLoader in the account time zone", () => {
     expect(
       queryClient
         .getQueryCache()
-        .findAll({ queryKey: ["events"] })
+        .findAll({ queryKey: EVENTS_QUERY_KEY })
         .map((query) => query.queryKey[1]),
     ).toEqual(["2026-03"]);
   });
@@ -148,8 +152,12 @@ describe("useCalendarEventsLoader in the account time zone", () => {
     expect(loader.current?.events.map((item) => item.id)).toEqual([]);
 
     renderLoader("UTC", true);
-    // TanStack Query notifies observers on a timer, so wait a macrotask rather than a microtask.
+    // Await the fetch before its timed observer notification, so an idle timer cannot win the race.
     await act(async () => {
+      await queryClient.getQueryCache().find({
+        queryKey: getMonthQueryKey("2026-03", "UTC"),
+        exact: true,
+      })?.promise;
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -175,7 +183,7 @@ describe("useCalendarEventsLoader in the account time zone", () => {
     expect(
       queryClient
         .getQueryCache()
-        .findAll({ queryKey: ["events"], type: "active" })
+        .findAll({ queryKey: EVENTS_QUERY_KEY, type: "active" })
         .map((query) => query.queryKey[1]),
     ).toEqual(["2026-03"]);
   });
@@ -231,7 +239,7 @@ describe("useCalendarEventsLoader in the account time zone", () => {
       expect(
         queryClient
           .getQueryCache()
-          .findAll({ queryKey: ["events"] })
+          .findAll({ queryKey: EVENTS_QUERY_KEY })
           .map((query) => query.queryKey[1])
           .filter((key) => key !== "none"),
       ).toEqual([month]);

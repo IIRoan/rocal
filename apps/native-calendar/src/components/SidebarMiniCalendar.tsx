@@ -416,27 +416,36 @@ export function SidebarMiniCalendar({
           </View>
 
           <View style={styles.gridViewport} onLayout={handleGridLayout}>
-            <View style={[styles.pagesStripOffset, { left: windowOffsetPx }]}>
-              <Animated.View style={[styles.pagesStrip, pagesAnimatedStyle]}>
-                {pages.map((page) => (
-                  <View
-                    key={page.key}
-                    style={[styles.page, { width: pageWidth }]}
-                  >
-                    <MiniCalendarMonthPage
-                      monthDate={page.monthDate}
-                      weeks={page.weeks}
-                      eventsByDay={page.eventsByDay}
-                      selectedDate={effectiveSelectedDate}
-                      today={today}
-                      onDayPress={onDayPress}
-                      theme={theme}
-                      styles={styles}
-                    />
-                  </View>
-                ))}
-              </Animated.View>
-            </View>
+            {/* Keep offset and transform on one native view so accessibility sees the visible month. */}
+            <Animated.View
+              style={[
+                styles.pagesStrip,
+                { left: windowOffsetPx, width: pages.length * pageWidth },
+                pagesAnimatedStyle,
+              ]}
+            >
+              {pages.map((page) => (
+                <View
+                  key={page.key}
+                  style={[styles.page, { width: pageWidth }]}
+                  accessibilityElementsHidden={page.key !== monthKey}
+                  importantForAccessibility={
+                    page.key === monthKey ? "auto" : "no-hide-descendants"
+                  }
+                >
+                  <MiniCalendarMonthPage
+                    monthDate={page.monthDate}
+                    weeks={page.weeks}
+                    eventsByDay={page.eventsByDay}
+                    selectedDate={effectiveSelectedDate}
+                    today={today}
+                    onDayPress={onDayPress}
+                    theme={theme}
+                    styles={styles}
+                  />
+                </View>
+              ))}
+            </Animated.View>
           </View>
         </View>
       </GestureDetector>
@@ -478,9 +487,6 @@ function createStyles(theme: ThemeTokens) {
     },
     gridViewport: {
       overflow: "hidden" as const,
-    },
-    pagesStripOffset: {
-      position: "relative" as const,
     },
     pagesStrip: {
       flexDirection: "row" as const,

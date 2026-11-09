@@ -16,7 +16,7 @@
         "SOLACE_ENV_SOURCE": "eas"
       },
       "ios": {
-        "image": "sdk-57"
+        "image": "sdk-58"
       },
       "android": {
         "buildType": "apk"
@@ -33,7 +33,7 @@
         "SOLACE_ENV_SOURCE": "eas"
       },
       "ios": {
-        "image": "sdk-57"
+        "image": "sdk-58"
       },
       "android": {
         "buildType": "apk"
@@ -50,7 +50,7 @@
         "SOLACE_ENV_SOURCE": "eas"
       },
       "ios": {
-        "image": "sdk-57"
+        "image": "sdk-58"
       }
     },
     "testing": {

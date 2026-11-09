@@ -1,8 +1,14 @@
 /** @jest-environment jsdom */
 
-import React, { act, type ReactNode } from "react";
+import React, { act, type ReactNode, type Ref } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { Text, View, type ScrollViewProps } from "react-native";
+import {
+  Text,
+  View,
+  type ScrollViewProps,
+  type TextInputProps,
+  type TextInputInstance,
+} from "react-native";
 import type { BottomSheetProps as GorhomProps } from "@gorhom/bottom-sheet";
 import {
   BottomSheet,
@@ -10,6 +16,7 @@ import {
   SheetScrollFocusProvider,
   type BottomSheetHandle,
 } from "./BottomSheet";
+import { SheetSearchField, SheetTextField } from "./sheet/SheetSections";
 
 let mockSheetProps: GorhomProps;
 let mockScrollProps: ScrollViewProps;
@@ -18,6 +25,10 @@ const mockUnregisterScroll = jest.fn();
 const mockRegisterView = jest.fn();
 const mockForceClose = jest.fn();
 const mockSnapToIndex = jest.fn();
+const mockKeyboardFocus = jest.fn();
+const mockKeyboardBlur = jest.fn();
+let mockInsideSheet = true;
+let mockInputProps: TextInputProps & { ref?: Ref<TextInputInstance> };
 const mockInternal = {
   animatedLayoutState: {
     get: () => ({ containerHeight: 800, handleHeight: 28 }),
@@ -39,6 +50,7 @@ jest.mock("react-native", () => ({
   },
   BackHandler: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
   Keyboard: {
+    metrics: () => undefined,
     dismiss: jest.fn(),
     addListener: jest.fn(() => ({ remove: jest.fn() })),
   },
@@ -49,6 +61,10 @@ jest.mock("react-native", () => ({
     hairlineWidth: 1,
   },
   Text: ({ children }: { children?: ReactNode }) => children,
+  TextInput: (props: TextInputProps) => {
+    mockInputProps = props;
+    return <input aria-label={props.accessibilityLabel} />;
+  },
   View: ({ children }: { children?: ReactNode }) => children,
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
@@ -118,7 +134,17 @@ jest.mock("@gorhom/bottom-sheet", () => ({
     mockScrollProps = props;
     return <div data-testid="gorhom-scroll">{props.children}</div>;
   },
-  useBottomSheetInternal: () => mockInternal,
+  BottomSheetTextInput: (props: TextInputProps) => {
+    mockInputProps = props;
+    return (
+      <input
+        aria-label={props.accessibilityLabel}
+        onFocus={mockKeyboardFocus}
+        onBlur={mockKeyboardBlur}
+      />
+    );
+  },
+  useBottomSheetInternal: () => (mockInsideSheet ? mockInternal : null),
 }));
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -127,11 +153,63 @@ let container: HTMLDivElement;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockInsideSheet = true;
   container = document.createElement("div");
+  document.body.appendChild(container);
   root = createRoot(container);
 });
 afterEach(() => {
   act(() => root.unmount());
+  container.remove();
+});
+
+it.each(["name", "search"])(
+  "registers keyboard focus for the drawer %s field",
+  async (kind) => {
+    const change = jest.fn();
+    const inputRef = React.createRef<TextInputInstance>();
+    const field =
+      kind === "name" ? (
+        <SheetTextField
+          accessibilityLabel="Mailbox name"
+          value="Maestro folder"
+          onChangeText={change}
+          autoFocus
+        />
+      ) : (
+        <SheetSearchField
+          accessibilityLabel="Search mailboxes"
+          value="Maestro folder"
+          onChangeText={change}
+          inputRef={inputRef}
+        />
+      );
+    await act(async () => root.render(field));
+    const input = container.querySelector("input");
+    if (!input) throw new Error("Missing drawer field");
+    act(() => input.focus());
+    expect(mockKeyboardFocus).toHaveBeenCalledTimes(1);
+    expect(mockInputProps.value).toBe("Maestro folder");
+    if (kind === "search") expect(mockInputProps.ref).toBe(inputRef);
+    act(() => mockInputProps.onChangeText?.("Renamed folder"));
+    expect(change).toHaveBeenCalledWith("Renamed folder");
+    act(() => input.blur());
+    expect(mockKeyboardBlur).toHaveBeenCalledTimes(1);
+  },
+);
+
+it("keeps the shared text field usable outside a drawer", async () => {
+  mockInsideSheet = false;
+  await act(async () =>
+    root.render(
+      <SheetTextField accessibilityLabel="Account name" value="Maestro" />,
+    ),
+  );
+  const input = container.querySelector("input");
+  if (!input) throw new Error("Missing standalone field");
+  act(() => input.focus());
+  expect(mockInputProps.value).toBe("Maestro");
+  expect(mockKeyboardFocus).not.toHaveBeenCalled();
 });
 
 it("keeps Gorhom scrolling and content dragging across drawer rerenders", async () => {

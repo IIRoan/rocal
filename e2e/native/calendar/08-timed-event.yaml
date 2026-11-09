@@ -1,0 +1,69 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- runFlow: ../common/create-event.yaml
+- tapOn: Event title
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro timed event
+- assertVisible: Maestro timed event
+- pressKey: Enter
+- waitForAnimationToEnd
+- copyTextFrom: "Start time:.*"
+- evalScript: ${output.originalStart = maestro.copiedText}
+- tapOn: "Start time:.*"
+- assertVisible: "Hour.*"
+- assertVisible: "Minute.*"
+- tapOn:
+    text: "Minute.*"
+    point: 50%,70%
+- waitForAnimationToEnd
+- tapOn: Done
+- copyTextFrom: "Start time:.*"
+- assertTrue: ${maestro.copiedText !== output.originalStart}
+- tapOn: "End time:.*"
+- assertVisible: "Hour.*"
+- assertVisible: "Minute.*"
+- tapOn: Done
+- copyTextFrom: "Start time:.*"
+- evalScript: ${output.startTime = maestro.copiedText}
+- copyTextFrom: "End time:.*"
+- evalScript: ${output.endTime = maestro.copiedText}
+- tapOn: Save
+- extendedWaitUntil:
+    notVisible: Event title
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: calendar-saved-event
+      text: Maestro timed event
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- extendedWaitUntil:
+    visible: "Maestro timed event.*"
+    timeout: 30000
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro timed event
+- tapOn: Edit
+- copyTextFrom: "Start time:.*"
+- assertTrue: ${maestro.copiedText === output.startTime}
+- copyTextFrom: "End time:.*"
+- assertTrue: ${maestro.copiedText === output.endTime}
+- takeScreenshot: ${SCREENSHOT_DIR}/timed-event-restored
+- tapOn: Save
+- extendedWaitUntil:
+    notVisible: Event title
+    timeout: 30000
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro timed event
+- tapOn: Delete
+- runFlow: ../common/confirm-event-delete.yaml
+- extendedWaitUntil:
+    notVisible: "Maestro timed event.*"
+    timeout: 30000
+- assertVisible: "Maestro updated event.*"

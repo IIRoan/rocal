@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: ${INPUT_ID}
+      enabled: true
+    timeout: 30000
+- tapOn:
+    id: ${INPUT_ID}
+    enabled: true
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "(q|Q)"
+          timeout: 60000

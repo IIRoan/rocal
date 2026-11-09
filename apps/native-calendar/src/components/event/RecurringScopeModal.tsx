@@ -33,9 +33,10 @@ export function RecurringScopeModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
+      <Pressable accessible={false} style={styles.modalOverlay} onPress={onClose}>
         <View
           style={styles.modalContent}
+          accessibilityViewIsModal
           onStartShouldSetResponder={() => true}
         >
           <Text style={styles.modalTitle}>

@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+---
+- runFlow: focus-input.yaml
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: android:id/input_method_nav_back
+          timeout: 15000
+      - tapOn: ${BLUR_TARGET}
+      - extendedWaitUntil:
+          visible:
+            id: ${INPUT_ID}
+            focused: false
+          timeout: 15000
+      - runFlow: focus-input.yaml

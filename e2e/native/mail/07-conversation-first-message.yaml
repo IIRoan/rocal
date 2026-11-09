@@ -1,0 +1,56 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/sign-out.yaml
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      EMAIL: ${PEER_EMAIL}
+      PASSWORD: ${PEER_PASSWORD}
+- extendedWaitUntil:
+    visible: "No messages (here|match this filter)"
+    timeout: 120000
+- assertNotVisible: ".*Maestro round trip.*"
+- tapOn: Compose message
+- assertVisible: Send
+- waitForAnimationToEnd
+- tapOn:
+    id: compose-recipient-to
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: ${EMAIL}
+      VERIFY_TEXT: "true"
+- pressKey: Enter
+- tapOn:
+    id: compose-subject
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro conversation
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: Message body
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro peer opening note
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn:
+    text: Send
+    enabled: true
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 120000
+- runFlow: ../common/sign-out.yaml
+- runFlow: ../common/sign-in.yaml
+- runFlow: ../common/conversation-inbox.yaml
+- tapOn: ".*Maestro conversation.*"
+- runFlow:
+    file: ../common/conversation-body.yaml
+    env:
+      BODY_TEXT: ".*Maestro peer opening note.*"
+      OPEN_TIMEOUT_MS: 10000
+- takeScreenshot: ${SCREENSHOT_DIR}/conversation-first-delivery
+- tapOn: Go back

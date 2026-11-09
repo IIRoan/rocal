@@ -14,6 +14,7 @@ import {
   View,
   type TextStyle,
   type ViewStyle,
+  type TextInputInstance,
 } from "react-native";
 import {
   formatRecentContactForField,
@@ -63,7 +64,7 @@ export type RecipientSuggestInputProps = {
   containerStyle?: ViewStyle | ViewStyle[];
   /** Renders beside the text field; suggestions always sit full-width below. */
   trailing?: ReactNode;
-  inputRef?: Ref<TextInput>;
+  inputRef?: Ref<TextInputInstance>;
   autoFocus?: boolean;
   hasError?: boolean;
 };
@@ -88,7 +89,7 @@ export function RecipientSuggestInput({
 }: RecipientSuggestInputProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const fieldRef = useRef<TextInput | null>(null);
+  const fieldRef = useRef<TextInputInstance | null>(null);
   const selectingRef = useRef(false);
   const listInteractionRef = useRef(false);
   const suppressOpenRef = useRef(false);

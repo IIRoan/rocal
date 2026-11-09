@@ -1,0 +1,95 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: ".*Switch mailbox"
+- tapOn: Inbox
+- tapOn: ".*Maestro round trip.*"
+- extendedWaitUntil:
+    visible: Unread
+    timeout: 30000
+- tapOn: Unread
+- extendedWaitUntil:
+    visible:
+      text: Move
+      enabled: true
+    timeout: 30000
+- tapOn: Go back
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 30000
+- assertVisible: "Unread, .*Maestro round trip.*"
+- tapOn: ".*Maestro round trip.*"
+- tapOn: Move
+- assertVisible: Move to
+- tapOn: Maestro renamed folder
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "No messages (here|match this filter)"
+    timeout: 30000
+- assertNotVisible: ".*Maestro round trip.*"
+- tapOn: ".*Switch mailbox"
+- tapOn: Maestro renamed folder
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: ".*Switch mailbox"
+- tapOn: Maestro renamed folder
+- tapOn: ".*Maestro round trip.*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- tapOn: Trash
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "No messages (here|match this filter)"
+    timeout: 30000
+- assertNotVisible: ".*Maestro round trip.*"
+- tapOn: ".*Switch mailbox"
+- tapOn: Deleted Items
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 30000
+- tapOn: ".*Maestro round trip.*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- tapOn: More
+- tapOn: Restore to inbox
+- extendedWaitUntil:
+    visible: Compose message
+    timeout: 30000
+- assertNotVisible: ".*Maestro round trip.*"
+- tapOn: ".*Switch mailbox"
+- tapOn: Inbox
+- extendedWaitUntil:
+    visible: ".*Maestro round trip.*"
+    timeout: 30000
+- tapOn: ".*Maestro round trip.*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"
+- takeScreenshot: ${SCREENSHOT_DIR}/restored-from-trash
+- tapOn: Go back
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: mailboxes
+- scrollUntilVisible:
+    element: Delete Maestro renamed folder
+    direction: DOWN
+- tapOn: Delete Maestro renamed folder
+- assertVisible: "Delete mailbox\\?"
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: Maestro renamed folder
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: mailboxes
+- scroll
+- assertNotVisible: Maestro renamed folder
+- runFlow: ../common/back-to-settings.yaml
+- runFlow: ../common/close-sheet.yaml

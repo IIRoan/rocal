@@ -381,7 +381,7 @@ describe("EventEditor", () => {
   });
 
   it("asks for confirmation before deleting an event", async () => {
-    const deleteEvent = jest.fn(async () => {});
+    const deleteEvent = jest.fn(async (_eventId: string) => {});
     mockUseSharedCalendarData.mockReturnValue({
       calendars: [...calendars],
       deleteEvent,

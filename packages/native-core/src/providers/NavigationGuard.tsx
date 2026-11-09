@@ -29,6 +29,7 @@ import {
 import { useAccountTimezoneSeed } from "../hooks/use-account-timezone-seed";
 import {
   STARTUP_CRYPTO_INITIAL_PHASE,
+  retrySessionStartup,
   type AuthenticatedSessionInput,
 } from "../lib/startup-crypto";
 import type { PushTapHandler } from "../lib/push-notifications";
@@ -100,6 +101,25 @@ function startupReducer(
   }
 }
 
+function WorkspaceContent({
+  blocked,
+  children,
+}: {
+  blocked: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <View
+      style={{ flex: 1 }}
+      accessibilityElementsHidden={blocked}
+      importantForAccessibility={blocked ? "no-hide-descendants" : "auto"}
+      pointerEvents={blocked ? "none" : "auto"}
+    >
+      {children}
+    </View>
+  );
+}
+
 /** Shared auth gate: redirects by session state and blocks the UI while E2EE and app startup run. */
 export function NavigationGuard({
   children,
@@ -164,10 +184,13 @@ export function NavigationGuard({
     }
 
     let cancelled = false;
-    dispatchStartup({ type: "started" });
+    let restoreAttempted = false;
+    let encryptionReady = false;
 
-    (async () => {
-      if (restoreSession) {
+    const initializeSession = async () => {
+      dispatchStartup({ type: "started" });
+      if (restoreSession && !restoreAttempted) {
+        restoreAttempted = true;
         const restored = await restoreWithTimeout(
           (isCancelled) =>
             restoreSession({ queryClient, userId: user.id, isCancelled }),
@@ -177,16 +200,19 @@ export function NavigationGuard({
         dispatchStartup({ type: "restored", userId: user.id, restored });
       }
 
-      const lock = await bootstrap(user.id, API_BASE_URL);
-      if (cancelled) return;
-      // A signed-in session always holds the account key; one that cannot open it ends instead of asking for a password.
-      if (lock) {
-        await signOut(
-          lock === "cannot-open"
-            ? UNLOCK_FAILED_NOTICE
-            : SIGN_IN_TO_UNLOCK_NOTICE,
-        );
-        return;
+      if (!encryptionReady) {
+        const lock = await bootstrap(user.id, API_BASE_URL);
+        if (cancelled) return;
+        // An authoritative lock ends the session; an unavailable API keeps the password for the next attempt.
+        if (lock) {
+          await signOut(
+            lock === "cannot-open"
+              ? UNLOCK_FAILED_NOTICE
+              : SIGN_IN_TO_UNLOCK_NOTICE,
+          );
+          return;
+        }
+        encryptionReady = true;
       }
 
       await prepareSession?.({
@@ -228,20 +254,19 @@ export function NavigationGuard({
           }
         })
         .catch(() => undefined);
-    })()
-      .catch((error: unknown) => {
-        log.warn("Session startup failed", {
-          errorName: error instanceof Error ? error.name : typeof error,
-        });
-      })
-      .finally(() => {
-        if (!cancelled) {
-          dispatchStartup({ type: "finished" });
-        }
+      dispatchStartup({ type: "finished" });
+    };
+
+    const stopRetry = retrySessionStartup(initializeSession, (error) => {
+      log.warn("Session startup failed", {
+        errorName: error instanceof Error ? error.name : typeof error,
       });
+      dispatchStartup({ type: "phase", message: "Waiting to reconnect…" });
+    });
 
     return () => {
       cancelled = true;
+      stopRetry();
     };
   }, [
     isAuthenticated,
@@ -268,8 +293,13 @@ export function NavigationGuard({
     isAuthenticated && !isLoading && !isStartupRunning;
 
   return (
-    <View style={{ flex: 1 }}>
-      {children}
+    <View
+      style={{ flex: 1 }}
+      testID={isPushNavigationReady ? "workspace-ready" : "workspace-preparing"}
+    >
+      <WorkspaceContent blocked={isPreparingWorkspace}>
+        {children}
+      </WorkspaceContent>
       <PushNotificationNavigation
         navigationReady={isPushNavigationReady}
         handler={pushTapHandler}

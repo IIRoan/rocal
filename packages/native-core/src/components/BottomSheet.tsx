@@ -5,10 +5,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
   type StyleProp,
   type TextStyle,
+  type TextInputInstance,
+  type TextInputProps,
   type ViewStyle,
 } from "react-native";
 import {
@@ -23,6 +26,7 @@ import {
   useRef,
   useState,
   type ComponentProps,
+  type ComponentType,
   type EffectCallback,
   type ReactNode,
   type Ref,
@@ -39,6 +43,7 @@ import Animated, {
 } from "react-native-reanimated";
 import GorhomBottomSheet, {
   BottomSheetScrollView as GorhomBottomSheetScrollView,
+  BottomSheetTextInput as GorhomBottomSheetTextInput,
   useBottomSheetInternal,
   type BottomSheetBackdropProps,
   type BottomSheetBackgroundProps,
@@ -65,6 +70,11 @@ const SHEET_CLOSE_FALLBACK_MS = 1200;
 /** Horizontal slop before the sheet pan gives way to horizontal gestures (page back-swipe, carousels). */
 const PAN_FAIL_OFFSET_X: [number, number] = [-12, 12];
 const PAN_ACTIVE_OFFSET_Y: [number, number] = [-6, 6];
+
+type SheetTextInputProps = TextInputProps & { ref?: Ref<TextInputInstance> };
+// Gorhom still types its input ref as the TextInput component from before RN 0.88.
+const GorhomTextInput =
+  GorhomBottomSheetTextInput as ComponentType<SheetTextInputProps>;
 
 const SHEET_SPRING: WithSpringConfig = {
   stiffness: 200,
@@ -248,6 +258,13 @@ export function BottomSheetScrollView({
 }
 
 BottomSheetScrollView.displayName = "BottomSheetScrollView";
+
+/** Registers focused drawer inputs so the sheet can keep its content above the keyboard. */
+export function BottomSheetTextInput(props: SheetTextInputProps) {
+  const sheet = useBottomSheetInternal(true);
+  if (sheet) return <GorhomTextInput {...props} />;
+  return <TextInput {...props} />;
+}
 
 export function BottomSheetFooter({
   children,

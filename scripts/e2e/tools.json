@@ -1,0 +1,30 @@
+{
+  "actionlint": {
+    "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz",
+    "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+  },
+  "maestro": {
+    "url": "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.12.0/maestro.zip",
+    "sha256": "a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e"
+  },
+  "s3mock": {
+    "url": "https://repo.maven.apache.org/maven2/com/adobe/testing/s3mock/4.10.0/s3mock-4.10.0-exec.jar",
+    "sha256": "91b4acb30e46884f46cffd69e283c33081e8cea13d0bf901c448dbf0eb50b710"
+  },
+  "stalwart-arm64": {
+    "url": "https://github.com/stalwartlabs/stalwart/releases/download/v1.0.0/stalwart-aarch64-apple-darwin.tar.gz",
+    "sha256": "38097ad18a61c20829a21d8b8fdc4b630e4f1b756d821175906cf75e32094a40"
+  },
+  "stalwart-x86_64": {
+    "url": "https://github.com/stalwartlabs/stalwart/releases/download/v1.0.0/stalwart-x86_64-apple-darwin.tar.gz",
+    "sha256": "571a41db3e963f290e2990a3a545560dd52e7638945393bea56aa1efe9fe0713"
+  },
+  "stalwart-cli-arm64": {
+    "url": "https://github.com/stalwartlabs/cli/releases/download/v1.0.14/stalwart-cli-aarch64-apple-darwin.tar.xz",
+    "sha256": "ba033a42cf91e9ecbd4a9125078d6c0615ff7512f86d0746e13938004b49de56"
+  },
+  "stalwart-cli-x86_64": {
+    "url": "https://github.com/stalwartlabs/cli/releases/download/v1.0.14/stalwart-cli-x86_64-apple-darwin.tar.xz",
+    "sha256": "523e72759d7579640463f63b9562ae815be012f4825e39cd7538e228c50d6570"
+  }
+}

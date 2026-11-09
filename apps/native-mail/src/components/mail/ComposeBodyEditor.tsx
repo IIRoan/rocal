@@ -135,7 +135,7 @@ function buildEditorDocument(input: {
   </style>
 </head>
 <body>
-  <div id="ed" contenteditable="true" data-placeholder="${escapeHtmlAttribute(placeholder)}">${sanitizeUntrustedEmailHtml(html)}</div>
+  <div id="ed" role="textbox" aria-label="Message body" aria-multiline="true" contenteditable="true" data-placeholder="${escapeHtmlAttribute(placeholder)}">${sanitizeUntrustedEmailHtml(html)}</div>
   <script>
     (function() {
       var ed = document.getElementById('ed');
@@ -356,7 +356,7 @@ export const ComposeBodyEditor = forwardRef<
   }
 
   return (
-    <View style={styles.container} accessibilityLabel="Message body">
+    <View style={styles.container}>
       <WebView
         ref={(instance) => {
           injectJavaScriptRef.current =

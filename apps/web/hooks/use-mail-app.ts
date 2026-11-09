@@ -33,6 +33,7 @@ import {
   appendMailboxMessages,
   hasMoreMailboxMessages,
   formatQuotedMailDate,
+  buildReplyContext,
   type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import { useSettings } from "@/hooks/use-settings";
@@ -139,7 +140,6 @@ import {
   sortMessages,
   listedDecryptedAttachments,
   buildAttachmentPreviewCacheKey,
-  buildReplyContext,
   createOptimisticReplyMessage,
   mergeMailboxes,
   mergeMessagesForMailbox,

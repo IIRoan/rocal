@@ -8,6 +8,7 @@ import {
   View,
   type TextStyle,
   type ViewStyle,
+  type TextInputInstance,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -98,7 +99,7 @@ export function CommandPalette() {
   const { setActiveView, setCurrentDate, setSelectedDate } = useCalendarView();
   const queryClient = useQueryClient();
   const { navigate, push } = useRouter();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const titleIndex = useNativeTitleIndex();
 
   const [query, setQuery] = useState("");

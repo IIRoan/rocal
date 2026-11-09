@@ -11,6 +11,7 @@ interface MockFile {
 jest.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 jest.mock("expo-file-system", () => {
   const created: MockFile[] = [];
+  const write = jest.fn<Promise<void>, [MockFile, string]>();
   class File implements MockFile {
     uri: string;
     exists = false;
@@ -23,20 +24,23 @@ jest.mock("expo-file-system", () => {
       this.exists = true;
     }
     write(content: string) {
-      this.content = content;
+      return write(this, content);
     }
     delete() {
       this.exists = false;
     }
   }
-  return { File, Paths: { cache: { uri: "file:///cache" } }, created };
+  return { File, Paths: { cache: { uri: "file:///cache" } }, created, write };
 });
 jest.mock("expo-sharing", () => ({
   isAvailableAsync: jest.fn(),
   shareAsync: jest.fn(),
 }));
 
-const { created: files } = jest.requireMock<{ created: MockFile[] }>("expo-file-system");
+const { created: files, write } = jest.requireMock<{
+  created: MockFile[];
+  write: jest.Mock<Promise<void>, [MockFile, string]>;
+}>("expo-file-system");
 const isAvailableAsync = Sharing.isAvailableAsync as jest.Mock;
 const shareAsync = Sharing.shareAsync as jest.Mock;
 
@@ -55,6 +59,9 @@ const event: CalendarEvent = {
 describe("shareEventIcs", () => {
   beforeEach(() => {
     files.length = 0;
+    write.mockReset().mockImplementation(async (file, content) => {
+      file.content = content;
+    });
     isAvailableAsync.mockReset().mockResolvedValue(true);
     shareAsync.mockReset();
   });
@@ -81,6 +88,39 @@ describe("shareEventIcs", () => {
     expect(files[0]?.exists).toBe(false);
   });
 
+  it("waits for the file write before opening the share sheet", async () => {
+    let finishWrite: (() => void) | undefined;
+    write.mockImplementation(
+      (file, content) =>
+        new Promise<void>((resolve) => {
+          finishWrite = () => {
+            file.content = content;
+            resolve();
+          };
+        }),
+    );
+
+    const sharing = shareEventIcs(event);
+    await Promise.resolve();
+
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(shareAsync).not.toHaveBeenCalled();
+    expect(files[0]?.exists).toBe(true);
+    if (!finishWrite) throw new Error("File write did not start");
+    finishWrite();
+    await sharing;
+    expect(shareAsync).toHaveBeenCalledTimes(1);
+    expect(files[0]?.exists).toBe(false);
+  });
+
+  it("cleans up a failed file write without opening the share sheet", async () => {
+    write.mockRejectedValue(new Error("write failed"));
+
+    await expect(shareEventIcs(event)).rejects.toThrow("write failed");
+    expect(shareAsync).not.toHaveBeenCalled();
+    expect(files[0]?.exists).toBe(false);
+  });
+
   it("deletes the temp file when the share sheet fails", async () => {
     shareAsync.mockRejectedValue(new Error("share failed"));
     await expect(shareEventIcs(event)).rejects.toThrow("share failed");
@@ -97,7 +137,11 @@ describe("shareEventIcs", () => {
 
   it("writes nothing for an event this device could not decrypt", async () => {
     await expect(
-      shareEventIcs({ ...event, title: "Encrypted event", encryptionState: "encrypted" }),
+      shareEventIcs({
+        ...event,
+        title: "Encrypted event",
+        encryptionState: "encrypted",
+      }),
     ).rejects.toThrow("still encrypted");
     expect(files).toHaveLength(0);
     expect(shareAsync).not.toHaveBeenCalled();

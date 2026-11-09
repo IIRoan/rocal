@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+---
+- waitForAnimationToEnd
+- runFlow:
+    file: focus-input.yaml
+    env:
+      INPUT_ID: sign-in-email
+- runFlow:
+    file: type.yaml
+    env:
+      TEXT: ${EMAIL}
+      VERIFY_TEXT: "true"
+      VERIFY_ID: sign-in-email
+- waitForAnimationToEnd
+- runFlow:
+    file: focus-input.yaml
+    env:
+      INPUT_ID: sign-in-password
+- runFlow:
+    file: type.yaml
+    env:
+      TEXT: ${PASSWORD}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- waitForAnimationToEnd
+- tapOn:
+    text: Sign in
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "(Create new event|Compose message|Not Now)"
+    timeout: 180000
+- runFlow: wait-for-home.yaml

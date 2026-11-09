@@ -1,0 +1,42 @@
+appId: ${APP_ID}
+---
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "(q|Q|Speed up your typing.*)"
+          timeout: 60000
+      - runFlow:
+          when:
+            visible: "Speed up your typing.*"
+          commands:
+            - tapOn: Continue
+            - extendedWaitUntil:
+                notVisible: "Speed up your typing.*"
+                timeout: 60000
+      - extendedWaitUntil:
+          visible: "(q|Q)"
+          timeout: 60000
+      - runFlow: type-characters.yaml
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: android:id/input_method_nav_back
+          timeout: 15000
+      - waitForAnimationToEnd
+      - runFlow:
+          when:
+            true: ${typeof VERIFY_TEXT !== "undefined" && VERIFY_TEXT === "true"}
+          commands:
+            - runFlow: type-characters.yaml
+      - runFlow:
+          when:
+            true: ${typeof VERIFY_TEXT === "undefined" || VERIFY_TEXT !== "true"}
+          commands:
+            - inputText: ${TEXT}

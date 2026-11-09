@@ -81,6 +81,7 @@ export function EventDetailsView({
 
       <View style={styles.viewTitleRow}>
         <Text
+          testID="event-details-title"
           style={[
             styles.viewEventTitle,
             isCancelledCalendarEvent(event) && styles.viewEventTitleCancelled,

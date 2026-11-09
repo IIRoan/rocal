@@ -1,0 +1,92 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: mailboxes
+- tapOn:
+    text: New mailbox name
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro folder
+      VERIFY_TEXT: "true"
+- assertVisible: Maestro folder
+- pressKey: Enter
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: Android
+      visible:
+        id: com.google.android.inputmethod.latin:id/keyboard_holder
+    commands:
+      - hideKeyboard
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: Rename Maestro folder
+    direction: DOWN
+    timeout: 30000
+- tapOn: Rename Maestro folder
+- scrollUntilVisible:
+    element: Save name
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn:
+    text: Rename Maestro folder
+    point: 95%,50%
+    retryTapIfNoChange: false
+- eraseText
+- waitForAnimationToEnd
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro renamed folder
+      VERIFY_TEXT: "true"
+- assertVisible: Maestro renamed folder
+- pressKey: Enter
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: Hide Maestro renamed folder
+    timeout: 30000
+- tapOn: Hide Maestro renamed folder
+- tapOn: Show Maestro renamed folder
+- takeScreenshot: ${SCREENSHOT_DIR}/encrypted-custom-mailbox
+- runFlow: ../common/back-to-settings.yaml
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: labels
+- tapOn:
+    text: Label name
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro mail label
+      VERIFY_TEXT: "true"
+- assertVisible: Maestro mail label
+- hideKeyboard
+- tapOn: Create label
+- extendedWaitUntil:
+    visible: Delete Maestro mail label
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: labels
+- assertVisible: Maestro mail label
+- tapOn: Delete Maestro mail label
+- assertVisible: "Delete label\\?"
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: Maestro mail label
+    timeout: 30000

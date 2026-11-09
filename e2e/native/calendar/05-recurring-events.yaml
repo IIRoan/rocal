@@ -1,0 +1,65 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- runFlow: ../common/create-event.yaml
+- tapOn: Event title
+- waitForAnimationToEnd
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro recurring event
+- assertVisible: Maestro recurring event
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: All day
+- tapOn: "Repeat:.*"
+- tapOn: "Every week on .*"
+- tapOn: Save
+- extendedWaitUntil:
+    visible: "Maestro recurring event.*"
+    timeout: 30000
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro recurring event
+- tapOn: Edit
+- extendedWaitUntil:
+    visible: All occurrences
+    timeout: 30000
+- tapOn: All occurrences
+- waitForAnimationToEnd
+- tapOn:
+    text: Event title
+    point: 95%,50%
+    retryTapIfNoChange: false
+- eraseText
+- waitForAnimationToEnd
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro edited series
+- assertVisible: Maestro edited series
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: Save
+- extendedWaitUntil:
+    notVisible: Event title
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Maestro edited series.*"
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro edited series
+- tapOn: Delete
+- extendedWaitUntil:
+    visible: All occurrences
+    timeout: 30000
+- tapOn: All occurrences
+- runFlow: ../common/confirm-event-delete.yaml
+- extendedWaitUntil:
+    notVisible: "Maestro edited series.*"
+    timeout: 30000
+- assertVisible: "Maestro updated event.*"

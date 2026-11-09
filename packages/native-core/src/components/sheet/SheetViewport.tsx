@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { StyleSheet } from "react-native";
+import { useEffect, type ReactNode } from "react";
+import { Keyboard, Platform, StyleSheet } from "react-native";
 import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
@@ -16,6 +16,17 @@ const ANIMATION_RUNNING = 1;
 const GESTURE_ACTIVE = 4;
 
 export function SheetViewport({ children }: { children: ReactNode }) {
+  const keyboardTop = useSharedValue(
+    Keyboard.metrics()?.screenY ?? Number.POSITIVE_INFINITY,
+  );
+  const isAndroid = Platform.OS === "android";
+  useEffect(() => {
+    if (!isAndroid) return;
+    const subscription = Keyboard.addListener("keyboardDidShow", (event) => {
+      keyboardTop.set(event.endCoordinates.screenY);
+    });
+    return () => subscription.remove();
+  }, [isAndroid, keyboardTop]);
   const {
     animatedLayoutState,
     animatedPosition,
@@ -50,13 +61,22 @@ export function SheetViewport({ children }: { children: ReactNode }) {
   const viewportStyle = useAnimatedStyle(() => {
     const layout = animatedLayoutState.get();
     const keyboard = animatedKeyboardState.get();
+    // Android resize mode reports zero overlap even when edge-to-edge leaves the container behind the keyboard.
+    const keyboardOverlap = isAndroid
+      ? Math.max(
+          0,
+          layout.containerOffset.top +
+            layout.containerHeight -
+            keyboardTop.get(),
+        )
+      : keyboard.heightWithinContainer;
     return {
       height: getBottomSheetViewportHeight(
         layout.containerHeight,
         restingPosition.get(),
         animatedSheetHeight.get(),
         layout.handleHeight,
-        keyboard.status === KEYBOARD_SHOWN ? keyboard.heightWithinContainer : 0,
+        keyboard.status === KEYBOARD_SHOWN ? keyboardOverlap : 0,
       ),
     };
   });

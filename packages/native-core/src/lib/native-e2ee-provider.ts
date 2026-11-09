@@ -50,7 +50,7 @@ export interface E2eeSession {
   apiBaseUrl: string;
 }
 
-/** Shape guard for the bootstrap payload; a malformed response is treated as no bootstrap. */
+/** Validate the bootstrap before trusting its device list. */
 function isE2eeBootstrapResponse(value: unknown): value is E2eeBootstrapResponse {
   if (typeof value !== "object" || value === null) {
     return false;
@@ -67,26 +67,43 @@ function isE2eeBootstrapResponse(value: unknown): value is E2eeBootstrapResponse
   );
 }
 
+async function withE2eeRequestTimeout<T>(request: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  try {
+    return await request(controller.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchE2eeBootstrap(
   apiBaseUrl: string,
 ): Promise<E2eeBootstrapResponse | null> {
   const bootstrapUrl = getE2eeApiUrl(apiBaseUrl, "/bootstrap");
-  // repo-rules-allow client-api-boundary: E2EE bootstrap endpoint; @workspace/calendar-client does not expose it.
-  const response = await fetch(bootstrapUrl, {
-    credentials: "omit",
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    log.warn("E2EE bootstrap endpoint returned a non-OK response", {
-      status: response.status,
-      url: bootstrapUrl,
+  return withE2eeRequestTimeout(async (signal) => {
+    // repo-rules-allow client-api-boundary: E2EE bootstrap endpoint; @workspace/calendar-client does not expose it.
+    const response = await fetch(bootstrapUrl, {
+      credentials: "omit",
+      headers: getAuthHeaders(),
+      signal,
     });
-    return null;
-  }
 
-  const payload: unknown = await response.json();
-  return isE2eeBootstrapResponse(payload) ? payload : null;
+    if (!response.ok) {
+      log.warn("E2EE bootstrap endpoint returned a non-OK response", {
+        status: response.status,
+        url: bootstrapUrl,
+      });
+      if (response.status === 401 || response.status === 403) return null;
+      throw new Error("Encryption setup is temporarily unavailable.");
+    }
+
+    const payload: unknown = await response.json();
+    if (!isE2eeBootstrapResponse(payload)) {
+      throw new Error("Encryption setup could not be validated.");
+    }
+    return payload;
+  });
 }
 
 export async function readStoredDevice(bootstrapData: E2eeBootstrapResponse) {
@@ -148,27 +165,30 @@ export async function registerDeviceForSession({
   );
   const exportedPrivateKeyJson = JSON.stringify(exportedPrivateKey);
 
-  // repo-rules-allow client-api-boundary: E2EE device-registration endpoint; @workspace/calendar-client does not expose it.
-  const deviceResponse = await fetch(getE2eeApiUrl(apiBaseUrl, "/device"), {
-    method: "PUT",
-    credentials: "omit",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify({
-      deviceId,
-      publicKey,
-      wrappedAccountKey,
-      wrappedSearchKey,
-    }),
-  });
+  await withE2eeRequestTimeout(async (signal) => {
+    // repo-rules-allow client-api-boundary: E2EE device-registration endpoint; @workspace/calendar-client does not expose it.
+    const deviceResponse = await fetch(getE2eeApiUrl(apiBaseUrl, "/device"), {
+      method: "PUT",
+      credentials: "omit",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({
+        deviceId,
+        publicKey,
+        wrappedAccountKey,
+        wrappedSearchKey,
+      }),
+    });
 
-  if (!deviceResponse.ok) {
-    throw new Error(
-      `E2EE device registration returned ${deviceResponse.status}.`,
-    );
-  }
+    if (!deviceResponse.ok) {
+      throw new Error(
+        `E2EE device registration returned ${deviceResponse.status}.`,
+      );
+    }
+  });
 
   // The old device's salt must never vouch for the new key, even if the app dies between writes.
   await rememberDeviceEnvelopeSalt(null);
@@ -308,20 +328,23 @@ export async function uploadPasswordEnvelope(
   apiBaseUrl: string,
   envelope: PasswordEnvelopeRequest,
 ): Promise<void> {
-  // repo-rules-allow client-api-boundary: E2EE password-envelope endpoint; @workspace/calendar-client does not expose it.
-  const response = await fetch(getE2eeApiUrl(apiBaseUrl, "/password"), {
-    method: "PUT",
-    credentials: "omit",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify(envelope),
-  });
+  await withE2eeRequestTimeout(async (signal) => {
+    // repo-rules-allow client-api-boundary: E2EE password-envelope endpoint; @workspace/calendar-client does not expose it.
+    const response = await fetch(getE2eeApiUrl(apiBaseUrl, "/password"), {
+      method: "PUT",
+      credentials: "omit",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(envelope),
+    });
 
-  if (!response.ok) {
-    throw new Error(`E2EE password registration returned ${response.status}.`);
-  }
+    if (!response.ok) {
+      throw new Error(`E2EE password registration returned ${response.status}.`);
+    }
+  });
   await rememberDeviceEnvelopeSalt(envelope.kdfSalt);
 }
 

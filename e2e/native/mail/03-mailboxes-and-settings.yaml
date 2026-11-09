@@ -1,0 +1,42 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: ".*Switch mailbox"
+- assertVisible: Inbox
+- assertVisible: Drafts
+- assertVisible: Sent Items
+- assertVisible: Deleted Items
+- tapOn: Inbox
+- assertVisible: ".*Maestro round trip.*"
+- tapOn: Settings
+- assertVisible: Search settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: appearance
+- assertVisible: "(?i)Theme"
+- tapOn: Dark
+- assertVisible:
+    text: Dark
+    selected: true
+- takeScreenshot: ${SCREENSHOT_DIR}/mail-dark-settings
+- tapOn: Light
+- assertVisible:
+    text: Light
+    selected: true
+- runFlow: ../common/back-to-settings.yaml
+- runFlow: ../common/close-sheet.yaml
+- tapOn: Search messages
+- assertVisible: Search mail
+- tapOn: Search mail
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: survives encrypted draft
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "Maestro round trip, .*"
+    timeout: 60000
+- takeScreenshot: ${SCREENSHOT_DIR}/on-device-body-search
+- tapOn: "Maestro round trip, .*"
+- assertVisible: ".*Maestro body survives encrypted draft storage.*"

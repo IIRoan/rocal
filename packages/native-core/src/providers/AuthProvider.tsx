@@ -13,7 +13,8 @@ import {
   AUTH_SESSION_LIFETIME_SECONDS,
   AUTH_SESSION_REFRESH_INTERVAL_SECONDS,
 } from "@workspace/calendar-core";
-import { authClient } from "../lib/auth-client";
+import { authClient, clearAuthSessionCache, readAuthSessionCache } from "../lib/auth-client";
+import { parseCachedAuthSession } from "../lib/cached-auth-session";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { API_BASE_URL } from "../lib/constants";
 import { calendarApiService, getAuthHeaders } from "../lib/api";
@@ -29,8 +30,10 @@ import {
 } from "../lib/passkey-browser-bridge";
 import {
   ensureSessionTokenCookie,
+  getSessionCookie,
   healAuthCookieJar,
   rememberSessionTokenFromJar,
+  readSessionTokenFromJar,
   persistRenewedSessionCookie,
   waitForSessionCookie,
 } from "../lib/session-cookie";
@@ -49,7 +52,7 @@ import {
 import { clearNativeTitleIndex } from "../lib/search/title-index-store";
 import { queryClient } from "./QueryProvider";
 
-const AUTH_STATUS_TIMEOUT_MS = 3_000;
+const AUTH_SESSION_CHECK_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
 
 type AuthStatusPayload = {
@@ -235,7 +238,7 @@ export function AuthProvider({
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
-      AUTH_STATUS_TIMEOUT_MS,
+      AUTH_SESSION_CHECK_TIMEOUT_MS,
     );
     let response: Response;
     const requestHeaders = new Headers(getAuthHeaders());
@@ -306,6 +309,12 @@ export function AuthProvider({
     [],
   );
 
+  const restoreCachedSession = useCallback((storedSession: unknown) => {
+    const cookie = getSessionCookie();
+    const cached: unknown = authClient.$store.atoms.session?.get().data;
+    return applySessionData(parseCachedAuthSession(cached, cookie) ?? parseCachedAuthSession(storedSession, cookie));
+  }, [applySessionData]);
+
   const clearPendingAuthPassword = useCallback(() => {
     pendingAuthPasswordRef.current = null;
   }, []);
@@ -349,15 +358,25 @@ export function AuthProvider({
         });
       }
 
-      if (applySessionData(data)) {
+      if (
+        typeof data === "object" && data !== null &&
+        "session" in data && data.session && applySessionData(data)
+      ) {
         return;
       }
 
       await waitForSessionCookie();
+      // Expo persists the complete restart cache when get-session finishes, before the workspace can be closed.
       const sessionResult = await authClient.getSession({
         query: { disableCookieCache: true },
-      });
-      if (applySessionData(sessionResult?.data)) return;
+        fetchOptions: { timeout: AUTH_SESSION_CHECK_TIMEOUT_MS },
+      }).catch(() => null);
+      const expectedUserId = (data as { user?: { id?: unknown } } | null | undefined)?.user?.id;
+      if (
+        (typeof expectedUserId !== "string" || sessionResult?.data?.user.id === expectedUserId) &&
+        applySessionData(sessionResult?.data)
+      ) return;
+      if (applySessionData(data)) return;
 
       if (authToken) {
         await ensureSessionTokenCookie(authToken, {
@@ -426,7 +445,10 @@ export function AuthProvider({
   // A session the server ended (revoked, expired, 401/403) gets the sign-out wipe; a network failure keeps the device's data.
   const endSession = useCallback(() => {
     clearSession();
-    void wipeSessionData(lifecycleRef.current).catch(() => undefined);
+    void Promise.all([
+      clearAuthSessionCache(),
+      wipeSessionData(lifecycleRef.current),
+    ]).catch(() => undefined);
   }, [clearSession]);
 
   // Register the end-session callback so the HTTP layer can terminate sessions on 401/403 without a React hook.
@@ -485,25 +507,26 @@ export function AuthProvider({
       setEmailPasswordAuthHints(password);
       sessionLoadIdRef.current += 1;
       let authData: unknown;
+      let result: Awaited<ReturnType<typeof authClient.signIn.email>> | undefined;
+      let previousSessionCookie: string | null | undefined;
       try {
         await healAuthCookieJar();
-        const result = await authClient.signIn.email({ email, password });
-
-        if (result.error) {
-          throw new Error(
-            result.error.message ?? "Sign-in failed. Please try again.",
-          );
-        }
-
-        authData = result.data;
+        previousSessionCookie = await readSessionTokenFromJar();
+        result = await authClient.signIn.email({ email, password });
       } catch (error) {
+        if (previousSessionCookie === undefined) {
+          resetAuthMethodHints();
+          throw error;
+        }
         let recoveredSession: Awaited<
           ReturnType<typeof authClient.getSession>
         > | null = null;
+        let recoveredSessionCookie: string | null = null;
         try {
           recoveredSession = await authClient.getSession({
             query: { disableCookieCache: true },
           });
+          recoveredSessionCookie = await readSessionTokenFromJar();
         } catch {
           // Preserve the original sign-in error below.
         }
@@ -512,13 +535,22 @@ export function AuthProvider({
         const recoveredEmail = recoveredSession?.data?.user.email
           ?.trim()
           .toLowerCase();
-        if (!recoveredSession?.data || recoveredEmail !== requestedEmail) {
+        if (
+          !recoveredSession?.data || recoveredEmail !== requestedEmail ||
+          !recoveredSessionCookie || recoveredSessionCookie === previousSessionCookie
+        ) {
           resetAuthMethodHints();
           throw error;
         }
 
         authData = recoveredSession.data;
       }
+
+      if (result?.error) {
+        resetAuthMethodHints();
+        throw new Error(result.error.message ?? "Sign-in failed. Please try again.");
+      }
+      if (result) authData = result.data;
 
       const earlyToken =
         typeof (authData as { token?: unknown } | undefined)?.token === "string"
@@ -597,6 +629,7 @@ export function AuthProvider({
     // Capture before clearing the fallback so logout requests still authenticate when the jar is empty.
     const logoutHeaders = getAuthHeaders();
     setFallbackSessionToken(null);
+    const cacheCleared = clearAuthSessionCache().catch(() => undefined);
     const leave = async () => {
       await Promise.all([
         unregisterNativePushDevice(logoutHeaders),
@@ -614,7 +647,8 @@ export function AuthProvider({
       await wipeSessionData(lifecycleRef.current);
     };
     // A failing cleanup step still ends the session, so the app is never left signed in without its keys.
-    await leave().finally(() => {
+    await leave().finally(async () => {
+      await cacheCleared;
       clearSession();
       setSignInNotice(notice ?? null);
     });
@@ -622,18 +656,40 @@ export function AuthProvider({
 
   useEffect(() => {
     let ignore = false;
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const loadId = ++sessionLoadIdRef.current;
     const isStale = () => ignore || loadId !== sessionLoadIdRef.current;
+    let storedSession: unknown = null;
 
     async function loadSession() {
       try {
         // Legacy jars used a bare `"1"` chunk meta; Better Auth JSON.parses that to number 1 and crashes on Set-Cookie. Flatten before any auth I/O.
         await healAuthCookieJar();
         if (isStale()) return;
+        storedSession = await readAuthSessionCache();
+        if (isStale()) return;
 
-        const result = await authClient.getSession({
-          query: { disableCookieCache: true },
-        });
+        const result = await Promise.race([
+          authClient.getSession({
+            query: { disableCookieCache: true },
+            fetchOptions: {
+              signal: controller.signal,
+              onSuccess() {
+                if (controller.signal.aborted || isStale()) {
+                  throw new Error("Session changed while loading.");
+                }
+              },
+            },
+          }),
+          new Promise<never>((_resolve, reject) => {
+            timeoutId = setTimeout(() => {
+              controller.abort();
+              reject(new Error("Session check timed out."));
+            }, AUTH_SESSION_CHECK_TIMEOUT_MS);
+          }),
+        ]);
+        clearTimeout(timeoutId);
         if (isStale()) return;
 
         if (applySessionData(result?.data)) {
@@ -650,14 +706,22 @@ export function AuthProvider({
             // Keep a session that Better Auth just validated.
           }
         } else if (!isStale() && !hasLiveSessionRef.current) {
-          if (result?.error) clearSession();
-          else endSession();
+          const status = result?.error?.status;
+          if (status === 0 || (typeof status === "number" && status >= 500)) {
+            if (!restoreCachedSession(storedSession)) clearSession();
+          } else if (!result?.error || status === 401 || status === 403) {
+            endSession();
+          } else {
+            clearSession();
+          }
         }
       } catch {
         if (!isStale() && !hasLiveSessionRef.current) {
-          clearSession();
+          if (!restoreCachedSession(storedSession)) clearSession();
         }
       } finally {
+        storedSession = null;
+        clearTimeout(timeoutId);
         if (!ignore) setIsLoading(false);
       }
     }
@@ -665,8 +729,10 @@ export function AuthProvider({
     void loadSession();
     return () => {
       ignore = true;
+      controller.abort();
+      clearTimeout(timeoutId);
     };
-  }, [applySessionData, clearSession, endSession, fetchAuthStatus]);
+  }, [applySessionData, clearSession, endSession, fetchAuthStatus, restoreCachedSession]);
 
   const userId = user?.id ?? null;
   useEffect(() => {

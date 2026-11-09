@@ -45,6 +45,7 @@ export function CategoryCreatePage() {
             returnKeyType="done"
             onSubmitEditing={handleCreate}
             accessibilityLabel="Category name"
+            testID="category-name"
           />
         </SheetGroup>
         {nameError ? <SheetMessage tone="destructive" text={nameError} /> : null}

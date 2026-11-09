@@ -3,7 +3,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["DOM", "ES2022"],
-    "types": ["jest", "@types/react"],
+    "types": ["@types/react"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
@@ -26,6 +26,6 @@
       "@workspace/logger/*": ["../logger/src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "jest.setup.ts", "env.d.ts"],
-  "exclude": ["node_modules", "coverage"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "env.d.ts"],
+  "exclude": ["node_modules", "coverage", "**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"]
 }

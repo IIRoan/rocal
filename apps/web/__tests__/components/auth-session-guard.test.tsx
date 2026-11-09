@@ -146,7 +146,7 @@ describe("AuthSessionGuard", () => {
       requiresPasskeyStepUp: false,
     });
     mockReconcileAuthSession.mockResolvedValue({ status: "recovered" });
-    const refetch = jest.fn(async () => undefined);
+    const refetch = jest.fn(async (_options?: unknown) => undefined);
     mockUseSession.mockReturnValue({
       data: { user: { id: "user-1" } },
       isPending: false,

@@ -53,9 +53,8 @@ jest.mock("@workspace/logger", () => ({
 }));
 
 jest.mock("@workspace/e2ee", () => {
-  const actual = jest.requireActual<typeof import("@workspace/e2ee")>(
-    "@workspace/e2ee",
-  );
+  const actual =
+    jest.requireActual<typeof import("@workspace/e2ee")>("@workspace/e2ee");
   return {
     ENCRYPTED_EVENT_PLACEHOLDER_TITLE: "Encrypted event",
     createE2eeModule: jest.fn(),
@@ -169,7 +168,9 @@ function storeDevice(
     E2EE_ENVELOPE_SALT: envelopeSalt,
     ...extra,
   };
-  mockGetItemAsync.mockImplementation(async (key: string) => stored[key] ?? null);
+  mockGetItemAsync.mockImplementation(
+    async (key: string) => stored[key] ?? null,
+  );
 }
 
 const storedDeviceRecord = {
@@ -356,6 +357,197 @@ describe("E2eeProvider", () => {
     container.remove();
   });
 
+  it.each(["offline", 503, "malformed"])(
+    "keeps encryption unready after %s and restores the same device keys when the API recovers",
+    async (failure) => {
+      storeDevice("salt");
+      mockE2eeModule.unwrapAccountKey.mockResolvedValue(accountKey);
+      mockE2eeModule.unwrapBlindIndexKey.mockResolvedValue(blindIndexKey);
+      if (failure === "offline") {
+        mockFetch.mockRejectedValueOnce(new Error("offline"));
+      } else {
+        mockFetch.mockResolvedValueOnce(
+          jsonResponse({}, failure === 503 ? 503 : 200),
+        );
+      }
+      await renderProvider();
+      await act(async () => {
+        await expect(
+          getE2ee().bootstrap("user-1", "https://api.solace.test"),
+        ).rejects.toThrow();
+      });
+
+      expect(getE2ee().isReady).toBe(false);
+      expect(getActiveE2eeSession()).toBeNull();
+      expect(clearPendingAuthPassword).not.toHaveBeenCalled();
+      mockFetch.mockResolvedValue(
+        jsonResponse(
+          createBootstrapResponse({
+            devices: [storedDeviceRecord],
+            passwordEnvelope: createPasswordRecord(),
+          }),
+        ),
+      );
+      await act(async () => {
+        await getE2ee().bootstrap("user-1", "https://api.solace.test");
+      });
+
+      expect(getE2ee().isReady).toBe(true);
+      expect(getActiveE2eeSession()?.accountKey).toBe(accountKey);
+      expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
+    },
+  );
+
+  it("aborts a bootstrap request that never answers so startup can retry", async () => {
+    mockFetch.mockImplementation(
+      (_url: string, options: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          options.signal?.addEventListener("abort", () =>
+            reject(new Error("Request timed out")),
+          );
+        }),
+    );
+    await renderProvider();
+    await act(async () => {
+      const attempt = expect(
+        getE2ee().bootstrap("user-1", "https://api.solace.test"),
+      ).rejects.toThrow("Request timed out");
+      await Promise.resolve();
+      jest.advanceTimersByTime(10_000);
+      await attempt;
+    });
+    expect(getE2ee().isReady).toBe(false);
+    expect(getActiveE2eeSession()).toBeNull();
+  });
+
+  it.each(["device", "password"])("aborts a stalled %s write and can unlock on the next attempt", async (endpoint) => {
+    peekPendingAuthPassword.mockReturnValue("secret-password");
+    const bootstrap = createBootstrapResponse({
+      passwordEnvelope: endpoint === "device" ? createPasswordRecord() : null,
+    });
+    mockE2eeModule.wrapSymmetricKey.mockReset().mockImplementation(async (key: CryptoKey) =>
+      key === accountKey ? "wrapped-account-key" : "wrapped-search-key",
+    );
+    let signal: AbortSignal | null | undefined;
+    mockFetch.mockImplementation(async (url: string, options: RequestInit) => {
+      if (url.endsWith(`/${endpoint}`)) {
+        signal = options.signal;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(new Error("Request timed out")));
+        });
+      }
+      return jsonResponse(bootstrap);
+    });
+    await renderProvider();
+    let outcome = "pending";
+    await act(async () => {
+      getE2ee().bootstrap("user-1", "https://api.solace.test")
+        .then(() => { outcome = "resolved"; })
+        .catch(() => { outcome = "rejected"; });
+    });
+    expect(mockFetch.mock.calls.some(([url]) => String(url).endsWith(`/${endpoint}`))).toBe(true);
+    await act(async () => { await jest.advanceTimersByTimeAsync(9_999); });
+    expect(outcome).toBe("pending");
+    await act(async () => { await jest.advanceTimersByTimeAsync(1); });
+    expect(outcome).toBe("rejected");
+    expect(signal?.aborted).toBe(true);
+    expect(getE2ee().isReady).toBe(false);
+    expect(getActiveE2eeSession()).toBeNull();
+    expect(clearPendingAuthPassword).not.toHaveBeenCalled();
+
+    mockFetch.mockImplementation(async (url: string) => jsonResponse(
+      url.endsWith("/bootstrap") ? bootstrap : {},
+    ));
+    await act(async () => {
+      await expect(getE2ee().bootstrap("user-1", "https://api.solace.test")).resolves.toBeNull();
+    });
+    expect(getE2ee().isReady).toBe(true);
+    expect(getActiveE2eeSession()?.accountKey).toBe(accountKey);
+  });
+
+  it.each(["device 503", "lost envelope response"])("retains the password after %s without replacing the stored account keys", async (failure) => {
+    let pendingPassword: string | null = "secret-password";
+    let envelopeStored = false;
+    let registrations = 0;
+    peekPendingAuthPassword.mockImplementation(() => pendingPassword);
+    clearPendingAuthPassword.mockImplementation(() => { pendingPassword = null; });
+    mockE2eeModule.wrapSymmetricKey.mockReset().mockImplementation(async (key: CryptoKey) =>
+      key === accountKey ? "wrapped-account-key" : "wrapped-search-key",
+    );
+    mockFetch.mockImplementation(async (url: string, options: RequestInit) => {
+      if (url.endsWith("/bootstrap")) {
+        return jsonResponse(createBootstrapResponse({
+          passwordEnvelope: envelopeStored ? createPasswordRecord() : null,
+        }));
+      }
+      if (url.endsWith("/password")) {
+        envelopeStored = true;
+        if (failure === "lost envelope response") {
+          return new Promise((_resolve, reject) => {
+            options.signal?.addEventListener("abort", () => reject(new Error("Request timed out")));
+          });
+        }
+        return jsonResponse({});
+      }
+      if (url.endsWith("/device")) {
+        registrations += 1;
+        return jsonResponse({}, failure === "device 503" && registrations === 1 ? 503 : 200);
+      }
+      throw new Error("Unexpected fixture request");
+    });
+    await renderProvider();
+    await act(async () => {
+      const attempt = expect(getE2ee().bootstrap("user-1", "https://api.solace.test")).rejects.toThrow(
+        failure === "device 503" ? "503" : "Request timed out",
+      );
+      if (failure === "lost envelope response") await jest.advanceTimersByTimeAsync(10_000);
+      await attempt;
+    });
+    expect(clearPendingAuthPassword).not.toHaveBeenCalled();
+    expect(getE2ee().isReady).toBe(false);
+
+    await act(async () => {
+      await expect(getE2ee().bootstrap("user-1", "https://api.solace.test")).resolves.toBeNull();
+    });
+    expect(mockE2eeModule.unwrapPasswordEnvelope).toHaveBeenCalledWith("secret-password", expect.anything());
+    expect(mockE2eeModule.generateAccountKey).toHaveBeenCalledTimes(1);
+    expect(mockE2eeModule.createPasswordEnvelope).toHaveBeenCalledTimes(1);
+    expect(getE2ee().isReady).toBe(true);
+    expect(clearPendingAuthPassword).toHaveBeenCalledTimes(1);
+    expect(pendingPassword).toBeNull();
+  });
+
+  it.each([401, 403])(
+    "ends a rejected bootstrap session (%s) without exposing a ready runtime",
+    async (status) => {
+      mockFetch.mockResolvedValue(jsonResponse({}, status));
+      await renderProvider();
+      await act(async () => {
+        await expect(
+          getE2ee().bootstrap("user-1", "https://api.solace.test"),
+        ).resolves.toBe("sign-in-again");
+      });
+
+      expect(getE2ee().isReady).toBe(false);
+      expect(getActiveE2eeSession()).toBeNull();
+      expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not expose a ready runtime when native crypto is unavailable", async () => {
+    mockCreateNativeCryptoProvider.mockImplementation(() => {
+      throw new Error("Native crypto unavailable");
+    });
+    await renderProvider();
+    await act(async () => {
+      await expect(
+        getE2ee().bootstrap("user-1", "https://api.solace.test"),
+      ).rejects.toThrow();
+    });
+    expect(getE2ee().isReady).toBe(false);
+    expect(getActiveE2eeSession()).toBeNull();
+  });
+
   it("auto-unlocks a password envelope with the pending email sign-in password", async () => {
     peekPendingAuthPassword.mockReturnValue("secret-password");
     mockUseAuth.mockReturnValue(
@@ -401,7 +593,10 @@ describe("E2eeProvider", () => {
         method: "PUT",
       }),
     );
-    expect(mockSetItemAsync).toHaveBeenLastCalledWith("E2EE_ENVELOPE_SALT", "salt");
+    expect(mockSetItemAsync).toHaveBeenLastCalledWith(
+      "E2EE_ENVELOPE_SALT",
+      "salt",
+    );
     expect(getE2ee().isReady).toBe(true);
     expect(getE2ee().isEnabled).toBe(true);
   });
@@ -440,7 +635,7 @@ describe("E2eeProvider", () => {
     await flushBootstrap();
 
     expect(lock).toBe("cannot-open");
-    expect(getE2ee().isReady).toBe(true);
+    expect(getE2ee().isReady).toBe(false);
     expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
     expect(mockFetch).not.toHaveBeenCalledWith(
       "https://api.solace.test/api/e2ee/device",
@@ -472,7 +667,7 @@ describe("E2eeProvider", () => {
       }
 
       if (url.endsWith("/api/e2ee/password")) {
-        return new Response("nope", { status: 500 });
+        return jsonResponse({}, 500);
       }
 
       throw new Error(`Unexpected fetch: ${url}`);
@@ -481,14 +676,18 @@ describe("E2eeProvider", () => {
     await renderProvider();
 
     await act(async () => {
-      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+      await expect(
+        getE2ee().bootstrap("user-1", "https://api.solace.test"),
+      ).rejects.toThrow();
     });
     await flushBootstrap();
 
-    expect(getE2ee().isReady).toBe(true);
+    expect(getE2ee().isReady).toBe(false);
     expect(clearPendingAuthPassword).not.toHaveBeenCalled();
     expect(
-      mockFetch.mock.calls.some(([url]) => String(url).endsWith("/api/e2ee/device")),
+      mockFetch.mock.calls.some(([url]) =>
+        String(url).endsWith("/api/e2ee/device"),
+      ),
     ).toBe(false);
   });
 
@@ -580,30 +779,34 @@ describe("E2eeProvider", () => {
   it.each([
     ["the envelope holds the device's account key", true, "salt"],
     ["the device minted a second account key", false, undefined],
-  ])("verifies a restored device key with the sign-in password when %s", async (_case, sameKey, marker) => {
-    storeDevice(null);
-    peekPendingAuthPassword.mockReturnValue("secret-password");
-    mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
-    mockE2eeModule.unwrapAccountKey.mockResolvedValue(accountKey);
-    mockE2eeModule.unwrapBlindIndexKey.mockResolvedValue(blindIndexKey);
-    mockE2eeModule.unwrapPasswordEnvelope.mockResolvedValue({
-      accountKey: { type: "envelope-account-key" },
-      blindIndexKey,
-    });
-    mockE2eeModule.encryptJsonPayload.mockResolvedValue({ ciphertext: "probe" });
-    mockE2eeModule.decryptJsonPayload.mockImplementation(async () => {
-      if (!sameKey) throw new Error("OperationError");
-      return true;
-    });
-    mockFetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/api/e2ee/bootstrap")) {
-        return jsonResponse(
-          createBootstrapResponse({
-            devices: [storedDeviceRecord],
-            passwordEnvelope: createPasswordRecord(),
-          }),
-        );
-      }
+  ])(
+    "verifies a restored device key with the sign-in password when %s",
+    async (_case, sameKey, marker) => {
+      storeDevice(null);
+      peekPendingAuthPassword.mockReturnValue("secret-password");
+      mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
+      mockE2eeModule.unwrapAccountKey.mockResolvedValue(accountKey);
+      mockE2eeModule.unwrapBlindIndexKey.mockResolvedValue(blindIndexKey);
+      mockE2eeModule.unwrapPasswordEnvelope.mockResolvedValue({
+        accountKey: { type: "envelope-account-key" },
+        blindIndexKey,
+      });
+      mockE2eeModule.encryptJsonPayload.mockResolvedValue({
+        ciphertext: "probe",
+      });
+      mockE2eeModule.decryptJsonPayload.mockImplementation(async () => {
+        if (!sameKey) throw new Error("OperationError");
+        return true;
+      });
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url.endsWith("/api/e2ee/bootstrap")) {
+          return jsonResponse(
+            createBootstrapResponse({
+              devices: [storedDeviceRecord],
+              passwordEnvelope: createPasswordRecord(),
+            }),
+          );
+        }
 
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -614,11 +817,17 @@ describe("E2eeProvider", () => {
     });
     await flushBootstrap();
 
-    expect(getActiveE2eeSession()).toMatchObject({ deviceId: "device-1", accountKey });
-    expect(
-      mockSetItemAsync.mock.calls.find(([key]) => key === "E2EE_ENVELOPE_SALT")?.[1],
-    ).toBe(marker);
-  });
+      expect(getActiveE2eeSession()).toMatchObject({
+        deviceId: "device-1",
+        accountKey,
+      });
+      expect(
+        mockSetItemAsync.mock.calls.find(
+          ([key]) => key === "E2EE_ENVELOPE_SALT",
+        )?.[1],
+      ).toBe(marker);
+    },
+  );
 
   it("forgets the envelope check of a restored device key once the envelope changed", async () => {
     storeDevice("previous-salt");
@@ -650,7 +859,9 @@ describe("E2eeProvider", () => {
   it("drops the server row of a stored key that no longer opens and lets the envelope decide", async () => {
     storeDevice("salt");
     mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
-    mockE2eeModule.unwrapAccountKey.mockRejectedValue(new Error("OperationError"));
+    mockE2eeModule.unwrapAccountKey.mockRejectedValue(
+      new Error("OperationError"),
+    );
     mockFetch.mockImplementation(async (url: string) => {
       if (url.endsWith("/api/e2ee/bootstrap")) {
         return jsonResponse(
@@ -684,7 +895,12 @@ describe("E2eeProvider", () => {
 
     expect(mockDeleteItemAsync.mock.calls.map(([key]) => key)).toEqual(
       deleted
-        ? ["E2EE_DEVICE_ID", "E2EE_PRIVATE_KEY", "E2EE_DEVICE_KEYS", "E2EE_ENVELOPE_SALT"]
+        ? [
+            "E2EE_DEVICE_ID",
+            "E2EE_PRIVATE_KEY",
+            "E2EE_DEVICE_KEYS",
+            "E2EE_ENVELOPE_SALT",
+          ]
         : [],
     );
   });
@@ -701,7 +917,11 @@ describe("E2eeProvider", () => {
       },
       "own-account-key",
     ],
-    ["keeps the server's copy once on an install that has none", {}, "wrapped-account-key"],
+    [
+      "keeps the server's copy once on an install that has none",
+      {},
+      "wrapped-account-key",
+    ],
     [
       "ignores a copy left by an earlier device",
       {
@@ -737,12 +957,17 @@ describe("E2eeProvider", () => {
     });
     await flushBootstrap();
 
-    expect(getActiveE2eeSession()).toMatchObject({ deviceId: "device-1", accountKey });
+    expect(getActiveE2eeSession()).toMatchObject({
+      deviceId: "device-1",
+      accountKey,
+    });
     expect(mockE2eeModule.unwrapAccountKey).toHaveBeenCalledWith(
       unwrapped,
       expect.anything(),
     );
-    const kept = mockSetItemAsync.mock.calls.find(([key]) => key === "E2EE_DEVICE_KEYS");
+    const kept = mockSetItemAsync.mock.calls.find(
+      ([key]) => key === "E2EE_DEVICE_KEYS",
+    );
     expect(kept ? JSON.parse(kept[1]) : null).toEqual(
       unwrapped === "own-account-key"
         ? null
@@ -805,9 +1030,9 @@ describe("E2eeProvider", () => {
   it("refuses to wrap keys without an unlocked session", async () => {
     await renderProvider();
 
-    await expect(getE2ee().createPasswordEnvelope("fresh-password")).rejects.toThrow(
-      "not unlocked",
-    );
+    await expect(
+      getE2ee().createPasswordEnvelope("fresh-password"),
+    ).rejects.toThrow("not unlocked");
     expect(mockE2eeModule.createPasswordEnvelope).not.toHaveBeenCalled();
   });
 
@@ -895,7 +1120,9 @@ describe("E2eeProvider", () => {
     expect(event.encryptedContent).toBeDefined();
     expect(calendar).not.toHaveProperty("name");
     expect(calendar.encryptedName).toBeDefined();
-    expect(JSON.stringify([event, calendar])).not.toMatch(/Therapy|Notes|Clinic/);
+    expect(JSON.stringify([event, calendar])).not.toMatch(
+      /Therapy|Notes|Clinic/,
+    );
     await expect(provider.hasActiveSession()).resolves.toBe(true);
     await expect(
       provider.hydrateEncryptedCalendar({
@@ -962,11 +1189,14 @@ describe("E2eeProvider", () => {
     await flushBootstrap();
 
     expect(lock).toBe("cannot-open");
-    expect(getE2ee().isReady).toBe(true);
+    expect(getE2ee().isReady).toBe(false);
     expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
     await expect(getE2ee().provider.hasActiveSession()).resolves.toBe(false);
     await expect(
-      getE2ee().provider.attachCalendarEncryptionShadow({ name: "Therapy", color: "blue" }),
+      getE2ee().provider.attachCalendarEncryptionShadow({
+        name: "Therapy",
+        color: "blue",
+      }),
     ).rejects.toThrow("Encryption is not ready");
   });
 
@@ -1002,7 +1232,7 @@ describe("E2eeProvider", () => {
     await flushBootstrap();
 
     expect(lock).toBe("sign-in-again");
-    expect(getE2ee().isReady).toBe(true);
+    expect(getE2ee().isReady).toBe(false);
     expect(mockE2eeModule.unwrapPasswordEnvelope).not.toHaveBeenCalled();
     expect(mockE2eeModule.generateAccountKey).not.toHaveBeenCalled();
     expect(mockFetch).not.toHaveBeenCalledWith(

@@ -1,0 +1,47 @@
+appId: ${APP_ID}
+---
+- launchApp:
+    stopApp: true
+    permissions:
+      notifications: allow
+- runFlow: wait-for-home.yaml
+- assertNotVisible: Welcome back
+- runFlow:
+    when:
+      true: ${APP_ID === "onl.solace.calendar.e2e"}
+    commands:
+      - tapOn: Choose date and view
+      - runFlow:
+          when:
+            notVisible: ${AGENDA_DATE_LABEL}
+          commands:
+            - tapOn: Previous month
+            - waitForAnimationToEnd
+      - extendedWaitUntil:
+          visible: ${AGENDA_DATE_LABEL}
+          timeout: 30000
+      - tapOn: ${AGENDA_DATE_LABEL}
+      - extendedWaitUntil:
+          notVisible: Close sheet
+          timeout: 30000
+      - waitForAnimationToEnd
+      - tapOn: Choose date and view
+      - assertVisible: Agenda
+      - runFlow:
+          when:
+            visible:
+              text: Agenda
+              selected: true
+          commands:
+            - runFlow: close-sheet.yaml
+      - runFlow:
+          when:
+            visible:
+              text: Agenda
+              selected: false
+          commands:
+            - tapOn: Agenda
+      - extendedWaitUntil:
+          notVisible: Agenda
+          timeout: 30000
+      - waitForAnimationToEnd

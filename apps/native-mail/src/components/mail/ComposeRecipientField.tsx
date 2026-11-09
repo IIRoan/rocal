@@ -14,6 +14,7 @@ import {
   View,
   type TextStyle,
   type ViewStyle,
+  type TextInputInstance,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import {
@@ -71,7 +72,7 @@ export function ComposeRecipientField({
   const { theme } = useTheme();
   const skin = useMailSkin();
   const styles = createStyles(theme, skin);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const selectingRef = useRef(false);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastEmittedRef = useRef(value);
@@ -251,6 +252,7 @@ export function ComposeRecipientField({
             </Pressable>
           ) : null}
           <TextInput
+            testID={`compose-recipient-${label.toLowerCase()}`}
             ref={inputRef}
             style={[styles.input, collapsed && styles.inputCollapsed]}
             value={draft}

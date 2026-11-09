@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { TextInput, View } from "react-native";
+import { TextInput, View, type TextInputInstance } from "react-native";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { EventEditorField } from "./EventEditorPrimitives";
 import { FieldError } from "./FieldError";
@@ -22,11 +22,11 @@ export function EventFormNotesFields({
   styles: EventFormStyles;
   onChangeLocation: (value: string) => void;
   onChangeDescription: (value: string) => void;
-  onFieldFocus: (input: TextInput | null) => void;
+  onFieldFocus: (input: TextInputInstance | null) => void;
 }) {
   const { theme } = useTheme();
-  const locationInputRef = useRef<TextInput>(null);
-  const descriptionInputRef = useRef<TextInput>(null);
+  const locationInputRef = useRef<TextInputInstance>(null);
+  const descriptionInputRef = useRef<TextInputInstance>(null);
   return (
     <>
       <View>
@@ -62,6 +62,7 @@ export function EventFormNotesFields({
             textAlignVertical="top"
             onFocus={() => onFieldFocus(descriptionInputRef.current)}
             accessibilityLabel="Description"
+            testID="event-description"
           />
         </EventEditorField>
         <FieldError message={descriptionError} style={styles.fieldError} />

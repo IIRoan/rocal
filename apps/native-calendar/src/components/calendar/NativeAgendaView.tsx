@@ -24,6 +24,7 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { resolveEventBlockColor } from "../../lib/calendar-color-utils";
+import { isOptimisticId } from "../../lib/optimistic-events";
 import {
   formatAgendaEventSubtitle,
   formatAgendaEventTime,
@@ -108,6 +109,7 @@ const AgendaEventRow = memo(function AgendaEventRow({
 
   return (
     <Pressable
+      testID={isOptimisticId(event.id) ? "calendar-pending-event" : "calendar-saved-event"}
       onPress={handlePress}
       style={({ pressed }) => (pressed ? styles.eventRowPressed : styles.eventRow)}
       accessibilityRole="button"

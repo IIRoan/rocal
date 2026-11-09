@@ -1,0 +1,131 @@
+appId: ${APP_ID}
+---
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
+- tapOn: "Categories(,.*)?"
+- waitForAnimationToEnd
+- tapOn:
+    text: New category
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: Category name
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    file: ../common/refocus-input.yaml
+    env:
+      INPUT_ID: category-name
+      BLUR_TARGET: Name
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: category-name
+            focused: true
+          timeout: 15000
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro category
+      VERIFY_TEXT: "true"
+      VERIFY_ID: category-name
+- assertVisible: Maestro category
+- hideKeyboard
+- tapOn: Create category
+- extendedWaitUntil:
+    notVisible: Create category
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Maestro category.*"
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro updated event
+- tapOn: Edit
+- scrollUntilVisible:
+    element: "Category:.*"
+    direction: DOWN
+- tapOn: "Category:.*"
+- tapOn: Maestro category
+- tapOn: Save
+- extendedWaitUntil:
+    notVisible: Event title
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro updated event
+- tapOn: Edit
+- scrollUntilVisible:
+    element: "Category: Maestro category"
+    direction: DOWN
+- assertVisible: "Category: Maestro category"
+- runFlow: ../common/open-app.yaml
+- tapOn: Settings
+- runFlow:
+    file: ../common/select-settings-page.yaml
+    env:
+      PAGE: calendars
+- tapOn: "Categories(,.*)?"
+- tapOn: "Maestro category.*"
+- waitForAnimationToEnd
+- tapOn:
+    id: category-name
+    point: 95%,50%
+    retryTapIfNoChange: false
+- eraseText
+- waitForAnimationToEnd
+- runFlow:
+    file: ../common/refocus-input.yaml
+    env:
+      INPUT_ID: category-name
+      BLUR_TARGET: Name
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: category-name
+            focused: true
+          timeout: 15000
+- runFlow:
+    file: ../common/type.yaml
+    env:
+      TEXT: Maestro renamed category
+      VERIFY_TEXT: "true"
+      VERIFY_ID: category-name
+- assertVisible: Maestro renamed category
+- hideKeyboard
+- tapOn: Save changes
+- extendedWaitUntil:
+    notVisible: Save changes
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: "Maestro renamed category.*"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: Delete category
+    direction: DOWN
+- tapOn: Delete category
+- tapOn: Delete
+- extendedWaitUntil:
+    notVisible: "Maestro renamed category.*"
+    timeout: 30000
+- runFlow: ../common/open-app.yaml
+- runFlow:
+    file: ../common/open-event.yaml
+    env:
+      EVENT_TITLE: Maestro updated event
+- assertVisible: Maestro meeting room
+- assertVisible: Maestro event notes stay encrypted
+- assertNotVisible: "Maestro renamed category.*"

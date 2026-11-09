@@ -141,22 +141,13 @@ export function E2eeProvider({
         const e2ee = await getModule();
 
         if (!e2ee) {
-          log.warn(
-            "E2EE is unavailable in the current runtime. Encryption is disabled for this session.",
-          );
-          if (!isStale()) {
-            setIsReady(true);
-          }
-          return null;
+          throw new Error("Encryption is unavailable in the current runtime.");
         }
 
         const bootstrapData = await fetchE2eeBootstrap(apiBaseUrl);
 
         if (!bootstrapData) {
-          if (!isStale()) {
-            setIsReady(true);
-          }
-          return null;
+          return isStale() ? null : "sign-in-again";
         }
 
         if (isStale()) {
@@ -299,7 +290,6 @@ export function E2eeProvider({
           : null;
         if (firstEnvelope) {
           await uploadPasswordEnvelopeToApi(apiBaseUrl, firstEnvelope);
-          clearPendingAuthPassword();
         }
         const nextSession = await registerDeviceForSession({
           e2ee,
@@ -316,18 +306,14 @@ export function E2eeProvider({
 
         sessionRef.current = nextSession;
         setActiveE2eeSession(nextSession);
+        clearPendingAuthPassword();
         return null;
-      } catch (error) {
-        if (!isStale()) {
-          log.error("E2EE bootstrap failed:", error);
-        }
       } finally {
         if (!isStale()) {
           finishPendingBootstrap();
-          setIsReady(true);
+          setIsReady(sessionRef.current !== null);
         }
       }
-      return null;
     },
     [
       peekPendingAuthPassword,
