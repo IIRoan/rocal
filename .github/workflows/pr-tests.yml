@@ -62,6 +62,8 @@ jobs:
         run: node scripts/tests/native-fingerprint.cjs
       - name: Check EAS uploads skip everything git ignores
         run: node scripts/tests/easignore.cjs
+      - name: Check App Store release automation
+        run: bun test scripts/tests/app-store-release.test.ts
 
       - name: Upload UI coverage
         if: always()
