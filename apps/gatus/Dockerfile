@@ -41,7 +41,7 @@ COPY stalwart-discord-bridge.py status.html /usr/local/lib/solace/
 COPY config.default.yaml /etc/gatus/config.default.yaml
 
 RUN chmod 755 /usr/local/bin/entrypoint.sh /usr/local/bin/gatus \
-    && chmod 644 /usr/local/lib/solace/*
+    && chmod 644 /usr/local/lib/solace/* /etc/gatus/config.default.yaml
 
 ENV GATUS_CONFIG_PATH=/data/config.yaml
 ENV PORT=8080
