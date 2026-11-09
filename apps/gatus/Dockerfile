@@ -1,9 +1,8 @@
 # Build Gatus with 90-day period uptime support (upstream PR #1651; CarmJos fork).
-FROM golang:1.27.3-alpine3.24@sha256:fa3d596898d9f126af7c01d14ee7597bab3f39cccf392ef36b69fe77cd681f18 AS gatus-builder
+FROM cgr.dev/chainguard/go:latest@sha256:135d3f59bd1ad5093d831f430bd29f31e753aac2fe9d88c08e849bb3f019aa03 AS gatus-builder
 
 ENV GOTOOLCHAIN=auto
 ARG GATUS_COMMIT=25e3e6fadba5a2fdbda99f24a6738025412defc2
-RUN apk add --no-cache ca-certificates git
 WORKDIR /src
 RUN git init \
     && git remote add origin https://github.com/CarmJos/gatus.git \
@@ -28,7 +27,7 @@ COPY assets/favicon.ico web/static/favicon.ico
 COPY assets/favicon-32x32.png web/static/favicon-32x32.png
 RUN CGO_ENABLED=0 GOOS=linux go build -mod=readonly -ldflags="-s -w" -o /gatus .
 
-FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:d13acb327aa77acf2752acea8c08456511a5b8142455cc2fe0f966b960bf64c6
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache ca-certificates apache2-utils tzdata wget python3 su-exec \

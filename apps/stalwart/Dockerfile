@@ -1,7 +1,6 @@
-FROM golang:1.27.3-alpine3.24@sha256:fa3d596898d9f126af7c01d14ee7597bab3f39cccf392ef36b69fe77cd681f18 AS frpc-builder
+FROM cgr.dev/chainguard/go:latest@sha256:135d3f59bd1ad5093d831f430bd29f31e753aac2fe9d88c08e849bb3f019aa03 AS frpc-builder
 
 ARG FRPC_COMMIT=bafec21abce5f91ae4a05b4bd19c55543c263128
-RUN apk add --no-cache git
 WORKDIR /src
 RUN git init && git remote add origin https://github.com/fatedier/frp.git \
     && git fetch --depth 1 origin "$FRPC_COMMIT" && git checkout FETCH_HEAD
@@ -50,5 +49,8 @@ USER root
 RUN ln -sfn 'background_thread:true,narenas:8' /etc/malloc.conf
 
 EXPOSE 25 8080 8081 8082 8090
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
+    CMD curl -fsS --max-time 3 "http://127.0.0.1:${PORT:-8090}/healthz/ready" > /dev/null || exit 1
 
 ENTRYPOINT ["/usr/local/bin/railway-entrypoint.sh"]
