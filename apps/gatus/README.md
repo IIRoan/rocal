@@ -2,7 +2,7 @@
 
 [Gatus](https://github.com/TwiN/gatus) monitors Solace and mail from Railway. The image is
 built from a pinned commit of [CarmJos/gatus](https://github.com/CarmJos/gatus) (upstream PR
-#1651, 90-day retention) with the patches below; the page reads history from its own
+#1651, 90-day retention) with local patches; the page reads history from its own
 `/timeline` endpoint, not Gatus's `period-statuses`.
 Deploy as a **separate Railway service** (root directory `apps/gatus`, volume at `/data`).
 `apps/gatus` must be on the GitHub `master` branch before Railway can build it.
@@ -122,7 +122,3 @@ Without `prometheus_*` the metrics monitor fails auth; without `DISCORD_WEBHOOK_
 - **VPS SSH monitor:** install `apps/stalwart/vps/gatus-monitor.sh` as root-owned mode 755, then run `sudo bash apps/stalwart/vps/setup-gatus-monitor.sh --check /path/to/monitor.pub` and `--apply` after review. Set the three `VPS_MONITOR_SSH_*` variables above; the account has no sudo, forwarding or arbitrary command access.
 - `ssh-known-hosts.patch` adds `GATUS_SSH_KNOWN_HOSTS` to the pinned Gatus source; the entrypoint requires a host-key pin for VPS monitoring and writes credential files with mode 600. The image build tests matching, changed, unknown and missing host keys, plus deadlines for stalled handshakes and commands.
 - SSH probes refuse connections when host pins are absent, including custom configurations. VPS service states use a fixed allowlist; raw command errors never enter monitor JSON.
-
-## Security updates
-
-`security-dependencies.patch` pins patched Go modules while preserving the upstream source commit and the existing behavior patches. The image pins Go 1.27.3 and Alpine 3.24. At startup root fixes ownership of the existing `/data` volume, then `su-exec` runs the config preparation, Gatus and Python front as `gatus` (UID 10001). The front relays upstream redirects without fetching their targets.
