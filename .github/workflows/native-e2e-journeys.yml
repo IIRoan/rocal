@@ -9,18 +9,22 @@ on:
       diagnostic:
         type: boolean
         default: false
+      app:
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
   journeys:
-    name: ${{ inputs.diagnostic && 'Native E2E diagnostics' || 'Native E2E' }} (${{ inputs.platform }})
+    name: ${{ inputs.diagnostic && 'Native E2E diagnostics' || 'Native E2E' }} (${{ inputs.platform }}${{ inputs.app && format(' {0}', inputs.app) || '' }})
     timeout-minutes: 180
     runs-on: ${{ inputs.platform == 'ios' && 'macos-latest' || 'ubuntu-latest' }}
     env:
       SOLACE_E2E: "1"
       E2E_PLATFORM: ${{ inputs.platform }}
+      E2E_APP: ${{ inputs.app }}
       CI: "1"
       CARGO_BUILD_JOBS: "3"
       MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
@@ -90,7 +94,7 @@ jobs:
         run: python3 scripts/e2e/device.py "$E2E_PLATFORM"
       - name: Exercise Calendar authentication and management
         id: calendar
-        if: ${{ !inputs.diagnostic }}
+        if: ${{ !inputs.diagnostic && inputs.app != 'mail' }}
         shell: bash
         run: python3 scripts/e2e/run.py "$E2E_PLATFORM" --calendar-start
       - name: Upload initial Calendar evidence
@@ -106,13 +110,17 @@ jobs:
         if: ${{ !cancelled() && !inputs.diagnostic && steps.calendar.outputs.ready == 'true' }}
         shell: bash
         run: python3 scripts/e2e/run.py "$E2E_PLATFORM" --continue
+      - name: Exercise Mail journeys
+        if: ${{ !inputs.diagnostic && inputs.app == 'mail' }}
+        shell: bash
+        run: python3 scripts/e2e/run.py "$E2E_PLATFORM"
       - name: Exercise focused iOS journeys
         if: ${{ inputs.diagnostic }}
         shell: bash
         run: python3 scripts/e2e/run.py "$E2E_PLATFORM" --diagnostic
       - name: Check persisted encryption and account state
         if: ${{ !inputs.diagnostic }}
-        run: ./target/debug/xtask e2e verify
+        run: ./target/debug/xtask e2e verify ${{ inputs.app }}
       - name: Publish test evidence
         if: always()
         shell: bash
@@ -121,7 +129,7 @@ jobs:
         if: always()
         uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
         with:
-          name: native-e2e-${{ inputs.platform }}${{ inputs.diagnostic && '-diagnostics' || '' }}
+          name: native-e2e-${{ inputs.platform }}${{ inputs.app && format('-{0}', inputs.app) || '' }}${{ inputs.diagnostic && '-diagnostics' || '' }}
           path: ${{ runner.temp }}/solace-e2e/artifacts
           if-no-files-found: error
           overwrite: true

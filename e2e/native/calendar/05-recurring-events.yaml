@@ -43,6 +43,9 @@ appId: ${APP_ID}
 - waitForAnimationToEnd
 - tapOn: Save
 - extendedWaitUntil:
+    notVisible: Event title
+    timeout: 30000
+- extendedWaitUntil:
     visible: "Maestro edited series.*"
     timeout: 30000
 - runFlow: ../common/open-app.yaml

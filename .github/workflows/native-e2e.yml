@@ -65,13 +65,18 @@ jobs:
       app: ${{ matrix.app }}
 
   ios:
-    name: ${{ inputs.diagnostic && 'iOS diagnostics' || 'iOS' }}
+    name: ${{ inputs.diagnostic && 'iOS diagnostics' || format('iOS {0}', matrix.app) }}
     needs: build-ios
     if: ${{ always() && !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(inputs.diagnostic && '[""]' || '["calendar", "mail"]') }}
     uses: ./.github/workflows/native-e2e-journeys.yml
     with:
       platform: ios
       diagnostic: ${{ inputs.diagnostic || false }}
+      app: ${{ matrix.app }}
 
   android:
     name: Android

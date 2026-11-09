@@ -6,7 +6,7 @@ appId: ${APP_ID}
     while:
       true: ${output.nativeTextIndex < String(TEXT).length}
     commands:
-      - inputText: ${String(TEXT).charAt(output.nativeTextIndex)}
+      - inputText: ${String(TEXT).slice(output.nativeTextIndex, output.nativeTextIndex + 2)}
       - runFlow:
           when:
             true: ${typeof VERIFY_TEXT !== "undefined" && VERIFY_TEXT === "true"}
@@ -17,10 +17,10 @@ appId: ${APP_ID}
                 commands:
                   - assertVisible:
                       id: ${VERIFY_ID}
-                      text: ${String(TEXT).slice(0, output.nativeTextIndex + 1)}
+                      text: ${String(TEXT).slice(0, output.nativeTextIndex + 2)}
             - runFlow:
                 when:
                   true: ${typeof VERIFY_ID === "undefined"}
                 commands:
-                  - assertVisible: ${String(TEXT).slice(0, output.nativeTextIndex + 1)}
-      - evalScript: ${output.nativeTextIndex = output.nativeTextIndex + 1}
+                  - assertVisible: ${String(TEXT).slice(0, output.nativeTextIndex + 2)}
+      - evalScript: ${output.nativeTextIndex = output.nativeTextIndex + 2}

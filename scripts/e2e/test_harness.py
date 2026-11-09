@@ -92,6 +92,45 @@ class HarnessTests(unittest.TestCase):
                             self.assertEqual(len(rows), len(calls))
                             self.assertEqual([row["name"] for row in rows if not row["passed"]], [] if failed is None else [failed[1]])
 
+    def test_split_ios_jobs_run_only_their_app_and_mail_signs_in_through_calendar_first(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "repository"
+            for app, names in (("calendar", ("01-authentication", "02-calendar-management", "03-content")),
+                               ("mail", ("01-unlock", "offline", "sign-out"))):
+                parent = repository / "e2e/native" / app
+                parent.mkdir(parents=True)
+                for name in names:
+                    (parent / f"{name}.yaml").touch()
+            mail_run = [("calendar", "01-authentication"), ("mail", "01-unlock"), ("mail", "offline"),
+                        ("mail", "online-recovery"), ("mail", "sign-out")]
+            for index, (app, failed, staged, expected) in enumerate((
+                    ("calendar", None, True, [("calendar", "01-authentication"), ("calendar", "02-calendar-management"), ("calendar", "03-content")]),
+                    ("mail", None, False, mail_run),
+                    ("mail", mail_run[0], False, mail_run[:1]),
+                    ("contacts", None, False, []))):
+                with self.subTest(app=app, failed=failed):
+                    calls = []
+                    root = Path(temporary) / str(index) / "solace-e2e"
+                    def execute(_platform, journey_app, flow, results):
+                        calls.append((journey_app, flow.stem))
+                        results.append({"app": journey_app, "name": flow.stem, "passed": calls[-1] != failed, "seconds": 1})
+                        journeys.publish(results)
+                        return calls[-1] != failed
+                    with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root), "E2E_APP": app}, clear=True), \
+                            patch.object(journeys, "REPO", repository), patch.object(journeys, "run_journey", side_effect=execute), \
+                            patch.object(journeys.os, "kill") as backend_signal, \
+                            patch.object(journeys.subprocess, "run", return_value=journeys.subprocess.CompletedProcess([], 0, stdout="xtask e2e serve")):
+                        (directory() / "private/backend.pid").write_text("4242")
+                        if staged:
+                            journeys.run_calendar_start("ios")
+                        if failed is None and app != "contacts":
+                            journeys.main("ios", resume=staged)
+                        else:
+                            with self.assertRaises(SystemExit):
+                                journeys.main("ios", resume=staged)
+                        self.assertEqual(calls, expected)
+                        self.assertEqual(backend_signal.called, app == "mail" and failed is None)
+
     def test_calendar_continuation_rejects_missing_reordered_duplicate_and_invalid_results(self):
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(Path(temporary) / "solace-e2e")}, clear=True):

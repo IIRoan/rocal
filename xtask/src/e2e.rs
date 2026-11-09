@@ -33,8 +33,10 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     match args {
         ["serve"] => serve(&env).await,
         ["seed"] => seed(&env).await,
-        ["verify"] => verify(&env).await,
-        _ => anyhow::bail!("usage: cargo xtask e2e serve | seed | verify"),
+        ["verify"] => verify(&env, true, true).await,
+        ["verify", "calendar"] => verify(&env, true, false).await,
+        ["verify", "mail"] => verify(&env, false, true).await,
+        _ => anyhow::bail!("usage: cargo xtask e2e serve | seed | verify [calendar | mail]"),
     }
 }
 
@@ -130,46 +132,51 @@ async fn seed(env: &TestEnv) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn verify(env: &TestEnv) -> anyhow::Result<()> {
+async fn verify(env: &TestEnv, calendar: bool, mail: bool) -> anyhow::Result<()> {
     let mut db = database(env).await?;
     let user: String = sqlx::query_scalar("SELECT id FROM \"user\" WHERE email = $1")
         .bind(EMAIL)
         .fetch_one(&mut db)
         .await?;
-    let calendars: i64 = sqlx::query_scalar("SELECT count(*) FROM calendar WHERE user_id = $1 AND encrypted_name IS NOT NULL AND encryption_state = 'encrypted'").bind(&user).fetch_one(&mut db).await?;
-    let events: i64 = sqlx::query_scalar("SELECT count(*) FROM calendar_event WHERE user_id = $1 AND encrypted_content IS NOT NULL AND encryption_state = 'encrypted'").bind(&user).fetch_one(&mut db).await?;
     let readable: i64 = sqlx::query_scalar("SELECT (SELECT count(*) FROM calendar_event WHERE user_id = $1 AND (title LIKE 'Maestro%' OR coalesce(description, '') LIKE '%Maestro%' OR coalesce(location, '') LIKE '%Maestro%')) + (SELECT count(*) FROM calendar WHERE user_id = $1 AND name LIKE '%Maestro%') + (SELECT count(*) FROM event_category WHERE user_id = $1 AND name LIKE '%Maestro%')").bind(&user).fetch_one(&mut db).await?;
-    let preferences: Option<String> =
-        sqlx::query_scalar("SELECT encrypted_preferences FROM user_settings WHERE user_id = $1")
-            .bind(&user)
-            .fetch_one(&mut db)
-            .await?;
-    ensure!(calendars > 0, "UI did not persist encrypted calendars");
-    ensure!(events > 0, "UI did not persist encrypted events");
     ensure!(
         readable == 0,
         "UI left readable event, calendar or category names in the database"
     );
-    ensure!(preferences.is_some(), "UI did not seal account settings");
-    let mail_accounts: i64 = sqlx::query_scalar(
-        "SELECT count(DISTINCT u.id) FROM \"user\" u \
-         JOIN user_encryption_password p ON p.user_id = u.id \
-         JOIN mail_directory_entry d ON d.user_id = u.id \
-         JOIN mail_vault_backup v ON v.directory_entry_id = d.id \
-         WHERE u.email IN ($1, $2) AND u.mailbox_approved_at IS NOT NULL \
-         AND p.wrapped_account_key <> '' AND v.wrapped_secret IS NOT NULL",
-    )
-    .bind(EMAIL)
-    .bind(PEER_EMAIL)
-    .fetch_one(&mut db)
-    .await?;
-    ensure!(
-        mail_accounts == 2,
-        "UI did not initialize two independently sealed mail accounts"
-    );
-    println!(
-        "E2E postconditions passed: encrypted calendars, events and settings; two sealed mail accounts; no readable journey content"
-    );
+    if calendar {
+        let calendars: i64 = sqlx::query_scalar("SELECT count(*) FROM calendar WHERE user_id = $1 AND encrypted_name IS NOT NULL AND encryption_state = 'encrypted'").bind(&user).fetch_one(&mut db).await?;
+        let events: i64 = sqlx::query_scalar("SELECT count(*) FROM calendar_event WHERE user_id = $1 AND encrypted_content IS NOT NULL AND encryption_state = 'encrypted'").bind(&user).fetch_one(&mut db).await?;
+        let preferences: Option<String> = sqlx::query_scalar(
+            "SELECT encrypted_preferences FROM user_settings WHERE user_id = $1",
+        )
+        .bind(&user)
+        .fetch_one(&mut db)
+        .await?;
+        ensure!(calendars > 0, "UI did not persist encrypted calendars");
+        ensure!(events > 0, "UI did not persist encrypted events");
+        ensure!(preferences.is_some(), "UI did not seal account settings");
+        println!("E2E calendar postconditions passed: encrypted calendars, events and settings");
+    }
+    if mail {
+        let mail_accounts: i64 = sqlx::query_scalar(
+            "SELECT count(DISTINCT u.id) FROM \"user\" u \
+             JOIN user_encryption_password p ON p.user_id = u.id \
+             JOIN mail_directory_entry d ON d.user_id = u.id \
+             JOIN mail_vault_backup v ON v.directory_entry_id = d.id \
+             WHERE u.email IN ($1, $2) AND u.mailbox_approved_at IS NOT NULL \
+             AND p.wrapped_account_key <> '' AND v.wrapped_secret IS NOT NULL",
+        )
+        .bind(EMAIL)
+        .bind(PEER_EMAIL)
+        .fetch_one(&mut db)
+        .await?;
+        ensure!(
+            mail_accounts == 2,
+            "UI did not initialize two independently sealed mail accounts"
+        );
+        println!("E2E mail postconditions passed: two independently sealed mail accounts");
+    }
+    println!("E2E postconditions passed: no readable journey content");
     Ok(())
 }
 

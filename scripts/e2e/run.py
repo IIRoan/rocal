@@ -309,7 +309,32 @@ def calendar_checkpoint():
     return results
 
 
+def run_mail_tail(platform, scenarios, results):
+    if not all(result["passed"] for result in results if result["app"] == "mail"):
+        raise SystemExit("The mail content prerequisites failed")
+    backend = backend_pid()
+    if backend is None:
+        raise RuntimeError("Refusing to suspend a process outside the disposable backend")
+    os.kill(backend, signal.SIGSTOP)
+    try:
+        offline_passed = run_journey(platform, "mail", scenarios / "mail/offline.yaml", results)
+    finally:
+        os.kill(backend, signal.SIGCONT)
+    if not offline_passed:
+        raise SystemExit("The mail offline-read prerequisite failed")
+    subprocess.run([sys.executable, REPO / "scripts/e2e/services.py", "wait-api"], check=True)
+    if not run_journey(platform, "mail", scenarios / "common/online-recovery.yaml", results):
+        raise SystemExit("The mail online-recovery prerequisite failed")
+    for flow in sorted((scenarios / "mail").glob("*.yaml")):
+        if flow.stem in CONVERSATION_JOURNEYS and not run_journey(platform, "mail", flow, results):
+            raise SystemExit("The mail conversation prerequisite failed")
+    run_journey(platform, "mail", scenarios / "mail/sign-out.yaml", results)
+
+
 def main(platform, diagnostic=False, resume=False):
+    apps = (os.environ["E2E_APP"],) if os.environ.get("E2E_APP") else APPS
+    if not set(apps) <= set(APPS):
+        raise SystemExit("E2E_APP must be calendar or mail")
     results = calendar_checkpoint() if resume else []
     scenarios = REPO / "e2e/native"
     if diagnostic:
@@ -320,7 +345,10 @@ def main(platform, diagnostic=False, resume=False):
                 raise SystemExit("The focused iOS diagnostic failed")
         publish(results)
         return
-    for app in APPS:
+    # Mail unlocks the account Calendar sets up, so a Mail-only run signs in through Calendar first.
+    if apps == ("mail",) and not run_journey(platform, "calendar", scenarios / "calendar/01-authentication.yaml", results):
+        raise SystemExit("The calendar authentication prerequisite failed")
+    for app in apps:
         flows = sorted(path for path in (scenarios / app).glob("*.yaml")
                        if path.name not in ("offline.yaml", "sign-out.yaml") and path.stem not in CONVERSATION_JOURNEYS
                        and not (resume and app == "calendar" and path.stem in CALENDAR_START))
@@ -330,29 +358,10 @@ def main(platform, diagnostic=False, resume=False):
             passed = run_journey(platform, app, flow, results)
             if index == 0 and not passed:
                 raise SystemExit(f"The {app} authentication/content prerequisite failed")
-    if all(result["passed"] for result in results if result["app"] == "mail"):
-        backend = backend_pid()
-        if backend is None:
-            raise RuntimeError("Refusing to suspend a process outside the disposable backend")
-        os.kill(backend, signal.SIGSTOP)
-        try:
-            offline_passed = run_journey(platform, "mail", scenarios / "mail/offline.yaml", results)
-        finally:
-            os.kill(backend, signal.SIGCONT)
-        if not offline_passed:
-            raise SystemExit("The mail offline-read prerequisite failed")
-        subprocess.run([sys.executable, REPO / "scripts/e2e/services.py", "wait-api"], check=True)
-        if not run_journey(platform, "mail", scenarios / "common/online-recovery.yaml", results):
-            raise SystemExit("The mail online-recovery prerequisite failed")
-    else:
-        raise SystemExit("The mail content prerequisites failed")
-    for flow in sorted((scenarios / "mail").glob("*.yaml")):
-        if flow.stem in CONVERSATION_JOURNEYS:
-            if not run_journey(platform, "mail", flow, results):
-                raise SystemExit("The mail conversation prerequisite failed")
-    run_journey(platform, "mail", scenarios / "mail/sign-out.yaml", results)
+    if "mail" in apps:
+        run_mail_tail(platform, scenarios, results)
     publish(results)
-    expected = sum(len(list((scenarios / app).glob("*.yaml"))) for app in APPS) + 1
+    expected = sum(len(list((scenarios / app).glob("*.yaml"))) for app in apps) + ("mail" in apps) + (apps == ("mail",))
     if len(results) != expected or not all(result["passed"] for result in results):
         raise SystemExit("Native end-to-end journeys failed or required scenarios did not run")
 
