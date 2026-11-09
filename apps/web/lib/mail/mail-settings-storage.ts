@@ -66,7 +66,7 @@ export function writeLocalTrustedSenders(values: string[]): void {
     .catch(() => undefined);
 }
 
-/** An add before hydration merges with the sealed list instead of replacing it with the still-empty view. */
+/** Merge edits with sealed senders while hydration is pending. */
 async function sealTrustedSenders(
   session: ActiveE2eeSession,
   snapshot: string[],
@@ -104,7 +104,7 @@ async function sealTrustedSenders(
   return encrypted;
 }
 
-/** Rehydrate before syncing, so a reload cannot upload an empty list over an unsynced edit. */
+/** Restore sealed senders before sync to preserve unsaved edits. */
 export async function restoreLocalTrustedSenders(): Promise<void> {
   const session = getActiveE2eeSession();
   if (!session || typeof window === "undefined") return;

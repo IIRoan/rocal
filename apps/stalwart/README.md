@@ -301,8 +301,6 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 
 ## Railway environment variables
 
-The Dockerfile pins frpc 0.72.0 by source commit and applies `frpc-security.patch` to its Go dependencies. The old `FRPC_VERSION` build variable is retired; source changes and CI scans now review the exact client build together. The VPS server is managed separately.
-
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `FRPS_ADDR` | yes | VPS IP or hostname |

@@ -183,7 +183,7 @@ def _proxy(handler: BaseHTTPRequestHandler) -> None:
             handler.end_headers()
             if handler.command != "HEAD":
                 handler.wfile.write(payload)
-    except Exception:  # noqa: BLE001 — surface upstream failure without internal details
+    except Exception:
         msg = b"gatus proxy unavailable\n"
         handler.send_response(502)
         handler.send_header("Content-Type", "text/plain")

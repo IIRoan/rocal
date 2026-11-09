@@ -6,19 +6,14 @@ import {
 
 export { LOG_HASH_FIELD_KEYS, LOG_OMIT_FIELD_KEYS };
 
-/** Placeholder written when a structured field is fully omitted. */
 export const LOG_OMITTED_PLACEHOLDER = "[omitted]" as const;
 
-/** Placeholder written when an email address is redacted from free-form text. */
 export const LOG_REDACTED_EMAIL_PLACEHOLDER = "[email]" as const;
 
-/** Placeholder written when a URL is redacted from free-form text. */
 export const LOG_REDACTED_URL_PLACEHOLDER = "[url]" as const;
 
-/** Placeholder written when a bearer token is redacted from free-form text. */
 export const LOG_REDACTED_BEARER_PLACEHOLDER = "Bearer [redacted]" as const;
 
-/** Placeholder written when a request URL query string is stripped. */
 export const LOG_REDACTED_QUERY_PLACEHOLDER = "?[redacted]" as const;
 
 /** Order matters: bearer tokens before URLs avoids partial leaks. */
@@ -39,7 +34,7 @@ const OMIT_KEYS = new Set(LOG_OMIT_FIELD_KEYS.map((key) => key.toLowerCase()));
 const HASH_KEYS = new Set(LOG_HASH_FIELD_KEYS.map((key) => key.toLowerCase()));
 const MAX_CONTEXT_DEPTH = 6;
 
-/** Scan each complete token once; retrying a local-part match at every character was quadratic. */
+/** Match whole tokens to avoid quadratic backtracking. */
 function redactEmailAddresses(text: string): string {
   return text.replace(LOG_PII_TEXT_PATTERNS.emailCandidate, (token) =>
     /(?:@|%40)[a-zA-Z0-9.-]+\.[a-zA-Z]{2}/i.test(token)
@@ -48,14 +43,12 @@ function redactEmailAddresses(text: string): string {
   );
 }
 
-/** Redact emails, bearer tokens and URLs from free-form text. */
 export function redactPII(text: string): string {
   return redactEmailAddresses(text)
     .replace(LOG_PII_TEXT_PATTERNS.bearer, LOG_REDACTED_BEARER_PLACEHOLDER)
     .replace(LOG_PII_TEXT_PATTERNS.url, LOG_REDACTED_URL_PLACEHOLDER);
 }
 
-/** Strip query strings and redact email path params from absolute or relative request URLs. */
 export function sanitizeRequestUrl(url: string): string {
   try {
     const parsed = new URL(url);
