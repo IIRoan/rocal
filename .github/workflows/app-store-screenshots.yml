@@ -44,7 +44,7 @@ jobs:
         if: steps.app.outputs.cache-hit != 'true'
         run: echo "version=$(node -p "require('../../packages/native-core/expo-apps.json').easCliVersion")" >> "$GITHUB_OUTPUT"
       - if: steps.app.outputs.cache-hit != 'true'
-        uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
+        uses: chainguard-actions/expo-expo-github-action@f202d68400237adfeabf5142b03e4b5aea4e70f8 # 8.2.1
         with:
           eas-version: ${{ steps.eas.outputs.version }}
           token: ${{ secrets.EXPO_TOKEN }}

@@ -125,7 +125,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
+      - uses: chainguard-actions/expo-expo-github-action@f202d68400237adfeabf5142b03e4b5aea4e70f8 # 8.2.1
         with:
           eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
@@ -213,7 +213,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
+      - uses: chainguard-actions/expo-expo-github-action@f202d68400237adfeabf5142b03e4b5aea4e70f8 # 8.2.1
         with:
           eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
