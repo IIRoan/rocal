@@ -15,4 +15,18 @@ appId: ${APP_ID}
             id: ${INPUT_ID}
             focused: false
           timeout: 15000
+      - runFlow:
+          when:
+            visible:
+              id: android:id/input_method_nav_back
+          commands:
+            - hideKeyboard
+      - extendedWaitUntil:
+          notVisible:
+            id: android:id/input_method_nav_back
+          timeout: 15000
       - runFlow: focus-input.yaml
+      - extendedWaitUntil:
+          visible:
+            id: android:id/input_method_nav_back
+          timeout: 15000
