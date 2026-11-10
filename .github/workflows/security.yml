@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
 
       - name: Review dependency changes
-        uses: chainguard-actions/actions-dependency-review-action@9734438463c5dfd5ea001f1c5735d88042eba9de # v5.0.0
+        uses: chainguard-actions/actions-dependency-review-action@9c300baf8189a413594de0217a5119aa9c5982b2 # v5.0.0
         with:
           fail-on-severity: high
           fail-on-scopes: runtime,development,unknown
@@ -52,7 +52,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Bun
-        uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+        uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
 
@@ -108,7 +108,7 @@ jobs:
         run: trivy convert --format sarif --output "$RUNNER_TEMP/repository.sarif" "$RUNNER_TEMP/repository.json"
 
       - name: Publish findings
-        uses: chainguard-actions/github-codeql-action/upload-sarif@a321c5c716c880c793b7c21e00b50c5e7e864a62 # v4.39.2
+        uses: chainguard-actions/github-codeql-action/upload-sarif@e4969b640f7a67163769dc6d910d19032366881b # v4.39.3
         with:
           sarif_file: ${{ runner.temp }}/repository.sarif
           category: /trivy/repository
@@ -150,7 +150,7 @@ jobs:
         uses: chainguard-actions/docker-setup-buildx-action@9744db81e7643f97efc7d98e7ce3d11d197f3093 # v4.4.1
 
       - name: Build the application image
-        uses: chainguard-actions/docker-build-push-action@5b225cb1d6f5196bc2459eaa52642b902bf3750f # v7.4.0
+        uses: chainguard-actions/docker-build-push-action@7a9792a1d0d1c43df643ef18b1f3a4a495833b23 # v7.4.0
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
@@ -179,7 +179,7 @@ jobs:
         run: trivy convert --format sarif --output "$RUNNER_TEMP/runtime.sarif" "$RUNNER_TEMP/runtime.json"
 
       - name: Publish application image findings
-        uses: chainguard-actions/github-codeql-action/upload-sarif@a321c5c716c880c793b7c21e00b50c5e7e864a62 # v4.39.2
+        uses: chainguard-actions/github-codeql-action/upload-sarif@e4969b640f7a67163769dc6d910d19032366881b # v4.39.3
         with:
           sarif_file: ${{ runner.temp }}/runtime.sarif
           category: /trivy/container/${{ matrix.image }}/runtime
