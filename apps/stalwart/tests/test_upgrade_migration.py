@@ -13,6 +13,7 @@ import tempfile
 import time
 import unittest
 import uuid
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("migration_110", ROOT / "scripts/upgrade-1.1.0.py")
@@ -24,8 +25,12 @@ TARGET_IMAGE = "docker.io/stalwartlabs/stalwart@sha256:f772aa6ef8cd8018969fa4916
 
 @unittest.skipUnless(os.environ.get("STALWART_RUN_MIGRATION_TESTS") == "1", "Set STALWART_RUN_MIGRATION_TESTS=1 for isolated container/PostgreSQL rehearsal")
 class PopulatedMigrationTests(unittest.TestCase):
-    def command(self, args, input=None):
-        return subprocess.check_output(args, input=input, stderr=subprocess.DEVNULL, timeout=40)
+    def command(self, args, input=None, environment=None):
+        return subprocess.check_output(args, input=input, env=environment, stderr=subprocess.DEVNULL, timeout=40)
+
+    def run_container(self, args, values):
+        flags = [part for name in values for part in ("--env", name)]
+        return self.command(["podman", "run", *flags, *args], environment={**os.environ, **values})
 
     def psql(self, database, sql):
         return self.command(["podman", "exec", self.pg_container, "psql", "-U", self.pg_user, "-d", database, "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", sql])
@@ -41,7 +46,6 @@ class PopulatedMigrationTests(unittest.TestCase):
         config = self.directory / (suffix + ".json")
         config.write_text(json.dumps({"@type": "PostgreSql", "host": self.pg_container, "port": 5432, "database": database, "authUsername": self.pg_user, "authSecret": {"@type": "EnvironmentVariable", "variableName": "PGPASSWORD"}, "useTls": False, "poolMaxConnections": 4}))
         config.chmod(0o644)
-        env = self.directory / (suffix + ".env")
         values = {"PGPASSWORD": self.pg_password}
         if recovery:
             values.update(STALWART_RECOVERY_MODE="true", STALWART_RECOVERY_MODE_PORT="8080")
@@ -49,9 +53,7 @@ class PopulatedMigrationTests(unittest.TestCase):
             values["STALWART_RECOVERY_ADMIN"] = "admin:solace-test-migration-admin"
         if update_roles:
             values["STALWART_UPDATE_ROLE_PERMISSIONS"] = "true"
-        env.write_text("".join(key+"="+value+"\n" for key, value in values.items()))
-        env.chmod(0o600)
-        self.command(["podman", "run", "-d", "--name", name, "--network", self.network, "-p", "127.0.0.1:"+str(port)+":8080", "--env-file", str(env), "-v", str(config)+":/tmp/config.json:ro,z", "--entrypoint", "/usr/local/bin/stalwart", image, "--config", "/tmp/config.json"])
+        self.run_container(["-d", "--name", name, "--network", self.network, "-p", "127.0.0.1:"+str(port)+":8080", "-v", str(config)+":/tmp/config.json:ro,z", "--entrypoint", "/usr/local/bin/stalwart", image, "--config", "/tmp/config.json"], values)
         self.containers.append(name)
         authorization = "Bearer " + token if token else "Basic " + base64.b64encode(b"admin:solace-test-migration-admin").decode()
         client = upgrade.Client("http://127.0.0.1:"+str(port), authorization, timeout=3)
@@ -73,10 +75,9 @@ class PopulatedMigrationTests(unittest.TestCase):
     def test_checkpoint_exact_key_conversion_recovery_and_clean_restart(self):
         reference_pg = os.environ.get("STALWART_MIGRATION_PG_CONTAINER", "solace-test-pg")
         self.assertTrue(reference_pg.startswith("solace-test-"))
-        info = json.loads(self.command(["podman", "inspect", reference_pg]))[0]
-        settings = dict(value.split("=", 1) for value in info["Config"]["Env"])
-        self.pg_user, self.pg_password = settings["POSTGRES_USER"], settings["POSTGRES_PASSWORD"]
-        self.assertTrue(self.pg_password.startswith("solace-test-"))
+        pg_image = self.command(["podman", "inspect", "--format", "{{.Image}}", reference_pg]).decode().strip()
+        self.pg_user = "solace_test"
+        self.pg_password = "solace-test-" + uuid.uuid4().hex
         self.port = int(os.environ.get("STALWART_MIGRATION_HTTP_PORT", "58180"))
         self.assertTrue(58140 <= self.port < 59000)
         self.prefix = "solace-aster-migration-" + uuid.uuid4().hex[:10]
@@ -90,10 +91,7 @@ class PopulatedMigrationTests(unittest.TestCase):
             self.directory = Path(directory)
             try:
                 self.command(["podman", "network", "create", "--internal", self.network])
-                pg_environment = self.directory / "postgres.env"
-                pg_environment.write_text("POSTGRES_USER="+self.pg_user+"\nPOSTGRES_PASSWORD="+self.pg_password+"\nPOSTGRES_DB=solace_test\n")
-                pg_environment.chmod(0o600)
-                self.command(["podman", "run", "-d", "--name", self.pg_container, "--network", self.network, "--env-file", str(pg_environment), info["Image"]])
+                self.run_container(["-d", "--name", self.pg_container, "--network", self.network, pg_image], {"POSTGRES_USER": self.pg_user, "POSTGRES_PASSWORD": self.pg_password, "POSTGRES_DB": "solace_test"})
                 self.containers.append(self.pg_container)
                 for attempt in range(100):
                     ready = subprocess.run(["podman", "exec", self.pg_container, "pg_isready", "-h", "127.0.0.1", "-U", self.pg_user, "-d", "postgres"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
@@ -222,6 +220,21 @@ class PopulatedMigrationTests(unittest.TestCase):
                     self.psql("postgres", "DROP DATABASE " + database + " WITH (FORCE)")
                 subprocess.run(["podman", "rm", "-fv", self.pg_container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=25)
                 subprocess.run(["podman", "network", "rm", self.network], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=25)
+
+
+class MigrationCredentialTests(unittest.TestCase):
+    def test_container_credentials_stay_in_the_process_environment(self):
+        probe = PopulatedMigrationTests()
+        credentials = {"PGPASSWORD": "solace-test-credential-sentinel", "STALWART_RECOVERY_ADMIN": "admin:solace-test-recovery-sentinel"}
+        with patch.object(probe, "command", return_value=b"container-id") as command:
+            self.assertEqual(probe.run_container(["--name", "synthetic", TARGET_IMAGE], credentials), b"container-id")
+        args = command.call_args.args[0]
+        environment = command.call_args.kwargs["environment"]
+        self.assertNotIn("--env-file", args)
+        for key, value in credentials.items():
+            self.assertNotIn(value, args)
+            self.assertEqual(environment[key], value)
+            self.assertEqual(args[args.index(key) - 1], "--env")
 
 
 if __name__ == "__main__":
