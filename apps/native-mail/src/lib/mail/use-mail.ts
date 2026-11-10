@@ -6,6 +6,7 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
+import { cancelMailMessageReads } from "@workspace/calendar-client/mail-query-coordination";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { useE2ee } from "@workspace/native-core/providers/E2eeProvider";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
@@ -392,8 +393,16 @@ export function useMailMutations(
   };
 
   const invalidateMessages = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mailMessagesAll() });
+    queryClient
+      .invalidateQueries({ queryKey: QUERY_KEYS.mailMessagesAll() })
+      .catch(() => undefined);
   };
+  const cancelKeywordReads = () =>
+    cancelMailMessageReads(queryClient, [
+      QUERY_KEYS.mailMessagesAll(),
+      QUERY_KEYS.mailThreadsAll(),
+      QUERY_KEYS.mailMessageDetailsAll(),
+    ]);
 
   const markAsRead = useMutation({
     mutationFn: (messageId: string) => {
@@ -403,16 +412,22 @@ export function useMailMutations(
       const rt = requireRuntime();
       return rt.client.markAsRead(rt.session, messageId);
     },
-    onMutate: (messageId) => {
+    onMutate: async (messageId) => {
       if (suppressMarkAsReadIds.has(messageId)) return;
+      const resume = await cancelKeywordReads();
+      if (suppressMarkAsReadIds.has(messageId)) return resume;
       patchMessageInCache(queryClient, messageId, (msg) => ({
         keywords: { ...msg.keywords, $seen: true },
       }));
       patchSingleMessageInCache(queryClient, messageId, (msg) => ({
         keywords: { ...msg.keywords, $seen: true },
       }));
+      return resume;
     },
     onError: () => invalidateMessages(),
+    onSettled: (_data, _error, _variables, resume) => {
+      resume?.().catch(() => undefined);
+    },
   });
 
   const toggleFlagged = useMutation({
@@ -424,16 +439,21 @@ export function useMailMutations(
         input.flagged,
       );
     },
-    onMutate: (input) => {
+    onMutate: async (input) => {
+      const resume = await cancelKeywordReads();
       patchMessageInCache(queryClient, input.messageId, (msg) => ({
         keywords: { ...msg.keywords, $flagged: input.flagged },
       }));
       patchSingleMessageInCache(queryClient, input.messageId, (msg) => ({
         keywords: { ...msg.keywords, $flagged: input.flagged },
       }));
+      return resume;
     },
     onError: () => {
-      invalidateMessages();
+      return invalidateMessages();
+    },
+    onSettled: (_data, _error, _variables, resume) => {
+      resume?.().catch(() => undefined);
     },
   });
 
@@ -442,7 +462,8 @@ export function useMailMutations(
       const rt = requireRuntime();
       return rt.client.markAsUnread(rt.session, messageId);
     },
-    onMutate: (messageId) => {
+    onMutate: async (messageId) => {
+      const resume = await cancelKeywordReads();
       patchMessageInCache(queryClient, messageId, (msg) => {
         const keywords = { ...msg.keywords };
         delete keywords.$seen;
@@ -453,8 +474,12 @@ export function useMailMutations(
         delete keywords.$seen;
         return { keywords };
       });
+      return resume;
     },
     onError: () => invalidateMessages(),
+    onSettled: (_data, _error, _variables, resume) => {
+      resume?.().catch(() => undefined);
+    },
   });
 
   const moveToTrash = useMutation({
@@ -526,7 +551,8 @@ export function useMailMutations(
         input.assigned,
       );
     },
-    onMutate: (input) => {
+    onMutate: async (input) => {
+      const resume = await cancelKeywordReads();
       const keywordKey = `label:${input.labelId}` as const;
       patchMessageInCache(queryClient, input.messageId, (msg) => {
         const keywords = { ...msg.keywords };
@@ -546,8 +572,12 @@ export function useMailMutations(
         }
         return { keywords };
       });
+      return resume;
     },
     onError: () => invalidateMessages(),
+    onSettled: (_data, _error, _variables, resume) => {
+      resume?.().catch(() => undefined);
+    },
   });
 
   const bulkMarkAsRead = useMutation({
@@ -555,12 +585,17 @@ export function useMailMutations(
       const rt = requireRuntime();
       return rt.client.bulkMarkAsRead(rt.session, messageIds);
     },
-    onMutate: (messageIds) => {
+    onMutate: async (messageIds) => {
+      const resume = await cancelKeywordReads();
       patchManyMessagesInCache(queryClient, messageIds, (msg) => ({
         keywords: { ...msg.keywords, $seen: true },
       }));
+      return resume;
     },
     onError: () => invalidateMessages(),
+    onSettled: (_data, _error, _variables, resume) => {
+      resume?.().catch(() => undefined);
+    },
   });
 
   const bulkMarkAsUnread = useMutation({
@@ -568,14 +603,19 @@ export function useMailMutations(
       const rt = requireRuntime();
       return rt.client.bulkMarkAsUnread(rt.session, messageIds);
     },
-    onMutate: (messageIds) => {
+    onMutate: async (messageIds) => {
+      const resume = await cancelKeywordReads();
       patchManyMessagesInCache(queryClient, messageIds, (msg) => {
         const keywords = { ...msg.keywords };
         delete keywords.$seen;
         return { keywords };
       });
+      return resume;
     },
     onError: () => invalidateMessages(),
+    onSettled: (_data, _error, _variables, resume) => {
+      resume?.().catch(() => undefined);
+    },
   });
 
   const resolveBulkTrashTarget = () => {

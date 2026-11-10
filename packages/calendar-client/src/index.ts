@@ -52,3 +52,4 @@ export type {
   MailTrustResponse,
   PutMailTrustRequest,
 } from "./mail-trust";
+export { cancelMailMessageReads } from "./mail-query-coordination";

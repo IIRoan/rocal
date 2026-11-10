@@ -74,11 +74,19 @@ export function useMailMessageActions({
 
   const isFlagged = Boolean(message?.keywords?.["$flagged"]);
   const isSeen = Boolean(message?.keywords?.["$seen"]);
+  const loadedMessageId = message?.id;
   const { mutate: markAsReadMutate } = markAsRead;
 
   // Mark read once per visit; a mid-visit "mark unread" also claims the id so it is not undone.
   useEffect(() => {
-    if (!runtime || !messageId || isSeen || !listSettingsLoaded) return;
+    if (
+      !runtime ||
+      !messageId ||
+      loadedMessageId !== messageId ||
+      isSeen ||
+      !listSettingsLoaded
+    )
+      return;
     if (markAsReadDelayMs === null) return;
     if (markReadHandledIdRef.current === messageId) return;
     const markRead = () => {
@@ -94,6 +102,7 @@ export function useMailMessageActions({
     return () => clearTimeout(timer);
   }, [
     isSeen,
+    loadedMessageId,
     listSettingsLoaded,
     markAsReadDelayMs,
     markAsReadMutate,

@@ -30,6 +30,7 @@ appId: ${APP_ID}
       BODY_TEXT: ".*Maestro primary reply.*"
       EXCLUDED_TEXT: ".*Maestro peer final note.*"
       OPEN_TIMEOUT_MS: 5000
+      SIGNATURE_LABEL: Signed with your local key
 - scrollUntilVisible:
     element:
       id: mail-thread-message-2

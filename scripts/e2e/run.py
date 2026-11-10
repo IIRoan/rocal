@@ -191,15 +191,21 @@ def capture_failure_hierarchy(tool, device, fixture, name):
             completed = subprocess.run([tool, "--device", device["id"], "hierarchy", "--no-reinstall-driver", "--no-ansi"],
                                        cwd=REPO, env=maestro_environment(), check=False, timeout=60, stdout=output, stderr=log)
         if completed.returncode != 0:
+            print(f"Failure hierarchy unavailable (exit-status={completed.returncode}): {name}", flush=True)
             return
         tree = json.loads(source.read_text())
         if not isinstance(tree, dict):
+            print(f"Failure hierarchy unavailable (invalid-shape): {name}", flush=True)
             return
         target = root / "artifacts/hierarchy"
         target.mkdir(exist_ok=True)
         (target / f"{name}.json").write_text(json.dumps(sanitized_hierarchy(tree, fixture), indent=2))
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        print(f"Failure hierarchy unavailable: {name}", flush=True)
+    except subprocess.TimeoutExpired:
+        print(f"Failure hierarchy unavailable (timeout): {name}", flush=True)
+    except ValueError:
+        print(f"Failure hierarchy unavailable (invalid-json): {name}", flush=True)
+    except OSError:
+        print(f"Failure hierarchy unavailable (os-error): {name}", flush=True)
 
 
 def publish(results, summary=False):

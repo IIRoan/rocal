@@ -591,6 +591,56 @@ impl<'a> Admin<'a> {
         }
     }
 
+    pub async fn set_sender_name(
+        &self,
+        account_id: &str,
+        email: &str,
+        name: &str,
+    ) -> Result<(), AdminError> {
+        // Stalwart otherwise copies the administrative ownership marker into the default From name.
+        let name = normalized_sender_name(name, email);
+        let request = |calls: Value| {
+            self.post("/jmap/").bearer_auth(self.token).json(&json!({
+                "using": ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:submission"],
+                "methodCalls": calls,
+            }))
+        };
+        let (status, body) = super::send_in(
+            &super::PROVISIONER_LANE,
+            request(json!([["Identity/get", {"accountId": account_id, "properties": ["id", "email"]}, "i"]])),
+        )
+        .await?;
+        if !status.is_success() {
+            return Err(AdminError::Status(status.as_u16()));
+        }
+        let envelope = parse_envelope(read_json(&body)?);
+        let identities = method_result(&envelope, "Identity/get")?;
+        let id = list_of(identities)
+            .iter()
+            .find(|identity| {
+                str_field(identity, "email").is_some_and(|value| value.eq_ignore_ascii_case(email))
+            })
+            .and_then(|identity| str_field(identity, "id"))
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| AdminError::Failed("Mailbox sending identity is unavailable.".into()))?
+            .to_owned();
+        let (status, body) = super::send_in(
+            &super::PROVISIONER_LANE,
+            request(json!([["Identity/set", {"accountId": account_id, "update": {&id: {"name": &name}}}, "i"]])),
+        )
+        .await?;
+        if !status.is_success() {
+            return Err(AdminError::Status(status.as_u16()));
+        }
+        let envelope = parse_envelope(read_json(&body)?);
+        acknowledged(
+            method_result(&envelope, "Identity/set")?,
+            &id,
+            "Mailbox sender name update failed.",
+            "Mailbox sender name update was not acknowledged.",
+        )
+    }
+
     pub async fn mailbox_is_empty(&self, account_id: &str) -> Result<bool, AdminError> {
         // Owner-scoped mailbox totals avoid reading message identifiers, bodies or blobs.
         let (status, body) = super::send_in(&super::PROVISIONER_LANE,
@@ -624,7 +674,7 @@ impl<'a> Admin<'a> {
         &self,
         account_id: &str,
         armored: &str,
-    ) -> Result<(), AdminError> {
+    ) -> Result<Vec<Value>, AdminError> {
         let wanted = public_key_fingerprint(armored)
             .ok_or_else(|| AdminError::Failed("Invalid public key.".into()))?;
         let keys = self.public_keys(account_id).await?;
@@ -634,7 +684,7 @@ impl<'a> Admin<'a> {
                 .as_deref()
                 == Some(&wanted)
         {
-            return Ok(());
+            return Ok(keys);
         }
         if !self.mailbox_is_empty(account_id).await? {
             return Err(AdminError::Failed(
@@ -666,7 +716,7 @@ impl<'a> Admin<'a> {
             })
             .collect::<Result<Vec<_>, _>>()?;
         if ids.is_empty() {
-            return Ok(());
+            return Ok(Vec::new());
         }
         let result = self
             .call(
@@ -686,7 +736,7 @@ impl<'a> Admin<'a> {
                 "Staged public key cleanup was not acknowledged.".into(),
             ));
         }
-        Ok(())
+        Ok(Vec::new())
     }
 
     pub async fn needs_activation(
@@ -705,7 +755,7 @@ impl<'a> Admin<'a> {
     pub async fn register_public_key(
         &self,
         account_id: &str,
-        _email: &str,
+        prepared_keys: Option<&[Value]>,
         public_key_armored: &str,
         description: Option<&str>,
     ) -> Result<String, AdminError> {
@@ -714,7 +764,10 @@ impl<'a> Admin<'a> {
                 "Stalwart public-key registration requires a valid public key.".into(),
             )
         })?;
-        let existing = self.public_keys(account_id).await?;
+        let existing = match prepared_keys {
+            Some(keys) => keys.to_vec(),
+            None => self.public_keys(account_id).await?,
+        };
         if !existing.is_empty() {
             let matching: Vec<_> = existing
                 .iter()
@@ -1268,6 +1321,30 @@ fn read_json(body: &[u8]) -> Result<Value, AdminError> {
     serde_json::from_slice(body).map_err(|_| AdminError::NotJson)
 }
 
+fn normalized_sender_name(value: &str, email: &str) -> String {
+    let mut safe = String::new();
+    let mut space = false;
+    for character in value.chars() {
+        if character.is_control() || character.is_whitespace() {
+            space = !safe.is_empty();
+            continue;
+        }
+        if safe.len() + usize::from(space) + character.len_utf8() > 254 {
+            break;
+        }
+        if space {
+            safe.push(' ');
+        }
+        safe.push(character);
+        space = false;
+    }
+    if safe.is_empty() {
+        email.to_owned()
+    } else {
+        safe
+    }
+}
+
 fn str_field<'v>(value: &'v Value, key: &str) -> Option<&'v str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -1364,6 +1441,30 @@ mod tests {
 
     fn envelope(method: &str, arguments: Value, call_id: &str) -> Reply {
         Reply::json(json!({"methodResponses": [[method, arguments, call_id]]}))
+    }
+
+    #[test]
+    fn sender_names_have_no_controls_and_fit_the_identity_byte_limit() {
+        assert_eq!(
+            normalized_sender_name("  Alice\r\nExample\0\t ", "a@solace.test"),
+            "Alice Example"
+        );
+        assert_eq!(
+            normalized_sender_name("\r\n\0\u{7f}", "a@solace.test"),
+            "a@solace.test"
+        );
+        assert_eq!(
+            normalized_sender_name(&"a".repeat(300), "a@solace.test"),
+            "a".repeat(254)
+        );
+        assert_eq!(
+            normalized_sender_name(&"🚀".repeat(100), "a@solace.test"),
+            "🚀".repeat(63)
+        );
+        assert_eq!(
+            normalized_sender_name(&"é".repeat(200), "a@solace.test"),
+            "é".repeat(127)
+        );
     }
 
     #[test]

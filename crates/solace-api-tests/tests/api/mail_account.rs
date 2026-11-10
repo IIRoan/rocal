@@ -225,6 +225,137 @@ async fn bootstrap_provisions_an_encrypted_mailbox_linked_to_the_user() {
 }
 
 #[tokio::test]
+async fn provisioning_keeps_owner_markers_out_of_sending_identities() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    let account_id = owner.account_id().to_owned();
+    let reply = owner
+        .jmap(json!([["Identity/get", {"accountId": account_id}, "i"]]))
+        .await;
+    let identities = super::mail_support::method(&reply, "i")["list"]
+        .as_array()
+        .expect("sending identities");
+    let identity = identities
+        .iter()
+        .find(|identity| identity["email"] == json!(owner.user.email))
+        .expect("primary identity");
+    assert_eq!(identity["name"], json!(owner.user.name));
+    assert!(identities.iter().all(|identity| {
+        !identity["name"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(&owner.user.id)
+    }));
+}
+
+#[tokio::test]
+async fn sender_identity_names_are_safe_without_rejecting_existing_profile_names() {
+    let app = TestApp::spawn().await;
+    for (name, expected) in [
+        (
+            "  Alice\r\nExample\u{7f}\tFrom: name  ".to_owned(),
+            Some("Alice Example From: name".to_owned()),
+        ),
+        ("a".repeat(300), Some("a".repeat(254))),
+        ("🚀".repeat(100), Some("🚀".repeat(63))),
+        ("\r\n\u{7f}\t".to_owned(), None),
+    ] {
+        let mut user = app.user().await;
+        ok(user
+            .post("/api/auth/update-user", json!({"name":name}))
+            .await
+            .expect_status(200));
+        let signup = provision(&app, &mut user, &bootstrap_request(0)).await;
+        let account_id = signup.stalwart_account_id.0.clone();
+        let mut owner = super::mail_support::Mailbox { user, signup };
+        let reply = owner
+            .jmap(json!([["Identity/get", {"accountId":account_id}, "i"]]))
+            .await;
+        let identity = super::mail_support::method(&reply, "i")["list"]
+            .as_array()
+            .expect("identities")
+            .iter()
+            .find(|identity| identity["email"] == json!(owner.user.email))
+            .expect("primary identity");
+        assert_eq!(
+            identity["name"],
+            json!(expected.unwrap_or(owner.user.email.clone()))
+        );
+    }
+}
+
+#[tokio::test]
+async fn principal_metadata_does_not_expose_another_mailboxs_owner_marker() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    let other = mailbox(&app).await;
+    let account_id = owner.account_id().to_owned();
+    let calls = json!([
+        ["Principal/get", {"accountId":account_id,"ids":null}, "own"],
+        ["Principal/get", {"accountId":account_id,"ids":[other.account_id()]}, "foreign"],
+        ["Principal/query", {"accountId":account_id}, "query"]
+    ]);
+    let using = [
+        "urn:ietf:params:jmap:core",
+        "urn:ietf:params:jmap:principals",
+    ];
+    for direct in [true, false] {
+        let envelope: Value = if direct {
+            let mut request = reqwest::Client::new()
+                .post(format!("{}/jmap/", app.env.stalwart_url))
+                .basic_auth(
+                    &owner.user.email,
+                    Some(bridge_secret(
+                        &app.env.mail_bridge_hmac_key,
+                        &owner.user.id,
+                        &owner.user.email,
+                    )),
+                );
+            if let Some(key) = &app.env.stalwart_gate_key {
+                request = request.header("X-Solace-Gate", key);
+            }
+            request
+                .json(&json!({"using":using,"methodCalls":calls}))
+                .send()
+                .await
+                .expect("direct principal request")
+                .json()
+                .await
+                .expect("principal envelope")
+        } else {
+            ok(owner
+                .user
+                .post(
+                    "/api/mail/jmap/jmap/",
+                    json!({"using":using,"methodCalls":calls}),
+                )
+                .await
+                .expect_status(200)
+                .and_then(|reply| reply.value()))
+        };
+        let own = super::mail_support::method(&envelope, "own");
+        assert_eq!(own["list"].as_array().expect("own principal").len(), 1);
+        let foreign = super::mail_support::method(&envelope, "foreign");
+        assert_eq!(foreign["list"], json!([]));
+        assert_eq!(foreign["notFound"], json!([other.account_id()]));
+        assert_eq!(
+            super::mail_support::method(&envelope, "query")["type"],
+            "forbidden"
+        );
+    }
+    let global = app
+        .stalwart_admin(
+            &solace_api_tests::stalwart::REGISTRY,
+            json!([["x:Sharing/get",{"ids":["singleton"]},"s"]]),
+        )
+        .await;
+    assert_eq!(
+        super::mail_support::method(&global, "s")["list"][0]["allowDirectoryQueries"],
+        false
+    );
+}
+
+#[tokio::test]
 async fn bootstrap_requires_a_vault_secret_sealed_to_the_account_key() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;

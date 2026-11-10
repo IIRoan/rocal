@@ -27,6 +27,7 @@ class FakeClient:
         self.keys = {"u": [{"id": "k", "accountId": "u", "key": KEY, "kind": "openPgp", "keyType": "RSA", "warnings": {}, "expiresAt": None, "fingerprints": {key: True for key in FINGERPRINTS}}]}
         self.global_policy = {"id": "singleton", "atRestEnable": True, "gatewayEnable": False, "harvestKeys": {"match": {}, "else": "false"}}
         self.metrics = {"metricsPolicy": "exclude", "metrics": {}}
+        self.sharing = {"allowDirectoryQueries": False}
         self.writes = []
         self.fail_after = None
 
@@ -48,6 +49,8 @@ class FakeClient:
             return [copy.deepcopy(self.global_policy)]
         if kind == "x:Metrics":
             return [copy.deepcopy(self.metrics)]
+        if kind == "x:Sharing":
+            return [copy.deepcopy(self.sharing)]
         return [value for value in self.all(kind, account_id) if value["id"] in ids]
 
     def query(self, kind, account_id=None):
@@ -65,6 +68,8 @@ class FakeClient:
             self.metrics.update(copy.deepcopy(patch))
         elif kind == "x:Encryption":
             self.global_policy.update(copy.deepcopy(patch))
+        elif kind == "x:Sharing":
+            self.sharing.update(copy.deepcopy(patch))
         else:
             next(value for value in self.accounts if value["id"] == object_id).update(copy.deepcopy(patch))
 
@@ -273,6 +278,12 @@ class CurrentPolicyTests(unittest.TestCase):
         self.client.roles[0]["disabledPermissions"].pop("sysPasskeyCreate")
         with self.assertRaisesRegex(upgrade.Refusal, "passkeys"):
             upgrade.current(self.client, STORE, self.allowlist)
+
+    def test_public_principal_directory_is_refused_before_checking_accounts(self):
+        self.client.sharing["allowDirectoryQueries"] = True
+        with self.assertRaisesRegex(upgrade.Refusal, "principal-directory-queries-enabled"):
+            upgrade.current(self.client, STORE, self.allowlist)
+        self.assertEqual(self.client.writes, [])
 
     def test_prepare_preserves_existing_permissions_and_repairs_only_admin_role(self):
         self.client.roles[0]["disabledPermissions"] = {"sysAccountCreate": True}

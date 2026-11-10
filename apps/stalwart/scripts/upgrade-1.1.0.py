@@ -388,6 +388,8 @@ def snapshot(client):
 
 
 def verify_global(client, roles, defaults):
+    sharing = client.get("x:Sharing", ["singleton"])[0]
+    require(sharing.get("allowDirectoryQueries") is False, "principal-directory-queries-enabled")
     policy = client.get("x:Encryption", ["singleton"])[0]
     require(policy.get("atRestEnable") is True and policy.get("gatewayEnable") is False and policy.get("harvestKeys") == {"match": {}, "else": "false"}, "global-encryption-policy-mismatch")
     metrics = client.get("x:Metrics", ["singleton"])[0]

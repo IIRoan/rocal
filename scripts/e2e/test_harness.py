@@ -195,6 +195,26 @@ class HarnessTests(unittest.TestCase):
             self.assertIsNone(details["assertionTarget"])
             self.assertNotIn("secret-sentinel", json.dumps(details))
 
+    def test_hierarchy_failures_report_only_fixed_categories(self):
+        cases = (("exit-status=7", None, 7, b""), ("invalid-json", None, 0, b"private-invalid-json"),
+                 ("invalid-shape", None, 0, b"[]"), ("timeout", journeys.subprocess.TimeoutExpired("private-command", 60), 0, b""),
+                 ("os-error", OSError("private-os-error"), 0, b""))
+        for reason, failure, code, content in cases:
+            with self.subTest(reason=reason), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "solace-e2e"
+                def execute(*_args, **kwargs):
+                    if failure is not None:
+                        raise failure
+                    kwargs["stdout"].write(content)
+                    return journeys.subprocess.CompletedProcess([], code)
+                console = io.StringIO()
+                with patch.dict(os.environ, {"SOLACE_E2E":"1", "SOLACE_E2E_DIR":str(root)}, clear=True), \
+                        patch.object(journeys.subprocess, "run", side_effect=execute), redirect_stdout(console):
+                    directory()
+                    journeys.capture_failure_hierarchy("test-maestro", {"id":"test-device"}, {}, "test-flow")
+                self.assertIn(f"({reason}): test-flow", console.getvalue())
+                self.assertNotIn("private", console.getvalue())
+
     def test_mail_recovery_order_and_prerequisite_failures(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "solace-e2e"

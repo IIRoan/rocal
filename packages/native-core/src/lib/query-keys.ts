@@ -29,6 +29,7 @@ export const QUERY_KEYS = {
   mailMessagesAll: () => ["mail", "messages"] as const,
   mailMessages: (mailboxId: string | null) =>
     ["mail", "messages", mailboxId] as const,
+  mailMessageDetailsAll: () => ["mail", "message"] as const,
   mailMessage: (messageId: string) => ["mail", "message", messageId] as const,
   mailCalendarAttachments: (messageId: string) =>
     ["mail", "calendar-attachments", messageId] as const,

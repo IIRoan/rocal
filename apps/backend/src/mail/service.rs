@@ -588,19 +588,36 @@ impl Stalwart {
         }
         let token = owner_token(state, admin, &address.email, &secret).await?;
         let owner = admin.with_owner_token(&token.access_token);
-        if queries::entry_by_account(&state.db, &self.account_id)
+        owner
+            .set_sender_name(
+                &self.account_id,
+                &address.email,
+                provisioning
+                    .display_name
+                    .as_deref()
+                    .unwrap_or(&address.email),
+            )
+            .await?;
+        // A same-create acknowledgement proves this denied account has no old key; adopted stages still need the emptiness check.
+        let prepared_keys = if self.account_created {
+            Some(Vec::new())
+        } else if queries::entry_by_account(&state.db, &self.account_id)
             .await
             .map_err(|_| AdminError::Failed("Mailbox directory check failed.".into()))?
             .is_none()
         {
-            owner
-                .prepare_uncommitted_key(&self.account_id, &provisioning.public_key_armored)
-                .await?;
-        }
+            Some(
+                owner
+                    .prepare_uncommitted_key(&self.account_id, &provisioning.public_key_armored)
+                    .await?,
+            )
+        } else {
+            None
+        };
         self.public_key_id = owner
             .register_public_key(
                 &self.account_id,
-                &address.email,
+                prepared_keys.as_deref(),
                 &provisioning.public_key_armored,
                 Some("Solace mailbox OpenPGP key"),
             )
@@ -1483,6 +1500,21 @@ pub mod tests {
                     json!({"updated": {"acct-1": null}})
                 }
                 "Mailbox/get" => json!({"list":[{"id":"inbox","totalEmails":0}]}),
+                "Identity/get" => {
+                    assert_eq!(
+                        request.authorization.as_deref(),
+                        Some("Bearer stalwart-access-token")
+                    );
+                    json!({"list":[{"id":"identity-1","email":format!("{}@solace.test", plan.local_part)}]})
+                }
+                "Identity/set" => {
+                    assert_eq!(
+                        request.authorization.as_deref(),
+                        Some("Bearer stalwart-access-token")
+                    );
+                    assert_eq!(arguments["accountId"], "acct-1");
+                    json!({"updated":{"identity-1":null}})
+                }
                 "x:PublicKey/query" => {
                     json!({"ids":keys.lock().unwrap().iter().map(|key| key["id"].clone()).collect::<Vec<_>>()})
                 }
@@ -1726,6 +1758,45 @@ pub mod tests {
         assert_eq!(vault.wrapped_secret, "wrapped:sealed-secret");
         assert_eq!(count(&state, "mail_directory_entry").await, 1);
         assert!(!destroyed(&fake));
+    }
+
+    #[tokio::test]
+    async fn only_newly_created_denied_accounts_skip_abandoned_key_preparation() {
+        for adopt in [false, true] {
+            let database = ScratchDatabase::create().await;
+            let fake = FakeStalwart::start(provisioning(Plan {
+                local_part: "alice",
+                adopt,
+                ..Plan::default()
+            }))
+            .await;
+            let state = mail_state(&database, &fake).await;
+            bootstrap(&state, &owner("alice@solace.test"), request())
+                .await
+                .unwrap();
+            let requests = fake.requests();
+            assert_eq!(
+                requests
+                    .iter()
+                    .filter(|request| request.first_method() == "Mailbox/get")
+                    .count(),
+                usize::from(adopt)
+            );
+            assert_eq!(
+                requests
+                    .iter()
+                    .filter(|request| request.first_method() == "x:PublicKey/query")
+                    .count(),
+                usize::from(adopt)
+            );
+            assert_eq!(
+                requests
+                    .iter()
+                    .filter(|request| request.first_method() == "Identity/set")
+                    .count(),
+                1
+            );
+        }
     }
 
     #[tokio::test]
