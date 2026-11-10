@@ -1,6 +1,7 @@
 import {
   capIdentitiesForPicker,
   resolveMailServerPolicy,
+  isMailAccountEncryptedAtRest,
   type MailServerPolicy,
 } from "@workspace/calendar-core";
 import {
@@ -31,13 +32,17 @@ export type MailRuntime = {
 export async function refreshMailRuntimePolicy(
   runtime: MailRuntime,
 ): Promise<MailRuntime> {
-  const mailServerPolicy =
-    (await runtime.client.syncMailServerPolicy(runtime.session, {
+  const [updatedPolicy, accountSettings] = await Promise.all([
+    runtime.client.syncMailServerPolicy(runtime.session, {
       force: true,
-    })) ?? runtime.mailServerPolicy;
+    }),
+    runtime.client.getAccountSettings(runtime.session),
+  ]);
+  const mailServerPolicy = updatedPolicy ?? runtime.mailServerPolicy;
 
   return {
     ...runtime,
+    encryptedAtRest: isMailAccountEncryptedAtRest(accountSettings),
     pickerIdentities: capIdentitiesForPicker(
       runtime.identities,
       mailServerPolicy,
@@ -83,6 +88,8 @@ export function restoreMailRuntime(persisted: PersistedMailRuntime): MailRuntime
   );
   return {
     ...persisted,
+    // A cached boolean cannot attest to current server policy after an offline restore.
+    encryptedAtRest: false,
     client,
     pickerIdentities: capIdentitiesForPicker(
       persisted.identities,
@@ -115,10 +122,7 @@ export async function buildMailRuntime(): Promise<MailRuntime> {
 
   await client.ensureEncryptOnAppendDisabled(session).catch(() => undefined);
 
-  const encryptedAtRest =
-    (accountSettings.encryptionAtRest as { "@type"?: string } | undefined)?.[
-      "@type"
-    ] === "Aes256";
+  const encryptedAtRest = isMailAccountEncryptedAtRest(accountSettings);
 
   const mailServerPolicy = resolveMailServerPolicy({
     session,

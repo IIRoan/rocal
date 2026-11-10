@@ -1,5 +1,15 @@
+import { randomUUID } from "expo-crypto";
+import {
+  activateSessionData,
+  closeSessionData,
+} from "@workspace/native-core/lib/session-data-lifecycle";
 import * as FileSystem from "expo-file-system/legacy";
-import { clearAttachmentCache, writeAttachmentToCache } from "./attachment-cache";
+import {
+  clearAttachmentCache,
+  writeAttachmentToCache,
+  releaseCachedAttachment,
+  pruneAttachmentCache,
+} from "./attachment-cache";
 import {
   buildAttachmentCachePath,
   inferAttachmentMimeType,
@@ -22,6 +32,7 @@ jest.mock("./mail-offline-store", () => ({
   MAIL_OFFLINE_SNAPSHOT_FILE: "solace-mail-offline-snapshot.json",
 }));
 jest.mock("expo-sharing", () => ({}));
+jest.mock("expo-crypto", () => ({ randomUUID: jest.fn(() => "opaque-id") }));
 jest.mock("react-native", () => ({ Linking: {}, Platform: { OS: "ios" } }));
 
 describe("attachment path helpers", () => {
@@ -60,12 +71,19 @@ describe("attachment path helpers", () => {
 });
 
 describe("attachment cache", () => {
+  beforeEach(async () => {
+    await clearAttachmentCache();
+    activateSessionData("u1");
+    jest.clearAllMocks();
+  });
   it("keeps decrypted attachments only in the folder that sign-out wipes", async () => {
     const cached = await writeAttachmentToCache({
       attachment: { name: "report.pdf", type: "application/pdf", content: new Uint8Array([1, 2]) },
       cacheKey: "b1",
     });
-    expect(cached.uri).toBe("file:///cache/mail-attachments/report-b1.pdf");
+    expect(cached.uri).toBe(
+      "file:///cache/mail-attachments/report-opaque-id.pdf",
+    );
 
     await clearAttachmentCache();
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith("file:///cache/mail-attachments/", {
@@ -90,5 +108,125 @@ describe("attachment cache", () => {
       "file:///cache/invoice-cp3khzyld1zg.pdf",
       "file:///cache/mail-attachments/",
     ]);
+  });
+});
+
+function deferred() {
+  let resolve = () => undefined as void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+describe("attachment acquisition lifecycle", () => {
+  beforeEach(async () => {
+    await clearAttachmentCache();
+    activateSessionData("u1");
+    jest.clearAllMocks();
+  });
+
+  it("shares one pending download for an immutable blob", async () => {
+    const finish = deferred();
+    const downloadBlob = jest.fn(async () => {
+      await finish.promise;
+      return new Uint8Array([1]);
+    });
+    const runtime = {
+      accountId: "acc",
+      session: { apiUrl: "http://localhost:4001/api/mail/jmap", accounts: { acc: {} }, primaryAccounts: { "urn:ietf:params:jmap:mail": "acc" } },
+      client: { downloadBlob },
+    } satisfies NonNullable<Parameters<typeof writeAttachmentToCache>[0]["runtime"]>;
+    const input = {
+      attachment: { blobId: "blob", name: "report.pdf" },
+      cacheKey: "m1:p1",
+      runtime,
+    };
+    const first = writeAttachmentToCache(input);
+    const second = writeAttachmentToCache(input);
+    finish.resolve();
+    const values = await Promise.all([first, second]);
+    expect(downloadBlob).toHaveBeenCalledTimes(1);
+    expect(FileSystem.writeAsStringAsync).toHaveBeenCalledTimes(1);
+    expect(values[0]).toBe(values[1]);
+  });
+
+  it("keeps identical names from different message parts distinct", async () => {
+    jest
+      .mocked(randomUUID)
+      .mockReturnValueOnce("part-one")
+      .mockReturnValueOnce("part-two");
+    const attachment = { name: "report.pdf", content: new Uint8Array([1]) };
+    const first = await writeAttachmentToCache({
+      attachment,
+      cacheKey: "message1:part1",
+    });
+    const second = await writeAttachmentToCache({
+      attachment,
+      cacheKey: "message2:part1",
+    });
+    expect(first.uri).not.toBe(second.uri);
+  });
+
+  it("does not materialize a download completed after session closure", async () => {
+    const entered = deferred();
+    const finish = deferred();
+    const runtime = {
+      accountId: "acc",
+      session: { apiUrl: "http://localhost:4001/api/mail/jmap", accounts: { acc: {} }, primaryAccounts: { "urn:ietf:params:jmap:mail": "acc" } },
+      client: {
+        downloadBlob: async () => {
+          entered.resolve();
+          await finish.promise;
+          return new Uint8Array([1]);
+        },
+      },
+    } satisfies NonNullable<Parameters<typeof writeAttachmentToCache>[0]["runtime"]>;
+    const pending = writeAttachmentToCache({
+      attachment: { name: "report.pdf", blobId: "blob" },
+      cacheKey: "m1:p1",
+      runtime,
+    });
+    const result = expect(pending).rejects.toThrow("session ended");
+    await entered.promise;
+    await closeSessionData();
+    finish.resolve();
+    await result;
+    expect(FileSystem.writeAsStringAsync).not.toHaveBeenCalled();
+  });
+
+  it("removes a released preview file", async () => {
+    const cached = await writeAttachmentToCache({
+      attachment: { name: "report.pdf", content: new Uint8Array([1]) },
+      cacheKey: "part",
+    });
+    await releaseCachedAttachment(cached);
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(cached.uri, {
+      idempotent: true,
+    });
+  });
+
+  it("prunes expired inactive files without removing the encrypted snapshot", async () => {
+    jest
+      .mocked(FileSystem.readDirectoryAsync)
+      .mockResolvedValueOnce(["old.pdf", "recent.pdf"]);
+    jest
+      .mocked(FileSystem.getInfoAsync)
+      .mockImplementation(async (uri) => ({
+        exists: true,
+        uri,
+        isDirectory: uri.endsWith("/"),
+        modificationTime: uri.endsWith("old.pdf") ? 1 : Date.now() / 1000,
+        size: 1,
+      }));
+    await pruneAttachmentCache();
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+      "file:///cache/mail-attachments/old.pdf",
+      { idempotent: true },
+    );
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(
+      "file:///cache/mail-attachments/recent.pdf",
+      expect.anything(),
+    );
   });
 });

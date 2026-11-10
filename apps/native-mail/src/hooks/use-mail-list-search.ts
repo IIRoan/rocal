@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   DEFAULT_MAIL_LIST_FILTERS,
+  privateSearchCoverageText,
   buildMailboxFieldSearchFilter,
   countActiveMailListFilters,
   getErrorMessage,
@@ -39,22 +40,23 @@ export function useMailListSearch({
   }
 
   const fieldSearchActive = hasMailSearchFieldValues(fieldSearch.fields);
-  const fieldSearchInput = fieldSearchActive && mailboxId
-    ? {
-        filter: buildMailboxFieldSearchFilter(
-          mailboxId,
-          fieldSearch.fields,
+  const fieldSearchInput =
+    fieldSearchActive && mailboxId
+      ? {
+          filter: buildMailboxFieldSearchFilter(
+            mailboxId,
+            fieldSearch.fields,
+            listFilters,
+            {
+              timezone,
+              now: new Date(),
+            },
+          ),
+          fields: fieldSearch.fields,
           listFilters,
-          {
-            timezone,
-            now: new Date(),
-          },
-        ),
-        fields: fieldSearch.fields,
-        listFilters,
-        timezone,
-      }
-    : null;
+          timezone,
+        }
+      : null;
   const fieldSearchQuery = useMailboxFieldSearch(
     runtime,
     mailboxId,
@@ -83,6 +85,10 @@ export function useMailListSearch({
     listFilterActive:
       countActiveMailListFilters(listFilters) > 0 || fieldSearchActive,
     searchMessages,
+    searchCoverageText:
+      fieldSearchActive && fieldSearchQuery.data?.pages[0]?.coverage
+        ? privateSearchCoverageText(fieldSearchQuery.data.pages[0].coverage)
+        : null,
     fieldSearchQuery,
     searchPending: fieldSearchActive && fieldSearchQuery.isPending,
     searchErrorMessage:

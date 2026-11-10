@@ -1,0 +1,849 @@
+{
+  "syntheticOnly": true,
+  "targetVersion": "1.1.0",
+  "targetSourceCommit": "e7cde9b3fac32d2a254ef782efec56f2373ec5d4",
+  "targetImage": "stalwartlabs/stalwart:v1.1.0@sha256:f772aa6ef8cd8018969fa491640f1436b0270eb14e2c219b5f37f1a77020837e",
+  "producerSourceCommit": "475ff6dbd80710f8b4f419c49bc0d4582fe02f73",
+  "producerPolicy": "Plan004 shared anonymous-recipient engine; OpenPGP.js6.3.2; curve25519Legacy sender/ecc, RSA3072 recipient; all private keys are generated synthetic test-only keys",
+  "expected": {
+    "text": "SYNTHETIC target mail body",
+    "html": "<p>SYNTHETIC <b>target mail</b> body</p>",
+    "attachmentText": "SYNTHETIC attachment content"
+  },
+  "domain": "mime-probe-6e3bc9.solace.test",
+  "keys": [
+    {
+      "name": "sender",
+      "email": "sender@mime-probe-6e3bc9.solace.test",
+      "publicKeyArmored": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nxjMEavMWyBYJKwYBBAHaRw8BAQdAR6LWbIiJHP555/gXfVHJnlSvwdlnVZ57\n+JiIc5AJCj3NJjxzZW5kZXJAbWltZS1wcm9iZS02ZTNiYzkuc29sYWNlLnRl\nc3Q+wsATBBMWCgCFBYJq8xbIAwsJBwkQOVtEhKF/hPtFFAAAAAAAHAAgc2Fs\ndEBub3RhdGlvbnMub3BlbnBncGpzLm9yZ7QfYxScv0gFLiLvVwZ1sAq+XrrU\nKyFcxmUMHhU3JjipBRUKCA4MBBYAAgECGQECmwMCHgEWIQQYSXIURVulTYqR\nBcU5W0SEoX+E+wAAkS4BAP0B8BElWNcVXv7lYgq6spnXCAAcx37ZZkVnFNd/\nXc3tAQC/KKDRAXOhO7K8CKyRuxQWfhqpjjjyjKqNRzzAcyTAA844BGrzFsgS\nCisGAQQBl1UBBQEBB0ANxuYIhg66y8l/tuec4IBXZOk3/2JblMgU8TEdWDO8\nAQMBCAfCvgQYFgoAcAWCavMWyAkQOVtEhKF/hPtFFAAAAAAAHAAgc2FsdEBu\nb3RhdGlvbnMub3BlbnBncGpzLm9yZ2a9JzBoRnSc2uPJThBpJSLxPylCpB0+\nJQDAx7LCXIJrApsMFiEEGElyFEVbpU2KkQXFOVtEhKF/hPsAANIFAP47XVqB\nhpDkz3pwIAJsvtaCC7U65PlUUsxpNdm3bsO7ygD+KuYfUZXeM3IsqAHMPgdR\nohzlMEVXLJBsUNVKpPcaNAI=\n=NKGU\n-----END PGP PUBLIC KEY BLOCK-----\n",
+      "privateKeyArmored": "-----BEGIN PGP PRIVATE KEY BLOCK-----\n\nxVgEavMWyBYJKwYBBAHaRw8BAQdAR6LWbIiJHP555/gXfVHJnlSvwdlnVZ57\n+JiIc5AJCj0AAQDyaxW+qgdMU9d45bQXmye8vz/lQ/O0duJpqfO+7iZJrBHv\nzSY8c2VuZGVyQG1pbWUtcHJvYmUtNmUzYmM5LnNvbGFjZS50ZXN0PsLAEwQT\nFgoAhQWCavMWyAMLCQcJEDlbRIShf4T7RRQAAAAAABwAIHNhbHRAbm90YXRp\nb25zLm9wZW5wZ3Bqcy5vcme0H2MUnL9IBS4i71cGdbAKvl661CshXMZlDB4V\nNyY4qQUVCggODAQWAAIBAhkBApsDAh4BFiEEGElyFEVbpU2KkQXFOVtEhKF/\nhPsAAJEuAQD9AfARJVjXFV7+5WIKurKZ1wgAHMd+2WZFZxTXf13N7QEAvyig\n0QFzoTuyvAiskbsUFn4aqY448oyqjUc8wHMkwAPHXQRq8xbIEgorBgEEAZdV\nAQUBAQdADcbmCIYOusvJf7bnnOCAV2TpN/9iW5TIFPExHVgzvAEDAQgHAAD/\nTW+sOk2T7Uo/bbD9383P1GyKPjgTet/z9owin9i32iAS98K+BBgWCgBwBYJq\n8xbICRA5W0SEoX+E+0UUAAAAAAAcACBzYWx0QG5vdGF0aW9ucy5vcGVucGdw\nanMub3JnZr0nMGhGdJza48lOEGklIvE/KUKkHT4lAMDHssJcgmsCmwwWIQQY\nSXIURVulTYqRBcU5W0SEoX+E+wAA0gUA/jtdWoGGkOTPenAgAmy+1oILtTrk\n+VRSzGk12bduw7vKAP4q5h9Rld4zciyoAcw+B1GiHOUwRVcskGxQ1Uqk9xo0\nAg==\n=TKnv\n-----END PGP PRIVATE KEY BLOCK-----\n",
+      "fingerprint": "18497214455ba54d8a9105c5395b4484a17f84fb"
+    },
+    {
+      "name": "ecc",
+      "email": "ecc@mime-probe-6e3bc9.solace.test",
+      "publicKeyArmored": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nxjMEavMWyBYJKwYBBAHaRw8BAQdA+ZNLCq/0mzZLwptl2ZVuyLnmL0VUmzJp\n1aRpXbYmhkTNIzxlY2NAbWltZS1wcm9iZS02ZTNiYzkuc29sYWNlLnRlc3Q+\nwsATBBMWCgCFBYJq8xbIAwsJBwkQ/basXUwW7TVFFAAAAAAAHAAgc2FsdEBu\nb3RhdGlvbnMub3BlbnBncGpzLm9yZ36S8HFPogGg1wMa+QT4ew6DVuWvnWXk\nMQ7x3QUVJf4gBRUKCA4MBBYAAgECGQECmwMCHgEWIQRJX1vOKBuwisft78v9\ntqxdTBbtNQAA4JUA/RvVldEUG6j7562NovcR6My6Nm6CcHMIdC++XDLk6fut\nAQDgRPVWN+gelXyFo4uU3hYLGVCTTmyIDGliPq1t03oMB844BGrzFsgSCisG\nAQQBl1UBBQEBB0B6lnUVtCgqPltZ1Tk3CjMzY8N5OQqR3oZ78HwerDnyOgMB\nCAfCvgQYFgoAcAWCavMWyAkQ/basXUwW7TVFFAAAAAAAHAAgc2FsdEBub3Rh\ndGlvbnMub3BlbnBncGpzLm9yZzh5ifbZzlaPhRTyu/+RezvwRfFDcOMwuYPn\neWIF8tYpApsMFiEESV9bzigbsIrH7e/L/basXUwW7TUAACWmAP4yvPrVW12I\ng1bb8g72OasZMmsArr/HyUbJegYkdIzN4QEAkz9PtulnP7JaCoo01BITbtXE\nLOuzP/MbpP05h4G7XAU=\n=IVez\n-----END PGP PUBLIC KEY BLOCK-----\n",
+      "privateKeyArmored": "-----BEGIN PGP PRIVATE KEY BLOCK-----\n\nxVgEavMWyBYJKwYBBAHaRw8BAQdA+ZNLCq/0mzZLwptl2ZVuyLnmL0VUmzJp\n1aRpXbYmhkQAAQC2skN8v4XmdzwRyGAwVljS9Iq4WBeqcRCLB8IF/jih8A/e\nzSM8ZWNjQG1pbWUtcHJvYmUtNmUzYmM5LnNvbGFjZS50ZXN0PsLAEwQTFgoA\nhQWCavMWyAMLCQcJEP22rF1MFu01RRQAAAAAABwAIHNhbHRAbm90YXRpb25z\nLm9wZW5wZ3Bqcy5vcmd+kvBxT6IBoNcDGvkE+HsOg1blr51l5DEO8d0FFSX+\nIAUVCggODAQWAAIBAhkBApsDAh4BFiEESV9bzigbsIrH7e/L/basXUwW7TUA\nAOCVAP0b1ZXRFBuo++etjaL3EejMujZugnBzCHQvvlwy5On7rQEA4ET1Vjfo\nHpV8haOLlN4WCxlQk05siAxpYj6tbdN6DAfHXQRq8xbIEgorBgEEAZdVAQUB\nAQdAepZ1FbQoKj5bWdU5NwozM2PDeTkKkd6Ge/B8Hqw58joDAQgHAAD/fTOI\n7xTTEsSAeXxMqtu+FY6RR1HKKZmF6an8xkaf1zgSDMK+BBgWCgBwBYJq8xbI\nCRD9tqxdTBbtNUUUAAAAAAAcACBzYWx0QG5vdGF0aW9ucy5vcGVucGdwanMu\nb3JnOHmJ9tnOVo+FFPK7/5F7O/BF8UNw4zC5g+d5YgXy1ikCmwwWIQRJX1vO\nKBuwisft78v9tqxdTBbtNQAAJaYA/jK8+tVbXYiDVtvyDvY5qxkyawCuv8fJ\nRsl6BiR0jM3hAQCTP0+26Wc/sloKijTUEhNu1cQs67M/8xuk/TmHgbtcBQ==\n=VRpP\n-----END PGP PRIVATE KEY BLOCK-----\n",
+      "fingerprint": "495f5bce281bb08ac7edefcbfdb6ac5d4c16ed35"
+    },
+    {
+      "name": "rsa",
+      "email": "rsa@mime-probe-6e3bc9.solace.test",
+      "publicKeyArmored": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n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\n=mLIf\n-----END PGP PUBLIC KEY BLOCK-----\n",
+      "privateKeyArmored": "-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n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\n=338d\n-----END PGP PRIVATE KEY BLOCK-----\n",
+      "fingerprint": "9fa17296ce4877cce6eede5b256bc0a8eff0a616"
+    },
+    {
+      "name": "unrelated",
+      "email": "unrelated@mime-probe-6e3bc9.solace.test",
+      "publicKeyArmored": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nxjMEavMWyRYJKwYBBAHaRw8BAQdAIAgW+HI+sFmN9Fw+d2+lZEGfXj8wp2XL\nLtcp2ZuQqj/NKTx1bnJlbGF0ZWRAbWltZS1wcm9iZS02ZTNiYzkuc29sYWNl\nLnRlc3Q+wsATBBMWCgCFBYJq8xbJAwsJBwkQDae4PPXBQaJFFAAAAAAAHAAg\nc2FsdEBub3RhdGlvbnMub3BlbnBncGpzLm9yZ7WLA1c6KGvR1zG8Yp7YWxxa\nmeh9NZwQ4p68RUi+A88oBRUKCA4MBBYAAgECGQECmwMCHgEWIQSw05Ra4Q20\nSJ2B6UINp7g89cFBogAAG6cA/i9nbOpdJcEIqMkGdVvm7oC3btmOexbLZCui\nLd9OYFxqAQD44Tw+MNnPpmW7JUg6h9DnRcdVAFKCJWNfNjjoUjBUC844BGrz\nFskSCisGAQQBl1UBBQEBB0AQbrg7vO6rQBMN5w9reZFbCPqxPEznNhafZ2Mg\n1XfgYgMBCAfCvgQYFgoAcAWCavMWyQkQDae4PPXBQaJFFAAAAAAAHAAgc2Fs\ndEBub3RhdGlvbnMub3BlbnBncGpzLm9yZx8uL6Vt1QgDE7PsvTtKtlIlWaBb\nsCSvMml4qJtJWCieApsMFiEEsNOUWuENtEidgelCDae4PPXBQaIAAK+OAP9X\nHG2dFZiaR6PXYdpNaMTPCO8x1l7nqg+PFX/doRZL0AD/T1X4KnM9Se754f9j\nRiWaLcPLDHdOLpEjdoXwW8GrdAg=\n=fwE+\n-----END PGP PUBLIC KEY BLOCK-----\n",
+      "privateKeyArmored": "-----BEGIN PGP PRIVATE KEY BLOCK-----\n\nxVgEavMWyRYJKwYBBAHaRw8BAQdAIAgW+HI+sFmN9Fw+d2+lZEGfXj8wp2XL\nLtcp2ZuQqj8AAQDeZzzgK4ozSENg7NDQgo+3ugdomq1qWvukP6P7V0ZP1BD5\nzSk8dW5yZWxhdGVkQG1pbWUtcHJvYmUtNmUzYmM5LnNvbGFjZS50ZXN0PsLA\nEwQTFgoAhQWCavMWyQMLCQcJEA2nuDz1wUGiRRQAAAAAABwAIHNhbHRAbm90\nYXRpb25zLm9wZW5wZ3Bqcy5vcme1iwNXOihr0dcxvGKe2FscWpnofTWcEOKe\nvEVIvgPPKAUVCggODAQWAAIBAhkBApsDAh4BFiEEsNOUWuENtEidgelCDae4\nPPXBQaIAABunAP4vZ2zqXSXBCKjJBnVb5u6At27ZjnsWy2Qroi3fTmBcagEA\n+OE8PjDZz6ZluyVIOofQ50XHVQBSgiVjXzY46FIwVAvHXQRq8xbJEgorBgEE\nAZdVAQUBAQdAEG64O7zuq0ATDecPa3mRWwj6sTxM5zYWn2djINV34GIDAQgH\nAAD/STYv7kyxh4dPU10vAiiVTJ+Uw/l9evgPvVMhSnrcQSAO/sK+BBgWCgBw\nBYJq8xbJCRANp7g89cFBokUUAAAAAAAcACBzYWx0QG5vdGF0aW9ucy5vcGVu\ncGdwanMub3JnHy4vpW3VCAMTs+y9O0q2UiVZoFuwJK8yaXiom0lYKJ4CmwwW\nIQSw05Ra4Q20SJ2B6UINp7g89cFBogAAr44A/1ccbZ0VmJpHo9dh2k1oxM8I\n7zHWXueqD48Vf92hFkvQAP9PVfgqcz1J7vnh/2NGJZotw8sMd04ukSN2hfBb\nwat0CA==\n=R11g\n-----END PGP PRIVATE KEY BLOCK-----\n",
+      "fingerprint": "b0d3945ae10db4489d81e9420da7b83cf5c141a2"
+    }
+  ],
+  "records": [
+    {
+      "name": "sender-structured",
+      "owner": "sender",
+      "subject": "SYNTHETIC structured missing protocol",
+      "rawMime": "sender-structured.eml",
+      "ciphertext": "sender-structured.asc",
+      "message": {
+        "id": "eaaaaab",
+        "blobId": "ccaydhrbnoctzp3sr0o9rxrwtbqjcp70hfy7b9c1y1tjgrhojbo7aciaae",
+        "threadId": "b",
+        "subject": "SYNTHETIC structured missing protocol",
+        "from": [
+          {
+            "name": null,
+            "email": "sender@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "to": [
+          {
+            "name": null,
+            "email": "ecc@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "cc": null,
+        "bcc": null,
+        "bodyStructure": {
+          "partId": null,
+          "blobId": null,
+          "size": 2851,
+          "name": null,
+          "type": "multipart/encrypted",
+          "charset": null,
+          "disposition": null,
+          "cid": null,
+          "language": null,
+          "location": null,
+          "subParts": [
+            {
+              "partId": "1",
+              "blobId": "cgaydhrbnoctzp3sr0o9rxrwtbqjcp70hfy7b9c1y1tjgrhojbo7aciaah2agda",
+              "size": 12,
+              "name": null,
+              "type": "application/pgp-encrypted",
+              "charset": null,
+              "disposition": null,
+              "cid": null,
+              "language": null,
+              "location": null
+            },
+            {
+              "partId": "2",
+              "blobId": "coaydhrbnoctzp3sr0o9rxrwtbqjcp70hfy7b9c1y1tjgrhojbo7aciaageqlvqt",
+              "size": 1839,
+              "name": null,
+              "type": "application/octet-stream",
+              "charset": null,
+              "disposition": null,
+              "cid": null,
+              "language": null,
+              "location": null
+            }
+          ]
+        },
+        "bodyValues": {},
+        "textBody": [],
+        "htmlBody": [],
+        "attachments": [
+          {
+            "partId": "1",
+            "blobId": "cgaydhrbnoctzp3sr0o9rxrwtbqjcp70hfy7b9c1y1tjgrhojbo7aciaah2agda",
+            "size": 12,
+            "name": null,
+            "type": "application/pgp-encrypted",
+            "charset": null,
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          },
+          {
+            "partId": "2",
+            "blobId": "coaydhrbnoctzp3sr0o9rxrwtbqjcp70hfy7b9c1y1tjgrhojbo7aciaageqlvqt",
+            "size": 1839,
+            "name": null,
+            "type": "application/octet-stream",
+            "charset": null,
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "preview": ""
+      },
+      "topContentType": "multipart/encrypted; boundary=\"18e6b0ec5892d52a_4acfabbaef845ba2_b6c0ad3fe51d2439\"",
+      "expectedSignature": "verified",
+      "usable": true,
+      "expectedLayers": 1
+    },
+    {
+      "name": "sender-inline",
+      "owner": "sender",
+      "subject": "SYNTHETIC inline MIME payload",
+      "rawMime": "sender-inline.eml",
+      "ciphertext": "sender-inline.asc",
+      "message": {
+        "id": "iaaaaac",
+        "blobId": "cdayk2q0qitsztfprri7khaqh3a9f39uaebglgtmkpinr3r9z3ungciaai",
+        "threadId": "c",
+        "subject": "SYNTHETIC inline MIME payload",
+        "from": [
+          {
+            "name": null,
+            "email": "sender@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "to": [
+          {
+            "name": null,
+            "email": "ecc@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "cc": null,
+        "bcc": null,
+        "bodyStructure": {
+          "partId": "0",
+          "blobId": "chayk2q0qitsztfprri7khaqh3a9f39uaebglgtmkpinr3r9z3ungciaallafuio",
+          "size": 1873,
+          "name": null,
+          "type": "text/plain",
+          "charset": "utf-8",
+          "disposition": null,
+          "cid": null,
+          "language": null,
+          "location": null
+        },
+        "bodyValues": {
+          "0": {
+            "isEncodingProblem": false,
+            "isTruncated": false,
+            "value": "-----BEGIN PGP MESSAGE-----\n\nwV4DAAAAAAAAAAASAQdAQ410I7bbdOL0NbGwdaDBpKuDjPKDhOYmwuYVBCSO\nPXwwSMGfEzmJnCvnxIOnozNDS6hcyNKlntDgNRAw2+cCXopS4vuvelJxDl+g\n63OcBHbawV4DAAAAAAAAAAASAQdAKgQ7y3H9geK/VjUleS2cByQu7EOJ7itp\nXH3yVqC+DgkwhS3917cVRew54DNl3UMXCip5njZu8DPxNVqYkQxuaC3yVSr5\nF5gk1LKsjKd/o+1Z0sObARmEFrpm48VIHveSSdeoUxo/ToZJcUL9YIIldrcU\n8kMA35FFZ15drxzQGlaAupcwLjszRX8FN6rgQFM+DVfkJ+hG/htLUqygL1qX\naj5pbSP0l6Ha1tEbDr6lhAmFJq4SC+4UI8dAIf10NdqX1Xx5gdzc73/Jr3Fh\nPlyhtH3nVOPIPlIgOj1Qbf8sOCJSBgHlY1gM7w4pyFTplU9ZGRwmmQmYB17I\nsxStRqBxjsN6+FDieJ64TrAfP5euo6pCw226KNiBUmSFlgbBkYmvXoC9tMuB\nFfaQgwHRpl3egublf1gXhZcYAc/S1m4CVQxokCvReh5+dTRdhWIVIM2cSri/\nv8TCWrM2O5gdO/CKbu86f6uAheTjtxI0FC/gDuQS9nnISFSQWNuc8FnujUBM\ncqxj4ow/ZXQ9lG8DJikeiLf3GkErnSwQiwAktqFVmlMV75MeDweiZ+OTasIQ\nPSiLCyQUfGVUtI+b2TJz3BQSkcyHQRXRmLnqCgql6bJy0OvU1dsBaqhgK7vM\nVTWPl2W81B+MTHItMV/gaoF7xZw9/7qqGQpfXxIhKsE5HA1Y1CkCaoCzqsv8\nZdzZs43IRDfv5Mil5faChYnVrIcjxsetY6FJK/nqrdO5C5N16fGPuOelzh4X\n9O9hiiFHhI1jh/4fRizE8fUfG21X7hRFwpdtuUKr/sictaLW4no+qRMDJ4mp\nscGGvuE7chqnTobZVPwFO76fDQKX/dRDzdjLJJlCncKQd+JzakAyYfhzp5pH\nEvbqvsjAr7xhW0A2IeUX5TMvcbUXOr7Di1T1JTHsATIHjsw9UY8yBcjR+RAv\nksJF1Ggd6MCLjdUKX8WPuRrzM2TZAKYslPKq6cYlW+nZefRS2Zr9SYzj9W6A\n5WPngflNHd1fuFuJxEmgA4FiVQKPCK9c+BYvf5uWaWMDGP2Oj0V/NovuRQZn\nkeX/Y3OMUKm4sPGRv6foS1np03BQs/hp1E12dSNLgY0IvC6FsALAwPVNhFd1\nWvmey1BqxYQq/pZSV2dX7afu6F3inWx4PdA/xTkcvLEmx9PBK2ZWXWlzEOJ2\n3gmJHyQUeDSM4r1uLGC0CuRUx7yq7qlOGCoR6xNcMnhpCEfRMpcl/n7xZgjw\nwHoNM5eAossoW5jMIvsaamMybnzz1B6mLr4ON5n/ZUaLu4m3WwANTQTQ7NKS\nnsELvS9/5ufVfa/Q1J5WTMUkxJijXlfLMMRl6eW3CnYctS9rMucS72pk/Ewx\nmfW8JBfcMP39OZXhXGvmOaRi213iqnqUU15c1bFMR9E40i1OqpJ71y6STaIM\nl79t1zBB+/jxO/NUTKVPnq89d34G0G/dH49BwE4gLAsdrrG8z/msiGJ/AM9p\n8wcskGnzI3sK/m2ZMQy4qYldC6nfGZNGofCjKAgxU3u4vqz5/zR2n2HyPg5U\nBsVliU/Y5naqs7nLn3QZ65nrN78elPLtvDRUFkG+Kk14ruDx8r5lAT0fBBe6\nSO87NY8=\n=pxnv\n-----END PGP MESSAGE-----\n"
+          }
+        },
+        "textBody": [
+          {
+            "partId": "0",
+            "blobId": "chayk2q0qitsztfprri7khaqh3a9f39uaebglgtmkpinr3r9z3ungciaallafuio",
+            "size": 1873,
+            "name": null,
+            "type": "text/plain",
+            "charset": "utf-8",
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "htmlBody": [
+          {
+            "partId": "0",
+            "blobId": "chayk2q0qitsztfprri7khaqh3a9f39uaebglgtmkpinr3r9z3ungciaallafuio",
+            "size": 1873,
+            "name": null,
+            "type": "text/plain",
+            "charset": "utf-8",
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "attachments": [],
+        "preview": "-----BEGIN PGP MESSAGE-----\n\nwV4DAAAAAAAAAAASAQdAQ410I7bbdOL0NbGwdaDBpKuDjPKDhOYmwuYVBCSO\nPXwwSMGfEzmJnCvnxIOnozNDS6hcyNKlntDgNRAw2+cCXopS4vuvelJxDl+g\n63OcBHbawV4DAAAAAAAAAAASAQdAKgQ7y3H9geK/VjUleS2cByQu7EOJ7itp\nXH3yVqC+DgkwhS3917cVRew54DNl3UMXCip5njZu8..."
+      },
+      "topContentType": "text/plain; charset=\"utf-8\"",
+      "expectedSignature": "verified",
+      "usable": true,
+      "expectedLayers": 1
+    },
+    {
+      "name": "sender-nested-inline",
+      "owner": "sender",
+      "subject": "SYNTHETIC nested inline MIME payload",
+      "rawMime": "sender-nested-inline.eml",
+      "ciphertext": "sender-nested-inline.asc",
+      "message": {
+        "id": "qaaaaae",
+        "blobId": "cdgcf3sbgvaokc3nisa7r31r3a33v2rynv70fvmj2aj1ec1saqiouciaaq",
+        "threadId": "e",
+        "subject": "SYNTHETIC nested inline MIME payload",
+        "from": [
+          {
+            "name": null,
+            "email": "sender@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "to": [
+          {
+            "name": null,
+            "email": "ecc@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "cc": null,
+        "bcc": null,
+        "bodyStructure": {
+          "partId": "0",
+          "blobId": "chgcf3sbgvaokc3nisa7r31r3a33v2rynv70fvmj2aj1ec1saqiouciaatoqfqiz",
+          "size": 3265,
+          "name": null,
+          "type": "text/plain",
+          "charset": "utf-8",
+          "disposition": null,
+          "cid": null,
+          "language": null,
+          "location": null
+        },
+        "bodyValues": {
+          "0": {
+            "isEncodingProblem": false,
+            "isTruncated": false,
+            "value": "-----BEGIN PGP MESSAGE-----\n\n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\nJy65vdmm7KIAIAN9mFHWJbcE1E1yW1DTdSHV\n=RBd8\n-----END PGP MESSAGE-----\n"
+          }
+        },
+        "textBody": [
+          {
+            "partId": "0",
+            "blobId": "chgcf3sbgvaokc3nisa7r31r3a33v2rynv70fvmj2aj1ec1saqiouciaatoqfqiz",
+            "size": 3265,
+            "name": null,
+            "type": "text/plain",
+            "charset": "utf-8",
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "htmlBody": [
+          {
+            "partId": "0",
+            "blobId": "chgcf3sbgvaokc3nisa7r31r3a33v2rynv70fvmj2aj1ec1saqiouciaatoqfqiz",
+            "size": 3265,
+            "name": null,
+            "type": "text/plain",
+            "charset": "utf-8",
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "attachments": [],
+        "preview": "-----BEGIN PGP MESSAGE-----\n\nwV4DAAAAAAAAAAASAQdA4JupAgcZYdZbvRHPL9/K4ssTs1+lWdHvdlezYnjT\nr2swcl3aHyrYKMAo5It3zJyYN5CDtDgFr5J3vrDWUxcX6UjkElBPQJLnkEvv\nJO+9f2mDwV4DAAAAAAAAAAASAQdA7DmY1N3jt2VUeq5z1ep76Lqz6d3v6RLb\nUc2VtQG2x2owBgkiln48EQvdlYxYosSNy+EWZJxG8..."
+      },
+      "topContentType": "text/plain; charset=\"utf-8\"",
+      "expectedSignature": "verified",
+      "usable": true,
+      "expectedLayers": 2
+    },
+    {
+      "name": "ecc-structured",
+      "owner": "ecc",
+      "subject": "SYNTHETIC structured missing protocol",
+      "rawMime": "ecc-structured.eml",
+      "ciphertext": "ecc-structured.asc",
+      "message": {
+        "id": "eaaaaab",
+        "blobId": "ccumkddom7fvrxlqvxyzspbwdmi1su91nyz7uvcpumtfeaqrukxnocqaae",
+        "threadId": "b",
+        "subject": "SYNTHETIC structured missing protocol",
+        "from": [
+          {
+            "name": null,
+            "email": "sender@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "to": [
+          {
+            "name": null,
+            "email": "ecc@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "cc": null,
+        "bcc": null,
+        "bodyStructure": {
+          "partId": null,
+          "blobId": null,
+          "size": 4687,
+          "name": null,
+          "type": "multipart/encrypted",
+          "charset": null,
+          "disposition": null,
+          "cid": null,
+          "language": null,
+          "location": null,
+          "subParts": [
+            {
+              "partId": "1",
+              "blobId": "cgumkddom7fvrxlqvxyzspbwdmi1su91nyz7uvcpumtfeaqrukxnocqaagnawda",
+              "size": 12,
+              "name": null,
+              "type": "application/pgp-encrypted",
+              "charset": null,
+              "disposition": null,
+              "cid": null,
+              "language": null,
+              "location": null
+            },
+            {
+              "partId": "2",
+              "blobId": "cgumkddom7fvrxlqvxyzspbwdmi1su91nyz7uvcpumtfeaqrukxnocqaahcqz7zb",
+              "size": 4331,
+              "name": "encrypted.asc",
+              "type": "application/octet-stream",
+              "charset": null,
+              "disposition": "inline",
+              "cid": null,
+              "language": null,
+              "location": null
+            }
+          ]
+        },
+        "bodyValues": {},
+        "textBody": [],
+        "htmlBody": [],
+        "attachments": [
+          {
+            "partId": "1",
+            "blobId": "cgumkddom7fvrxlqvxyzspbwdmi1su91nyz7uvcpumtfeaqrukxnocqaagnawda",
+            "size": 12,
+            "name": null,
+            "type": "application/pgp-encrypted",
+            "charset": null,
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          },
+          {
+            "partId": "2",
+            "blobId": "cgumkddom7fvrxlqvxyzspbwdmi1su91nyz7uvcpumtfeaqrukxnocqaahcqz7zb",
+            "size": 4331,
+            "name": "encrypted.asc",
+            "type": "application/octet-stream",
+            "charset": null,
+            "disposition": "inline",
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "preview": ""
+      },
+      "topContentType": "multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"=_b2ed8eb57271ff1d8cf1079b73b53f3f\"",
+      "expectedSignature": "verified",
+      "usable": true,
+      "expectedLayers": 2
+    },
+    {
+      "name": "ecc-inline",
+      "owner": "ecc",
+      "subject": "SYNTHETIC inline MIME payload",
+      "rawMime": "ecc-inline.eml",
+      "ciphertext": "ecc-inline.asc",
+      "message": {
+        "id": "iaaaaac",
+        "blobId": "caqmftiio2vw7bzirzh3urdemzgvnrz9zfljnqrfxvdnemrkkj3qycqaai",
+        "threadId": "c",
+        "subject": "SYNTHETIC inline MIME payload",
+        "from": [
+          {
+            "name": null,
+            "email": "sender@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "to": [
+          {
+            "name": null,
+            "email": "ecc@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "cc": null,
+        "bcc": null,
+        "bodyStructure": {
+          "partId": "0",
+          "blobId": "ceqmftiio2vw7bzirzh3urdemzgvnrz9zfljnqrfxvdnemrkkj3qycqaaljqtuio",
+          "size": 1873,
+          "name": null,
+          "type": "text/plain",
+          "charset": "utf-8",
+          "disposition": null,
+          "cid": null,
+          "language": null,
+          "location": null
+        },
+        "bodyValues": {
+          "0": {
+            "isEncodingProblem": false,
+            "isTruncated": false,
+            "value": "-----BEGIN PGP MESSAGE-----\n\nwV4DAAAAAAAAAAASAQdAQ410I7bbdOL0NbGwdaDBpKuDjPKDhOYmwuYVBCSO\nPXwwSMGfEzmJnCvnxIOnozNDS6hcyNKlntDgNRAw2+cCXopS4vuvelJxDl+g\n63OcBHbawV4DAAAAAAAAAAASAQdAKgQ7y3H9geK/VjUleS2cByQu7EOJ7itp\nXH3yVqC+DgkwhS3917cVRew54DNl3UMXCip5njZu8DPxNVqYkQxuaC3yVSr5\nF5gk1LKsjKd/o+1Z0sObARmEFrpm48VIHveSSdeoUxo/ToZJcUL9YIIldrcU\n8kMA35FFZ15drxzQGlaAupcwLjszRX8FN6rgQFM+DVfkJ+hG/htLUqygL1qX\naj5pbSP0l6Ha1tEbDr6lhAmFJq4SC+4UI8dAIf10NdqX1Xx5gdzc73/Jr3Fh\nPlyhtH3nVOPIPlIgOj1Qbf8sOCJSBgHlY1gM7w4pyFTplU9ZGRwmmQmYB17I\nsxStRqBxjsN6+FDieJ64TrAfP5euo6pCw226KNiBUmSFlgbBkYmvXoC9tMuB\nFfaQgwHRpl3egublf1gXhZcYAc/S1m4CVQxokCvReh5+dTRdhWIVIM2cSri/\nv8TCWrM2O5gdO/CKbu86f6uAheTjtxI0FC/gDuQS9nnISFSQWNuc8FnujUBM\ncqxj4ow/ZXQ9lG8DJikeiLf3GkErnSwQiwAktqFVmlMV75MeDweiZ+OTasIQ\nPSiLCyQUfGVUtI+b2TJz3BQSkcyHQRXRmLnqCgql6bJy0OvU1dsBaqhgK7vM\nVTWPl2W81B+MTHItMV/gaoF7xZw9/7qqGQpfXxIhKsE5HA1Y1CkCaoCzqsv8\nZdzZs43IRDfv5Mil5faChYnVrIcjxsetY6FJK/nqrdO5C5N16fGPuOelzh4X\n9O9hiiFHhI1jh/4fRizE8fUfG21X7hRFwpdtuUKr/sictaLW4no+qRMDJ4mp\nscGGvuE7chqnTobZVPwFO76fDQKX/dRDzdjLJJlCncKQd+JzakAyYfhzp5pH\nEvbqvsjAr7xhW0A2IeUX5TMvcbUXOr7Di1T1JTHsATIHjsw9UY8yBcjR+RAv\nksJF1Ggd6MCLjdUKX8WPuRrzM2TZAKYslPKq6cYlW+nZefRS2Zr9SYzj9W6A\n5WPngflNHd1fuFuJxEmgA4FiVQKPCK9c+BYvf5uWaWMDGP2Oj0V/NovuRQZn\nkeX/Y3OMUKm4sPGRv6foS1np03BQs/hp1E12dSNLgY0IvC6FsALAwPVNhFd1\nWvmey1BqxYQq/pZSV2dX7afu6F3inWx4PdA/xTkcvLEmx9PBK2ZWXWlzEOJ2\n3gmJHyQUeDSM4r1uLGC0CuRUx7yq7qlOGCoR6xNcMnhpCEfRMpcl/n7xZgjw\nwHoNM5eAossoW5jMIvsaamMybnzz1B6mLr4ON5n/ZUaLu4m3WwANTQTQ7NKS\nnsELvS9/5ufVfa/Q1J5WTMUkxJijXlfLMMRl6eW3CnYctS9rMucS72pk/Ewx\nmfW8JBfcMP39OZXhXGvmOaRi213iqnqUU15c1bFMR9E40i1OqpJ71y6STaIM\nl79t1zBB+/jxO/NUTKVPnq89d34G0G/dH49BwE4gLAsdrrG8z/msiGJ/AM9p\n8wcskGnzI3sK/m2ZMQy4qYldC6nfGZNGofCjKAgxU3u4vqz5/zR2n2HyPg5U\nBsVliU/Y5naqs7nLn3QZ65nrN78elPLtvDRUFkG+Kk14ruDx8r5lAT0fBBe6\nSO87NY8=\n=pxnv\n-----END PGP MESSAGE-----\n"
+          }
+        },
+        "textBody": [
+          {
+            "partId": "0",
+            "blobId": "ceqmftiio2vw7bzirzh3urdemzgvnrz9zfljnqrfxvdnemrkkj3qycqaaljqtuio",
+            "size": 1873,
+            "name": null,
+            "type": "text/plain",
+            "charset": "utf-8",
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "htmlBody": [
+          {
+            "partId": "0",
+            "blobId": "ceqmftiio2vw7bzirzh3urdemzgvnrz9zfljnqrfxvdnemrkkj3qycqaaljqtuio",
+            "size": 1873,
+            "name": null,
+            "type": "text/plain",
+            "charset": "utf-8",
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "attachments": [],
+        "preview": "-----BEGIN PGP MESSAGE-----\n\nwV4DAAAAAAAAAAASAQdAQ410I7bbdOL0NbGwdaDBpKuDjPKDhOYmwuYVBCSO\nPXwwSMGfEzmJnCvnxIOnozNDS6hcyNKlntDgNRAw2+cCXopS4vuvelJxDl+g\n63OcBHbawV4DAAAAAAAAAAASAQdAKgQ7y3H9geK/VjUleS2cByQu7EOJ7itp\nXH3yVqC+DgkwhS3917cVRew54DNl3UMXCip5njZu8..."
+      },
+      "topContentType": "text/plain; charset=\"utf-8\"",
+      "expectedSignature": "verified",
+      "usable": true,
+      "expectedLayers": 1
+    },
+    {
+      "name": "ecc-inbound",
+      "owner": "ecc",
+      "subject": "SYNTHETIC inbound SMTP ecc",
+      "rawMime": "ecc-inbound.eml",
+      "ciphertext": "ecc-inbound.asc",
+      "message": {
+        "id": "maaaaad",
+        "blobId": "cdjhptmpbvrk0nmtdyu1qe1nwobd7vznwo70uccjuzagrcdlkt32ycqaam",
+        "threadId": "d",
+        "subject": "SYNTHETIC inbound SMTP ecc",
+        "from": [
+          {
+            "name": "SYNTHETIC sender",
+            "email": "sender@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "to": [
+          {
+            "name": null,
+            "email": "ecc@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "cc": null,
+        "bcc": null,
+        "bodyStructure": {
+          "partId": null,
+          "blobId": null,
+          "size": 1787,
+          "name": null,
+          "type": "multipart/encrypted",
+          "charset": null,
+          "disposition": null,
+          "cid": null,
+          "language": null,
+          "location": null,
+          "subParts": [
+            {
+              "partId": "1",
+              "blobId": "chjhptmpbvrk0nmtdyu1qe1nwobd7vznwo70uccjuzagrcdlkt32ycqaaoxrcda",
+              "size": 12,
+              "name": null,
+              "type": "application/pgp-encrypted",
+              "charset": null,
+              "disposition": null,
+              "cid": null,
+              "language": null,
+              "location": null
+            },
+            {
+              "partId": "2",
+              "blobId": "chjhptmpbvrk0nmtdyu1qe1nwobd7vznwo70uccjuzagrcdlkt32ycqaapnbffyl",
+              "size": 1431,
+              "name": "encrypted.asc",
+              "type": "application/octet-stream",
+              "charset": null,
+              "disposition": "inline",
+              "cid": null,
+              "language": null,
+              "location": null
+            }
+          ]
+        },
+        "bodyValues": {},
+        "textBody": [],
+        "htmlBody": [],
+        "attachments": [
+          {
+            "partId": "1",
+            "blobId": "chjhptmpbvrk0nmtdyu1qe1nwobd7vznwo70uccjuzagrcdlkt32ycqaaoxrcda",
+            "size": 12,
+            "name": null,
+            "type": "application/pgp-encrypted",
+            "charset": null,
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          },
+          {
+            "partId": "2",
+            "blobId": "chjhptmpbvrk0nmtdyu1qe1nwobd7vznwo70uccjuzagrcdlkt32ycqaapnbffyl",
+            "size": 1431,
+            "name": "encrypted.asc",
+            "type": "application/octet-stream",
+            "charset": null,
+            "disposition": "inline",
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "preview": ""
+      },
+      "topContentType": "multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"=_8e60317c8d18a45b08f9d1e0ed09268d\"",
+      "expectedSignature": "not_signed",
+      "usable": true,
+      "expectedLayers": 1
+    },
+    {
+      "name": "ecc-nested-inline",
+      "owner": "ecc",
+      "subject": "SYNTHETIC nested inline MIME payload",
+      "rawMime": "ecc-nested-inline.eml",
+      "ciphertext": "ecc-nested-inline.asc",
+      "message": {
+        "id": "qaaaaae",
+        "blobId": "ccgui3svcxrbpuyx1ld7lnh3eemqd3gcu9cfvoaodhijnmgnotcxacqaaq",
+        "threadId": "e",
+        "subject": "SYNTHETIC nested inline MIME payload",
+        "from": [
+          {
+            "name": null,
+            "email": "sender@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "to": [
+          {
+            "name": null,
+            "email": "ecc@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "cc": null,
+        "bcc": null,
+        "bodyStructure": {
+          "partId": "0",
+          "blobId": "cggui3svcxrbpuyx1ld7lnh3eemqd3gcu9cfvoaodhijnmgnotcxacqaatnatqiz",
+          "size": 3265,
+          "name": null,
+          "type": "text/plain",
+          "charset": "utf-8",
+          "disposition": null,
+          "cid": null,
+          "language": null,
+          "location": null
+        },
+        "bodyValues": {
+          "0": {
+            "isEncodingProblem": false,
+            "isTruncated": false,
+            "value": "-----BEGIN PGP MESSAGE-----\n\nwV4DAAAAAAAAAAASAQdA4JupAgcZYdZbvRHPL9/K4ssTs1+lWdHvdlezYnjT\nr2swcl3aHyrYKMAo5It3zJyYN5CDtDgFr5J3vrDWUxcX6UjkElBPQJLnkEvv\nJO+9f2mDwV4DAAAAAAAAAAASAQdA7DmY1N3jt2VUeq5z1ep76Lqz6d3v6RLb\nUc2VtQG2x2owBgkiln48EQvdlYxYosSNy+EWZJxG80GmJu4Uyz9GMCELhEvf\nlMLiK6BUBwiMu1UN0sePAUk6jjIhsFqD+VGCmhJqpvSfpVbW9k3tT3+hyOSE\nuz6vuMjwQRR4905V7nHNPgfZP2fuR+7LT+FHbFmFqF7CagDaLoQTfxYyD7mn\nqms86RK3NlTY6SFa8UicaNKgqUCkWukVVyaLvvy1wgpURkXjiup4bmi/Cl8P\nidRVtZ5O4zj3D72dhvTek7YE2OxCdajklPayN7DtwUFr2ZUUeLL7IkeJonBV\n7N2RHMv/fMXJqLxiYF5S4Y6OJo39Zt4xgd52rqu4fG/uQbXego6aFezs6xDi\nci5bNra41Xz+DSNhFvQLFGVnjxYTc2zULoKy5YtEc2m6Q+bRXjju0+IhYqH8\nhkS72ydvxAWr8KF/Jhyy0eKXe7t26T8532bTOG/Z+g6HSXs+tzZTarMOwA38\nMG389kZ02sTCx9TIWRF+uuWFFuiDtg5nA9VQy7t/E5cQIznaQZu6n7rLg9UB\nyJhSgBF41htAzBUVsrSuhTA3q59ebbWrICnLiRbRdn47LXOwe5yt1cr6YaFN\nszy03xcg6ynyep9Bd0qMJ+ll9bbY+MfVoYDqDMseBXGKvlwfz3+cwdbpZmK7\nAguR0qUR+4O7wkIzN5WuSQjSjfQyBdEHPtRwYL2psLfnvy2U0d7t8lo4n516\nYG37eN3M4BId27Gczch4e0M8FwYjOuHi/F0j3oJVfsFU/lNUGlwm3Cy0zjtX\nBcFZeUuQXjaxtVMSGwo6L0SauSJRTsszJTqRef8WYCA/9ic9TaJAPJ7JvWPZ\nShobb/N5iBcZKWbOQliPDGJwVXw8x6nI6Y6MqIaAdjmBI5L6GeSj+D5dOHtc\n7v+vOkEBAP2b4xqBS9qwpOPGNvweyKs1EnePl4tDMZIHLRhybDsjJC9hizpS\nKy+kE59trPjlji0xFa/1hu17CmgvY+1ADj7zpJ7pqAn/NWnwZ2hEDh6EQd1z\nryXegOHk/EvqqUZolve/yzzfuKqOnm2PFKrYsWTvIiSyuMexPMOgKZk0E6KP\n9ri5ccuC3dZLNLYrNus6zoCOy9dtEXEJl1m073kclkyj/1GA2LKFM7o1RsWh\nrSSghQ1rN2TNFlIQQunktbhX6+eqkdgv/aU5HlG1mUXtu2co0AoQ0duWraCi\n4no0UnwRMCFyLnPfoNXCJjwAyHVAj6gaFhVaji7cVVmm/8b3WaLBHZ77vIdi\n6jeojHP87RyaX6+qqxbUXbxHiCwX4LMlmvrUhIG2KYjb9dBzztvojPUwF3A0\nAhLfito5CDhOs7BHjkJ88T1rADcC+VopKoFv2CgRFoPycfKi6mhVotLi0+ij\n/JpgZB3jI4KKX7Mx8CqjaewyGyH9Sm3pA/jhwe5H4DNXPVYn3GYXrKOcu6Jt\nStnkBRooZUY+qzwdbqbboA35QjLMHKxLFx9IpQ0yF7V61BWPbCfPv5bAlhrF\nBBQm6OIpt9DpzgefoSb+Jl0btrlCTR9qdgds215u8VG2+aa7mEh8ryV1AfYN\n8fJ3RwQvyEUnsR3bWvaBF88GYJssW1iem0ozvu/eWlYcw17yU0j4QTTTS4ME\nMh0VQ2cxkJ6+ayq3wYgMILfKTqG7vzXGpb+3wAy/eef0b0qXsS+O2/uJQ4bc\nfQ4wyfP7LiGASRSDwJxs5NSKGh3lr2RRkOhtM8nj0uOqgdFvWpd98gh0Sznq\nAo6agg2KAx1+ESDi9hBgAwuziYVoMTiOx3XYat1TdQDuEZ3SepX26zpIVm0D\nmOgXC/IKyUozy8uTCntLlfi8cl4VSUBBKjMio39DvDanxNqXGUyAmWPIQIGD\nev5EdTLb3CJim1DiyE/BqFvAqTNgCPYWL0X1t98v6y8nstw5imKrkYt6UV9s\nz/tAge4e4ed7aoAUOBN5oMvf+lKKcm/CynacvA3HfAg31hhvOHK4GlDkfZiX\nhrGdBzrTRviU33jicalu8yhq4liEA0e1fILN6vm98ahR7I4uMjF4eA6WhKNY\nhEA7EMzw4wDYza6ofSRB62PObbEHc38JTh7oFPhMWqQ7hJhOM1if9bCLBIE4\nW9gYgbc12CmnXdaeDQnpZ1UKE/DvntJK1OADZyfNrSk6t2a+SZk/0X73DD3N\nzVvV2sLTmFrXeJqrms89nyqjkdROj3ujgb6UBHwwvZkYTAPARg+8Ft6wJTts\nsCSs2gGiNShKO+DPR/986wvWg0g5vKSn31A/emjy0Ok8aYhppfuii/ZEE+D1\nv+EuRPGtfKFXj5P0mZGRoqRs6xj8QgYBwZ/DpASXUBWxya+EFGDn17jiwkRN\nsmlzkfhLYmmtzpmyWSblPhvoIpMbHyASHhWcdW+WT47+2JASgLs8JY0rDvBV\nM408tWR2tIegn5Kn80MY7ojTlMfVxiK16/cGn9N1DFhCQ0nUAYQYzwrjyC2S\ny6axNik9UWLrsiT7qLUqhLAX+pesBoeMg0Jiidq64G5GRXLbZl7O7OpeBmCF\nGORwW7pyZLziqy1INKu7alaFRROVXZNBvLo+qljOarAvdeO+ZDZIw7bc2COX\n2MaJqLvbBhxJH5uBFKo/x3fnnAKaDm4cU1zSpvy/qYp1f/ZE9FuwKm9VEivL\nX/kZHyFd5uq2MG2Uggox8eDF5mQLvFJ5fJ7G9HWB8tobDW9YEtWoYP8Eli6d\nCgKg69jncjbm7HDiQVcxJAgXDY6BRuN27UOSWmgyAmfqKTzsmdBZTYfEWoWi\n8uIbG22NpI4LEjqVyKFQ5hwBUf+0JVpmx1DGkZtCrYhQR+9PlTMXtxWCyUf3\nf8dUhigGSGDTtsFe6NLWPjcAIRKiMA53Vhv+aMsv1TR+rm9hGFGkQV3/xaca\nJy65vdmm7KIAIAN9mFHWJbcE1E1yW1DTdSHV\n=RBd8\n-----END PGP MESSAGE-----\n"
+          }
+        },
+        "textBody": [
+          {
+            "partId": "0",
+            "blobId": "cggui3svcxrbpuyx1ld7lnh3eemqd3gcu9cfvoaodhijnmgnotcxacqaatnatqiz",
+            "size": 3265,
+            "name": null,
+            "type": "text/plain",
+            "charset": "utf-8",
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "htmlBody": [
+          {
+            "partId": "0",
+            "blobId": "cggui3svcxrbpuyx1ld7lnh3eemqd3gcu9cfvoaodhijnmgnotcxacqaatnatqiz",
+            "size": 3265,
+            "name": null,
+            "type": "text/plain",
+            "charset": "utf-8",
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "attachments": [],
+        "preview": "-----BEGIN PGP MESSAGE-----\n\nwV4DAAAAAAAAAAASAQdA4JupAgcZYdZbvRHPL9/K4ssTs1+lWdHvdlezYnjT\nr2swcl3aHyrYKMAo5It3zJyYN5CDtDgFr5J3vrDWUxcX6UjkElBPQJLnkEvv\nJO+9f2mDwV4DAAAAAAAAAAASAQdA7DmY1N3jt2VUeq5z1ep76Lqz6d3v6RLb\nUc2VtQG2x2owBgkiln48EQvdlYxYosSNy+EWZJxG8..."
+      },
+      "topContentType": "text/plain; charset=\"utf-8\"",
+      "expectedSignature": "verified",
+      "usable": true,
+      "expectedLayers": 2
+    },
+    {
+      "name": "rsa-inbound",
+      "owner": "rsa",
+      "subject": "SYNTHETIC inbound SMTP rsa",
+      "rawMime": "rsa-inbound.eml",
+      "ciphertext": "rsa-inbound.asc",
+      "message": {
+        "id": "eaaaaab",
+        "blobId": "camidu2csgsawfi1bkkntmyh2cavopu27a2dpwmso9e29c2gtzkjocyaae",
+        "threadId": "b",
+        "subject": "SYNTHETIC inbound SMTP rsa",
+        "from": [
+          {
+            "name": "SYNTHETIC sender",
+            "email": "sender@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "to": [
+          {
+            "name": null,
+            "email": "rsa@mime-probe-6e3bc9.solace.test"
+          }
+        ],
+        "cc": null,
+        "bcc": null,
+        "bodyStructure": {
+          "partId": null,
+          "blobId": null,
+          "size": 2203,
+          "name": null,
+          "type": "multipart/encrypted",
+          "charset": null,
+          "disposition": null,
+          "cid": null,
+          "language": null,
+          "location": null,
+          "subParts": [
+            {
+              "partId": "1",
+              "blobId": "cemidu2csgsawfi1bkkntmyh2cavopu27a2dpwmso9e29c2gtzkjocyaagxrcda",
+              "size": 12,
+              "name": null,
+              "type": "application/pgp-encrypted",
+              "charset": null,
+              "disposition": null,
+              "cid": null,
+              "language": null,
+              "location": null
+            },
+            {
+              "partId": "2",
+              "blobId": "cemidu2csgsawfi1bkkntmyh2cavopu27a2dpwmso9e29c2gtzkjocyaahnbfnyo",
+              "size": 1847,
+              "name": "encrypted.asc",
+              "type": "application/octet-stream",
+              "charset": null,
+              "disposition": "inline",
+              "cid": null,
+              "language": null,
+              "location": null
+            }
+          ]
+        },
+        "bodyValues": {},
+        "textBody": [],
+        "htmlBody": [],
+        "attachments": [
+          {
+            "partId": "1",
+            "blobId": "cemidu2csgsawfi1bkkntmyh2cavopu27a2dpwmso9e29c2gtzkjocyaagxrcda",
+            "size": 12,
+            "name": null,
+            "type": "application/pgp-encrypted",
+            "charset": null,
+            "disposition": null,
+            "cid": null,
+            "language": null,
+            "location": null
+          },
+          {
+            "partId": "2",
+            "blobId": "cemidu2csgsawfi1bkkntmyh2cavopu27a2dpwmso9e29c2gtzkjocyaahnbfnyo",
+            "size": 1847,
+            "name": "encrypted.asc",
+            "type": "application/octet-stream",
+            "charset": null,
+            "disposition": "inline",
+            "cid": null,
+            "language": null,
+            "location": null
+          }
+        ],
+        "preview": ""
+      },
+      "topContentType": "multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"=_b11f3ab8d9f03fad42ee2bf5c09bc3c1\"",
+      "expectedSignature": "not_signed",
+      "usable": true,
+      "expectedLayers": 1
+    },
+    {
+      "name": "ecc-rfc3156-import",
+      "owner": "ecc",
+      "subject": "SYNTHETIC proper RFC3156 import",
+      "rawMime": "ecc-rfc3156-import.eml",
+      "ciphertext": "ecc-rfc3156-import.asc",
+      "message": {
+        "id": "qaaaaae",
+        "blobId": "cbus77zcybzb73c7tbk0hq7ypwzcxkxjmm113ecixur2qmjdiqyu7fqaaq",
+        "subject": "SYNTHETIC proper RFC3156 import",
+        "bodyStructure": {
+          "partId": null,
+          "blobId": null,
+          "size": 2061,
+          "name": null,
+          "type": "multipart/encrypted",
+          "charset": null,
+          "disposition": null,
+          "cid": null,
+          "language": null,
+          "location": null,
+          "subParts": [
+            {
+              "partId": "1",
+              "blobId": "cfus77zcybzb73c7tbk0hq7ypwzcxkxjmm113ecixur2qmjdiqyu7fqaathqkda",
+              "size": 12,
+              "name": null,
+              "type": "application/pgp-encrypted",
+              "charset": null,
+              "disposition": null,
+              "cid": null,
+              "language": null,
+              "location": null
+            },
+            {
+              "partId": "2",
+              "blobId": "cfus77zcybzb73c7tbk0hq7ypwzcxkxjmm113ecixur2qmjdiqyu7fqaatbanlyo",
+              "size": 1839,
+              "name": null,
+              "type": "application/octet-stream",
+              "charset": null,
+              "disposition": "inline",
+              "cid": null,
+              "language": null,
+              "location": null
+            }
+          ]
+        },
+        "hasAttachment": true
+      },
+      "topContentType": "multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"SYNTHETIC-RFC3156-BOUNDARY\"",
+      "expectedSignature": "verified",
+      "expectedLayers": 1,
+      "usable": true
+    }
+  ],
+  "capturedAt": "2026-11-10",
+  "accountPolicy": {
+    "@type": "Enabled",
+    "headerProtection": "none",
+    "encryptOnAppend": false,
+    "allowSpamTraining": false
+  },
+  "clientCiphertextPolicy": "wildcard recipient packets; signed ECC sender; original structured-builder experiment before selected inline transport fix",
+  "filesSha256": {
+    "source-rfc3156-import.eml": "32b763bd33733dd80ffdb39c90209b485eabc5fee9060bd165b503461cb39dc7",
+    "ecc-rfc3156-import.asc": "b06fba532380c4426df077f97a880fd3e384047e3f75e921ffbc6582437cb2fe",
+    "ecc-rfc3156-import.eml": "c29566618c68f43212de656da57c9702a52b002c3a73972145513c2187f0aaf5",
+    "source-nested-client-ciphertext.asc": "edc8efc00f9759cc789b82f620392ba162729f625d7aeb634a72a3c782a8ebb1",
+    "source-client-ciphertext.asc": "b06fba532380c4426df077f97a880fd3e384047e3f75e921ffbc6582437cb2fe",
+    "source-body.mime": "bce2dd6abf97450d6eb4a9db55ee653c94d776856f3e9299926c7cf3f23cc64f",
+    "ecc-nested-inline.asc": "b41e2b4c979121ac423bc643861d49adc8dcfe1b9a7ccdc598c33337ee58eb85",
+    "ecc-nested-inline.eml": "d961535013407f477cdca389e784b2f6a751d1661023d3bff83fa3aa2bb4d0f6",
+    "sender-nested-inline.asc": "b41e2b4c979121ac423bc643861d49adc8dcfe1b9a7ccdc598c33337ee58eb85",
+    "sender-nested-inline.eml": "7318a2fcce8a99c41d9802560b0ae12f7f604cd6006173f4bfa1e3c4d0e250d5",
+    "rsa-inbound.asc": "7e37a1f0820e98d0d5bd1023c0bc9736fb2f7e69417b3b094002af9e40439ade",
+    "rsa-inbound.eml": "795a4d1817bc2273908477c3e47b369d1cae72fa92579f6e8f2bdd3bfea90205",
+    "ecc-inbound.asc": "85252a5d4eaab79bfeb528fba25dfb871139db9dd706534670428f23f9ffc673",
+    "ecc-inbound.eml": "5573194e9c09f23ad896ac9582996803ab0b597a50991709a2ad55f09b171ea3",
+    "ecc-inline.asc": "7aa3d481560ac1eab108d1d7d11c77de90c80bf675e7714daad65972e036d9d8",
+    "ecc-inline.eml": "8997ff80250a3d1b3fe9ffccb9e1c02ad02b09fe499917ba411980c944d5a1c5",
+    "ecc-structured.asc": "de503aa85b31d472626cfaf9ef2a5e6782d9898eabc7b9e3e37ea87d179fd018",
+    "ecc-structured.eml": "70a7f90f5582cb997fadc3d722622b563479b95617ef4273abf1e737f61e6eb0",
+    "sender-inline.asc": "7aa3d481560ac1eab108d1d7d11c77de90c80bf675e7714daad65972e036d9d8",
+    "sender-inline.eml": "791f8a0abb4f4ff8f49dccd3885a2f53ec0703b06e00f1a0ea51ecff4073bf2c",
+    "sender-structured.asc": "b06fba532380c4426df077f97a880fd3e384047e3f75e921ffbc6582437cb2fe",
+    "sender-structured.eml": "614f3e806effcdda2ceb18fc4ecbd49e208f52cf60d6f238c7fe9a7fdb30006f"
+  }
+}

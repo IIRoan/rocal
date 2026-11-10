@@ -3,6 +3,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import sys
 import tarfile
 import tempfile
@@ -21,6 +22,18 @@ specification.loader.exec_module(journeys)
 
 
 class HarnessTests(unittest.TestCase):
+    def test_macos_and_container_mail_fixtures_use_the_same_stalwart_release(self):
+        repository = Path(__file__).resolve().parents[2]
+        dockerfile = (repository / "apps/stalwart/test-env/Dockerfile").read_text()
+        target = re.search(r"FROM stalwartlabs/stalwart:v([^@\s]+)@sha256:", dockerfile)
+        self.assertIsNotNone(target)
+        tools = json.loads((repository / "scripts/e2e/tools.json").read_text())
+        for architecture in ("arm64", "x86_64"):
+            with self.subTest(architecture=architecture):
+                tool = tools["stalwart-" + architecture]
+                self.assertIn(f"/releases/download/v{target.group(1)}/", tool["url"])
+                self.assertRegex(tool["sha256"], r"^[0-9a-f]{64}$")
+
     def test_focused_ios_diagnostic_runs_calendar_and_photo_in_order_and_stops_on_failure(self):
         with patch.object(journeys, "run_journey", return_value=True) as execute, patch.object(journeys, "publish") as publish:
             journeys.main("ios", diagnostic=True)

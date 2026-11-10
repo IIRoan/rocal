@@ -37,8 +37,11 @@ const mockEncryptForRecipients = jest.fn(
     armoredMessage: "-----BEGIN PGP MESSAGE-----\nsealed\n-----END PGP MESSAGE-----",
   }),
 );
+const mockVerificationContext = { publicKeyArmored: "alice-public-key", fingerprint: "synthetic-fingerprint", ownAddresses: ["alice@solace.onl"] };
 jest.mock("@/lib/mail/worker-client", () => ({
   mailCryptoWorkerClient: {
+    getVerificationContext: () => mockVerificationContext,
+    isVerificationContextCurrent: (context: unknown) => context === mockVerificationContext,
     encryptForRecipients: (input: {
       plaintext: string;
       recipientPublicKeysArmored: string[];
@@ -59,7 +62,7 @@ function AutosaveProbe({
       uploadTextBlob,
     } as never,
     session: { apiUrl: "https://mail.example.com/jmap/" } as JmapSession,
-    unlockedVault: { publicKeyArmored: "alice-public-key" } as UserKeyVault,
+    unlockedVault: { publicKeyArmored: "alice-public-key", publicKeyFingerprint: "synthetic-fingerprint" } as UserKeyVault,
     mailboxes: [{ id: "drafts-1", role: "drafts" }],
     identities: [{ id: "identity-1", email: "alice@solace.onl", name: "Alice" }],
     fallbackFromEmail: "alice@solace.onl",

@@ -2,20 +2,25 @@
 
 use axum::Json;
 use axum::extract::{RawQuery, State};
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use solace_api_types::health::{ConnectionTest, HealthStatus, MailHealthFailure};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
+use crate::http::client_ip::client_ip;
+use crate::http::rate_limit::{self, Limit};
 use crate::instant;
 use crate::integrations::stalwart::reachability;
+use crate::mail::maintenance::monitor;
 use crate::state::AppState;
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(health))
         .routes(routes!(mail_jmap))
+        .routes(routes!(mail_policy))
+        .routes(routes!(mail_key_expiry))
         .routes(routes!(connection_test))
 }
 
@@ -58,6 +63,48 @@ pub async fn mail_jmap(State(state): State<AppState>) -> Response {
         )
             .into_response(),
     }
+}
+
+/// Fresh complete metadata cycles without encryption-policy drift; never gates mail delivery.
+#[utoipa::path(get, path = "/api/health/mail-policy", operation_id = "getMailPolicyHealth", tag = "Health", responses((status = 200, body = HealthStatus), (status = 503, body = HealthStatus), (status = 429, body = HealthStatus)))]
+#[tracing::instrument(skip_all)]
+pub async fn mail_policy(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    metadata_health(&state, &headers, false).await
+}
+
+/// Fresh complete user-directory cycles without keys expired or expiring within fourteen days.
+#[utoipa::path(get, path = "/api/health/mail-key-expiry", operation_id = "getMailKeyExpiryHealth", tag = "Health", responses((status = 200, body = HealthStatus), (status = 503, body = HealthStatus), (status = 429, body = HealthStatus)))]
+#[tracing::instrument(skip_all)]
+pub async fn mail_key_expiry(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    metadata_health(&state, &headers, true).await
+}
+
+async fn metadata_health(state: &AppState, headers: &HeaderMap, expiry: bool) -> Response {
+    let store = if expiry {
+        "mail-key-expiry-health"
+    } else {
+        "mail-policy-health"
+    };
+    let status = if rate_limit::enforce(store, &client_ip(headers), Limit::per_minute(30)).is_err()
+    {
+        StatusCode::TOO_MANY_REQUESTS
+    } else {
+        match monitor::health(state).await {
+            Ok(health) if if expiry { health.expiry } else { health.policy } => StatusCode::OK,
+            _ => StatusCode::SERVICE_UNAVAILABLE,
+        }
+    };
+    let mut response = (
+        status,
+        Json(HealthStatus {
+            status: if status.is_success() { "ok" } else { "error" }.into(),
+        }),
+    )
+        .into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
 }
 
 /// Confirms request routing and shows the server time.

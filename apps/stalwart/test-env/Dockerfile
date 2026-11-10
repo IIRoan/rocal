@@ -1,5 +1,5 @@
 # Test-only Stalwart for the Rust rewrite test environment: no frp tunnels, no outbound delivery, test secrets only.
-FROM stalwartlabs/stalwart:v1.0.0@sha256:baafeacd6cbde77acdd94af49972d41c6709e54a376df48e18a9fe3f445eb3d5
+FROM stalwartlabs/stalwart:v1.1.0@sha256:f772aa6ef8cd8018969fa491640f1436b0270eb14e2c219b5f37f1a77020837e
 
 ARG STALWART_CLI_VERSION=1.0.14
 

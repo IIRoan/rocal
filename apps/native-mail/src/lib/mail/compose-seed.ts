@@ -22,6 +22,7 @@ import {
   resolveInlinePgpArmoredCiphertext,
 } from "./message-security";
 import type { JmapEmailMessage, JmapIdentity } from "./types";
+import { getMailDraftSizeError } from "@workspace/calendar-core/mail-mime-limits";
 
 const EMPTY_FIELDS: ComposeTextFields = {
   to: "",
@@ -149,6 +150,7 @@ export function planComposeSeed({
       if (isEncrypted(sourceMessage)) {
         return runtime ? { kind: "decrypt-draft", draftId: sourceMessage.id } : null;
       }
+      if (getMailDraftSizeError(extractMessageBodies(sourceMessage))) return null;
       return {
         kind: "fields",
         draftId: sourceMessage.id,
@@ -172,6 +174,7 @@ function isEncrypted(message: JmapEmailMessage): boolean {
 export async function decryptMessagePlaintext(
   runtime: MailRuntime,
   message: JmapEmailMessage,
+  forDraft = false,
 ): Promise<string> {
   const decrypted =
     classifyMessageEncryption(message) === "inline_pgp"
@@ -185,17 +188,24 @@ export async function decryptMessagePlaintext(
           }),
         )
       : await decryptPgpMimeMessage(runtime, message.id, message.bodyStructure);
+  if (forDraft && decrypted.rawMimeFallback) {
+    throw new Error("This draft could not be opened safely here. Edit it on the web. The saved draft has not been changed.");
+  }
+  const sizeError = forDraft
+    ? getMailDraftSizeError({ text: decrypted.plaintext }) ?? getMailDraftSizeError({ html: decrypted.html })
+    : null;
+  if (sizeError) throw new Error(sizeError);
   return decrypted.plaintext;
 }
 
-/** Decrypts a saved encrypted draft for editing; a failure still opens its headers with an empty body. */
+/** A failed draft read returns headers for the error state; the editor closes before seeding or autosaving. */
 export async function decryptDraftFields(
   runtime: MailRuntime,
   message: JmapEmailMessage,
 ): Promise<{ fields: ComposeTextFields; error: string | null }> {
   const headers = draftHeaders(message);
   try {
-    return { fields: { ...headers, body: await decryptMessagePlaintext(runtime, message) }, error: null };
+    return { fields: { ...headers, body: await decryptMessagePlaintext(runtime, message, true) }, error: null };
   } catch (err) {
     return {
       fields: headers,

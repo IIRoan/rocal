@@ -1,4 +1,5 @@
-"use client";
+import { privateSearchCoverageText } from "@workspace/calendar-core";
+("use client");
 
 import {
   useEffect,
@@ -75,6 +76,7 @@ export type UseCommandPaletteSearchResult = {
   searchInputInteractionProps: SearchInputInteractionProps;
   searchInputRef: RefObject<HTMLInputElement | null>;
   searchLoading: boolean;
+  searchCoverageText?: string;
   searchQuery: string;
   selectCommand: (command: Command) => void;
   selectedIndex: number;
@@ -120,6 +122,7 @@ export function useCommandPaletteSearch({
   const {
     results: rawSearchResults,
     isFetching: searchLoading,
+    coverage,
   } = useUnifiedSearch({
     query: debouncedQuery,
     enabled: showEventSearch,
@@ -322,6 +325,9 @@ export function useCommandPaletteSearch({
     matchingCommands,
     searchEvents,
     searchResults,
+    searchCoverageText: coverage
+      ? privateSearchCoverageText(coverage)
+      : undefined,
     searchInputInteractionProps,
     searchInputRef,
     searchLoading,

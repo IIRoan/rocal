@@ -1,9 +1,16 @@
+import { capturePrivateSearchRequest } from "./private-index-lifecycle";
 import type {
   TitleIndexDocument,
   TitleIndexShardPayload,
 } from "@workspace/calendar-core";
 import {
   buildMailBodyExcerpt,
+  collectOwnMailAddresses,
+  collectPrivateMailTitles,
+  parsePrivateSearchCoverage,
+  unknownPrivateSearchCoverage,
+  withPrivateSearchBodyCoverage,
+  type PrivateSearchCoverage,
   decryptSearchShard,
   encryptSearchShard,
   eventToTitleIndexDocument,
@@ -45,11 +52,6 @@ import {
   titleIndexAdditionalData,
 } from "./local-index-store";
 
-const TITLE_PAGE_SIZE = 100;
-const MAX_MAIL_PER_MAILBOX = 800;
-const MAX_MAILBOXES = 12;
-const MAX_MAIL_TITLES = 6000;
-
 const store = new BrowserSearchIndexStore();
 
 export type PrivateTitleIndexSnapshot = {
@@ -59,6 +61,7 @@ export type PrivateTitleIndexSnapshot = {
   /** Mail whose body excerpt is not indexed yet. */
   pendingBodies: number;
   loadedBodies: number;
+  coverage: PrivateSearchCoverage;
 };
 
 const EMPTY_SNAPSHOT: PrivateTitleIndexSnapshot = {
@@ -67,6 +70,7 @@ const EMPTY_SNAPSHOT: PrivateTitleIndexSnapshot = {
   itemCount: 0,
   pendingBodies: 0,
   loadedBodies: 0,
+  coverage: unknownPrivateSearchCoverage(),
 };
 
 function sortMailboxes(mailboxes: JmapMailbox[]): JmapMailbox[] {
@@ -99,44 +103,23 @@ async function loadCalendarTitleDocuments(
 async function loadMailTitleDocuments(
   client: StalwartJmapClient,
   session: JmapSession,
-): Promise<TitleIndexDocument[]> {
-  const mailboxes = sortMailboxes(await client.getMailboxes(session)).slice(
-    0,
-    MAX_MAILBOXES,
-  );
-  const unique = new Map<string, TitleIndexDocument>();
-
-  for (const mailbox of mailboxes) {
-    if (unique.size >= MAX_MAIL_TITLES) break;
-    let position = 0;
-    let loadedForMailbox = 0;
-    let total = Number.POSITIVE_INFINITY;
-
-    while (
-      loadedForMailbox < MAX_MAIL_PER_MAILBOX &&
-      position < total &&
-      unique.size < MAX_MAIL_TITLES
-    ) {
-      const page = await client.getMailboxMessageIds(session, mailbox.id, {
-        limit: TITLE_PAGE_SIZE,
+  isCurrent: () => boolean,
+) {
+  const mailboxes = sortMailboxes(await client.getMailboxes(session));
+  return collectPrivateMailTitles({
+    mailboxIds: mailboxes.map((mailbox) => mailbox.id),
+    isCurrent,
+    loadPage: async (mailboxId, position, limit) => {
+      const page = await client.getMailboxMessageIds(session, mailboxId, {
+        limit,
         position,
       });
-      total = page.total;
-      const pageSize = page.ids.length;
-      if (pageSize === 0) break;
-
       const messages = await client.getMessagesByIds(session, page.ids, {
         includeBodies: false,
       });
-      for (const message of messages) {
-        unique.set(message.id, mailToTitleIndexDocument(message));
-      }
-      loadedForMailbox += pageSize;
-      position += pageSize;
-    }
-  }
-
-  return Array.from(unique.values());
+      return { messages, total: page.total };
+    },
+  });
 }
 
 async function messageBodyExcerpt(
@@ -158,7 +141,7 @@ async function messageBodyExcerpt(
   return buildMailBodyExcerpt(decrypted);
 }
 
-async function loadMailVault(accountId: string): Promise<void> {
+async function loadMailVault(accountId: string, client: StalwartJmapClient, session: JmapSession): Promise<void> {
   const encryptionSession = await getEncryptionSession();
   if (encryptionSession?.userId !== accountId) {
     throw new Error("Account encryption key is unavailable.");
@@ -194,7 +177,11 @@ async function loadMailVault(accountId: string): Promise<void> {
   if (getActiveE2eeSession() !== encryptionSession) {
     throw new Error("Account encryption session changed.");
   }
+  const identities = await client.getIdentities(session);
+  if (getActiveE2eeSession() !== encryptionSession) throw new Error("Account encryption session changed.");
   await mailCryptoWorkerClient.loadVault({
+    ownerUserId: accountId,
+    ownAddresses: collectOwnMailAddresses([vault.email, session.username, ...identities.map((identity) => identity.email)]),
     privateKeyArmored: vault.encryptedPrivateKeyArmored,
     privateKeyPassphrase: secret,
     publicKeyArmored: vault.publicKeyArmored,
@@ -208,7 +195,7 @@ function createBodyLoader(
   accountId: string,
 ) {
   let vaultReady: Promise<void> | undefined;
-  const ensureVault = () => (vaultReady ??= loadMailVault(accountId));
+  const ensureVault = () => (vaultReady ??= loadMailVault(accountId, client, session));
   return async (batch: TitleIndexDocument[]): Promise<Map<string, string>> => {
     const ids = batch.flatMap((document) =>
       document.messageId ? [document.messageId] : [],
@@ -270,7 +257,8 @@ export async function loadPrivateTitleIndex(
   accountId: string,
 ): Promise<PrivateTitleIndexSnapshot> {
   try {
-    const key = await store.getOrCreateKey();
+    const key = await store.readKey();
+    if (!key) return EMPTY_SNAPSHOT;
     const record = await store.get(TITLE_INDEX_SHARD_ID);
     if (!record) return EMPTY_SNAPSHOT;
 
@@ -284,8 +272,11 @@ export async function loadPrivateTitleIndex(
       documents: payload.documents,
       indexedAt: payload.indexedAt,
       itemCount: payload.documents.length,
-      pendingBodies: 0,
+      pendingBodies:
+        parsePrivateSearchCoverage(payload.coverage).bodies.pendingMessages ??
+        0,
       loadedBodies: 0,
+      coverage: parsePrivateSearchCoverage(payload.coverage),
     };
   } catch {
     return EMPTY_SNAPSHOT;
@@ -294,23 +285,27 @@ export async function loadPrivateTitleIndex(
 
 export async function rebuildPrivateTitleIndex(input: {
   accountId: string;
+  isCurrent?: () => boolean;
   signal?: AbortSignal;
 }): Promise<PrivateTitleIndexSnapshot> {
+  const owner = capturePrivateSearchRequest(input.accountId);
+  const request = { ...owner, isCurrent: () => owner.isCurrent() && (input.isCurrent?.() ?? true) };
+  if (!request.isCurrent()) throw new Error("Private search was cancelled.");
   const [calendarDocuments, mailClient] = await Promise.all([
     loadCalendarTitleDocuments(input.signal),
     tryCreateMailClient(),
   ]);
 
   const mailTitles = mailClient
-    ? await loadMailTitleDocuments(mailClient.client, mailClient.session)
-    : [];
+    ? await loadMailTitleDocuments(mailClient.client, mailClient.session, request.isCurrent)
+    : { documents: [], coverage: unknownPrivateSearchCoverage() };
   const {
     documents: mailDocuments,
     pending: pendingBodies,
     loaded: loadedBodies,
   } = mailClient
     ? await refreshMailBodyExcerpts({
-        documents: mailTitles,
+        documents: mailTitles.documents,
         previous: (await loadPrivateTitleIndex(input.accountId)).documents,
         loadBodies: createBodyLoader(
           mailClient.client,
@@ -318,19 +313,26 @@ export async function rebuildPrivateTitleIndex(input: {
           input.accountId,
         ),
       })
-    : { documents: mailTitles, pending: 0, loaded: 0 };
+    : { documents: mailTitles.documents, pending: 0, loaded: 0 };
 
   const documents = [...calendarDocuments, ...mailDocuments];
+  const coverage = withPrivateSearchBodyCoverage(
+    mailTitles.coverage,
+    mailDocuments,
+  );
   const payload: TitleIndexShardPayload = {
     documents,
+    coverage,
     indexedAt: new Date().toISOString(),
   };
+  if (!request.isCurrent()) throw new Error("Private search was cancelled.");
   const key = await store.getOrCreateKey();
   const shard = await encryptSearchShard(key, payload, {
     additionalData: titleIndexAdditionalData(input.accountId),
     itemCount: documents.length,
   });
 
+  if (!request.isCurrent()) throw new Error("Private search was cancelled.");
   await store.put({
     id: TITLE_INDEX_SHARD_ID,
     source: "title",
@@ -344,6 +346,7 @@ export async function rebuildPrivateTitleIndex(input: {
     itemCount: documents.length,
     pendingBodies,
     loadedBodies,
+    coverage,
   };
 }
 

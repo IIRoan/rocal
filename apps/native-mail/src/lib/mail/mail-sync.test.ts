@@ -1,3 +1,4 @@
+import { activateSessionData } from "@workspace/native-core/lib/session-data-lifecycle";
 import { QueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import type { MailRuntime } from "./mail-runtime";
@@ -54,6 +55,7 @@ describe("syncMailboxChanges", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
+    activateSessionData("u1");
     resetMailSync();
     queryClient = new QueryClient();
     queryClient.setQueryData(QUERY_KEYS.mailMessages("inbox"), list(["a", "b"]));

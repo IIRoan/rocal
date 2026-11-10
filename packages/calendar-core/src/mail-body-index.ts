@@ -8,6 +8,7 @@ export const MAIL_BODY_EXCERPT_MAX_CHARS = 5000;
 export const MAIL_BODY_MAX_INDEXED = 1000;
 const DEFAULT_PASS_LIMIT = 60;
 const DEFAULT_BATCH_SIZE = 10;
+const MAIL_BODY_SOURCE_MAX_CHARS = 100_000;
 
 const HTML_ENTITIES: Record<string, string> = {
   amp: "&",
@@ -45,10 +46,12 @@ export function buildMailBodyExcerpt(input: {
   text?: string | null;
   html?: string | null;
 }): string {
+  const text = input.text?.slice(0, MAIL_BODY_SOURCE_MAX_CHARS);
+  const html = input.html?.slice(0, MAIL_BODY_SOURCE_MAX_CHARS);
   const source =
-    input.text?.trim() && !(input.html && looksLikeMimeMessage(input.text))
-      ? input.text
-      : stripHtml(input.html ?? "");
+    text?.trim() && !(html && looksLikeMimeMessage(text))
+      ? text
+      : stripHtml(html ?? "");
   return source
     .replace(/\s+/g, " ")
     .trim()

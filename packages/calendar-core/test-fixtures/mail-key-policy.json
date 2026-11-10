@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "now": "2026-11-10T00:00:00Z",
+  "cases": [
+    {
+      "name": "clean",
+      "warnings": [],
+      "expiresAt": null,
+      "usable": true,
+      "nearExpiry": false
+    },
+    {
+      "name": "address-mismatch",
+      "warnings": [
+        "addressMismatch"
+      ],
+      "expiresAt": null,
+      "usable": true,
+      "nearExpiry": false
+    },
+    {
+      "name": "expiry-advisory",
+      "warnings": [
+        "expiresSoon"
+      ],
+      "expiresAt": "2026-11-10T00:05:00Z",
+      "usable": true,
+      "nearExpiry": true
+    },
+    {
+      "name": "expiry-and-address-advisory",
+      "warnings": [
+        "expiresSoon",
+        "addressMismatch"
+      ],
+      "expiresAt": "2026-11-20T00:00:00Z",
+      "usable": true,
+      "nearExpiry": true
+    },
+    {
+      "name": "future-outside-advisory",
+      "warnings": [],
+      "expiresAt": "2026-12-10T00:00:00Z",
+      "usable": true,
+      "nearExpiry": false
+    },
+    {
+      "name": "expired",
+      "warnings": [
+        "expiresSoon"
+      ],
+      "expiresAt": "2026-11-09T00:00:00Z",
+      "usable": false,
+      "nearExpiry": false
+    },
+    {
+      "name": "expires-now",
+      "warnings": [
+        "expiresSoon"
+      ],
+      "expiresAt": "2026-11-10T00:00:00Z",
+      "usable": false,
+      "nearExpiry": false
+    },
+    {
+      "name": "expiry-warning-missing-time",
+      "warnings": [
+        "expiresSoon"
+      ],
+      "expiresAt": null,
+      "usable": false,
+      "nearExpiry": false
+    },
+    {
+      "name": "weakRsa",
+      "warnings": [
+        "weakRsa"
+      ],
+      "expiresAt": null,
+      "usable": false,
+      "nearExpiry": false
+    },
+    {
+      "name": "noKnownDecryptor",
+      "warnings": [
+        "noKnownDecryptor"
+      ],
+      "expiresAt": null,
+      "usable": false,
+      "nearExpiry": false
+    },
+    {
+      "name": "postQuantumOnly",
+      "warnings": [
+        "postQuantumOnly"
+      ],
+      "expiresAt": null,
+      "usable": false,
+      "nearExpiry": false
+    },
+    {
+      "name": "unusable",
+      "warnings": [
+        "unusable"
+      ],
+      "expiresAt": null,
+      "usable": false,
+      "nearExpiry": false
+    },
+    {
+      "name": "futureWarning",
+      "warnings": [
+        "futureWarning"
+      ],
+      "expiresAt": null,
+      "usable": false,
+      "nearExpiry": false
+    }
+  ]
+}

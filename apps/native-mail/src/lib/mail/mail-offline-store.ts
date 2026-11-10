@@ -8,6 +8,11 @@ import {
   importLocalSearchIndexKey,
   type EncryptedSearchShard,
 } from "@workspace/calendar-core";
+import {
+  createSessionDataStore,
+  type SessionDataScope,
+  isSessionDataScopeCurrent,
+} from "@workspace/native-core/lib/session-data-lifecycle";
 import { SECURE_STORE_KEYS } from "@workspace/native-core/lib/constants";
 import {
   isMailOfflineSnapshot,
@@ -21,8 +26,18 @@ const KEY_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
 };
 
-/** Bumped on clear so a save that started before sign-out never lands afterwards. */
-let generation = 0;
+const store = createSessionDataStore(async () => {
+  const results = await Promise.allSettled([
+    FileSystem.deleteAsync(snapshotPath(), { idempotent: true }),
+    SecureStore.deleteItemAsync(
+      SECURE_STORE_KEYS.MAIL_OFFLINE_CACHE_KEY,
+      KEY_OPTIONS,
+    ),
+  ]);
+  if (results.some((result) => result.status === "rejected")) {
+    throw new Error("Mailbox cleanup could not finish. Please retry.");
+  }
+});
 
 function snapshotPath(): string {
   return `${FileSystem.cacheDirectory ?? ""}${MAIL_OFFLINE_SNAPSHOT_FILE}`;
@@ -69,55 +84,53 @@ async function getOrCreateKey(): Promise<CryptoKey> {
 export async function loadMailOfflineSnapshot(
   userId: string,
 ): Promise<MailOfflineSnapshot | null> {
-  try {
-    const path = snapshotPath();
-    const info = await FileSystem.getInfoAsync(path);
-    if (!info.exists) return null;
-    const key = await readKey();
-    if (!key) {
-      await clearMailOfflineSnapshot();
+  const request = store.capture(userId);
+  const result = await store
+    .run(request.isCurrent, async () => {
+      const info = await FileSystem.getInfoAsync(snapshotPath());
+      if (!info.exists) return null;
+      const key = await readKey();
+      if (!key) throw new Error("Mailbox snapshot key is unavailable.");
+      const raw: unknown = JSON.parse(
+        await FileSystem.readAsStringAsync(snapshotPath()),
+      );
+      if (!isEncryptedSearchShard(raw))
+        throw new Error("Mailbox snapshot is unreadable.");
+      const snapshot = await decryptSearchShard<unknown>(key, raw, {
+        additionalData: additionalData(userId),
+      });
+      if (!isMailOfflineSnapshot(snapshot) || snapshot.userId !== userId) {
+        throw new Error("Mailbox snapshot belongs to another account.");
+      }
+      return snapshot;
+    })
+    .catch(async () => {
+      if (request.isCurrent()) await store.clear();
       return null;
-    }
-    const raw: unknown = JSON.parse(
-      await FileSystem.readAsStringAsync(path),
-    );
-    if (!isEncryptedSearchShard(raw)) {
-      await clearMailOfflineSnapshot();
-      return null;
-    }
-    const snapshot = await decryptSearchShard<unknown>(key, raw, {
-      additionalData: additionalData(userId),
     });
-    if (!isMailOfflineSnapshot(snapshot) || snapshot.userId !== userId) {
-      await clearMailOfflineSnapshot();
-      return null;
-    }
-    return snapshot;
-  } catch {
-    // Wrong account (AAD mismatch), corrupt file, or an older format: start clean.
-    await clearMailOfflineSnapshot().catch(() => undefined);
-    return null;
-  }
+  return result ?? null;
 }
 
 export async function saveMailOfflineSnapshot(
   snapshot: MailOfflineSnapshot,
+  scope?: SessionDataScope | null,
 ): Promise<void> {
-  const startedAt = generation;
-  const key = await getOrCreateKey();
-  const shard = await encryptSearchShard(key, snapshot, {
-    additionalData: additionalData(snapshot.userId),
-    itemCount: snapshot.lists.length,
+  const request = store.capture(snapshot.userId);
+  const isCurrent = () =>
+    request.isCurrent() &&
+    (scope === undefined || isSessionDataScopeCurrent(scope));
+  await store.run(isCurrent, async () => {
+    const key = await getOrCreateKey();
+    if (!isCurrent()) return;
+    const shard = await encryptSearchShard(key, snapshot, {
+      additionalData: additionalData(snapshot.userId),
+      itemCount: snapshot.lists.length,
+    });
+    if (!isCurrent()) return;
+    await FileSystem.writeAsStringAsync(snapshotPath(), JSON.stringify(shard));
   });
-  if (startedAt !== generation) return;
-  await FileSystem.writeAsStringAsync(snapshotPath(), JSON.stringify(shard));
 }
 
-export async function clearMailOfflineSnapshot(): Promise<void> {
-  generation += 1;
-  await FileSystem.deleteAsync(snapshotPath(), { idempotent: true });
-  await SecureStore.deleteItemAsync(
-    SECURE_STORE_KEYS.MAIL_OFFLINE_CACHE_KEY,
-    KEY_OPTIONS,
-  );
+export function clearMailOfflineSnapshot(): Promise<void> {
+  return store.clear();
 }

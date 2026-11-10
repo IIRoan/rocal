@@ -22,7 +22,6 @@ jest.mock("./mail-api", () => ({
   mailFetch: jest.fn(),
 }));
 
-
 function message(id: string, body = "hello"): JmapEmailMessage {
   return {
     id,
@@ -96,7 +95,9 @@ describe("captureMailOfflineSnapshot", () => {
       listData([message("secret-search-hit")]),
     );
     queryClient.setQueryData(QUERY_KEYS.mailThread("t-a"), [message("a")]);
-    queryClient.setQueryData(QUERY_KEYS.mailThread("t-older"), [message("older")]);
+    queryClient.setQueryData(QUERY_KEYS.mailThread("t-older"), [
+      message("older"),
+    ]);
 
     const snapshot = captureMailOfflineSnapshot(queryClient, {
       userId: "u1",
@@ -200,7 +201,10 @@ describe("captureMailOfflineSnapshot", () => {
       QUERY_KEYS.mailMessages("inbox"),
       listData([row, otherRow]),
     );
-    queryClient.setQueryData(QUERY_KEYS.mailMessage("a"), message("a", "opened"));
+    queryClient.setQueryData(
+      QUERY_KEYS.mailMessage("a"),
+      message("a", "opened"),
+    );
     queryClient.setQueryData(
       QUERY_KEYS.mailMessage("removed"),
       message("removed", "gone"),
@@ -211,7 +215,9 @@ describe("captureMailOfflineSnapshot", () => {
       emailState: null,
     });
 
-    expect(snapshot?.lists[0]?.messages[0]?.bodyValues?.["1"]?.value).toBe("opened");
+    expect(snapshot?.lists[0]?.messages[0]?.bodyValues?.["1"]?.value).toBe(
+      "opened",
+    );
     expect(snapshot?.lists[0]?.messages[1]?.bodyValues).toBeUndefined();
     expect(JSON.stringify(snapshot)).not.toContain("gone");
   });
@@ -219,7 +225,10 @@ describe("captureMailOfflineSnapshot", () => {
   it("caps each list to one page", () => {
     const queryClient = seededClient();
     const many = Array.from({ length: 80 }, (_, index) => message(`m${index}`));
-    queryClient.setQueryData(QUERY_KEYS.mailMessages("inbox"), listData(many, 80));
+    queryClient.setQueryData(
+      QUERY_KEYS.mailMessages("inbox"),
+      listData(many, 80),
+    );
 
     const snapshot = captureMailOfflineSnapshot(queryClient, {
       userId: "u1",
@@ -277,7 +286,9 @@ describe("hydrateMailOfflineSnapshot", () => {
     const queryClient = new QueryClient();
     hydrateMailOfflineSnapshot(queryClient, snapshot(), 9_000);
 
-    const restored = queryClient.getQueryData<MailRuntime>(QUERY_KEYS.mailRuntime());
+    const restored = queryClient.getQueryData<MailRuntime>(
+      QUERY_KEYS.mailRuntime(),
+    );
     expect(restored?.accountId).toBe("acc");
     expect(typeof restored?.client.getEmailChanges).toBe("function");
     expect(restored?.pickerIdentities).toEqual([
@@ -291,7 +302,8 @@ describe("hydrateMailOfflineSnapshot", () => {
       queryClient.getQueryState(QUERY_KEYS.mailRuntime())?.dataUpdatedAt,
     ).toBe(5_000);
     expect(
-      queryClient.getQueryState(QUERY_KEYS.mailMessages("inbox"))?.dataUpdatedAt,
+      queryClient.getQueryState(QUERY_KEYS.mailMessages("inbox"))
+        ?.dataUpdatedAt,
     ).toBe(9_000);
   });
 
@@ -302,7 +314,9 @@ describe("hydrateMailOfflineSnapshot", () => {
 
     hydrateMailOfflineSnapshot(queryClient, snapshot());
 
-    expect(queryClient.getQueryData(QUERY_KEYS.mailMessages("inbox"))).toBe(live);
+    expect(queryClient.getQueryData(QUERY_KEYS.mailMessages("inbox"))).toBe(
+      live,
+    );
   });
 
   it("retains restored reader bodies when a background refresh replaces the list rows", () => {
@@ -316,8 +330,12 @@ describe("hydrateMailOfflineSnapshot", () => {
       emailState: "s2",
     });
 
-    expect(resaved?.lists[0]?.messages[0]?.bodyValues).toEqual(message("a").bodyValues);
-    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("a"))).toEqual(message("a"));
+    expect(resaved?.lists[0]?.messages[0]?.bodyValues).toEqual(
+      message("a").bodyValues,
+    );
+    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("a"))).toEqual(
+      message("a"),
+    );
   });
 
   it("restores complete thread bodies without treating missing or capped bodies as reader data", () => {
@@ -326,16 +344,25 @@ describe("hydrateMailOfflineSnapshot", () => {
     const [inbox] = saved.lists;
     if (!inbox) throw new Error("expected an inbox snapshot");
     inbox.messages = [
-      { ...message("a"), bodyValues: { "1": { value: "partial", isTruncated: true } } },
+      {
+        ...message("a"),
+        bodyValues: { "1": { value: "partial", isTruncated: true } },
+      },
       { ...message("missing"), bodyValues: undefined },
     ];
     saved.threads = [{ threadId: "t-a", messages: [message("sibling")] }];
 
     hydrateMailOfflineSnapshot(queryClient, saved);
 
-    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("a"))).toBeUndefined();
-    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("missing"))).toBeUndefined();
-    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("sibling"))).toEqual(message("sibling"));
+    expect(
+      queryClient.getQueryData(QUERY_KEYS.mailMessage("a")),
+    ).toBeUndefined();
+    expect(
+      queryClient.getQueryData(QUERY_KEYS.mailMessage("missing")),
+    ).toBeUndefined();
+    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("sibling"))).toEqual(
+      message("sibling"),
+    );
   });
 
   it("keeps a live reader detail when restoring an older body", () => {
@@ -358,22 +385,31 @@ describe("snapshot guards", () => {
     expect(isMailOfflineSnapshot(valid)).toBe(true);
     expect(isMailOfflineSnapshot({ ...valid, version: 1 })).toBe(false);
     expect(isMailOfflineSnapshot({ ...valid, lists: [{}] })).toBe(false);
-    expect(isMailOfflineSnapshot({ ...valid, decrypted: [{ messageId: "a" }] })).toBe(false);
+    expect(
+      isMailOfflineSnapshot({ ...valid, decrypted: [{ messageId: "a" }] }),
+    ).toBe(false);
     expect(isMailOfflineSnapshot(null)).toBe(false);
   });
 
   it("only watches keys that feed the snapshot", () => {
-    expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailMessages("inbox"))).toBe(true);
+    expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailMessages("inbox"))).toBe(
+      true,
+    );
     expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailRuntime())).toBe(true);
     expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailDecrypted("a"))).toBe(true);
     expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailLabels())).toBe(true);
-    expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailSearchMessages("inbox", 1))).toBe(false);
+    expect(
+      isMailOfflineSnapshotKey(QUERY_KEYS.mailSearchMessages("inbox", 1)),
+    ).toBe(false);
     expect(isMailOfflineSnapshotKey(QUERY_KEYS.mailMessage("a"))).toBe(true);
   });
 });
 
 describe("decrypted content in the snapshot", () => {
-  function decrypted(plaintext: string, extra: Partial<MailDecryptResult> = {}) {
+  function decrypted(
+    plaintext: string,
+    extra: Partial<MailDecryptResult> = {},
+  ) {
     return {
       plaintext,
       html: null,
@@ -394,8 +430,14 @@ describe("decrypted content in the snapshot", () => {
 
   it("keeps decrypted bodies of saved messages and drops those of mail no longer listed", () => {
     const queryClient = clientWithInbox(["a"]);
-    queryClient.setQueryData(QUERY_KEYS.mailDecrypted("a"), decrypted("Secret plan"));
-    queryClient.setQueryData(QUERY_KEYS.mailDecrypted("removed"), decrypted("Old secret"));
+    queryClient.setQueryData(
+      QUERY_KEYS.mailDecrypted("a"),
+      decrypted("Secret plan"),
+    );
+    queryClient.setQueryData(
+      QUERY_KEYS.mailDecrypted("removed"),
+      decrypted("Old secret"),
+    );
     queryClient.setQueryData(QUERY_KEYS.mailLabels(), [
       { id: "l1", name: "Work", color: "blue" },
     ]);
@@ -409,7 +451,9 @@ describe("decrypted content in the snapshot", () => {
       { messageId: "a", result: decrypted("Secret plan"), partial: false },
     ]);
     expect(JSON.stringify(snapshot)).not.toContain("Old secret");
-    expect(snapshot?.labels).toEqual([{ id: "l1", name: "Work", color: "blue" }]);
+    expect(snapshot?.labels).toEqual([
+      { id: "l1", name: "Work", color: "blue" },
+    ]);
   });
 
   it("keeps only a preview for oversized bodies or ones carrying attachment bytes", () => {
@@ -434,7 +478,9 @@ describe("decrypted content in the snapshot", () => {
     expect(big?.partial).toBe(true);
     expect(big?.result.plaintext.startsWith("Hello there")).toBe(true);
     expect(big?.result.plaintext.length).toBeLessThanOrEqual(500);
-    const attached = snapshot?.decrypted.find((entry) => entry.messageId === "attached");
+    const attached = snapshot?.decrypted.find(
+      (entry) => entry.messageId === "attached",
+    );
     expect(attached).toEqual({
       messageId: "attached",
       partial: true,
@@ -449,22 +495,67 @@ describe("decrypted content in the snapshot", () => {
 
   it("hydrates full copies as fresh and partial copies as stale so they decrypt again when shown", () => {
     const source = clientWithInbox(["a", "big"]);
-    source.setQueryData(QUERY_KEYS.mailDecrypted("a"), decrypted("Secret plan"));
-    source.setQueryData(QUERY_KEYS.mailDecrypted("big"), decrypted("y".repeat(70_000)));
-    const snap = captureMailOfflineSnapshot(source, { userId: "u1", emailState: "s1" });
+    source.setQueryData(
+      QUERY_KEYS.mailDecrypted("a"),
+      decrypted("Secret plan"),
+    );
+    source.setQueryData(
+      QUERY_KEYS.mailDecrypted("big"),
+      decrypted("y".repeat(70_000)),
+    );
+    const snap = captureMailOfflineSnapshot(source, {
+      userId: "u1",
+      emailState: "s1",
+    });
     if (!snap) throw new Error("expected a snapshot");
 
     const queryClient = new QueryClient();
     hydrateMailOfflineSnapshot(queryClient, snap);
 
-    expect(queryClient.getQueryData(QUERY_KEYS.mailDecrypted("a"))).toEqual(
-      decrypted("Secret plan"),
-    );
-    expect(queryClient.getQueryState(QUERY_KEYS.mailDecrypted("a"))?.isInvalidated).toBe(false);
-    expect(queryClient.getQueryState(QUERY_KEYS.mailDecrypted("big"))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryData(QUERY_KEYS.mailDecrypted("a"))).toEqual({
+      ...decrypted("Secret plan"),
+      senderKeyTrustState: { kind: "unavailable", reason: "history" },
+    });
+    expect(
+      queryClient.getQueryState(QUERY_KEYS.mailDecrypted("a"))?.isInvalidated,
+    ).toBe(false);
+    expect(
+      queryClient.getQueryState(QUERY_KEYS.mailDecrypted("big"))?.isInvalidated,
+    ).toBe(true);
 
     // Saving again before the re-decrypt lands must not promote the preview to a full body.
-    const resaved = captureMailOfflineSnapshot(queryClient, { userId: "u1", emailState: "s1" });
-    expect(resaved?.decrypted.find((entry) => entry.messageId === "big")?.partial).toBe(true);
+    const resaved = captureMailOfflineSnapshot(queryClient, {
+      userId: "u1",
+      emailState: "s1",
+    });
+    expect(
+      resaved?.decrypted.find((entry) => entry.messageId === "big")?.partial,
+    ).toBe(true);
+  });
+});
+
+it("restores historical signature facts without restoring a current pinned sender verdict", () => {
+  const source = seededClient();
+  source.setQueryData(
+    QUERY_KEYS.mailMessages("inbox"),
+    listData([message("a")]),
+  );
+  source.setQueryData(QUERY_KEYS.mailDecrypted("a"), {
+    plaintext: "Synthetic signed content",
+    html: null,
+    signatureVerificationState: "verified",
+    hasVerifiedSignature: true,
+    senderKeyTrustState: { kind: "pinned" },
+  });
+  const snapshot = captureMailOfflineSnapshot(source, {
+    userId: "u1",
+    emailState: "s1",
+  });
+  if (!snapshot) throw new Error("Expected a synthetic snapshot");
+  const restored = new QueryClient();
+  hydrateMailOfflineSnapshot(restored, snapshot);
+  expect(restored.getQueryData(QUERY_KEYS.mailDecrypted("a"))).toMatchObject({
+    signatureVerificationState: "verified",
+    senderKeyTrustState: { kind: "unavailable", reason: "history" },
   });
 });

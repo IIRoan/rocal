@@ -8,8 +8,9 @@ jest.mock("@/lib/search/private-index-flags", () => ({
   isPrivateContentIndexEnabled: () => mockIndexEnabled.current,
 }));
 jest.mock("@/lib/search/private-title-index", () => ({
-  loadLocalMailSearchDocuments: (accountId: string) =>
-    mockLoadLocalMailSearchDocuments(accountId),
+  loadPrivateTitleIndex: async (accountId: string) => ({
+    documents: await mockLoadLocalMailSearchDocuments(accountId),
+  }),
 }));
 jest.mock("@/lib/e2ee-session", () => ({
   getActiveE2eeSession: () => ({ userId: "user-1" }),
@@ -70,8 +71,13 @@ describe("searchMailbox", () => {
 
     expect(client.searchMailboxMessages).not.toHaveBeenCalled();
     expect(client.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
-    expect(JSON.stringify(client.getMessagesByIds.mock.calls)).not.toContain("invoice");
-    expect(messages.map((message) => message.id)).toEqual(["m2", "m1"]);
+    expect(JSON.stringify(client.getMessagesByIds.mock.calls)).not.toContain(
+      "invoice",
+    );
+    expect(messages.messages.map((message) => message.id)).toEqual([
+      "m2",
+      "m1",
+    ]);
   });
 
   it("applies keyword conditions to the fetched messages", async () => {
@@ -88,7 +94,7 @@ describe("searchMailbox", () => {
     });
 
     expect(client.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
-    expect(messages.map((message) => message.id)).toEqual(["m2"]);
+    expect(messages.messages.map((message) => message.id)).toEqual(["m2"]);
   });
 
   it("keeps the words on the device while the index is still empty or unreadable", async () => {
@@ -106,7 +112,7 @@ describe("searchMailbox", () => {
 
     expect(client.searchMailboxMessages).not.toHaveBeenCalled();
     expect(client.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
-    expect(messages).toEqual([]);
+    expect(messages.messages).toEqual([]);
   });
 
   it("drops a match that has since left the mailbox, such as one moved to Trash", async () => {
@@ -126,7 +132,7 @@ describe("searchMailbox", () => {
       limit: 40,
     });
 
-    expect(messages.map((message) => message.id)).toEqual(["m2"]);
+    expect(messages.messages.map((message) => message.id)).toEqual(["m2"]);
   });
 
   it("asks the mail server when the index is off", async () => {
@@ -142,7 +148,12 @@ describe("searchMailbox", () => {
       limit: 40,
     });
 
-    expect(client.searchMailboxMessages).toHaveBeenCalledWith(session, "inbox", "invoice", 40);
-    expect(messages.map((message) => message.id)).toEqual(["server"]);
+    expect(client.searchMailboxMessages).toHaveBeenCalledWith(
+      session,
+      "inbox",
+      "invoice",
+      40,
+    );
+    expect(messages.messages.map((message) => message.id)).toEqual(["server"]);
   });
 });

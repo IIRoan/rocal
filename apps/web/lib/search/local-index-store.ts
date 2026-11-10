@@ -1,3 +1,4 @@
+import { invalidatePrivateSearch } from "./private-index-lifecycle";
 import {
   decryptSearchShard,
   encryptSearchShard,
@@ -26,7 +27,18 @@ export type SearchShardRecord = {
   shard: EncryptedSearchShard;
 };
 
-function openDatabase(): Promise<IDBDatabase> {
+const stores = new Set<BrowserSearchIndexStore>();
+let generation = 0;
+let operations: Promise<unknown> = Promise.resolve();
+let cleanupPending = false;
+
+function serialize<T>(operation: () => Promise<T>): Promise<T> {
+  const result = operations.then(operation);
+  operations = result.catch(() => undefined);
+  return result;
+}
+
+function openDatabase(onClose: () => void): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") {
     return Promise.reject(
       new Error("Local private search index storage is unavailable."),
@@ -49,7 +61,10 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onsuccess = () => {
       const database = request.result;
       // Sign-out in another tab deletes this database; holding it open would block the next sign-in's index.
-      database.onversionchange = () => database.close();
+      database.onversionchange = () => {
+        database.close();
+        onClose();
+      };
       resolve(database);
     };
   });
@@ -58,14 +73,31 @@ function openDatabase(): Promise<IDBDatabase> {
 export class BrowserSearchIndexStore {
   private databasePromise: Promise<IDBDatabase> | null = null;
 
+  constructor() {
+    stores.add(this);
+  }
+
+  async close(): Promise<void> {
+    const pending = this.databasePromise;
+    this.databasePromise = null;
+    if (pending) (await pending).close();
+  }
+
   private getDatabase(): Promise<IDBDatabase> {
     if (!this.databasePromise) {
-      this.databasePromise = openDatabase();
+      this.databasePromise = openDatabase(() => {
+        this.databasePromise = null;
+        generation += 1;
+        invalidatePrivateSearch();
+      }).catch((error: unknown) => {
+        this.databasePromise = null;
+        throw error;
+      });
     }
     return this.databasePromise;
   }
 
-  async put(record: SearchShardRecord): Promise<void> {
+  private async putRecord(record: SearchShardRecord): Promise<void> {
     const database = await this.getDatabase();
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(
@@ -78,7 +110,7 @@ export class BrowserSearchIndexStore {
     });
   }
 
-  async get(id: string): Promise<SearchShardRecord | null> {
+  private async getRecord(id: string): Promise<SearchShardRecord | null> {
     const database = await this.getDatabase();
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(LOCAL_SEARCH_STORE_NAME, "readonly");
@@ -89,7 +121,7 @@ export class BrowserSearchIndexStore {
     });
   }
 
-  async delete(id: string): Promise<void> {
+  private async deleteRecord(id: string): Promise<void> {
     const database = await this.getDatabase();
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(
@@ -102,7 +134,7 @@ export class BrowserSearchIndexStore {
     });
   }
 
-  async getOrCreateKey(): Promise<CryptoKey> {
+  private async createKey(): Promise<CryptoKey> {
     const database = await this.getDatabase();
     const existing = await new Promise<CryptoKey | null>((resolve, reject) => {
       const transaction = database.transaction(
@@ -131,6 +163,45 @@ export class BrowserSearchIndexStore {
     });
     return key;
   }
+  private run<T>(operation: () => Promise<T>): Promise<T> {
+    const startedAt = generation;
+    return serialize(async () => {
+      if (startedAt !== generation)
+        throw new Error("Private search was cancelled.");
+      if (cleanupPending) await deleteIndexDatabase();
+      return operation();
+    });
+  }
+
+  put(record: SearchShardRecord): Promise<void> {
+    return this.run(() => this.putRecord(record));
+  }
+  get(id: string): Promise<SearchShardRecord | null> {
+    return this.run(() => this.getRecord(id));
+  }
+  delete(id: string): Promise<void> {
+    return this.run(() => this.deleteRecord(id));
+  }
+  getOrCreateKey(): Promise<CryptoKey> {
+    return this.run(() => this.createKey());
+  }
+  readKey(): Promise<CryptoKey | null> {
+    return this.run(async () => {
+      const database = await this.getDatabase();
+      return new Promise<CryptoKey | null>((resolve, reject) => {
+        const transaction = database.transaction(
+          LOCAL_SEARCH_KEY_STORE_NAME,
+          "readonly",
+        );
+        const request = transaction
+          .objectStore(LOCAL_SEARCH_KEY_STORE_NAME)
+          .get(TITLE_INDEX_KEY_ID);
+        request.onsuccess = () =>
+          resolve((request.result as CryptoKey | undefined) ?? null);
+        request.onerror = () => reject(request.error);
+      });
+    });
+  }
 }
 
 export const TITLE_INDEX_SHARD_ID = TITLE_INDEX_RECORD_ID;
@@ -139,16 +210,25 @@ export function titleIndexAdditionalData(accountId: string): string {
   return `title:${accountId}`;
 }
 
-export function clearLocalSearchIndexDatabase(): Promise<void> {
+async function deleteIndexDatabase(): Promise<void> {
+  await Promise.allSettled([...stores].map((store) => store.close()));
   if (typeof indexedDB === "undefined") {
-    return Promise.resolve();
+    cleanupPending = false;
+    return;
   }
-
-  return new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const request = indexedDB.deleteDatabase(LOCAL_SEARCH_DB_NAME);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
     request.onblocked = () =>
       reject(new Error("Local private search index database is busy."));
   });
+  cleanupPending = false;
+}
+
+export function clearLocalSearchIndexDatabase(): Promise<void> {
+  invalidatePrivateSearch();
+  generation += 1;
+  cleanupPending = true;
+  return serialize(deleteIndexDatabase);
 }

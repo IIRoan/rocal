@@ -18,6 +18,8 @@ import {
 } from "./mail-runtime";
 import {
   getSimpleLoginForward,
+  runMailSendAction,
+  completeMailSendAttempt,
   resolveEncryptionInternalDomain,
   resolveMailboxMessagesPageSize,
   resolveMessageReplyFrom,
@@ -30,6 +32,7 @@ import {
   type MailSearchFieldValues,
   type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
+import { getPrimaryMailAccountId } from "./jmap-client";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
 import { searchMailboxLocally } from "../search/local-mail-search";
 import { createMailSealer } from "./outgoing-message-crypto";
@@ -133,9 +136,9 @@ export function useMailboxMessages(
   const queryClient = useQueryClient();
   const pageSize = runtime?.mailServerPolicy
     ? resolveMailboxMessagesPageSize(
-      runtime.mailServerPolicy,
-      MAILBOX_MESSAGES_PAGE_SIZE,
-    )
+        runtime.mailServerPolicy,
+        MAILBOX_MESSAGES_PAGE_SIZE,
+      )
     : MAILBOX_MESSAGES_PAGE_SIZE;
 
   return useInfiniteQuery({
@@ -148,10 +151,7 @@ export function useMailboxMessages(
       if (!cached || !("pages" in cached)) {
         return undefined;
       }
-      return cached as InfiniteData<
-        MailboxMessagesPage,
-        number
-      >;
+      return cached as InfiniteData<MailboxMessagesPage, number>;
     },
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
@@ -206,9 +206,18 @@ export function useMailboxFieldSearch(
       if (!runtime || !mailboxId || !search) {
         throw new Error("Your mailbox is not connected.");
       }
-      const local = await searchMailboxLocally({ runtime, mailboxId, ...search });
+      const local = await searchMailboxLocally({
+        runtime,
+        mailboxId,
+        ...search,
+      });
       if (local) {
-        return { messages: sortMessagesByDate(local), total: local.length, position: 0 };
+        return {
+          messages: sortMessagesByDate(local.messages),
+          total: local.messages.length,
+          position: 0,
+          coverage: local.coverage,
+        };
       }
       const { messages, total } =
         await runtime.client.searchMailboxMessagesWithFilter(
@@ -218,14 +227,23 @@ export function useMailboxFieldSearch(
           pageSize,
           pageParam,
         );
-      return { messages: sortMessagesByDate(messages), total, position: pageParam };
+      return {
+        messages: sortMessagesByDate(messages),
+        total,
+        position: pageParam,
+        coverage: null,
+      };
     },
     getNextPageParam: (lastPage) => {
       const next = lastPage.position + lastPage.messages.length;
       if (!lastPage.messages.length) return undefined;
       return lastPage.total > 0
-        ? (next < lastPage.total ? next : undefined)
-        : (lastPage.messages.length >= pageSize ? next : undefined);
+        ? next < lastPage.total
+          ? next
+          : undefined
+        : lastPage.messages.length >= pageSize
+          ? next
+          : undefined;
     },
   });
 }
@@ -253,7 +271,8 @@ export function useMailMessage(
 ) {
   const listCopy = useCachedMessage(messageId);
   // List rows hold no body text and snapshot copies may be capped; the reader always gets the full message.
-  const cached = listCopy && !hasIncompleteBody(listCopy) ? listCopy : undefined;
+  const cached =
+    listCopy && !hasIncompleteBody(listCopy) ? listCopy : undefined;
   return useQuery<JmapEmailMessage | null>({
     queryKey: QUERY_KEYS.mailMessage(messageId),
     enabled: Boolean(messageId) && (Boolean(cached) || Boolean(runtime)),
@@ -494,7 +513,11 @@ export function useMailMutations(
   });
 
   const setMessageLabel = useMutation({
-    mutationFn: (input: { messageId: string; labelId: string; assigned: boolean }) => {
+    mutationFn: (input: {
+      messageId: string;
+      labelId: string;
+      assigned: boolean;
+    }) => {
       const rt = requireRuntime();
       return rt.client.setMessageLabel(
         rt.session,
@@ -588,11 +611,7 @@ export function useMailMutations(
       );
     },
     onMutate: (input) =>
-      beginOptimisticMove(
-        queryClient,
-        input.messageIds,
-        input.targetMailboxId,
-      ),
+      beginOptimisticMove(queryClient, input.messageIds, input.targetMailboxId),
     onError: (_error, _input, snapshot) =>
       rollbackOptimisticMove(queryClient, snapshot),
     onSettled: (_data, _error, _input, snapshot) =>
@@ -641,6 +660,11 @@ export function useMailMutations(
 }
 
 export interface ComposeMessageInput {
+  sendScope: string;
+  contentFingerprint?: string;
+  isCurrent?: () => boolean;
+  isUiCurrent?: () => boolean;
+  getCurrentDraftId?: () => string | null;
   to: string[];
   cc?: string[];
   bcc?: string[];
@@ -651,6 +675,7 @@ export interface ComposeMessageInput {
   previousDraftId?: string | null;
   attachments?: JmapAttachmentInput[];
   pgpMimeCiphertext?: JmapPgpMimeCiphertext;
+  pgpMimeMessage?: string;
   sentCopyCiphertext: JmapPgpMimeCiphertext | null;
   inReplyTo?: string[];
   references?: string[];
@@ -734,26 +759,40 @@ export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
           ? resolveComposeContext(runtime, replyFrom.identityId)
           : null;
         if (!context) {
-          throw new Error("Could not find the address this message was sent to.");
+          throw new Error(
+            "Could not find the address this message was sent to.",
+          );
         }
-        await runtime.client.ensureEncryptOnAppendDisabled(runtime.session);
-        await runtime.client.sendMessage(runtime.session, {
-          draftsMailboxId: context.draftsMailboxId,
-          sentMailboxId: context.sentMailboxId,
-          fromEmail: context.fromEmail,
-          fromName: context.fromName,
-          to: [action.target.to],
-          subject: action.target.subject,
-          textBody: action.target.body,
-          identityId: context.identityId,
-          sentCopyCiphertext: await sealMailForSelf(
-            { text: action.target.body },
-            await createMailSealer(runtime),
-          ),
+        const target = action.target;
+        const accountId = getPrimaryMailAccountId(runtime.session);
+        if (!accountId) throw new Error("Your mailbox is not connected.");
+        await runMailSendAction(accountId, `simplelogin:${message.id}`, async (sendScope, isActionCurrent) => {
+          await runtime.client.ensureEncryptOnAppendDisabled(runtime.session);
+          const sealer = await createMailSealer(runtime);
+          const sentCopyCiphertext = await sealMailForSelf({ text: target.body }, sealer);
+          if (!isActionCurrent()) throw new Error("This mail action was closed before sending.");
+          await runtime.client.sendMessage(runtime.session, {
+            isCurrent: sealer.isCurrent,
+            sendScope,
+            draftsMailboxId: context.draftsMailboxId,
+            sentMailboxId: context.sentMailboxId,
+            fromEmail: context.fromEmail,
+            fromName: context.fromName,
+            to: [target.to],
+            subject: target.subject,
+            textBody: target.body,
+            identityId: context.identityId,
+            sentCopyCiphertext,
+          });
         });
       }
       await runtime.client
-        .setMessageKeyword(runtime.session, message.id, SIMPLELOGIN_DONE_KEYWORD, true)
+        .setMessageKeyword(
+          runtime.session,
+          message.id,
+          SIMPLELOGIN_DONE_KEYWORD,
+          true,
+        )
         .catch(() => undefined);
       return { action, mode };
     },
@@ -793,6 +832,11 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
       }
 
       return refreshedRuntime.client.sendMessage(refreshedRuntime.session, {
+        sendScope: input.sendScope,
+        contentFingerprint: input.contentFingerprint,
+        isCurrent: input.isCurrent,
+        isUiCurrent: input.isUiCurrent,
+        getCurrentDraftId: input.getCurrentDraftId,
         draftsMailboxId: context.draftsMailboxId,
         sentMailboxId: context.sentMailboxId,
         fromEmail: context.fromEmail,
@@ -807,12 +851,15 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
         previousDraftId: input.previousDraftId ?? undefined,
         attachments: input.attachments,
         pgpMimeCiphertext: input.pgpMimeCiphertext,
+        pgpMimeMessage: input.pgpMimeMessage,
         sentCopyCiphertext: input.sentCopyCiphertext,
         inReplyTo: input.inReplyTo,
         references: input.references,
       });
     },
     onSuccess: (_data, variables) => {
+      if (runtime) completeMailSendAttempt(getPrimaryMailAccountId(runtime.session), variables.sendScope);
+      if (variables.isUiCurrent && !variables.isUiCurrent()) return;
       const draftId = variables.previousDraftId?.trim();
       if (draftId) {
         const lists = queryClient.getQueriesData<MailboxMessagesCacheData>({
@@ -828,7 +875,9 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
             queryClient.setQueryData(key, updated);
           }
         }
-        queryClient.removeQueries({ queryKey: QUERY_KEYS.mailMessage(draftId) });
+        queryClient.removeQueries({
+          queryKey: QUERY_KEYS.mailMessage(draftId),
+        });
       }
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mailMessagesAll() });
     },

@@ -1,4 +1,6 @@
+import { MAIL_KEY_CONTINUITY_ENABLED } from "@workspace/calendar-core";
 import { useQuery } from "@tanstack/react-query";
+import { limitMailDisplayContent } from "@workspace/calendar-core/mail-mime-limits";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { useMailMessage, useMailRuntime } from "../lib/mail/use-mail";
 import {
@@ -41,7 +43,7 @@ export function useMailMessageContent(messageId: string) {
     queryKey: QUERY_KEYS.mailDecrypted(messageId),
     enabled: isEncrypted && Boolean(runtime) && Boolean(message),
     retry: 1,
-    staleTime: Infinity,
+    staleTime: MAIL_KEY_CONTINUITY_ENABLED ? 60_000 : Infinity,
     gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (!runtime || !message)
@@ -62,15 +64,14 @@ export function useMailMessageContent(messageId: string) {
     decrypted: selectedDecryptedPreview,
   });
 
-  const htmlContent: string | null =
-    decryptResult?.html ?? (isEncrypted ? null : (bodies?.html ?? null));
-  const plainContent: string | null =
-    decryptResult?.plaintext ??
-    (isEncrypted ? null : (bodies?.text ?? null));
+  const { html: htmlContent, text: plainContent } = limitMailDisplayContent({
+    html: decryptResult?.html ?? (isEncrypted ? null : (bodies?.html ?? null)),
+    text: decryptResult?.plaintext ?? (isEncrypted ? null : (bodies?.text ?? null)),
+  });
   const isDecrypting =
     isEncrypted && (isDecryptLoading || isDecryptFetching);
   const decryptError = isEncrypted ? decryptQueryError : null;
-  const rawHtmlSource = decryptResult?.html ?? bodies?.html ?? null;
+  const rawHtmlSource = limitMailDisplayContent({ html: decryptResult?.html ?? bodies?.html ?? null }).html;
 
   const displayAttachments = resolveDisplayAttachments({
     encryption,

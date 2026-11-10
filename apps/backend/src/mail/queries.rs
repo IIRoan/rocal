@@ -4,9 +4,11 @@ use sea_orm::ActiveValue::{NotSet, Set, Unchanged};
 use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::sea_query::{Expr, ExprTrait, OnConflict};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QuerySelect,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect,
 };
 use serde_json::Value;
+use std::collections::HashSet;
 use time::PrimitiveDateTime;
 
 use crate::db::cuid;
@@ -15,6 +17,89 @@ use crate::db::entities::{
     user_settings,
 };
 use crate::instant;
+
+pub struct ProvisioningLock<'a> {
+    _connection: sea_orm::sqlx::PgConnection,
+    _permit: tokio::sync::SemaphorePermit<'a>,
+}
+
+pub async fn acquire_provisioning_lock<'a>(
+    state: &'a crate::state::AppState,
+    user_id: &str,
+) -> Result<ProvisioningLock<'a>, crate::error::AppError> {
+    let permit = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        state.mail_cache.lock_slots.acquire(),
+    )
+    .await
+    .map_err(|_| lock_busy())?
+    .map_err(|_| lock_busy())?;
+    lock_connection(state, user_id, permit, true)
+        .await?
+        .ok_or_else(lock_busy)
+}
+
+pub async fn try_maintenance_lock<'a>(
+    state: &'a crate::state::AppState,
+    user_id: &str,
+) -> Result<Option<ProvisioningLock<'a>>, crate::error::AppError> {
+    let Ok(permit) = state.mail_cache.maintenance_slots.try_acquire() else {
+        return Ok(None);
+    };
+    lock_connection(state, user_id, permit, false).await
+}
+
+fn lock_busy() -> crate::error::AppError {
+    crate::error::AppError::Upstream {
+        status: axum::http::StatusCode::SERVICE_UNAVAILABLE,
+        message: "Mailbox preparation is busy. Try again shortly.".into(),
+    }
+}
+
+async fn lock_connection<'a>(
+    state: &crate::state::AppState,
+    user_id: &str,
+    permit: tokio::sync::SemaphorePermit<'a>,
+    wait: bool,
+) -> Result<Option<ProvisioningLock<'a>>, crate::error::AppError> {
+    use sea_orm::sqlx::Connection;
+    use std::time::Duration;
+    // Dedicated connections keep waiting advisory locks outside the application's query pool.
+    let mut connection = tokio::time::timeout(
+        Duration::from_secs(5),
+        sea_orm::sqlx::PgConnection::connect(&state.config.database_url),
+    )
+    .await
+    .map_err(|_| lock_busy())?
+    .map_err(|_| lock_busy())?;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let acquired: bool = tokio::time::timeout(
+            Duration::from_secs(1),
+            sea_orm::sqlx::query_scalar(
+                "SELECT pg_try_advisory_lock(hashtextextended($1, 110013))",
+            )
+            .bind(user_id)
+            .fetch_one(&mut connection),
+        )
+        .await
+        .map_err(|_| lock_busy())?
+        .map_err(|_| lock_busy())?;
+        if acquired {
+            return Ok(Some(ProvisioningLock {
+                _connection: connection,
+                _permit: permit,
+            }));
+        }
+        if !wait {
+            return Ok(None);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(lock_busy());
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
 
 /// What provisioning writes to an entry and its vault.
 pub struct Provisioned<'a> {
@@ -43,6 +128,44 @@ pub struct Vault {
     pub kdf_parallelism: i32,
     pub wrapped_secret: String,
     pub wrap_algorithm: Option<String>,
+}
+
+pub async fn directory_account_ids<C: ConnectionTrait>(
+    db: &C,
+    ids: &[String],
+) -> Result<HashSet<String>, DbErr> {
+    if ids.len() > 10_000 {
+        return Err(DbErr::Custom(
+            "Mail account inventory exceeds its bounded limit".into(),
+        ));
+    }
+    let mut known = HashSet::new();
+    for page in ids.chunks(1000) {
+        let found: Vec<String> = mail_directory_entry::Entity::find()
+            .select_only()
+            .column(mail_directory_entry::Column::StalwartAccountId)
+            .filter(mail_directory_entry::Column::StalwartAccountId.is_in(page.iter().cloned()))
+            .into_tuple()
+            .all(db)
+            .await?;
+        known.extend(found);
+    }
+    Ok(known)
+}
+
+pub async fn maintenance_entries<C: ConnectionTrait>(
+    db: &C,
+    cursor: Option<&str>,
+) -> Result<Vec<mail_directory_entry::Model>, DbErr> {
+    let mut query = mail_directory_entry::Entity::find();
+    if let Some(cursor) = cursor {
+        query = query.filter(mail_directory_entry::Column::Id.gt(cursor));
+    }
+    query
+        .order_by_asc(mail_directory_entry::Column::Id)
+        .limit(101)
+        .all(db)
+        .await
 }
 
 pub async fn entry_by_user<C: ConnectionTrait>(

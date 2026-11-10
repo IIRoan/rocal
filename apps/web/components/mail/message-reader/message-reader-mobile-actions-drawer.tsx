@@ -5,11 +5,9 @@ import {
   ChevronLeft,
   ChevronRight,
   FolderInput,
-  Forward,
   Inbox,
   MailOpen,
   OctagonAlert,
-  Reply,
   Tag,
   Trash2,
 } from "lucide-react";
@@ -26,6 +24,7 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
 import { LabelPickerPanel } from "../label-picker-panel";
+import { MessageReaderReplyActions } from "./message-reader-reply-actions";
 import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 import type {
   MessageReaderController,
@@ -51,6 +50,7 @@ export function MessageReaderMobileActionsDrawer({
     onNavigatePrev,
     onNavigateNext,
     onReply,
+    onReplyAll,
     onForward,
     onArchive,
     onMarkAsUnread,
@@ -135,36 +135,13 @@ export function MessageReaderMobileActionsDrawer({
                   Next message
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  onReply();
-                  dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
-                }}
+              <MessageReaderReplyActions
+                onReply={onReply}
+                onReplyAll={onReplyAll}
+                onForward={onForward}
                 disabled={!canReply}
-                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
-              >
-                <Reply
-                  className="size-4 text-muted-foreground"
-                  strokeWidth={2.25}
-                />
-                Reply
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onForward();
-                  dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } });
-                }}
-                disabled={!canReply}
-                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-hover/40 active:bg-hover/60 disabled:opacity-40"
-              >
-                <Forward
-                  className="size-4 text-muted-foreground"
-                  strokeWidth={2.25}
-                />
-                Forward
-              </button>
+                onClose={() => dispatchChrome({ type: "patch", patch: { moreActionsOpen: false } })}
+              />
               {onArchive && (
                 <button
                   type="button"

@@ -7,7 +7,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { TitleIndexDocument } from "@workspace/calendar-core";
+import { unknownPrivateSearchCoverage } from "@workspace/calendar-core";
+import {
+  capturePrivateSearchRequest,
+  invalidatePrivateSearch,
+} from "@/lib/search/private-index-lifecycle";
+import type { PrivateTitleIndexSnapshot } from "@/lib/search/private-title-index";
 import { createLogger } from "@workspace/logger";
 import { PRIVATE_CONTENT_INDEX_ENABLED_KEY } from "@/lib/search/private-index-flags";
 import { useSession } from "@/lib/auth-client";
@@ -47,11 +52,13 @@ export function usePrivateTitleIndex() {
     getServerEncryptionSession,
   );
   const [flags, setFlags] = useState(readIndexFlags);
-  const [documents, setDocuments] = useState<TitleIndexDocument[]>([]);
+  const [snapshot, setSnapshot] = useState<{
+    session: typeof encryptionSession;
+    value: PrivateTitleIndexSnapshot;
+  } | null>(null);
   const [isIndexing, setIsIndexing] = useState(false);
-  const [indexedAt, setIndexedAt] = useState<string | null>(null);
   const [pendingBodies, setPendingBodies] = useState(0);
-  const inFlightRef = useRef(false);
+  const inFlightRef = useRef<object | null>(null);
 
   const canIndex =
     Boolean(accountId) &&
@@ -60,7 +67,12 @@ export function usePrivateTitleIndex() {
     encryptionSession?.userId === accountId;
 
   useEffect(() => {
-    const syncFlags = () => setFlags(readIndexFlags());
+    const syncFlags = () => {
+      invalidatePrivateSearch();
+      inFlightRef.current = null;
+      setIsIndexing(false);
+      setFlags(readIndexFlags());
+    };
     window.addEventListener(PRIVATE_SEARCH_INDEX_CHANGE_EVENT, syncFlags);
     window.addEventListener("storage", syncFlags);
     return () => {
@@ -70,33 +82,32 @@ export function usePrivateTitleIndex() {
   }, []);
 
   const refreshFromStore = async () => {
-    if (!accountId) {
-      setDocuments([]);
-      setIndexedAt(null);
-      return;
-    }
-    const snapshot = await loadPrivateTitleIndex(accountId);
-    setDocuments(snapshot.documents);
-    setIndexedAt(snapshot.indexedAt);
+    if (!accountId || !encryptionSession) return;
+    const owner = encryptionSession;
+    const request = capturePrivateSearchRequest(accountId);
+    const value = await loadPrivateTitleIndex(accountId);
+    if (request.isCurrent() && getActiveE2eeSession() === owner)
+      setSnapshot({ session: owner, value });
   };
 
   const rebuild = async () => {
     if (!accountId || !canIndex || inFlightRef.current) return;
-    inFlightRef.current = true;
+    const request = {};
+    const guard = capturePrivateSearchRequest(accountId);
+    inFlightRef.current = request;
     setIsIndexing(true);
+    const current = () => inFlightRef.current === request && guard.isCurrent();
     const indexTitles = async () => {
-      const snapshot = await rebuildPrivateTitleIndex({ accountId });
-      setDocuments(snapshot.documents);
-      setIndexedAt(snapshot.indexedAt);
-      // Only chase the backlog while passes make progress, so a locked vault cannot loop.
-      setPendingBodies(snapshot.loadedBodies > 0 ? snapshot.pendingBodies : 0);
+      const value = await rebuildPrivateTitleIndex({ accountId, isCurrent: current });
+      if (!current()) return;
+      setSnapshot({ session: guard.session, value });
+      setPendingBodies(value.loadedBodies > 0 ? value.pendingBodies : 0);
     };
-    await indexTitles().catch(async () => {
-      // A failed index read only delays this pass, and the flags below must reset either way.
-      await refreshFromStore().catch(() => undefined);
-    });
-    inFlightRef.current = false;
-    setIsIndexing(false);
+    await indexTitles().catch(() => undefined);
+    if (inFlightRef.current === request) {
+      inFlightRef.current = null;
+      setIsIndexing(false);
+    }
   };
 
   const refreshIndex = useEffectEvent(() => refreshFromStore());
@@ -125,6 +136,7 @@ export function usePrivateTitleIndex() {
 
     return () => {
       cancelled = true;
+      inFlightRef.current = null;
       window.clearInterval(interval);
     };
   }, [accountId, canIndex, flags.enabled]);
@@ -139,12 +151,19 @@ export function usePrivateTitleIndex() {
     return () => window.clearTimeout(timeout);
   }, [canIndex, isIndexing, pendingBodies]);
 
-  const indexActive = Boolean(accountId) && flags.enabled;
+  const indexActive =
+    Boolean(accountId) &&
+    flags.enabled &&
+    encryptionSession !== null &&
+    snapshot?.session === encryptionSession;
 
   return {
-    documents: indexActive ? documents : [],
+    documents: indexActive ? snapshot.value.documents : [],
+    coverage: indexActive
+      ? snapshot.value.coverage
+      : unknownPrivateSearchCoverage(),
     isIndexing,
-    indexedAt: indexActive ? indexedAt : null,
+    indexedAt: indexActive ? snapshot.value.indexedAt : null,
     enabled: canIndex,
     rebuild,
   };

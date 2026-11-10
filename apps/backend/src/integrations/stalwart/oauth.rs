@@ -3,6 +3,9 @@ use url::Url;
 
 use crate::mail::bridge::Pkce;
 
+pub const MAIL_BRIDGE_SCOPES: &str =
+    "urn:ietf:params:oauth:scope:mail urn:stalwart:oauth:scope:settings";
+
 pub fn login_request(
     account_name: &str,
     account_secret: &str,
@@ -17,7 +20,7 @@ pub fn login_request(
             ("redirect_uri", redirect_uri),
             ("response_type", "code"),
             ("state", state),
-            ("scope", "urn:ietf:params:oauth:scope:mail"),
+            ("scope", MAIL_BRIDGE_SCOPES),
             ("code_challenge", pkce.challenge.as_str()),
             ("code_challenge_method", "S256"),
         ])

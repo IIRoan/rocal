@@ -1,3 +1,4 @@
+import { activateSessionData, suspendSessionData } from "@workspace/native-core/lib/session-data-lifecycle";
 import {
   decryptMailMessage,
   decryptPgpMimeMessage,
@@ -143,6 +144,8 @@ describe("resolveSenderVerificationKey", () => {
 
 describe("decryptEncryptedMessage", () => {
   beforeEach(() => {
+    activateSessionData("synthetic-user");
+    clearSenderKeyCache();
     jest.clearAllMocks();
     (getRecipientKey as jest.Mock).mockResolvedValue({
       publicKeyArmored: "bob-public-key",
@@ -196,4 +199,17 @@ describe("decryptEncryptedMessage", () => {
       "bob-public-key",
     );
   });
+});
+
+it("never returns native decrypted content after its account changes during download", async () => {
+  activateSessionData("synthetic-user"); clearSenderKeyCache(); jest.clearAllMocks();
+  let entered: (() => void) | undefined; let resume: ((value: string) => void) | undefined;
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  (classifyMessageEncryption as jest.Mock).mockReturnValue("inline_pgp");
+  (getRecipientKey as jest.Mock).mockResolvedValue({ publicKeyArmored: "bob-public-key" });
+  (resolveInlinePgpArmoredCiphertext as jest.Mock).mockImplementationOnce(() => { entered?.(); return new Promise<string>((resolve) => { resume = resolve; }); });
+  const runtime = createRuntime({ identities: [] });
+  const pending = decryptEncryptedMessage(runtime, { id: "synthetic-message", from: [{ email: "bob@solace.onl" }] });
+  const rejected = expect(pending).rejects.toThrow("session changed"); await started; suspendSessionData(); activateSessionData("other-synthetic-user"); resume?.("SYNTHETIC-ciphertext"); await rejected;
+  expect(decryptMailMessage).not.toHaveBeenCalled();
 });

@@ -4,11 +4,15 @@ import {
   useEffect,
   useReducer,
   useRef,
+  useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
 import { toast } from "@workspace/ui/lib/toast";
 import {
+  createMailSendSessionId,
+  createMailSendScopeLifetime,
+  discardMailSendAttempt,
   hasComposeUserContent,
   type ComposeTextFields,
   type MailServerLimits,
@@ -53,11 +57,11 @@ import {
 function hasSavableContent(draft: ComposeDraft): boolean {
   return Boolean(
     draft.to.trim() ||
-      draft.cc.trim() ||
-      draft.bcc.trim() ||
-      draft.subject.trim() ||
-      draft.body.trim() ||
-      draft.htmlBody.trim(),
+    draft.cc.trim() ||
+    draft.bcc.trim() ||
+    draft.subject.trim() ||
+    draft.body.trim() ||
+    draft.htmlBody.trim(),
   );
 }
 
@@ -102,11 +106,14 @@ export function useMailComposeController({
       selectedIdentityId: identities[0]?.id ?? null,
     }),
   );
+  const sendSessionIdRef = useRef<string | null>(null);
   const draftIdRef = useRef<string | null>(null);
   const baselineRef = useRef<ComposeSnapshot | null>(null);
   const seedTextRef = useRef<ComposeTextFields | null>(null);
   const explicitCloseRef = useRef(false);
   const closingRef = useRef(false);
+  const [sendLifetime] = useState(createMailSendScopeLifetime);
+  useEffect(() => sendLifetime.activate(() => sendSessionIdRef.current ? `compose:${sendSessionIdRef.current}` : null), [sendLifetime]);
 
   const resolvedIdentityId =
     state.selectedIdentityId &&
@@ -173,6 +180,7 @@ export function useMailComposeController({
   };
 
   const closeCompose = (afterClose?: () => void) => {
+    if (sendSessionIdRef.current) discardMailSendAttempt(`compose:${sendSessionIdRef.current}`);
     getComposeCloseActionsRef().current?.dismiss();
     afterClose?.();
   };
@@ -186,7 +194,8 @@ export function useMailComposeController({
       id: "compose-draft-saved",
       action: {
         label: "Open",
-        onClick: () => getComposeCloseActionsRef().current?.openDraft?.(draftId),
+        onClick: () =>
+          getComposeCloseActionsRef().current?.openDraft?.(draftId),
       },
       cancel: { label: "Discard", onClick: () => discardDraft(draftId) },
     });
@@ -248,6 +257,8 @@ export function useMailComposeController({
   };
 
   const resetDraftRefs = () => {
+    if (sendSessionIdRef.current) discardMailSendAttempt(`compose:${sendSessionIdRef.current}`);
+    sendSessionIdRef.current = createMailSendSessionId();
     draftIdRef.current = null;
     baselineRef.current = null;
     seedTextRef.current = null;
@@ -333,7 +344,11 @@ export function useMailComposeController({
     });
   };
 
-  const seedReply = (message: JmapEmailMessage, plaintext: string | null) => {
+  const seedReply = (
+    message: JmapEmailMessage,
+    plaintext: string | null,
+    mode: "reply" | "reply-all" = "reply",
+  ) => {
     applySeed(
       buildReplySeed(
         message,
@@ -341,6 +356,7 @@ export function useMailComposeController({
         identities,
         resolvedIdentityId,
         quoteDateOptions,
+        mode,
       ),
     );
   };
@@ -418,6 +434,10 @@ export function useMailComposeController({
   useEffect(() => {
     composeBridgeRef.current = {
       getDraft: () => draftRef.current,
+      getComposeSessionId: () => {
+        if (!sendSessionIdRef.current) sendSessionIdRef.current = createMailSendSessionId();
+        return sendSessionIdRef.current;
+      },
       resetDraft,
       clearCompose,
       openNewCompose,

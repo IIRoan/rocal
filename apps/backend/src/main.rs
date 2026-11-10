@@ -39,10 +39,14 @@ async fn run(config: Config) -> anyhow::Result<()> {
         .config
         .mail_receipt_polling
         .then(|| realtime::start(state.clone()));
+    let mail_maintenance = Some(solace_server::mail::maintenance::start(state.clone()));
     let stopping = state.clone();
     let shutdown = async move {
         shutdown_signal().await;
-        for task in [calendar_sync, receipt_poll].into_iter().flatten() {
+        for task in [calendar_sync, receipt_poll, mail_maintenance]
+            .into_iter()
+            .flatten()
+        {
             task.abort();
         }
         realtime::stop(&stopping);

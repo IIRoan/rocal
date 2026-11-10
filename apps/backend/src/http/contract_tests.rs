@@ -328,6 +328,7 @@ fn checked() -> Vec<(String, Vec<String>)> {
         check::<events::InvitationByExternalIdQuery>(),
         check::<account::InviteTokenQuery>(),
         check::<mail::MailBootstrapRequest>(),
+        check::<mail::PutMailTrustRequest>(),
         check::<mail::MailSyncQuery>(),
         check::<mail::MailVaultBackupRequest>(),
         check::<e2ee::PasswordEnvelopeRequest>(),

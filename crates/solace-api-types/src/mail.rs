@@ -261,3 +261,21 @@ pub struct StalwartWebhookError {
     pub error: String,
     pub message: String,
 }
+
+/// The account's opaque encrypted correspondent-key history.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MailTrust {
+    #[schema(required = true, max_length = 1_400_000)]
+    pub encrypted_trust: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PutMailTrustRequest {
+    #[schema(min_length = 1, max_length = 1_400_000)]
+    pub encrypted_trust: String,
+    #[serde(deserialize_with = "Option::deserialize")]
+    #[schema(required = true, max_length = 1_400_000)]
+    pub expected_encrypted_trust: Option<String>,
+}

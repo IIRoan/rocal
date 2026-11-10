@@ -91,6 +91,10 @@ impl ActiveModelBehavior for entities::passkey::ActiveModel {}
 
 impl ActiveModelBehavior for entities::rate_limit::ActiveModel {}
 
+impl ActiveModelBehavior for entities::mail_policy_monitor::ActiveModel {}
+
+impl ActiveModelBehavior for entities::user_mail_trust::ActiveModel {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -165,7 +165,7 @@ pub async fn stalwart_account(app: &TestApp, account_id: &str) -> Option<Value> 
     let reply = app
         .stalwart_admin(
             &REGISTRY,
-            json!([["x:Account/get", {"ids": [account_id], "properties": ["id", "name", "emailAddress", "encryptionAtRest"]}, "a"]]),
+            json!([["x:Account/get", {"ids": [account_id], "properties": ["id", "name", "emailAddress", "encryptionAtRest", "description", "permissions"]}, "a"]]),
         )
         .await;
     reply["methodResponses"][0][1]["list"].get(0).cloned()

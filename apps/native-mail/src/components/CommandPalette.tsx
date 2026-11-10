@@ -1,3 +1,4 @@
+import { privateSearchCoverageText } from "@workspace/calendar-core";
 import { useEffect, useRef, useState } from "react";
 import { type TextInputInstance } from "react-native";
 import { useRouter } from "expo-router";
@@ -119,7 +120,14 @@ export function CommandPalette() {
         />
 
         {results.length > 0 ? (
-          <SheetSection title="Messages">
+          <SheetSection
+            title="Messages"
+            footer={
+              titleIndex.enabled
+                ? privateSearchCoverageText(titleIndex.coverage)
+                : undefined
+            }
+          >
             <SheetGroup>
               {results.map((result) => (
                 <SheetItem
@@ -144,13 +152,21 @@ export function CommandPalette() {
         ) : searching ? (
           <SheetCenteredState loading message="Searching…" />
         ) : (
-          <SheetCenteredState
-            message={
-              titleIndex.pendingBodies > 0
-                ? `No matches yet. Still indexing message text (${titleIndex.pendingBodies} left).`
-                : "No matching messages."
+          <SheetSection
+            footer={
+              titleIndex.enabled
+                ? privateSearchCoverageText(titleIndex.coverage)
+                : undefined
             }
-          />
+          >
+            <SheetCenteredState
+              message={
+                titleIndex.pendingBodies > 0
+                  ? `No matches yet. Still indexing message text (${titleIndex.pendingBodies} left).`
+                  : "No matches in indexed mail."
+              }
+            />
+          </SheetSection>
         )}
       </SheetScroll>
     </BottomSheet>

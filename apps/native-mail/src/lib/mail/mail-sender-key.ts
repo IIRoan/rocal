@@ -1,7 +1,14 @@
 import {
-  getEmailDomain,
+  captureSessionDataScope,
+  isSessionDataScopeCurrent,
+} from "@workspace/native-core/lib/session-data-lifecycle";
+import {
   normalizeEmailAddress,
-  resolveEncryptionInternalDomain,
+  MAIL_KEY_CONTINUITY_ENABLED,
+  MailTrustBlockedError,
+  type MailSenderVerification,
+  resolveMailSenderKeySource,
+  collectOwnMailAddresses,
 } from "@workspace/calendar-core";
 import { getRecipientKey } from "./mail-api";
 import {
@@ -40,38 +47,70 @@ function lookupDirectoryKey(email: string): Promise<string | undefined> {
 }
 
 /** Best-effort sender key so decrypt can verify signatures, not only unwrap. */
+export async function resolveSenderVerification(
+  runtime: MailRuntime,
+  senderEmail: string | undefined,
+): Promise<MailSenderVerification> {
+  const email = senderEmail ? normalizeEmailAddress(senderEmail) : "";
+  if (!email) {
+    return { senderKeyTrustState: { kind: "not_applicable" } };
+  }
+
+  const source = resolveMailSenderKeySource({
+    senderEmail: email,
+    ownAddresses: collectOwnMailAddresses([
+      runtime.session.username,
+      ...runtime.identities.map((identity) => identity.email),
+    ]),
+    internalDomain: runtime.config.defaultDomain,
+  });
+
+  if (source === "self") {
+    try {
+      const unlocked = await ensureVaultLoaded(runtime);
+      return {
+        senderPublicKeyArmored: unlocked.vault.publicKeyArmored,
+        senderKeyTrustState: { kind: "self" },
+      };
+    } catch {
+      return {
+        senderKeyTrustState: { kind: "unavailable", reason: "history" },
+      };
+    }
+  }
+
+  if (source !== "directory")
+    return { senderKeyTrustState: { kind: "not_applicable" } };
+
+  if (MAIL_KEY_CONTINUITY_ENABLED) {
+    const scope = captureSessionDataScope();
+    const { inspectPinnedMailSender } = await import("./mail-trust");
+    if (!isSessionDataScopeCurrent(scope))
+      throw new Error("Mail encryption session changed.");
+    const result = await inspectPinnedMailSender(runtime, email, async () => {
+      const key = await lookupDirectoryKey(email);
+      if (!key) throw new Error("Sender key is unavailable.");
+      return key;
+    }).catch((error: unknown): MailSenderVerification => {
+      if (error instanceof MailTrustBlockedError)
+        return {
+          senderKeyTrustState: { kind: "unavailable", reason: "history" },
+        };
+      throw error;
+    });
+    if (!isSessionDataScopeCurrent(scope))
+      throw new Error("Mail encryption session changed.");
+    return result;
+  }
+  return { senderPublicKeyArmored: await lookupDirectoryKey(email) };
+}
+
 export async function resolveSenderVerificationKey(
   runtime: MailRuntime,
   senderEmail: string | undefined,
 ): Promise<string | undefined> {
-  const email = senderEmail ? normalizeEmailAddress(senderEmail) : "";
-  if (!email) {
-    return undefined;
-  }
-
-  const selfEmails = new Set(
-    [runtime.session.username, ...runtime.identities.map((identity) => identity.email)]
-      .filter((value): value is string => Boolean(value))
-      .map((value) => normalizeEmailAddress(value)),
-  );
-
-  if (selfEmails.has(email)) {
-    try {
-      const unlocked = await ensureVaultLoaded(runtime);
-      return unlocked.vault.publicKeyArmored;
-    } catch {
-      return undefined;
-    }
-  }
-
-  const internalDomain = resolveEncryptionInternalDomain(
-    runtime.config.defaultDomain,
-  );
-  if (!internalDomain || getEmailDomain(email) !== internalDomain) {
-    return undefined;
-  }
-
-  return lookupDirectoryKey(email);
+  return (await resolveSenderVerification(runtime, senderEmail))
+    .senderPublicKeyArmored;
 }
 
 /** Decrypt an encrypted JMAP message and verify the sender signature when possible. */
@@ -79,10 +118,18 @@ export async function decryptEncryptedMessage(
   runtime: MailRuntime,
   message: JmapEmailMessage,
 ): Promise<MailDecryptResult> {
-  const senderPublicKeyArmored = await resolveSenderVerificationKey(
+  const scope = captureSessionDataScope();
+  const assertCurrent = () => {
+    if (!isSessionDataScopeCurrent(scope))
+      throw new Error("Mail encryption session changed.");
+  };
+  assertCurrent();
+  const verification = await resolveSenderVerification(
     runtime,
     message.from?.[0]?.email,
   );
+  assertCurrent();
+  const senderPublicKeyArmored = verification.senderPublicKeyArmored;
   const encryption = classifyMessageEncryption(message);
 
   if (encryption === "inline_pgp") {
@@ -91,21 +138,26 @@ export async function decryptEncryptedMessage(
       fetchBlob: (blobId) =>
         runtime.client.getBlobAsText(runtime.session, blobId),
     });
-    return decryptMailMessage(
+    assertCurrent();
+    const result = await decryptMailMessage(
       runtime,
       message.id,
       armoredMessage,
       senderPublicKeyArmored,
     );
+    assertCurrent();
+    return { ...result, senderKeyTrustState: verification.senderKeyTrustState };
   }
 
   if (encryption === "pgp_mime") {
-    return decryptPgpMimeMessage(
+    const result = await decryptPgpMimeMessage(
       runtime,
       message.id,
       message.bodyStructure,
       senderPublicKeyArmored,
     );
+    assertCurrent();
+    return { ...result, senderKeyTrustState: verification.senderKeyTrustState };
   }
 
   throw new Error(`Unsupported encryption type: ${encryption}`);

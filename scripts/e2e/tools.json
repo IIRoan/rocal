@@ -12,12 +12,12 @@
     "sha256": "91b4acb30e46884f46cffd69e283c33081e8cea13d0bf901c448dbf0eb50b710"
   },
   "stalwart-arm64": {
-    "url": "https://github.com/stalwartlabs/stalwart/releases/download/v1.0.0/stalwart-aarch64-apple-darwin.tar.gz",
-    "sha256": "38097ad18a61c20829a21d8b8fdc4b630e4f1b756d821175906cf75e32094a40"
+    "url": "https://github.com/stalwartlabs/stalwart/releases/download/v1.1.0/stalwart-aarch64-apple-darwin.tar.gz",
+    "sha256": "090758af021014c830661ec17c7b5467db1e911de17956361ee6b27551487325"
   },
   "stalwart-x86_64": {
-    "url": "https://github.com/stalwartlabs/stalwart/releases/download/v1.0.0/stalwart-x86_64-apple-darwin.tar.gz",
-    "sha256": "571a41db3e963f290e2990a3a545560dd52e7638945393bea56aa1efe9fe0713"
+    "url": "https://github.com/stalwartlabs/stalwart/releases/download/v1.1.0/stalwart-x86_64-apple-darwin.tar.gz",
+    "sha256": "1e68836b98c2599cd72dbefd7f501e598f760a533f6bc27127535fd1bcd45840"
   },
   "stalwart-cli-arm64": {
     "url": "https://github.com/stalwartlabs/cli/releases/download/v1.0.14/stalwart-cli-aarch64-apple-darwin.tar.xz",

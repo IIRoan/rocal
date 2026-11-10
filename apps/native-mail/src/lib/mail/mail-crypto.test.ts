@@ -1,3 +1,7 @@
+import {
+  activateSessionData,
+  closeSessionData,
+} from "@workspace/native-core/lib/session-data-lifecycle";
 /**
  * Tests for mail-crypto.ts
  *
@@ -11,7 +15,7 @@
  * candidate ordering, cache behaviour, error propagation, and logging.
  */
 
-import { buildOutgoingMimeMessage } from "@workspace/calendar-core";
+import { buildOutgoingMimeMessage, resolveMailServerPolicy, MAX_PGP_DECRYPT_BYTES } from "@workspace/calendar-core";
 import {
   ensureVaultLoaded,
   decryptMailMessage,
@@ -111,6 +115,7 @@ jest.mock("openpgp", () => ({
 // Stub mail-mime-parser
 const mockParseMimeBody = jest.fn();
 jest.mock("./mail-mime-parser", () => ({
+  ...jest.requireActual("./mail-mime-parser"),
   parseMimeBody: (...args: unknown[]) => mockParseMimeBody(...args),
 }));
 
@@ -168,7 +173,6 @@ const MOCK_DECRYPTED_KEY = {
   getFingerprint: () => MOCK_VAULT.publicKeyFingerprint.toLowerCase(),
 } as any;
 
-import { resolveMailServerPolicy } from "@workspace/calendar-core";
 
 const mockGetBlobAsText = jest.fn();
 
@@ -221,10 +225,13 @@ function rejectedSignature(message: string): Promise<boolean> {
 
 describe("mail-crypto", () => {
   beforeEach(() => {
+    activateSessionData("u1");
     clearVaultCache();
     // resetAllMocks clears mock implementations AND the once-queue
     jest.resetAllMocks();
-    mockWrapVaultSecret.mockImplementation(async (secret) => `wrapped:${secret}`);
+    mockWrapVaultSecret.mockImplementation(
+      async (secret) => `wrapped:${secret}`,
+    );
     mockUnwrapVaultSecret.mockImplementation(async (wrapped) =>
       wrapped.replace(/^wrapped:/, ""),
     );
@@ -336,6 +343,35 @@ describe("mail-crypto", () => {
       expect(mockMailFetch).toHaveBeenCalledTimes(1);
     });
 
+    it("rejects a vault unlock completed after close and same-account sign-in", async () => {
+      const runtime = buildRuntime();
+      mockMailFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ...MOCK_VAULT_BACKUP, wrappedSecret: "wrapped:sealed-secret", wrapAlgorithm: "e2ee-account-key-v1" }) });
+      mockReadPrivateKey.mockResolvedValueOnce(MOCK_PRIVATE_KEY);
+      mockDecryptKey.mockResolvedValueOnce(MOCK_DECRYPTED_KEY);
+      let enter = () => undefined as void;
+      const entered = new Promise<void>((resolve) => {
+        enter = resolve;
+      });
+      let finish = () => undefined as void;
+      const original = mockUnlockVault.getMockImplementation();
+      mockUnlockVault.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            enter();
+            finish = () => resolve(MOCK_VAULT);
+          }),
+      );
+      const loading = ensureVaultLoaded(runtime);
+      const result = expect(loading).rejects.toThrow("session ended");
+      await entered;
+      await closeSessionData();
+      activateSessionData("u1");
+      finish();
+      await result;
+      expect(isVaultLoaded()).toBe(false);
+      mockUnlockVault.mockImplementation(original);
+    });
+
     it("sign-out releases a held unlock so waiters settle", async () => {
       mockMailFetch.mockResolvedValueOnce({
         ok: false,
@@ -347,7 +383,7 @@ describe("mail-crypto", () => {
       const pending = ensureVaultLoaded(buildRuntime());
       clearVaultCache();
 
-      await expect(pending).rejects.toThrow(/vault backup/i);
+      await expect(pending).rejects.toThrow(/session ended/i);
     });
 
     it("returns the cached vault on repeated calls (does not re-fetch)", async () => {
@@ -396,6 +432,7 @@ describe("mail-crypto", () => {
 
   describe("decryptMailMessage", () => {
     beforeEach(() => {
+      activateSessionData("u1");
       mockSuccessfulVaultLoad();
     });
 
@@ -442,6 +479,17 @@ describe("mail-crypto", () => {
 
       expect(result.plaintext).toBe("Hello world");
       expect(result.html).toBe("<p>Hello <strong>world</strong></p>");
+    });
+
+    it("marks an inline HTML-only MIME fallback as unsuitable for draft editing", async () => {
+      const mime = "Content-Type: text/html\r\n\r\n<p>HTML only</p>";
+      mockReadMessage.mockResolvedValueOnce({});
+      mockDecrypt.mockResolvedValueOnce({ data: mime, signatures: [] });
+      mockParseMimeBody.mockImplementationOnce(jest.requireActual("./mail-mime-parser").parseMimeBody);
+      const result = await decryptMailMessage(buildRuntime(), "inline-html-only", "-----BEGIN PGP MESSAGE-----");
+      expect(result.plaintext).toBe(mime);
+      expect(result.html).toBe("<p>HTML only</p>");
+      expect(result.rawMimeFallback).toBe(true);
     });
 
     it("reports unverified signature when no sender key is provided", async () => {
@@ -555,10 +603,12 @@ describe("mail-crypto", () => {
     it("throws and propagates errors from ensureVaultLoaded", async () => {
       // Override beforeEach setup — test a failure path
       jest.resetAllMocks();
-      mockWrapVaultSecret.mockImplementation(async (secret) => `wrapped:${secret}`);
-    mockUnwrapVaultSecret.mockImplementation(async (wrapped) =>
-      wrapped.replace(/^wrapped:/, ""),
-    );
+      mockWrapVaultSecret.mockImplementation(
+        async (secret) => `wrapped:${secret}`,
+      );
+      mockUnwrapVaultSecret.mockImplementation(async (wrapped) =>
+        wrapped.replace(/^wrapped:/, ""),
+      );
 
       mockMailFetch.mockResolvedValueOnce({
         ok: false,
@@ -605,6 +655,7 @@ describe("mail-crypto", () => {
 
   describe("decryptPgpMimeMessage", () => {
     beforeEach(() => {
+      activateSessionData("u1");
       mockSuccessfulVaultLoad();
     });
 
@@ -633,7 +684,7 @@ describe("mail-crypto", () => {
 
       expect(mockExtractBlobId).toHaveBeenCalledWith(MOCK_BODY_STRUCTURE);
       expect(mockGetBlobAsText).toHaveBeenCalled();
-      expect(mockReadMessage).toHaveBeenCalledWith({ armoredMessage: armoredCiphertext });
+      expect(mockReadMessage).toHaveBeenCalledWith({ armoredMessage: armoredCiphertext, config: { maxDecompressedMessageSize: MAX_PGP_DECRYPT_BYTES } });
       expect(mockParseMimeBody).toHaveBeenCalled();
       expect(result.plaintext).toBe("Hello MIME world");
       expect(result.html).toBeNull();
@@ -659,6 +710,18 @@ describe("mail-crypto", () => {
       expect(result.html).toBe("<p>HTML content</p>");
     });
 
+    it("marks structured HTML-only MIME without a text part as a raw fallback", async () => {
+      const mime = "Content-Type: text/html\r\n\r\n<p>HTML only</p>";
+      mockExtractBlobId.mockReturnValue("blob-html-only");
+      mockGetBlobAsText.mockResolvedValueOnce("-----BEGIN PGP MESSAGE-----");
+      mockReadMessage.mockResolvedValueOnce({});
+      mockDecrypt.mockResolvedValueOnce({ data: mime, signatures: [] });
+      mockParseMimeBody.mockImplementationOnce(jest.requireActual("./mail-mime-parser").parseMimeBody);
+      const result = await decryptPgpMimeMessage(buildRuntime(), "structured-html-only", MOCK_BODY_STRUCTURE);
+      expect(result.plaintext).toBe(mime);
+      expect(result.rawMimeFallback).toBe(true);
+    });
+
     it("falls back to raw plaintext when MIME parser throws", async () => {
       mockExtractBlobId.mockReturnValue("blob-xyz");
       mockGetBlobAsText.mockResolvedValueOnce("-----BEGIN PGP MESSAGE-----");
@@ -670,7 +733,18 @@ describe("mail-crypto", () => {
       const result = await decryptPgpMimeMessage(runtime, "msg-mime-003", MOCK_BODY_STRUCTURE as any);
 
       expect(result.plaintext).toBe("raw decrypted content");
+      expect(result.rawMimeFallback).toBe(true);
       expect(result.attachments).toEqual([]);
+    });
+
+    it("refuses oversized MIME instead of rendering raw content", async () => {
+      mockExtractBlobId.mockReturnValue("blob-xyz");
+      mockGetBlobAsText.mockResolvedValueOnce("-----BEGIN PGP MESSAGE-----");
+      mockReadMessage.mockResolvedValueOnce({});
+      mockDecrypt.mockResolvedValueOnce({ data: "bounded decrypted content", signatures: [] });
+      mockParseMimeBody.mockImplementationOnce(() => { throw new Error("This message has too many lines to open here."); });
+
+      await expect(decryptPgpMimeMessage(buildRuntime(), "msg-limit", MOCK_BODY_STRUCTURE)).rejects.toThrow("too many lines to open");
     });
 
     it("throws when ciphertext blobId cannot be located", async () => {

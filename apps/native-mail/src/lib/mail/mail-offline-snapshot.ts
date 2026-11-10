@@ -1,3 +1,4 @@
+import { mailSenderKeyTrustStateSchema } from "@workspace/calendar-core";
 import type { Query, QueryClient, QueryKey } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import {
@@ -93,7 +94,11 @@ export function isMailOfflineSnapshot(
         typeof entry.messageId === "string" &&
         typeof entry.partial === "boolean" &&
         isRecord(entry.result) &&
-        typeof entry.result.plaintext === "string",
+        typeof entry.result.plaintext === "string" &&
+        (entry.result.senderKeyTrustState === undefined ||
+          mailSenderKeyTrustStateSchema.safeParse(
+            entry.result.senderKeyTrustState,
+          ).success),
     ) &&
     (value.labels === null || Array.isArray(value.labels))
   );
@@ -136,7 +141,9 @@ export function isMailOfflineSnapshotKey(key: QueryKey): boolean {
 export function hasIncompleteBody(message: JmapEmailMessage): boolean {
   return (
     !message.bodyValues ||
-    Object.values(message.bodyValues).some((value) => value.isTruncated === true)
+    Object.values(message.bodyValues).some(
+      (value) => value.isTruncated === true,
+    )
   );
 }
 
@@ -200,7 +207,9 @@ function decryptedSize(result: MailDecryptResult): number {
 
 /** Decrypted attachment bytes do not survive JSON and are too large to keep. */
 function hasAttachmentContent(result: MailDecryptResult): boolean {
-  return (result.attachments ?? []).some((attachment) => attachment.content != null);
+  return (result.attachments ?? []).some(
+    (attachment) => attachment.content != null,
+  );
 }
 
 /** Decrypted content for saved messages only, so removed mail never keeps a plaintext copy on disk. */
@@ -248,6 +257,7 @@ function captureDecrypted(
         plaintext: preview,
         html: null,
         signatureVerificationState: result.signatureVerificationState,
+        senderKeyTrustState: result.senderKeyTrustState,
         hasVerifiedSignature: result.hasVerifiedSignature,
       },
     });
@@ -301,14 +311,12 @@ export function captureMailOfflineSnapshot(
     )
     .sort(newestFirst)
     .slice(0, MAX_THREADS);
-  const threads = threadQueries.map(
-    (query): MailOfflineThread => ({
-      threadId: query.queryKey[2] as string,
-      messages: (query.state.data as JmapEmailMessage[]).map((entry) =>
-        withLoadedBody(queryClient, entry),
-      ),
-    }),
-  );
+  const threads = threadQueries.map((query): MailOfflineThread => ({
+    threadId: query.queryKey[2] as string,
+    messages: (query.state.data as JmapEmailMessage[]).map((entry) =>
+      withLoadedBody(queryClient, entry),
+    ),
+  }));
 
   const decrypted = captureDecrypted(queryClient, [
     ...lists.flatMap((list) => list.messages),
@@ -389,7 +397,11 @@ export function hydrateMailOfflineSnapshot(
   for (const entry of snapshot.decrypted) {
     const key = QUERY_KEYS.mailDecrypted(entry.messageId);
     if (queryClient.getQueryData(key) !== undefined) continue;
-    queryClient.setQueryData(key, entry.result, { updatedAt: now });
+    const result: MailDecryptResult = {
+      ...entry.result,
+      senderKeyTrustState: { kind: "unavailable", reason: "history" },
+    };
+    queryClient.setQueryData(key, result, { updatedAt: now });
     if (entry.partial) {
       void queryClient.invalidateQueries({
         queryKey: key,

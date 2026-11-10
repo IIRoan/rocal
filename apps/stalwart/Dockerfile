@@ -8,10 +8,10 @@ COPY frpc-security.patch /tmp/frpc-security.patch
 RUN git apply /tmp/frpc-security.patch \
     && CGO_ENABLED=0 GOOS=linux go build -mod=readonly -trimpath -tags=frpc,noweb -ldflags="-s -w" -o /frpc ./cmd/frpc
 
-FROM stalwartlabs/stalwart:v1.0.0@sha256:baafeacd6cbde77acdd94af49972d41c6709e54a376df48e18a9fe3f445eb3d5
+FROM stalwartlabs/stalwart:v1.1.0@sha256:f772aa6ef8cd8018969fa491640f1436b0270eb14e2c219b5f37f1a77020837e
 
 ARG STALWART_CLI_VERSION=1.0.14
-ARG BUILD_TIMESTAMP=2026-10-26-v1.0.0
+ARG BUILD_TIMESTAMP=2026-11-10-v1.1.0
 
 USER root
 
@@ -29,6 +29,7 @@ RUN apt-get -o Acquire::Retries=0 update \
 
 COPY --from=frpc-builder --chmod=755 /frpc /usr/local/bin/frpc
 
+COPY scripts/upgrade-1.1.0.py /usr/local/bin/upgrade-1.1.0.py
 COPY railway-entrypoint.sh /usr/local/bin/railway-entrypoint.sh
 COPY backend-gate.cfg /usr/local/share/stalwart/backend-gate.cfg
 COPY admin-gate.lua /usr/local/share/stalwart/admin-gate.lua
@@ -51,6 +52,7 @@ RUN ln -sfn 'background_thread:true,narenas:8' /etc/malloc.conf
 EXPOSE 25 8080 8081 8082 8090
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
-    CMD curl -fsS --max-time 3 "http://127.0.0.1:${PORT:-8090}/healthz/ready" > /dev/null || exit 1
+    CMD case "${STALWART_UPGRADE_PHASE:-ordinary}" in prepare) health_target=maintenance ;; held) health_target=held ;; *) health_target=ready ;; esac; \
+        curl -fsS --max-time 3 "http://127.0.0.1:${PORT:-8090}/healthz/${health_target}" > /dev/null || exit 1
 
 ENTRYPOINT ["/usr/local/bin/railway-entrypoint.sh"]

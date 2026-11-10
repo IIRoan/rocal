@@ -44,6 +44,21 @@ class MockWorker {
 }
 
 describe("MailCryptoWorkerClient", () => {
+  it("ends in-flight crypto and terminates its worker synchronously on session disposal", async () => {
+    const worker: Worker = {
+      onmessage: null, onmessageerror: null, onerror: null,
+      postMessage: jest.fn(), terminate: jest.fn(),
+      addEventListener: jest.fn(), removeEventListener: jest.fn(), dispatchEvent: () => true,
+    };
+    const client = new MailCryptoWorkerClient(() => worker);
+    const pending = client.decryptMessage({ armoredMessage: "synthetic ciphertext" });
+    const rejected = expect(pending).rejects.toThrow("session ended");
+    client.dispose();
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(client.getVerificationContext()).toBeNull();
+    await rejected;
+  });
+
   beforeEach(() => {
     MockWorker.instances = [];
     jest.useFakeTimers();

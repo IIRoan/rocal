@@ -1,4 +1,6 @@
-"use client";
+import { useMailboxSearch } from "@/hooks/use-mailbox-search";
+import { privateSearchCoverageText } from "@workspace/calendar-core";
+("use client");
 
 import {
   useEffect,
@@ -23,7 +25,6 @@ import {
   hasActiveFilters,
   mergeInlineSearchResults,
 } from "@/lib/mail/mail-search-filter";
-import { searchMailbox } from "@/lib/mail/mailbox-search";
 import { registerComposeCloseActions } from "./mail-compose-bridge";
 import {
   useMailComposeChrome,
@@ -77,6 +78,7 @@ export function useMailAppContentController(
     selectedMessageDecryptedAttachments,
     attachmentPreview,
     selectedMessageSignatureVerificationState,
+    selectedMessageSenderKeyTrustState,
     selectedMessageDecryptError,
     selectedMessageIsDecrypting,
     conversationDecryptedPreviews,
@@ -93,6 +95,7 @@ export function useMailAppContentController(
     handleComposeImageUpload,
     handleDeleteMessage,
     handleReply,
+    handleReplyAll,
     handleForward,
     handleEditDraft,
     handleDiscardDraft,
@@ -198,27 +201,19 @@ export function useMailAppContentController(
     data: serverSearchResults,
     isFetching: isSearching,
     isError: isSearchError,
-  } = useQuery<JmapEmailMessage[]>({
-    queryKey: mailQueryKeys.inlineSearchWithFilters(
-      mailboxId,
-      trimmedDebouncedMailListSearch,
-      advancedFilters,
-    ),
-    queryFn: async () => {
-      if (!activeMailbox || !mailboxId) return [];
-      return searchMailbox({
-        client: activeMailbox.client,
-        session: activeMailbox.session,
-        mailboxId,
-        text: trimmedDebouncedMailListSearch,
-        filters: hasAdvancedFilters ? advancedFilters : null,
-        timezone: settings?.timezone,
-        limit: 40,
-      });
-    },
-    enabled: Boolean(searchActive && activeMailbox && mailboxId),
-    staleTime: 10_000,
-  });
+  } = useMailboxSearch(
+    searchActive && activeMailbox && mailboxId
+      ? {
+          client: activeMailbox.client,
+          session: activeMailbox.session,
+          mailboxId,
+          text: trimmedDebouncedMailListSearch,
+          filters: hasAdvancedFilters ? advancedFilters : null,
+          timezone: settings?.timezone,
+          limit: 40,
+        }
+      : null,
+  );
 
   const showSearchLoadingState =
     searchUiActive &&
@@ -235,11 +230,11 @@ export function useMailAppContentController(
           ? []
           : trimmedDebouncedMailListSearch
             ? mergeInlineSearchResults(
-                serverSearchResults,
+                serverSearchResults.messages,
                 activeMailbox?.messages ?? [],
                 trimmedDebouncedMailListSearch,
               )
-            : serverSearchResults
+            : serverSearchResults.messages
       : (activeMailbox?.messages ?? []);
 
   const filteredListMessages = applyMailListViewFilter(
@@ -417,7 +412,7 @@ export function useMailAppContentController(
       navigatePrev: handleNavigatePrev,
       navigateNext: handleNavigateNext,
       reply: () => handleReply(),
-      replyAll: () => handleReply(),
+      replyAll: () => handleReplyAll(),
       forward: () => handleForward(),
       archive: () => handleArchive?.(),
       deleteMessage: () =>
@@ -597,6 +592,10 @@ export function useMailAppContentController(
     isSearching,
     searchActive,
     searchUiActive,
+    searchCoverageText:
+      searchActive && serverSearchResults?.coverage
+        ? privateSearchCoverageText(serverSearchResults.coverage)
+        : null,
     isSearchDebouncing,
     showSearchLoadingState,
     showMobileDetailPane,
@@ -613,6 +612,7 @@ export function useMailAppContentController(
     selectedMessageDecryptedHtml,
     selectedMessageDecryptedAttachments,
     selectedMessageSignatureVerificationState,
+    selectedMessageSenderKeyTrustState,
     selectedMessageDecryptError,
     selectedMessageIsDecrypting,
     conversationDecryptedPreviews,
@@ -671,6 +671,7 @@ export function useMailAppContentController(
     handleNavigateNext,
     setSelectedConversationMessageId,
     handleReply,
+    handleReplyAll,
     handleForward,
     handleDeleteMessage,
     handleMoveMessage,

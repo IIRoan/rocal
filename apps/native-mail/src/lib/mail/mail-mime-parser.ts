@@ -1,5 +1,13 @@
 /** MIME parser for decrypted PGP/MIME payloads, avoiding Blob/ReadableStream APIs that Hermes lacks. */
 
+import {
+  MAX_MAIL_MIME_BYTES,
+  readMailMimeLeaves,
+} from "@workspace/calendar-core/mail-mime-limits";
+import {
+  resolveNestedPgpMimeCiphertext,
+  getPgpMimeEnvelopeContentType,
+} from "@workspace/calendar-core/mail-pgp-layers";
 import { decodeBase64ToBytes } from "./binary-utils";
 import type { JmapAttachment } from "./types";
 
@@ -9,20 +17,21 @@ export interface ParsedMimeBody {
   attachments: JmapAttachment[];
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
 export function parseMimeBody(rawMime: string): ParsedMimeBody {
   const result: ParsedMimeBody = { text: null, html: null, attachments: [] };
-  // Normalise CRLF → LF once at the top so all internal code works with LF only.
-  parsePart(rawMime.replace(/\r\n/g, "\n"), result, false);
+  for (const part of readMailMimeLeaves(rawMime)) {
+    const { headers } = extractHeaders(part.headers);
+    const used =
+      (headers.disposition === "attachment" && !part.isRelated) ||
+      headers.contentType === "message/rfc822" ||
+      (headers.contentType === "text/plain" && result.text === null) ||
+      (headers.contentType === "text/html" && result.html === null);
+    if (!used) continue;
+    const body = rawMime.slice(part.bodyStart, part.end).replace(/\r\n/g, "\n");
+    parseLeaf(headers, body, result, part.isRelated);
+  }
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// Internals
-// ---------------------------------------------------------------------------
 
 interface MimeHeaders {
   contentType: string;
@@ -34,7 +43,10 @@ interface MimeHeaders {
   name: string | null;
 }
 
-function extractHeaders(text: string): { headers: MimeHeaders; bodyOffset: number } {
+function extractHeaders(text: string): {
+  headers: MimeHeaders;
+  bodyOffset: number;
+} {
   const blankLine = text.indexOf("\n\n");
   if (blankLine === -1) {
     return {
@@ -78,7 +90,10 @@ function extractHeaders(text: string): { headers: MimeHeaders; bodyOffset: numbe
         const eq = parts[i].indexOf("=");
         if (eq === -1) continue;
         const pName = parts[i].slice(0, eq).trim().toLowerCase();
-        const pVal = parts[i].slice(eq + 1).trim().replace(/^"|"$/g, "");
+        const pVal = parts[i]
+          .slice(eq + 1)
+          .trim()
+          .replace(/^"|"$/g, "");
         if (pName === "boundary") boundary = pVal;
         else if (pName === "charset") charset = pVal.toLowerCase();
         else if (pName === "name") name = pVal;
@@ -92,33 +107,46 @@ function extractHeaders(text: string): { headers: MimeHeaders; bodyOffset: numbe
         const eq = parts[i].indexOf("=");
         if (eq === -1) continue;
         const pName = parts[i].slice(0, eq).trim().toLowerCase();
-        const pVal = parts[i].slice(eq + 1).trim().replace(/^"|"$/g, "");
+        const pVal = parts[i]
+          .slice(eq + 1)
+          .trim()
+          .replace(/^"|"$/g, "");
         if (pName === "filename") filename = pVal;
       }
     }
   }
 
-  return { headers: { contentType, boundary, charset, encoding, disposition, filename, name }, bodyOffset };
+  return {
+    headers: {
+      contentType,
+      boundary,
+      charset,
+      encoding,
+      disposition,
+      filename,
+      name,
+    },
+    bodyOffset,
+  };
 }
 
-function parsePart(text: string, result: ParsedMimeBody, isRelated: boolean): void {
-  const { headers, bodyOffset } = extractHeaders(text);
-  const { contentType, boundary, encoding, disposition, filename, name } = headers;
-
-  if (contentType.startsWith("multipart/")) {
-    if (!boundary) return;
-    const body = text.slice(bodyOffset);
-    const childIsRelated = isRelated || contentType === "multipart/related";
-    for (const part of splitOnBoundary(body, boundary)) {
-      parsePart(part, result, childIsRelated);
-    }
-    return;
-  }
+function parseLeaf(
+  headers: MimeHeaders,
+  body: string,
+  result: ParsedMimeBody,
+  isRelated: boolean,
+): void {
+  const { contentType, encoding, disposition, filename, name } = headers;
 
   // Match web PostalMime: disposition === "attachment" && !related
-  if (disposition === "attachment" && !isRelated) {
-    const attachmentName = filename || name || "attachment";
-    const body = text.slice(bodyOffset);
+  if (
+    (disposition === "attachment" && !isRelated) ||
+    contentType === "message/rfc822"
+  ) {
+    const attachmentName =
+      filename ||
+      name ||
+      (contentType === "message/rfc822" ? "message.eml" : "attachment");
     const content = decodeAttachmentBody(body, encoding, contentType);
     result.attachments.push({
       name: attachmentName,
@@ -130,40 +158,10 @@ function parsePart(text: string, result: ParsedMimeBody, isRelated: boolean): vo
   }
 
   if (contentType === "text/plain" && result.text === null) {
-    result.text = decodeTextBody(text.slice(bodyOffset), encoding);
+    result.text = decodeTextBody(body, encoding);
   } else if (contentType === "text/html" && result.html === null) {
-    result.html = decodeTextBody(text.slice(bodyOffset), encoding);
+    result.html = decodeTextBody(body, encoding);
   }
-}
-
-function splitOnBoundary(body: string, boundary: string): string[] {
-  const open = "--" + boundary;
-  const close = "--" + boundary + "--";
-  const parts: string[] = [];
-  let currentLines: string[] = [];
-  let inPart = false;
-
-  for (const line of body.split("\n")) {
-    const trimmed = line.trimEnd();
-    if (trimmed === close) {
-      if (inPart) parts.push(currentLines.join("\n"));
-      inPart = false;
-      currentLines = [];
-      break;
-    } else if (trimmed === open) {
-      if (inPart) parts.push(currentLines.join("\n"));
-      currentLines = [];
-      inPart = true;
-    } else if (inPart) {
-      currentLines.push(line);
-    }
-  }
-
-  if (inPart && currentLines.length > 0) {
-    parts.push(currentLines.join("\n"));
-  }
-
-  return parts;
 }
 
 function decodeTextBody(body: string, encoding: string): string {
@@ -178,9 +176,14 @@ function decodeTextBody(body: string, encoding: string): string {
   }
 }
 
-function decodeAttachmentBody(body: string, encoding: string, contentType: string): Uint8Array {
+function decodeAttachmentBody(
+  body: string,
+  encoding: string,
+  contentType: string,
+): Uint8Array {
   const trimmed = body.endsWith("\n") ? body.slice(0, -1) : body;
-  const isText = contentType.startsWith("text/");
+  const isText =
+    contentType.startsWith("text/") || contentType === "message/rfc822";
 
   switch (encoding) {
     case "quoted-printable":
@@ -205,59 +208,76 @@ function decodeAttachmentBody(body: string, encoding: string, contentType: strin
   }
 }
 
-function decodeQuotedPrintableBytes(text: string): Uint8Array {
-  const joined = text.replace(/=\n/g, "");
-  const bytes: number[] = [];
+function hexNibble(code: number): number {
+  if (code >= 48 && code <= 57) return code - 48;
+  if (code >= 65 && code <= 70) return code - 55;
+  if (code >= 97 && code <= 102) return code - 87;
+  return -1;
+}
 
-  let i = 0;
-  while (i < joined.length) {
-    if (
-      joined[i] === "=" &&
-      i + 2 < joined.length &&
-      /[0-9A-Fa-f]{2}/.test(joined.slice(i + 1, i + 3))
-    ) {
-      bytes.push(parseInt(joined.slice(i + 1, i + 3), 16));
-      i += 3;
+function quotedByte(text: string, offset: number): number {
+  if (text.charCodeAt(offset) !== 61 || offset + 2 >= text.length) return -1;
+  const high = hexNibble(text.charCodeAt(offset + 1));
+  const low = hexNibble(text.charCodeAt(offset + 2));
+  return high >= 0 && low >= 0 ? (high << 4) | low : -1;
+}
+
+function decodeQuotedPrintableBytes(text: string): Uint8Array {
+  const bytes = new Uint8Array(text.length);
+  let written = 0;
+  for (let offset = 0; offset < text.length;) {
+    if (text.charCodeAt(offset) === 61 && text.charCodeAt(offset + 1) === 10) {
+      offset += 2;
+      continue;
+    }
+    const byte = quotedByte(text, offset);
+    if (byte >= 0) {
+      bytes[written++] = byte;
+      offset += 3;
     } else {
-      bytes.push(joined.charCodeAt(i) & 0xff);
-      i++;
+      bytes[written++] = text.charCodeAt(offset) & 0xff;
+      offset += 1;
     }
   }
-
-  return new Uint8Array(bytes);
+  return written === bytes.length ? bytes : bytes.slice(0, written);
 }
 
 function decodeQuotedPrintable(text: string): string {
-  const joined = text.replace(/=\n/g, "");
-
-  let result = "";
-  let byteBuffer: number[] = [];
-
-  const flushBuffer = () => {
-    if (byteBuffer.length > 0) {
-      result += new TextDecoder("utf-8").decode(new Uint8Array(byteBuffer));
-      byteBuffer = [];
+  const bytes = new Uint8Array(
+    /[^\x00-\x7f]/.test(text)
+      ? Math.min(text.length * 3, MAX_MAIL_MIME_BYTES)
+      : text.length,
+  );
+  let written = 0;
+  for (let offset = 0; offset < text.length;) {
+    if (text.charCodeAt(offset) === 61 && text.charCodeAt(offset + 1) === 10) {
+      offset += 2;
+      continue;
     }
-  };
-
-  let i = 0;
-  while (i < joined.length) {
-    if (
-      joined[i] === "=" &&
-      i + 2 < joined.length &&
-      /[0-9A-Fa-f]{2}/.test(joined.slice(i + 1, i + 3))
-    ) {
-      byteBuffer.push(parseInt(joined.slice(i + 1, i + 3), 16));
-      i += 3;
-    } else {
-      flushBuffer();
-      result += joined[i];
-      i++;
+    const byte = quotedByte(text, offset);
+    if (byte >= 0) {
+      bytes[written++] = byte;
+      offset += 3;
+      continue;
+    }
+    let code = text.codePointAt(offset) ?? 0xfffd;
+    offset += code > 0xffff ? 2 : 1;
+    if (code >= 0xd800 && code <= 0xdfff) code = 0xfffd;
+    const width = code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+    if (written + width > bytes.length)
+      throw new Error("Mail MIME decoded content exceeds the size limit.");
+    if (width === 1) bytes[written++] = code;
+    else {
+      if (width === 4) {
+        bytes[written++] = 0xf0 | (code >> 18);
+        bytes[written++] = 0x80 | ((code >> 12) & 0x3f);
+      } else if (width === 3) bytes[written++] = 0xe0 | (code >> 12);
+      else bytes[written++] = 0xc0 | (code >> 6);
+      if (width > 2) bytes[written++] = 0x80 | ((code >> 6) & 0x3f);
+      bytes[written++] = 0x80 | (code & 0x3f);
     }
   }
-
-  flushBuffer();
-  return result;
+  return new TextDecoder("utf-8").decode(bytes.subarray(0, written));
 }
 
 function decodeBase64String(encoded: string): string {
@@ -271,4 +291,24 @@ function decodeBase64String(encoded: string): string {
   } catch {
     return encoded;
   }
+}
+
+export function extractNestedPgpMimeCiphertext(rawMime: string): string | null {
+  if (!getPgpMimeEnvelopeContentType(rawMime)) return null;
+  const parts = readMailMimeLeaves(rawMime);
+  if (parts.some((part) => part.depth !== 1))
+    throw new Error("Encrypted MIME control parts are invalid.");
+  return resolveNestedPgpMimeCiphertext({
+    contentType: "multipart/encrypted",
+    parts: parts.map((part) => {
+      const { headers } = extractHeaders(part.headers);
+      return {
+        type: headers.contentType,
+        body: decodeTextBody(
+          rawMime.slice(part.bodyStart, part.end).replace(/\r\n/g, "\n"),
+          headers.encoding,
+        ),
+      };
+    }),
+  });
 }

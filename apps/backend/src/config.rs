@@ -153,9 +153,7 @@ impl Config {
                 .unwrap_or_else(|| DEFAULT_STALWART_BASE_URL.into()),
             stalwart_default_domain: var("STALWART_DEFAULT_DOMAIN")
                 .unwrap_or_else(|| "solace.onl".into()),
-            stalwart_provision_token: trimmed(&var, "STALWART_PROVISION_TOKEN")
-                .or_else(|| var("STALWART_ADMIN_TOKEN"))
-                .unwrap_or_default(),
+            stalwart_provision_token: trimmed(&var, "STALWART_PROVISION_TOKEN").unwrap_or_default(),
             mailer: mailer(&var, &noreply_email),
             noreply_email,
             stalwart_webhook_secret: trimmed(&var, "STALWART_WEBHOOK_SECRET"),
@@ -291,6 +289,19 @@ mod tests {
     }
 
     const DB: (&str, &str) = ("DATABASE_URL", "postgres://localhost/solace_test");
+
+    #[test]
+    fn provisioning_requires_its_explicit_credential_and_never_falls_back_to_admin() {
+        let admin_only = config(&[DB, ("STALWART_ADMIN_TOKEN", "synthetic-admin")]).unwrap();
+        assert!(admin_only.stalwart_provision_token.is_empty());
+        let explicit = config(&[
+            DB,
+            ("STALWART_ADMIN_TOKEN", "synthetic-admin"),
+            ("STALWART_PROVISION_TOKEN", " synthetic-provisioner "),
+        ])
+        .unwrap();
+        assert_eq!(explicit.stalwart_provision_token, "synthetic-provisioner");
+    }
 
     #[test]
     fn the_noreply_address_drops_a_display_name() {

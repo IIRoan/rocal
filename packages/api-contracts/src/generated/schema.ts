@@ -514,6 +514,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/health/mail-key-expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fresh complete user-directory cycles without keys expired or expiring within fourteen days. */
+        get: operations["getMailKeyExpiryHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/mail-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fresh complete metadata cycles without encryption-policy drift; never gates mail delivery. */
+        get: operations["getMailPolicyHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/internal/stalwart/admin-access": {
         parameters: {
             query?: never;
@@ -713,6 +747,22 @@ export interface paths {
         /** JMAP Email, Mailbox and Thread changes for the caller's own mailbox, read with server-side credentials. */
         get: operations["syncMail"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mail/trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMailTrust"];
+        put: operations["putMailTrust"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1942,6 +1992,10 @@ export interface components {
             mailbox: components["schemas"]["MailSyncCollection"];
             thread: components["schemas"]["MailSyncCollection"];
         };
+        /** @description The account's opaque encrypted correspondent-key history. */
+        MailTrust: {
+            encryptedTrust: string | null;
+        };
         /** @description `GET /api/mail/account/vault-backup` and the answer of its `PUT`. */
         MailVaultBackup: {
             email: string;
@@ -2138,6 +2192,10 @@ export interface components {
              * @description Defaults to 1 on the first upload and is kept when omitted later.
              */
             encryptionKeyVersion?: number;
+        };
+        PutMailTrustRequest: {
+            encryptedTrust: string;
+            expectedEncryptedTrust: string | null;
         };
         PutRecentContactsRequest: {
             encryptedContent: string;
@@ -3428,6 +3486,76 @@ export interface operations {
             };
         };
     };
+    getMailKeyExpiryHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthStatus"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthStatus"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthStatus"];
+                };
+            };
+        };
+    };
+    getMailPolicyHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthStatus"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthStatus"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthStatus"];
+                };
+            };
+        };
+    };
     authorizeStalwartAdminAccess: {
         parameters: {
             query?: never;
@@ -3802,6 +3930,54 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MailSyncResult"];
                 };
+            };
+        };
+    };
+    getMailTrust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailTrust"];
+                };
+            };
+        };
+    };
+    putMailTrust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutMailTrustRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailTrust"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

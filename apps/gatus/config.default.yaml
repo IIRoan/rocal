@@ -65,6 +65,30 @@ endpoints:
       - "[BODY].status == ok"
       - "[RESPONSE_TIME] < 10000"
 
+  # Shared user-directory scan status; independent from liveness and mail acceptance.
+  - name: api-mail-policy
+    <<: *discord-alerts
+    group: Application
+    url: https://api.solace.onl/api/health/mail-policy
+    interval: 5m
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+
+  # Fourteen-day user-key advisory; service keys require a separate operator check.
+  - name: api-mail-key-expiry
+    <<: *discord-alerts
+    group: Application
+    url: https://api.solace.onl/api/health/mail-key-expiry
+    interval: 5m
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+
   # Public JMAP through Railway HTTPS.
   - name: jmap-session
     <<: *discord-alerts
@@ -105,19 +129,20 @@ endpoints:
       hide-url: true
     conditions:
       - "[STATUS] == 200"
-      - "[BODY] == pat(*server_memory*)"
-      - "[BODY] == pat(*smtp_active_connections*)"
-      - "[BODY] == pat(*smtp_request_time*)"
-      - "[BODY] == pat(*delivery_active_connections*)"
-      - "[BODY] == pat(*imap_active_connections*)"
-      - "[BODY] == pat(*http_active_connections*)"
-      - "[BODY] == pat(*http_request_time_count*)"
-      - "[BODY] == pat(*user_count*)"
-      - "[BODY] == pat(*domain_count*)"
-      - "[BODY] == pat(*store_blob_read*)"
-      - "[BODY] == pat(*store_data_write*)"
+      - "[BODY] == pat(*stalwart_server_memory_bytes*)"
+      - "[BODY] == pat(*stalwart_smtp_active_connections*)"
+      - "[BODY] == pat(*stalwart_smtp_request_time_seconds_count*)"
+      - "[BODY] == pat(*stalwart_delivery_active_connections*)"
+      - "[BODY] == pat(*stalwart_imap_active_connections*)"
+      - "[BODY] == pat(*stalwart_http_active_connections*)"
+      - "[BODY] == pat(*stalwart_http_request_time_seconds_count*)"
+      - "[BODY] == pat(*stalwart_users*)"
+      - "[BODY] == pat(*stalwart_domains*)"
+      - "[BODY] == pat(*stalwart_store_blob_read_total*)"
+      - "[BODY] == pat(*stalwart_store_data_write_total*)"
       # Error counters are exported only once they are non-zero.
       - "[BODY] != pat(*store_unexpected_error*)"
       - "[BODY] != pat(*store_s3_error*)"
       - "[BODY] != pat(*smtp_concurrency_limit_exceeded*)"
       - "[BODY] != pat(*calendar_rule_expansion_error*)"
+      - "[BODY] != pat(*stalwart_encryption_encryption_skipped_total*)"

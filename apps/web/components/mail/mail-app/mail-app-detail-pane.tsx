@@ -39,10 +39,12 @@ export function MailAppDetailPane({
     selectedMessageDecryptedHtml,
     selectedMessageDecryptedAttachments,
     selectedMessageSignatureVerificationState,
+    selectedMessageSenderKeyTrustState,
     selectedMessageDecryptError,
     activeMailbox,
     isBusy,
     handleReply,
+    handleReplyAll,
     handleForward,
     handleDeleteMessage,
     handleMoveMessage,
@@ -113,12 +115,14 @@ export function MailAppDetailPane({
             signatureVerificationState={
               selectedMessageSignatureVerificationState
             }
+            senderKeyTrustState={selectedMessageSenderKeyTrustState}
             decryptError={selectedMessageDecryptError}
             accountEncryptedAtRest={activeMailbox.accountEncryptedAtRest}
             isBusy={isBusy}
             mailboxes={activeMailbox.mailboxes}
             currentMailboxId={activeMailbox.selectedMailboxId}
             onReply={handleReply}
+            onReplyAll={handleReplyAll}
             onForward={handleForward}
             onDelete={() =>
               void handleDeleteMessage().catch((error) =>

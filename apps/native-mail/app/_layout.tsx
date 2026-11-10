@@ -22,6 +22,7 @@ import {
 } from "@workspace/native-core/lib/navigation-routes";
 import { MailComposeProvider } from "../src/providers/MailComposeProvider";
 import { MailSelectionProvider } from "../src/providers/MailSelectionProvider";
+import { MailTrustReview } from "../src/components/mail/MailTrustReview";
 import { CommandPalette } from "../src/components/CommandPalette";
 import { MAIL_HOME_ROUTE, MAIL_PUSH_TAP_HANDLER } from "../src/lib/mail-routes";
 import {
@@ -76,6 +77,7 @@ function RootLayout() {
                               </Stack>
                               <AuthenticatedChrome>
                                 <CommandPalette />
+                                <MailTrustReview />
                               </AuthenticatedChrome>
                             </CommandPaletteProvider>
                           </MailComposeProvider>
