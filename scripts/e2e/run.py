@@ -48,6 +48,8 @@ def failure_kind(log, report=None):
     content = failure_content(log, report)
     if "AppCrash" in content:
         return "app-crash"
+    if "DeviceUnreachableException" in content:
+        return "driver-connection"
     if any(marker in content for marker in ("TimeoutException", "DEADLINE_EXCEEDED", "OperationTimeout")):
         return "driver-timeout"
     if any(marker in content for marker in ("Connection refused", "Failed to connect to", "UNAVAILABLE: io exception", "DeviceServerDiedException")):
@@ -248,18 +250,26 @@ def run_journey(platform, app, flow, results):
     if results and platform == "android":
         command.insert(4, "--no-reinstall-driver")
     print(f"Running {platform}: {app}/{name}", flush=True)
-    reason = None
-    exit_code = None
-    try:
-        with (root / f"private/{app}-{name}.log").open("wb") as log:
-            completed = subprocess.run(command, cwd=REPO, env=maestro_environment(), check=False, timeout=1200 if platform == "ios" else 600, stdout=log, stderr=subprocess.STDOUT)
-        passed = completed.returncode == 0
-        exit_code = completed.returncode
-        if not passed:
-            reason = failure_kind(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml")
-    except subprocess.TimeoutExpired:
-        passed = False
-        reason = "journey-timeout"
+    for attempt in range(2):
+        if attempt:
+            # Maestro's iOS driver dies under runner load (mobile-dev-inc/maestro#3538); a new invocation starts a fresh one.
+            print(f"Retrying {platform}: {app}/{name} after the device driver disconnected", flush=True)
+            shutil.rmtree(screenshots)
+            screenshots.mkdir(parents=True)
+        reason = None
+        exit_code = None
+        try:
+            with (root / f"private/{app}-{name}.log").open("wb") as log:
+                completed = subprocess.run(command, cwd=REPO, env=maestro_environment(), check=False, timeout=1200 if platform == "ios" else 600, stdout=log, stderr=subprocess.STDOUT)
+            passed = completed.returncode == 0
+            exit_code = completed.returncode
+            if not passed:
+                reason = failure_kind(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml")
+        except subprocess.TimeoutExpired:
+            passed = False
+            reason = "journey-timeout"
+        if platform != "ios" or reason != "driver-connection":
+            break
     if app == "mail" and name in CONVERSATION_JOURNEYS:
         timings = collect_reader_timings(screenshots)
         target = root / "artifacts/reader-timings"

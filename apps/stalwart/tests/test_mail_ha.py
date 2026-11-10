@@ -11,6 +11,7 @@ import tempfile
 import threading
 import tomllib
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRYPOINT = (ROOT / "railway-entrypoint.sh").read_text()
@@ -179,17 +180,21 @@ class EntrypointTests(unittest.TestCase):
             binary = Path(tmp, "frpc")
             binary.write_text('#!/bin/sh\n[ "$1" = verify ] && exit 0\nexec sleep 30\n')
             binary.chmod(0o755)
-            script = ('write_frpc_tls() { :; }\nwrite_frpc_config() { :; }\n'
+            script = ('write_frpc_tls() { mkdir -p "$FRPC_TLS_DIR"; }\nwrite_frpc_config() { touch "$FRPC_CONFIG"; }\n'
+                      'chown() { :; }\nrun_as_stalwart() { echo "unprivileged:$*" >&2; if [ "$2" = verify ]; then "$@"; else exec "$@"; fi; }\n'
                       'frpc_proxies_running() { return 1; }\nport_listening() { return 1; }\n'
-                      'log() { echo "$2"; }\ndie() { exit 1; }\nsleep() { :; }\n' +
+                      'log() { echo "$2"; }\ndie() { exit 1; }\nsleep() { /bin/sleep 0.05; }\n' +
                       shell_functions("start_frpc").replace('/usr/local/bin/frpc', '"$FRPC_TEST_BINARY"') +
                       'start_frpc\nkill "$FRPC_PID"\nwait "$FRPC_PID" 2>/dev/null || true\n')
             result = subprocess.run(["sh", "-euc", script], env={"PATH": os.environ["PATH"],
                                     "FRPC_TEST_BINARY": str(binary), "FRPC_CONFIG": str(Path(tmp, "frpc.toml")),
+                                    "FRPC_TLS_DIR": str(Path(tmp, "tls")),
                                     "FRPC_READY_TIMEOUT_SECONDS": "1", "FRPC_RELAY_LOCAL_PORT": "2525"},
                                     capture_output=True, text=True, timeout=5)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("JMAP remains ready", result.stdout)
+            self.assertIn(f"unprivileged:{binary} verify", result.stderr)
+            self.assertIn(f"unprivileged:{binary} -c", result.stderr)
 
     def test_health_requires_ready_state_and_live_stalwart_and_frpc(self):
         code = "def ready():" + ENTRYPOINT.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]
@@ -203,6 +208,15 @@ class EntrypointTests(unittest.TestCase):
         alive.add(2)
         state["ready"] = False
         self.assertFalse(namespace["ready"]())
+
+    def test_health_recognizes_a_live_root_owned_supervisor(self):
+        code = "def pid_alive(pid):" + ENTRYPOINT.split("def pid_alive(pid):", 1)[1].split("\ndef port_open(port):", 1)[0]
+        namespace = {"os": os}
+        exec(code, namespace)
+        with mock.patch.object(os, "kill", side_effect=PermissionError):
+            self.assertTrue(namespace["pid_alive"](123))
+        with mock.patch.object(os, "kill", side_effect=ProcessLookupError):
+            self.assertFalse(namespace["pid_alive"](123))
 
     def test_health_stays_ready_while_the_relay_listener_reconnects(self):
         code = "def ready():" + ENTRYPOINT.split("def ready():", 1)[1].split("\ndef handle(conn):", 1)[0]

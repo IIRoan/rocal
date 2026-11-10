@@ -14,6 +14,7 @@ import { calendarApiService } from "./calendar-api-service";
 import { readMailComposeSettings, writeMailComposeSettings } from "./mail/compose-settings";
 import { readMailDisplaySettings, writeMailDisplaySettings } from "./mail/mail-display-settings";
 import { readMailListSettings, writeMailListSettings } from "./mail/mail-list-settings";
+import { readLocalTrustedSenders, restoreLocalTrustedSenders } from "./mail/mail-settings-storage";
 import {
   isMailSettingsSyncPending,
   scheduleMailSettingsServerSync,
@@ -53,7 +54,11 @@ function writeLocalMailSyncedSettings(settings: MailSyncedSettings): MailSyncedS
 export async function saveMailSyncedSettings(settings: MailSyncedSettings): Promise<boolean> {
   const cipher = await getCipher();
   if (!cipher) return false;
-  await pushMailSyncedSettings(calendarApiService, cipher, settings);
+  await restoreLocalTrustedSenders();
+  await pushMailSyncedSettings(calendarApiService, cipher, {
+    ...settings,
+    display: { ...settings.display, trustedSenders: readLocalTrustedSenders() },
+  });
   return true;
 }
 
@@ -61,6 +66,7 @@ export async function saveMailSyncedSettings(settings: MailSyncedSettings): Prom
 export async function loadMailSyncedSettings(): Promise<MailSyncedSettings | null> {
   const cipher = await getCipher();
   if (!cipher) return null;
+  await restoreLocalTrustedSenders();
 
   if (isMailSettingsSyncPending()) {
     scheduleMailSettingsServerSync();

@@ -147,7 +147,6 @@ export default defineRailway(() => {
       FRPC_TLS_CERT: preserve(),
       FRPC_TLS_KEY: preserve(),
       FRPC_TOKEN: preserve(),
-      FRPC_VERSION: preserve(),
       FRPS_ADDR: preserve(),
       PGDATABASE: "stalwart_v1",
       PGHOST: ref(postgresStalwart, "PGHOST"),

@@ -212,6 +212,8 @@ state = {
 }
 with open(path + ".tmp", "w", encoding="utf-8") as handle:
     json.dump(state, handle)
+# The unprivileged listener reads only non-secret process and port state.
+os.chmod(path + ".tmp", 0o644)
 os.replace(path + ".tmp", path)
 PY
 }
@@ -219,7 +221,7 @@ PY
 start_health_server() {
 	log info "Starting Railway health listener on 0.0.0.0:${HEALTH_PORT}/healthz/ready."
 	write_health_state false
-	HEALTH_PORT="$HEALTH_PORT" HEALTH_STATE_PATH="$HEALTH_STATE_PATH" python3 -u <<'PY' &
+	HEALTH_PORT="$HEALTH_PORT" HEALTH_STATE_PATH="$HEALTH_STATE_PATH" run_as_stalwart python3 -u <<'PY' &
 import json
 import os
 import socket
@@ -259,6 +261,8 @@ def pid_alive(pid):
         return False
     try:
         os.kill(int(pid), 0)
+    except PermissionError:
+        return True
     except OSError:
         return False
     return True
@@ -523,8 +527,10 @@ sys.exit(0 if proxies and all(proxy.get("status") == "running" for proxy in prox
 start_frpc() {
 	write_frpc_tls || die "FRPC_TLS_* must be base64-encoded PEM."
 	write_frpc_config
-	/usr/local/bin/frpc verify -c "$FRPC_CONFIG" >/dev/null || die "Invalid frpc configuration."
-	/usr/local/bin/frpc -c "$FRPC_CONFIG" >&2 &
+	chown -R stalwart:stalwart "$FRPC_TLS_DIR" "$FRPC_CONFIG"
+	chmod 600 "$FRPC_CONFIG"
+	run_as_stalwart /usr/local/bin/frpc verify -c "$FRPC_CONFIG" >/dev/null || die "Invalid frpc configuration."
+	run_as_stalwart /usr/local/bin/frpc -c "$FRPC_CONFIG" >&2 &
 	FRPC_PID=$!
 
 	i=0

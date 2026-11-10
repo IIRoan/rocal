@@ -5,6 +5,11 @@ umask 077
 
 mkdir -p /data
 
+if [ "$(id -u)" -eq 0 ]; then
+	chown -R gatus:gatus /data
+	exec su-exec gatus "$0" "$@"
+fi
+
 GATUS_INTERNAL_PORT="${GATUS_INTERNAL_PORT:-8081}"
 PUBLIC_PORT="${PORT}"
 

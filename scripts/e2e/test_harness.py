@@ -339,6 +339,40 @@ class HarnessTests(unittest.TestCase):
                     self.assertNotIn(b"secret-output-sentinel", exported)
                     self.assertNotIn(b"cookie-token-sentinel", exported)
 
+    def test_only_a_disconnected_ios_driver_retries_the_journey_once_with_fresh_evidence(self):
+        unreachable = b"maestro.DeviceUnreachableException: Device became unreachable during viewHierarchy"
+        cases = {
+            "recovers": ("ios", [(unreachable, 1), (b"1/1 Flow Passed", 0)], True, None),
+            "stays-unreachable": ("ios", [(unreachable, 1), (unreachable, 1)], False, "driver-connection"),
+            "unreachable-after-timeout": ("ios", [(b"java.net.SocketTimeoutException\n" + unreachable, 1), (b"1/1 Flow Passed", 0)], True, None),
+            "assertion": ("ios", [(b"Assertion is false: sign-in-email is visible", 1)], False, "assertion"),
+            "android-unreachable": ("android", [(unreachable, 1)], False, "driver-connection"),
+        }
+        for case, (platform, attempts, passed, reason) in cases.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "solace-e2e"
+                with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                    private = directory() / "private"
+                    (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+                    (private / "fixture.json").write_text(json.dumps({"email": "journey@solace.test", "password": "synthetic"}))
+                    (private / "maestro-path").write_text("synthetic-maestro")
+                    outcomes = iter(attempts)
+                    evidence = private / "maestro/calendar-synthetic/first-attempt.png"
+                    stale_evidence = []
+                    def maestro(command, **options):
+                        stale_evidence.append(evidence.exists())
+                        evidence.write_bytes(b"screenshot")
+                        output, code = next(outcomes)
+                        options["stdout"].write(output)
+                        return journeys.subprocess.CompletedProcess([], code)
+                    results = []
+                    with patch.object(journeys.subprocess, "run", side_effect=maestro), \
+                            patch.object(journeys, "capture_failure_screenshot"), \
+                            patch.object(journeys, "capture_failure_hierarchy"), redirect_stdout(io.StringIO()):
+                        self.assertEqual(journeys.run_journey(platform, "calendar", Path("synthetic.yaml"), results), passed)
+                    self.assertEqual(stale_evidence, [False] * len(attempts))
+                    self.assertEqual([(result["passed"], result["reason"]) for result in results], [(passed, reason)])
+
     def test_failure_hierarchies_preserve_selectors_and_states_without_credentials(self):
         fixture = {"email": "journey@solace.test", "password": "private-password-sentinel",
                    "peerEmail": "peer-private-sentinel@solace.test", "peerPassword": "peer-private-sentinel"}

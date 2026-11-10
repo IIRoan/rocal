@@ -3,7 +3,14 @@ export type ParsedMailAddress = {
   name?: string;
 };
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+$/;
+
+function isValidParsedEmailAddress(email: string): boolean {
+  if (!EMAIL_PATTERN.test(email)) return false;
+  const domain = email.slice(email.indexOf("@") + 1);
+  const dot = domain.indexOf(".", 1);
+  return dot !== -1 && dot < domain.length - 1;
+}
 
 export function normalizeEmailAddress(value: string): string {
   return value.trim().toLowerCase();
@@ -44,7 +51,7 @@ export function parseAddressList(raw: string): ParsedMailAddress[] {
 }
 
 export function isValidEmailAddress(value: string): boolean {
-  return EMAIL_PATTERN.test(parseRecipientString(value).email);
+  return isValidParsedEmailAddress(parseRecipientString(value).email);
 }
 
 export const RESERVED_SYSTEM_LOCAL_PARTS = new Set([
@@ -183,7 +190,7 @@ export function validateComposeRecipients(input: {
   }
 
   const invalid = [...to, ...cc, ...bcc].filter(
-    (address) => !EMAIL_PATTERN.test(address.email),
+    (address) => !isValidParsedEmailAddress(address.email),
   );
   if (invalid.length > 0) {
     const label = invalid[0]?.name

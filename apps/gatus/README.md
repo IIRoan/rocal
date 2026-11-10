@@ -2,7 +2,7 @@
 
 [Gatus](https://github.com/TwiN/gatus) monitors Solace and mail from Railway. The image is
 built from a pinned commit of [CarmJos/gatus](https://github.com/CarmJos/gatus) (upstream PR
-#1651, 90-day retention) with the three patches below; the page reads history from its own
+#1651, 90-day retention) with local patches; the page reads history from its own
 `/timeline` endpoint, not Gatus's `period-statuses`.
 Deploy as a **separate Railway service** (root directory `apps/gatus`, volume at `/data`).
 `apps/gatus` must be on the GitHub `master` branch before Railway can build it.

@@ -306,7 +306,6 @@ Certs last five years (`FRP_TLS_DAYS`); rotating mints a new CA, so repeat all f
 | `FRPS_ADDR` | yes | VPS IP or hostname |
 | `FRPC_TOKEN` | yes | frp auth token (must match `FRP_TOKEN` in GitHub Environment `mail-vps`) |
 | `FRPC_RELAY_STCP_KEY` | yes | Relay STCP secret (must match `FRP_RELAY_STCP_KEY` in `mail-vps`); missing key fails boot |
-| `FRPC_VERSION` | build | Pins the frpc version used by the Docker build; production currently uses `0.71.1` |
 | `STALWART_ADMIN_TOKEN` | yes | Plan apply + relay route at startup |
 | `SOLACE_ADMIN_AUTH_URL` | admin UI | Verified private API URL including its actual port; unset keeps the UI closed |
 | `SOLACE_ADMIN_LOGIN_URL` | admin UI | Environment-specific Solace `/login` URL; HTTPS except loopback HTTP |

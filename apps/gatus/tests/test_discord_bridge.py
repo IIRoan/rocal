@@ -5,7 +5,11 @@ import io
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 import unittest
+from email.message import Message
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
 from unittest import mock
 from zoneinfo import ZoneInfo
 
@@ -14,6 +18,38 @@ BRIDGE = Path(__file__).resolve().parents[1] / "stalwart-discord-bridge.py"
 SPEC = importlib.util.spec_from_file_location("stalwart_discord_bridge", BRIDGE)
 bridge = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bridge)
+
+
+class ProxyRedirectTests(unittest.TestCase):
+    def test_upstream_redirect_is_relayed_without_fetching_its_target(self):
+        paths = []
+
+        class RedirectHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                paths.append(self.path)
+                self.send_response(302 if self.path == "/start" else 200)
+                self.send_header("Location", "/private")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        with ThreadingHTTPServer(("127.0.0.1", 0), RedirectHandler) as upstream:
+            thread = threading.Thread(target=upstream.serve_forever)
+            thread.start()
+            self.addCleanup(thread.join)
+            self.addCleanup(upstream.shutdown)
+            sent = {}
+            handler = SimpleNamespace(
+                headers=Message(), rfile=io.BytesIO(), wfile=io.BytesIO(),
+                path="/start", command="GET", send_response=lambda code: sent.update(status=code),
+                send_header=sent.__setitem__, end_headers=lambda: None,
+            )
+            with mock.patch.object(bridge, "GATUS_PORT", upstream.server_port):
+                bridge._proxy(handler)
+            self.assertEqual(paths, ["/start"])
+            self.assertEqual(sent["status"], 302)
+            self.assertEqual(sent["Location"], "/private")
 
 
 class AccessLogTests(unittest.TestCase):
