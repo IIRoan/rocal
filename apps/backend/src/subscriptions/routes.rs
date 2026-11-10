@@ -32,6 +32,7 @@ request_schema!(UpdateSubscriptionRequest => zod::object([
     ("name", zod::string().optional()),
     ("encryptedName", zod::string().optional()),
     ("encryptionKeyVersion", key_version_schema()),
+    ("expectedNameRevision", zod::string().optional()),
     ("color", calendar_color_schema().optional()),
     ("isActive", zod::boolean().optional()),
     ("syncIntervalMinutes", zod::number().int().min(5).max(1440).optional()),

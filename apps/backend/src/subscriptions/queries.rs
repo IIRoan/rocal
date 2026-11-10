@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use sea_orm::prelude::TimeDateTime;
 use sea_orm::sea_query::{Condition, Expr, LockType, OnConflict};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set, Statement, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, Statement,
 };
 
 use crate::db::cuid;
@@ -59,6 +59,7 @@ pub async fn owned<C: ConnectionTrait>(
         .await
 }
 
+#[cfg(test)]
 pub async fn owned_with_calendar<C: ConnectionTrait>(
     db: &C,
     id: &str,
@@ -69,6 +70,31 @@ pub async fn owned_with_calendar<C: ConnectionTrait>(
         .find_also_related(calendar::Entity)
         .one(db)
         .await
+}
+
+/// Names are checked and written under the same locks; calendar first matches the legacy writer's order.
+pub async fn owned_for_update<C: ConnectionTrait>(
+    db: &C,
+    id: &str,
+    user_id: &str,
+) -> Result<Option<(calendar_subscription::Model, calendar::Model)>, sea_orm::DbErr> {
+    let Some(feed) = owned(db, id, user_id).await? else {
+        return Ok(None);
+    };
+    let Some(calendar) = calendar::Entity::find_by_id(&feed.calendar_id)
+        .filter(calendar::Column::UserId.eq(user_id))
+        .lock_exclusive()
+        .one(db)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let feed = calendar_subscription::Entity::find_by_id(id)
+        .filter(calendar_subscription::Column::UserId.eq(user_id))
+        .lock_exclusive()
+        .one(db)
+        .await?;
+    Ok(feed.map(|feed| (feed, calendar)))
 }
 
 pub async fn by_url<C: ConnectionTrait>(
@@ -141,14 +167,13 @@ pub struct FeedChanges<'a> {
     pub sync_interval_minutes: Option<i32>,
 }
 
-/// Renames and recolors the calendar, then updates the feed, in one transaction; a sealed name blanks both readable copies.
-pub async fn update_feed(
-    db: &DatabaseConnection,
+/// The caller holds both row locks until its transaction commits; a sealed name blanks both readable copies.
+pub async fn update_feed<C: ConnectionTrait>(
+    db: &C,
     feed: calendar_subscription::Model,
     calendar: calendar::Model,
     changes: FeedChanges<'_>,
 ) -> Result<(calendar_subscription::Model, calendar::Model), sea_orm::DbErr> {
-    let transaction = db.begin().await?;
     let name = if changes.sealed.is_some() {
         Some("")
     } else {
@@ -163,7 +188,7 @@ pub async fn update_feed(
         if let Some(color) = changes.color {
             row.color = Set(color.to_owned());
         }
-        row.update(&transaction).await?
+        row.update(db).await?
     } else {
         calendar
     };
@@ -177,8 +202,7 @@ pub async fn update_feed(
     if let Some(minutes) = changes.sync_interval_minutes {
         row.sync_interval_minutes = Set(minutes);
     }
-    let feed = row.update(&transaction).await?;
-    transaction.commit().await?;
+    let feed = row.update(db).await?;
     Ok((feed, calendar))
 }
 

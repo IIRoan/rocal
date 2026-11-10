@@ -518,6 +518,127 @@ async fn sealing_a_feed_name_blanks_both_readable_copies_and_then_refuses_readab
 }
 
 #[tokio::test]
+async fn sealing_with_a_stale_name_revision_preserves_newer_readable_and_sealed_names() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let feed = insert_feed(&app, &user, "https://example.com/feed.ics", 0).await;
+    let other_feed = insert_feed(&app, &user, "https://example.com/other.ics", 0).await;
+    let path = format!("/api/subscriptions/{}", feed.subscription_id);
+    let subscriptions: Vec<CalendarSubscription> = ok(user.get("/api/subscriptions").await.dto());
+    let original = subscriptions
+        .iter()
+        .find(|entry| entry.id.0 == feed.subscription_id)
+        .expect("feed");
+    let other = subscriptions
+        .iter()
+        .find(|entry| entry.id.0 == other_feed.subscription_id)
+        .expect("other feed");
+    assert_ne!(
+        original.name_revision, other.name_revision,
+        "the revision is bound to the feed"
+    );
+    let renamed: CalendarSubscription = ok(user
+        .put(&path, json!({"name": "Clinic"}))
+        .await
+        .expect_status(200)
+        .and_then(|response| response.dto()));
+
+    ok(user
+        .put(&path, json!({"encryptedName": fake_envelope(), "expectedNameRevision": original.name_revision, "isActive": false}))
+        .await
+        .expect_error(409, "Conflict", "The calendar name changed on another device. Try again."));
+    assert_eq!(name_columns(&app, &feed).await.0, "Clinic");
+    let is_active: bool =
+        sqlx::query_scalar("SELECT is_active FROM calendar_subscription WHERE id = $1")
+            .bind(&feed.subscription_id)
+            .fetch_one(&app.db)
+            .await
+            .expect("rejected changes are rolled back");
+    assert!(is_active);
+
+    let sealed: CalendarSubscription = ok(user
+        .put(&path, json!({"encryptedName": fake_envelope(), "expectedNameRevision": renamed.name_revision}))
+        .await
+        .expect_status(200)
+        .and_then(|response| response.dto()));
+    let newest_name = fake_envelope();
+    let newest: CalendarSubscription = ok(user
+        .put(&path, json!({"encryptedName": newest_name}))
+        .await
+        .expect_status(200)
+        .and_then(|response| response.dto()));
+    assert_ne!(sealed.name_revision, newest.name_revision);
+    ok(user
+        .put(
+            &path,
+            json!({"encryptedName": fake_envelope(), "expectedNameRevision": sealed.name_revision}),
+        )
+        .await
+        .expect_error(
+            409,
+            "Conflict",
+            "The calendar name changed on another device. Try again.",
+        ));
+    assert_eq!(name_columns(&app, &feed).await.2, Some(newest_name));
+}
+
+#[tokio::test]
+async fn a_readable_rename_waiting_for_a_seal_cannot_restore_plaintext() {
+    let app = TestApp::spawn().await;
+    let user = app.user().await;
+    let feed = insert_feed(&app, &user, "https://example.com/feed.ics", 0).await;
+    let mut transaction = app.db.begin().await.expect("lock transaction");
+    sqlx::query("SELECT id FROM calendar WHERE id = $1 FOR UPDATE")
+        .bind(&feed.calendar_id)
+        .execute(&mut *transaction)
+        .await
+        .expect("hold calendar lock");
+    let mut legacy = user.agent.clone();
+    let path = format!("/api/subscriptions/{}", feed.subscription_id);
+    let rename = tokio::spawn(async move { legacy.put(&path, json!({"name": "Clinic"})).await });
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            let waiting: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock')",
+            )
+            .fetch_one(&app.db)
+            .await
+            .expect("observe blocked rename");
+            if waiting {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("rename reaches the calendar lock");
+    let ciphertext = fake_envelope();
+    sqlx::query("UPDATE calendar SET name = '', encrypted_name = $1, encryption_state = 'encrypted' WHERE id = $2")
+        .bind(&ciphertext)
+        .bind(&feed.calendar_id)
+        .execute(&mut *transaction)
+        .await
+        .expect("seal while the rename waits");
+    sqlx::query("UPDATE calendar_subscription SET name = '' WHERE id = $1")
+        .bind(&feed.subscription_id)
+        .execute(&mut *transaction)
+        .await
+        .expect("blank the feed name");
+    transaction.commit().await.expect("commit the seal");
+
+    expect_field_error(
+        &rename.await.expect("rename task").expect("rename response"),
+        "This calendar's name is encrypted. Update the app to rename it.",
+        "name",
+    );
+    let columns = name_columns(&app, &feed).await;
+    assert_eq!(
+        (columns.0, columns.1, columns.2),
+        (String::new(), String::new(), Some(ciphertext))
+    );
+}
+
+#[tokio::test]
 async fn create_refuses_a_url_the_user_already_follows() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;

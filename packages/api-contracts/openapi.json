@@ -2936,6 +2936,7 @@
         "required": [
           "id",
           "name",
+          "nameRevision",
           "url",
           "isActive",
           "syncIntervalMinutes",
@@ -3003,6 +3004,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "nameRevision": {
+            "type": "string",
+            "description": "An opaque revision of the two stored names, bound to this subscription and never persisted."
           },
           "syncIntervalMinutes": {
             "type": "integer",
@@ -7869,6 +7874,10 @@
           "encryptionKeyVersion": {
             "type": "integer",
             "format": "int32"
+          },
+          "expectedNameRevision": {
+            "type": "string",
+            "description": "Background sealing may replace only the names read with this revision."
           },
           "isActive": {
             "type": "boolean"

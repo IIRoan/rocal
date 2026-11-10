@@ -12,6 +12,8 @@ use crate::events::ParticipantInput;
 pub struct CalendarSubscription {
     pub id: SubscriptionId,
     pub name: String,
+    /// An opaque revision of the two stored names, bound to this subscription and never persisted.
+    pub name_revision: String,
     pub url: String,
     pub is_active: bool,
     pub sync_interval_minutes: i32,
@@ -104,6 +106,10 @@ pub struct UpdateSubscriptionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
+    /// Background sealing may replace only the names read with this revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub expected_name_revision: Option<String>,
     /// Recolors the mirrored calendar.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]

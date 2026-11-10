@@ -6,6 +6,7 @@ mod m20261029_120000_drop_unused_storage;
 mod m20261030_120000_encrypted_settings_preferences;
 mod m20261030_130000_sealed_reminder_lead;
 mod m20261106_121932_clear_search_tokens;
+mod m20261110_085151_discard_search_tokens;
 
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, TransactionTrait};
 use sea_orm_migration::{MigrationTrait, MigratorTrait};
@@ -25,6 +26,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261030_120000_encrypted_settings_preferences::Migration),
             Box::new(m20261030_130000_sealed_reminder_lead::Migration),
             Box::new(m20261106_121932_clear_search_tokens::Migration),
+            Box::new(m20261110_085151_discard_search_tokens::Migration),
         ]
     }
 }

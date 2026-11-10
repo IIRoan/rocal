@@ -1,3 +1,5 @@
+Subscribed calendar names are sealed in the shared client. Background sealing sends the subscription's opaque `nameRevision` as `expectedNameRevision`; the API compares it under row locks so a newer rename wins, and database triggers discard search tokens from older API instances during deployment.
+
 Auth uses rolling 14-day app and passkey sessions; Better Auth checks hourly and on focus/reconnect, with renewal cookies forwarded by the API.
 
 Calendar’s Riftbound palette settings also ship in native Calendar’s account drawer. Preferences stay sealed; `/api/riftbound` returns public store/events and registered-identity hashes, never accepts a Riot ID or login. Matching and encryption run on-device for the past 30 days and upcoming events while Calendar is open; the existing ICS import skips duplicates for Riftbound and a sealed ledger of imported IDs keeps deleted copies gone; existing imports are not automatically edited or deleted. Registered-only matching is opt-in because imported times can reveal the Riot ID to the server.

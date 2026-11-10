@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import type { CalendarEvent } from "@workspace/calendar-core";
+import type { CalendarEvent, UpdateSubscriptionRequest } from "@workspace/calendar-core";
 import { NoopE2eeProvider, withDecryptedEventContent } from "@workspace/e2ee";
 
 import { CalendarApiService } from "../calendar-api-service";
@@ -122,10 +122,10 @@ describe("upgradeStoredEncryption", () => {
       }),
       sealPendingReminders: jest.fn(async () => true),
       getSubscriptions: jest.fn(async () => [
-        { id: "s1", name: " Therapy practice " },
+        { id: "s1", name: " Therapy practice ", nameRevision: "original-revision" },
         { id: "s2", name: "" },
       ] as never),
-      updateSubscription: jest.fn(async () => ({}) as never),
+      updateSubscription: jest.fn(async (_id: string, _request: UpdateSubscriptionRequest) => ({}) as never),
     };
   }
 
@@ -147,7 +147,39 @@ describe("upgradeStoredEncryption", () => {
     await upgradeStoredEncryption(api);
 
     expect(api.getSubscriptions).toHaveBeenCalledTimes(1);
-    expect(api.updateSubscription.mock.calls).toEqual([["s1", { name: "Therapy practice" }]]);
+    expect(api.updateSubscription.mock.calls).toEqual([["s1", {
+      name: "Therapy practice",
+      expectedNameRevision: "original-revision",
+    }]]);
+  });
+
+  it("keeps a newer rename when the subscription changes after the sweep reads it", async () => {
+    const api = fakeApi({ subscriptionsWithReadableNames: ["s1"] });
+    let storedName = "New user name";
+    api.updateSubscription.mockImplementation(async (_id, request) => {
+      if (
+        request.expectedNameRevision &&
+        request.expectedNameRevision !== "new-revision"
+      )
+        throw new Error("Conflict");
+      storedName = request.name ?? storedName;
+      return {} as never;
+    });
+
+    await upgradeStoredEncryption(api);
+
+    expect(storedName).toBe("New user name");
+  });
+
+  it("leaves names alone when an older server supplies no revision", async () => {
+    const api = fakeApi({ subscriptionsWithReadableNames: ["s1"] });
+    api.getSubscriptions.mockResolvedValue([
+      { id: "s1", name: "Old name" },
+    ] as never);
+
+    await upgradeStoredEncryption(api);
+
+    expect(api.updateSubscription).not.toHaveBeenCalled();
   });
 
   it("runs each reported fix, and one failure does not stop the rest", async () => {

@@ -1226,6 +1226,8 @@ export interface components {
             /** @description `pending`, `success` or `error`. */
             lastSyncStatus: string;
             name: string;
+            /** @description An opaque revision of the two stored names, bound to this subscription and never persisted. */
+            nameRevision: string;
             /** Format: int32 */
             syncIntervalMinutes: number;
             updatedAt: components["schemas"]["Timestamp"];
@@ -2556,6 +2558,8 @@ export interface components {
             encryptedName?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
+            /** @description Background sealing may replace only the names read with this revision. */
+            expectedNameRevision?: string;
             isActive?: boolean;
             /** @description A readable rename from a shipped binary; refused once the name is sealed. */
             name?: string;

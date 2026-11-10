@@ -181,13 +181,13 @@ describe("CalendarApiService encrypted names", () => {
       url: "https://feeds.test/a.ics",
       color: "blue",
     });
-    await service.updateSubscription("s1", { name: "Clinic", isActive: false });
+    await service.updateSubscription("s1", { name: "Clinic", isActive: false, expectedNameRevision: "original-revision" });
     const [listed] = await service.getSubscriptions();
 
     const bodies = fetchMock.mock.calls.map(([, init]) => init?.body && JSON.parse(String(init.body)));
     expect(bodies.slice(0, 2)).toEqual([
       { url: "https://feeds.test/a.ics", color: "blue", encryptedName: "sealed:Therapy practice", encryptionKeyVersion: 1 },
-      { isActive: false, encryptedName: "sealed:Clinic", encryptionKeyVersion: 1 },
+      { isActive: false, expectedNameRevision: "original-revision", encryptedName: "sealed:Clinic", encryptionKeyVersion: 1 },
     ]);
     for (const subscription of [created, listed]) {
       expect(subscription).toMatchObject({

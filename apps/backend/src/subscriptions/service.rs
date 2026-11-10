@@ -9,6 +9,7 @@ use reqwest::header::{
 };
 use reqwest::{Method, StatusCode};
 use sea_orm::{ConnectionTrait, Set, TransactionTrait};
+use sha2::{Digest, Sha256};
 use solace_api_types::Timestamp;
 use solace_api_types::events::ParticipantInput;
 use solace_api_types::subscriptions::{
@@ -163,12 +164,31 @@ fn calendar_dto(model: calendar::Model) -> SubscribedCalendar {
     }
 }
 
+/// Binding the revision to the subscription prevents equal readable names from sharing a token.
+fn name_revision(feed: &calendar_subscription::Model, calendar: &calendar::Model) -> String {
+    let mut hash = Sha256::new();
+    for value in [
+        feed.id.as_str(),
+        feed.name.as_str(),
+        calendar.name.as_str(),
+        calendar.encrypted_name.as_deref().unwrap_or_default(),
+        calendar.encryption_state.as_str(),
+    ] {
+        hash.update(value.len().to_string().as_bytes());
+        hash.update(b":");
+        hash.update(value.as_bytes());
+    }
+    hash.update(calendar.encryption_key_version.to_be_bytes());
+    hex::encode(hash.finalize())
+}
+
 fn dto(
     feed: calendar_subscription::Model,
     calendar: calendar::Model,
     sync_logs: Option<i64>,
 ) -> CalendarSubscription {
     CalendarSubscription {
+        name_revision: name_revision(&feed, &calendar),
         id: feed.id.into(),
         name: feed.name,
         url: feed.url,
@@ -324,11 +344,18 @@ pub async fn update(
     id: &str,
     request: UpdateSubscriptionRequest,
 ) -> Result<CalendarSubscription, AppError> {
-    let Some((feed, Some(calendar))) =
-        queries::owned_with_calendar(&state.db, id, &user.id).await?
+    let transaction = state.db.begin().await?;
+    let Some((feed, calendar)) = queries::owned_for_update(&transaction, id, &user.id).await?
     else {
         return Err(AppError::NotFound(NOT_FOUND.into()));
     };
+    if let Some(expected) = &request.expected_name_revision
+        && *expected != name_revision(&feed, &calendar)
+    {
+        return Err(AppError::Conflict(
+            "The calendar name changed on another device. Try again.".into(),
+        ));
+    }
     let sealed = sealed_name(
         request.encrypted_name.as_deref(),
         request.encryption_key_version,
@@ -361,7 +388,8 @@ pub async fn update(
         is_active: request.is_active,
         sync_interval_minutes: request.sync_interval_minutes,
     };
-    let (feed, calendar) = queries::update_feed(&state.db, feed, calendar, changes).await?;
+    let (feed, calendar) = queries::update_feed(&transaction, feed, calendar, changes).await?;
+    transaction.commit().await?;
     Ok(dto(feed, calendar, None))
 }
 
