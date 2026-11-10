@@ -21,7 +21,7 @@ jobs:
         uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
 
@@ -100,7 +100,7 @@ jobs:
         uses: chainguard-actions/Swatinem-rust-cache@203beff8e447695cdc59f7c4f322178a54ec6be4 # v2.9.3
 
       - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
 

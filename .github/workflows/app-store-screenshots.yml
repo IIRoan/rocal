@@ -31,7 +31,7 @@ jobs:
         with:
           path: ${{ runner.temp }}/build/Build/Products/Release-iphonesimulator
           key: ${{ matrix.app }}-simulator-app-v2-${{ hashFiles('bun.lock', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/src/**', 'packages/native-core/plugins/**', format('apps/native-{0}/app/**', matrix.app), format('apps/native-{0}/src/**', matrix.app), format('apps/native-{0}/assets/**', matrix.app), format('apps/native-{0}/*.json', matrix.app), format('apps/native-{0}/*.ts', matrix.app), format('apps/native-{0}/*.js', matrix.app), format('apps/native-{0}/*.cts', matrix.app)) }}
-      - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+      - uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
       - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0

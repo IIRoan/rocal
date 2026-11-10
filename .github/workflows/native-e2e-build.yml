@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           echo "SOLACE_E2E_DIR=$RUNNER_TEMP/solace-e2e" >> "$GITHUB_ENV"
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
-      - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+      - uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
       - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
