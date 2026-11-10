@@ -4,30 +4,29 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    # A hijacked release is usually caught within days; never propose one sooner.
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 3
+    # Security updates use a separate limit; zero disables only routine version updates.
+    open-pull-requests-limit: 0
     groups:
       javascript:
-        update-types: [minor, patch]
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     groups:
       rust:
-        update-types: [minor, patch]
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    # A hijacked release is usually caught within days; never propose one sooner.
     cooldown:
       default-days: 7
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
     groups:
       actions:
-        update-types: [minor, patch]
+        patterns: ["*"]
