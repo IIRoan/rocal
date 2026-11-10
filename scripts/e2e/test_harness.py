@@ -327,6 +327,28 @@ class HarnessTests(unittest.TestCase):
                     self.assertEqual(journeys.agenda_anchor_label(fixture), expected)
                     self.assertEqual(journeys.agenda_anchor_date(fixture).isoformat(), key)
 
+    def test_ios_driver_failure_categories_preserve_the_specific_cause(self):
+        cases = (
+            ("Maestro driver timed out during viewHierarchy", "driver-timeout"),
+            ("Maestro driver timed out during viewHierarchy: process main thread busy", "app-main-thread-busy"),
+            ("Maestro driver timed out during viewHierarchy. Your app is doing heavy work on the main/UI thread.", "app-main-thread-busy"),
+            ("Maestro driver timed out during viewHierarchy: Timed out while evaluating UI query", "ax-query-timeout"),
+            ("Maestro driver timed out during viewHierarchy. Your app screen might be too complex.", "ax-query-timeout"),
+            ("Error getting main window kAXErrorCannotComplete", "driver-ax-error"),
+            ("Request for viewHierarchy failed, because of unknown reason", "driver-ax-error"),
+            ("Request failed, the app is not running", "app-not-running"),
+            ("The app is not running. It may have crashed or been closed.", "app-not-running"),
+            ("App not running during viewHierarchy command", "app-not-running"),
+            ("Assertion is false: Welcome back is visible", "assertion"),
+            ("Unexpected private response", "maestro-failure"),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "maestro.log"
+            for message, expected in cases:
+                with self.subTest(expected=expected, message=message):
+                    log.write_text(message)
+                    self.assertEqual(journeys.failure_kind(log), expected)
+
     def test_journey_output_and_driver_failures_stay_private_but_classified(self):
         timeout = "java.net.SocketTimeoutException"
         cases = {
@@ -339,6 +361,22 @@ class HarnessTests(unittest.TestCase):
             "junit-error-type": (b"Flow failed", f'<testsuite><testcase><error type="{timeout}" message="cookie-token-sentinel" /></testcase></testsuite>', None, 1,
                                  "driver-timeout", {"exceptionType": timeout, "command": None, "exitCode": 1}),
         }
+        for index, (marker, reason) in enumerate((
+            ("Maestro driver timed out during viewHierarchy", "driver-timeout"),
+            ("process main thread busy", "app-main-thread-busy"),
+            ("Your app is doing heavy work on the main/UI thread.", "app-main-thread-busy"),
+            ("Timed out while evaluating UI query", "ax-query-timeout"),
+            ("Your app screen might be too complex.", "ax-query-timeout"),
+            ("kAXErrorCannotComplete", "driver-ax-error"),
+            ("failed, because of unknown reason", "driver-ax-error"),
+            ("the app is not running", "app-not-running"),
+            ("The app is not running. It may have crashed or been closed.", "app-not-running"),
+            ("App not running during viewHierarchy command", "app-not-running"),
+        )):
+            cases[f"ios-driver-{index}"] = (
+                f"{marker}: secret-output-sentinel cookie-token-sentinel".encode(), None, None, 1,
+                reason, {"exceptionType": None, "command": None, "exitCode": 1},
+            )
         for case, (console_output, report, trace, code, reason, details) in cases.items():
             with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary) / "solace-e2e"

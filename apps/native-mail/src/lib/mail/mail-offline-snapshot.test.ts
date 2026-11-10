@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { resolveMailServerPolicy } from "@workspace/calendar-core";
+import * as calendarCore from "@workspace/calendar-core";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import type { MailRuntime } from "./mail-runtime";
 import type { MailboxMessagesInfiniteData } from "./mail-message-cache";
@@ -13,6 +13,16 @@ import {
 } from "./mail-offline-snapshot";
 import type { MailDecryptResult } from "./mail-crypto";
 import type { JmapEmailMessage } from "./types";
+
+jest.mock("@workspace/calendar-core", () => ({
+  ...jest.requireActual("@workspace/calendar-core"),
+  __esModule: true,
+  MAIL_KEY_CONTINUITY_ENABLED: false,
+}));
+
+const continuityFlag: { MAIL_KEY_CONTINUITY_ENABLED: boolean } = calendarCore;
+
+afterEach(() => jest.restoreAllMocks());
 
 jest.mock("./mail-api", () => ({
   createServerMailTokenManager: jest.fn(() => ({
@@ -59,7 +69,7 @@ function runtime(): MailRuntime {
     identities: [{ id: "i1", email: "alice@solace.onl" }],
     pickerIdentities: [],
     encryptedAtRest: false,
-    mailServerPolicy: resolveMailServerPolicy({}),
+    mailServerPolicy: calendarCore.resolveMailServerPolicy({}),
   };
 }
 
@@ -514,7 +524,6 @@ describe("decrypted content in the snapshot", () => {
 
     expect(queryClient.getQueryData(QUERY_KEYS.mailDecrypted("a"))).toEqual({
       ...decrypted("Secret plan"),
-      senderKeyTrustState: { kind: "unavailable", reason: "history" },
     });
     expect(
       queryClient.getQueryState(QUERY_KEYS.mailDecrypted("a"))?.isInvalidated,
@@ -535,6 +544,7 @@ describe("decrypted content in the snapshot", () => {
 });
 
 it("restores historical signature facts without restoring a current pinned sender verdict", () => {
+  jest.replaceProperty(continuityFlag, "MAIL_KEY_CONTINUITY_ENABLED", true);
   const source = seededClient();
   source.setQueryData(
     QUERY_KEYS.mailMessages("inbox"),
@@ -559,3 +569,61 @@ it("restores historical signature facts without restoring a current pinned sende
     senderKeyTrustState: { kind: "unavailable", reason: "history" },
   });
 });
+
+it.each([false, true])(
+  "restores legacy signature labels only while key continuity is disabled (enabled=%s)",
+  (enabled) => {
+    jest.replaceProperty(
+      continuityFlag,
+      "MAIL_KEY_CONTINUITY_ENABLED",
+      enabled,
+    );
+    const source = seededClient();
+    source.setQueryData(
+      QUERY_KEYS.mailMessages("inbox"),
+      listData([message("foreign"), message("own")]),
+    );
+    const foreign: MailDecryptResult = {
+      plaintext: "Foreign signed text",
+      signatureVerificationState: "verified",
+      hasVerifiedSignature: true,
+    };
+    const own: MailDecryptResult = {
+      ...foreign,
+      plaintext: "Own signed text",
+      senderKeyTrustState: { kind: "self" },
+    };
+    source.setQueryData(QUERY_KEYS.mailDecrypted("foreign"), foreign);
+    source.setQueryData(QUERY_KEYS.mailDecrypted("own"), own);
+    const snapshot = captureMailOfflineSnapshot(source, {
+      userId: "u1",
+      emailState: "s1",
+    });
+    if (!snapshot) throw new Error("Expected a signed snapshot");
+    const restored = new QueryClient();
+    hydrateMailOfflineSnapshot(restored, snapshot);
+    for (const [id, original, label] of [
+      ["foreign", foreign, "Signature verified"],
+      ["own", own, "Signed with your local key"],
+    ] as const) {
+      const result = restored.getQueryData<MailDecryptResult>(
+        QUERY_KEYS.mailDecrypted(id),
+      );
+      expect(result?.signatureVerificationState).toBe("verified");
+      expect(result?.senderKeyTrustState).toEqual(
+        enabled
+          ? { kind: "unavailable", reason: "history" }
+          : original.senderKeyTrustState,
+      );
+      expect(
+        calendarCore.getMailSignatureVerificationLabel(
+          "verified",
+          result?.senderKeyTrustState,
+        ),
+      ).toBe(
+        enabled ? "Earlier signature check, key history unconfirmed" : label,
+      );
+    }
+    expect(source.getQueryData(QUERY_KEYS.mailDecrypted("own"))).toEqual(own);
+  },
+);

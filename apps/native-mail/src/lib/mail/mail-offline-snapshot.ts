@@ -1,4 +1,7 @@
-import { mailSenderKeyTrustStateSchema } from "@workspace/calendar-core";
+import {
+  MAIL_KEY_CONTINUITY_ENABLED,
+  mailSenderKeyTrustStateSchema,
+} from "@workspace/calendar-core";
 import type { Query, QueryClient, QueryKey } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import {
@@ -397,10 +400,12 @@ export function hydrateMailOfflineSnapshot(
   for (const entry of snapshot.decrypted) {
     const key = QUERY_KEYS.mailDecrypted(entry.messageId);
     if (queryClient.getQueryData(key) !== undefined) continue;
-    const result: MailDecryptResult = {
-      ...entry.result,
-      senderKeyTrustState: { kind: "unavailable", reason: "history" },
-    };
+    const result: MailDecryptResult = MAIL_KEY_CONTINUITY_ENABLED
+      ? {
+          ...entry.result,
+          senderKeyTrustState: { kind: "unavailable", reason: "history" },
+        }
+      : entry.result;
     queryClient.setQueryData(key, result, { updatedAt: now });
     if (entry.partial) {
       void queryClient.invalidateQueries({

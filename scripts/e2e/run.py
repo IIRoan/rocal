@@ -50,7 +50,15 @@ def failure_kind(log, report=None):
         return "app-crash"
     if "DeviceUnreachableException" in content:
         return "driver-connection"
-    if any(marker in content for marker in ("TimeoutException", "DEADLINE_EXCEEDED", "OperationTimeout")):
+    if any(marker in content for marker in ("process main thread busy", "Your app is doing heavy work on the main/UI thread")):
+        return "app-main-thread-busy"
+    if any(marker in content for marker in ("Timed out while evaluating UI query", "Your app screen might be too complex")):
+        return "ax-query-timeout"
+    if any(marker in content for marker in ("the app is not running", "The app is not running", "App not running during")):
+        return "app-not-running"
+    if any(marker in content for marker in ("kAXError", "failed, because of unknown reason")):
+        return "driver-ax-error"
+    if any(marker in content for marker in ("TimeoutException", "DEADLINE_EXCEEDED", "OperationTimeout", "Maestro driver timed out")):
         return "driver-timeout"
     if any(marker in content for marker in ("Connection refused", "Failed to connect to", "UNAVAILABLE: io exception", "DeviceServerDiedException")):
         return "driver-connection"
