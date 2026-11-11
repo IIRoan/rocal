@@ -14,6 +14,7 @@ import { mailDemoApiService } from "@/lib/mail/api-service";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import { mergeMailMessage, mergeMailMessagePreservingKeywords } from "@/lib/mail/mail-message-body";
 import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
+import { guardMailKeywords, type MailKeywordGuard } from "@workspace/calendar-core";
 import type {
   JmapEmailMessage,
   JmapIdentity,
@@ -342,6 +343,7 @@ export function mergeMessagesForMailbox(
   currentMessages: JmapEmailMessage[],
   mailboxId: string,
   sync: MailSyncResponse["email"],
+  keywordGuard?: MailKeywordGuard,
 ): JmapEmailMessage[] {
   if (sync.records.length === 0 && sync.destroyed.length === 0) {
     return currentMessages;
@@ -359,9 +361,12 @@ export function mergeMessagesForMailbox(
   for (const message of sync.records) {
     if (message.mailboxIds?.[mailboxId]) {
       const existing = nextMessages.get(message.id);
+      const guarded = keywordGuard
+        ? guardMailKeywords(message, existing, keywordGuard)
+        : message;
       nextMessages.set(
         message.id,
-        existing ? mergeMailMessage(existing, message) : message,
+        existing ? mergeMailMessage(existing, guarded) : guarded,
       );
     } else {
       nextMessages.delete(message.id);

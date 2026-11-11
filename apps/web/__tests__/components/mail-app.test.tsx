@@ -291,6 +291,7 @@ const mockJmapClient = {
     .mockResolvedValue({ blobId: "sealed-blob", size: 64, type: "text/plain" }),
   markAsRead: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   markAsUnread: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  toggleFlagged: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   moveToTrash: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   moveToMailbox: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   createMailbox: jest.fn<() => Promise<any>>(),
@@ -397,19 +398,56 @@ jest.mock("../../components/mail/message-list", () => ({
   MessageList: ({
     messages,
     onSelect,
+    onToggleFlagged,
+    onMarkAsRead,
+    onMarkAsUnread,
+    onDelete,
   }: {
-    messages: { id: string; subject?: string }[];
+    messages: {
+      id: string;
+      subject?: string;
+      keywords?: Record<string, boolean>;
+    }[];
     onSelect?: (id: string) => void;
+    onToggleFlagged?: (id: string) => void;
+    onMarkAsRead?: (id: string) => void;
+    onMarkAsUnread?: (id: string) => void;
+    onDelete?: (id: string) => void;
   }) =>
     messages.length === 0 ? (
       <p>No messages</p>
     ) : (
       <ul>
         {messages.map((m) => (
-          <li key={m.id}>
+          <li
+            key={m.id}
+            data-message-row={m.id}
+            data-unread={m.keywords?.$seen ? "false" : "true"}
+            data-starred={m.keywords?.$flagged ? "true" : "false"}
+          >
             <button type="button" onClick={() => onSelect?.(m.id)}>
               {m.subject}
             </button>
+            <button
+              type="button"
+              aria-label={`Toggle star ${m.id}`}
+              onClick={() => onToggleFlagged?.(m.id)}
+            />
+            <button
+              type="button"
+              aria-label={`Mark read ${m.id}`}
+              onClick={() => onMarkAsRead?.(m.id)}
+            />
+            <button
+              type="button"
+              aria-label={`Mark unread ${m.id}`}
+              onClick={() => onMarkAsUnread?.(m.id)}
+            />
+            <button
+              type="button"
+              aria-label={`Trash ${m.id}`}
+              onClick={() => onDelete?.(m.id)}
+            />
           </li>
         ))}
       </ul>
@@ -2451,5 +2489,267 @@ describe("MailApp", () => {
     });
     expect(mockJmapClient.uploadPreparedAttachment).not.toHaveBeenCalled();
     expect(mockJmapClient.uploadPreparedAttachments).not.toHaveBeenCalled();
+  });
+
+  describe("keyword edits against server answers that were read earlier", () => {
+    /** What the fake server holds; reads answer from it at the moment they are asked. */
+    let serverKeywords: Record<string, Record<string, boolean>>;
+
+    function deferred<T>() {
+      let resolve: (value: T) => void = () => undefined;
+      const promise = new Promise<T>((done) => {
+        resolve = done;
+      });
+      return { promise, resolve };
+    }
+
+    const row = (id: string, keywords: Record<string, boolean> = {}) => ({
+      id,
+      subject: id === "mail-1" ? "Encrypted hello" : "Second message",
+      from: [{ email: "bob@solace.onl", name: "Bob" }],
+      receivedAt:
+        id === "mail-1" ? "2026-05-06T21:10:00.000Z" : "2026-05-06T20:10:00.000Z",
+      preview: "Hello Alice",
+      keywords,
+      mailboxIds: { "inbox-1": true },
+    });
+
+    const snapshot = (
+      records: ReturnType<typeof row>[],
+      destroyed: string[] = [],
+    ) => ({
+      accountId: "b",
+      initialized: true,
+      changedTypes: ["Email"],
+      email: {
+        oldState: "email-old",
+        newState: "email-new",
+        created: [],
+        updated: records.map((record) => record.id),
+        destroyed,
+        records,
+      },
+      mailbox: { oldState: "m", newState: "m", created: [], updated: [], destroyed: [], records: [] },
+      thread: { oldState: "t", newState: "t", created: [], updated: [], destroyed: [], records: [] },
+    });
+
+    /** Delivers a snapshot the way the realtime hook does, for an API sync response and an embedded SSE payload alike. */
+    async function deliverSync(
+      records: ReturnType<typeof row>[],
+      destroyed: string[] = [],
+    ) {
+      const { useMailRealtime } = jest.requireMock<
+        typeof import("../../hooks/use-mail-realtime")
+      >("@/hooks/use-mail-realtime");
+      const input = jest.mocked(useMailRealtime).mock.calls.at(-1)?.[0];
+      if (!input) throw new Error("The realtime hook was not mounted");
+      await act(async () => {
+        await input.onSync(snapshot(records, destroyed) as any);
+      });
+    }
+
+    const listRow = (id: string) =>
+      container.querySelector<HTMLElement>(`[data-message-row="${id}"]`);
+    const isUnread = (id = "mail-1") => listRow(id)?.dataset.unread === "true";
+    const isStarred = (id = "mail-1") => listRow(id)?.dataset.starred === "true";
+    const confirmingReads = () =>
+      mockJmapClient.getMessagesByIds.mock.calls.filter(
+        (call: unknown[]) =>
+          (call[2] as { includeBodies?: boolean } | undefined)?.includeBodies === false,
+      );
+
+    async function press(label: string) {
+      const button = container.querySelector<HTMLButtonElement>(
+        `[aria-label="${label}"]`,
+      );
+      if (!button) throw new Error(`No "${label}" control`);
+      await act(async () => {
+        button.click();
+      });
+    }
+
+    async function openInbox(
+      messages: ReturnType<typeof row>[],
+      strict = false,
+    ) {
+      serverKeywords = Object.fromEntries(
+        messages.map((message) => [message.id, { ...message.keywords }]),
+      );
+      mockJmapClient.getMailboxMessages.mockResolvedValue({
+        messages,
+        total: messages.length,
+      });
+      mockJmapClient.getMessagesByIds.mockImplementation(
+        async (...args: unknown[]) =>
+          (args[1] as string[]).map((id) => ({
+            ...row(id, { ...serverKeywords[id] }),
+            // A reader fetch must come back with a body, or the app keeps asking for one.
+            textBody: [{ partId: "text" }],
+            bodyValues: { text: { value: "Hello Alice" } },
+          })),
+      );
+      await renderApp(false, strict);
+      await waitForExpectation(() =>
+        expect(listRow("mail-1")).not.toBeNull(),
+      );
+    }
+
+    it("keeps a star through a sync snapshot read before the write, in flight or already answered", async () => {
+      await openInbox([row("mail-1")]);
+      const write = deferred<void>();
+      mockJmapClient.toggleFlagged.mockReturnValueOnce(write.promise);
+
+      await press("Toggle star mail-1");
+      expect(isStarred()).toBe(true);
+      await deliverSync([row("mail-1")]);
+      expect(isStarred()).toBe(true);
+      expect(confirmingReads()).toHaveLength(0);
+
+      serverKeywords["mail-1"] = { $flagged: true };
+      await act(async () => {
+        write.resolve();
+      });
+      await waitForExpectation(() => expect(confirmingReads()).toHaveLength(1));
+      expect(isStarred()).toBe(true);
+
+      await deliverSync([row("mail-1")]);
+      await waitForExpectation(() => expect(confirmingReads()).toHaveLength(2));
+      expect(isStarred()).toBe(true);
+    });
+
+    it("keeps a message unread through an earlier snapshot, then shows another device marking it read", async () => {
+      await openInbox([row("mail-1", { $seen: true })]);
+      expect(isUnread()).toBe(false);
+      const write = deferred<void>();
+      mockJmapClient.markAsUnread.mockReturnValueOnce(write.promise);
+
+      await press("Mark unread mail-1");
+      expect(isUnread()).toBe(true);
+      await deliverSync([row("mail-1", { $seen: true })]);
+      expect(isUnread()).toBe(true);
+
+      serverKeywords["mail-1"] = {};
+      await act(async () => {
+        write.resolve();
+      });
+      await deliverSync([row("mail-1", { $seen: true })]);
+      await waitForExpectation(() =>
+        expect(confirmingReads().length).toBeGreaterThan(0),
+      );
+      expect(isUnread()).toBe(true);
+
+      serverKeywords["mail-1"] = { $seen: true, $flagged: true };
+      await deliverSync([row("mail-1", { $seen: true, $flagged: true })]);
+      await waitForExpectation(() => expect(isUnread()).toBe(false));
+      expect(isStarred()).toBe(true);
+    });
+
+    it("merges a held manual refresh into the list as it is now: edits, a delete and the sync that follows", async () => {
+      await openInbox([row("mail-1", { $seen: true }), row("mail-2", { $seen: true })]);
+      const page = deferred<unknown>();
+      const sync = deferred<unknown>();
+      mockJmapClient.getMailboxMessages.mockReturnValueOnce(page.promise);
+      mockApi.syncAccount.mockReturnValueOnce(sync.promise as any);
+
+      const loads = mockJmapClient.getMailboxMessages.mock.calls.length;
+      await press("Refresh");
+      await waitForExpectation(() =>
+        expect(mockJmapClient.getMailboxMessages).toHaveBeenCalledTimes(loads + 1),
+      );
+
+      await press("Toggle star mail-1");
+      serverKeywords["mail-1"] = { $seen: true, $flagged: true };
+      await press("Mark unread mail-1");
+      serverKeywords["mail-1"] = { $flagged: true };
+      await waitForExpectation(() => {
+        expect(mockJmapClient.toggleFlagged).toHaveBeenCalledTimes(1);
+        expect(mockJmapClient.markAsUnread).toHaveBeenCalledTimes(1);
+      });
+      await press("Trash mail-2");
+      expect(listRow("mail-2")).toBeNull();
+
+      await act(async () => {
+        page.resolve({
+          messages: [row("mail-1", { $seen: true }), row("mail-2", { $seen: true })],
+          total: 2,
+        });
+      });
+      expect(isStarred()).toBe(true);
+      expect(isUnread()).toBe(true);
+      expect(listRow("mail-2")).toBeNull();
+
+      await act(async () => {
+        sync.resolve(snapshot([row("mail-1", { $seen: true })]));
+      });
+      await waitForExpectation(() =>
+        expect(confirmingReads().length).toBeGreaterThan(0),
+      );
+      expect(isStarred()).toBe(true);
+      expect(isUnread()).toBe(true);
+    });
+
+    it.each([false, true])(
+      "closes the open message when a sync removes its row and keeps it open otherwise (strict mode %s)",
+      async (strict) => {
+        await openInbox([row("mail-1"), row("mail-2")], strict);
+        await act(async () => {
+          Array.from(container.querySelectorAll("button"))
+            .find((button) => button.textContent === "Encrypted hello")
+            ?.click();
+        });
+        const readerOpen = () =>
+          container.querySelector('[aria-label="Close message"]') !== null;
+        await waitForExpectation(() => expect(readerOpen()).toBe(true));
+
+        await deliverSync([], ["mail-2"]);
+        await waitForExpectation(() => expect(listRow("mail-2")).toBeNull());
+        expect(readerOpen()).toBe(true);
+
+        await deliverSync([], ["mail-1"]);
+        await waitForExpectation(() => {
+          expect(listRow("mail-1")).toBeNull();
+          expect(readerOpen()).toBe(false);
+        });
+      },
+      15_000,
+    );
+
+    it("drops a held manual refresh when another mailbox is open by the time it answers", async () => {
+      await openInbox([row("mail-1")]);
+      const page = deferred<unknown>();
+      mockJmapClient.getMailboxMessages.mockImplementation(
+        async (...args: unknown[]) =>
+          args[1] === "junk-1"
+            ? {
+                messages: [
+                  {
+                    ...row("mail-9"),
+                    subject: "Junk hello",
+                    mailboxIds: { "junk-1": true },
+                  },
+                ],
+                total: 1,
+              }
+            : page.promise,
+      );
+
+      const loads = mockJmapClient.getMailboxMessages.mock.calls.length;
+      await press("Refresh");
+      await waitForExpectation(() =>
+        expect(mockJmapClient.getMailboxMessages).toHaveBeenCalledTimes(loads + 1),
+      );
+      await act(async () => {
+        Array.from(container.querySelectorAll("button"))
+          .find((element) => element.textContent?.includes("Junk Mail"))
+          ?.click();
+      });
+      await waitForExpectation(() => expect(listRow("mail-9")).not.toBeNull());
+
+      await act(async () => {
+        page.resolve({ messages: [row("mail-1")], total: 1 });
+      });
+      expect(listRow("mail-9")).not.toBeNull();
+      expect(listRow("mail-1")).toBeNull();
+    });
   });
 });

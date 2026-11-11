@@ -61,6 +61,7 @@ import {
 } from "@/lib/auth-navigation";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { useMailRealtime } from "@/hooks/use-mail-realtime";
+import { useMailKeywordReconciliation } from "@/hooks/use-mail-keyword-reconciliation";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { useSimpleLoginAliasAction } from "@/hooks/use-simplelogin-alias-action";
 import {
@@ -115,7 +116,7 @@ import {
   hasComposeHtmlBody,
   resolveOutgoingComposeBodies,
 } from "@/lib/mail/signature-utils";
-import { mergeRefreshedMailboxMessages } from "@/lib/mail/mail-list-merge";
+import { mergeRefreshedIntoCurrentMessages } from "@/lib/mail/mail-list-merge";
 import {
   readMailListSettings,
   MARK_AS_READ_DELAY_MS,
@@ -338,6 +339,20 @@ export function useMailApp() {
   >(new Map());
   const attachmentHoverPreviewUrlsRef = useRef<Set<string>>(new Set());
   const activeMailboxRef = useRef<ActiveMailboxState | null>(null);
+  const keywordReconciliation = useMailKeywordReconciliation({
+    accountId: activeMailbox
+      ? getPrimaryMailAccountId(activeMailbox.session)
+      : null,
+    activeMailboxRef,
+    setActiveMailbox,
+  });
+  const trackAutoReadWrite = useEffectEvent(
+    (enabled: boolean, messageId: string, write: () => Promise<void>) =>
+      keywordReconciliation.trackWrite(
+        [{ messageId, keyword: "$seen", enabled }],
+        write,
+      ),
+  );
   const composeSendInFlightRef = useRef(false);
   const quickReplySendInFlightRef = useRef(false);
   const quickReplyScopeRef = useRef<{ messageId: string; scope: string } | null>(null);
@@ -1227,13 +1242,16 @@ export function useMailApp() {
 
       applyOptimisticRead();
 
-      void currentMailbox.client
-        .markAsRead(currentMailbox.session, messageId)
+      void trackAutoReadWrite(true, messageId, () =>
+        currentMailbox.client.markAsRead(currentMailbox.session, messageId),
+      )
         .then(() => {
           if (autoReadNonceRef.current.get(messageId) !== nonce) {
-            return currentMailbox.client.markAsUnread(
-              currentMailbox.session,
-              messageId,
+            return trackAutoReadWrite(false, messageId, () =>
+              currentMailbox.client.markAsUnread(
+                currentMailbox.session,
+                messageId,
+              ),
             );
           }
           return undefined;
@@ -2899,9 +2917,17 @@ export function useMailApp() {
         : cur,
     );
     try {
-      await activeMailbox.client.bulkMarkAsUnread(
-        activeMailbox.session,
-        messageIds,
+      await keywordReconciliation.trackWrite(
+        messageIds.map((messageId) => ({
+          messageId,
+          keyword: "$seen",
+          enabled: false,
+        })),
+        () =>
+          activeMailbox.client.bulkMarkAsUnread(
+            activeMailbox.session,
+            messageIds,
+          ),
       );
     } catch (error) {
       log.error("Failed to bulk mark as unread", error);
@@ -2924,9 +2950,17 @@ export function useMailApp() {
         : cur,
     );
     try {
-      await activeMailbox.client.bulkMarkAsRead(
-        activeMailbox.session,
-        messageIds,
+      await keywordReconciliation.trackWrite(
+        messageIds.map((messageId) => ({
+          messageId,
+          keyword: "$seen",
+          enabled: true,
+        })),
+        () =>
+          activeMailbox.client.bulkMarkAsRead(
+            activeMailbox.session,
+            messageIds,
+          ),
       );
     } catch (error) {
       log.error("Failed to bulk mark as read", error);
@@ -2969,7 +3003,10 @@ export function useMailApp() {
       current.map((m) => (m.id === targetId ? markUnread(m) : m)),
     );
     try {
-      await activeMailbox.client.markAsUnread(activeMailbox.session, targetId);
+      await keywordReconciliation.trackWrite(
+        [{ messageId: targetId, keyword: "$seen", enabled: false }],
+        () => activeMailbox.client.markAsUnread(activeMailbox.session, targetId),
+      );
     } catch (error) {
       log.error("Failed to mark message as unread", error);
     }
@@ -2997,17 +3034,26 @@ export function useMailApp() {
         : cur,
     );
     try {
-      await activeMailbox.client.markAsRead(activeMailbox.session, targetId);
+      await keywordReconciliation.trackWrite(
+        [{ messageId: targetId, keyword: "$seen", enabled: true }],
+        () => activeMailbox.client.markAsRead(activeMailbox.session, targetId),
+      );
     } catch (error) {
       log.error("Failed to mark message as read", error);
     }
   };
 
   const handleRealtimeSync = (result: MailSyncResponse) => {
-    let resolvedSelectedMessageId: string | null | undefined;
     const calendarImport = result.calendarImport;
+    const keywordGuard = keywordReconciliation.guardSnapshot(
+      result.accountId,
+      result.email.records,
+    );
 
-    setActiveMailbox((current) => {
+    /** The mailbox with this snapshot merged in; unchanged when the snapshot is for another account. */
+    const applySync = (
+      current: ActiveMailboxState | null,
+    ): ActiveMailboxState | null => {
       if (!current) {
         return current;
       }
@@ -3030,14 +3076,9 @@ export function useMailApp() {
             current.messages,
             nextSelectedMailboxId,
             result.email,
+            keywordGuard,
           )
         : [];
-
-      resolvedSelectedMessageId =
-        selectedMessageId &&
-        nextMessages.some((message) => message.id === selectedMessageId)
-          ? selectedMessageId
-          : null;
 
       return {
         ...current,
@@ -3045,10 +3086,21 @@ export function useMailApp() {
         selectedMailboxId: nextSelectedMailboxId,
         messages: nextMessages,
       };
-    });
+    };
 
-    if (resolvedSelectedMessageId !== undefined) {
-      setSelectedMessageId(resolvedSelectedMessageId);
+    // The same pure merge answers whether the open message survives, so the updater has nothing to report back.
+    const latest = activeMailboxRef.current;
+    const merged = applySync(latest);
+    setActiveMailbox(applySync);
+    if (
+      merged &&
+      merged !== latest &&
+      selectedMessageId &&
+      !merged.messages.some((message) => message.id === selectedMessageId)
+    ) {
+      setSelectedMessageId((current) =>
+        current === selectedMessageId ? null : current,
+      );
     }
 
     const importedCount =
@@ -3073,39 +3125,70 @@ export function useMailApp() {
     if (!mailboxId) {
       return;
     }
-    setIsRefreshing(true);
-    try {
+    const accountId = getPrimaryMailAccountId(mailbox.session);
+    const isStillOpen = (
+      current: ActiveMailboxState | null,
+    ): current is ActiveMailboxState =>
+      current !== null &&
+      current.selectedMailboxId === mailboxId &&
+      getPrimaryMailAccountId(current.session) === accountId;
+    const refresh = async () => {
       const previousTotal = totalMessages;
       const pageSize = resolveMailboxMessagesPageSize(
         mailbox.mailServerPolicy,
         MAILBOX_MESSAGES_PAGE_SIZE,
       );
-      const { messages: refreshed, total } =
-        await mailbox.client.getMailboxMessages(mailbox.session, mailboxId, {
+      const started = activeMailboxRef.current?.messages ?? mailbox.messages;
+      const read = keywordReconciliation.beginRead();
+      const { messages: refreshed, total } = await mailbox.client
+        .getMailboxMessages(mailbox.session, mailboxId, {
           limit: pageSize,
           position: 0,
+        })
+        .catch((error: unknown) => {
+          keywordReconciliation.endRead(read, []);
+          throw error;
         });
-      setTotalMessages(total);
-      const merged = mergeRefreshedMailboxMessages(
-        mailbox.messages,
-        refreshed,
-        previousTotal,
-        total,
+      const keywordGuard = keywordReconciliation.endRead(
+        read,
+        refreshed.map((message) => message.id),
       );
-      seedMailMessageCache(queryClient, mailboxId, merged, total);
-      setActiveMailbox((cur) =>
-        cur ? { ...cur, messages: merged, selectedMailboxId: mailboxId } : cur,
-      );
+      // The page was requested a while ago, so it is merged into the list as it is now and only while this mailbox is still open.
+      const mergeInto = (current: JmapEmailMessage[]) =>
+        mergeRefreshedIntoCurrentMessages({
+          started,
+          current,
+          refreshed,
+          previousTotal,
+          newTotal: total,
+          keywordGuard,
+        });
+      const latest = activeMailboxRef.current;
+      if (isStillOpen(latest)) {
+        setTotalMessages(total);
+        seedMailMessageCache(
+          queryClient,
+          mailboxId,
+          mergeInto(latest.messages),
+          total,
+        );
+        setActiveMailbox((current) =>
+          isStillOpen(current)
+            ? { ...current, messages: mergeInto(current.messages) }
+            : current,
+        );
+      }
 
-      const accountId = getPrimaryMailAccountId(mailbox.session);
       if (accountId) {
         const result = await mailDemoApiService.syncAccount(accountId);
         handleRealtimeSync(result);
       }
-    } catch (error) {
+    };
+    setIsRefreshing(true);
+    await refresh().catch((error: unknown) => {
       log.error("Manual refresh failed", error);
       toast.error(getErrorMessage(error, "Could not refresh mail."));
-    }
+    });
     setIsRefreshing(false);
   };
 
@@ -3125,6 +3208,7 @@ export function useMailApp() {
     } catch {
       /* best-effort */
     }
+    keywordReconciliation.reset();
     setActiveMailbox(null);
     setSelectedMessageId(null);
     setSelectedMessagePlaintext(null);
@@ -3177,6 +3261,7 @@ export function useMailApp() {
   const handleSimpleLoginAction = useSimpleLoginAliasAction({
     activeMailbox,
     patchMessageKeyword,
+    trackKeywordWrite: keywordReconciliation.trackWrite,
   });
 
   const handleToggleFlagged = async (messageId?: string) => {
@@ -3192,10 +3277,14 @@ export function useMailApp() {
 
     patchMessageKeyword(msg, "$flagged", next);
     try {
-      await activeMailbox.client.toggleFlagged(
-        activeMailbox.session,
-        targetId,
-        next,
+      await keywordReconciliation.trackWrite(
+        [{ messageId: targetId, keyword: "$flagged", enabled: next }],
+        () =>
+          activeMailbox.client.toggleFlagged(
+            activeMailbox.session,
+            targetId,
+            next,
+          ),
       );
     } catch (error) {
       log.error("Failed to toggle flag", error);
@@ -3220,11 +3309,15 @@ export function useMailApp() {
 
     patchMessageKeyword(msg, keywordKey, assigned);
     try {
-      await activeMailbox.client.setMessageLabel(
-        activeMailbox.session,
-        messageId,
-        labelId,
-        assigned,
+      await keywordReconciliation.trackWrite(
+        [{ messageId, keyword: keywordKey, enabled: assigned }],
+        () =>
+          activeMailbox.client.setMessageLabel(
+            activeMailbox.session,
+            messageId,
+            labelId,
+            assigned,
+          ),
       );
     } catch (error) {
       log.error("Failed to set message label", error);
