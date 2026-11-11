@@ -8,6 +8,7 @@ export type MailKeywordLedger = {
   pendingAfterOverflow: number;
   /** Start ticks of the reads that have not answered yet. */
   reads: number[];
+  editCount: number;
   edits: Map<string, Map<string, MailKeywordEditState>>;
 };
 
@@ -34,6 +35,7 @@ export type MailKeywordGuard = {
 type KeywordRow = { id: string; keywords?: Record<string, boolean> | null };
 
 export const MAX_MAIL_KEYWORD_LEDGER_MESSAGES = 1000;
+export const MAX_MAIL_KEYWORD_LEDGER_EDITS = 1000;
 export const MAX_MAIL_KEYWORD_LEDGER_READS = 32;
 
 export function createMailKeywordLedger(): MailKeywordLedger {
@@ -42,6 +44,7 @@ export function createMailKeywordLedger(): MailKeywordLedger {
     floor: 0,
     pendingAfterOverflow: 0,
     reads: [],
+    editCount: 0,
     edits: new Map(),
   };
 }
@@ -52,6 +55,7 @@ function collapseLedger(ledger: MailKeywordLedger): void {
     for (const state of keys.values())
       ledger.pendingAfterOverflow += state.pending;
   ledger.edits.clear();
+  ledger.editCount = 0;
   ledger.reads.length = 0;
   ledger.floor = ++ledger.clock;
 }
@@ -64,8 +68,10 @@ function pruneSettledEdits(ledger: MailKeywordLedger): void {
   );
   for (const [messageId, keys] of [...ledger.edits]) {
     for (const [keyword, state] of [...keys]) {
-      if (state.pending === 0 && state.settledAt <= oldestRead)
+      if (state.pending === 0 && state.settledAt <= oldestRead) {
         keys.delete(keyword);
+        ledger.editCount -= 1;
+      }
     }
     if (keys.size === 0) ledger.edits.delete(messageId);
   }
@@ -79,17 +85,19 @@ export function beginMailKeywordEdits(
   const states: MailKeywordEditState[] = [];
   for (const edit of edits) {
     let keys = ledger.edits.get(edit.messageId);
+    if (!keys?.has(edit.keyword) && ledger.editCount >= MAX_MAIL_KEYWORD_LEDGER_EDITS) {
+      collapseLedger(ledger);
+      keys = undefined;
+    }
     if (!keys) {
-      if (ledger.edits.size >= MAX_MAIL_KEYWORD_LEDGER_MESSAGES)
-        collapseLedger(ledger);
       keys = new Map();
       ledger.edits.set(edit.messageId, keys);
     }
-    const state = keys.get(edit.keyword) ?? {
-      pending: 0,
-      settledAt: 0,
-      value: null,
-    };
+    let state = keys.get(edit.keyword);
+    if (!state) {
+      state = { pending: 0, settledAt: 0, value: null };
+      ledger.editCount += 1;
+    }
     state.pending += 1;
     state.value = edit.enabled;
     keys.set(edit.keyword, state);

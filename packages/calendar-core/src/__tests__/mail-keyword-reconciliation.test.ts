@@ -6,6 +6,7 @@ import {
   guardMailKeywords,
   hasPendingMailKeywordEdit,
   mailKeywordsDiffer,
+  MAX_MAIL_KEYWORD_LEDGER_EDITS,
   MAX_MAIL_KEYWORD_LEDGER_MESSAGES,
   MAX_MAIL_KEYWORD_LEDGER_READS,
   planMailKeywordMerge,
@@ -213,6 +214,30 @@ it("stays bounded when reads never answer: past the cap every read already begun
   expect(ledger.reads).toEqual([fresh]);
   endMailKeywordRead(ledger, fresh);
   expect(ledger.reads).toEqual([]);
+});
+
+it("bounds distinct keywords on one message and still waits for retired writes", () => {
+  const ledger = createMailKeywordLedger();
+  const finish: Array<(succeeded: boolean) => void> = [];
+  for (let index = 0; index <= MAX_MAIL_KEYWORD_LEDGER_EDITS; index += 1)
+    finish.push(beginMailKeywordEdits(ledger, [{
+      messageId: "one-message",
+      keyword: `label-${index}`,
+      enabled: true,
+    }]));
+  const count = [...ledger.edits.values()].reduce((total, keys) => total + keys.size, 0);
+  expect(count).toBeLessThanOrEqual(MAX_MAIL_KEYWORD_LEDGER_EDITS);
+  expect(ledger.editCount).toBe(count);
+  const stale = beginMailKeywordRead(ledger);
+  expect(planMailKeywordMerge(ledger, ["one-message"], stale).keepLocal).toBe(true);
+  for (const settle of finish) settle(true);
+  const fresh = beginMailKeywordRead(ledger);
+  expect(planMailKeywordMerge(ledger, ["one-message"], fresh).keepLocal).toBe(false);
+  endMailKeywordRead(ledger, stale);
+  endMailKeywordRead(ledger, fresh);
+  expect(ledger.edits.size).toBe(0);
+  expect(ledger.pendingAfterOverflow).toBe(0);
+  expect(ledger.editCount).toBe(0);
 });
 
 it.each(["reads", "messages"])(
