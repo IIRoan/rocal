@@ -1,8 +1,9 @@
 import ts from "typescript";
 
-import { type Rule, CLIENT_SOURCE, appSourceUnder, calleeName, find, isComponentName, walk } from "./engine";
+import { type Finding, type Rule, CLIENT_SOURCE, appSourceUnder, calleeName, find, isComponentName, walk } from "./engine";
 
 const REACT_SOURCE = appSourceUnder(CLIENT_SOURCE);
+const MODULE_DIRECTIVES = new Set(["use client", "use server", "use memo", "use no memo"]);
 
 const EFFECT_HOOKS = new Set(["useEffect", "useLayoutEffect", "useInsertionEffect"]);
 
@@ -51,6 +52,53 @@ const rootIdentifier = (node: ts.Expression): string | null => {
 };
 
 export const reactRules: Rule[] = [
+  {
+    id: "directive-prologue",
+    summary: "Module-level React directives are bare strings in the prologue before imports or other code.",
+    files: appSourceUnder(["apps/", "packages/"], /\.[cm]?[jt]sx?$/),
+    check: (file) => {
+      const source = file.ast();
+      const findings: Finding[] = [];
+      let inPrologue = true;
+      for (const statement of source.statements) {
+        const expression = ts.isExpressionStatement(statement) ? statement.expression : null;
+        let value = expression;
+        while (value && ts.isParenthesizedExpression(value)) value = value.expression;
+        if (
+          value && ts.isStringLiteral(value) &&
+          MODULE_DIRECTIVES.has(value.text) &&
+          (!inPrologue || value !== expression)
+        ) {
+          findings.push({
+            line: file.lineOf(statement.getStart(source)),
+            message: `"${value.text}" must be an unparenthesised directive before imports and other code`,
+          });
+        }
+        if (!expression || !ts.isStringLiteral(expression)) inPrologue = false;
+      }
+      return findings;
+    },
+    examples: {
+      path: "apps/web/components/client.tsx",
+      bad: [
+        'import { useState } from "react";\n"use client";',
+        'import { useState } from "react";\n("use client");',
+        '("use client");',
+        'const value = 1;\n"use server";',
+        'import React from "react";\n"use no memo";',
+        '("use memo");',
+      ],
+      good: [
+        '"use client";\nimport { useState } from "react";',
+        '// A licence header.\n"use server";\nexport async function action() {}',
+        '"use strict";\n"use client";',
+        '"use client";\n"use no memo";\nimport React from "react";',
+        '"use memo";\nexport function Component() { return null; }',
+        'const text = "use client";',
+        'export const value = 1;',
+      ],
+    },
+  },
   {
     id: "react-effect-lifecycle",
     summary: "Effects that install listeners, intervals, subscriptions, or observers return a cleanup function.",

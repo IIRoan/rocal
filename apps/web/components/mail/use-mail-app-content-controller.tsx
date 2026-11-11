@@ -1,6 +1,7 @@
+"use client";
+
 import { useMailboxSearch } from "@/hooks/use-mailbox-search";
 import { privateSearchCoverageText } from "@workspace/calendar-core";
-("use client");
 
 import {
   useEffect,

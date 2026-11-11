@@ -1,5 +1,6 @@
+"use client";
+
 import { privateSearchCoverageText } from "@workspace/calendar-core";
-("use client");
 
 import {
   useEffect,
