@@ -48,6 +48,12 @@ jobs:
       - name: Run tests with coverage
         run: bun run scripts/run-tests.ts --coverage --summary="$GITHUB_STEP_SUMMARY"
 
+      - name: Build the web production bundle
+        working-directory: apps/web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: bun run build
+
       - name: Check mail service helpers
         run: |
           python3 -B -m unittest discover -s apps/stalwart/tests -v
