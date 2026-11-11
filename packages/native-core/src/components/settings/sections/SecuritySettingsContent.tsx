@@ -1,3 +1,4 @@
+import { APP_SCHEME, CALENDAR_SCHEME } from "../../../lib/constants";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -152,7 +153,7 @@ export function SecuritySettingsContent() {
               key="title-index"
               icon="search"
               label="On-device search index"
-              detail="Keep encrypted titles of your mail and events, and the start of each message, on this device so older items stay searchable."
+              detail={APP_SCHEME === CALENDAR_SCHEME ? "On by default. Keep an encrypted search index of your events on this device." : "On by default. Keep an encrypted index of recent mail and excerpts on this device. Older mail may be missing."}
               value={titleIndexEnabled}
               onValueChange={(value) => {
                 setTitleIndexEnabled(value);

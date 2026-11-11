@@ -2,10 +2,12 @@ import { encryptForRecipients, ensureVaultLoaded } from "./mail-crypto";
 import { getRecipientKey } from "./mail-api";
 import { resolveOutgoingMessageBody } from "./outgoing-message-crypto";
 import type { MailRuntime } from "./mail-runtime";
+import { StalwartJmapClient } from "./jmap-client";
 
 jest.mock("./mail-crypto", () => ({
   encryptForRecipients: jest.fn(),
   ensureVaultLoaded: jest.fn(),
+  isMailVaultCurrent: jest.fn(() => true),
 }));
 
 jest.mock("./mail-api", () => ({
@@ -23,7 +25,7 @@ function createRuntime(): MailRuntime {
       signupEnabled: true,
       oauth: {} as MailRuntime["config"]["oauth"],
     },
-    client: { uploadBlob } as unknown as MailRuntime["client"], // Only the blob upload is exercised.
+    client: Object.assign(new StalwartJmapClient({ baseUrl: "https://mail.solace.test", accessToken: "synthetic-token" }), { uploadBlob }),
     session: {} as MailRuntime["session"],
     accountId: "acc-1",
     mailboxes: [],
@@ -70,6 +72,9 @@ describe("resolveOutgoingMessageBody", () => {
     });
 
     expect(result).toEqual({
+      kind: "plaintext",
+      contentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      isCurrent: expect.any(Function),
       textBody: "Hello Gmail",
       encrypted: false,
       sentCopyCiphertext: { blobId: "sealed-blob", size: ARMORED.length },
@@ -86,7 +91,7 @@ describe("resolveOutgoingMessageBody", () => {
     expect(getRecipientKey).not.toHaveBeenCalled();
   });
 
-  it("encrypts internal mail with attachments to the recipient and sender as PGP/MIME", async () => {
+  it("carries sealed internal attachment MIME through raw import", async () => {
     const result = await resolveOutgoingMessageBody({
       runtime: createRuntime(),
       recipients: ["bob@solace.onl"],
@@ -96,9 +101,12 @@ describe("resolveOutgoingMessageBody", () => {
     });
 
     expect(result).toEqual({
+      kind: "import",
+      contentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      isCurrent: expect.any(Function),
       textBody: "",
       encrypted: true,
-      pgpMimeCiphertext: { blobId: "sealed-blob", size: ARMORED.length },
+      pgpMimeMessage: ARMORED,
       sentCopyCiphertext: null,
     });
     expect(encryptForRecipients).toHaveBeenCalledWith({
@@ -106,5 +114,6 @@ describe("resolveOutgoingMessageBody", () => {
       recipientPublicKeysArmored: ["sender-public-key", "recipient-public-key"],
     });
     expect(getRecipientKey).toHaveBeenCalledWith("bob@solace.onl");
+    expect(uploadBlob).not.toHaveBeenCalled();
   });
 });

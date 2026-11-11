@@ -4,6 +4,8 @@ export * from "./content-encryption";
 export * from "./calendar-query-keys";
 export * from "./mail-types";
 export * from "./mail-pgp-layers";
+export * from "./mail-pgp-encryption";
+export * from "./mail-sender-verification";
 export * from "./mail-attachment-preview";
 export * from "./mail-pagination";
 export * from "./mail-addresses";
@@ -23,6 +25,7 @@ export * from "./mail-thread-summary";
 export * from "./mail-jmap-validation";
 export * from "./mail-server-limits";
 export * from "./mail-server-policy";
+export * from "./mail-account-encryption";
 export * from "./search-types";
 export * from "./mail-search-relevance";
 export * from "./search-index-crypto";
@@ -77,3 +80,11 @@ export * from "./mail-jmap-email-set";
 export * from "./mail-outgoing-crypto";
 export * from "./calendar-view-days";
 export * from "./after-paint";
+
+export * from "./private-search-coverage";
+
+export * from "./mail-key-continuity";
+export {
+  inspectMailPublicKey,
+  MAIL_PGP_KEY_GENERATION_PROFILE,
+} from "./mail-pgp-key-inspection";

@@ -1,0 +1,1 @@
+{"@type":"update","object":"Encryption","value":{"atRestEnable":true,"gatewayEnable":false,"harvestKeys":{"match":{},"else":"false"}}}

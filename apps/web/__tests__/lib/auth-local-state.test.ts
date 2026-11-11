@@ -14,6 +14,8 @@ const mockClearAuthPasswords = jest.fn();
 const mockClearLegacyRememberedPassword = jest.fn();
 const mockResetE2eeBootstrap = jest.fn();
 const mockGetSession = jest.fn();
+const mockCancelMailTrustReview = jest.fn();
+const mockClearMailTrustAnchors = jest.fn<() => Promise<void>>();
 const mockClearLocalSearchIndexDatabase = jest.fn<() => Promise<void>>();
 const mockDeleteRecoverableE2eeDevices = jest.fn<() => Promise<void>>();
 const mockListRecoverableE2eeDevices =
@@ -55,6 +57,9 @@ jest.mock("@/lib/calendar-api-service", () => ({
   },
 }));
 
+jest.mock("@/lib/mail/mail-trust-lifecycle", () => ({ cancelMailTrustReview: () => mockCancelMailTrustReview() }));
+jest.mock("@/lib/mail/mail-trust-anchor-storage", () => ({ clearMailTrustAnchors: () => mockClearMailTrustAnchors() }));
+
 jest.mock("@/lib/search/local-index-store", () => ({
   clearLocalSearchIndexDatabase: () => mockClearLocalSearchIndexDatabase(),
 }));
@@ -77,6 +82,7 @@ import {
 
 describe("auth-local-state", () => {
   beforeEach(() => {
+    mockClearMailTrustAnchors.mockResolvedValue(undefined);
     jest.clearAllMocks();
     mockSignOut.mockResolvedValue(undefined as never);
     mockClearLocalSearchIndexDatabase.mockResolvedValue(undefined);

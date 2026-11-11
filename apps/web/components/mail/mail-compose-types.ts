@@ -29,15 +29,17 @@ export type DraftSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export type MailComposeBridge = {
   getDraft: () => ComposeDraft;
+  getComposeSessionId: () => string;
   resetDraft: () => void;
   clearCompose: () => void;
   openNewCompose: () => void;
-  seedReply: (message: JmapEmailMessage, plaintext: string | null) => void;
+  seedReply: (
+    message: JmapEmailMessage,
+    plaintext: string | null,
+    mode?: "reply" | "reply-all",
+  ) => void;
   seedForward: (message: JmapEmailMessage, plaintext: string | null) => void;
-  seedNewMessage: (recipient: {
-    email: string;
-    name?: string | null;
-  }) => void;
+  seedNewMessage: (recipient: { email: string; name?: string | null }) => void;
   seedDraft: (
     message: JmapEmailMessage,
     overrides?: {

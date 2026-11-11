@@ -8,6 +8,11 @@ import type {
 import {
   saveJmapDraft,
   sendJmapMessage,
+  getMailSendAttemptStore,
+  assertMailSendCurrent,
+  withMailSendCommand,
+  JmapHttpStatusError,
+  type ScopedOutgoingJmapMessage,
   type JmapAttachmentInput,
   type JmapDraft,
   type JmapPgpMimeCiphertext,
@@ -29,7 +34,8 @@ import {
   chunkJmapMethodCalls,
   isBlobUploadExpired,
   jmapMethodCallsHaveDependencies,
-  isStalwartEncryptOnAppendEnabled,
+  disabledAppendEncryption,
+  assertMailEncryptionUpdate,
   sortMailMessagesBySearchRelevance,
   extractTextQueryFromJmapFilter,
   toJmapTextQuery,
@@ -362,14 +368,18 @@ export class StalwartJmapClient {
   }
 
   private getMaxMethodCalls(): number {
-    return this.mailServerPolicy?.maxMethodCalls ?? DEFAULT_JMAP_MAX_METHOD_CALLS;
+    return (
+      this.mailServerPolicy?.maxMethodCalls ?? DEFAULT_JMAP_MAX_METHOD_CALLS
+    );
   }
 
   /** Re-uploads only this message's expired blobs, so attachments from earlier plaintext sends never return to the server. */
   private async refreshRegisteredBlobUploads(
     session: JmapSession,
     blobIds: string[],
+    isCurrent?: () => boolean,
   ): Promise<void> {
+    assertMailSendCurrent({ isCurrent });
     const uploadTtlMs = this.getUploadTtlMs();
     const now = Date.now();
     const records = new Set(
@@ -378,6 +388,7 @@ export class StalwartJmapClient {
 
     await runTasksWithConcurrencyLimit(
       [...records].map((record) => async () => {
+        assertMailSendCurrent({ isCurrent });
         if (!isBlobUploadExpired(record.uploadedAt, uploadTtlMs, now)) {
           return;
         }
@@ -390,6 +401,7 @@ export class StalwartJmapClient {
                   type: record.source.contentType ?? "application/octet-stream",
                 }),
                 record.source.contentType ?? "application/octet-stream",
+                true, isCurrent,
               )
             : await this.uploadBlob(
                 session,
@@ -397,8 +409,10 @@ export class StalwartJmapClient {
                   type: record.source.contentType,
                 }),
                 record.source.contentType,
+                true, isCurrent,
               );
 
+        assertMailSendCurrent({ isCurrent });
         this.blobUploadRegistry.replaceBlobId(record.blobId, {
           blobId: refreshed.blobId,
           size: refreshed.size,
@@ -414,22 +428,22 @@ export class StalwartJmapClient {
     input: {
       attachments?: JmapAttachmentInput[];
       pgpMimeCiphertext?: JmapPgpMimeCiphertext;
+      isCurrent?: () => boolean;
     },
   ): Promise<{
     attachments?: JmapAttachmentInput[];
     pgpMimeCiphertext?: JmapPgpMimeCiphertext;
   }> {
-    if (
-      !input.attachments?.length &&
-      !input.pgpMimeCiphertext
-    ) {
+    assertMailSendCurrent(input);
+    if (!input.attachments?.length && !input.pgpMimeCiphertext) {
       return input;
     }
 
     await this.refreshRegisteredBlobUploads(session, [
       ...(input.attachments ?? []).map((attachment) => attachment.blobId),
       ...(input.pgpMimeCiphertext ? [input.pgpMimeCiphertext.blobId] : []),
-    ]);
+    ], input.isCurrent);
+    assertMailSendCurrent(input);
 
     const attachments = input.attachments?.map((attachment) => {
       const refreshed = this.blobUploadRegistry.get(attachment.blobId);
@@ -560,13 +574,10 @@ export class StalwartJmapClient {
 
   /** Stalwart encryptOnAppend re-encrypts JMAP submissions with the user's PGP key, which breaks external delivery; Solace handles internal encryption. */
   async ensureEncryptOnAppendDisabled(session: JmapSession): Promise<void> {
-    const settings = await this.getAccountSettings(session);
-    if (!isStalwartEncryptOnAppendEnabled(settings)) {
-      return;
-    }
-
-    const encryptionAtRest = settings.encryptionAtRest;
-    if (!encryptionAtRest || typeof encryptionAtRest !== "object") {
+    const encryptionAtRest = disabledAppendEncryption(
+      await this.getAccountSettings(session),
+    );
+    if (!encryptionAtRest) {
       return;
     }
 
@@ -581,10 +592,7 @@ export class StalwartJmapClient {
             accountId,
             update: {
               singleton: {
-                encryptionAtRest: {
-                  ...(encryptionAtRest as Record<string, unknown>),
-                  encryptOnAppend: false,
-                },
+                encryptionAtRest,
               },
             },
           },
@@ -592,20 +600,12 @@ export class StalwartJmapClient {
         ],
       ],
     );
-    const result = this.getMethodResult<{
-      notUpdated?: Record<string, { description?: string }>;
-    }>(envelope, "x:AccountSettings/set");
-    const updateError = result.notUpdated?.singleton;
-    if (updateError) {
-      log.warn("Failed to disable Stalwart encryptOnAppend", {
-        description: updateError.description,
-      });
-    }
+    assertMailEncryptionUpdate(
+      this.getMethodResult<unknown>(envelope, "x:AccountSettings/set"),
+    );
   }
 
-  async getStalwartPolicySingletons(
-    session: JmapSession,
-  ): Promise<{
+  async getStalwartPolicySingletons(session: JmapSession): Promise<{
     emailSettings: Record<string, unknown> | null;
     jmapSettings: Record<string, unknown> | null;
   }> {
@@ -715,7 +715,13 @@ export class StalwartJmapClient {
           "Identity/get",
           {
             accountId,
-            properties: ["id", "email", "name", "textSignature", "htmlSignature"],
+            properties: [
+              "id",
+              "email",
+              "name",
+              "textSignature",
+              "htmlSignature",
+            ],
           },
           "c1",
         ],
@@ -777,11 +783,7 @@ export class StalwartJmapClient {
         "urn:stalwart:jmap",
       ],
       [
-        [
-          "x:AccountSettings/get",
-          { accountId, ids: ["singleton"] },
-          "as1",
-        ],
+        ["x:AccountSettings/get", { accountId, ids: ["singleton"] }, "as1"],
         [
           "x:Email/get",
           {
@@ -823,12 +825,11 @@ export class StalwartJmapClient {
       ],
     );
 
-    const accountSettings =
-      this.getMethodResult<{
-        list?: Array<Record<string, unknown>>;
-      }>(envelope, "x:AccountSettings/get").list?.[0] ?? {
-        encryptionAtRest: { "@type": "Disabled" },
-      };
+    const accountSettings = this.getMethodResult<{
+      list?: Array<Record<string, unknown>>;
+    }>(envelope, "x:AccountSettings/get").list?.[0] ?? {
+      encryptionAtRest: { "@type": "Disabled" },
+    };
     // Soft — matches getStalwartPolicySingletons() try/catch behavior.
     const emailSettings = this.tryGetMethodListItem(envelope, "x:Email/get");
     const jmapSettings = this.tryGetMethodListItem(envelope, "x:Jmap/get");
@@ -838,10 +839,8 @@ export class StalwartJmapClient {
         .list ?? [],
     );
     const identities =
-      this.getMethodResult<{ list?: JmapIdentity[] }>(
-        envelope,
-        "Identity/get",
-      ).list ?? [];
+      this.getMethodResult<{ list?: JmapIdentity[] }>(envelope, "Identity/get")
+        .list ?? [];
 
     return {
       accountSettings,
@@ -1074,7 +1073,10 @@ export class StalwartJmapClient {
               operator: "AND",
               conditions: [
                 { operator: "OR", conditions: allFilterConditions },
-                { operator: "OR", conditions: threadIds.map((tid) => ({ threadId: tid })) },
+                {
+                  operator: "OR",
+                  conditions: threadIds.map((tid) => ({ threadId: tid })),
+                },
               ],
             },
             sort: [{ property: "receivedAt", isAscending: false }],
@@ -1208,7 +1210,11 @@ export class StalwartJmapClient {
     session: JmapSession,
     mailboxId: string,
     options: { limit?: number; position?: number } = {},
-  ): Promise<{ messages: JmapEmailMessage[]; total: number; queryState?: string }> {
+  ): Promise<{
+    messages: JmapEmailMessage[];
+    total: number;
+    queryState?: string;
+  }> {
     const { ids, total, queryState } = await this.getMailboxMessageIds(
       session,
       mailboxId,
@@ -1336,7 +1342,9 @@ export class StalwartJmapClient {
     blob: Blob,
     contentType: string,
     allowRetry = true,
+    isCurrent?: () => boolean,
   ): Promise<{ blobId: string; size: number; type: string }> {
+    assertMailSendCurrent({ isCurrent });
     const accountId = this.requirePrimaryAccountId(session);
     if (!session.uploadUrl) {
       throw new Error("No upload URL in JMAP session.");
@@ -1346,6 +1354,7 @@ export class StalwartJmapClient {
       encodeURIComponent(accountId),
     );
     const authorization = await this.getAuthorizationHeader();
+    assertMailSendCurrent({ isCurrent });
     const response = await this.fetcher(url, {
       method: "POST",
       headers: {
@@ -1355,14 +1364,18 @@ export class StalwartJmapClient {
       body: blob,
     });
 
+    assertMailSendCurrent({ isCurrent });
     if (response.status === 401 && allowRetry) {
-      log.warn("Blob upload rejected with 401; clearing auth and retrying once", {
-        url,
-        contentType,
-        blobSize: blob.size,
-      });
+      log.warn(
+        "Blob upload rejected with 401; clearing auth and retrying once",
+        {
+          url,
+          contentType,
+          blobSize: blob.size,
+        },
+      );
       await this.onUnauthorized?.();
-      return this.uploadBlob(session, blob, contentType, false);
+      return this.uploadBlob(session, blob, contentType, false, isCurrent);
     }
 
     if (!response.ok) {
@@ -1375,9 +1388,12 @@ export class StalwartJmapClient {
         detail,
         retriedAfterUnauthorized: !allowRetry,
       });
-      throw new Error(formatHttpStatusError("Blob upload", response.status, detail));
+      throw new Error(
+        formatHttpStatusError("Blob upload", response.status, detail),
+      );
     }
     const json = await response.json();
+    assertMailSendCurrent({ isCurrent });
     const validated = parseJmapBlobUploadResponse(
       json,
       blob.size,
@@ -1393,7 +1409,9 @@ export class StalwartJmapClient {
   async uploadPreparedAttachment(
     session: JmapSession,
     attachment: PreparedOutgoingAttachment,
+    isCurrent?: () => boolean,
   ): Promise<JmapAttachmentInput> {
+    assertMailSendCurrent({ isCurrent });
     const blob = new Blob([attachment.content.slice()], {
       type: attachment.contentType,
     });
@@ -1401,7 +1419,9 @@ export class StalwartJmapClient {
       session,
       blob,
       attachment.contentType,
+      true, isCurrent,
     );
+    assertMailSendCurrent({ isCurrent });
     const validated = validateUploadedBlob({
       blobId: uploaded.blobId,
       size: uploaded.size,
@@ -1443,7 +1463,8 @@ export class StalwartJmapClient {
 
     return runTasksWithConcurrencyLimit(
       attachments.map(
-        (attachment) => () => this.uploadPreparedAttachment(session, attachment),
+        (attachment) => () =>
+          this.uploadPreparedAttachment(session, attachment),
       ),
       concurrency,
     );
@@ -1468,24 +1489,39 @@ export class StalwartJmapClient {
 
   async sendMessage(
     session: JmapSession,
-    input: OutgoingJmapMessage,
+    input: ScopedOutgoingJmapMessage,
   ): Promise<SentJmapMessage> {
-    await this.syncMailServerPolicy(session);
+    assertMailSendCurrent(input);
+    const attempt = getMailSendAttemptStore(this.requirePrimaryAccountId(session)).get(input.sendScope, input.fromEmail);
+    return withMailSendCommand(attempt, async () => {
+      const guardedInput = { ...input, isCurrent: () => !attempt.cancelled && (input.isCurrent?.() ?? true) };
+      await this.syncMailServerPolicy(session);
+      assertMailSendCurrent(guardedInput);
 
-    const refreshed = await this.refreshOutgoingBlobReferences(session, input);
-    const mailAccountId = this.requirePrimaryAccountId(session);
-    return sendJmapMessage(
-      { ...input, ...refreshed },
-      {
-        mailAccountId,
-        submissionAccountId: getSubmissionAccountId(session, mailAccountId),
-        policy: this.mailServerPolicy,
-        request: (using, calls) => this.call(session, using, calls),
-        onCleanupError: (error) => {
-          log.warn("Sent mail cleanup failed", sanitizeContext({ error }));
+      const refreshed = await this.refreshOutgoingBlobReferences(session, guardedInput);
+      assertMailSendCurrent(guardedInput);
+      const mailAccountId = this.requirePrimaryAccountId(session);
+      return sendJmapMessage(
+        { ...guardedInput, ...refreshed },
+        {
+          attempt,
+          mailAccountId,
+          submissionAccountId: getSubmissionAccountId(session, mailAccountId),
+          policy: this.mailServerPolicy,
+          request: (using, calls) => this.call(session, using, calls, true, guardedInput.isCurrent),
+          uploadMessage: (wire) =>
+            this.uploadBlob(
+              session,
+              new Blob([wire], { type: "message/rfc822" }),
+              "message/rfc822",
+              true, guardedInput.isCurrent,
+            ),
+          onCleanupError: (error) => {
+            log.warn("Sent mail cleanup failed", sanitizeContext({ error }));
+          },
         },
-      },
-    );
+      );
+    });
   }
 
   async saveDraft(session: JmapSession, input: JmapDraft): Promise<string> {
@@ -1556,7 +1592,13 @@ export class StalwartJmapClient {
     await this.call(
       session,
       ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-      [["Mailbox/set", { accountId, update: { [mailboxId]: { name: sealed } } }, "c1"]],
+      [
+        [
+          "Mailbox/set",
+          { accountId, update: { [mailboxId]: { name: sealed } } },
+          "c1",
+        ],
+      ],
     );
   }
 
@@ -1820,10 +1862,12 @@ export class StalwartJmapClient {
   async emptyMailbox(session: JmapSession, mailboxId: string): Promise<number> {
     return destroyMailboxMessagesInBatches({
       listIds: async (limit) =>
-        (await this.getMailboxMessageIds(session, mailboxId, {
-          limit,
-          position: 0,
-        })).ids,
+        (
+          await this.getMailboxMessageIds(session, mailboxId, {
+            limit,
+            position: 0,
+          })
+        ).ids,
       destroy: (ids) => this.bulkDestroyMessages(session, ids),
     });
   }
@@ -1842,7 +1886,9 @@ export class StalwartJmapClient {
 
     if (!response.ok) {
       const detail = await readHttpErrorDetail(response);
-      throw new Error(formatHttpStatusError("Blob download", response.status, detail));
+      throw new Error(
+        formatHttpStatusError("Blob download", response.status, detail),
+      );
     }
     return response.text();
   }
@@ -1866,7 +1912,9 @@ export class StalwartJmapClient {
 
     if (!response.ok) {
       const detail = await readHttpErrorDetail(response);
-      throw new Error(formatHttpStatusError("Blob download", response.status, detail));
+      throw new Error(
+        formatHttpStatusError("Blob download", response.status, detail),
+      );
     }
     return response.blob();
   }
@@ -1881,9 +1929,12 @@ export class StalwartJmapClient {
     });
 
     if (response.status === 401 && allowRetry) {
-      log.warn("Blob download rejected with 401; clearing auth and retrying once", {
-        url,
-      });
+      log.warn(
+        "Blob download rejected with 401; clearing auth and retrying once",
+        {
+          url,
+        },
+      );
       await this.onUnauthorized?.();
       return this.authorizedBlobFetch(url, false);
     }
@@ -1906,19 +1957,20 @@ export class StalwartJmapClient {
     capabilities: string[],
     methodCalls: JmapMethodCall[],
     allowRetry = true,
+    isCurrent?: () => boolean,
   ): Promise<JmapEnvelope> {
     const maxMethodCalls = this.getMaxMethodCalls();
     if (
       methodCalls.length <= maxMethodCalls ||
       jmapMethodCallsHaveDependencies(methodCalls)
     ) {
-      return this.executeCall(session, capabilities, methodCalls, allowRetry);
+      return this.executeCall(session, capabilities, methodCalls, allowRetry, isCurrent);
     }
 
     // Chunks only run when no call references another's result, so the requests are independent.
     const envelopes = await Promise.all(
       chunkJmapMethodCalls(methodCalls, maxMethodCalls).map((chunk) =>
-        this.executeCall(session, capabilities, chunk, allowRetry),
+        this.executeCall(session, capabilities, chunk, allowRetry, isCurrent),
       ),
     );
     return {
@@ -1933,8 +1985,11 @@ export class StalwartJmapClient {
     capabilities: string[],
     methodCalls: JmapMethodCall[],
     allowRetry = true,
+    isCurrent?: () => boolean,
   ): Promise<JmapEnvelope> {
+    assertMailSendCurrent({ isCurrent });
     const authorization = await this.getAuthorizationHeader();
+    assertMailSendCurrent({ isCurrent });
     const response = await this.fetcher(session.apiUrl, {
       method: "POST",
       headers: {
@@ -1947,15 +2002,19 @@ export class StalwartJmapClient {
       }),
     });
 
-    if (response.status === 401 && allowRetry) {
-      log.warn("JMAP request rejected with 401; clearing auth and retrying once", {
-        apiUrl: session.apiUrl,
-        methods: methodCalls.map(([method]) => method),
-      });
+    if (response.status === 401 && allowRetry && !methodCalls.some(([method]) => method === "EmailSubmission/set")) {
+      log.warn(
+        "JMAP request rejected with 401; clearing auth and retrying once",
+        {
+          apiUrl: session.apiUrl,
+          methods: methodCalls.map(([method]) => method),
+        },
+      );
       await this.onUnauthorized?.();
-      return this.executeCall(session, capabilities, methodCalls, false);
+      return this.executeCall(session, capabilities, methodCalls, false, isCurrent);
     }
 
+    assertMailSendCurrent({ isCurrent });
     if (!response.ok) {
       const detail = await readHttpErrorDetail(response);
       log.error("JMAP request failed", {
@@ -1967,13 +2026,14 @@ export class StalwartJmapClient {
       });
 
       if (response.status === 401) {
-        throw new Error(
-          "Mail sign-in expired or was rejected by the mail server.",
+        await this.onUnauthorized?.();
+        throw new JmapHttpStatusError(
+          response.status, "Mail sign-in expired or was rejected by the mail server.",
         );
       }
 
-      throw new Error(
-        formatHttpStatusError("JMAP request", response.status, detail),
+      throw new JmapHttpStatusError(
+        response.status, formatHttpStatusError("JMAP request", response.status, detail),
       );
     }
 

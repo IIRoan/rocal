@@ -155,6 +155,11 @@ export default defineRailway(() => {
       PGUSER: ref(postgresStalwart, "PGUSER"),
       PORT: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
+      STALWART_APPROVED_STORE_ID: preserve(),
+      STALWART_APPROVED_VERSION: "1.1.0",
+      STALWART_RECOVERY_ISOLATION: preserve(),
+      STALWART_SERVICE_ALLOWLIST_JSON: preserve(),
+      STALWART_UPGRADE_PHASE: preserve(),
       SOLACE_ADMIN_AUTH_URL: preserve(),
       SOLACE_ADMIN_LOGIN_URL: `${fromApi("FRONTEND_URL")}/login`,
       STALWART_ADMIN_GATE_KEY: preserve(),
@@ -209,8 +214,8 @@ export default defineRailway(() => {
       FRONTEND_URL: "https://solace.onl",
       MAIL_BRIDGE_HMAC_KEY: preserve(),
       MOBILE_AUTH_CALLBACK_URL: preserve(),
-      // The same Stalwart admin token the server itself is configured with.
-      STALWART_ADMIN_TOKEN: ref(stalwartMail, "STALWART_ADMIN_TOKEN"),
+      // Provisioning uses its dedicated credential without access to other mailboxes.
+      STALWART_PROVISION_TOKEN: preserve(),
       STALWART_ADMIN_USER_IDS: preserve(),
       STALWART_ADMIN_GATE_KEY: preserve(),
       STALWART_BASE_URL: `http://${ref(stalwartMail, "RAILWAY_PRIVATE_DOMAIN")}:8081`,

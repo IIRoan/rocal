@@ -1,4 +1,5 @@
 /** @jest-environment jsdom */
+import { unknownPrivateSearchCoverage } from "@workspace/calendar-core";
 
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -36,12 +37,16 @@ const snapshot = {
   itemCount: 0,
   pendingBodies: 0,
   loadedBodies: 0,
+  coverage: unknownPrivateSearchCoverage(),
 };
 let root: Root;
+let container: HTMLDivElement;
 
 export function Harness() {
-  usePrivateTitleIndex();
-  return null;
+  const index = usePrivateTitleIndex();
+  return (
+    <div>{index.documents.map((document) => document.title).join(",")}</div>
+  );
 }
 
 function unlock() {
@@ -81,7 +86,8 @@ describe("usePrivateTitleIndex", () => {
     });
     jest.mocked(loadPrivateTitleIndex).mockResolvedValue(snapshot);
     jest.mocked(rebuildPrivateTitleIndex).mockResolvedValue(snapshot);
-    root = createRoot(document.createElement("div"));
+    container = document.createElement("div");
+    root = createRoot(container);
   });
 
   afterEach(async () => {
@@ -120,5 +126,31 @@ describe("usePrivateTitleIndex", () => {
       jest.advanceTimersByTime(10000);
     });
     expect(rebuildPrivateTitleIndex).toHaveBeenCalledTimes(3);
+  });
+  it("does not republish an older build after disabling and re-enabling", async () => {
+    let finish = () => undefined as void;
+    jest.mocked(rebuildPrivateTitleIndex).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () =>
+            resolve({
+              ...snapshot,
+              documents: [
+                {
+                  id: "old",
+                  source: "mail",
+                  title: "Old private mail",
+                  encryptionStatus: "metadata-only",
+                },
+              ],
+            });
+        }),
+    );
+    unlock();
+    await act(async () => root.render(<Harness />));
+    await act(async () => setEnabled(false));
+    await act(async () => setEnabled(true));
+    await act(async () => finish());
+    expect(container.textContent).toBe("");
   });
 });

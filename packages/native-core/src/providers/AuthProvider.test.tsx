@@ -1,4 +1,6 @@
 /** @jest-environment jsdom */
+import { captureSessionDataScope } from "../lib/session-data-lifecycle";
+import * as sessionDataLifecycle from "../lib/session-data-lifecycle";
 
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -10,6 +12,7 @@ import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { getSessionCookie, readSessionTokenFromJar, waitForSessionCookie } from "../lib/session-cookie";
 import { signInWithBrowserPasskey } from "../lib/passkey-browser-bridge";
 import { unregisterNativePushDevice } from "../lib/push-notifications";
+import { clearNotificationExtensionSecrets } from "../lib/notification-extension-store";
 import {
   getFallbackSessionToken,
   setFallbackSessionToken,
@@ -93,6 +96,9 @@ jest.mock("../lib/session-cookie", () => ({
 
 jest.mock("../lib/push-notifications", () => ({
   unregisterNativePushDevice: jest.fn(async () => {}),
+}));
+jest.mock("../lib/notification-extension-store", () => ({
+  clearNotificationExtensionSecrets: jest.fn(async () => undefined),
 }));
 
 (
@@ -224,6 +230,7 @@ describe("AuthProvider", () => {
     mockReadSessionTokenFromJar.mockReset().mockResolvedValue("existing-signed-cookie");
     mockSignInWithBrowserPasskey.mockReset();
     mockUnregisterNativePushDevice.mockReset();
+    jest.mocked(clearNotificationExtensionSecrets).mockReset().mockResolvedValue(undefined);
     mockOnSignedOut.mockClear();
     mockClearRecoverableStoredDevice.mockClear();
 
@@ -313,6 +320,7 @@ describe("AuthProvider", () => {
     ["the server reports no session", { data: null }, 1],
     ["the session check fails", { data: null, error: { status: 503 } }, 0],
   ])("wipes app data on startup only when %s", async (_case, response, wipes) => {
+    const close = jest.spyOn(sessionDataLifecycle, "closeSessionData");
     mockGetSession.mockResolvedValue(response as never);
 
     await renderProvider();
@@ -320,6 +328,9 @@ describe("AuthProvider", () => {
 
     expect(getAuth().isAuthenticated).toBe(false);
     expect(mockOnSignedOut).toHaveBeenCalledTimes(wipes);
+    expect(close).toHaveBeenCalledTimes(wipes);
+    expect(captureSessionDataScope()).toBeNull();
+    close.mockRestore();
   });
 
   it("opens a valid cached session when the startup request never answers", async () => {
@@ -433,14 +444,18 @@ describe("AuthProvider", () => {
     expect(getAuth().session?.token).toBe("other-token");
   });
 
-  it.each(["missing", 401, 403])("never restores cached authentication when the server rejects it (%s)", async (status) => {
-    const cached = createSessionData();
-    cached.session.expiresAt = new Date(Date.now() + 60_000);
-    mockGetSessionState.mockReturnValue({ data: cached });
-    mockReadAuthSessionCache.mockResolvedValue(cached);
-    mockGetSession.mockResolvedValueOnce(status === "missing"
-      ? { data: null }
-      : { data: null, error: { status } } as never);
+  it.each(["missing", 401, 403])(
+    "never restores cached authentication when the server rejects it (%s)",
+    async (status) => {
+      const cached = createSessionData();
+      cached.session.expiresAt = new Date(Date.now() + 60_000);
+      mockGetSessionState.mockReturnValue({ data: cached });
+      mockReadAuthSessionCache.mockResolvedValue(cached);
+      mockGetSession.mockResolvedValueOnce(
+        status === "missing"
+          ? { data: null }
+          : ({ data: null, error: { status } } as never),
+      );
 
     await renderProvider();
     expect(getAuth().isAuthenticated).toBe(false);
@@ -697,7 +712,7 @@ describe("AuthProvider", () => {
     expect(mockUnregisterNativePushDevice).toHaveBeenCalled();
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockOnSignedOut).toHaveBeenCalled();
-    expect(mockClearNativeTitleIndex).toHaveBeenCalled();
+    expect(captureSessionDataScope()).toBeNull();
     expect(mockClearRecoverableStoredDevice).toHaveBeenCalled();
     expect(getAuth().lastAuthMethod).toBe("unknown");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
@@ -732,6 +747,32 @@ describe("AuthProvider", () => {
 
     expect(getAuth().isAuthenticated).toBe(false);
     expect(getAuth().signInNotice).toBe("Sign in again.");
+  });
+
+  it("still attempts server sign-out when push unregistration fails", async () => {
+    await renderProvider();
+    await act(async () => { await getAuth().signIn("roan@example.com", "secret-password"); });
+    mockSignOut.mockClear();
+    mockUnregisterNativePushDevice.mockRejectedValueOnce(new Error("Fixture push unavailable"));
+    await act(async () => { await getAuth().signOut(); });
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(getAuth().isAuthenticated).toBe(false);
+  });
+
+  it("reports notification-secret cleanup failure after ending the server and local sessions", async () => {
+    await renderProvider();
+    await act(async () => {
+      await getAuth().signIn("roan@example.com", "secret-password");
+    });
+    mockSignOut.mockClear();
+    jest.mocked(clearNotificationExtensionSecrets).mockRejectedValueOnce(new Error("Fixture keychain unavailable"));
+    await act(async () => {
+      await expect(getAuth().signOut()).rejects.toThrow("Fixture keychain unavailable");
+    });
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockOnSignedOut).toHaveBeenCalled();
+    expect(mockClearRecoverableStoredDevice).toHaveBeenCalled();
+    expect(getAuth().isAuthenticated).toBe(false);
   });
 
   it("keeps the sign-out notice for the sign-in screen until the next sign-in", async () => {

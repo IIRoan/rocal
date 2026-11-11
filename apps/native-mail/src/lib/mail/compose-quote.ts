@@ -5,6 +5,7 @@ import {
   type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import { extractMessageBodies } from "./message-security";
+import { limitMailQuoteContent } from "@workspace/calendar-core/mail-mime-limits";
 import type { JmapEmailMessage, MailAddress } from "./types";
 
 export function prefixSubject(
@@ -36,8 +37,9 @@ function getReplyRecipients(
   }).join(", ");
 }
 
-function messageText(message: JmapEmailMessage): string {
-  const bodies = extractMessageBodies(message);
+function messageText(message: JmapEmailMessage, plaintext?: string): string {
+  const rawBodies = extractMessageBodies(message);
+  const bodies = limitMailQuoteContent({ text: plaintext ?? rawBodies.text, html: rawBodies.html });
   return bodies.text?.trim() || stripHtmlToText(bodies.html);
 }
 
@@ -51,11 +53,8 @@ export function buildReplyBody(
     message.from?.[0]?.email?.trim() ||
     "Unknown sender";
   const receivedAt = formatQuotedMailDate(message.receivedAt, dateOptions);
-  const source = plaintext?.trim() ?? messageText(message);
-  const quoted = source
-    .split(/\r?\n/)
-    .map((line) => `> ${line}`)
-    .join("\n");
+  const source = messageText(message, plaintext);
+  const quoted = `> ${source.replace(/\r?\n/g, "\n> ")}`;
 
   return `\n\nOn ${receivedAt}, ${sender} wrote:\n${quoted}`;
 }
@@ -65,7 +64,7 @@ export function buildForwardBody(
   dateOptions: QuotedDateOptions,
   plaintext?: string,
 ): string {
-  const textBody = plaintext?.trim() ?? messageText(message);
+  const textBody = messageText(message, plaintext);
   const from = getReplyRecipients(message) || "Unknown sender";
   const to = (message.to ?? [])
     .map((entry) => entry.email?.trim())

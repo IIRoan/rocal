@@ -9,13 +9,18 @@ import {
   type EncryptedSearchShard,
   type TitleIndexDocument,
   type TitleIndexShardPayload,
+  type PrivateSearchCoverage,
+  parsePrivateSearchCoverage,
+  unknownPrivateSearchCoverage,
 } from "@workspace/calendar-core";
+import { createSessionDataStore } from "../session-data-lifecycle";
 import { SECURE_STORE_KEYS } from "../constants";
 
 const SHARD_FILE = "solace-private-title-index.json";
 
 type EnabledListener = (enabled: boolean) => void;
 const enabledListeners = new Set<EnabledListener>();
+let enabled: boolean | undefined;
 
 function notifyEnabled(enabled: boolean) {
   for (const listener of enabledListeners) listener(enabled);
@@ -51,32 +56,67 @@ function isEncryptedSearchShard(value: unknown): value is EncryptedSearchShard {
 }
 
 export async function isNativeTitleIndexEnabled(): Promise<boolean> {
+  if (enabled !== undefined) return enabled;
   const stored = await SecureStore.getItemAsync(
     SECURE_STORE_KEYS.SEARCH_INDEX_ENABLED,
   );
-  return stored !== "false";
+  enabled ??= stored !== "false";
+  return enabled;
 }
 
-export async function setNativeTitleIndexEnabled(
-  enabled: boolean,
-): Promise<void> {
-  await SecureStore.setItemAsync(
-    SECURE_STORE_KEYS.SEARCH_INDEX_ENABLED,
-    enabled ? "true" : "false",
-  );
-  notifyEnabled(enabled);
-  if (!enabled) {
-    await clearNativeTitleIndex();
-  }
+export function setNativeTitleIndexEnabled(value: boolean): Promise<void> {
+  enabled = value;
+  notifyEnabled(value);
+  const clearing = value ? Promise.resolve() : store.clear();
+  return Promise.allSettled([
+    clearing,
+    store.serialize(() =>
+      SecureStore.setItemAsync(
+        SECURE_STORE_KEYS.SEARCH_INDEX_ENABLED,
+        String(value),
+      ),
+    ),
+  ]).then((results) => {
+    if (results.some((result) => result.status === "rejected")) {
+      throw new Error(
+        "Private search settings could not be saved. Please retry.",
+      );
+    }
+  });
 }
 
-async function getOrCreateKey(): Promise<CryptoKey> {
+async function readKey(): Promise<CryptoKey | null> {
   const stored = await SecureStore.getItemAsync(
     SECURE_STORE_KEYS.SEARCH_INDEX_KEY,
   );
-  if (stored) {
-    return importLocalSearchIndexKey(stored);
+  return stored ? importLocalSearchIndexKey(stored) : null;
+}
+
+const store = createSessionDataStore(async () => {
+  const results = await Promise.allSettled([
+    FileSystem.deleteAsync(shardPath(), { idempotent: true }),
+    SecureStore.deleteItemAsync(SECURE_STORE_KEYS.SEARCH_INDEX_KEY),
+  ]);
+  if (results.some((result) => result.status === "rejected")) {
+    throw new Error("Private search cleanup could not finish. Please retry.");
   }
+});
+
+export function captureNativeTitleIndexRequest(accountId: string) {
+  const request = store.capture(accountId);
+  return {
+    ...request,
+    isCurrent: () => request.isCurrent() && enabled !== false,
+  };
+}
+
+export type NativeTitleIndexRequest = ReturnType<
+  typeof captureNativeTitleIndexRequest
+>;
+
+async function getOrCreateKey(): Promise<CryptoKey> {
+  const existing = await readKey();
+  if (existing) return existing;
 
   const key = await generateLocalSearchIndexKey({ extractable: true });
   const exported = await exportLocalSearchIndexKey(key);
@@ -84,51 +124,66 @@ async function getOrCreateKey(): Promise<CryptoKey> {
   return key;
 }
 
+export async function loadNativeTitleIndexSnapshot(
+  accountId: string,
+  request = captureNativeTitleIndexRequest(accountId),
+): Promise<{ documents: TitleIndexDocument[]; coverage: PrivateSearchCoverage }> {
+  const empty = () => ({ documents: [], coverage: unknownPrivateSearchCoverage() });
+  const result = await store.run(request.isCurrent, async () => {
+    try {
+      const info = await FileSystem.getInfoAsync(shardPath());
+      if (!info.exists) return empty();
+      const key = await readKey();
+      if (!key) return null;
+      if (!request.isCurrent()) return empty();
+      const parsed: unknown = JSON.parse(await FileSystem.readAsStringAsync(shardPath()));
+      if (!isEncryptedSearchShard(parsed)) return null;
+      const payload = await decryptSearchShard<TitleIndexShardPayload>(key, parsed, { additionalData: additionalData(accountId) });
+      if (!Array.isArray(payload.documents)) return null;
+      return { documents: payload.documents, coverage: parsePrivateSearchCoverage(payload.coverage) };
+    } catch {
+      return null;
+    }
+  });
+  if (result === null && request.isCurrent()) await store.clear();
+  return result ?? empty();
+}
+
 export async function loadNativeTitleIndex(
   accountId: string,
+  request = captureNativeTitleIndexRequest(accountId),
 ): Promise<TitleIndexDocument[]> {
-  try {
-    const path = shardPath();
-    const info = await FileSystem.getInfoAsync(path);
-    if (!info.exists) return [];
-
-    const raw = await FileSystem.readAsStringAsync(path);
-    const parsed: unknown = JSON.parse(raw);
-    if (!isEncryptedSearchShard(parsed)) return [];
-    const shard = parsed;
-    const key = await getOrCreateKey();
-    const payload = await decryptSearchShard<TitleIndexShardPayload>(
-      key,
-      shard,
-      { additionalData: additionalData(accountId) },
-    );
-    return payload.documents;
-  } catch {
-    return [];
-  }
+  return (await loadNativeTitleIndexSnapshot(accountId, request)).documents;
 }
 
 export async function saveNativeTitleIndex(input: {
   accountId: string;
   documents: TitleIndexDocument[];
-}): Promise<void> {
-  const key = await getOrCreateKey();
-  const payload: TitleIndexShardPayload = {
-    documents: input.documents,
-    indexedAt: new Date().toISOString(),
-  };
-  const shard = await encryptSearchShard(key, payload, {
-    additionalData: additionalData(input.accountId),
-    itemCount: input.documents.length,
-  });
-  await FileSystem.writeAsStringAsync(shardPath(), JSON.stringify(shard));
+  request?: NativeTitleIndexRequest;
+  coverage?: PrivateSearchCoverage;
+}): Promise<boolean> {
+  const request =
+    input.request ?? captureNativeTitleIndexRequest(input.accountId);
+  return (
+    (await store.run(request.isCurrent, async () => {
+      const key = await getOrCreateKey();
+      if (!request.isCurrent()) return false;
+      const payload: TitleIndexShardPayload = {
+        documents: input.documents,
+        indexedAt: new Date().toISOString(),
+        coverage: input.coverage,
+      };
+      const shard = await encryptSearchShard(key, payload, {
+        additionalData: additionalData(input.accountId),
+        itemCount: input.documents.length,
+      });
+      if (!request.isCurrent()) return false;
+      await FileSystem.writeAsStringAsync(shardPath(), JSON.stringify(shard));
+      return true;
+    })) ?? false
+  );
 }
 
-export async function clearNativeTitleIndex(): Promise<void> {
-  const path = shardPath();
-  const info = await FileSystem.getInfoAsync(path);
-  if (info.exists) {
-    await FileSystem.deleteAsync(path, { idempotent: true });
-  }
-  await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.SEARCH_INDEX_KEY);
+export function clearNativeTitleIndex(): Promise<void> {
+  return store.clear();
 }

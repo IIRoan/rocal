@@ -15,8 +15,11 @@ jest.mock("@/lib/mail/api-service", () => ({
 const mockDecryptMessage = jest.fn<
   (input: { armoredMessage: string }) => Promise<{ plaintext: string }>
 >();
+const mockVerificationContext = { publicKeyArmored: "synthetic-public", fingerprint: "synthetic-fingerprint", ownAddresses: ["alice@solace.onl"] };
 jest.mock("@/lib/mail/worker-client", () => ({
   mailCryptoWorkerClient: {
+    getVerificationContext: () => mockVerificationContext,
+    isVerificationContextCurrent: (context: unknown) => context === mockVerificationContext,
     decryptMessage: (input: { armoredMessage: string }) => mockDecryptMessage(input),
   },
 }));
@@ -41,6 +44,7 @@ beforeAll(async () => {
   privateKey = generated.privateKey;
   const selfPublicKeyArmored = generated.publicKey.armor();
   sealer = {
+    isCurrent: () => true,
     selfPublicKeyArmored,
     encrypt: async ({ plaintext, recipientPublicKeysArmored }) => ({
       armoredMessage: await openpgp.encrypt({

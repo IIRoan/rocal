@@ -11,6 +11,7 @@ const ARMORED = "-----BEGIN PGP MESSAGE-----\nsealed\n-----END PGP MESSAGE-----"
 
 jest.mock("../lib/mail/mail-crypto", () => ({
   ensureVaultLoaded: jest.fn(async () => ({ vault: { publicKeyArmored: "self-key" } })),
+  isMailVaultCurrent: jest.fn(() => true),
   encryptForRecipients: jest.fn(async () => ({
     armoredMessage: "-----BEGIN PGP MESSAGE-----\nsealed\n-----END PGP MESSAGE-----",
   })),

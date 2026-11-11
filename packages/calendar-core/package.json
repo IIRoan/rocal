@@ -28,11 +28,15 @@
     "./zod": "./src/zod.ts",
     "./sanitize-email-html": "./src/sanitize-email-html.ts",
     "./mail-html": "./src/mail-html.ts",
+    "./mail-mime-limits": "./src/mail-mime-limits.ts",
     "./mail-pgp-layers": "./src/mail-pgp-layers.ts",
+    "./mail-pgp-encryption": "./src/mail-pgp-encryption.ts",
     "./event-ics-export": "./src/event-ics-export.ts",
     "./ics-import": "./src/ics-import.ts",
     "./riftbound": "./src/riftbound.ts",
     "./riftbound-settings": "./src/riftbound-settings.ts",
-    "./third-party-notices": "./src/third-party-notices.ts"
+    "./third-party-notices": "./src/third-party-notices.ts",
+    "./mail-key-continuity": "./src/mail-key-continuity.ts",
+    "./mail-pgp-key-inspection": "./src/mail-pgp-key-inspection.ts"
   }
 }

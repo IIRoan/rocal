@@ -1,3 +1,9 @@
+import * as FileSystem from "expo-file-system/legacy";
+import {
+  activateSessionData,
+  closeSessionData,
+  captureSessionDataScope,
+} from "@workspace/native-core/lib/session-data-lifecycle";
 import type { MailOfflineSnapshot } from "./mail-offline-snapshot";
 import {
   clearMailOfflineSnapshot,
@@ -36,7 +42,6 @@ jest.mock("./mail-api", () => ({
   getMailConfig: jest.fn(),
   mailFetch: jest.fn(),
 }));
-
 
 function snapshot(userId = "u1"): MailOfflineSnapshot {
   return {
@@ -78,7 +83,9 @@ function snapshot(userId = "u1"): MailOfflineSnapshot {
 }
 
 describe("mail offline store", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearMailOfflineSnapshot();
+    activateSessionData("u1");
     for (const key of Object.keys(mockSecureStore)) delete mockSecureStore[key];
     for (const key of Object.keys(mockFiles)) delete mockFiles[key];
   });
@@ -96,6 +103,7 @@ describe("mail offline store", () => {
   it("refuses and wipes a snapshot written for another account", async () => {
     await saveMailOfflineSnapshot(snapshot("u1"));
 
+    activateSessionData("u2");
     expect(await loadMailOfflineSnapshot("u2")).toBeNull();
     expect(Object.keys(mockFiles)).toHaveLength(0);
   });
@@ -122,6 +130,39 @@ describe("mail offline store", () => {
     await clearMailOfflineSnapshot();
     await pending;
 
+    expect(Object.keys(mockFiles)).toHaveLength(0);
+  });
+  it("ignores a debounced save captured before signing back into the same account", async () => {
+    const scope = captureSessionDataScope("u1");
+    await closeSessionData();
+    activateSessionData("u1");
+    await saveMailOfflineSnapshot(snapshot(), scope);
+    expect(Object.keys(mockFiles)).toHaveLength(0);
+    await saveMailOfflineSnapshot(snapshot());
+    expect(await loadMailOfflineSnapshot("u1")).toEqual(snapshot());
+  });
+
+  it("clears a snapshot whose filesystem write was already running", async () => {
+    let enter = () => undefined as void;
+    let finish = () => undefined as void;
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    jest
+      .mocked(FileSystem.writeAsStringAsync)
+      .mockImplementationOnce(async (path, value) => {
+        enter();
+        await released;
+        mockFiles[path] = value;
+      });
+    const saving = saveMailOfflineSnapshot(snapshot());
+    await entered;
+    const clearing = clearMailOfflineSnapshot();
+    finish();
+    await Promise.all([saving, clearing]);
     expect(Object.keys(mockFiles)).toHaveLength(0);
   });
 });

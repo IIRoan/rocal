@@ -14,7 +14,7 @@ import {
   registerComposeCloseActions,
   registerComposeDraftSaver,
 } from "@/components/mail/mail-compose-bridge";
-import { resolveMailServerLimits } from "@workspace/calendar-core";
+import { clearMailSendAttempts, completeMailSendAttempt, getMailSendAttemptStore, isMailSendScopeOpen, sendJmapMessage, resolveMailServerLimits } from "@workspace/calendar-core";
 
 jest.mock("sonner", () => ({
   toast: Object.assign(jest.fn(), { error: jest.fn() }),
@@ -52,6 +52,7 @@ describe("useMailCompose", () => {
   let root: Root;
 
   beforeEach(() => {
+    clearMailSendAttempts();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -66,6 +67,33 @@ describe("useMailCompose", () => {
     registerComposeCloseActions(null);
     mockToast.mockClear();
     mockToast.error.mockClear();
+  });
+
+  it("sends two consecutive compose intents with the real controller and account attempt store", async () => {
+    let compose: ReturnType<typeof useMailCompose> | null = null;
+    await act(async () => {
+      root.render(<MailComposeProvider mailServerLimits={fallbackMailServerLimits} quoteDateOptions={{ timeFormat: "24h" }}><ComposeProbe onReady={(value) => { compose = value; }} /></MailComposeProvider>);
+    });
+    const scopes: string[] = [];
+    const messageIds: string[] = [];
+    let submissions = 0;
+    for (const body of ["First message", "Second message"]) {
+      await act(async () => { compose?.openNewCompose(); });
+      const scope = getMailComposeBridge()?.getComposeSessionId();
+      if (!scope) throw new Error("Compose session was not exposed");
+      scopes.push(scope);
+      const attempt = getMailSendAttemptStore("consecutive-controller").get(scope, "sender@solace.test");
+      messageIds.push(attempt.messageId);
+      await sendJmapMessage({ draftsMailboxId: "drafts", fromEmail: "sender@solace.test", to: ["recipient@solace.test"], subject: body, textBody: body, identityId: "identity", sentCopyCiphertext: null }, {
+        attempt, mailAccountId: "consecutive-controller", submissionAccountId: "consecutive-controller", policy: null, onCleanupError: () => {},
+        request: async () => { submissions += 1; return { methodResponses: [["Email/set", { created: { draft1: { id: `email-${submissions}` } } }, "c1"], ["EmailSubmission/set", { created: { s1: { id: `submission-${submissions}` } } }, "c2"]] }; },
+      });
+      completeMailSendAttempt("consecutive-controller", scope);
+      await act(async () => { getMailComposeBridge()?.clearCompose(); });
+    }
+    expect(new Set(scopes).size).toBe(2);
+    expect(new Set(messageIds).size).toBe(2);
+    expect(submissions).toBe(2);
   });
 
   function registerCloseHarness(flushResult: string | null) {
@@ -146,9 +174,15 @@ describe("useMailCompose", () => {
       latest!.setComposeBody("Draft body");
     });
 
+    const oldSession = getMailComposeBridge()?.getComposeSessionId();
+    if (!oldSession) throw new Error("Compose session was not exposed");
+    const attempt = getMailSendAttemptStore("reset-controller").get(`compose:${oldSession}`, "sender@solace.test");
     await act(async () => {
       getMailComposeBridge()?.resetDraft();
     });
+    expect(attempt.retired).toBe(true);
+    expect(() => getMailSendAttemptStore("reset-controller").get(`compose:${oldSession}`, "sender@solace.test")).toThrow("finished");
+    expect(getMailComposeBridge()?.getComposeSessionId()).not.toBe(oldSession);
 
     expect(getMailComposeBridge()?.getDraft().to).toBe("");
     expect(getMailComposeBridge()?.getDraft().body).toBe("");
@@ -512,4 +546,31 @@ describe("useMailCompose", () => {
 
     expect(getMailComposeBridge()?.isComposeDirty()).toBe(false);
   });
+});
+
+function StrictAutoCompose() {
+  const compose = useMailCompose();
+  const opened = React.useRef(false);
+  React.useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
+    compose.openNewCompose();
+  }, [compose]);
+  return null;
+}
+
+it("keeps the real controller's active scope open through StrictMode replay and closes it on unmount", async () => {
+  clearMailSendAttempts();
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  await act(async () => root.render(<React.StrictMode><MailComposeProvider mailServerLimits={fallbackMailServerLimits} quoteDateOptions={{ timeFormat: "24h" }}><StrictAutoCompose /></MailComposeProvider></React.StrictMode>));
+  const session = getMailComposeBridge()?.getComposeSessionId();
+  if (!session) throw new Error("Missing compose session");
+  const scope = `compose:${session}`;
+  const attempt = getMailSendAttemptStore("strict-controller").get(scope, "owner@solace.test");
+  expect(attempt.cancelled).toBe(false);
+  await expect(sendJmapMessage({ draftsMailboxId: "drafts", fromEmail: "owner@solace.test", to: ["other@solace.test"], subject: "StrictMode first send", textBody: "Body", identityId: "identity", sentCopyCiphertext: null, isCurrent: () => isMailSendScopeOpen(scope) }, { attempt, mailAccountId: "strict-controller", submissionAccountId: "strict-controller", policy: null, onCleanupError: () => {}, request: async () => ({ methodResponses: [["Email/set", { created: { draft1: { id: "sent" } } }, "c1"], ["EmailSubmission/set", { created: { s1: { id: "receipt" } } }, "c2"]] }) })).resolves.toMatchObject({ submissionId: "receipt" });
+  await act(async () => root.unmount());
+  expect(attempt.retired).toBe(true);
+  expect(() => getMailSendAttemptStore("strict-controller").get(scope, "owner@solace.test")).toThrow("finished");
 });

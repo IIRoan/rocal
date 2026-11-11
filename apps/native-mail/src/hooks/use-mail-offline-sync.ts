@@ -9,6 +9,11 @@ import {
   captureMailOfflineSnapshot,
   isMailOfflineSnapshotKey,
 } from "../lib/mail/mail-offline-snapshot";
+import {
+  captureSessionDataScope,
+  isSessionDataScopeCurrent,
+} from "@workspace/native-core/lib/session-data-lifecycle";
+import { pruneAttachmentCache } from "../lib/mail/attachment-cache";
 import { saveMailOfflineSnapshot } from "../lib/mail/mail-offline-store";
 
 const SYNC_INTERVAL_MS = 30_000;
@@ -56,6 +61,7 @@ export function useMailOfflineSync(runtime: MailRuntime | undefined) {
     if (AppState.currentState === "active") sync();
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
+      void pruneAttachmentCache().catch(() => undefined);
       sync();
       void queryClient.refetchQueries({
         queryKey: QUERY_KEYS.mailRuntime(),
@@ -70,13 +76,15 @@ export function useMailOfflineSync(runtime: MailRuntime | undefined) {
 
   useEffect(() => {
     if (!userId) return;
+    const scope = captureSessionDataScope(userId);
     const writer = createDelayedTask(() => {
+      if (!isSessionDataScopeCurrent(scope)) return;
       const snapshot = captureMailOfflineSnapshot(queryClient, {
         userId,
         emailState: getMailSyncState(),
       });
       if (snapshot) {
-        void saveMailOfflineSnapshot(snapshot).catch(() => undefined);
+        void saveMailOfflineSnapshot(snapshot, scope).catch(() => undefined);
       }
     }, SNAPSHOT_WRITE_DELAY_MS);
 

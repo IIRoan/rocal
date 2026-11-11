@@ -1,0 +1,92 @@
+Delivered-To: ecc@mime-probe-6e3bc9.solace.test
+X-Spam-Status: Yes
+Received: from [192.168.88.254] (6efdff6716d3 [192.168.88.254])
+	by 6efdff6716d3 (Stalwart SMTP) with ESMTP id 4B743339FC00400;
+	Tue, 10 Nov 2026 13:07:10 +0000
+Authentication-Results: 6efdff6716d3;
+	spf=permerror (6efdff6716d3: unable to verify SPF record for postmaster@[192.168.88.254]) smtp.helo=[192.168.88.254];
+	spf=none (6efdff6716d3: no SPF records found for sender@mime-probe-6e3bc9.solace.test) smtp.mailfrom=sender@mime-probe-6e3bc9.solace.test;
+	iprev=pass policy.iprev=192.168.88.254;
+	dmarc=none header.from=mime-probe-6e3bc9.solace.test policy.dmarc=none
+Received-SPF: none (6efdff6716d3: no SPF records found for sender@mime-probe-6e3bc9.solace.test)
+	receiver=6efdff6716d3; client-ip=192.168.88.254; envelope-from="sender@mime-probe-6e3bc9.solace.test"; helo=[192.168.88.254];
+X-Spam-Result: ARC_NA (0.00),
+	DBL_BLOCKED_OPENRESOLVER (0.00),
+	DKIM2_NA (0.00),
+	DKIM_NA (0.00),
+	DNSWL_BLOCKED (0.00),
+	FROM_EQ_ENV_FROM (0.00),
+	HAS_ATTACHMENT (0.00),
+	HTML_SHORT_1 (0.00),
+	MID_RHS_MATCH_ENV_FROM (0.00),
+	RBL_SENDERSCORE_REPUT_BLOCKED (0.00),
+	RBL_SPAMHAUS_BLOCKED_OPENRESOLVER (0.00),
+	RCPT_COUNT_ONE (0.00),
+	SPF_NA (0.00),
+	TO_DN_NONE (0.00),
+	TO_DOM_EQ_FROM_DOM (0.00),
+	TO_MATCH_ENVRCPT_ALL (0.00),
+	URIBL_BLOCKED (0.00),
+	RCVD_COUNT_ZERO (0.10),
+	RCVD_NO_TLS_LAST (0.10),
+	MISSING_CHARSET (0.50),
+	AUTH_NA (1.00),
+	DMARC_NA (1.00),
+	MID_RHS_MATCH_FROM (1.00),
+	MID_RHS_MATCH_TO (1.00),
+	MIME_BASE64_TEXT_BOGUS (1.00),
+	MISSING_DATE (1.00),
+	ENV_FROM_INVALID (2.00),
+	FROM_INVALID (2.00),
+	HELO_BAREIP (3.00)
+X-Spam-Score: spam, score=13.70
+Return-Path: <sender@mime-probe-6e3bc9.solace.test>
+Date: Tue, 10 Nov 2026 13:07:11 +0000
+From: SYNTHETIC sender <sender@mime-probe-6e3bc9.solace.test>
+To: ecc@mime-probe-6e3bc9.solace.test
+Subject: SYNTHETIC inbound SMTP ecc
+Message-ID: <df3849c3-05b6-4a8e-86bb-3c72fb0fc201@mime-probe-6e3bc9.solace.test>
+MIME-Version: 1.0
+MIME-Version: 1.0
+Content-Type: multipart/encrypted;
+	protocol="application/pgp-encrypted";
+	boundary="=_8e60317c8d18a45b08f9d1e0ed09268d"
+
+OpenPGP/MIME message (Automatically encrypted by Stalwart)
+
+--=_8e60317c8d18a45b08f9d1e0ed09268d
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--=_8e60317c8d18a45b08f9d1e0ed09268d
+Content-Type: application/octet-stream; name="encrypted.asc"
+Content-Disposition: inline; filename="encrypted.asc"
+
+-----BEGIN PGP MESSAGE-----
+
+wV4DPPdpmUZ6/OYSAQdA2xXJG09xSgcoIBzqo75xH6tFgynM63kcC1U6SvSqfU8w
+pJFa67s4YYm+6bmRFWHJDgCRcKjj4GwvQwGyLnp0LVKhtE7Ta05aOyqCA9RVVXRw
+0sK+AUtCA/+7M2Rt4aKayPWGS36LOi9lLxGuqXZf/IEmJitEW9NnMrvysZXYYx1u
+mIRXaiYVfqhWysDIQQTbmHHVkGBslpq9DOewuYVcLXMah8nSSxds2aQDY/FR2a6D
+CBnINDchFizzy0J2Rg4REa86Pn2cjZOQ7uqU626J6Eo71AM+vFp+xPPM46zSA0I4
+JYZaQrpv1IxmKqByGikKM3ko3fISN7pv6a+c1xmsc/psrcIuQ/hKVnC3UAynZf4o
+ittKhw3Nc4Xqx/aBTzGfmtTaA04gDAP2k+twJ3OfW3kUbnWnhFrxbPu7Wr0BZsZE
+j3BHTI/hxHRGILFEbe/h8/4524h2QLf33XalPi3mc2ahBwuaDsnYX5f86QBZDsXM
+LWTj9I6x1jLf8muxbEaUyFgK7TjWF83ZvY5pnQXBT40FZ16LGNfxfEjX6Q0b+jLQ
+W5q0WqS8q2fx1tQr2iJOdOqgvmAtjO5Usj9yz8V8Qxem6X4dy86uSygyAzQPTpuE
+MiOuDMw5cbiAxsnFS0GKwrvaVQm+mo5HPSvOfciQgHV5Smr/YjSj9bfbyJM290oV
+mxvtlklttbkznQZl5qYzm+gbSsT380zEaxX/u5Ixf2527ceCIppCmP/xWk1y24zW
+dQ6c2Z2BS2cjbuHVuEbzCfQOq21VuAcuElIGjXl2fvorYbtRGkcPkx1f+MTf1Q+5
+4r1sngpCz/sxX0FR7JgR6aaU7kLrSzVKxacx9jqBzUjXp9m4fPvQbwnTbxouYXME
+GMGLyFQmTWtKiSxjC7989kG72EBWJ5Tf0kYNK/SJwp3cFXwC6yD3grM1nh7Y5+qP
+XxH7xWjM5jRwfVm4XwMlh2I2L7r+N+u/YCpVTXi13ehnMTwDwCGXR3zBwQF+gQbJ
+ZaqKgoo4+krG9II8lenMaRX4MJNaJQogElPJYHl+bI+UzfkuIpV4eBPCdqEan+wK
+FI5S2sE/Vn4mwNbdfiDgQgVgA5kkMlfKbH6YEoeXkJ2PcWS4zcncKwX3fvyKWMVD
+cWLFA2SJPfeiZzJfWRn7RbYvoecAcrhLLROpajys2mLRhrQGYSjxPzJCsSJ/cGc3
+OLgl8grp2KLd8O/vzRejukM6DFXi87GUW8eQ3ZCXX7JOgojTOETaUfycX1P17XVq
+Yz9cfsXvv517NMKgQnopVTuxSrlglEoKzA0hrT+1NE4r
+=IHT/
+-----END PGP MESSAGE-----
+
+--=_8e60317c8d18a45b08f9d1e0ed09268d--

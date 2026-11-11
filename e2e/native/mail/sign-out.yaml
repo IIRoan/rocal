@@ -22,5 +22,5 @@ appId: ${APP_ID}
       id: mail-message-text
       text: ".*Maestro body survives encrypted draft storage.*"
     timeout: 60000
-- assertVisible: Signature verified
+- assertVisible: Signed with your local key
 - takeScreenshot: ${SCREENSHOT_DIR}/signed-in-and-unlocked-again

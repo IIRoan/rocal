@@ -1,3 +1,4 @@
+import { reviewMailSenderKey } from "../../../src/lib/mail/mail-trust";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   StyleSheet,
@@ -170,7 +171,8 @@ export default function MailMessageScreen() {
   const openEvent = (eventId: string) => {
     void openCalendarEvent(eventId).then(
       (opened) => {
-        if (!opened) toast("Install Solace Calendar to open this event", "error");
+        if (!opened)
+          toast("Install Solace Calendar to open this event", "error");
       },
       () => toast("Could not open this event.", "error"),
     );
@@ -208,6 +210,23 @@ export default function MailMessageScreen() {
                 signatureVerificationState={
                   content.decryptResult?.signatureVerificationState
                 }
+                senderKeyTrustState={content.decryptResult?.senderKeyTrustState}
+                onReviewSenderKey={() => {
+                  const email = message.from?.[0]?.email;
+                  if (!runtime || !email) return;
+                  void reviewMailSenderKey(runtime, email).then(
+                    () =>
+                      toast(
+                        "Reopen this message to check its sender key again.",
+                        "success",
+                      ),
+                    () =>
+                      toast(
+                        "The sender key could not be reviewed. Saved keys were kept.",
+                        "error",
+                      ),
+                  );
+                }}
                 decryptionFailed={Boolean(content.decryptError)}
                 attachments={content.threadAttachments}
                 downloadingBlobId={actions.downloadingBlobId}

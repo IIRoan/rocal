@@ -5,7 +5,7 @@ appId: ${APP_ID}
       id: mail-message-text
       text: ${BODY_TEXT}
     timeout: ${OPEN_TIMEOUT_MS}
-- assertVisible: Signature verified
+- assertVisible: '${typeof SIGNATURE_LABEL !== "undefined" ? SIGNATURE_LABEL : "Signature verified"}'
 - assertNotVisible: This message has no content.
 - runFlow:
     when:

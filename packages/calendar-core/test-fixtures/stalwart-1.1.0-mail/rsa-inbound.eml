@@ -1,0 +1,98 @@
+Delivered-To: rsa@mime-probe-6e3bc9.solace.test
+X-Spam-Status: Yes
+Received: from [192.168.88.254] (6efdff6716d3 [192.168.88.254])
+	by 6efdff6716d3 (Stalwart SMTP) with ESMTP id 4B74333F8200600;
+	Tue, 10 Nov 2026 13:07:11 +0000
+Authentication-Results: 6efdff6716d3;
+	spf=permerror (6efdff6716d3: unable to verify SPF record for postmaster@[192.168.88.254]) smtp.helo=[192.168.88.254];
+	spf=none (6efdff6716d3: no SPF records found for sender@mime-probe-6e3bc9.solace.test) smtp.mailfrom=sender@mime-probe-6e3bc9.solace.test;
+	iprev=pass policy.iprev=192.168.88.254;
+	dmarc=none header.from=mime-probe-6e3bc9.solace.test policy.dmarc=none
+Received-SPF: none (6efdff6716d3: no SPF records found for sender@mime-probe-6e3bc9.solace.test)
+	receiver=6efdff6716d3; client-ip=192.168.88.254; envelope-from="sender@mime-probe-6e3bc9.solace.test"; helo=[192.168.88.254];
+X-Spam-Result: ARC_NA (0.00),
+	DBL_BLOCKED_OPENRESOLVER (0.00),
+	DKIM2_NA (0.00),
+	DKIM_NA (0.00),
+	DNSWL_BLOCKED (0.00),
+	FROM_EQ_ENV_FROM (0.00),
+	HAS_ATTACHMENT (0.00),
+	HTML_SHORT_1 (0.00),
+	MID_RHS_MATCH_ENV_FROM (0.00),
+	RBL_SENDERSCORE_REPUT_BLOCKED (0.00),
+	RBL_SPAMHAUS_BLOCKED_OPENRESOLVER (0.00),
+	RCPT_COUNT_ONE (0.00),
+	SPF_NA (0.00),
+	TO_DN_NONE (0.00),
+	TO_DOM_EQ_FROM_DOM (0.00),
+	TO_MATCH_ENVRCPT_ALL (0.00),
+	URIBL_BLOCKED (0.00),
+	RCVD_COUNT_ZERO (0.10),
+	RCVD_NO_TLS_LAST (0.10),
+	MISSING_CHARSET (0.50),
+	AUTH_NA (1.00),
+	DMARC_NA (1.00),
+	MID_RHS_MATCH_FROM (1.00),
+	MID_RHS_MATCH_TO (1.00),
+	MIME_BASE64_TEXT_BOGUS (1.00),
+	MISSING_DATE (1.00),
+	ENV_FROM_INVALID (2.00),
+	FROM_INVALID (2.00),
+	HELO_BAREIP (3.00)
+X-Spam-Score: spam, score=13.70
+Return-Path: <sender@mime-probe-6e3bc9.solace.test>
+Date: Tue, 10 Nov 2026 13:07:11 +0000
+From: SYNTHETIC sender <sender@mime-probe-6e3bc9.solace.test>
+To: rsa@mime-probe-6e3bc9.solace.test
+Subject: SYNTHETIC inbound SMTP rsa
+Message-ID: <d4ea2795-61d4-43bf-8570-33ca2f299816@mime-probe-6e3bc9.solace.test>
+MIME-Version: 1.0
+MIME-Version: 1.0
+Content-Type: multipart/encrypted;
+	protocol="application/pgp-encrypted";
+	boundary="=_b11f3ab8d9f03fad42ee2bf5c09bc3c1"
+
+OpenPGP/MIME message (Automatically encrypted by Stalwart)
+
+--=_b11f3ab8d9f03fad42ee2bf5c09bc3c1
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--=_b11f3ab8d9f03fad42ee2bf5c09bc3c1
+Content-Type: application/octet-stream; name="encrypted.asc"
+Content-Disposition: inline; filename="encrypted.asc"
+
+-----BEGIN PGP MESSAGE-----
+
+wcDMA2P4MEei0jGHAQv+OUz/qyc71lE4KDyhE0d3hKjzFdrtg8/wPXDS3TDcxAqi
+eEOWt6qPdD47YiQy1VGvg4MOR39AGAptmqNwXYyZWRDmBZ7VsBPNtAoTPXxia0cn
+qk7Fx/1dDFOVW+LVNMzZaRTXT292Fi4uL4eiI+VwmqoiJ86RabHWQ6jgBVtegSAW
+IqmKl7iKlebHHvRLY/jXTlXLyskKPt8iLGeAgZbJlo/TedsoQ7V7/uYkyArixk6R
+N5jwOZoUGzcy+5xLw/eYymc1Bx4qLLFekM3RmhBv7+p5Xyq6hjYAAIBCzLH6b8iy
+V5t0j+ZYDVqTcNE3/Wf6yhmt+WAZxBSRieKBzPrV596iXN4hbWidgVp+1sdIG7wV
+jcBnudeC+CJEknPrIOg9dvyy+vvnU1/sn3Zn0EpsvwoaGgw0NHHFoEAHQ5b6sce0
+5aqr7N1565BEvKlnz2/eM/EfrIgEXkfTdVBheEPLF1vy1I4cli3+1kIb3eBulsQX
+ZGe3IDuRCTgDBohytVSk0sK+ATx7NhBzr4z7f/+w0m78/qDMxdTcpxwQu2y/pFyk
+hMdg0Sh2kzmup1GZuw1VsymbGIU3JnUMcCQC+RWq8MgZEaiVSmaPg6qo9bRRhHpP
+wIgH/18SbTGuqIgChB3V3FNZzhiL3236xmOAvyZAZWacZu8cOWrJDPmaDdEunCZH
+35elwOOLo5+KMUwN/jL3I+j1XFt5G64hPngjItkfRHXCrRLS25QEd2aXw7y19UyF
+MpB29e1/Tym7UQsZXbh6zjuXoj/hC5qveMrN5S/pKFC8XA4nWdvTW+Ve1Y066WiR
+HtaqRXRv3vNJZgOIo8zCs57bcb5iF6eLPfrQG1PkzWIF2e3mWq3ZB65H348zSFfu
+/oADRdVXaATQ/9EG7j3QcoKnmO9WLqwO6ylKZWkBuqMSdVyuQXFkz8S9+ZX3mfje
+rMmcWL/iIcOv55WiR50IdB8jqcrEkt1+ol3CtWnXcjp6zkSpVX/NvDUB+gJ6VVpT
++v8qt0qwhDhMP0I+DHeNSLCtbmazg4WCkJp2GGOJlSHwcTSxzO2ee/ecTINvqR67
+9tzooKKgYHV207prtbUmmtqGyx0uQcQWHmJUOGlA/shIvP41p6YBu+YRjm1WreUA
+OXmCXQ1Er/L0KOYTnvGa1l8aadWilZwykez1gg5jBl12eR52RrAt09FgBPvNyzET
+/735hwydK+Ck3Xpjt5HGQKP5I4PIlzxlZoW+vKjYSxJejqIGtTnC5qUqqsxv/fk5
+n6MY/dkE7Q82xA/9XzyNjuVKsoWwdLwHdoFK+dR1HghmivNd0tXHKKrFxhGZkyWL
+nlGT8V4Bwvhcqt/Zgaj4siXGWoMCQfdoMkzdATOqcYxIkGo5vDvKSMBhsa+6tNJ2
+UR4BZZ10MRYmlwSTiWWk1wGyRHCWpVLsfmpyUaC8Qc9629izlfVz6EYsOdC0h3iM
+K/6j5nvZMvMxy8JSL+GLxmHtqurFHYgigIpgfPQZBKCnQiYp/PTfjIL9WH44I6Cf
+p2c2lC0Djj9/FXaIXw29j69Pi51mfQxHYFaTkColD6psX1IGPfLKW3IS22veglHb
+1BIOjvkgWk97Un8o8zFGS6C5MvshFNpSbxjLmRo1jzV0EyX1n4KLohQStTBU5olJ
+cGgUd+1l9kz8rIANLN0BmKEbV538Sw1ehkBv+2pL0CsYOh4B8gsbiRyuc5wzRSnz
+=0Kxs
+-----END PGP MESSAGE-----
+
+--=_b11f3ab8d9f03fad42ee2bf5c09bc3c1--

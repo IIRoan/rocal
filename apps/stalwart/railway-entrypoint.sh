@@ -72,6 +72,8 @@ export PGPASSWORD="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
 USE_TLS=false
 ALLOW_INVALID=false
 RECOVERY_MODE=false
+UPGRADE_PHASE="${STALWART_UPGRADE_PHASE:-ordinary}"
+UPGRADE_HELPER="${STALWART_UPGRADE_HELPER:-/usr/local/bin/upgrade-1.1.0.py}"
 
 case "$PGHOST" in
 	*.proxy.rlwy.net|*.rlwy.net) USE_TLS=true; ALLOW_INVALID=true ;;
@@ -203,7 +205,9 @@ import sys
 path, ready = sys.argv[1], sys.argv[2] == "true"
 state = {
     "ready": ready,
-    "recovery_mode": os.environ.get("RECOVERY_MODE") == "true",
+    "phase": os.environ.get("UPGRADE_PHASE", "ordinary"),
+    "management_url": os.environ.get("MANAGEMENT_URL", "http://127.0.0.1:8080"),
+    "recovery_mode": os.environ.get("UPGRADE_PHASE") == "prepare",
     "stalwart_pid": int(os.environ.get("STALWART_PID", "0") or 0),
     "frpc_pid": int(os.environ.get("FRPC_PID", "0") or 0),
     "http_port": int(os.environ.get("STALWART_HTTP_PORT", "8080")),
@@ -226,6 +230,8 @@ import json
 import os
 import socket
 import threading
+import base64
+import urllib.request
 
 port = int(os.environ["HEALTH_PORT"])
 state_path = os.environ["HEALTH_STATE_PATH"]
@@ -276,7 +282,7 @@ def port_open(port):
 
 def ready():
     state = load_state()
-    if not state.get("ready"):
+    if not state.get("ready") or state.get("phase", "ordinary") != "ordinary":
         return False
     # Tunnel reachability is checked once at boot; probing the VPS here would also take down the VPS-independent gate.
     if not pid_alive(state.get("stalwart_pid")) or not pid_alive(state.get("frpc_pid")):
@@ -284,13 +290,37 @@ def ready():
     for port in (25, state.get("http_port", 8080), state.get("gate_port", 8081), state.get("public_port", 8082)):
         if not port_open(port):
             return False
-    return True
+    return management_ready(state, authenticated=False)
+
+
+def management_ready(state, authenticated=True):
+    try:
+        request = urllib.request.Request(state.get("management_url", "http://127.0.0.1:8080") + ("/jmap/session" if authenticated else "/healthz/ready"))
+        if authenticated:
+            temporary = os.environ.get("STALWART_RECOVERY_ADMIN")
+            authorization = "Basic " + base64.b64encode(temporary.encode()).decode() if temporary else "Bearer " + os.environ["STALWART_ADMIN_TOKEN"]
+            request.add_header("Authorization", authorization)
+        with urllib.request.urlopen(request, timeout=2) as response:
+            return response.status == 200
+    except (OSError, KeyError):
+        return False
+
+
+def phase_ready(phase):
+    state = load_state()
+    if state.get("phase") != phase or not state.get("ready") or not pid_alive(state.get("stalwart_pid")):
+        return False
+    if phase == "held" and not port_open(state.get("gate_port", 8081)):
+        return False
+    return management_ready(state, authenticated=phase == "prepare")
 
 
 def handle(conn):
     try:
-        conn.recv(4096)
-        conn.sendall(OK if ready() else UNAVAILABLE)
+        request = conn.recv(4096).split(b" ", 2)
+        path = request[1] if len(request) > 1 else b""
+        available = ready() if path == b"/healthz/ready" else (phase_ready("prepare") if path == b"/healthz/maintenance" else (phase_ready("held") if path == b"/healthz/held" else False))
+        conn.sendall(OK if available else UNAVAILABLE)
     finally:
         conn.close()
 
@@ -325,7 +355,7 @@ run_as_stalwart() {
 
 start_stalwart() {
 	log info "Starting Stalwart (db=${PGHOST}:${PGPORT}/${PGDATABASE})."
-	run_as_stalwart /usr/local/bin/stalwart --config /etc/stalwart/config.json 2>&1 &
+	setpriv --reuid=stalwart --regid=stalwart --init-groups -- /usr/local/bin/stalwart --config /etc/stalwart/config.json 2>&1 &
 	STALWART_PID=$!
 	log info "Stalwart pid=${STALWART_PID}."
 	wait_for_stalwart_ready
@@ -372,14 +402,13 @@ update_relay_route() {
 
 	i=0
 	max_attempts="${RELAY_ROUTE_UPDATE_ATTEMPTS:-90}"
-	err_log="/tmp/relay-route-update.err"
 	while [ "$i" -lt "$max_attempts" ]; do
 		if stalwart-cli --url "$stalwart_url" --api-key "$STALWART_ADMIN_TOKEN" \
 			update MtaRoute "$RELAY_ROUTE_ID" \
 			--field "host=${relay_addr}" \
 			--field "port=${FRPC_RELAY_LOCAL_PORT}" \
-			2>"$err_log"; then
-			reload_stalwart_settings
+			2>/dev/null; then
+			reload_stalwart_settings || return 1
 			log info "Relay route -> ${relay_addr}:${FRPC_RELAY_LOCAL_PORT} (id=${RELAY_ROUTE_ID}; via ${stalwart_url})."
 			return 0
 		fi
@@ -387,7 +416,6 @@ update_relay_route() {
 		sleep 2
 	done
 
-	tail -n 3 "$err_log" >&2 || true
 	log error "Could not update relay route to ${relay_addr}:${FRPC_RELAY_LOCAL_PORT} via ${stalwart_url}."
 	return 1
 }
@@ -410,13 +438,13 @@ seed_stalwart_cli_schema() {
 
 reload_stalwart_settings() {
 	# The coordinator fans a reload out to every node; stalwart-cli 1.0 refuses an action without a body.
-	stalwart-cli --url "$(stalwart_management_url)" --api-key "$STALWART_ADMIN_TOKEN" \
+	stalwart-cli --url "${1:-$(stalwart_management_url)}" --api-key "$STALWART_ADMIN_TOKEN" \
 		create Action/ReloadSettings --json '{}' >/dev/null 2>&1 \
-		|| log warn "Stalwart settings reload failed."
+		|| { log warn "Stalwart settings reload failed."; return 1; }
 }
 
 verify_stalwart_cluster() {
-	python3 - "$(stalwart_management_url)" <<'PY'
+	python3 - "${1:-$(stalwart_management_url)}" <<'PY'
 import json, os, sys, urllib.request
 try:
     methods = ["x:InMemoryStore/get", "x:Coordinator/get"]
@@ -445,11 +473,32 @@ for path in sorted(pathlib.Path(sys.argv[1]).glob("*.ndjson")):
         entry = json.loads(line)
         if entry.get("object") == "InMemoryStore":
             entry["value"]["url"] = os.environ["STALWART_REDIS_URL"]
+        if entry.get("object") == "BlobStore" and entry["value"].get("@type") == "S3":
+            entry["value"]["bucket"] = os.environ["BUCKET"]
+            entry["value"]["region"] = {"@type": "Custom", "url": os.environ["BUCKET_ENDPOINT"], "region": os.environ["BUCKET_REGION"]}
+            entry["value"]["keyPrefix"] = os.environ.get("STALWART_BLOB_KEY_PREFIX", "stalwart/")
         print(json.dumps(entry))
 PY
 }
 
+verify_stalwart_plan() {
+	python3 - "$UPGRADE_HELPER" "$1" "$2" <<'PY_PLAN'
+import importlib.util, json, os, pathlib, sys
+spec = importlib.util.spec_from_file_location("upgrade", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+try:
+    client = module.Client(sys.argv[3], "Bearer " + os.environ["STALWART_ADMIN_TOKEN"])
+    entries = [module.decode(line) for line in pathlib.Path(sys.argv[2]).read_text().splitlines() if line.strip()]
+    count = module.verify_managed_plan(client, entries)
+    print(json.dumps({"managedObjectsVerified": count}))
+except (module.Refusal, OSError, KeyError, TypeError):
+    sys.exit("Managed plan readback failed; ordinary workers remain stopped.")
+PY_PLAN
+}
+
 apply_stalwart_plan() {
+	[ "${1:-}" = "recovery" ] || die "Managed plan apply requires recovery isolation."
 	[ -n "${STALWART_ADMIN_TOKEN:-}" ] || die "STALWART_ADMIN_TOKEN required to apply config plan."
 	plan_dir="${STALWART_PLAN_DIR:-/usr/local/share/stalwart/plan}"
 	[ -d "$plan_dir" ] || die "Config plan missing at ${plan_dir}."
@@ -462,15 +511,13 @@ apply_stalwart_plan() {
 
 	# Pin validation to the schema shipped with this server image.
 	ipv4_loopback_url="http://127.0.0.1:${STALWART_HTTP_PORT}"
-	private_url="$(stalwart_management_url)"
+	private_url="$ipv4_loopback_url"
 	for seed_url in "$ipv4_loopback_url" "$private_url"; do
 		seed_stalwart_cli_schema "$seed_url"
 	done
 	log info "Seeded stalwart-cli schema cache for plan apply."
 	i=0
 	max_attempts="${PLAN_APPLY_ATTEMPTS:-15}"
-	err_log="/tmp/stalwart-plan-apply.err"
-	: >"$err_log"
 	while [ "$i" -lt "$max_attempts" ]; do
 		applied=""
 		# Apply only to this container, including when the public edge still serves the previous store.
@@ -481,32 +528,32 @@ apply_stalwart_plan() {
 				continue
 			fi
 			if stalwart-cli --url "$try_url" --api-key "$STALWART_ADMIN_TOKEN" \
-				apply --file "$plan" 2>"$err_log"; then
+				apply --file "$plan" 2>/dev/null; then
 				applied="$try_url"
 				break
 			fi
 		done
 		if [ -n "$applied" ]; then
-			reload_stalwart_settings
+			reload_stalwart_settings "$applied" || die "Managed settings reload failed; startup remains closed."
+			verify_stalwart_plan "$plan" "$applied" || die "Managed plan readback failed; startup remains closed."
 			rm -f "$plan"
 			log info "Applied Stalwart config plan from ${plan_dir} via ${applied}."
 			return 0
 		fi
 		if [ "$i" -eq 0 ]; then
-			log warn "plan apply not ready yet: $(tr '\n' ' ' <"$err_log" 2>/dev/null || true)"
+			log warn "Plan apply has not succeeded; retrying local management."
 		fi
 		i=$((i + 1))
 		sleep 2
 	done
-	tail -n 20 "$err_log" >&2 || true
 	rm -f "$plan"
 	die "Could not apply Stalwart config plan via ${private_url} or ${ipv4_loopback_url}."
 }
 
 mark_health_ready() {
-	export STALWART_PID STALWART_HTTP_PORT FRPC_RELAY_LOCAL_PORT RECOVERY_MODE FRPC_PID
+	export STALWART_PID STALWART_HTTP_PORT FRPC_RELAY_LOCAL_PORT RECOVERY_MODE FRPC_PID UPGRADE_PHASE MANAGEMENT_URL
 	write_health_state true
-	log info "Railway health gate open (Stalwart and local JMAP gateways ready)."
+	log info "Phase ${UPGRADE_PHASE} health check enabled."
 }
 
 write_frpc_tls() {
@@ -560,6 +607,113 @@ cleanup() {
 	for child in "${GATE_PID:-}" "${STALWART_PID:-}" "${HEALTH_PID:-}"; do
 		[ -z "$child" ] || kill "$child" 2>/dev/null || true
 	done
+	for child in "${GATE_PID:-}" "${STALWART_PID:-}" "${HEALTH_PID:-}"; do
+		[ -z "$child" ] || wait "$child" 2>/dev/null || true
+	done
+}
+
+validate_upgrade_configuration() {
+	case "$UPGRADE_PHASE" in ordinary|prepare|held) ;; *) die "STALWART_UPGRADE_PHASE must be ordinary, prepare or held." ;; esac
+	[ "$STALWART_HTTP_PORT" = "8080" ] || die "Recovery and ordinary HTTP must use the validated port 8080."
+	[ "${STALWART_RECOVERY_MODE_PORT:-8080}" = "8080" ] || die "Unexpected recovery listener port."
+	[ "$RECOVERY_MODE" = "false" ] || die "Select prepare through STALWART_UPGRADE_PHASE; direct recovery flags are forbidden."
+	[ -n "${STALWART_APPROVED_STORE_ID:-}" ] || die "STALWART_APPROVED_STORE_ID is required."
+	[ "${STALWART_APPROVED_VERSION:-}" = "1.1.0" ] || die "Explicit Stalwart 1.1.0 approval is required."
+	[ "${STALWART_RECOVERY_ISOLATION:-}" = "unrouted-8080" ] || die "Recovery port isolation must be explicitly verified."
+	if [ "$UPGRADE_PHASE" != "prepare" ]; then
+		[ -z "${STALWART_RECOVERY_ADMIN:-}" ] || die "Temporary recovery administrators are forbidden outside prepare."
+		[ -n "${STALWART_ADMIN_TOKEN:-}" ] || die "Ordinary administrative API key required for recovery preflight."
+	fi
+	if [ "$UPGRADE_PHASE" != "held" ]; then
+		case "${STALWART_UPDATE_ROLE_PERMISSIONS:-false}" in false|0|"") ;; *) die "Role permission updates are restricted to held startup." ;; esac
+	fi
+	python3 - "$UPGRADE_HELPER" <<'PY_CHECK'
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("upgrade", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+try:
+    module.require(module.local_version("/usr/local/bin/stalwart") == "1.1.0", "wrong-server-binary")
+    module.require(module.store_identity("/etc/stalwart/config.json") == os.environ["STALWART_APPROVED_STORE_ID"], "wrong-approved-store")
+except (module.Refusal, OSError, KeyError):
+    sys.exit("Image/store identity approval failed; refusing startup.")
+PY_CHECK
+}
+
+start_recovery() {
+	port_listening "$STALWART_HTTP_PORT" && die "Recovery port is already occupied; refusing ambiguous management."
+	log info "Starting isolated recovery management before ordinary workers."
+	STALWART_RECOVERY_MODE=true STALWART_RECOVERY_MODE_PORT=8080 STALWART_UPDATE_ROLE_PERMISSIONS=false \
+		setpriv --reuid=stalwart --regid=stalwart --init-groups -- /usr/local/bin/stalwart --config /etc/stalwart/config.json >/dev/null 2>&1 &
+	STALWART_PID=$!
+	i=0
+	while [ "$i" -lt "${STALWART_RECOVERY_TIMEOUT_SECONDS:-60}" ]; do
+		kill -0 "$STALWART_PID" 2>/dev/null || die "Recovery process exited before authenticated management."
+		if STALWART_UPGRADE_PHASE="$UPGRADE_PHASE" python3 - "$UPGRADE_HELPER" <<'PY_PROBE'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("upgrade", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+try:
+    module.Client("http://127.0.0.1:8080", module.authorization(), timeout=2, deadline=3).call("x:Account/query", {"limit": 1})
+except (module.Refusal, OSError):
+    sys.exit(1)
+PY_PROBE
+		then
+			kill -0 "$STALWART_PID" 2>/dev/null || die "Recovery child exited during authentication."
+			return 0
+		fi
+		i=$((i + 1))
+		sleep 1
+	done
+	die "Authenticated recovery management timed out."
+}
+
+stop_recovery() {
+	kill "$STALWART_PID" 2>/dev/null || die "Recovery child was lost."
+	i=0
+	while kill -0 "$STALWART_PID" 2>/dev/null; do
+		[ "$i" -lt 20 ] || die "Recovery child did not exit; normal startup forbidden."
+		i=$((i + 1))
+		sleep 1
+	done
+	wait "$STALWART_PID" 2>/dev/null || true
+	STALWART_PID=""
+	port_listening "$STALWART_HTTP_PORT" && die "Recovery port is still occupied; normal startup forbidden."
+	return 0
+}
+
+render_service_allowlist() {
+	[ -n "${STALWART_SERVICE_ALLOWLIST_JSON:-}" ] || die "Store-bound service account allowlist is required."
+	python3 - "$UPGRADE_HELPER" <<'PY_ALLOWLIST'
+import importlib.util, json, os, sys
+spec = importlib.util.spec_from_file_location("upgrade", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+try:
+    value = module.decode(os.environ["STALWART_SERVICE_ALLOWLIST_JSON"])
+    module.validate_allowlist(value, os.environ["STALWART_APPROVED_STORE_ID"])
+    path = os.environ.get("STALWART_SERVICE_ALLOWLIST", "/etc/stalwart/service-allowlist.json")
+    with open(path + ".tmp", "w", encoding="utf-8", opener=lambda path, flags: os.open(path, flags, 0o600)) as output:
+        json.dump(value, output)
+    os.replace(path + ".tmp", path)
+except (module.Refusal, OSError, KeyError):
+    sys.exit("Invalid store-bound service account allowlist.")
+PY_ALLOWLIST
+}
+
+verify_current_policy() {
+	python3 "$UPGRADE_HELPER" verify-current --url "http://127.0.0.1:${STALWART_HTTP_PORT}" \
+		--service-allowlist "${STALWART_SERVICE_ALLOWLIST:-/etc/stalwart/service-allowlist.json}" \
+		|| die "Current encryption policy verification failed; ordinary workers remain stopped."
+}
+
+supervise_prepare() {
+	MANAGEMENT_URL="http://127.0.0.1:${STALWART_HTTP_PORT}"
+	mark_health_ready
+	log info "Prepare remains isolated; explicitly stop this deployment before held startup."
+	while kill -0 "$STALWART_PID" 2>/dev/null && kill -0 "$HEALTH_PID" 2>/dev/null; do sleep 2; done
+	die "Prepare supervisor lost a child."
 }
 
 # --- main ---
@@ -574,24 +728,42 @@ STALWART_GATE_KEY="${STALWART_GATE_KEY:-}"
 [ -n "${STALWART_WEBHOOK_SECRET:-}" ] || die "STALWART_WEBHOOK_SECRET is required to sign the mail-ingest webhook."
 STALWART_GATE_KEY_SHA256="$(printf '%s' "$STALWART_GATE_KEY" | sha256sum | cut -d' ' -f1)"
 unset STALWART_GATE_KEY
-export STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT STALWART_PUBLIC_PORT
+STALWART_HELD_MODE=false
+[ "$UPGRADE_PHASE" != "held" ] || STALWART_HELD_MODE=true
+export STALWART_HELD_MODE STALWART_GATE_KEY_SHA256 STALWART_GATE_PORT STALWART_HTTP_PORT STALWART_PUBLIC_PORT
 trap cleanup EXIT
 trap 'exit 0' TERM INT
 
 write_store_config
+validate_upgrade_configuration
+export UPGRADE_PHASE
+MANAGEMENT_URL="http://127.0.0.1:${STALWART_HTTP_PORT}"
+export MANAGEMENT_URL
 start_health_server
+start_recovery
+if [ "$UPGRADE_PHASE" = "prepare" ]; then
+	supervise_prepare
+fi
+render_service_allowlist
+apply_stalwart_plan recovery
+verify_stalwart_cluster "http://127.0.0.1:${STALWART_HTTP_PORT}"
+verify_current_policy
+stop_recovery
+unset STALWART_RECOVERY_ADMIN STALWART_RECOVERY_MODE STALWART_RECOVERY_MODE_PORT
 start_stalwart
+MANAGEMENT_URL="$(stalwart_management_url)"
 start_gate
-verify_stalwart_cluster
-apply_stalwart_plan
-update_relay_route || die "Relay route update failed; refusing to open health gate."
-# Joining the tunnel groups is the last boot step: from here the VPS sends this container traffic.
-start_frpc
+if [ "$UPGRADE_PHASE" = "ordinary" ]; then
+	update_relay_route || die "Relay route update failed; refusing to open health gate."
+	start_frpc
+fi
 mark_health_ready
 
+HEALTH_TARGET=ready
+[ "$UPGRADE_PHASE" != "held" ] || HEALTH_TARGET=held
 i=0
 while [ "$i" -lt 30 ]; do
-	if curl -fsS --max-time 1 "http://127.0.0.1:${HEALTH_PORT}/healthz/ready" >/dev/null 2>&1; then
+	if curl -fsS --max-time 1 "http://127.0.0.1:${HEALTH_PORT}/healthz/${HEALTH_TARGET}" >/dev/null 2>&1; then
 		break
 	fi
 	i=$((i + 1))
@@ -599,7 +771,7 @@ while [ "$i" -lt 30 ]; do
 done
 [ "$i" -lt 30 ] || die "Health gate did not return 200 after readiness."
 
-log info "Running (Railway health :${HEALTH_PORT}/healthz/ready; Stalwart :${STALWART_HTTP_PORT})."
+log info "Running (phase ${UPGRADE_PHASE}; health :${HEALTH_PORT}/healthz/${HEALTH_TARGET}; Stalwart :${STALWART_HTTP_PORT})."
 
 while :; do
 	if ! kill -0 "$STALWART_PID" 2>/dev/null; then
@@ -610,7 +782,7 @@ while :; do
 	if ! kill -0 "$HEALTH_PID" 2>/dev/null; then
 		die "Health listener exited."
 	fi
-	if ! kill -0 "$FRPC_PID" 2>/dev/null; then
+	if [ "$UPGRADE_PHASE" = "ordinary" ] && ! kill -0 "$FRPC_PID" 2>/dev/null; then
 		die "frpc exited."
 	fi
 	if ! kill -0 "$GATE_PID" 2>/dev/null; then

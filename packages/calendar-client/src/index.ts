@@ -39,3 +39,17 @@ export type {
 
 export { NoopE2eeProvider } from "@workspace/e2ee";
 export type { E2eeProvider } from "@workspace/e2ee";
+
+export {
+  MailTrustApiService,
+  MailTrustClient,
+  createMailTrustAnchor,
+  resolveMailTrustRecipient,
+  reviewMailTrustSender,
+} from "./mail-trust";
+export type {
+  MailTrustClientOptions,
+  MailTrustResponse,
+  PutMailTrustRequest,
+} from "./mail-trust";
+export { cancelMailMessageReads } from "./mail-query-coordination";

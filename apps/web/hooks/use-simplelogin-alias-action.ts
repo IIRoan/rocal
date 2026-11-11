@@ -1,6 +1,7 @@
 import { toast } from "@workspace/ui/lib/toast";
 import {
   getErrorMessage,
+  runMailSendAction,
   getSimpleLoginForward,
   resolveMessageReplyFrom,
   sealMailForSelf,
@@ -13,6 +14,7 @@ import {
   getPrimaryMailboxId,
   type ActiveMailboxState,
 } from "@/lib/mail/mail-app-helpers";
+import { getPrimaryMailAccountId } from "@/lib/mail/jmap-client";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 
 const log = createLogger("simplelogin-alias-action");
@@ -65,20 +67,27 @@ export function useSimpleLoginAliasAction({
     patchMessageKeyword(message, SIMPLELOGIN_DONE_KEYWORD, true);
     try {
       // SimpleLogin only honours the command from the mailbox it forwards to, so it goes out from the receiving identity.
-      await client.ensureEncryptOnAppendDisabled(session);
-      await client.sendMessage(session, {
-        draftsMailboxId,
-        sentMailboxId: getPrimaryMailboxId(mailboxes, "sent"),
-        fromEmail: identity.email,
-        fromName: identity.name,
-        to: [action.target.to],
-        subject: action.target.subject,
-        textBody: action.target.body,
-        identityId: identity.id,
-        sentCopyCiphertext: await sealMailForSelf(
-          { text: action.target.body },
-          createMailSealer(activeMailbox),
-        ),
+      const target = action.target;
+      const accountId = getPrimaryMailAccountId(session);
+      if (!accountId) throw new Error("Your mailbox is not connected.");
+      await runMailSendAction(accountId, `simplelogin:${message.id}`, async (sendScope, isActionCurrent) => {
+        await client.ensureEncryptOnAppendDisabled(session);
+        const sealer = createMailSealer(activeMailbox);
+        const sentCopyCiphertext = await sealMailForSelf({ text: target.body }, sealer);
+        if (!isActionCurrent()) throw new Error("This mail action was closed before sending.");
+        await client.sendMessage(session, {
+          isCurrent: sealer.isCurrent,
+          sendScope,
+          draftsMailboxId,
+          sentMailboxId: getPrimaryMailboxId(mailboxes, "sent"),
+          fromEmail: identity.email,
+          fromName: identity.name,
+          to: [target.to],
+          subject: target.subject,
+          textBody: target.body,
+          identityId: identity.id,
+          sentCopyCiphertext,
+        });
       });
     } catch (error) {
       log.error("Failed to run SimpleLogin action", error);

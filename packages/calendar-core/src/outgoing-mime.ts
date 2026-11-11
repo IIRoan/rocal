@@ -7,7 +7,20 @@ export type OutgoingMimeAttachment = {
 };
 
 function encodeMimeFilename(value: string): string {
-  return value.replace(/["\\]/g, "_");
+  const normalized = value
+    .replace(/\r\n|[\r\n\t]/g, " ")
+    .replace(/["\\]/g, "_");
+  assertAttachmentHeader(normalized, 512);
+  return normalized;
+}
+
+function assertAttachmentHeader(value: string, maximumBytes: number): void {
+  if (
+    /[\u0000-\u001f\u007f]/.test(value) ||
+    new TextEncoder().encode(value).byteLength > maximumBytes
+  ) {
+    throw new Error("Attachment metadata is not a valid MIME header value.");
+  }
 }
 
 /** 57 bytes encode to one 76-column line, so every chunk ends on a line break. */
@@ -18,7 +31,9 @@ function encodeBase64Lines(bytes: Uint8Array): string[] {
   const chunks: string[] = [];
   for (let offset = 0; offset < bytes.length; offset += BASE64_CHUNK_BYTES) {
     const chunk = bytes.subarray(offset, offset + BASE64_CHUNK_BYTES);
-    chunks.push(btoa(String.fromCharCode(...chunk)).replace(/.{76}(?=.)/g, "$&\r\n"));
+    chunks.push(
+      btoa(String.fromCharCode(...chunk)).replace(/.{76}(?=.)/g, "$&\r\n"),
+    );
   }
   return chunks;
 }
@@ -106,15 +121,22 @@ export function buildOutgoingMimeMessage(input: {
     const filename = encodeMimeFilename(attachment.filename);
     const disposition = attachment.disposition ?? "attachment";
     const cid = attachment.cid?.trim();
+    assertAttachmentHeader(attachment.contentType, 256);
+    if (!/^[^\s;/]+\/[^\s;/]+(?:;[^\r\n]*)?$/.test(attachment.contentType)) {
+      throw new Error("Attachment content type is invalid.");
+    }
+    if (cid) {
+      assertAttachmentHeader(cid, 256);
+      if (/[\s<>]/.test(cid))
+        throw new Error("Attachment content identifier is invalid.");
+    }
     lines.push(
       `--${boundary}`,
       `Content-Type: ${attachment.contentType}; name="${filename}"`,
       disposition === "inline" && cid
         ? `Content-Disposition: inline; filename="${filename}"`
         : `Content-Disposition: attachment; filename="${filename}"`,
-      ...(disposition === "inline" && cid
-        ? [`Content-ID: <${cid}>`]
-        : []),
+      ...(disposition === "inline" && cid ? [`Content-ID: <${cid}>`] : []),
       "Content-Transfer-Encoding: base64",
       "",
       ...encodeBase64Lines(attachment.content),

@@ -9,6 +9,7 @@ import {
 import { Feather, FontAwesome } from "@expo/vector-icons";
 import {
   formatMailThreadDateRange,
+  type MailSenderKeyTrustState,
   getMailThreadParticipants,
   type MailThreadParticipant,
 } from "@workspace/calendar-core";
@@ -48,6 +49,8 @@ type MailThreadHeaderProps = {
   encryptedAtRest: boolean;
   signatureVerificationState?: MailSignatureVerificationState;
   decryptionFailed: boolean;
+  senderKeyTrustState?: MailSenderKeyTrustState;
+  onReviewSenderKey?: () => void;
   attachments: KeyedAttachment[];
   downloadingBlobId: string | null;
   onOpenAttachment: (attachment: JmapAttachment, cacheKey: string) => void;
@@ -65,6 +68,8 @@ export function MailThreadHeader({
   encryption,
   encryptedAtRest,
   signatureVerificationState,
+  senderKeyTrustState,
+  onReviewSenderKey,
   decryptionFailed,
   attachments,
   downloadingBlobId,
@@ -97,6 +102,8 @@ export function MailThreadHeader({
             encryption={encryption}
             encryptedAtRest={encryptedAtRest}
             signatureVerificationState={signatureVerificationState}
+            senderKeyTrustState={senderKeyTrustState}
+            onReviewSenderKey={onReviewSenderKey}
             decryptionFailed={decryptionFailed}
           />
           <Pressable
@@ -119,7 +126,11 @@ export function MailThreadHeader({
       {labels.length > 0 ? (
         <View style={styles.wrapRow}>
           {labels.map((label) => (
-            <MailLabelChip key={label.id} name={label.name} color={label.color} />
+            <MailLabelChip
+              key={label.id}
+              name={label.name}
+              color={label.color}
+            />
           ))}
         </View>
       ) : null}

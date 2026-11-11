@@ -13,10 +13,19 @@ type PendingRequest = {
   timeoutId: ReturnType<typeof setTimeout>;
 };
 
+export type MailVaultVerificationContext = {
+  readonly ownerUserId?: string;
+  readonly publicKeyArmored: string;
+  readonly fingerprint: string;
+  readonly ownAddresses: readonly string[];
+};
+
 export class MailCryptoWorkerClient {
   private static readonly DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
   private worker: Worker | null = null;
+  private vaultGeneration = 0;
+  private verificationContext: MailVaultVerificationContext | null = null;
   private requestId = 0;
   private readonly requestTimeoutMs: number;
   private readonly createWorker: () => Worker;
@@ -63,6 +72,8 @@ export class MailCryptoWorkerClient {
   }
 
   private resetWorker(worker: Worker) {
+    this.vaultGeneration += 1;
+    this.verificationContext = null;
     worker.terminate();
     if (this.worker === worker) {
       this.worker = null;
@@ -151,19 +162,51 @@ export class MailCryptoWorkerClient {
     return this.call<GenerateKeyPairResult>("GENERATE_PGP_KEYPAIR", input);
   }
 
-  loadVault(input: {
+  async loadVault(input: {
     privateKeyArmored: string;
     privateKeyPassphrase: string;
     publicKeyArmored: string;
+    ownAddresses?: readonly string[];
+    ownerUserId?: string;
   }): Promise<{ fingerprint: string }> {
-    return this.call<{ fingerprint: string }>("LOAD_ACTIVE_VAULT", input);
+    const generation = ++this.vaultGeneration;
+    this.verificationContext = null;
+    const { ownAddresses, ownerUserId, ...payload } = input;
+    const result = await this.call<{ fingerprint: string }>("LOAD_ACTIVE_VAULT", payload);
+    if (generation !== this.vaultGeneration) throw new Error("Mail encryption session changed.");
+    this.verificationContext = Object.freeze({
+      ownerUserId,
+      publicKeyArmored: input.publicKeyArmored,
+      fingerprint: result.fingerprint,
+      ownAddresses: Object.freeze([...(ownAddresses ?? [])]),
+    });
+    return result;
   }
 
-  decryptMessage(input: {
+  async inspectPublicKey(input: { armoredKey: string; knownArmoredKey?: string; forEncryption: boolean }): Promise<{ fingerprint: string; publicKeyArmored: string }> {
+    const generation = this.vaultGeneration;
+    const result = await this.call<{ fingerprint: string; publicKeyArmored: string }>("INSPECT_PUBLIC_KEY", input);
+    if (generation !== this.vaultGeneration) throw new Error("Mail encryption session changed.");
+    return result;
+  }
+
+  getVerificationContext(): MailVaultVerificationContext | null {
+    return this.verificationContext;
+  }
+
+  isVerificationContextCurrent(context: MailVaultVerificationContext): boolean {
+    return this.verificationContext === context;
+  }
+
+  async decryptMessage(input: {
     armoredMessage: string;
     senderPublicKeyArmored?: string;
+    expectedVaultFingerprint?: string;
   }): Promise<MailDecryptResult> {
-    return this.call<MailDecryptResult>("DECRYPT_PGP_MESSAGE", input);
+    const generation = this.vaultGeneration;
+    const result = await this.call<MailDecryptResult>("DECRYPT_PGP_MESSAGE", input);
+    if (generation !== this.vaultGeneration) throw new Error("Mail encryption session changed.");
+    return result;
   }
 
   encryptForRecipients(input: {
@@ -177,10 +220,19 @@ export class MailCryptoWorkerClient {
   }
 
   clear(): Promise<{ cleared: boolean }> {
+    this.vaultGeneration += 1;
+    this.verificationContext = null;
     if (!this.worker) {
       return Promise.resolve({ cleared: true });
     }
     return this.call<{ cleared: boolean }>("CLEAR_ACTIVE_VAULT");
+  }
+
+  dispose(): void {
+    this.vaultGeneration += 1;
+    this.verificationContext = null;
+    this.rejectAllPending(new Error("Mail encryption session ended."));
+    if (this.worker) this.resetWorker(this.worker);
   }
 
   deriveVaultKey(input: {

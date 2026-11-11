@@ -1,3 +1,8 @@
+import {
+  createSessionDataStore,
+  captureSessionDataScope,
+  isSessionDataScopeCurrent,
+} from "@workspace/native-core/lib/session-data-lifecycle";
 /** Caches the unlocked PGP key in expo-secure-store and removes secrets that older versions stored there. */
 import * as SecureStore from "expo-secure-store";
 import { createLogger } from "@workspace/logger";
@@ -38,7 +43,7 @@ export async function clearDerivedVaultKey(): Promise<void> {
 const PGP_KEY_CHUNK_SIZE = 1800;
 
 /** Caches the unprotected armored PGP key in 1 800-char chunks to fit SecureStore's ~2 KB item limit. */
-export async function saveCachedPrivateKey(armoredKey: string): Promise<void> {
+async function persistCachedPrivateKey(armoredKey: string): Promise<void> {
   if (!armoredKey) return;
   try {
     const chunks: string[] = [];
@@ -49,11 +54,15 @@ export async function saveCachedPrivateKey(armoredKey: string): Promise<void> {
       SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_COUNT,
       String(chunks.length),
     );
-    await Promise.all(
+    const writes = await Promise.allSettled(
       chunks.map((chunk, i) =>
-        SecureStore.setItemAsync(`${SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_PART}${i}`, chunk),
+        SecureStore.setItemAsync(
+          `${SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_PART}${i}`,
+          chunk,
+        ),
       ),
     );
+    if (writes.some((result) => result.status === "rejected")) throw new Error("Private key persistence failed.");
     log.debug(
       "[mail-password-cache] saveCachedPrivateKey: saved %d chunk(s) to SecureStore",
       chunks.length,
@@ -78,7 +87,9 @@ export async function loadCachedPrivateKey(): Promise<string | null> {
 
     const chunks = await Promise.all(
       Array.from({ length: count }, (_, i) =>
-        SecureStore.getItemAsync(`${SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_PART}${i}`),
+        SecureStore.getItemAsync(
+          `${SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_PART}${i}`,
+        ),
       ),
     );
 
@@ -102,7 +113,7 @@ export async function loadCachedPrivateKey(): Promise<string | null> {
 }
 
 /** Clears the cached PGP private key; called on sign-out. */
-export async function clearCachedPrivateKey(): Promise<void> {
+async function removeCachedPrivateKey(): Promise<void> {
   try {
     const countStr = await SecureStore.getItemAsync(
       SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_COUNT,
@@ -110,21 +121,38 @@ export async function clearCachedPrivateKey(): Promise<void> {
     if (countStr) {
       const count = parseInt(countStr, 10);
       if (!isNaN(count) && count > 0) {
-        await Promise.all(
+        const results = await Promise.allSettled(
           Array.from({ length: count }, (_, i) =>
             SecureStore.deleteItemAsync(
               `${SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_PART}${i}`,
-            ).catch(() => {}),
+            ),
           ),
         );
+        if (results.some((result) => result.status === "rejected"))
+          throw new Error("Private key cleanup needs a retry.");
       }
       await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.MAIL_VAULT_PGP_KEY_COUNT);
     }
     log.debug("[mail-password-cache] clearCachedPrivateKey: cleared");
   } catch (err) {
-    log.warn(
-      "[mail-password-cache] clearCachedPrivateKey: failed:",
-      err instanceof Error ? err.message : String(err),
-    );
+    log.warn("[mail-password-cache] clearCachedPrivateKey: failed");
+    throw err;
   }
+}
+
+const keyStore = createSessionDataStore(removeCachedPrivateKey);
+
+export async function saveCachedPrivateKey(
+  armoredKey: string,
+  scope = captureSessionDataScope(),
+): Promise<void> {
+  const request = keyStore.capture();
+  await keyStore.run(
+    () => request.isCurrent() && isSessionDataScopeCurrent(scope),
+    async () => { await removeCachedPrivateKey(); await persistCachedPrivateKey(armoredKey); },
+  );
+}
+
+export function clearCachedPrivateKey(): Promise<void> {
+  return keyStore.clear();
 }

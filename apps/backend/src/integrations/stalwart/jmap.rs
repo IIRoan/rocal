@@ -76,7 +76,7 @@ mod tests {
                 json!({"methodResponses": [["x:OAuthClient/query", {"ids": ["c"]}, "c1"]]}),
             ),
             _ if request.first_method() == "x:OAuthClient/get" => Reply::json(
-                json!({"methodResponses": [["x:OAuthClient/get", {"list": [{"id": "c", "clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}}]}, "c1"]]}),
+                json!({"methodResponses": [["x:OAuthClient/get", {"list": [{"id": "c", "clientId": "solace-mail-bridge", "scopes": {"mail":true,"settings":true}, "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}}]}, "c1"]]}),
             ),
             "/auth/token" => {
                 Reply::json(json!({"access_token": "fresh-token", "expires_in": 3600}))
@@ -134,15 +134,9 @@ mod tests {
     #[tokio::test]
     async fn resends_calls_refused_at_the_concurrency_limit() {
         let database = ScratchDatabase::create().await;
-        let refusals = std::sync::atomic::AtomicUsize::new(2);
+        let attempts = std::sync::atomic::AtomicUsize::new(0);
         let fake = FakeStalwart::start(move |request| {
-            let refuse = refusals
-                .fetch_update(
-                    std::sync::atomic::Ordering::SeqCst,
-                    std::sync::atomic::Ordering::SeqCst,
-                    |left| left.checked_sub(1),
-                )
-                .is_ok();
+            let refuse = attempts.fetch_add(1, std::sync::atomic::Ordering::SeqCst) < 2;
             if refuse {
                 Reply::concurrency_limit()
             } else {

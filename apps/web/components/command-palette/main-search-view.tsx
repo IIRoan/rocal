@@ -104,6 +104,7 @@ export function CommandPaletteMainSearchView({
     searchInputInteractionProps,
     searchInputRef,
     searchLoading,
+    searchCoverageText,
     searchQuery,
     selectCommand,
     selectSearchResult,
@@ -202,6 +203,9 @@ export function CommandPaletteMainSearchView({
       <p role="status" className="sr-only">
         {resultStatus}
       </p>
+      {showEventSearch && searchCoverageText ? (
+        <p role="status" className="px-3 py-2 text-xs text-muted-foreground">{searchCoverageText}</p>
+      ) : null}
       <div
         ref={listRef}
         id={listboxId}

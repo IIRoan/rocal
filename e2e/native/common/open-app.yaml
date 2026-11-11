@@ -5,12 +5,19 @@ appId: ${APP_ID}
     permissions:
       notifications: allow
 - runFlow: wait-for-home.yaml
+- extendedWaitUntil:
+    visible:
+      id: workspace-ready
+    timeout: 90000
 - assertNotVisible: Welcome back
 - runFlow:
     when:
       true: ${APP_ID === "onl.solace.calendar.e2e"}
     commands:
       - tapOn: Choose date and view
+      - extendedWaitUntil:
+          visible: Close sheet
+          timeout: 30000
       - runFlow:
           when:
             notVisible: ${AGENDA_DATE_LABEL}
@@ -26,6 +33,9 @@ appId: ${APP_ID}
           timeout: 30000
       - waitForAnimationToEnd
       - tapOn: Choose date and view
+      - extendedWaitUntil:
+          visible: Close sheet
+          timeout: 30000
       - assertVisible: Agenda
       - runFlow:
           when:
