@@ -2,7 +2,7 @@
 
 import type { MailSenderKeyTrustState } from "@workspace/calendar-core";
 
-import { getMailDraftSizeError, getMailReadLimitNotice } from "@workspace/calendar-core/mail-mime-limits";
+import { getMailDraftSizeError, getMailReadLimitNotice, limitMailDisplayContent } from "@workspace/calendar-core/mail-mime-limits";
 
 import {
   useEffect,
@@ -110,7 +110,6 @@ import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose
 import { useConversationDecryptedPreviews } from "@/hooks/use-conversation-decrypted-previews";
 import { replaceSavedDraftInMailboxList } from "@/lib/mail/compose-draft-cache";
 import { getDraftsMailboxId } from "@/lib/mail/draft-utils";
-import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
 import {
   hasComposeHtmlBody,
   resolveOutgoingComposeBodies,
@@ -1019,18 +1018,16 @@ export function useMailApp() {
         });
         if (isCancelled()) return;
         assertMailVerificationContext(verificationContext);
-        const parsed = await parseDecryptedMailContent(
-          decrypted.plaintext,
-        ).catch((parseError: unknown) => {
-          if (getMailReadLimitNotice(parseError)) throw parseError;
-          log.warn("Failed to parse decrypted MIME", parseError);
-          return null;
-        });
-        if (isCancelled()) return;
-        assertMailVerificationContext(verificationContext);
         setSelectedMessageSenderKeyTrustState(verification.senderKeyTrustState);
-        if (!parsed) {
-          setSelectedMessagePlaintext(decrypted.plaintext);
+        // The worker already stopped at the read limit, so its truncation result supplies the notice here.
+        const shown = limitMailDisplayContent({
+          text: decrypted.plaintext ?? decrypted.sourceText,
+          html: decrypted.html,
+          truncated: decrypted.truncated || decrypted.sourceTruncated,
+        });
+        if (decrypted.rawMimeFallback) {
+          log.warn("Failed to parse decrypted MIME");
+          setSelectedMessagePlaintext(shown.text);
           setSelectedMessageDecryptedHtml(null);
           setSelectedMessageDecryptedAttachments(
             encState === "pgp_mime" ? [] : null,
@@ -1042,11 +1039,11 @@ export function useMailApp() {
           setSelectedMessageIsDecrypting(false);
           return;
         }
-        setSelectedMessageDecryptedHtml(parsed.html ?? null);
-        setSelectedMessagePlaintext(parsed.text ?? decrypted.plaintext);
+        setSelectedMessageDecryptedHtml(shown.html);
+        setSelectedMessagePlaintext(shown.text);
         if (encState === "pgp_mime") {
           setSelectedMessageDecryptedAttachments(
-            listedDecryptedAttachments(parsed.attachments),
+            listedDecryptedAttachments(decrypted.attachments),
           );
         } else {
           setSelectedMessageDecryptedAttachments(null);
@@ -2134,6 +2131,7 @@ export function useMailApp() {
 
     let overrides:
       { plaintext?: string | null; html?: string | null } | undefined;
+    let truncated: boolean | undefined;
     const encryption = classifyMessageEncryption(draft);
     if (encryption === "inline_pgp" || encryption === "pgp_mime") {
       try {
@@ -2142,6 +2140,7 @@ export function useMailApp() {
           session: activeMailbox.session,
           message: draft,
           config,
+          editable: true,
         });
         if (decrypted.rawMimeFallback) {
           toast.error("This draft could not be opened safely here. The saved draft has not been changed.");
@@ -2151,6 +2150,7 @@ export function useMailApp() {
           plaintext: decrypted.text,
           html: decrypted.html,
         };
+        truncated = decrypted.truncated;
       } catch (error) {
         log.error("Failed to decrypt draft", error);
         toast.error(getErrorMessage(error, "Could not decrypt this draft."));
@@ -2160,7 +2160,7 @@ export function useMailApp() {
     }
 
     const draftBodies = extractMessageBodies(draft);
-    const draftSizeError = getMailDraftSizeError({ text: overrides?.plaintext ?? draftBodies.text, html: overrides?.html ?? draftBodies.html });
+    const draftSizeError = getMailDraftSizeError({ text: overrides?.plaintext ?? draftBodies.text, html: overrides?.html ?? draftBodies.html, truncated });
     if (draftSizeError) {
       toast.error(draftSizeError);
       return;

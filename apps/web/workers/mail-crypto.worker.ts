@@ -8,7 +8,17 @@ import {
   decryptPgpMessageLayers,
   MAX_PGP_DECRYPT_BYTES,
 } from "@workspace/calendar-core/mail-pgp-layers";
-import { extractNestedPgpMimeCiphertext } from "../lib/mail/decrypted-mail-content";
+import {
+  clipMailText,
+  getMailReadLimitNotice,
+  MAX_MAIL_DISPLAY_CHARACTERS,
+} from "@workspace/calendar-core/mail-mime-limits";
+import {
+  extractNestedPgpMimeCiphertext,
+  MAIL_DRAFT_TEXT_LIMITS,
+  parseDecryptedMailContent,
+  type ParsedMailContent,
+} from "@workspace/calendar-core/mail-mime-parser";
 import type { MailDecryptResult, MailVaultKdfParams } from "../lib/mail/types";
 
 import {
@@ -42,10 +52,38 @@ async function handleGenerateKeyPair(payload: {
   };
 }
 
+/** Parsed here so the page receives bounded content and never the whole decrypted message. */
+function readDecryptedContent(plaintext: string, editable: boolean) {
+  let parsed: ParsedMailContent | null = null;
+  try {
+    parsed = parseDecryptedMailContent(
+      plaintext,
+      editable ? MAIL_DRAFT_TEXT_LIMITS : undefined,
+    );
+  } catch (error) {
+    if (getMailReadLimitNotice(error)) throw error;
+  }
+  const { text, ...content } = parsed ?? {
+    text: null,
+    html: null,
+    attachments: [],
+    truncated: false,
+  };
+  if (text !== null) return { ...content, plaintext: text };
+  return {
+    ...content,
+    plaintext: null,
+    sourceText: clipMailText(plaintext, MAX_MAIL_DISPLAY_CHARACTERS),
+    sourceTruncated: plaintext.length > MAX_MAIL_DISPLAY_CHARACTERS,
+    rawMimeFallback: !parsed,
+  };
+}
+
 async function handleDecryptMessage(payload: {
   armoredMessage: string;
   senderPublicKeyArmored?: string;
   expectedVaultFingerprint?: string;
+  editable?: boolean;
 }) {
   const activePrivateKey = getActiveMailPrivateKey();
   if (!activePrivateKey) {
@@ -63,7 +101,7 @@ async function handleDecryptMessage(payload: {
     ? await openpgp.readKey({ armoredKey: payload.senderPublicKeyArmored })
     : undefined;
 
-  const result = (await decryptPgpMessageLayers({
+  const result = await decryptPgpMessageLayers({
     armoredMessage: payload.armoredMessage,
     extractMimeCiphertext: extractNestedPgpMimeCiphertext,
     decryptLayer: async (armoredMessage) => {
@@ -85,10 +123,14 @@ async function handleDecryptMessage(payload: {
         hasVerificationKey: Boolean(verificationKeys),
       };
     },
-  })) satisfies MailDecryptResult;
+  });
   if (getActiveMailPrivateKey() !== activePrivateKey)
     throw new Error("Mail encryption session changed.");
-  return result;
+  const { plaintext, ...verification } = result;
+  return {
+    ...verification,
+    ...readDecryptedContent(plaintext, payload.editable === true),
+  } satisfies MailDecryptResult;
 }
 
 async function handleDeriveVaultKey(payload: {
@@ -146,6 +188,7 @@ self.onmessage = async (event: MessageEvent<MailCryptoWorkerRequest>) => {
 
   try {
     let result: unknown;
+    let transfer: ArrayBuffer[] = [];
 
     switch (request.type) {
       case "INSPECT_PUBLIC_KEY":
@@ -157,9 +200,14 @@ self.onmessage = async (event: MessageEvent<MailCryptoWorkerRequest>) => {
       case "LOAD_ACTIVE_VAULT":
         result = await loadActiveMailVault(request.payload);
         break;
-      case "DECRYPT_PGP_MESSAGE":
-        result = await handleDecryptMessage(request.payload);
+      case "DECRYPT_PGP_MESSAGE": {
+        const decrypted = await handleDecryptMessage(request.payload);
+        result = decrypted;
+        transfer = decrypted.attachments.map(
+          (attachment) => attachment.content.buffer,
+        );
         break;
+      }
       case "ENCRYPT_FOR_RECIPIENTS":
         result = await encryptForRecipients(request.payload);
         break;
@@ -173,11 +221,14 @@ self.onmessage = async (event: MessageEvent<MailCryptoWorkerRequest>) => {
         throw new Error(`Unknown mail crypto worker command: ${commandType}`);
     }
 
-    self.postMessage({
-      requestId: request.requestId,
-      type: `${request.type}_RESULT`,
-      payload: result,
-    });
+    self.postMessage(
+      {
+        requestId: request.requestId,
+        type: `${request.type}_RESULT`,
+        payload: result,
+      },
+      { transfer },
+    );
   } catch (error) {
     self.postMessage({
       requestId: request.requestId,

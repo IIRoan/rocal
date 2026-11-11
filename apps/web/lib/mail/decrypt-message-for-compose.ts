@@ -1,5 +1,4 @@
 import { createLogger } from "@workspace/logger";
-import { getMailReadLimitNotice } from "@workspace/calendar-core/mail-mime-limits";
 import type { MailDemoConfig } from "@workspace/calendar-core";
 import { assertMailVerificationContext, captureMailVerificationContext, resolveMailSenderVerification } from "./mail-sender-verification";
 import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
@@ -8,7 +7,6 @@ import {
   extractPgpMimeCiphertextBlobId,
   resolveInlinePgpArmoredCiphertext,
 } from "@/lib/mail/message-security";
-import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
 import { listedDecryptedAttachments } from "@/lib/mail/mail-app-helpers";
 import type { JmapEmailMessage, JmapSession, MailAttachment, MailSignatureVerificationState } from "@/lib/mail/types";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
@@ -18,6 +16,8 @@ const log = createLogger("decrypt-message-for-compose");
 export type DecryptedComposeContent = {
   text: string | null;
   rawMimeFallback?: boolean;
+  /** The text or HTML is shorter than the message, so it must not seed an editable draft. */
+  truncated?: boolean;
   html: string | null;
   attachments?: MailAttachment[];
   senderKeyTrustState?: import("@workspace/calendar-core").MailSenderKeyTrustState;
@@ -31,6 +31,7 @@ export async function decryptMessageForCompose(
     session: JmapSession;
     message: JmapEmailMessage;
     config: MailDemoConfig | null | undefined;
+    editable?: boolean;
   },
 ): Promise<DecryptedComposeContent> {
   const encState = classifyMessageEncryption(input.message);
@@ -65,27 +66,27 @@ export async function decryptMessageForCompose(
     armoredMessage,
     senderPublicKeyArmored: verification.senderPublicKeyArmored,
     expectedVaultFingerprint: verificationContext.fingerprint,
+    editable: input.editable,
   });
   assertMailVerificationContext(verificationContext);
 
-  const parsed = await parseDecryptedMailContent(decrypted.plaintext).catch((parseError: unknown) => {
-    if (getMailReadLimitNotice(parseError)) throw parseError;
-    log.warn("Failed to parse decrypted MIME for compose", parseError);
-    return null;
-  });
-  assertMailVerificationContext(verificationContext);
-  if (!parsed) return {
-    text: decrypted.plaintext,
-    rawMimeFallback: true,
-    html: null,
-    senderKeyTrustState: verification.senderKeyTrustState,
-    signatureVerificationState: decrypted.signatureVerificationState,
-    signatureVerificationLayers: decrypted.signatureVerificationLayers,
-  };
+  if (decrypted.rawMimeFallback) {
+    log.warn("Failed to parse decrypted MIME for compose");
+    return {
+      text: decrypted.sourceText ?? "",
+      rawMimeFallback: true,
+      truncated: decrypted.sourceTruncated,
+      html: null,
+      senderKeyTrustState: verification.senderKeyTrustState,
+      signatureVerificationState: decrypted.signatureVerificationState,
+      signatureVerificationLayers: decrypted.signatureVerificationLayers,
+    };
+  }
   return {
-    text: parsed.text ?? "",
-    html: parsed.html ?? null,
-    attachments: encState === "pgp_mime" ? listedDecryptedAttachments(parsed.attachments) : [],
+    text: decrypted.plaintext ?? "",
+    truncated: decrypted.truncated,
+    html: decrypted.html ?? null,
+    attachments: encState === "pgp_mime" ? listedDecryptedAttachments(decrypted.attachments) : [],
     senderKeyTrustState: verification.senderKeyTrustState,
     signatureVerificationState: decrypted.signatureVerificationState,
     signatureVerificationLayers: decrypted.signatureVerificationLayers,
