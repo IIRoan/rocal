@@ -19,7 +19,7 @@ def plan_entry(object_name):
 
 class SimpleLoginSieveTest(unittest.TestCase):
     def test_plan_contents_match_source(self):
-        source = SIEVE.read_text()
+        source = SIEVE.read_text().strip()
         script = plan_entry("SieveSystemScript")["value"]["solace-simplelogin"]
         self.assertTrue(script["isActive"])
         self.assertEqual(

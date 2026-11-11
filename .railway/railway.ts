@@ -29,7 +29,6 @@ export default defineRailway(() => {
   const postgresApp = postgres("Postgres", { region: "europe-west4-drams3a" });
   postgresApp.networking = {
     privateNetworkEndpoint: "postgres",
-    tcpProxies: { "5432": {} },
   };
   const postgresStalwart = postgres("Postgres-stalwart", {
     region: "europe-west4-drams3a",
@@ -69,6 +68,10 @@ export default defineRailway(() => {
   });
   // Private; the API serves uploaded profile pictures through /api/profiles/avatars/:id.
   const profilePictures = bucket("profile-pictures", { region: "ams" });
+  // Keep the encrypted cutover checkpoints through the recovery retention window.
+  const upgradeRecovery = bucket("mail-upgrade-recovery-181", {
+    region: "ams",
+  });
   const gatusData = volume("gatus-data", {
     region: "europe-west4-drams3a",
     sizeMB: 1000,
@@ -133,6 +136,9 @@ export default defineRailway(() => {
       ipv6EgressEnabled: true,
       drainingSeconds: 120,
       overlapSeconds: 90,
+      // Old images must never receive PGPASSWORD or POSTGRES_PASSWORD for the rotated store.
+      startCommand:
+        '/bin/sh -ec \'test -r /usr/local/bin/upgrade-1.1.0.py; /usr/local/bin/stalwart --version | grep -Eq "(^|[[:space:]])v?1[.]1[.]0($|[[:space:]])"; export PGPASSWORD="$SOLACE_MAIL_PG_PASSWORD_V110"; exec /usr/local/bin/railway-entrypoint.sh\'',
     },
     env: {
       BUCKET: ref(stalwartBlobs, "BUCKET"),
@@ -150,7 +156,7 @@ export default defineRailway(() => {
       FRPS_ADDR: preserve(),
       PGDATABASE: "stalwart_v1",
       PGHOST: ref(postgresStalwart, "PGHOST"),
-      PGPASSWORD: ref(postgresStalwart, "PGPASSWORD"),
+      SOLACE_MAIL_PG_PASSWORD_V110: ref(postgresStalwart, "PGPASSWORD"),
       PGPORT: ref(postgresStalwart, "PGPORT"),
       PGUSER: ref(postgresStalwart, "PGUSER"),
       PORT: preserve(),
@@ -282,6 +288,7 @@ export default defineRailway(() => {
       postgresStalwartVolume,
       stalwartBlobs,
       profilePictures,
+      upgradeRecovery,
       monitoring,
       apiGroup,
       mailServer,
