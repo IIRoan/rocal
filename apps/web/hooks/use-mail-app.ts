@@ -2411,6 +2411,14 @@ export function useMailApp() {
     }
   };
 
+  const replaceAttachmentPreview = (next: MailAttachmentPreviewState | null) => {
+    const previousUrl = attachmentPreviewUrlRef.current;
+    const nextUrl = next && "url" in next ? next.url : null;
+    attachmentPreviewUrlRef.current = nextUrl;
+    if (previousUrl && previousUrl !== nextUrl) URL.revokeObjectURL(previousUrl);
+    setAttachmentPreview(next);
+  };
+
   const handlePreviewAttachment = async (attachment: MailAttachment) => {
     const previewKind = resolveAttachmentPreviewKind(attachment);
     if (!previewKind) {
@@ -2427,35 +2435,21 @@ export function useMailApp() {
 
       if (previewKind === "text") {
         const text = (await blob.text()).slice(0, 200000);
-        setAttachmentPreview((current) => {
-          if (current?.kind !== "text") {
-            if (current && "url" in current) {
-              URL.revokeObjectURL(current.url);
-            }
-            attachmentPreviewUrlRef.current = null;
-          }
-          return {
-            kind: "text",
-            name: filename,
-            type: normalizedType,
-            text,
-          };
+        replaceAttachmentPreview({
+          kind: "text",
+          name: filename,
+          type: normalizedType,
+          text,
         });
         return;
       }
 
       const url = URL.createObjectURL(blob);
-      setAttachmentPreview((current) => {
-        if (current && "url" in current) {
-          URL.revokeObjectURL(current.url);
-        }
-        attachmentPreviewUrlRef.current = url;
-        return {
-          kind: previewKind,
-          name: filename,
-          type: normalizedType,
-          url,
-        };
+      replaceAttachmentPreview({
+        kind: previewKind,
+        name: filename,
+        type: normalizedType,
+        url,
       });
     };
     await showPreview().catch((error: unknown) => {
@@ -2502,15 +2496,7 @@ export function useMailApp() {
     return preview;
   };
 
-  const closeAttachmentPreview = () => {
-    setAttachmentPreview((current) => {
-      if (current && "url" in current) {
-        URL.revokeObjectURL(current.url);
-      }
-      attachmentPreviewUrlRef.current = null;
-      return null;
-    });
-  };
+  const closeAttachmentPreview = () => replaceAttachmentPreview(null);
 
   useEffect(() => {
     const hoverPreviewUrls = attachmentHoverPreviewUrlsRef.current;

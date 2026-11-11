@@ -122,7 +122,7 @@ export function useMailCalendarInvitation({
   } = useQuery({
     queryKey: mailCalendarInviteUid
       ? invitationByExternalIdQueryKey(mailCalendarInviteUid)
-      : ["invitations", "by-external-id", "disabled"],
+      : invitationByExternalIdQueryKey("disabled"),
     queryFn: () => {
       if (!mailCalendarInviteUid) {
         throw new Error("Invitation not found.");
@@ -204,6 +204,7 @@ export function useMailCalendarInvitation({
           existing,
         );
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
+        if (cancelled) return;
         setInviteDeclined(false);
         setCalendarInviteEvent({
           eventId: mailCalendarInviteUid,
@@ -243,8 +244,8 @@ export function useMailCalendarInvitation({
       const sealed = event
         ? await calendarApiService.sealImportedInvitationIfNeeded(event)
         : null;
-
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
+      if (cancelled) return;
       setInviteDeclined(false);
       setCalendarInviteEvent({
         eventId: mailCalendarInviteUid,

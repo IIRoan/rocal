@@ -424,11 +424,15 @@ jest.mock("../../components/mail/message-reader", () => ({
     onReplyAll,
     onSendReply,
     onClose,
+    onPreviewAttachment,
   }: any) =>
     message ? (
       <div>
         <button type="button" aria-label="Close message" onClick={onClose} />
         <div>{message.subject}</div>
+        <button type="button" aria-label="Preview image" onClick={() => onPreviewAttachment?.({ name: "synthetic.png", type: "image/png", content: new Uint8Array([1, 2, 3]) })}>
+          Preview image
+        </button>
         <ul data-testid="conversation-strip">
           {conversationMessages.map((entry: any) => (
             <li key={entry.id}>
@@ -458,7 +462,10 @@ jest.mock("../../components/mobile-app-switcher", () => ({
 }));
 
 jest.mock("../../components/mail/attachment-preview-dialog", () => ({
-  AttachmentPreviewDialog: () => null,
+  AttachmentPreviewDialog: ({ preview, onOpenChange }: {
+    preview: { name: string } | null;
+    onOpenChange: (open: boolean) => void;
+  }) => preview ? <div data-testid="attachment-preview">{preview.name}<button type="button" aria-label="Close attachment preview" onClick={() => onOpenChange(false)} /></div> : null,
 }));
 
 jest.mock("../../components/mail/compose-dialog", () => {
@@ -1023,6 +1030,44 @@ describe("MailApp", () => {
       refetch: jest.fn(() => Promise.resolve()),
     });
   }
+
+  it("releases each replaced, closed and unmounted attachment URL once in Strict Mode", async () => {
+    const previousCreate = Object.getOwnPropertyDescriptor(URL, "createObjectURL");
+    const previousRevoke = Object.getOwnPropertyDescriptor(URL, "revokeObjectURL");
+    let nextUrlId = 0;
+    const create = jest.fn(() => `blob:synthetic-${++nextUrlId}`);
+    const revoke = jest.fn();
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: create });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revoke });
+    const click = async (label: string) => {
+      const target = container.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
+      if (!target) throw new Error(`Missing ${label}`);
+      await act(async () => target.click());
+    };
+    try {
+      await renderApp(false, true);
+      await waitForExpectation(() => expect(container.textContent).toContain("Encrypted hello"));
+      const message = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Encrypted hello");
+      if (!message) throw new Error("Missing message");
+      await act(async () => message.click());
+      await click("Preview image");
+      expect(container.querySelector('[data-testid="attachment-preview"]')?.textContent).toContain("synthetic.png");
+      expect(revoke).not.toHaveBeenCalled();
+      await click("Preview image");
+      expect(revoke.mock.calls).toEqual([["blob:synthetic-1"]]);
+      await click("Close attachment preview");
+      expect(revoke.mock.calls).toEqual([["blob:synthetic-1"], ["blob:synthetic-2"]]);
+      await click("Preview image");
+      await act(async () => root.render(<div />));
+      expect(revoke.mock.calls).toEqual([["blob:synthetic-1"], ["blob:synthetic-2"], ["blob:synthetic-3"]]);
+    } finally {
+      await act(async () => root.render(<div />));
+      if (previousCreate) Object.defineProperty(URL, "createObjectURL", previousCreate);
+      else Reflect.deleteProperty(URL, "createObjectURL");
+      if (previousRevoke) Object.defineProperty(URL, "revokeObjectURL", previousRevoke);
+      else Reflect.deleteProperty(URL, "revokeObjectURL");
+    }
+  });
 
   it("redirects Mail once when the session disappears with the real router and Strict Mode", async () => {
     enableRealRouteTransitions();
