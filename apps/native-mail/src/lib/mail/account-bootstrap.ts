@@ -1,5 +1,5 @@
+import { MAIL_PGP_KEY_GENERATION_PROFILE } from "@workspace/calendar-core";
 import * as openpgp from "openpgp";
-import { createLogger } from "@workspace/logger";
 import {
   bootstrapAccountMailbox,
   getMailAccountStatus,
@@ -16,8 +16,6 @@ import {
 } from "./vault-secret";
 import type { MailSignupResponse } from "./types";
 
-const log = createLogger("native:mail-bootstrap");
-
 function normalizeOptionalText(value?: string | null): string | null {
   const normalized = value?.trim() || "";
   return normalized.length > 0 ? normalized : null;
@@ -33,8 +31,8 @@ async function generateMailboxKeyPair(input: {
   passphrase: string;
 }) {
   const { privateKey, publicKey } = await openpgp.generateKey({
-    type: "ecc",
-    curve: "curve25519Legacy" as never,
+    type: MAIL_PGP_KEY_GENERATION_PROFILE.type,
+    curve: MAIL_PGP_KEY_GENERATION_PROFILE.curve as never,
     userIDs: [
       {
         name: input.displayName || input.email,

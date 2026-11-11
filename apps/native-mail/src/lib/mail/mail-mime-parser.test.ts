@@ -1,7 +1,30 @@
-import { buildOutgoingMimeMessage, looksLikeMimeMessage } from "@workspace/calendar-core";
+import {
+  buildOutgoingMimeMessage,
+  looksLikeMimeMessage,
+} from "@workspace/calendar-core";
 import { parseMimeBody } from "./mail-mime-parser";
 
 describe("parseMimeBody", () => {
+  it("decodes quoted-printable UTF8, literal Unicode and soft line breaks together", () => {
+    const mime =
+      "Content-Type: text/plain; charset=utf-8\nContent-Transfer-Encoding: quoted-printable\n\ncafé =E2=82=AC =E2=\n=82=AC";
+    expect(parseMimeBody(mime).text).toBe("café € €");
+  });
+
+  it("decodes quoted-printable binary attachment bytes without stringifying them", () => {
+    const mime =
+      "Content-Type: application/octet-stream\nContent-Disposition: attachment; filename=test.bin\nContent-Transfer-Encoding: quoted-printable\n\n=00=FF=41=\nZ";
+    expect(parseMimeBody(mime).attachments[0]?.content).toEqual(
+      new Uint8Array([0, 255, 65, 90]),
+    );
+  });
+
+  it("keeps a newline-heavy multipart body readable without an array per line", () => {
+    const body = "\n".repeat(2_000_000) + "tail";
+    const mime = `Content-Type: multipart/mixed; boundary=flood\n\n--flood\nContent-Type: text/plain\n\n${body}\n--flood--`;
+    expect(parseMimeBody(mime).text).toBe(body);
+  });
+
   it("parses encrypted compose MIME from buildOutgoingMimeMessage", () => {
     const mime = buildOutgoingMimeMessage({
       text: "Hello world",
@@ -50,7 +73,7 @@ describe("parseMimeBody", () => {
       "See attached.",
       "--mix",
       'Content-Type: application/pdf; name="doc.pdf"',
-      "Content-Disposition: attachment; filename=\"doc.pdf\"",
+      'Content-Disposition: attachment; filename="doc.pdf"',
       "Content-Transfer-Encoding: base64",
       "",
       base64,
@@ -63,7 +86,9 @@ describe("parseMimeBody", () => {
     expect(parsed.attachments[0]?.name).toBe("doc.pdf");
     expect(parsed.attachments[0]?.type).toBe("application/pdf");
     expect(parsed.attachments[0]?.content).toBeInstanceOf(Uint8Array);
-    expect(new Uint8Array(parsed.attachments[0]!.content as Uint8Array)).toEqual(pdfBytes);
+    expect(
+      new Uint8Array(parsed.attachments[0]!.content as Uint8Array),
+    ).toEqual(pdfBytes);
   });
 
   it("does not treat inline related parts as attachments", () => {
@@ -73,7 +98,7 @@ describe("parseMimeBody", () => {
       "--rel",
       "Content-Type: text/html",
       "",
-      "<img src=\"cid:logo\">",
+      '<img src="cid:logo">',
       "--rel",
       'Content-Type: image/png; name="logo.png"',
       "Content-Disposition: inline; filename=logo.png",
@@ -103,4 +128,25 @@ describe("parseMimeBody", () => {
 
     expect(parseMimeBody(mime).attachments).toHaveLength(0);
   });
+});
+it("preserves attached messages as opaque files rather than recursively parsing their contents", () => {
+  let message = "Content-Type: text/plain\n\nHello";
+  for (let depth = 0; depth < 22; depth += 1)
+    message = "Content-Type: message/rfc822\n\n" + message;
+  const parsed = parseMimeBody(message);
+  expect(parsed.text).toBeNull();
+  expect(parsed.attachments).toHaveLength(1);
+  expect(parsed.attachments[0]?.name).toBe("message.eml");
+  expect(parsed.attachments[0]?.type).toBe("message/rfc822");
+});
+
+it("preserves UTF8 bytes in an 8bit attached message", () => {
+  const inner =
+    "Subject: café 中文\nContent-Type: text/plain; charset=utf-8\n\n🙂";
+  const result = parseMimeBody(
+    "Content-Type: message/rfc822\nContent-Transfer-Encoding: 8bit\n\n" + inner,
+  );
+  expect(result.attachments[0]?.content).toEqual(
+    new TextEncoder().encode(inner),
+  );
 });

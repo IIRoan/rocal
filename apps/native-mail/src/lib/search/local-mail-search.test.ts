@@ -12,7 +12,9 @@ jest.mock("@workspace/native-core/lib/search/title-index-store", () => ({
   isNativeTitleIndexEnabled: () => mockIndexEnabled(),
 }));
 jest.mock("./private-title-index", () => ({
-  readNativeTitleIndex: (accountId: string) => mockReadIndex(accountId),
+  readNativeTitleIndexSnapshot: async (accountId: string) => ({
+    documents: await mockReadIndex(accountId),
+  }),
 }));
 
 const documents = [
@@ -58,7 +60,7 @@ describe("searchMailboxLocally", () => {
       listFilters: { ...DEFAULT_MAIL_LIST_FILTERS, starred: true },
     });
 
-    expect(messages?.map((message) => message.id)).toEqual(["m1"]);
+    expect(messages?.messages.map((message) => message.id)).toEqual(["m1"]);
     expect(client.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
     expect(JSON.stringify(client.getMessagesByIds.mock.calls)).not.toContain("finance");
   });
@@ -75,7 +77,7 @@ describe("searchMailboxLocally", () => {
         fields: { subject: "invoice" },
         listFilters: DEFAULT_MAIL_LIST_FILTERS,
       }),
-    ).resolves.toEqual([]);
+    ).resolves.toMatchObject({ messages: [] });
     expect(client.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
   });
 
@@ -94,7 +96,7 @@ describe("searchMailboxLocally", () => {
         fields: { to: "finance" },
         listFilters: DEFAULT_MAIL_LIST_FILTERS,
       }),
-    ).resolves.toEqual([]);
+    ).resolves.toMatchObject({ messages: [] });
   });
 
   it("leaves the search to the server when the index is off", async () => {

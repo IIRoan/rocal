@@ -25,6 +25,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./account-query-options": "./src/account-query-options.ts",
-    "./use-riftbound": "./src/use-riftbound.ts"
+    "./use-riftbound": "./src/use-riftbound.ts",
+    "./use-mail-trust-review": "./src/use-mail-trust-review.ts",
+    "./mail-query-coordination": "./src/mail-query-coordination.ts"
   }
 }

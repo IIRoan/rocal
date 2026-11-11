@@ -1,8 +1,10 @@
+import { activateSessionData, closeSessionData } from "@workspace/native-core/lib/session-data-lifecycle";
 /**
  * Tests for mail-password-cache.ts
  */
 
-import { clearMailVaultPassword } from "./mail-password-cache";
+import { clearMailVaultPassword, saveCachedPrivateKey, clearCachedPrivateKey } from "./mail-password-cache";
+import * as SecureStore from "expo-secure-store";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -27,12 +29,11 @@ jest.mock("expo-secure-store", () => ({
   }),
 }));
 
-import * as SecureStore from "expo-secure-store";
-
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("mail-password-cache", () => {
   beforeEach(() => {
+    activateSessionData("u1");
     jest.clearAllMocks();
     Object.keys(mockSecureStore).forEach((k) => delete mockSecureStore[k]);
   });
@@ -52,5 +53,22 @@ describe("mail-password-cache", () => {
       );
       await expect(clearMailVaultPassword()).resolves.toBeUndefined();
     });
+  });
+});
+
+describe("private key cache lifetime", () => {
+  beforeEach(async () => { await clearCachedPrivateKey(); activateSessionData("u1"); jest.clearAllMocks(); });
+
+  it("does not retain a private key whose SecureStore write completed after close", async () => {
+    let enter = () => undefined as void; let finish = () => undefined as void;
+    const entered = new Promise<void>((resolve) => { enter = resolve; });
+    const released = new Promise<void>((resolve) => { finish = resolve; });
+    jest.mocked(SecureStore.setItemAsync).mockImplementationOnce(async (key, value) => { enter(); await released; mockSecureStore[key] = value; });
+    const pending = saveCachedPrivateKey("synthetic private-key fixture");
+    await entered;
+    const closing = closeSessionData();
+    finish();
+    await Promise.all([pending, closing]);
+    expect(Object.keys(mockSecureStore)).toHaveLength(0);
   });
 });

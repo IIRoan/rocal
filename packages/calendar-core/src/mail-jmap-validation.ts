@@ -89,6 +89,7 @@ export function findJmapResponseError(
     }
     const patchError =
       firstPatchError(result.notCreated) ??
+      firstPatchError(result.notImported) ??
       firstPatchError(result.notDestroyed) ??
       firstPatchError(result.notUpdated);
     if (patchError) {

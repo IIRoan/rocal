@@ -46,6 +46,7 @@ export function MessageReaderDesktopToolbar({
     onReportSpam,
     onNotSpam,
     onReply,
+    onReplyAll,
     onDelete,
     onMove,
     onSetLabel,
@@ -187,6 +188,16 @@ export function MessageReaderDesktopToolbar({
           tooltip="Reply"
           type={Type.SECONDARY}
         />
+        {onReplyAll ? (
+          <IconButton
+            disabled={!canReply}
+            icon={Icon.ReplyAll}
+            onClick={onReplyAll}
+            size={Size.SMALL}
+            tooltip="Reply all"
+            type={Type.SECONDARY}
+          />
+        ) : null}
         <MessageReaderMoreActionsPopover controller={controller} view={view} />
         <IconButton
           disabled={isBusy}

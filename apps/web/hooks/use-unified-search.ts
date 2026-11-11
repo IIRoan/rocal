@@ -180,6 +180,7 @@ export function useUnifiedSearch({
         calendar: results.filter((result) => result.source === "calendar").length,
       },
       isIndexing: titleIndex.isIndexing,
+      coverage: titleIndex.coverage,
       isLimited:
         !titleIndex.enabled &&
         ((includeMail && searchableMailMessages.length === 0) ||

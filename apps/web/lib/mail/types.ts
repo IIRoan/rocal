@@ -1,3 +1,4 @@
+import type { MailSenderKeyTrustState } from "@workspace/calendar-core";
 import {
   normalizeJmapHeaderValues,
   type MailAccountStatus as SharedMailAccountStatus,
@@ -356,6 +357,8 @@ export type MailSignatureVerificationState =
 
 export type MailDecryptResult = {
   plaintext: string;
+  signatureVerificationLayers?: MailSignatureVerificationState[];
+  senderKeyTrustState?: MailSenderKeyTrustState;
   hasVerifiedSignature: boolean;
   signatureVerificationState: MailSignatureVerificationState;
 };

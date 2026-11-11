@@ -49,8 +49,17 @@ import {
   clearRecoverableStoredDevice,
   recoverableStoredDeviceId,
 } from "../lib/native-e2ee-provider";
-import { clearNativeTitleIndex } from "../lib/search/title-index-store";
+import "../lib/search/title-index-store";
+import {
+  activateSessionData,
+  closeSessionData,
+  suspendSessionData,
+} from "../lib/session-data-lifecycle";
+import { createLogger } from "@workspace/logger";
+
 import { queryClient } from "./QueryProvider";
+
+const sessionDataLog = createLogger("session-data");
 
 const AUTH_SESSION_CHECK_TIMEOUT_MS = 3_000;
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 150, 400] as const;
@@ -155,12 +164,18 @@ async function deleteRecoverableDeviceRow(headers: Record<string, string>): Prom
 }
 
 /** The device key opens the account key and the search index holds decrypted text, so both go with the session in both apps. */
-async function wipeSessionData(lifecycle: AuthLifecycle | undefined): Promise<void> {
-  await Promise.all([
-    clearRecoverableStoredDevice().catch(() => undefined),
-    clearNativeTitleIndex().catch(() => undefined),
-    lifecycle?.onSignedOut?.(),
+async function wipeSessionData(
+  lifecycle: AuthLifecycle | undefined,
+): Promise<void> {
+  const results = await Promise.allSettled([
+    clearRecoverableStoredDevice(),
+    Promise.resolve().then(() => lifecycle?.onSignedOut?.()),
   ]);
+  const failure = results.find((result) => result.status === "rejected");
+  if (failure?.status === "rejected") {
+    sessionDataLog.warn("Some local session cleanup needs a retry");
+    throw failure.reason;
+  }
 }
 
 export interface AuthContextValue {
@@ -262,58 +277,61 @@ export function AuthProvider({
     return payload;
   }, []);
 
-  const applySessionData = useCallback(
-    (data: unknown) => {
-      const typedData = data as
-          | {
-            user?: User;
-            session?: Session;
-            token?: string;
-          }
-        | undefined;
+  const applySessionData = useCallback((data: unknown) => {
+    const typedData = data as
+      | {
+          user?: User;
+          session?: Session;
+          token?: string;
+        }
+      | undefined;
 
-      if (!typedData?.user) return false;
+    if (!typedData?.user) return false;
 
-      const token =
-        typedData.session?.token?.trim() || typedData.token?.trim() || "";
-      if (token && !getFallbackSessionToken()) {
-        setFallbackSessionToken(token);
-      }
+    const token =
+      typedData.session?.token?.trim() || typedData.token?.trim() || "";
+    if (token && !getFallbackSessionToken()) {
+      setFallbackSessionToken(token);
+    }
 
-      if (typedData.session) {
-        hasLiveSessionRef.current = true;
-        dispatch({
-          type: "loaded",
-          user: typedData.user,
-          session: typedData.session,
-        });
-        return true;
-      }
-
-      if (!token) return false;
-
+    if (typedData.session) {
+      activateSessionData(typedData.user.id);
       hasLiveSessionRef.current = true;
       dispatch({
         type: "loaded",
         user: typedData.user,
-        session: {
-          token,
-          userId: typedData.user.id,
-          expiresAt: new Date(
-            Date.now() + AUTH_SESSION_LIFETIME_SECONDS * 1000,
-          ),
-        },
+        session: typedData.session,
       });
       return true;
-    },
-    [],
-  );
+    }
 
-  const restoreCachedSession = useCallback((storedSession: unknown) => {
-    const cookie = getSessionCookie();
-    const cached: unknown = authClient.$store.atoms.session?.get().data;
-    return applySessionData(parseCachedAuthSession(cached, cookie) ?? parseCachedAuthSession(storedSession, cookie));
-  }, [applySessionData]);
+    if (!token) return false;
+
+    activateSessionData(typedData.user.id);
+    hasLiveSessionRef.current = true;
+    dispatch({
+      type: "loaded",
+      user: typedData.user,
+      session: {
+        token,
+        userId: typedData.user.id,
+        expiresAt: new Date(Date.now() + AUTH_SESSION_LIFETIME_SECONDS * 1000),
+      },
+    });
+    return true;
+  }, []);
+
+  const restoreCachedSession = useCallback(
+    (storedSession: unknown) => {
+      const cookie = getSessionCookie();
+      const cached: unknown = authClient.$store.atoms.session?.get().data;
+      return applySessionData(
+        parseCachedAuthSession(cached, cookie) ??
+          parseCachedAuthSession(storedSession, cookie),
+      );
+    },
+    [applySessionData],
+  );
 
   const clearPendingAuthPassword = useCallback(() => {
     pendingAuthPasswordRef.current = null;
@@ -432,7 +450,14 @@ export function AuthProvider({
     dispatch({ type: "step-up", required: false });
   }, [fetchAuthStatus]);
 
-  const clearSession = useCallback(() => {
+  const clearSession = useCallback((closeStorage = false) => {
+    if (closeStorage) {
+      void closeSessionData().catch(() =>
+        sessionDataLog.warn("Local session data cleanup needs a retry"),
+      );
+    } else {
+      suspendSessionData();
+    }
     sessionLoadIdRef.current += 1;
     hasLiveSessionRef.current = false;
     setFallbackSessionToken(null);
@@ -444,7 +469,7 @@ export function AuthProvider({
 
   // A session the server ended (revoked, expired, 401/403) gets the sign-out wipe; a network failure keeps the device's data.
   const endSession = useCallback(() => {
-    clearSession();
+    clearSession(true);
     void Promise.all([
       clearAuthSessionCache(),
       wipeSessionData(lifecycleRef.current),
@@ -623,36 +648,56 @@ export function AuthProvider({
     ],
   );
 
-  const signOut = useCallback(async (notice?: string) => {
-    sessionLoadIdRef.current += 1;
-    hasLiveSessionRef.current = false;
-    // Capture before clearing the fallback so logout requests still authenticate when the jar is empty.
-    const logoutHeaders = getAuthHeaders();
-    setFallbackSessionToken(null);
-    const cacheCleared = clearAuthSessionCache().catch(() => undefined);
-    const leave = async () => {
-      await Promise.all([
-        unregisterNativePushDevice(logoutHeaders),
-        deleteRecoverableDeviceRow(logoutHeaders).catch(() => undefined),
-        clearNotificationExtensionSecrets(),
+  const signOut = useCallback(
+    async (notice?: string) => {
+      const storageCleanup = closeSessionData();
+      const cleanupResult = storageCleanup.catch(() =>
+        sessionDataLog.warn("Local session data cleanup needs a retry"),
+      );
+      const localCleanup = Promise.allSettled([
+        cleanupResult,
+        Promise.resolve().then(() => lifecycleRef.current?.onSignedOut?.()),
       ]);
-      await authClient
-        .signOut(
-          logoutHeaders.cookie
-            ? { fetchOptions: { headers: { cookie: logoutHeaders.cookie } } }
-            : undefined,
-        )
-        // Best-effort — local state is cleared regardless.
-        .catch(() => undefined);
-      await wipeSessionData(lifecycleRef.current);
-    };
-    // A failing cleanup step still ends the session, so the app is never left signed in without its keys.
-    await leave().finally(async () => {
-      await cacheCleared;
-      clearSession();
-      setSignInNotice(notice ?? null);
-    });
-  }, [clearSession]);
+      sessionLoadIdRef.current += 1;
+      hasLiveSessionRef.current = false;
+      // Capture before clearing the fallback so logout requests still authenticate when the jar is empty.
+      const logoutHeaders = getAuthHeaders();
+      setFallbackSessionToken(null);
+      const cacheCleared = clearAuthSessionCache().catch(() => undefined);
+      const leave = async () => {
+        const cleanup = await Promise.allSettled([
+          Promise.resolve().then(() => unregisterNativePushDevice(logoutHeaders)).catch(() => undefined),
+          deleteRecoverableDeviceRow(logoutHeaders).catch(() => undefined),
+          clearNotificationExtensionSecrets(),
+        ]);
+        await authClient
+          .signOut(
+            logoutHeaders.cookie
+              ? { fetchOptions: { headers: { cookie: logoutHeaders.cookie } } }
+              : undefined,
+          )
+          // Best-effort — local state is cleared regardless.
+          .catch(() => undefined);
+        const failure = cleanup.find((result) => result.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
+      };
+      // A failing cleanup step still ends the session, so the app is never left signed in without its keys.
+      await leave().finally(async () => {
+        const results = [
+          ...(await Promise.allSettled([
+            cacheCleared,
+            clearRecoverableStoredDevice(),
+          ])),
+          ...(await localCleanup),
+        ];
+        clearSession(false);
+        setSignInNotice(notice ?? null);
+        const failure = results.find((result) => result.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
+      });
+    },
+    [clearSession],
+  );
 
   useEffect(() => {
     let ignore = false;

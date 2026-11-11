@@ -1,0 +1,58 @@
+Delivered-To: ecc@mime-probe-6e3bc9.solace.test
+X-Spam-Status: No
+DKIM-Signature: v=1; a=ed25519-sha256; s=v1-ed25519-20261110; d=mime-probe-6e3bc9.solace.test; c=relaxed/relaxed; r=y;
+	h=Message-ID:Subject:To:From:Date; t=1794317218; bh=TfPNbobParykJMMeWBFY58i
+	A8vDlaQSFiUl1HFG0BII=; b=0BE1t6zL8qow/Bk55dufDcx/fROYV4Dj7Ok5j7AyMfCZH6p67H
+	qO6hyIBu6bsyUVqtQ75tySBVnRAcOJ9hmLDg==;
+From: sender@mime-probe-6e3bc9.solace.test
+To: ecc@mime-probe-6e3bc9.solace.test
+Subject: SYNTHETIC proper RFC3156 import
+Message-ID: <synthetic-rfc3156-import@mime-probe-6e3bc9.solace.test>
+MIME-Version: 1.0
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary="SYNTHETIC-RFC3156-BOUNDARY"
+
+--SYNTHETIC-RFC3156-BOUNDARY
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--SYNTHETIC-RFC3156-BOUNDARY
+Content-Type: application/octet-stream
+Content-Disposition: inline
+
+-----BEGIN PGP MESSAGE-----
+
+wV4DAAAAAAAAAAASAQdAQ410I7bbdOL0NbGwdaDBpKuDjPKDhOYmwuYVBCSO
+PXwwSMGfEzmJnCvnxIOnozNDS6hcyNKlntDgNRAw2+cCXopS4vuvelJxDl+g
+63OcBHbawV4DAAAAAAAAAAASAQdAKgQ7y3H9geK/VjUleS2cByQu7EOJ7itp
+XH3yVqC+DgkwhS3917cVRew54DNl3UMXCip5njZu8DPxNVqYkQxuaC3yVSr5
+F5gk1LKsjKd/o+1Z0sObARmEFrpm48VIHveSSdeoUxo/ToZJcUL9YIIldrcU
+8kMA35FFZ15drxzQGlaAupcwLjszRX8FN6rgQFM+DVfkJ+hG/htLUqygL1qX
+aj5pbSP0l6Ha1tEbDr6lhAmFJq4SC+4UI8dAIf10NdqX1Xx5gdzc73/Jr3Fh
+PlyhtH3nVOPIPlIgOj1Qbf8sOCJSBgHlY1gM7w4pyFTplU9ZGRwmmQmYB17I
+sxStRqBxjsN6+FDieJ64TrAfP5euo6pCw226KNiBUmSFlgbBkYmvXoC9tMuB
+FfaQgwHRpl3egublf1gXhZcYAc/S1m4CVQxokCvReh5+dTRdhWIVIM2cSri/
+v8TCWrM2O5gdO/CKbu86f6uAheTjtxI0FC/gDuQS9nnISFSQWNuc8FnujUBM
+cqxj4ow/ZXQ9lG8DJikeiLf3GkErnSwQiwAktqFVmlMV75MeDweiZ+OTasIQ
+PSiLCyQUfGVUtI+b2TJz3BQSkcyHQRXRmLnqCgql6bJy0OvU1dsBaqhgK7vM
+VTWPl2W81B+MTHItMV/gaoF7xZw9/7qqGQpfXxIhKsE5HA1Y1CkCaoCzqsv8
+ZdzZs43IRDfv5Mil5faChYnVrIcjxsetY6FJK/nqrdO5C5N16fGPuOelzh4X
+9O9hiiFHhI1jh/4fRizE8fUfG21X7hRFwpdtuUKr/sictaLW4no+qRMDJ4mp
+scGGvuE7chqnTobZVPwFO76fDQKX/dRDzdjLJJlCncKQd+JzakAyYfhzp5pH
+EvbqvsjAr7xhW0A2IeUX5TMvcbUXOr7Di1T1JTHsATIHjsw9UY8yBcjR+RAv
+ksJF1Ggd6MCLjdUKX8WPuRrzM2TZAKYslPKq6cYlW+nZefRS2Zr9SYzj9W6A
+5WPngflNHd1fuFuJxEmgA4FiVQKPCK9c+BYvf5uWaWMDGP2Oj0V/NovuRQZn
+keX/Y3OMUKm4sPGRv6foS1np03BQs/hp1E12dSNLgY0IvC6FsALAwPVNhFd1
+Wvmey1BqxYQq/pZSV2dX7afu6F3inWx4PdA/xTkcvLEmx9PBK2ZWXWlzEOJ2
+3gmJHyQUeDSM4r1uLGC0CuRUx7yq7qlOGCoR6xNcMnhpCEfRMpcl/n7xZgjw
+wHoNM5eAossoW5jMIvsaamMybnzz1B6mLr4ON5n/ZUaLu4m3WwANTQTQ7NKS
+nsELvS9/5ufVfa/Q1J5WTMUkxJijXlfLMMRl6eW3CnYctS9rMucS72pk/Ewx
+mfW8JBfcMP39OZXhXGvmOaRi213iqnqUU15c1bFMR9E40i1OqpJ71y6STaIM
+l79t1zBB+/jxO/NUTKVPnq89d34G0G/dH49BwE4gLAsdrrG8z/msiGJ/AM9p
+8wcskGnzI3sK/m2ZMQy4qYldC6nfGZNGofCjKAgxU3u4vqz5/zR2n2HyPg5U
+BsVliU/Y5naqs7nLn3QZ65nrN78elPLtvDRUFkG+Kk14ruDx8r5lAT0fBBe6
+SO87NY8=
+=pxnv
+-----END PGP MESSAGE-----
+
+--SYNTHETIC-RFC3156-BOUNDARY--

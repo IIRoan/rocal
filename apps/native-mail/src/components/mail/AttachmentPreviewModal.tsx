@@ -13,8 +13,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { getErrorMessage, type MailAttachmentPreviewKind } from "@workspace/calendar-core";
-import type { CachedAttachment } from "../../lib/mail/attachment-cache";
+import {
+  getErrorMessage,
+  type MailAttachmentPreviewKind,
+} from "@workspace/calendar-core";
+import {
+  releaseCachedAttachment,
+  type CachedAttachment,
+} from "../../lib/mail/attachment-cache";
 import { CenteredLoader } from "@workspace/native-core/components/ui/loading";
 
 const SHEET_HEIGHT_FRACTION = 0.8;
@@ -80,7 +86,12 @@ export function AttachmentPreviewModal({
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const sheetHeight = screenHeight * SHEET_HEIGHT_FRACTION;
-  const [loaded, setLoaded] = useState<LoadedPreview | null>(null);
+  const [snapshot, setSnapshot] = useState<{
+    loader: typeof loadCached;
+    result: LoadedPreview;
+  } | null>(null);
+  const loaded =
+    visible && snapshot?.loader === loadCached ? snapshot.result : null;
   const cached = loaded?.cached ?? null;
   const textContent = loaded?.textContent ?? null;
   const error = loaded?.error ?? null;
@@ -90,10 +101,16 @@ export function AttachmentPreviewModal({
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
+    let acquired: CachedAttachment | null = null;
     const load = async () => {
       try {
         const result = await loadPreview(kind, loadCached);
-        if (!cancelled) setLoaded(result);
+        acquired = result.cached;
+        if (cancelled) {
+          if (acquired) await releaseCachedAttachment(acquired);
+          return;
+        }
+        setSnapshot({ loader: loadCached, result });
       } catch {
         // loadPreview folds its own errors into the result, so nothing is left to report.
       }
@@ -101,6 +118,8 @@ export function AttachmentPreviewModal({
     void load();
     return () => {
       cancelled = true;
+      if (acquired)
+        void releaseCachedAttachment(acquired).catch(() => undefined);
     };
   }, [visible, kind, loadCached]);
 

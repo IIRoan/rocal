@@ -49,6 +49,7 @@ Add it to the matching module (`repository`, `comments`, `client`, `typescript`,
 | `typescript-null-safety` | `Array.find` results are checked or optional-chained before they are dereferenced. |
 | `async-promise-handling` | `void promise` does not handle rejection; attach `.catch` or await it. |
 | `react-effect-lifecycle` | Effects that install listeners, intervals, subscriptions, or observers return a cleanup. |
+| `directive-prologue` | Module-level React directives are unparenthesised strings before imports and other code. |
 | `react-effect-purpose` | An effect that only calls state setters is derived state; compute it in render or the handler. |
 | `react-component-boundaries` | Components are defined at module scope, never inside another component. |
 | `react-immutable-state` | Never mutate React state or query data in place. |

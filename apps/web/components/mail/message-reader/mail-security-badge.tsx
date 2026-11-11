@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { useState } from "react";
+import { reviewCurrentMailSenderKey } from "@/lib/mail/mail-trust-lifecycle";
 import { ShieldCheck, ShieldAlert, Lock } from "lucide-react";
 import {
   getMailSecurityNotice,
   MAIL_READABLE_METADATA,
+  MAIL_KEY_CONTINUITY_ENABLED,
+  type MailSenderKeyTrustState,
 } from "@workspace/calendar-core";
 import { DropdownPanel } from "@workspace/ui/solace";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -17,6 +21,8 @@ export function MailSecurityBadge(props: {
   accountEncryptedAtRest: boolean;
   signatureVerificationState: MailSignatureVerificationState;
   decryptionFailed: boolean;
+  senderKeyTrustState?: MailSenderKeyTrustState;
+  senderEmail?: string;
 }) {
   const meta = getMailSecurityNotice(props);
   const Icon =
@@ -57,6 +63,10 @@ export function MailSecurityBadge(props: {
         <p className="text-xs leading-snug text-[var(--text-secondary)]">
           {MAIL_READABLE_METADATA}
         </p>
+        <SenderKeyReviewAction
+          email={props.senderEmail}
+          state={props.senderKeyTrustState}
+        />
         <Link
           href="/privacy#mail-encryption"
           target="_blank"
@@ -67,5 +77,45 @@ export function MailSecurityBadge(props: {
         </Link>
       </div>
     </DropdownPanel>
+  );
+}
+
+function SenderKeyReviewAction({
+  email,
+  state,
+}: {
+  email?: string;
+  state?: MailSenderKeyTrustState;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  if (!MAIL_KEY_CONTINUITY_ENABLED || !email || state?.kind !== "key_changed")
+    return null;
+  const review = () => {
+    setBusy(true);
+    setNotice(null);
+    void reviewCurrentMailSenderKey(email)
+      .then(() => {
+        setBusy(false);
+        setNotice("Reopen this message to check its sender key again.");
+      })
+      .catch(() => {
+        setBusy(false);
+        setNotice(
+          "The sender key could not be reviewed. Saved keys were kept.",
+        );
+      });
+  };
+  return (
+    <>
+      <Button variant="outline" disabled={busy} onClick={review}>
+        Review sender key
+      </Button>
+      {notice ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          {notice}
+        </p>
+      ) : null}
+    </>
   );
 }

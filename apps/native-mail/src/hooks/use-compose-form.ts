@@ -1,5 +1,7 @@
 import { useEffect, useEffectEvent, useReducer } from "react";
 import type { ComposeTextFields } from "@workspace/calendar-core";
+import { getMailDraftSizeError } from "@workspace/calendar-core/mail-mime-limits";
+import { classifyMessageEncryption, extractMessageBodies } from "../lib/mail/message-security";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 import { useUserTimezone } from "@workspace/native-core/hooks/use-user-timezone";
@@ -24,10 +26,19 @@ export function useComposeForm({ onClose, ...seedInput }: ComposeFormInput) {
   const timeFormat = useUserTimeFormat();
   const [form, dispatch] = useReducer(composeFormReducer, INITIAL_COMPOSE_FORM);
   const { runtime, sourceMessage } = seedInput;
+  const draftSizeError = sourceMessage && seedInput.params.mode === "draft" && classifyMessageEncryption(sourceMessage) === "plain"
+    ? getMailDraftSizeError(extractMessageBodies(sourceMessage))
+    : null;
+
+  useEffect(() => {
+    if (!draftSizeError) return;
+    toast(draftSizeError, "error");
+    onClose();
+  }, [draftSizeError, onClose, toast]);
 
   // Seeded during render once the source message and settings are in, so the form never paints empty first.
   const seedPlan =
-    form.seed || form.decrypting
+    form.seed || form.decrypting || draftSizeError
       ? null
       : planComposeSeed({ ...seedInput, dateOptions: { timeFormat, timezone } });
   if (seedPlan) dispatch({ type: "seed", plan: seedPlan });

@@ -55,6 +55,8 @@ pub enum Relation {
     UserEncryptionPassword,
     #[sea_orm(has_one = "super::user_mail_settings::Entity")]
     UserMailSettings,
+    #[sea_orm(has_one = "super::user_mail_trust::Entity")]
+    UserMailTrust,
     #[sea_orm(has_one = "super::user_recent_contacts::Entity")]
     UserRecentContacts,
     #[sea_orm(has_one = "super::user_settings::Entity")]
@@ -148,6 +150,12 @@ impl Related<super::user_encryption_password::Entity> for Entity {
 impl Related<super::user_mail_settings::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::UserMailSettings.def()
+    }
+}
+
+impl Related<super::user_mail_trust::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserMailTrust.def()
     }
 }
 

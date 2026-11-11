@@ -241,6 +241,11 @@ function MailThreadList({ controller }: { controller: MailListController }) {
 
   return (
     <View style={styles.listArea}>
+      {controller.searchCoverageText ? (
+        <Text accessibilityLiveRegion="polite" style={styles.mutedText}>
+          {controller.searchCoverageText}
+        </Text>
+      ) : null}
       <FlatList
         key={resolvedMailboxId ?? "mailbox"}
         style={styles.listFlex}

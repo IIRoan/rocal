@@ -1,6 +1,7 @@
 import { createLogger } from "@workspace/logger";
+import { getMailReadLimitNotice } from "@workspace/calendar-core/mail-mime-limits";
 import type { MailDemoConfig } from "@workspace/calendar-core";
-import { mailDemoApiService } from "@/lib/mail/api-service";
+import { assertMailVerificationContext, captureMailVerificationContext, resolveMailSenderVerification } from "./mail-sender-verification";
 import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
 import {
   classifyMessageEncryption,
@@ -9,15 +10,19 @@ import {
 } from "@/lib/mail/message-security";
 import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
 import { listedDecryptedAttachments } from "@/lib/mail/mail-app-helpers";
-import type { JmapEmailMessage, JmapSession, MailAttachment } from "@/lib/mail/types";
+import type { JmapEmailMessage, JmapSession, MailAttachment, MailSignatureVerificationState } from "@/lib/mail/types";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 
 const log = createLogger("decrypt-message-for-compose");
 
 export type DecryptedComposeContent = {
   text: string | null;
+  rawMimeFallback?: boolean;
   html: string | null;
   attachments?: MailAttachment[];
+  senderKeyTrustState?: import("@workspace/calendar-core").MailSenderKeyTrustState;
+  signatureVerificationState?: MailSignatureVerificationState;
+  signatureVerificationLayers?: MailSignatureVerificationState[];
 };
 
 export async function decryptMessageForCompose(
@@ -33,6 +38,7 @@ export async function decryptMessageForCompose(
     return { text: null, html: null };
   }
 
+  const verificationContext = captureMailVerificationContext();
   let armoredMessage: string;
   if (encState === "inline_pgp") {
     armoredMessage = await resolveInlinePgpArmoredCiphertext({
@@ -48,39 +54,40 @@ export async function decryptMessageForCompose(
     armoredMessage = await input.client.getBlobAsText(input.session, blobId);
   }
 
-  const senderEmail = input.message.from?.[0]?.email;
-  let senderPublicKeyArmored: string | undefined;
-  if (
-    senderEmail &&
-    input.config &&
-    senderEmail.endsWith(`@${input.config.defaultDomain}`)
-  ) {
-    try {
-      const senderKey = await mailDemoApiService.getRecipientKey(senderEmail);
-      senderPublicKeyArmored = senderKey.publicKeyArmored;
-    } catch {
-      /* best-effort */
-    }
-  }
+  const verification = await resolveMailSenderVerification({
+    senderEmail: input.message.from?.[0]?.email,
+    internalDomain: input.config?.defaultDomain,
+    context: verificationContext,
+  });
+  assertMailVerificationContext(verificationContext);
 
   const decrypted = await mailCryptoWorkerClient.decryptMessage({
     armoredMessage,
-    senderPublicKeyArmored,
+    senderPublicKeyArmored: verification.senderPublicKeyArmored,
+    expectedVaultFingerprint: verificationContext.fingerprint,
   });
+  assertMailVerificationContext(verificationContext);
 
-  try {
-    const parsed = await parseDecryptedMailContent(decrypted.plaintext);
-    return {
-      text: parsed.text ?? decrypted.plaintext,
-      html: parsed.html ?? null,
-      attachments:
-        encState === "pgp_mime" ? listedDecryptedAttachments(parsed.attachments) : [],
-    };
-  } catch (parseError) {
+  const parsed = await parseDecryptedMailContent(decrypted.plaintext).catch((parseError: unknown) => {
+    if (getMailReadLimitNotice(parseError)) throw parseError;
     log.warn("Failed to parse decrypted MIME for compose", parseError);
-    return {
-      text: decrypted.plaintext,
-      html: null,
-    };
-  }
+    return null;
+  });
+  assertMailVerificationContext(verificationContext);
+  if (!parsed) return {
+    text: decrypted.plaintext,
+    rawMimeFallback: true,
+    html: null,
+    senderKeyTrustState: verification.senderKeyTrustState,
+    signatureVerificationState: decrypted.signatureVerificationState,
+    signatureVerificationLayers: decrypted.signatureVerificationLayers,
+  };
+  return {
+    text: parsed.text ?? "",
+    html: parsed.html ?? null,
+    attachments: encState === "pgp_mime" ? listedDecryptedAttachments(parsed.attachments) : [],
+    senderKeyTrustState: verification.senderKeyTrustState,
+    signatureVerificationState: decrypted.signatureVerificationState,
+    signatureVerificationLayers: decrypted.signatureVerificationLayers,
+  };
 }

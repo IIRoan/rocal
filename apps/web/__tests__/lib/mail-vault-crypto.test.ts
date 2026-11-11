@@ -1,4 +1,14 @@
-import { describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import * as openpgp from "openpgp";
+import {
+  invalidFixtureEnvelopes,
+  mailVaultFixtures,
+  readFixtureEnvelope,
+} from "../../../../packages/calendar-core/src/__tests__/fixtures/mail-vault-fixtures";
+import { clearActiveE2eeSession, setActiveE2eeSession } from "@/lib/e2ee-session";
+import { unwrapVaultSecret } from "@/lib/mail/vault-secret";
+
+jest.mock("@/lib/e2ee-bootstrap", () => ({ waitForPendingE2eeBootstrap: () => null }));
 
 import {
   createEncryptedMailVault,
@@ -6,6 +16,45 @@ import {
   unlockEncryptedMailVaultWithDerivedKey,
 } from "../../lib/mail/vault-crypto";
 import { deriveVaultKeyBytes } from "../../lib/mail/vault-kdf";
+
+afterEach(() => clearActiveE2eeSession());
+
+describe.each(mailVaultFixtures.fixtures)("committed $id vault", (fixture) => {
+  it("opens the actual producer's envelope and validates its wire framing", async () => {
+    const envelope = readFixtureEnvelope(fixture.encryptedVaultB64);
+    expect(Buffer.from(envelope.ivB64, "base64")).toHaveLength(12);
+    expect(Buffer.from(envelope.ciphertextB64, "base64").length).toBeGreaterThan(16);
+    await expect(unlockEncryptedMailVault(fixture.encryptedVaultB64, fixture.passphrase, fixture.kdfParams)).resolves.toEqual(fixture.expectedVault);
+  });
+
+  it("matches the independent Node/OpenSSL Argon2id known answer", async () => {
+    const key = await deriveVaultKeyBytes(fixture.passphrase, fixture.kdfParams);
+    expect(Buffer.from(key).toString("hex")).toBe(fixture.expectedKeyHex);
+  });
+
+  it("unwraps the account secret, opens the vault and decrypts its signed message", async () => {
+    const accountKey = await crypto.subtle.importKey("raw", new Uint8Array(Buffer.from(mailVaultFixtures.accountKeyB64, "base64")), "AES-GCM", false, ["decrypt"]);
+    setActiveE2eeSession({ userId: fixture.expectedVault.userId, deviceId: "synthetic-device", accountKey, blindIndexKey: accountKey, activatedAt: new Date() });
+    const secret = await unwrapVaultSecret(fixture.wrappedSecret);
+    if (!secret) throw new Error("Fixture account secret did not open");
+    const vault = await unlockEncryptedMailVault(fixture.encryptedVaultB64, secret, fixture.kdfParams);
+    const privateKey = await openpgp.decryptKey({ privateKey: await openpgp.readPrivateKey({ armoredKey: vault.encryptedPrivateKeyArmored }), passphrase: secret });
+    const publicKey = await openpgp.readKey({ armoredKey: vault.publicKeyArmored });
+    expect(publicKey.getFingerprint()).toBe(vault.publicKeyFingerprint);
+    const decrypted = await openpgp.decrypt({ message: await openpgp.readMessage({ armoredMessage: fixture.armoredMessage }), decryptionKeys: privateKey, verificationKeys: publicKey, format: "utf8" });
+    expect(decrypted.data).toBe(fixture.plaintext);
+    expect(decrypted.signatures).toHaveLength(1);
+    await expect(decrypted.signatures[0]?.verified).resolves.toBe(true);
+  });
+
+  it("rejects a wrong passphrase", async () => {
+    await expect(unlockEncryptedMailVault(fixture.encryptedVaultB64, `${fixture.passphrase}-wrong`, fixture.kdfParams)).rejects.toThrow("Failed to decrypt mail vault");
+  });
+
+  it.each(invalidFixtureEnvelopes(fixture.encryptedVaultB64))("rejects $name", async ({ value }) => {
+    await expect(unlockEncryptedMailVault(value, fixture.passphrase, fixture.kdfParams)).rejects.toThrow("Failed to decrypt mail vault");
+  });
+});
 
 const sampleVault = {
   userId: "mail-user-1",

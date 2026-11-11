@@ -1,6 +1,7 @@
 "use client";
 
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
+import { MailTrustReview } from "./mail-trust-review";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useComposeDraftAutosave } from "@/hooks/use-compose-draft-autosave";
 import { useMailSyncedSettingsHydration } from "@/lib/mail/use-mail-synced-settings-hydration";
@@ -82,6 +83,7 @@ export function MailApp() {
         accountEmail={mail.accountEmail}
         onDraftSaved={mail.handleDraftSaved}
       />
+      <MailTrustReview accountId={mail.session?.user?.id ?? null} />
       <MailAppContent mail={mail} />
     </MailComposeProvider>
   );

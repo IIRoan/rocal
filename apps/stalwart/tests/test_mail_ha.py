@@ -76,7 +76,7 @@ class EntrypointTests(unittest.TestCase):
         result = subprocess.run(["sh", "-euc", shell_functions("render_stalwart_plan") +
                                  'render_stalwart_plan "$PLAN"'],
                                 env={"PATH": os.environ["PATH"], "PLAN": str(ROOT / "stalwart/plan"),
-                                     "STALWART_REDIS_URL": url}, capture_output=True, text=True, check=True)
+                                     "STALWART_REDIS_URL": url, "BUCKET": "solace-test-rendered", "BUCKET_ENDPOINT": "http://127.0.0.1:59000", "BUCKET_REGION": "test"}, capture_output=True, text=True, check=True)
         entries = [json.loads(line) for line in result.stdout.splitlines()]
         stores = {entry["object"]: entry["value"] for entry in entries if entry.get("object") in ("InMemoryStore", "Coordinator")}
         self.assertEqual(stores["InMemoryStore"]["url"], url)
@@ -135,7 +135,7 @@ class EntrypointTests(unittest.TestCase):
                       'stalwart_management_url() { echo http://192.0.2.1:8080; }\n'
                       'seed_stalwart_cli_schema() { :; }\nreload_stalwart_settings() { :; }\n'
                       'curl() { case "$*" in *old-deployment.invalid*) return 0;; *) return 1;; esac; }\n' +
-                      shell_functions("render_stalwart_plan", "apply_stalwart_plan") + "apply_stalwart_plan\n")
+                      shell_functions("render_stalwart_plan", "apply_stalwart_plan") + "apply_stalwart_plan recovery\n")
             result = subprocess.run(["sh", "-euc", script], env=env, capture_output=True, timeout=3)
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(applied.exists(), "the previous live deployment must never receive the new schema")
@@ -202,6 +202,7 @@ class EntrypointTests(unittest.TestCase):
         alive = {1, 2}
         namespace = {"load_state": lambda: state, "pid_alive": lambda pid: pid in alive, "port_open": lambda _: True}
         exec(code, namespace)
+        namespace["management_ready"] = lambda *args, **kwargs: True
         self.assertTrue(namespace["ready"]())
         alive.discard(2)
         self.assertFalse(namespace["ready"]())
@@ -225,6 +226,7 @@ class EntrypointTests(unittest.TestCase):
         namespace = {"load_state": lambda: state, "pid_alive": lambda _: True,
                      "port_open": lambda port: port in listening}
         exec(code, namespace)
+        namespace["management_ready"] = lambda *args, **kwargs: True
         self.assertTrue(namespace["ready"](), "a closed relay must not take the private JMAP gate offline")
         listening.remove(8081)
         self.assertFalse(namespace["ready"](), "the private JMAP gate must still be reachable")
@@ -236,6 +238,7 @@ class EntrypointTests(unittest.TestCase):
         namespace = {"load_state": lambda: state, "pid_alive": lambda _: True,
                      "port_open": lambda port: port in listening}
         exec(code, namespace)
+        namespace["management_ready"] = lambda *args, **kwargs: True
         self.assertFalse(namespace["ready"]())
         listening.add(8082)
         self.assertTrue(namespace["ready"]())

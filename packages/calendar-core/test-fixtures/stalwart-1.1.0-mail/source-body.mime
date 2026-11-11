@@ -1,0 +1,29 @@
+Content-Type: multipart/mixed; boundary="solace_mixed_1794315977373_5y2i9iyb"
+MIME-Version: 1.0
+
+--solace_mixed_1794315977373_5y2i9iyb
+Content-Type: multipart/alternative; boundary="solace_alt_1794315977373_7868ywe1"
+MIME-Version: 1.0
+
+--solace_alt_1794315977373_7868ywe1
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+SYNTHETIC target mail body
+
+--solace_alt_1794315977373_7868ywe1
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<p>SYNTHETIC <b>target mail</b> body</p>
+
+--solace_alt_1794315977373_7868ywe1--
+
+--solace_mixed_1794315977373_5y2i9iyb
+Content-Type: text/plain; name="synthetic-notes.txt"
+Content-Disposition: attachment; filename="synthetic-notes.txt"
+Content-Transfer-Encoding: base64
+
+U1lOVEhFVElDIGF0dGFjaG1lbnQgY29udGVudA==
+
+--solace_mixed_1794315977373_5y2i9iyb--

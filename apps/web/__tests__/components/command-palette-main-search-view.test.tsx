@@ -105,6 +105,7 @@ describe("CommandPaletteMainSearchView", () => {
       },
       searchInputRef: createRef<HTMLInputElement>(),
       searchLoading: false,
+      searchCoverageText: "Searching recent indexed mail. Older mail may be missing.",
       searchQuery: "plan",
       selectCommand: () => {},
       selectedIndex: 0,
@@ -137,5 +138,10 @@ describe("CommandPaletteMainSearchView", () => {
     expect(
       container.querySelector('button[aria-label="Clear search"]'),
     ).not.toBeNull();
+    expect(container.textContent).toContain("Searching recent indexed mail");
+    await act(async () => root.render(<CommandPaletteMainSearchView search={{ ...search, searchResults: [], searchEvents: [], totalSearchEvents: 0, totalSearchResults: 0 }} />));
+    expect(container.textContent).toContain("Searching recent indexed mail");
+    expect(container.textContent).not.toContain("Planning");
+
   });
 });

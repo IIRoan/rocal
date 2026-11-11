@@ -185,7 +185,7 @@ async fn bootstrap_provisions_an_encrypted_mailbox_linked_to_the_user() {
     assert_eq!(remote["emailAddress"], json!(user.email));
     assert_eq!(
         remote["encryptionAtRest"],
-        json!({"@type": "Aes256", "publicKey": signup.stalwart_public_key_id, "encryptOnAppend": false, "allowSpamTraining": false}),
+        json!({"@type": "Enabled", "headerProtection":"none", "publicKey": signup.stalwart_public_key_id, "encryptOnAppend": false, "allowSpamTraining": false}),
         "delivered mail is encrypted to the user's key"
     );
 
@@ -222,6 +222,137 @@ async fn bootstrap_provisions_an_encrypted_mailbox_linked_to_the_user() {
         ));
     assert_eq!(again["details"], json!({"field": "email"}));
     assert_eq!(count(&app.db, ENTRY_COUNT, &user.id).await, 1);
+}
+
+#[tokio::test]
+async fn provisioning_keeps_owner_markers_out_of_sending_identities() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    let account_id = owner.account_id().to_owned();
+    let reply = owner
+        .jmap(json!([["Identity/get", {"accountId": account_id}, "i"]]))
+        .await;
+    let identities = super::mail_support::method(&reply, "i")["list"]
+        .as_array()
+        .expect("sending identities");
+    let identity = identities
+        .iter()
+        .find(|identity| identity["email"] == json!(owner.user.email))
+        .expect("primary identity");
+    assert_eq!(identity["name"], json!(owner.user.name));
+    assert!(identities.iter().all(|identity| {
+        !identity["name"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(&owner.user.id)
+    }));
+}
+
+#[tokio::test]
+async fn sender_identity_names_are_safe_without_rejecting_existing_profile_names() {
+    let app = TestApp::spawn().await;
+    for (name, expected) in [
+        (
+            "  Alice\r\nExample\u{7f}\tFrom: name  ".to_owned(),
+            Some("Alice Example From: name".to_owned()),
+        ),
+        ("a".repeat(300), Some("a".repeat(254))),
+        ("🚀".repeat(100), Some("🚀".repeat(63))),
+        ("\r\n\u{7f}\t".to_owned(), None),
+    ] {
+        let mut user = app.user().await;
+        ok(user
+            .post("/api/auth/update-user", json!({"name":name}))
+            .await
+            .expect_status(200));
+        let signup = provision(&app, &mut user, &bootstrap_request(0)).await;
+        let account_id = signup.stalwart_account_id.0.clone();
+        let mut owner = super::mail_support::Mailbox { user, signup };
+        let reply = owner
+            .jmap(json!([["Identity/get", {"accountId":account_id}, "i"]]))
+            .await;
+        let identity = super::mail_support::method(&reply, "i")["list"]
+            .as_array()
+            .expect("identities")
+            .iter()
+            .find(|identity| identity["email"] == json!(owner.user.email))
+            .expect("primary identity");
+        assert_eq!(
+            identity["name"],
+            json!(expected.unwrap_or(owner.user.email.clone()))
+        );
+    }
+}
+
+#[tokio::test]
+async fn principal_metadata_does_not_expose_another_mailboxs_owner_marker() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    let other = mailbox(&app).await;
+    let account_id = owner.account_id().to_owned();
+    let calls = json!([
+        ["Principal/get", {"accountId":account_id,"ids":null}, "own"],
+        ["Principal/get", {"accountId":account_id,"ids":[other.account_id()]}, "foreign"],
+        ["Principal/query", {"accountId":account_id}, "query"]
+    ]);
+    let using = [
+        "urn:ietf:params:jmap:core",
+        "urn:ietf:params:jmap:principals",
+    ];
+    for direct in [true, false] {
+        let envelope: Value = if direct {
+            let mut request = reqwest::Client::new()
+                .post(format!("{}/jmap/", app.env.stalwart_url))
+                .basic_auth(
+                    &owner.user.email,
+                    Some(bridge_secret(
+                        &app.env.mail_bridge_hmac_key,
+                        &owner.user.id,
+                        &owner.user.email,
+                    )),
+                );
+            if let Some(key) = &app.env.stalwart_gate_key {
+                request = request.header("X-Solace-Gate", key);
+            }
+            request
+                .json(&json!({"using":using,"methodCalls":calls}))
+                .send()
+                .await
+                .expect("direct principal request")
+                .json()
+                .await
+                .expect("principal envelope")
+        } else {
+            ok(owner
+                .user
+                .post(
+                    "/api/mail/jmap/jmap/",
+                    json!({"using":using,"methodCalls":calls}),
+                )
+                .await
+                .expect_status(200)
+                .and_then(|reply| reply.value()))
+        };
+        let own = super::mail_support::method(&envelope, "own");
+        assert_eq!(own["list"].as_array().expect("own principal").len(), 1);
+        let foreign = super::mail_support::method(&envelope, "foreign");
+        assert_eq!(foreign["list"], json!([]));
+        assert_eq!(foreign["notFound"], json!([other.account_id()]));
+        assert_eq!(
+            super::mail_support::method(&envelope, "query")["type"],
+            "forbidden"
+        );
+    }
+    let global = app
+        .stalwart_admin(
+            &solace_api_tests::stalwart::REGISTRY,
+            json!([["x:Sharing/get",{"ids":["singleton"]},"s"]]),
+        )
+        .await;
+    assert_eq!(
+        super::mail_support::method(&global, "s")["list"][0]["allowDirectoryQueries"],
+        false
+    );
 }
 
 #[tokio::test]
@@ -449,41 +580,21 @@ async fn bootstrap_service_rules_reject_unusable_keys_and_vaults() {
 }
 
 #[tokio::test]
-async fn an_incomplete_mailbox_is_repaired_by_a_second_bootstrap() {
+async fn an_active_mailbox_without_a_vault_refuses_key_replacement() {
     let app = TestApp::spawn().await;
     let mut owner = mailbox(&app).await;
-    sqlx::query(
-        "DELETE FROM mail_vault_backup WHERE directory_entry_id = \
-         (SELECT id FROM mail_directory_entry WHERE user_id = $1)",
-    )
-    .bind(&owner.user.id)
-    .execute(&app.db)
-    .await
-    .expect("drop the vault");
-    ok(owner
-        .user
-        .get("/api/mail/account/vault-backup")
+    sqlx::query("DELETE FROM mail_vault_backup WHERE directory_entry_id = (SELECT id FROM mail_directory_entry WHERE user_id = $1)")
+        .bind(&owner.user.id).execute(&app.db).await.expect("drop vault");
+    let before = stalwart_account(&app, owner.account_id())
         .await
-        .expect_error(
-            404,
-            "Not Found",
-            "No encrypted vault backup was found for this mailbox.",
-        ));
-
-    let request = bootstrap_request(2);
-    let repaired: MailSignup = ok(bootstrap(&mut owner.user, &request)
+        .expect("account");
+    ok(bootstrap(&mut owner.user, &bootstrap_request(2))
         .await
-        .expect_status(200)
-        .and_then(|r| r.dto()));
-    assert_eq!(
-        repaired.stalwart_account_id, owner.signup.stalwart_account_id,
-        "the Stalwart account is reused"
-    );
-    assert_eq!(repaired.fingerprint, request.fingerprint);
-    assert_eq!(count(&app.db, ENTRY_COUNT, &owner.user.id).await, 1);
-
-    let vault: MailVaultBackup = ok(owner.user.get("/api/mail/account/vault-backup").await.dto());
-    assert_eq!(vault.encrypted_vault_b64, request.encrypted_vault_b64);
+        .expect_error(409, "Conflict", "This mailbox needs operator recovery before its vault can be replaced. Contact support."));
+    let after = stalwart_account(&app, owner.account_id())
+        .await
+        .expect("account preserved");
+    assert_eq!(before["encryptionAtRest"], after["encryptionAtRest"]);
     let fingerprint: String = sqlx::query_scalar(
         "SELECT public_key_fingerprint FROM mail_directory_entry WHERE user_id = $1",
     )
@@ -492,15 +603,8 @@ async fn an_incomplete_mailbox_is_repaired_by_a_second_bootstrap() {
     .await
     .expect("entry");
     assert_eq!(
-        fingerprint, request.fingerprint,
-        "the new key replaces the old"
-    );
-    let remote = stalwart_account(&app, owner.account_id())
-        .await
-        .expect("Stalwart account");
-    assert_eq!(
-        remote["encryptionAtRest"]["publicKey"],
-        json!(repaired.stalwart_public_key_id)
+        fingerprint, owner.signup.fingerprint,
+        "missing vault cannot authorize key rotation"
     );
 }
 
@@ -981,7 +1085,7 @@ async fn mail_tokens_are_stalwart_bearers_for_the_users_own_mailbox() {
     }
     assert_eq!(
         response("settings")[1]["list"][0]["encryptionAtRest"]["@type"],
-        "Aes256"
+        "Enabled"
     );
     for (id, error) in [
         ("administration", "forbidden"),
@@ -1154,40 +1258,26 @@ async fn unknown_addresses_have_no_directory_key() {
 }
 
 #[tokio::test]
-async fn signed_in_callers_resolve_a_missing_directory_entry_from_stalwart() {
+async fn signed_in_callers_cannot_disclose_an_uncommitted_stalwart_key() {
     let app = TestApp::spawn().await;
     let owner = mailbox(&app).await;
     let mut sender = app.user().await;
-    let (armored, fingerprint) = pgp_key(owner_key_index(&owner.signup.fingerprint));
     sqlx::query("DELETE FROM mail_directory_entry WHERE user_id = $1")
         .bind(&owner.user.id)
         .execute(&app.db)
         .await
-        .expect("drop the directory entry");
+        .expect("drop entry");
     let path = format!("/api/mail/keys/{}", owner.user.email);
-
-    ok(app.anonymous().get(&path).await.and_then(|r| {
-        r.expect_error(
-            404,
-            "Not Found",
-            "No internal public key was found for that email.",
-        )
-    }));
-    let key: MailDirectoryKey = ok(sender
+    let missing = "No internal public key was found for that email.";
+    ok(app
+        .anonymous()
         .get(&path)
         .await
-        .expect_status(200)
-        .and_then(|r| r.dto()));
-    assert_eq!(
-        key,
-        MailDirectoryKey {
-            email: owner.user.email.clone(),
-            public_key_armored: armored.trim().to_owned(),
-            fingerprint,
-            source: "internal".into(),
-            trust: "verified".into(),
-        }
-    );
+        .and_then(|r| r.expect_error(404, "Not Found", missing)));
+    ok(sender
+        .get(&path)
+        .await
+        .expect_error(404, "Not Found", missing));
 }
 
 #[tokio::test]
@@ -1240,13 +1330,6 @@ async fn deleting_the_account_removes_the_mailbox_from_stalwart() {
     );
 }
 
-/// Which fixture key a fingerprint belongs to.
-fn owner_key_index(fingerprint: &str) -> usize {
-    (0..4)
-        .find(|index| pgp_key(*index).1 == fingerprint)
-        .expect("fixture fingerprint")
-}
-
 async fn register_passkey(app: &TestApp, user: &mut TestUser) -> SoftPasskey {
     let rp_id = url::Url::parse(&app.origin)
         .ok()
@@ -1285,4 +1368,310 @@ async fn signed_in(app: &TestApp, user: &TestUser) -> TestUser {
         password: user.password.clone(),
         name: user.name.clone(),
     }
+}
+
+#[tokio::test]
+async fn the_provisioner_without_impersonation_cannot_read_an_owner_mailbox() {
+    let app = TestApp::spawn().await;
+    let owner = mailbox(&app).await;
+    let token = solace_api_tests::stalwart::provision_key(&app.env)
+        .await
+        .expect("provisioner key");
+    let mut request = reqwest::Client::new()
+        .post(format!("{}/jmap/", app.env.stalwart_url))
+        .bearer_auth(token);
+    if let Some(key) = &app.env.stalwart_gate_key {
+        request = request.header("X-Solace-Gate", key);
+    }
+    let response: Value = request.json(&json!({
+        "using":["urn:ietf:params:jmap:core","urn:ietf:params:jmap:mail","urn:stalwart:jmap"],
+        "methodCalls":[
+            ["Email/get",{"accountId":owner.account_id(),"ids":[]},"mail"],
+            ["x:PublicKey/get",{"accountId":owner.account_id()},"keys"],
+            ["x:AccountSettings/get",{"accountId":owner.account_id(),"ids":["singleton"]},"settings"]
+        ]
+    })).send().await.expect("provisioner request").json().await.expect("JMAP");
+    for row in response["methodResponses"].as_array().expect("responses") {
+        assert_eq!(row[0], "error", "{response}");
+        assert_eq!(row[1]["type"], "accountNotFound", "{response}");
+    }
+}
+
+#[tokio::test]
+async fn an_expired_public_key_never_activates_or_enters_the_directory() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let mut request = bootstrap_request(0);
+    request.public_key_armored = include_str!("../../fixtures/pgp/expired.asc").into();
+    request.fingerprint = "46C86D9A8658BF1FDBD6856967F2FF641D5DCB7D".into();
+    ok(bootstrap(&mut user, &request).await.expect_status(503));
+    assert_eq!(count(&app.db, ENTRY_COUNT, &user.id).await, 0);
+    let accounts = app.stalwart_admin(&solace_api_tests::stalwart::REGISTRY,json!([["x:Account/query",{"filter":{"name":user.email.split_once('@').expect("email").0}},"q"]])).await;
+    assert_eq!(
+        accounts["methodResponses"][0][1]["ids"],
+        json!([]),
+        "failed new account is cleaned up"
+    );
+}
+
+async fn staged_account(app: &TestApp, user: &TestUser, marker: &str) -> String {
+    let domain = app
+        .stalwart_admin(
+            &solace_api_tests::stalwart::REGISTRY,
+            json!([["x:Domain/query",{"filter":{"name":app.env.mail_domain}},"q"]]),
+        )
+        .await;
+    let domain_id = domain["methodResponses"][0][1]["ids"][0].clone();
+    let created=app.stalwart_admin(&solace_api_tests::stalwart::REGISTRY,json!([["x:Account/set",{"create":{"a":{
+        "@type":"User","name":user.email.split_once('@').expect("email").0,"domainId":domain_id,"description":marker,
+        "roles":{"@type":"User"},"permissions":{"@type":"Merge","enabledPermissions":{},"disabledPermissions":{"emailReceive":true}},
+        "credentials":{"0":{"@type":"Password","secret":"solace-test-staged-original"}}
+    }}},"s"]])).await;
+    created["methodResponses"][0][1]["created"]["a"]["id"]
+        .as_str()
+        .expect("staged account")
+        .to_owned()
+}
+
+#[tokio::test]
+async fn staged_accounts_without_a_directory_are_deleted_with_their_owner() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let account_id = staged_account(
+        &app,
+        &user,
+        &solace_server::integrations::stalwart::admin::managed_marker(&user.id),
+    )
+    .await;
+    ok(user.delete("/api/account").await.expect_status(200));
+    assert!(stalwart_account(&app, &account_id).await.is_none());
+}
+
+#[tokio::test]
+async fn unknown_remote_accounts_are_not_adopted_or_mutated() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let account_id = staged_account(&app, &user, "Unattributed mailbox").await;
+    ok(bootstrap(&mut user, &bootstrap_request(0))
+        .await
+        .expect_status(503));
+    assert_eq!(count(&app.db, ENTRY_COUNT, &user.id).await, 0);
+    let mut request = reqwest::Client::new()
+        .get(format!("{}/jmap/session", app.env.stalwart_url))
+        .basic_auth(&user.email, Some("solace-test-staged-original"));
+    if let Some(key) = &app.env.stalwart_gate_key {
+        request = request.header("X-Solace-Gate", key);
+    }
+    assert!(
+        request
+            .send()
+            .await
+            .expect("original credential")
+            .status()
+            .is_success()
+    );
+    ok(user.delete("/api/account").await.expect_status(200));
+    assert!(
+        stalwart_account(&app, &account_id).await.is_some(),
+        "unattributed remote account is preserved"
+    );
+    app.stalwart_admin(
+        &solace_api_tests::stalwart::REGISTRY,
+        json!([["x:Account/set",{"destroy":[account_id]},"d"]]),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn committed_stages_activate_atomically_but_operator_quarantine_is_preserved() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    app.stalwart_admin(&solace_api_tests::stalwart::REGISTRY,json!([["x:Account/set",{"update":{owner.account_id():{"description":solace_server::integrations::stalwart::admin::managed_marker(&owner.user.id),"permissions":{"@type":"Merge","enabledPermissions":{},"disabledPermissions":{"emailReceive":true}}}}},"s"]])).await;
+    ok(bootstrap(&mut owner.user, &bootstrap_request(2))
+        .await
+        .expect_status(400));
+    let read=app.stalwart_admin(&solace_api_tests::stalwart::REGISTRY,json!([["x:Account/get",{"ids":[owner.account_id()],"properties":["id","description","permissions","encryptionAtRest"]},"g"]])).await;
+    let account = &read["methodResponses"][0][1]["list"][0];
+    assert_ne!(
+        account["permissions"]["disabledPermissions"]["emailReceive"],
+        json!(true)
+    );
+    assert_eq!(
+        account["encryptionAtRest"]["publicKey"],
+        json!(owner.signup.stalwart_public_key_id)
+    );
+    assert_eq!(count(&app.db, ENTRY_COUNT, &owner.user.id).await, 1);
+    assert_eq!(
+        account["description"],
+        json!(format!("Solace activated mailbox v1:{}", owner.user.id))
+    );
+    app.stalwart_admin(&solace_api_tests::stalwart::REGISTRY, json!([["x:Account/set",{"update":{owner.account_id():{"permissions":{"@type":"Merge","enabledPermissions":{},"disabledPermissions":{"emailReceive":true}}}}},"quarantine"]])).await;
+    ok(owner
+        .user
+        .get("/api/mail/oauth/access-token")
+        .await
+        .expect_status(200));
+    ok(bootstrap(&mut owner.user, &bootstrap_request(2))
+        .await
+        .expect_status(400));
+    let quarantined = stalwart_account(&app, owner.account_id())
+        .await
+        .expect("account survives");
+    assert_eq!(
+        quarantined["permissions"]["disabledPermissions"]["emailReceive"],
+        json!(true)
+    );
+}
+
+#[tokio::test]
+async fn empty_uncommitted_stages_can_replace_abandoned_keys() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let marker = solace_server::integrations::stalwart::admin::managed_marker(&user.id);
+    let account_id = staged_account(&app, &user, &marker).await;
+    let original = bootstrap_request(0);
+    let mut create = reqwest::Client::new()
+        .post(format!("{}/jmap/", app.env.stalwart_url))
+        .basic_auth(&user.email, Some("solace-test-staged-original"));
+    if let Some(key) = &app.env.stalwart_gate_key {
+        create = create.header("X-Solace-Gate", key);
+    }
+    let created:Value=create.json(&json!({"using":solace_api_tests::stalwart::REGISTRY,"methodCalls":[["x:PublicKey/set",{"accountId":account_id,"create":{"k":{"key":original.public_key_armored,"description":"Synthetic original"}}},"s"]]})).send().await.expect("owner key create").json().await.expect("created key");
+    let key_id = created["methodResponses"][0][1]["created"]["k"]["id"]
+        .as_str()
+        .expect("key id");
+    let mut enable = reqwest::Client::new()
+        .post(format!("{}/jmap/", app.env.stalwart_url))
+        .basic_auth(&user.email, Some("solace-test-staged-original"));
+    if let Some(gate) = &app.env.stalwart_gate_key {
+        enable = enable.header("X-Solace-Gate", gate);
+    }
+    let enabled: Value = enable.json(&json!({"using":solace_api_tests::stalwart::REGISTRY,"methodCalls":[["x:AccountSettings/set",{"accountId":account_id,"update":{"singleton":{"encryptionAtRest":{"@type":"Enabled","publicKey":key_id,"headerProtection":"none","encryptOnAppend":false,"allowSpamTraining":false}}}},"enabled"]]})).send().await.expect("enable abandoned key").json().await.expect("enabled response");
+    assert!(
+        enabled["methodResponses"][0][1]["updated"]
+            .get("singleton")
+            .is_some()
+    );
+    let replacement = bootstrap_request(1);
+    let signup: MailSignup = ok(bootstrap(&mut user, &replacement)
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_ne!(signup.stalwart_public_key_id, key_id);
+    let secret = bridge_secret(&app.env.mail_bridge_hmac_key, &user.id, &user.email);
+    let mut read = reqwest::Client::new()
+        .post(format!("{}/jmap/", app.env.stalwart_url))
+        .basic_auth(&user.email, Some(secret));
+    if let Some(key) = &app.env.stalwart_gate_key {
+        read = read.header("X-Solace-Gate", key);
+    }
+    let keys:Value=read.json(&json!({"using":solace_api_tests::stalwart::REGISTRY,"methodCalls":[["x:PublicKey/get",{"accountId":account_id,"ids":[key_id]},"g"]]})).send().await.expect("owner key read").json().await.expect("keys");
+    assert_eq!(keys["methodResponses"][0][1]["list"], json!([]));
+    assert_eq!(count(&app.db, ENTRY_COUNT, &user.id).await, 1);
+    assert_eq!(signup.fingerprint, replacement.fingerprint);
+}
+
+#[tokio::test]
+async fn the_bare_management_role_cannot_grant_the_builtin_user_role() {
+    let app = TestApp::spawn().await;
+    let role_ids = app
+        .stalwart_admin(
+            &solace_api_tests::stalwart::REGISTRY,
+            json!([["x:Role/query", {}, "q"]]),
+        )
+        .await;
+    let roles = app
+        .stalwart_admin(
+            &solace_api_tests::stalwart::REGISTRY,
+            json!([["x:Role/get",{"ids":role_ids["methodResponses"][0][1]["ids"]},"g"]]),
+        )
+        .await;
+    let role_id = roles["methodResponses"][0][1]["list"]
+        .as_array()
+        .expect("roles")
+        .iter()
+        .find(|role| role["enabledPermissions"]["sysAccountCreate"] == json!(true))
+        .expect("management role")["id"]
+        .clone();
+    let domain = app
+        .stalwart_admin(
+            &solace_api_tests::stalwart::REGISTRY,
+            json!([["x:Domain/query",{"filter":{"name":app.env.mail_domain}},"q"]]),
+        )
+        .await;
+    let domain_id = domain["methodResponses"][0][1]["ids"][0].clone();
+    let name = format!("bare-provisioner-{}", hex(6));
+    let created=app.stalwart_admin(&solace_api_tests::stalwart::REGISTRY,json!([["x:Account/set",{"create":{"a":{
+        "@type":"User","name":name,"domainId":domain_id,"roles":{"@type":"Custom","roleIds":{role_id.as_str().expect("role id"):true}},
+        "credentials":{"0":{"@type":"Password","secret":"solace-test-bare-provisioner"}}
+    }}},"s"]])).await;
+    let account_id = created["methodResponses"][0][1]["created"]["a"]["id"]
+        .as_str()
+        .expect("bare principal");
+    let mut request = reqwest::Client::new()
+        .post(format!("{}/jmap/", app.env.stalwart_url))
+        .basic_auth(
+            format!("{name}@{}", app.env.mail_domain),
+            Some("solace-test-bare-provisioner"),
+        );
+    if let Some(key) = &app.env.stalwart_gate_key {
+        request = request.header("X-Solace-Gate", key);
+    }
+    let response:Value=request.json(&json!({"using":solace_api_tests::stalwart::REGISTRY,"methodCalls":[["x:Account/set",{"create":{"a":{
+        "@type":"User","name":format!("denied-{}",hex(6)),"domainId":domain_id,"roles":{"@type":"User"},
+        "permissions":{"@type":"Merge","enabledPermissions":{},"disabledPermissions":{"emailReceive":true}}
+    }}},"s"]]})).send().await.expect("bare principal create").json().await.expect("response");
+    assert!(
+        response["methodResponses"][0][1]["created"]["a"].is_null(),
+        "{response}"
+    );
+    assert!(
+        response["methodResponses"][0][1]["notCreated"]["a"].is_object(),
+        "permission subset must refuse User grant: {response}"
+    );
+    app.stalwart_admin(
+        &solace_api_tests::stalwart::REGISTRY,
+        json!([["x:Account/set",{"destroy":[account_id]},"d"]]),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn encryption_policy_drift_does_not_lock_the_owner_out_of_an_active_mailbox() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    app.stalwart_admin(&solace_api_tests::stalwart::REGISTRY,json!([["x:Account/set",{"update":{owner.account_id():{"encryptionAtRest":{"@type":"Disabled"}}}},"drift"]])).await;
+    ok(owner
+        .user
+        .get("/api/mail/oauth/access-token")
+        .await
+        .expect_status(200));
+    let current = stalwart_account(&app, owner.account_id())
+        .await
+        .expect("active account");
+    assert_eq!(current["encryptionAtRest"]["@type"], json!("Disabled"));
+}
+
+#[tokio::test]
+async fn deleting_an_owner_also_removes_activated_mailboxes_missing_from_the_directory() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    let account = owner.account_id().to_owned();
+    sqlx::query("DELETE FROM mail_directory_entry WHERE user_id = $1")
+        .bind(&owner.user.id)
+        .execute(&app.db)
+        .await
+        .expect("simulate lost row");
+    ok(owner.user.delete("/api/account").await.expect_status(200));
+    assert!(stalwart_account(&app, &account).await.is_none());
+}
+
+#[tokio::test]
+async fn missing_explicit_provisioner_credentials_never_provision_a_mailbox() {
+    let app = TestApp::spawn_with_config(|config| config.stalwart_provision_token.clear()).await;
+    let mut user = app.user().await;
+    ok(bootstrap(&mut user, &bootstrap_request(0))
+        .await
+        .expect_status(503));
+    assert_eq!(count(&app.db, ENTRY_COUNT, &user.id).await, 0);
 }

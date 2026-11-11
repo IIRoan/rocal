@@ -14,6 +14,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { StalwartJmapClient } from "../../lib/mail/jmap-client";
 
 const mockToggleSidebar = jest.fn();
+let mockComposeAttachmentFiles: File[] = [];
+let mockQuickReplyFiles: File[] = [];
 let mockAuthNavigationPending = false;
 const mockUseIsMobile = jest.fn(() => false);
 const mockUseSmoothRouter =
@@ -77,11 +79,8 @@ jest.mock("@workspace/ui/components/ui/dropdown-menu", () => {
   const Passthrough = ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   );
-  const PassthroughAsButton = ({
-    children,
-    asChild,
-    ...props
-  }: any) => (asChild ? children : <button {...props}>{children}</button>);
+  const PassthroughAsButton = ({ children, asChild, ...props }: any) =>
+    asChild ? children : <button {...props}>{children}</button>;
   return {
     DropdownMenu: Passthrough,
     DropdownMenuContent: Passthrough,
@@ -185,7 +184,9 @@ jest.mock("@workspace/ui/components/ui/tooltip", () => ({
   TooltipContent: ({ children }: { children: React.ReactNode }) => (
     <span>{children}</span>
   ),
-  SimpleTooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  SimpleTooltip: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 jest.mock("../../components/mail/advanced-search-panel", () => ({
@@ -266,11 +267,25 @@ const mockJmapClient = {
   getAccountSettings: jest.fn<() => Promise<any>>(),
   getStalwartPolicySingletons: jest.fn<() => Promise<any>>(),
   getMailboxes: jest.fn<() => Promise<any>>(),
-  getMailboxMessages: jest.fn<(...args: Parameters<StalwartJmapClient["getMailboxMessages"]>) => Promise<unknown>>(),
+  getMailboxMessages:
+    jest.fn<
+      (
+        ...args: Parameters<StalwartJmapClient["getMailboxMessages"]>
+      ) => Promise<unknown>
+    >(),
   getMessagesByIds: jest.fn<() => Promise<any>>(),
   getThreadMessages: jest.fn<() => Promise<any>>(),
   getIdentities: jest.fn<() => Promise<any>>(),
-  sendMessage: jest.fn<(...args: Parameters<StalwartJmapClient["sendMessage"]>) => Promise<unknown>>(),
+  sendMessage:
+    jest.fn<
+      (
+        ...args: Parameters<StalwartJmapClient["sendMessage"]>
+      ) => Promise<unknown>
+    >(),
+  uploadPreparedAttachment:
+    jest.fn<StalwartJmapClient["uploadPreparedAttachment"]>(),
+  uploadPreparedAttachments:
+    jest.fn<StalwartJmapClient["uploadPreparedAttachments"]>(),
   uploadTextBlob: jest
     .fn<() => Promise<any>>()
     .mockResolvedValue({ blobId: "sealed-blob", size: 64, type: "text/plain" }),
@@ -294,14 +309,22 @@ const mockJmapClient = {
   setMailServerPolicy: jest.fn(),
   syncMailServerPolicy: jest.fn<() => Promise<any>>(),
   clearCachedSession: jest.fn(),
-  searchMailboxMessages: jest.fn<(...args: Parameters<StalwartJmapClient["searchMailboxMessages"]>) => Promise<unknown>>().mockResolvedValue({
-    messages: [],
-    total: 0,
-  }),
-  searchMailboxMessagesWithFilter: jest.fn<() => Promise<any>>().mockResolvedValue({
-    messages: [],
-    total: 0,
-  }),
+  searchMailboxMessages: jest
+    .fn<
+      (
+        ...args: Parameters<StalwartJmapClient["searchMailboxMessages"]>
+      ) => Promise<unknown>
+    >()
+    .mockResolvedValue({
+      messages: [],
+      total: 0,
+    }),
+  searchMailboxMessagesWithFilter: jest
+    .fn<() => Promise<any>>()
+    .mockResolvedValue({
+      messages: [],
+      total: 0,
+    }),
 };
 
 jest.mock("../../lib/mail/jmap-client", () => ({
@@ -317,8 +340,11 @@ jest.mock("../../lib/mail/jmap-client", () => ({
   ),
 }));
 
+const mockVerificationContext = { publicKeyArmored: "public-key-armored", fingerprint: "ABCD1234EF567890", ownAddresses: ["alice@solace.onl"] };
 jest.mock("../../lib/mail/worker-client", () => ({
   mailCryptoWorkerClient: {
+    getVerificationContext: jest.fn(),
+    isVerificationContextCurrent: jest.fn(),
     generateKeyPair: jest.fn(),
     loadVault: jest.fn(),
     encryptForRecipients: jest.fn(),
@@ -339,7 +365,12 @@ jest.mock("../../hooks/use-settings", () => ({
 }));
 
 jest.mock("../../components/mail/mail-sidebar", () => ({
-  MailSidebar: ({ activeMailbox, onSelectMailbox, onCompose, onSignOut }: {
+  MailSidebar: ({
+    activeMailbox,
+    onSelectMailbox,
+    onCompose,
+    onSignOut,
+  }: {
     activeMailbox: { mailboxes: { id: string; name: string }[] } | null;
     onSelectMailbox: (id: string) => void;
     onCompose: () => void;
@@ -390,6 +421,7 @@ jest.mock("../../components/mail/message-reader", () => ({
     message,
     conversationMessages = [],
     onReply,
+    onReplyAll,
     onSendReply,
     onClose,
   }: any) =>
@@ -408,7 +440,13 @@ jest.mock("../../components/mail/message-reader", () => ({
         <button type="button" aria-label="Reply" onClick={onReply}>
           Reply
         </button>
-        <button type="button" onClick={() => void onSendReply?.("Thanks!", [])}>
+        <button type="button" aria-label="Reply all" onClick={onReplyAll}>
+          Reply all
+        </button>
+        <button
+          type="button"
+          onClick={() => void onSendReply?.("Thanks!", mockQuickReplyFiles)}
+        >
           Send reply
         </button>
       </div>
@@ -444,6 +482,7 @@ jest.mock("../../components/mail/compose-dialog", () => {
       setComposeTo,
       setComposeSubject,
       setComposeBody,
+      setComposeAttachments,
     } = useMailCompose();
 
     return (
@@ -462,9 +501,12 @@ jest.mock("../../components/mail/compose-dialog", () => {
           value={composeBody}
           onChange={(e: any) => setComposeBody(e.target.value)}
         />
-        {onExpand ? (
-          <button onClick={onExpand}>Expand compose</button>
-        ) : null}
+        {onExpand ? <button onClick={onExpand}>Expand compose</button> : null}
+        <button
+          onClick={() => setComposeAttachments(mockComposeAttachmentFiles)}
+        >
+          Attach fixture
+        </button>
         <button onClick={() => void onSend()}>Send message</button>
       </div>
     );
@@ -489,6 +531,7 @@ jest.mock("../../hooks/use-smooth-router", () => ({
 }));
 
 import { MailApp } from "../../components/mail/mail-app";
+import { getMailComposeBridge } from "@/components/mail/mail-compose-bridge";
 import { RouteTransitionProvider } from "@/components/route-transition-provider";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { authSessionDataFixture } from "../mocks/auth-session";
@@ -505,8 +548,12 @@ import { toast } from "sonner";
 
 const mockToast = jest.mocked(toast);
 const mockUseSession = jest.mocked(useSession);
-const mockGetSession = jest.mocked<(...args: Parameters<typeof authClient.getSession>) => Promise<unknown>>(authClient.getSession);
-const mockSignOut = jest.mocked<(...args: Parameters<typeof authClient.signOut>) => Promise<unknown>>(authClient.signOut);
+const mockGetSession = jest.mocked<
+  (...args: Parameters<typeof authClient.getSession>) => Promise<unknown>
+>(authClient.getSession);
+const mockSignOut = jest.mocked<
+  (...args: Parameters<typeof authClient.signOut>) => Promise<unknown>
+>(authClient.signOut);
 const mockCompleteAuthNavigation = jest.mocked(completeAuthNavigation);
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
 const mockApi = jest.mocked(mailDemoApiService);
@@ -595,8 +642,75 @@ async function waitForExpectation(
 }
 
 describe("MailApp", () => {
+  it.each(["shortcut", "reader action"])(
+    "%s seeds reply-all Cc through the actual controller and compose bridge",
+    async (source) => {
+      const message = {
+        id: "reply-all-message",
+        subject: "Group plans",
+        from: [{ email: "bob@solace.onl" }],
+        replyTo: [{ email: "reply@solace.onl" }],
+        to: [{ email: "alice@solace.onl" }, { email: "cara@solace.onl" }],
+        cc: [{ email: "dan@solace.onl" }, { email: "cara@solace.onl" }],
+        receivedAt: "2026-11-10T10:00:00Z",
+        textBody: [{ partId: "text" }],
+        bodyValues: { text: { value: "Original group message" } },
+      };
+      mockJmapClient.getMailboxMessages.mockResolvedValue({
+        messages: [message],
+        total: 1,
+      });
+      mockJmapClient.getMessagesByIds.mockResolvedValue([message]);
+      mockJmapClient.getThreadMessages.mockResolvedValue([message]);
+      await renderApp();
+      await waitForExpectation(() =>
+        expect(container.textContent).toContain("Group plans"),
+      );
+      await act(async () => {
+        Array.from(container.querySelectorAll("button"))
+          .find((button) => button.textContent === "Group plans")
+          ?.click();
+      });
+      await waitForExpectation(() =>
+        expect(container.querySelector('[aria-label="Reply"]')).not.toBeNull(),
+      );
+      await act(async () => {
+        if (source === "shortcut")
+          window.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "R", bubbles: true }),
+          );
+        else
+          container
+            .querySelector<HTMLButtonElement>('[aria-label="Reply all"]')
+            ?.click();
+      });
+      await waitForExpectation(() => {
+        expect(getMailComposeBridge()?.getDraft()).toMatchObject({
+          to: "reply@solace.onl",
+          cc: "cara@solace.onl, dan@solace.onl",
+          bcc: "",
+          composeMode: "reply",
+        });
+      });
+      const quote = getMailComposeBridge()?.getDraft().body;
+      await act(async () => getMailComposeBridge()?.clearCompose());
+      await act(async () =>
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "r", bubbles: true }),
+        ),
+      );
+      expect(getMailComposeBridge()?.getDraft()).toMatchObject({
+        to: "reply@solace.onl",
+        cc: "",
+        body: quote,
+      });
+    },
+  );
+
   beforeEach(async () => {
     mockAuthNavigationPending = false;
+    mockComposeAttachmentFiles = [];
+    mockQuickReplyFiles = [];
     clearMailOpenPrefetch();
     await resetMailVaultDatabase();
     container = document.createElement("div");
@@ -748,6 +862,18 @@ describe("MailApp", () => {
       vaultVersion: 1,
       createdAt: "2026-05-06T21:00:00.000Z",
     });
+    mockWorkerClient.getVerificationContext.mockReturnValue(mockVerificationContext);
+    mockWorkerClient.isVerificationContextCurrent.mockReturnValue(true);
+    mockJmapClient.uploadPreparedAttachment.mockReset();
+    mockJmapClient.uploadPreparedAttachment.mockImplementation(
+      async (_session, attachment) => ({
+        blobId: "plain-attachment",
+        name: attachment.filename,
+        type: attachment.contentType,
+        size: attachment.size,
+      }),
+    );
+    mockJmapClient.uploadPreparedAttachments.mockReset();
     mockWorkerClient.loadVault.mockResolvedValue({
       fingerprint: "ABCD1234EF567890",
     });
@@ -762,7 +888,13 @@ describe("MailApp", () => {
     });
     mockJmapClient.bootstrapMailboxState.mockResolvedValue({
       accountSettings: {
-        encryptionAtRest: { "@type": "Aes256" },
+        encryptionAtRest: {
+          "@type": "Enabled",
+          publicKey: "synthetic-key",
+          headerProtection: "none",
+          encryptOnAppend: false,
+          allowSpamTraining: false,
+        },
       },
       emailSettings: null,
       jmapSettings: null,
@@ -775,7 +907,13 @@ describe("MailApp", () => {
       identities: [{ id: "identity-1", email: "alice@solace.onl" }],
     });
     mockJmapClient.getAccountSettings.mockResolvedValue({
-      encryptionAtRest: { "@type": "Aes256" },
+      encryptionAtRest: {
+        "@type": "Enabled",
+        publicKey: "synthetic-key",
+        headerProtection: "none",
+        encryptOnAppend: false,
+        allowSpamTraining: false,
+      },
     });
     mockJmapClient.getStalwartPolicySingletons.mockResolvedValue({
       emailSettings: null,
@@ -856,7 +994,9 @@ describe("MailApp", () => {
       );
       const content = withRouteTransitions ? (
         <RouteTransitionProvider>{app}</RouteTransitionProvider>
-      ) : app;
+      ) : (
+        app
+      );
       root.render(
         strict ? <React.StrictMode>{content}</React.StrictMode> : content,
       );
@@ -919,7 +1059,9 @@ describe("MailApp", () => {
     mockSignOut.mockResolvedValue({ data: { success: true }, error: null });
     await renderApp(true, true);
     await waitForExpectation(() =>
-      expect(container.querySelector('button[aria-label="Sign out"]')).not.toBeNull(),
+      expect(
+        container.querySelector('button[aria-label="Sign out"]'),
+      ).not.toBeNull(),
     );
     const button = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Sign out"]',
@@ -1048,17 +1190,14 @@ describe("MailApp", () => {
     await waitForExpectation(() => {
       expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalled();
     });
-    const payload = mockApi.bootstrapAccountMailbox.mock.calls[0]?.[0] as Record<
-      string,
-      unknown
-    >;
+    const payload = mockApi.bootstrapAccountMailbox.mock
+      .calls[0]?.[0] as Record<string, unknown>;
     expect(payload).not.toHaveProperty("password");
     expect(payload.wrappedSecret).toBe("wrapped:sealed-secret");
     expect(container.textContent).not.toContain("One-time mailbox migration");
   });
 
   it("signs in with JMAP credentials, unlocks the vault, and renders inbox messages", async () => {
-
     await renderApp();
 
     expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
@@ -1077,13 +1216,14 @@ describe("MailApp", () => {
       privateKeyArmored: "private-key-armored",
       privateKeyPassphrase: "sealed-secret",
       publicKeyArmored: "public-key-armored",
+      ownerUserId: "mail-user-1",
+      ownAddresses: ["alice@solace.onl"],
     });
     expect(container.textContent).toContain("Encrypted hello");
     expect(container.textContent).toContain("Inbox");
   });
 
   it("automatically opens a provisioned mailbox when the auth password is still cached", async () => {
-
     await renderApp();
 
     await waitForExpectation(() => {
@@ -1133,12 +1273,17 @@ describe("MailApp", () => {
     expect(searchInput?.value).toBe("");
     expect(container.textContent).toContain("Encrypted hello");
     expect(mockJmapClient.searchMailboxMessages).not.toHaveBeenCalled();
-    expect(mockJmapClient.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
+    expect(
+      mockJmapClient.searchMailboxMessagesWithFilter,
+    ).not.toHaveBeenCalled();
   });
 
   it("runs server search after typing a query without leaving the list empty while loading", async () => {
     let resolveSearch:
-      | ((value: { messages: { id: string; subject: string }[]; total: number }) => void)
+      | ((value: {
+          messages: { id: string; subject: string }[];
+          total: number;
+        }) => void)
       | null = null;
     mockJmapClient.searchMailboxMessages.mockImplementation(
       () =>
@@ -1193,7 +1338,9 @@ describe("MailApp", () => {
     });
 
     await waitForExpectation(() => {
-      expect(mockJmapClient.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
+      expect(
+        mockJmapClient.searchMailboxMessagesWithFilter,
+      ).not.toHaveBeenCalled();
       expect(container.textContent).toContain("Matched hello");
     });
   });
@@ -1242,7 +1389,10 @@ describe("MailApp", () => {
 
   it("shows the search loader while debouncing and after the query changes", async () => {
     let resolveFirstSearch:
-      | ((value: { messages: { id: string; subject: string }[]; total: number }) => void)
+      | ((value: {
+          messages: { id: string; subject: string }[];
+          total: number;
+        }) => void)
       | null = null;
     mockJmapClient.searchMailboxMessages.mockImplementation(
       () =>
@@ -1393,7 +1543,9 @@ describe("MailApp", () => {
       expect(searchInput?.value).toBe("");
       expect(container.textContent).toContain("Encrypted hello");
       expect(mockJmapClient.searchMailboxMessages).not.toHaveBeenCalled();
-      expect(mockJmapClient.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
+      expect(
+        mockJmapClient.searchMailboxMessagesWithFilter,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -1427,7 +1579,9 @@ describe("MailApp", () => {
       setInputValue(searchInput!, "");
     });
 
-    expect(container.textContent).not.toContain("No messages match these filters");
+    expect(container.textContent).not.toContain(
+      "No messages match these filters",
+    );
     expect(container.textContent).toContain("Encrypted hello");
   });
 
@@ -1691,7 +1845,9 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const composeButton = container.querySelector('[aria-label="Compose"]') as HTMLButtonElement | null;
+    const composeButton = container.querySelector(
+      '[aria-label="Compose"]',
+    ) as HTMLButtonElement | null;
     await act(async () => {
       composeButton?.click();
       await Promise.resolve();
@@ -1762,7 +1918,11 @@ describe("MailApp", () => {
         subject: "Hello",
         textBody: "Plaintext body",
         identityId: "identity-1",
-        sentCopyCiphertext: { blobId: "sealed-blob", size: 64, type: "text/plain" },
+        sentCopyCiphertext: {
+          blobId: "sealed-blob",
+          size: 64,
+          type: "text/plain",
+        },
       }),
     );
   });
@@ -1797,9 +1957,9 @@ describe("MailApp", () => {
     });
 
     await waitForExpectation(() => {
-      expect(container.querySelector('input[placeholder="Recipient"]')).not.toBe(
-        null,
-      );
+      expect(
+        container.querySelector('input[placeholder="Recipient"]'),
+      ).not.toBe(null);
     });
   });
 
@@ -1825,9 +1985,9 @@ describe("MailApp", () => {
     });
 
     await waitForExpectation(() => {
-      expect(container.querySelector('input[placeholder="Recipient"]')).not.toBe(
-        null,
-      );
+      expect(
+        container.querySelector('input[placeholder="Recipient"]'),
+      ).not.toBe(null);
     });
 
     expect(container.textContent).not.toContain("App switcher");
@@ -1855,7 +2015,9 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const composeButton = container.querySelector('[aria-label="Compose"]') as HTMLButtonElement | null;
+    const composeButton = container.querySelector(
+      '[aria-label="Compose"]',
+    ) as HTMLButtonElement | null;
     await act(async () => {
       composeButton?.click();
       await Promise.resolve();
@@ -1966,9 +2128,9 @@ describe("MailApp", () => {
       await Promise.resolve();
     });
 
-    const quickReplyButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Send reply",
-    );
+    const quickReplyButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((element) => element.textContent === "Send reply");
 
     await act(async () => {
       quickReplyButton?.click();
@@ -1976,7 +2138,9 @@ describe("MailApp", () => {
     });
 
     await waitForExpectation(() => {
-      expect(container.textContent).toContain("alice@solace.onl|Re: Encrypted hello|Thanks!");
+      expect(container.textContent).toContain(
+        "alice@solace.onl|Re: Encrypted hello|Thanks!",
+      );
     });
   });
 
@@ -2047,12 +2211,16 @@ describe("MailApp", () => {
     });
 
     await waitForExpectation(() => {
-      const textarea = container.querySelector("textarea") as HTMLTextAreaElement | null;
+      const textarea = container.querySelector(
+        "textarea",
+      ) as HTMLTextAreaElement | null;
       expect(textarea?.value).toContain("Hello Alice");
     });
 
     act(() => {
-      const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+      const textarea = container.querySelector(
+        "textarea",
+      ) as HTMLTextAreaElement;
       const descriptor = Object.getOwnPropertyDescriptor(
         HTMLTextAreaElement.prototype,
         "value",
@@ -2112,4 +2280,176 @@ describe("MailApp", () => {
     });
   });
 
+  function attachmentFile(): File {
+    const file = new File(["Synthetic attachment"], "fixture.txt", {
+      type: "text/plain",
+    });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: async () =>
+        new TextEncoder().encode("Synthetic attachment").buffer,
+    });
+    return file;
+  }
+
+  async function composeWithAttachment(
+    recipient: string,
+  ): Promise<HTMLButtonElement> {
+    mockComposeAttachmentFiles = [attachmentFile()];
+    await renderApp();
+    await waitForExpectation(() =>
+      expect(container.textContent).toContain("Encrypted hello"),
+    );
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Compose"]')
+        ?.click(),
+    );
+    const recipientInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder="Recipient"]',
+    );
+    const subjectInput = container.querySelector<HTMLInputElement>(
+      'input[placeholder="Subject"]',
+    );
+    if (!recipientInput || !subjectInput)
+      throw new Error("Missing compose fields");
+    setInputValue(recipientInput, recipient);
+    setInputValue(subjectInput, "Attachment proof");
+    await act(async () => {
+      const body = container.querySelector("textarea");
+      if (!body) throw new Error("Missing compose body");
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(body, "See attached");
+      body.dispatchEvent(new Event("input", { bubbles: true }));
+      Array.from(container.querySelectorAll("button"))
+        .find((button) => button.textContent === "Attach fixture")
+        ?.click();
+    });
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Send message",
+    );
+    if (!button) throw new Error("Missing send action");
+    return button;
+  }
+
+  it("routes encrypted compose attachments through import and ignores a same-session double click", async () => {
+    const button = await composeWithAttachment("bob@solace.onl");
+    let currentAtSubmission = false;
+    mockJmapClient.sendMessage.mockImplementationOnce(async (_session, input) => {
+      currentAtSubmission = input.isCurrent?.() ?? false;
+      return { emailId: "sent", threadId: null, submissionId: "submission" };
+    });
+    await act(async () => {
+      button.click();
+      button.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await waitForExpectation(() =>
+      expect(mockJmapClient.sendMessage).toHaveBeenCalledTimes(1),
+    );
+    const message = mockJmapClient.sendMessage.mock.calls[0]?.[1];
+    expect(message).toMatchObject({
+      sendScope: expect.stringMatching(/^compose:/),
+      textBody: "",
+      pgpMimeMessage: expect.stringContaining("BEGIN PGP MESSAGE"),
+      contentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(currentAtSubmission).toBe(true);
+    expect(message?.isCurrent?.()).toBe(true);
+    expect(message?.isUiCurrent?.()).toBe(false);
+    expect(message?.attachments).toBeUndefined();
+    expect(mockJmapClient.uploadPreparedAttachment).not.toHaveBeenCalled();
+    expect(mockJmapClient.uploadPreparedAttachments).not.toHaveBeenCalled();
+  });
+
+  it("uploads external compose attachments only through the plaintext route", async () => {
+    const button = await composeWithAttachment("peer@example.com");
+    await act(async () => {
+      button.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await waitForExpectation(() =>
+      expect(mockJmapClient.sendMessage).toHaveBeenCalledTimes(1),
+    );
+    expect(mockJmapClient.uploadPreparedAttachment).toHaveBeenCalledTimes(1);
+    expect(mockJmapClient.uploadPreparedAttachment).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.any(Function));
+    expect(mockJmapClient.sendMessage.mock.calls[0]?.[1]).toMatchObject({
+      sendScope: expect.stringMatching(/^compose:/),
+      attachments: [expect.objectContaining({ blobId: "plain-attachment" })],
+      pgpMimeMessage: undefined,
+    });
+  });
+
+  it("keeps a replacement compose's fields when an older send finishes", async () => {
+    const button = await composeWithAttachment("bob@solace.onl");
+    let finish: ((value: { emailId: string; threadId: string | null; submissionId: string }) => void) | undefined;
+    mockJmapClient.sendMessage.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await act(async () => { button.click(); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await waitForExpectation(() => expect(mockJmapClient.sendMessage).toHaveBeenCalledTimes(1));
+    const oldMessage = mockJmapClient.sendMessage.mock.calls[0]?.[1];
+    await act(async () => getMailComposeBridge()?.seedNewMessage({ email: "carol@solace.onl", name: "Carol" }));
+    const subject = container.querySelector<HTMLInputElement>('input[placeholder="Subject"]');
+    if (!subject) throw new Error("Replacement compose did not open");
+    setInputValue(subject, "Replacement subject");
+    await act(async () => {
+      const body = container.querySelector("textarea");
+      if (!body) throw new Error("Replacement body is missing");
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(body, "Keep replacement edits");
+      body.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const replacement = getMailComposeBridge()?.getComposeSessionId();
+    expect(oldMessage?.isCurrent?.()).toBe(true);
+    expect(oldMessage?.isUiCurrent?.()).toBe(false);
+    await act(async () => { finish?.({ emailId: "old-sent", threadId: "old-thread", submissionId: "old-receipt" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(getMailComposeBridge()?.getComposeSessionId()).toBe(replacement);
+    expect(getMailComposeBridge()?.getDraft()).toMatchObject({ to: "Carol <carol@solace.onl>", subject: "Replacement subject", body: "Keep replacement edits" });
+    expect(container.querySelector('input[placeholder="Subject"]')).not.toBeNull();
+  });
+
+  it("stops a stale vault before encrypting or uploading compose attachments", async () => {
+    const button = await composeWithAttachment("peer@example.com");
+    mockWorkerClient.isVerificationContextCurrent.mockReturnValue(false);
+    await act(async () => {
+      button.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(mockWorkerClient.encryptForRecipients).not.toHaveBeenCalled();
+    expect(mockJmapClient.uploadPreparedAttachment).not.toHaveBeenCalled();
+    expect(mockJmapClient.sendMessage).not.toHaveBeenCalled();
+    expect(
+      container.querySelector('input[placeholder="Subject"]'),
+    ).not.toBeNull();
+  });
+
+  it("routes quick-reply attachments through import with a separate session scope", async () => {
+    mockQuickReplyFiles = [attachmentFile()];
+    await renderApp();
+    await waitForExpectation(() =>
+      expect(container.textContent).toContain("Encrypted hello"),
+    );
+    const open = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Encrypted hello",
+    );
+    await act(async () => open?.click());
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Send reply",
+    );
+    await act(async () => {
+      button?.click();
+      button?.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await waitForExpectation(() =>
+      expect(mockJmapClient.sendMessage).toHaveBeenCalledTimes(1),
+    );
+    expect(mockJmapClient.sendMessage.mock.calls[0]?.[1]).toMatchObject({
+      sendScope: expect.stringMatching(/^quick-reply:/),
+      textBody: "",
+      pgpMimeMessage: expect.stringContaining("BEGIN PGP MESSAGE"),
+      contentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(mockJmapClient.uploadPreparedAttachment).not.toHaveBeenCalled();
+    expect(mockJmapClient.uploadPreparedAttachments).not.toHaveBeenCalled();
+  });
 });

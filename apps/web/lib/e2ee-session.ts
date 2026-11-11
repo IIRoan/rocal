@@ -1,3 +1,5 @@
+import { bindMailSendOwner } from "@workspace/calendar-core";
+
 export interface ActiveE2eeSession {
   userId: string;
   deviceId: string;
@@ -21,11 +23,13 @@ export function getActiveE2eeSession(): ActiveE2eeSession | null {
 }
 
 export function setActiveE2eeSession(session: ActiveE2eeSession): void {
+  bindMailSendOwner(session.userId);
   activeE2eeSession = session;
   for (const listener of listeners) listener();
 }
 
 export function clearActiveE2eeSession(): void {
+  bindMailSendOwner(null);
   activeE2eeSession = null;
   for (const listener of listeners) listener();
 }

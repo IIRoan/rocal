@@ -1,4 +1,6 @@
 import {
+  clearMailSendAttempts,
+  discardMailSendAttempt,
   createMailboxNameCipher,
   isSealedMailboxName,
   resolveMailServerPolicy,
@@ -14,6 +16,8 @@ import {
   normalizeJmapSession,
   StalwartJmapClient,
 } from "./jmap-client";
+
+beforeEach(() => clearMailSendAttempts());
 
 describe("buildBearerAuthHeader", () => {
   it("prefixes and trims the access token", () => {
@@ -38,7 +42,9 @@ describe("normalizeJmapSession", () => {
       "https://proxy.example.com/download/{blobId}",
     );
     expect(result.uploadUrl).toBe("https://proxy.example.com/upload/");
-    expect(result.eventSourceUrl).toBe("https://proxy.example.com/eventsource/");
+    expect(result.eventSourceUrl).toBe(
+      "https://proxy.example.com/eventsource/",
+    );
   });
 
   it("preserves non-endpoint fields", () => {
@@ -92,29 +98,32 @@ describe("ensureEncryptOnAppendDisabled", () => {
   };
 
   it("is a no-op when encryptOnAppend is already disabled", async () => {
-    const fetcher = jest.fn(async () =>
-      new Response(
-        JSON.stringify({
-          methodResponses: [
-            [
-              "x:AccountSettings/get",
-              {
-                list: [
-                  {
-                    encryptionAtRest: {
-                      "@type": "Aes256",
-                      publicKey: "pk-1",
-                      encryptOnAppend: false,
+    const fetcher = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [
+              [
+                "x:AccountSettings/get",
+                {
+                  list: [
+                    {
+                      encryptionAtRest: {
+                        "@type": "Enabled",
+                        publicKey: "pk-1",
+                        headerProtection: "none",
+                        encryptOnAppend: false,
+                        allowSpamTraining: false,
+                      },
                     },
-                  },
-                ],
-              },
-              "c1",
+                  ],
+                },
+                "c1",
+              ],
             ],
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
     );
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",
@@ -140,9 +149,11 @@ describe("ensureEncryptOnAppendDisabled", () => {
                   list: [
                     {
                       encryptionAtRest: {
-                        "@type": "Aes256",
+                        "@type": "Enabled",
                         publicKey: "pk-1",
+                        headerProtection: "none",
                         encryptOnAppend: true,
+                        allowSpamTraining: false,
                       },
                     },
                   ],
@@ -179,7 +190,7 @@ describe("ensureEncryptOnAppendDisabled", () => {
     });
 
     await expect(client.ensureEncryptOnAppendDisabled(session)).rejects.toThrow(
-      "Permission denied",
+      "did not confirm the encryption settings update",
     );
   });
 });
@@ -207,7 +218,10 @@ const testMailboxNameCipher = createMailboxNameCipher(
       iv: "iv",
       ciphertext: Buffer.from(JSON.stringify(payload)).toString("base64url"),
     }),
-    decryptJsonPayload: async <T,>(_key: string, payload: { ciphertext: string }) =>
+    decryptJsonPayload: async <T>(
+      _key: string,
+      payload: { ciphertext: string },
+    ) =>
       JSON.parse(Buffer.from(payload.ciphertext, "base64url").toString()) as T,
   },
   "account-key",
@@ -222,7 +236,9 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
   };
 
   function createClient(
-    fetcher: jest.MockedFunction<(url: string, init?: RequestInit) => Promise<Response>>,
+    fetcher: jest.MockedFunction<
+      (url: string, init?: RequestInit) => Promise<Response>
+    >,
   ) {
     return new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",
@@ -253,7 +269,11 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
       "Projects",
     );
 
-    expect(created).toMatchObject({ id: "mbx-9", name: "Projects", role: null });
+    expect(created).toMatchObject({
+      id: "mbx-9",
+      name: "Projects",
+      role: null,
+    });
     const request = parseJmapRequest(fetcher.mock.calls[0][1]);
     expect(request.methodCalls[0][0]).toBe("Mailbox/set");
     const sealed = request.methodCalls[0][1].create.new.name as string;
@@ -276,9 +296,9 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     await expect(client.createMailbox(session, "Projects")).rejects.toThrow(
       "Unlock your encrypted data",
     );
-    await expect(client.renameMailbox(session, "mbx-9", "Work")).rejects.toThrow(
-      "Unlock your encrypted data",
-    );
+    await expect(
+      client.renameMailbox(session, "mbx-9", "Work"),
+    ).rejects.toThrow("Unlock your encrypted data");
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -301,20 +321,26 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
               ],
             ],
           })
-        : jsonOk({ methodResponses: [["Mailbox/set", { updated: { r: null } }, "c1"]] }),
+        : jsonOk({
+            methodResponses: [["Mailbox/set", { updated: { r: null } }, "c1"]],
+          }),
     );
 
     const mailboxes = await createClient(fetcher).getMailboxes(session);
 
-    expect(mailboxes.map((mailbox) => mailbox.name)).toEqual(["Inbox", "Work", "Receipts"]);
+    expect(mailboxes.map((mailbox) => mailbox.name)).toEqual([
+      "Inbox",
+      "Work",
+      "Receipts",
+    ]);
     expect(fetcher).toHaveBeenCalledTimes(2);
     const migration = parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0];
     expect(migration[0]).toBe("Mailbox/set");
     expect(Object.keys(migration[1].update)).toEqual(["r"]);
     expect(String(fetcher.mock.calls[1][1]?.body)).not.toContain("Receipts");
-    await expect(testMailboxNameCipher.open(migration[1].update.r.name)).resolves.toBe(
-      "Receipts",
-    );
+    await expect(
+      testMailboxNameCipher.open(migration[1].update.r.name),
+    ).resolves.toBe("Receipts");
   });
 
   it("renames, deletes, and reorders mailboxes through Mailbox/set", async () => {
@@ -332,17 +358,22 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     await client.updateMailboxSortOrders(session, []);
 
     expect(fetcher).toHaveBeenCalledTimes(3);
-    const renamed = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1];
+    const renamed = parseJmapRequest(fetcher.mock.calls[0][1])
+      .methodCalls[0][1];
     expect(Object.keys(renamed.update)).toEqual(["mbx-9"]);
-    await expect(testMailboxNameCipher.open(renamed.update["mbx-9"].name)).resolves.toBe(
-      "Work",
-    );
+    await expect(
+      testMailboxNameCipher.open(renamed.update["mbx-9"].name),
+    ).resolves.toBe("Work");
     expect(String(fetcher.mock.calls[0][1]?.body)).not.toContain("Work");
-    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1]).toEqual({
+    expect(
+      parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1],
+    ).toEqual({
       accountId: "acc1",
       destroy: ["mbx-9"],
     });
-    expect(parseJmapRequest(fetcher.mock.calls[2][1]).methodCalls[0][1]).toEqual({
+    expect(
+      parseJmapRequest(fetcher.mock.calls[2][1]).methodCalls[0][1],
+    ).toEqual({
       accountId: "acc1",
       update: {
         "mbx-1": { sortOrder: 0 },
@@ -377,11 +408,7 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
             },
             "c1",
           ],
-          [
-            "EmailSubmission/set",
-            { created: { s1: { id: "sub-1" } } },
-            "c2",
-          ],
+          ["EmailSubmission/set", { created: { s1: { id: "sub-1" } } }, "c2"],
         ],
       });
     });
@@ -410,6 +437,7 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     );
 
     const sent = await client.sendMessage(session, {
+      sendScope: "test-compose-session",
       draftsMailboxId: "drafts",
       sentMailboxId: "sent",
       fromEmail: "me@example.com",
@@ -428,10 +456,7 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     });
 
     const sendRequest = parseJmapRequest(fetcher.mock.calls[1][1]);
-    expect(sendRequest.methodCalls.map((call) => call[0])).toEqual([
-      "Email/set",
-      "EmailSubmission/set",
-    ]);
+    expect(sendRequest.methodCalls.map((call) => call[0])).toEqual(["Email/set", "EmailSubmission/set"]);
     const draft = sendRequest.methodCalls[0][1].create.draft1;
     expect(draft.htmlBody).toEqual([{ partId: "html", type: "text/html" }]);
     expect(draft.bodyValues.html.value).toBe(
@@ -451,57 +476,27 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     expect(copy.bodyStructure.subParts[1].blobId).toBe("sealed-copy");
     expect(JSON.stringify(copy)).not.toContain("Hello world");
     expect(JSON.stringify(copy)).not.toContain("blob-uploaded");
-    expect(sendRequest.methodCalls[1][1].onSuccessDestroyEmail).toEqual(["#s1"]);
+    expect(sendRequest.methodCalls[1][1]).toMatchObject({ create: { s1: { emailId: "#draft1", envelope: { mailFrom: { parameters: { ENVID: expect.stringMatching(/^[a-f0-9]{32}$/) } } } } }, onSuccessDestroyEmail: ["#s1"] });
   });
 
-  it("removes the plaintext and its encrypted copy when the submission is refused", async () => {
-    let requests = 0;
-    const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
-      jsonOk({
-        methodResponses:
-          ++requests === 1
-            ? [
-                [
-                  "Email/set",
-                  { created: { draft1: { id: "plain-1" }, sent1: { id: "copy-1" } } },
-                  "c1",
-                ],
-                [
-                  "EmailSubmission/set",
-                  { notCreated: { s1: { type: "forbiddenToSend", description: "Quota" } } },
-                  "c2",
-                ],
-              ]
-            : [["Email/set", { destroyed: ["plain-1", "copy-1"] }, "c1"]],
-      }),
-    );
+  it("removes both refused batch objects and preserves the source draft", async () => {
+    const fetcher = jest.fn(async (_url: string, init?: RequestInit) => {
+      const [method, params, id] = parseJmapRequest(init).methodCalls[0];
+      return params.create ? jsonOk({ methodResponses: [["Email/set", { created: { draft1: { id: "plain-1" }, sent1: { id: "copy-1" } } }, "c1"], ["EmailSubmission/set", { notCreated: { s1: { type: "forbiddenToSend", description: "Quota" } } }, "c2"]] }) : jsonOk({ methodResponses: [[method, { destroyed: params.destroy }, id]] });
+    });
     const client = createClient(fetcher);
     client.setMailServerPolicy(resolveMailServerPolicy());
-
-    await expect(
-      client.sendMessage(session, {
-        draftsMailboxId: "drafts",
-        sentMailboxId: "sent",
-        fromEmail: "me@example.com",
-        to: ["you@example.com"],
-        subject: "Notes",
-        textBody: "Hello world",
-        identityId: "identity-1",
-        sentCopyCiphertext: { blobId: "sealed-copy", size: 900 },
-        previousDraftId: "draft-1",
-      }),
-    ).rejects.toThrow("Quota");
-
+    await expect(client.sendMessage(session, { sendScope: "test-compose-session", draftsMailboxId: "drafts", sentMailboxId: "sent", fromEmail: "me@example.com", to: ["you@example.com"], subject: "Notes", textBody: "Hello world", identityId: "identity-1", sentCopyCiphertext: { blobId: "sealed-copy", size: 900 }, previousDraftId: "draft-1" })).rejects.toThrow("Quota");
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls).toEqual([
-      ["Email/set", { accountId: "acc1", destroy: ["plain-1", "copy-1"] }, "c1"],
-    ]);
+    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls).toEqual([["Email/set", { accountId: "acc1", destroy: ["plain-1", "copy-1"] }, "c1"]]);
   });
 
   it("saves drafts only as PGP/MIME ciphertext", async () => {
     const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
       jsonOk({
-        methodResponses: [["Email/set", { created: { draft1: { id: "draft-2" } } }, "c1"]],
+        methodResponses: [
+          ["Email/set", { created: { draft1: { id: "draft-2" } } }, "c1"],
+        ],
       }),
     );
     const client = createClient(fetcher);
@@ -517,7 +512,8 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
       }),
     ).resolves.toBe("draft-2");
 
-    const draft = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1].create.draft1;
+    const draft = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1]
+      .create.draft1;
     expect(draft.subject).toBe("Plans");
     expect(draft.bodyStructure.type).toBe("multipart/encrypted");
     expect(draft).not.toHaveProperty("textBody");
@@ -534,7 +530,9 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
   };
 
   function createClient(
-    fetcher: jest.MockedFunction<(url: string, init?: RequestInit) => Promise<Response>>,
+    fetcher: jest.MockedFunction<
+      (url: string, init?: RequestInit) => Promise<Response>
+    >,
   ) {
     return new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",
@@ -545,7 +543,9 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
 
   it("restores every original mailbox when undoing a move", async () => {
     const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
-      jsonOk({ methodResponses: [["Email/set", { updated: { m1: null } }, "c1"]] }),
+      jsonOk({
+        methodResponses: [["Email/set", { updated: { m1: null } }, "c1"]],
+      }),
     );
     await createClient(fetcher).restoreMessageMailboxes(session, [
       { id: "m1", mailboxIds: { inbox: true, project: true } },
@@ -596,7 +596,11 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
         methodResponses: [
           [
             "Email/set",
-            { notDestroyed: { m2: { type: "forbidden", description: "Denied" } } },
+            {
+              notDestroyed: {
+                m2: { type: "forbidden", description: "Denied" },
+              },
+            },
             "c1",
           ],
         ],
@@ -605,7 +609,9 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
     await expect(
       createClient(fetcher).bulkDestroyMessages(session, ["m1", "m2"]),
     ).rejects.toThrow("Denied");
-    expect(parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1]).toEqual({
+    expect(
+      parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1],
+    ).toEqual({
       accountId: "acc1",
       destroy: ["m1", "m2"],
     });
@@ -616,11 +622,15 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
       .fn<Promise<Response>, [string, RequestInit?]>()
       .mockResolvedValueOnce(
         jsonOk({
-          methodResponses: [["Email/query", { ids: ["m1", "m2"], total: 2 }, "q1"]],
+          methodResponses: [
+            ["Email/query", { ids: ["m1", "m2"], total: 2 }, "q1"],
+          ],
         }),
       )
       .mockResolvedValueOnce(
-        jsonOk({ methodResponses: [["Email/set", { destroyed: ["m1", "m2"] }, "c1"]] }),
+        jsonOk({
+          methodResponses: [["Email/set", { destroyed: ["m1", "m2"] }, "c1"]],
+        }),
       );
     const count = await createClient(fetcher).emptyMailbox(session, "trash");
 
@@ -629,7 +639,9 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
     const query = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0];
     expect(query[0]).toBe("Email/query");
     expect(query[1].filter).toEqual({ inMailbox: "trash" });
-    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1]).toEqual({
+    expect(
+      parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1],
+    ).toEqual({
       accountId: "acc1",
       destroy: ["m1", "m2"],
     });
@@ -659,9 +671,15 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
 
     expect(result.total).toBe(1);
     expect(result.messages.map((message) => message.id)).toEqual(["m1"]);
-    const [queryCall, getCall] = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls;
+    const [queryCall, getCall] = parseJmapRequest(
+      fetcher.mock.calls[0][1],
+    ).methodCalls;
     expect(queryCall[1].filter).toEqual(filter);
-    expect(queryCall[1]).toMatchObject({ position: 40, limit: 40, calculateTotal: true });
+    expect(queryCall[1]).toMatchObject({
+      position: 40,
+      limit: 40,
+      calculateTotal: true,
+    });
     expect(getCall[1]["#ids"]).toEqual({
       resultOf: "q1",
       name: "Email/query",
@@ -678,7 +696,9 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
         ],
       }),
     );
-    await createClient(fetcher).getMailboxMessages(session, "inbox", { position: 0 });
+    await createClient(fetcher).getMailboxMessages(session, "inbox", {
+      position: 0,
+    });
 
     const get = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[1][1];
     expect(get.properties).toEqual(
@@ -698,7 +718,8 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
     await client.getMessagesByIds(session, ["m1"]);
 
     const rowGet = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1];
-    const detailGet = parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1];
+    const detailGet = parseJmapRequest(fetcher.mock.calls[1][1])
+      .methodCalls[0][1];
     expect(rowGet.properties).not.toContain("bodyValues");
     expect(rowGet).not.toHaveProperty("fetchAllBodyValues");
     expect(detailGet.properties).toContain("bodyValues");
@@ -739,14 +760,19 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
     ]);
 
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1]).toEqual({
+    expect(
+      parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0][1],
+    ).toEqual({
       accountId: "acc1",
       ids: ["t1", "t2"],
     });
     expect(
       parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1].ids,
     ).toEqual(["m1", "m2", "m3", "gone"]);
-    expect(threads.get("t1")?.map((message) => message.id)).toEqual(["m1", "m2"]);
+    expect(threads.get("t1")?.map((message) => message.id)).toEqual([
+      "m1",
+      "m2",
+    ]);
     expect(threads.get("t2")?.map((message) => message.id)).toEqual(["m3"]);
   });
 
@@ -863,5 +889,103 @@ describe("StalwartJmapClient parallel chunked requests", () => {
     expect(tracker.getPeak()).toBe(2);
     expect(singletons.emailSettings).toEqual({ getMaxResults: 50 });
     expect(singletons.jmapSettings).toEqual({ maxMethodCalls: 16 });
+  });
+});
+
+describe("send retries across client rebuilds", () => {
+  const session: JmapSession = { apiUrl: "http://localhost:4001/api/mail/jmap/", accounts: { "runtime-account": {} }, primaryAccounts: { "urn:ietf:params:jmap:mail": "runtime-account" } };
+  const input = { sendScope: "random-compose-session", draftsMailboxId: "drafts", sentMailboxId: "sent", fromEmail: "owner@solace.test", to: ["other@solace.test"], subject: "Runtime rebuild", textBody: "", identityId: "identity", pgpMimeCiphertext: { blobId: "sealed-body", size: 50 }, sentCopyCiphertext: null };
+
+  it("reconciles the same pending send after recreating the JMAP client", async () => {
+    let submissions = 0;
+    let messageId: unknown;
+    let submissionToken: unknown;
+    const fetcher = jest.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { methodCalls: [string, Record<string, unknown>, string][] };
+      const first = body.methodCalls[0];
+      if (!first) throw new Error("Missing method");
+      const [method, params, id] = first;
+      if (method === "Email/set") {
+        submissions += 1;
+        const create = params.create as { draft1: { messageId: unknown } };
+        messageId = create.draft1.messageId;
+        const submission = body.methodCalls[1]?.[1].create as { s1: { envelope: { mailFrom: { parameters: { ENVID: unknown } } } } };
+        submissionToken = submission.s1.envelope.mailFrom.parameters.ENVID;
+        throw new Error("Lost response after acceptance");
+      }
+      const result = method === "Email/query" ? { ids: ["original"], total: 1, position: 0 }
+        : method === "Email/get" ? { list: [{ id: "original", threadId: "thread", messageId }] }
+        : method === "EmailSubmission/query" ? { ids: ["receipt"], total: 1, position: 0 }
+        : { list: [{ id: "receipt", emailId: "original", undoStatus: "final", envelope: { mailFrom: { parameters: { ENVID: submissionToken } } } }] };
+      return new Response(JSON.stringify({ methodResponses: [[method, result, id]] }));
+    });
+    const build = () => {
+      const client = new StalwartJmapClient({ baseUrl: "http://localhost:4001/api/mail/jmap", accessToken: "synthetic-token", fetcher });
+      client.setMailServerPolicy(resolveMailServerPolicy({}));
+      return client;
+    };
+    await expect(build().sendMessage(session, input)).rejects.toThrow("Could not confirm whether");
+    await expect(build().sendMessage(session, input)).resolves.toEqual({ emailId: "original", threadId: "thread", submissionId: "receipt" });
+    expect(submissions).toBe(1);
+  });
+
+  it.each([401, 429])("allows explicit retry after HTTP %s without an automatic submission retry", async (status) => {
+    let requests = 0;
+    const fetcher = jest.fn(async () => {
+      requests += 1;
+      if (requests === 1) return new Response("Request rejected", { status });
+      return new Response(JSON.stringify({ methodResponses: [["Email/set", { created: { draft1: { id: "sent" } } }, "c1"], ["EmailSubmission/set", { created: { s1: { id: "receipt" } } }, "c2"]] }));
+    });
+    const client = new StalwartJmapClient({ baseUrl: "http://localhost:4001/api/mail/jmap", accessToken: "synthetic-token", fetcher });
+    client.setMailServerPolicy(resolveMailServerPolicy({}));
+    await expect(client.sendMessage(session, input)).rejects.toThrow();
+    expect(requests).toBe(1);
+    await expect(client.sendMessage(session, input)).resolves.toMatchObject({ submissionId: "receipt" });
+    expect(requests).toBe(2);
+  });
+});
+
+describe("native upload lifecycle fence", () => {
+  it("does not upload bytes when the vault changes during authorization", async () => {
+    let current = true;
+    let releaseToken: ((token: string) => void) | undefined;
+    let markStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const fetcher = jest.fn(async () => jsonOk({ blobId: "unexpected", size: 1 }));
+    const client = new StalwartJmapClient({ baseUrl: "http://localhost:4001/api/mail/jmap", getAccessToken: async () => {
+      markStarted?.();
+      return new Promise<string>((resolve) => { releaseToken = resolve; });
+    }, fetcher });
+    const session: JmapSession = { apiUrl: "http://localhost:4001/api/mail/jmap/", uploadUrl: "http://localhost:4001/api/mail/upload/{accountId}/", accounts: { owner: {} }, primaryAccounts: { "urn:ietf:params:jmap:mail": "owner" } };
+    const upload = client.uploadBlob(session, new Uint8Array([1]), "message/rfc822", () => current);
+    await started;
+    current = false;
+    releaseToken?.("synthetic-token");
+    await expect(upload).rejects.toThrow("unlocked mailbox changed");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("discarded compose authorization", () => {
+  it("lets an already-authorized command finish and refuses new sends on its discarded scope", async () => {
+    let releaseToken: ((token: string) => void) | undefined;
+    let markStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const fetcher = jest.fn(async () => new Response(JSON.stringify({ methodResponses: [["Email/set", { created: { draft1: { id: "sent" } } }, "c1"], ["EmailSubmission/set", { created: { s1: { id: "accepted" } } }, "c2"]] })));
+    const client = new StalwartJmapClient({ baseUrl: "http://localhost:4001/api/mail/jmap", getAccessToken: async () => {
+      markStarted?.();
+      return new Promise<string>((resolve) => { releaseToken = resolve; });
+    }, fetcher });
+    client.setMailServerPolicy(resolveMailServerPolicy({}));
+    const session: JmapSession = { apiUrl: "http://localhost:4001/api/mail/jmap/", accounts: { owner: {} }, primaryAccounts: { "urn:ietf:params:jmap:mail": "owner" } };
+    const input = { sendScope: "discard-pending-session", draftsMailboxId: "drafts", fromEmail: "owner@solace.test", to: ["other@solace.test"], subject: "Discard", textBody: "", pgpMimeCiphertext: { blobId: "sealed", size: 50 }, identityId: "identity", sentCopyCiphertext: null };
+    const pending = client.sendMessage(session, input);
+    await started;
+    discardMailSendAttempt(input.sendScope);
+    releaseToken?.("synthetic-token");
+    await expect(pending).resolves.toMatchObject({ submissionId: "accepted" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await expect(client.sendMessage(session, input)).rejects.toThrow("finished");
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });

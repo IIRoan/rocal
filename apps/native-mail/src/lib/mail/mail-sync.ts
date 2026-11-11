@@ -1,3 +1,4 @@
+import { captureSessionDataScope, isSessionDataScopeCurrent } from "@workspace/native-core/lib/session-data-lifecycle";
 import type { QueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import {
@@ -189,7 +190,14 @@ async function readPlacements(
 async function runMailboxSync(
   queryClient: QueryClient,
   runtime: MailRuntime,
+  isMutationScopeCurrent: () => boolean,
 ): Promise<void> {
+  const scope = captureSessionDataScope();
+  const isCurrent = () =>
+    isSessionDataScopeCurrent(scope) &&
+    isMutationScopeCurrent() &&
+    queryClient.isMutating() === 0;
+  if (!isCurrent()) return;
   const since = emailState;
   const delta = since
     ? await readEmailDelta(runtime, since).catch(() => null)
@@ -197,16 +205,19 @@ async function runMailboxSync(
 
   if (!delta) {
     // No usable baseline (first run, server state reset, or too many changes): re-anchor, then refresh everything.
-    emailState = await runtime.client.getEmailState(runtime.session);
+    const nextState = await runtime.client.getEmailState(runtime.session);
+    if (!isCurrent()) return;
     // Hidden threads could still hold removed mail that feeds conversation grouping; drop them instead of trusting them.
     queryClient.removeQueries({
       queryKey: QUERY_KEYS.mailThreadsAll(),
       type: "inactive",
     });
     await refreshChangedMail(queryClient, []);
+    if (isCurrent()) emailState = nextState;
     return;
   }
 
+  if (!isCurrent()) return;
   if (
     delta.created.length === 0 &&
     delta.updated.length === 0 &&
@@ -222,15 +233,15 @@ async function runMailboxSync(
     delta.updated.filter((id) => cached.has(id)),
   );
   // A mutation started meanwhile owns the cache; keep the old state so the next run replays this delta.
-  if (queryClient.isMutating() > 0) return;
+  if (!isCurrent()) return;
 
-  emailState = delta.newState;
   applyMailChanges(
     queryClient,
     new Set([...delta.destroyed, ...placements.notFound]),
     new Map(placements.list.map((placement) => [placement.id, placement])),
   );
   await refreshChangedMail(queryClient, [...delta.destroyed, ...delta.updated]);
+  if (isCurrent()) emailState = delta.newState;
 }
 
 /** Silent background reconcile against the server via JMAP Email/changes; one run at a time, skipped while a mutation owns the cache. */
@@ -240,7 +251,17 @@ export function syncMailboxChanges(
 ): Promise<void> {
   if (inflight) return inflight;
   if (queryClient.isMutating() > 0) return Promise.resolve();
-  const run = runMailboxSync(queryClient, runtime).finally(() => {
+  let mutationStarted = false;
+  const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
+    if (event.type === "updated" && event.action.type === "pending")
+      mutationStarted = true;
+  });
+  const run = runMailboxSync(
+    queryClient,
+    runtime,
+    () => !mutationStarted,
+  ).finally(() => {
+    unsubscribe();
     if (inflight === run) inflight = null;
   });
   inflight = run;

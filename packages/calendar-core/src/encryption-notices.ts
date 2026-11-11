@@ -1,3 +1,4 @@
+import { getMailSenderTrustNotice, getMailSignatureVerificationLabel, MAIL_KEY_CONTINUITY_ENABLED, type MailSenderKeyTrustState } from "./mail-key-continuity";
 import { isImportedExternalInvitationEvent } from "./invitation-encryption";
 import type { MessageEncryptionState } from "./mail-types";
 
@@ -102,6 +103,7 @@ type MailSecurityNoticeInput = {
     | "unverified"
     | "failed";
   decryptionFailed: boolean;
+  senderKeyTrustState?: MailSenderKeyTrustState;
 };
 
 export function getMailSecurityNotice(input: MailSecurityNoticeInput): {
@@ -128,6 +130,10 @@ export function getMailSecurityNotice(input: MailSecurityNoticeInput): {
     const origin = input.accountEncryptedAtRest
       ? "Solace may have encrypted it after receipt."
       : "Encryption before delivery is not confirmed.";
+    const trust = input.senderKeyTrustState ?? (MAIL_KEY_CONTINUITY_ENABLED && input.signatureVerificationState === "verified" ? { kind: "unavailable" as const, reason: "history" as const } : undefined);
+    const trustNotice = getMailSenderTrustNotice(trust);
+    const signatureLabel = getMailSignatureVerificationLabel(input.signatureVerificationState ?? "not_signed", trust);
+    if (trustNotice) return { label: `PGP encrypted: ${trustNotice.label.toLowerCase()}`, description: `${protection} ${signatureLabel ? `${signatureLabel}. ` : ""}${trustNotice.description} ${origin}`, tone: "warning" };
     if (input.signatureVerificationState === "failed") {
       return {
         label: "PGP encrypted, signature check failed",
@@ -144,7 +150,7 @@ export function getMailSecurityNotice(input: MailSecurityNoticeInput): {
     }
     const verified = input.signatureVerificationState === "verified";
     return {
-      label: verified ? "PGP encrypted & verified" : "PGP encrypted",
+      label: verified && trust ? `PGP encrypted: ${signatureLabel?.toLowerCase()}` : verified ? "PGP encrypted & verified" : "PGP encrypted",
       description: `${protection} ${verified ? "Signature verified with the sender key on this device. " : ""}${origin}`,
       tone: "encrypted",
     };

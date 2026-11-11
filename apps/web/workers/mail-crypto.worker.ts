@@ -1,18 +1,22 @@
+import {
+  inspectMailPublicKey,
+  MAIL_PGP_KEY_GENERATION_PROFILE,
+} from "@workspace/calendar-core/mail-pgp-key-inspection";
 import * as openpgp from "openpgp";
 import { deriveVaultKeyB64 } from "../lib/mail/vault-kdf";
 import {
-  containsArmoredPgpMessage,
-  MAX_PGP_DECRYPT_LAYERS,
-  mergeSignatureVerificationState,
-  resolveLayerSignatureVerificationState,
+  decryptPgpMessageLayers,
+  MAX_PGP_DECRYPT_BYTES,
 } from "@workspace/calendar-core/mail-pgp-layers";
-import type {
-  MailDecryptResult,
-  MailSignatureVerificationState,
-  MailVaultKdfParams,
-} from "../lib/mail/types";
+import { extractNestedPgpMimeCiphertext } from "../lib/mail/decrypted-mail-content";
+import type { MailDecryptResult, MailVaultKdfParams } from "../lib/mail/types";
 
-let activePrivateKey: openpgp.PrivateKey | null = null;
+import {
+  clearActiveMailVault,
+  encryptForRecipients,
+  getActiveMailPrivateKey,
+  loadActiveMailVault,
+} from "../lib/mail/mail-encryption-engine";
 
 async function handleGenerateKeyPair(payload: {
   name: string;
@@ -21,8 +25,7 @@ async function handleGenerateKeyPair(payload: {
 }) {
   const { privateKey, publicKey, revocationCertificate } =
     await openpgp.generateKey({
-      type: "ecc",
-      curve: "curve25519Legacy",
+      ...MAIL_PGP_KEY_GENERATION_PROFILE,
       userIDs: [{ name: payload.name, email: payload.email }],
       passphrase: payload.privateKeyPassphrase,
     });
@@ -39,113 +42,53 @@ async function handleGenerateKeyPair(payload: {
   };
 }
 
-async function handleLoadActiveVault(payload: {
-  privateKeyArmored: string;
-  privateKeyPassphrase: string;
-  publicKeyArmored: string;
-}) {
-  activePrivateKey = await openpgp.decryptKey({
-    privateKey: await openpgp.readPrivateKey({
-      armoredKey: payload.privateKeyArmored,
-    }),
-    passphrase: payload.privateKeyPassphrase,
-  });
-
-  const fingerprint = (
-    await openpgp.readKey({ armoredKey: payload.publicKeyArmored })
-  )
-    .getFingerprint()
-    .toUpperCase();
-
-  return { fingerprint };
-}
-
 async function handleDecryptMessage(payload: {
   armoredMessage: string;
   senderPublicKeyArmored?: string;
+  expectedVaultFingerprint?: string;
 }) {
+  const activePrivateKey = getActiveMailPrivateKey();
   if (!activePrivateKey) {
     throw new Error("Mail vault is not loaded on this device.");
   }
 
+  if (
+    payload.expectedVaultFingerprint &&
+    activePrivateKey.getFingerprint().toUpperCase() !==
+      payload.expectedVaultFingerprint.toUpperCase()
+  ) {
+    throw new Error("Mail encryption session changed.");
+  }
   const verificationKeys = payload.senderPublicKeyArmored
     ? await openpgp.readKey({ armoredKey: payload.senderPublicKeyArmored })
     : undefined;
 
-  let armoredMessage = payload.armoredMessage.trim();
-  let plaintext = "";
-  let signatureVerificationState: MailSignatureVerificationState = "not_signed";
-
-  for (let layer = 0; layer < MAX_PGP_DECRYPT_LAYERS; layer++) {
-    if (!containsArmoredPgpMessage(armoredMessage)) {
-      plaintext = armoredMessage;
-      break;
-    }
-
-    const message = await openpgp.readMessage({ armoredMessage });
-    const decrypted = await openpgp.decrypt({
-      message,
-      decryptionKeys: activePrivateKey,
-      verificationKeys,
-    });
-
-    plaintext =
-      typeof decrypted.data === "string"
-        ? decrypted.data
-        : new TextDecoder().decode(decrypted.data as Uint8Array);
-
-    const layerSignatureState = await resolveLayerSignatureVerificationState({
-      signatures: decrypted.signatures,
-      hasVerificationKey: Boolean(verificationKeys),
-    });
-    signatureVerificationState = mergeSignatureVerificationState(
-      signatureVerificationState,
-      layerSignatureState,
-    );
-
-    if (!containsArmoredPgpMessage(plaintext)) {
-      break;
-    }
-
-    armoredMessage = plaintext.trim();
-  }
-
-  if (!plaintext) {
-    throw new Error("PGP decryption did not return any plaintext.");
-  }
-
-  return {
-    plaintext,
-    hasVerifiedSignature: signatureVerificationState === "verified",
-    signatureVerificationState,
-  } satisfies MailDecryptResult;
-}
-
-async function handleEncryptForRecipients(payload: {
-  plaintext: string;
-  recipientPublicKeysArmored: string[];
-}) {
-  if (!activePrivateKey) {
-    throw new Error("Mail vault is not loaded on this device.");
-  }
-
-  const encryptionKeys = await Promise.all(
-    payload.recipientPublicKeysArmored.map((armoredKey) =>
-      openpgp.readKey({ armoredKey }),
-    ),
-  );
-  const armoredMessage = await openpgp.encrypt({
-    message: await openpgp.createMessage({ text: payload.plaintext }),
-    encryptionKeys,
-    signingKeys: activePrivateKey,
-  });
-
-  return { armoredMessage };
-}
-
-function clearActiveVault() {
-  activePrivateKey = null;
-  return { cleared: true };
+  const result = (await decryptPgpMessageLayers({
+    armoredMessage: payload.armoredMessage,
+    extractMimeCiphertext: extractNestedPgpMimeCiphertext,
+    decryptLayer: async (armoredMessage) => {
+      const decrypted = await openpgp.decrypt({
+        message: await openpgp.readMessage({
+          armoredMessage,
+          config: { maxDecompressedMessageSize: MAX_PGP_DECRYPT_BYTES },
+        }),
+        decryptionKeys: activePrivateKey,
+        verificationKeys,
+        config: { maxDecompressedMessageSize: MAX_PGP_DECRYPT_BYTES },
+      });
+      return {
+        plaintext:
+          typeof decrypted.data === "string"
+            ? decrypted.data
+            : new TextDecoder().decode(decrypted.data),
+        signatures: decrypted.signatures,
+        hasVerificationKey: Boolean(verificationKeys),
+      };
+    },
+  })) satisfies MailDecryptResult;
+  if (getActiveMailPrivateKey() !== activePrivateKey)
+    throw new Error("Mail encryption session changed.");
+  return result;
 }
 
 async function handleDeriveVaultKey(payload: {
@@ -156,7 +99,20 @@ async function handleDeriveVaultKey(payload: {
   return { keyB64 };
 }
 
+async function handleInspectPublicKey(payload: {
+  armoredKey: string;
+  knownArmoredKey?: string;
+  forEncryption: boolean;
+}) {
+  return inspectMailPublicKey(payload, openpgp);
+}
+
 type MailCryptoWorkerRequest =
+  | {
+      requestId: number;
+      type: "INSPECT_PUBLIC_KEY";
+      payload: Parameters<typeof handleInspectPublicKey>[0];
+    }
   | {
       requestId: number;
       type: "GENERATE_PGP_KEYPAIR";
@@ -165,7 +121,7 @@ type MailCryptoWorkerRequest =
   | {
       requestId: number;
       type: "LOAD_ACTIVE_VAULT";
-      payload: Parameters<typeof handleLoadActiveVault>[0];
+      payload: Parameters<typeof loadActiveMailVault>[0];
     }
   | {
       requestId: number;
@@ -175,7 +131,7 @@ type MailCryptoWorkerRequest =
   | {
       requestId: number;
       type: "ENCRYPT_FOR_RECIPIENTS";
-      payload: Parameters<typeof handleEncryptForRecipients>[0];
+      payload: Parameters<typeof encryptForRecipients>[0];
     }
   | { requestId: number; type: "CLEAR_ACTIVE_VAULT" }
   | {
@@ -192,20 +148,23 @@ self.onmessage = async (event: MessageEvent<MailCryptoWorkerRequest>) => {
     let result: unknown;
 
     switch (request.type) {
+      case "INSPECT_PUBLIC_KEY":
+        result = await handleInspectPublicKey(request.payload);
+        break;
       case "GENERATE_PGP_KEYPAIR":
         result = await handleGenerateKeyPair(request.payload);
         break;
       case "LOAD_ACTIVE_VAULT":
-        result = await handleLoadActiveVault(request.payload);
+        result = await loadActiveMailVault(request.payload);
         break;
       case "DECRYPT_PGP_MESSAGE":
         result = await handleDecryptMessage(request.payload);
         break;
       case "ENCRYPT_FOR_RECIPIENTS":
-        result = await handleEncryptForRecipients(request.payload);
+        result = await encryptForRecipients(request.payload);
         break;
       case "CLEAR_ACTIVE_VAULT":
-        result = clearActiveVault();
+        result = clearActiveMailVault();
         break;
       case "DERIVE_VAULT_KEY":
         result = await handleDeriveVaultKey(request.payload);

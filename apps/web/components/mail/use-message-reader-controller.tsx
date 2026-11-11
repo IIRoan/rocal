@@ -1,5 +1,7 @@
 "use client";
 
+import { limitMailDisplayContent } from "@workspace/calendar-core/mail-mime-limits";
+
 import {
   useEffect,
   useLayoutEffect,
@@ -418,7 +420,11 @@ export function useMessageReaderController(props: MessageReaderProps) {
       }
       dispatchMessageUi({ type: "patch", patch: { isSendingReply: true } });
       try {
-        await onSendReply(replyText, attachedFiles);
+        const current = await onSendReply(replyText, attachedFiles);
+        if (current === false) {
+          dispatchMessageUi({ type: "patch", patch: { isSendingReply: false } });
+          return;
+        }
         dispatchMessageUi({
           type: "patch",
           patch: {
@@ -474,11 +480,15 @@ export function useMessageReaderController(props: MessageReaderProps) {
   };
 
   const _earlyBodies = message ? extractMessageBodies(message) : null;
+  const limitedBodies = limitMailDisplayContent({
+    html: decryptedHtml ?? (_earlyBodies?.html || ""),
+    text: plaintext ?? (_earlyBodies?.text || ""),
+  });
   const _displayHtml = cleanInviteMailHtml(
-    decryptedHtml ?? (_earlyBodies?.html || ""),
+    limitedBodies.html ?? "",
   );
   const _displayText = cleanInviteMailText(
-    plaintext ?? (_earlyBodies?.text || ""),
+    limitedBodies.text ?? "",
   );
 
   const { body: plaintextBody, quote: plaintextQuote } = splitPlaintextQuote(

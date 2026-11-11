@@ -69,6 +69,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(config))
         .routes(routes!(directory_key))
         .routes(routes!(access_token))
+        .merge(super::trust::routes())
         .merge(super::proxy::routes())
         .merge(super::sync::routes())
         .merge(super::realtime::routes())

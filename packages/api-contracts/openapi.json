@@ -1161,6 +1161,82 @@
         }
       }
     },
+    "/api/health/mail-key-expiry": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Fresh complete user-directory cycles without keys expired or expiring within fourteen days.",
+        "operationId": "getMailKeyExpiryHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/mail-policy": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Fresh complete metadata cycles without encryption-policy drift; never gates mail delivery.",
+        "operationId": "getMailPolicyHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/stalwart/admin-access": {
       "get": {
         "tags": [
@@ -1601,6 +1677,53 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/mail/trust": {
+      "get": {
+        "tags": [
+          "Mail"
+        ],
+        "operationId": "getMailTrust",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailTrust"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Mail"
+        ],
+        "operationId": "putMailTrust",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutMailTrustRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailTrust"
+                }
+              }
+            }
+          },
+          "409": {}
         }
       }
     },
@@ -5771,6 +5894,22 @@
           }
         }
       },
+      "MailTrust": {
+        "type": "object",
+        "description": "The account's opaque encrypted correspondent-key history.",
+        "required": [
+          "encryptedTrust"
+        ],
+        "properties": {
+          "encryptedTrust": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1400000
+          }
+        }
+      },
       "MailVaultBackup": {
         "type": "object",
         "description": "`GET /api/mail/account/vault-backup` and the answer of its `PUT`.",
@@ -6458,6 +6597,28 @@
             "type": "integer",
             "format": "int32",
             "description": "Defaults to 1 on the first upload and is kept when omitted later."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PutMailTrustRequest": {
+        "type": "object",
+        "required": [
+          "encryptedTrust",
+          "expectedEncryptedTrust"
+        ],
+        "properties": {
+          "encryptedTrust": {
+            "type": "string",
+            "maxLength": 1400000,
+            "minLength": 1
+          },
+          "expectedEncryptedTrust": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1400000
           }
         },
         "additionalProperties": false

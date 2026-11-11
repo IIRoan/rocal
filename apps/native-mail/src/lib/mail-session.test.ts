@@ -1,3 +1,5 @@
+import { clearMailSendAttempts, getMailSendAttemptStore } from "@workspace/calendar-core";
+import { activateSessionData } from "@workspace/native-core/lib/session-data-lifecycle";
 import { QueryClient } from "@tanstack/react-query";
 import { MAIL_AUTH_LIFECYCLE, prepareMailSession, restoreMailSession } from "./mail-session";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
@@ -62,8 +64,20 @@ describe("restoreMailSession", () => {
   const input = { queryClient, userId: "u1", isCancelled: () => false };
   const snapshot = { emailState: "s1" };
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => { activateSessionData("u1"); clearMailSendAttempts(); jest.clearAllMocks(); mockLoadSnapshot.mockReset(); });
   afterEach(() => queryClient.clear());
+
+  it("cancels an old owner's pending attempt on account switch without sign-out", async () => {
+    mockLoadSnapshot.mockResolvedValueOnce(null);
+    await restoreMailSession(input);
+    const previous = getMailSendAttemptStore("stalwart-one").get("pending-scope", "owner@solace.test");
+    mockLoadSnapshot.mockResolvedValueOnce(null);
+    await restoreMailSession(input);
+    expect(getMailSendAttemptStore("stalwart-one").get("pending-scope", "owner@solace.test")).toBe(previous);
+    activateSessionData("u2");
+    expect(previous.cancelled).toBe(true);
+    expect(getMailSendAttemptStore("stalwart-one").get("pending-scope", "owner@solace.test")).not.toBe(previous);
+  });
 
   it("hydrates the current session", async () => {
     mockLoadSnapshot.mockResolvedValueOnce(snapshot);
@@ -109,22 +123,25 @@ describe("restoreMailSession", () => {
     "discards a pending snapshot after %s",
     async (reason) => {
       let finish: (value: typeof snapshot) => void = () => undefined;
-      mockLoadSnapshot.mockReturnValueOnce(
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-      );
+      let markLoaded: (() => void) | undefined;
+      const loaded = new Promise<void>((resolve) => { markLoaded = resolve; });
+      mockLoadSnapshot.mockImplementationOnce(() => {
+        markLoaded?.();
+        return new Promise((resolve) => { finish = resolve; });
+      });
       let cancelled = false;
       const restore = restoreMailSession({
         ...input,
         isCancelled: () => cancelled,
       });
+      await loaded;
       if (reason === "sign-out") {
         await MAIL_AUTH_LIFECYCLE.onSignedOut?.();
       } else if (reason === "cancellation") {
         cancelled = true;
       } else {
         mockLoadSnapshot.mockResolvedValueOnce(null);
+        activateSessionData("u2");
         await restoreMailSession({ ...input, userId: "u2" });
       }
       finish(snapshot);
