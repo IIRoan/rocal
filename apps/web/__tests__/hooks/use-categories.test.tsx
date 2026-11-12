@@ -33,6 +33,7 @@ import { calendarApiService } from "../../lib/calendar-api-service";
 import { EVENTS_QUERY_KEY } from "../../hooks/use-calendar-events-loader";
 import {
   useCategories,
+  useCategoryDeletePending,
   useCreateCategory,
   useDeleteCategory,
   useUpdateCategory,
@@ -222,4 +223,59 @@ describe("useCategories", () => {
 
     expect(cachedCategories()?.map((entry) => entry.id)).toEqual(["cat-1"]);
   });
+
+  it.each(["resolve", "reject"] as const)(
+    "keeps the deletion pending after its observer unmounts, then clears it on %s",
+    async (outcome) => {
+      queryClient.setQueryData(CATEGORIES_QUERY_KEY, [category({})]);
+      let settle: ((succeeded: boolean) => void) | undefined;
+      mockDeleteCategory.mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            settle = (succeeded) =>
+              succeeded
+                ? resolve({ success: true, message: "ok" })
+                : reject(new Error("boom"));
+          }),
+      );
+      const pending: boolean[] = [];
+      let mutate: ((id: string) => void) | undefined;
+      function Editor() {
+        mutate = useDeleteCategory().mutate;
+        return null;
+      }
+      function List({ editing }: { editing: boolean }) {
+        pending.push(useCategoryDeletePending());
+        return editing ? <Editor /> : null;
+      }
+      const render = (editing: boolean) =>
+        act(() => {
+          root.render(
+            <QueryClientProvider client={queryClient}>
+              <List editing={editing} />
+            </QueryClientProvider>,
+          );
+        });
+
+      render(true);
+      expect(pending.at(-1)).toBe(false);
+      await act(async () => {
+        mutate?.("cat-1");
+        await Promise.resolve();
+      });
+      render(false);
+      expect(pending.at(-1)).toBe(true);
+      expect(cachedCategories()).toEqual([]);
+
+      await act(async () => {
+        settle?.(outcome === "resolve");
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(pending.at(-1)).toBe(false);
+      expect(cachedCategories()?.map((entry) => entry.id)).toEqual(
+        outcome === "resolve" ? [] : ["cat-1"],
+      );
+    },
+  );
 });

@@ -16,6 +16,7 @@ import { cn } from "@workspace/ui/lib/utils";
 
 import {
   useCategories,
+  useCategoryDeletePending,
   useCategoryUsageCounts,
   useCreateCategory,
   useDeleteCategory,
@@ -80,6 +81,7 @@ function CategoriesListView({
   const categoriesQuery = useCategories();
   const categories = categoriesQuery.data ?? [];
   const usage = useCategoryUsageCounts().data;
+  const deleting = useCategoryDeletePending();
 
   const handleRetry = async () => {
     try {
@@ -96,9 +98,15 @@ function CategoriesListView({
           icon={Plus}
           label="Create New Category"
           onClick={onCreate}
+          disabled={deleting}
         />
       </PaletteSection>
       <PaletteSection label="Your Categories">
+        {deleting && (
+          <div role="status" className="px-2 py-2 text-[13px] leading-[130%] text-muted-foreground">
+            Deleting category…
+          </div>
+        )}
         {categoriesQuery.isLoading ? (
           <PaletteEmptyState>Loading categories…</PaletteEmptyState>
         ) : categoriesQuery.isError ? (
