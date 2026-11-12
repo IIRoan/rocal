@@ -34,6 +34,7 @@ mod profiles;
 mod push_devices;
 mod recurring;
 mod riftbound;
+mod search_token_retirement;
 mod settings;
 mod stalwart_webhook;
 mod subscriptions;

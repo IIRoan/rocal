@@ -5,6 +5,8 @@ mod m20261028_120000_encrypted_only_content;
 mod m20261029_120000_drop_unused_storage;
 mod m20261030_120000_encrypted_settings_preferences;
 mod m20261030_130000_sealed_reminder_lead;
+mod m20261106_121932_clear_search_tokens;
+mod m20261110_085151_discard_search_tokens;
 mod m20261110_160000_encrypted_mail_trust;
 mod m20261110_170000_mail_policy_monitor;
 
@@ -27,6 +29,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20261030_130000_sealed_reminder_lead::Migration),
             Box::new(m20261110_160000_encrypted_mail_trust::Migration),
             Box::new(m20261110_170000_mail_policy_monitor::Migration),
+            // These keep their original names because databases may have recorded them; they apply after the shipped mail migrations.
+            Box::new(m20261106_121932_clear_search_tokens::Migration),
+            Box::new(m20261110_085151_discard_search_tokens::Migration),
         ]
     }
 }
@@ -122,5 +127,133 @@ mod tests {
         let applied = Migrator::get_applied_migrations(&scratch.db).await.unwrap();
         assert_eq!(applied.len(), Migrator::migrations().len());
         let _ = other.close().await;
+    }
+
+    /// The search-token retirements, which databases migrated by earlier releases have never applied.
+    const RETIREMENTS: [&str; 2] = [
+        "m20261106_121932_clear_search_tokens",
+        "m20261110_085151_discard_search_tokens",
+    ];
+
+    async fn history(db: &DatabaseConnection) -> Vec<(String, i64)> {
+        let mut rows: Vec<_> = Migrator::get_migration_models(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.version, row.applied_at))
+            .collect();
+        rows.sort();
+        rows
+    }
+
+    async fn tokens(db: &DatabaseConnection, table: &str) -> Vec<Option<String>> {
+        db.query_all_raw(Statement::from_string(
+            sea_orm::DbBackend::Postgres,
+            format!("SELECT blind_index_tokens FROM {table} ORDER BY id"),
+        ))
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.try_get("", "blind_index_tokens").unwrap())
+        .collect()
+    }
+
+    #[tokio::test]
+    async fn an_earlier_release_database_gains_the_token_retirements_and_keeps_its_history() {
+        use sea_orm::{ActiveModelTrait, Set};
+        use sea_orm_migration::{SchemaManager, seaql_migrations};
+
+        let scratch = ScratchDatabase::empty().await;
+        // Recreate that release's history by name: every other migration applied and recorded, each with its own timestamp.
+        Migrator::install(&scratch.db).await.unwrap();
+        let manager = SchemaManager::new(&scratch.db);
+        for (index, migration) in Migrator::migrations().iter().enumerate() {
+            if RETIREMENTS.contains(&migration.name()) {
+                continue;
+            }
+            migration.up(&manager).await.unwrap();
+            seaql_migrations::ActiveModel {
+                version: Set(migration.name().to_owned()),
+                applied_at: Set(1_000 + i64::try_from(index).unwrap()),
+            }
+            .insert(&scratch.db)
+            .await
+            .unwrap();
+        }
+        let before = history(&scratch.db).await;
+        assert!(
+            before
+                .iter()
+                .all(|(version, _)| !RETIREMENTS.contains(&version.as_str()))
+        );
+        for shipped in [
+            "m20261110_160000_encrypted_mail_trust",
+            "m20261110_170000_mail_policy_monitor",
+        ] {
+            assert!(
+                before.iter().any(|(version, _)| version == shipped),
+                "{shipped} missing from the earlier history"
+            );
+        }
+        scratch
+            .db
+            .execute_unprepared(
+                r#"
+INSERT INTO "user" (id, name, email, updated_at) VALUES ('owner', 'Test', 'owner@solace.test', now());
+INSERT INTO calendar (id, name, color, user_id, updated_at, blind_index_tokens)
+VALUES ('calendar', '', 'blue', 'owner', now(), '["old"]');
+INSERT INTO calendar_event (id, title, start, "end", calendar_id, user_id, updated_at, blind_index_tokens)
+VALUES ('event', '', now(), now(), 'calendar', 'owner', now(), '["old"]');
+INSERT INTO event_category (id, name, color, user_id, updated_at, blind_index_tokens)
+VALUES ('category', '', 'blue', 'owner', now(), '["old"]');
+"#,
+            )
+            .await
+            .unwrap();
+
+        migrate(&scratch.db).await.unwrap();
+
+        let after = history(&scratch.db).await;
+        assert_eq!(after.len(), Migrator::migrations().len());
+        for entry in &before {
+            assert!(after.contains(entry), "history lost or rewrote {entry:?}");
+        }
+        for name in RETIREMENTS {
+            assert!(
+                after.iter().any(|(version, _)| version == name),
+                "{name} not recorded"
+            );
+        }
+        // Read before any later write, so the trigger cannot stand in for the purge.
+        for table in ["calendar", "calendar_event", "event_category"] {
+            let values = tokens(&scratch.db, table).await;
+            assert!(
+                !values.is_empty() && values.iter().all(Option::is_none),
+                "{table} kept tokens after the upgrade: {values:?}"
+            );
+        }
+        // The trigger also discards any an older API instance writes afterwards.
+        scratch
+            .db
+            .execute_unprepared(
+                r#"
+UPDATE calendar SET blind_index_tokens = '["late"]';
+INSERT INTO calendar_event (id, title, start, "end", calendar_id, user_id, updated_at, blind_index_tokens)
+VALUES ('later', '', now(), now(), 'calendar', 'owner', now(), '["late"]');
+UPDATE event_category SET blind_index_tokens = '["late"]';
+"#,
+            )
+            .await
+            .unwrap();
+        for table in ["calendar", "calendar_event", "event_category"] {
+            let values = tokens(&scratch.db, table).await;
+            assert!(
+                !values.is_empty() && values.iter().all(Option::is_none),
+                "{table}: {values:?}"
+            );
+        }
+
+        migrate(&scratch.db).await.unwrap();
+        assert_eq!(history(&scratch.db).await, after);
     }
 }

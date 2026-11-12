@@ -12,6 +12,8 @@ use crate::events::ParticipantInput;
 pub struct CalendarSubscription {
     pub id: SubscriptionId,
     pub name: String,
+    /// An opaque revision of the two stored names, bound to this subscription and never persisted.
+    pub name_revision: String,
     pub url: String,
     pub is_active: bool,
     pub sync_interval_minutes: i32,
@@ -71,10 +73,20 @@ pub struct SyncLogCount {
     pub sync_logs: i64,
 }
 
+/// Current clients send `encryptedName`; a readable `name` is only accepted from shipped binaries.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateSubscriptionRequest {
-    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub name: Option<String>,
+    /// The name sealed as a calendar name; stored on the mirrored calendar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub encrypted_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub encryption_key_version: Option<i32>,
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
@@ -84,9 +96,20 @@ pub struct CreateSubscriptionRequest {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateSubscriptionRequest {
+    /// A readable rename from a shipped binary; refused once the name is sealed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub encrypted_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub encryption_key_version: Option<i32>,
+    /// Background sealing may replace only the names read with this revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub expected_name_revision: Option<String>,
     /// Recolors the mirrored calendar.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]

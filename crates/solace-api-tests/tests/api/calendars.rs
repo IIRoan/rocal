@@ -765,8 +765,8 @@ async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
     assert_eq!(created.name, "");
     assert_eq!(created.encrypted_name.as_deref(), Some(ciphertext));
     assert_eq!(
-        created.blind_index_tokens.as_deref(),
-        Some(r#"["idx-1","idx-2"]"#)
+        created.blind_index_tokens, None,
+        "search tokens from a shipped binary are dropped"
     );
     assert_eq!(
         created.encryption_state, "encrypted",
@@ -776,11 +776,11 @@ async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
     let row = calendar_row(&app.db, &created.id.0).await.expect("row");
     assert_eq!(row["name"], json!(""));
     assert_eq!(row["encrypted_name"], json!(ciphertext));
-    assert_eq!(row["blind_index_tokens"], json!(r#"["idx-1","idx-2"]"#));
+    assert_eq!(row["blind_index_tokens"], json!(null));
     assert_eq!(row["encryption_state"], json!("encrypted"));
     assert_eq!(row["encryption_key_version"], json!(2));
 
-    // Tokens default to [] and the key version to 1.
+    // The key version defaults to 1.
     let blank = create_calendar_with(
         &mut user,
         &CreateCalendarRequest {
@@ -791,7 +791,7 @@ async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
     )
     .await;
     assert_eq!(blank.name, "");
-    assert_eq!(blank.blind_index_tokens.as_deref(), Some("[]"));
+    assert_eq!(blank.blind_index_tokens, None);
     assert_eq!(blank.encryption_key_version, 1);
     assert_ne!(
         blank.id, created.id,
@@ -936,10 +936,15 @@ async fn updates_change_only_the_given_fields() {
     );
 }
 #[tokio::test]
-async fn a_new_ciphertext_name_replaces_tokens_and_key_version() {
+async fn a_new_ciphertext_name_replaces_the_key_version_and_clears_stored_tokens() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let created = create_calendar(&mut user, "blue").await;
+    sqlx::query("UPDATE calendar SET blind_index_tokens = '[\"old\"]' WHERE id = $1")
+        .bind(&created.id.0)
+        .execute(&app.db)
+        .await
+        .expect("seed tokens an older server stored");
 
     let updated = update_calendar(
         &mut user,
@@ -954,7 +959,7 @@ async fn a_new_ciphertext_name_replaces_tokens_and_key_version() {
     .await;
     assert_eq!(updated.name, "");
     assert_eq!(updated.encrypted_name.as_deref(), Some("ciphertext"));
-    assert_eq!(updated.blind_index_tokens.as_deref(), Some(r#"["idx-1"]"#));
+    assert_eq!(updated.blind_index_tokens, None);
     assert_eq!(
         (
             updated.encryption_state.as_str(),
@@ -969,10 +974,10 @@ async fn a_new_ciphertext_name_replaces_tokens_and_key_version() {
             &row["encrypted_name"],
             &row["blind_index_tokens"]
         ),
-        (&json!(""), &json!("ciphertext"), &json!(r#"["idx-1"]"#))
+        (&json!(""), &json!("ciphertext"), &json!(null))
     );
 
-    // Omitted tokens and key version fall back to [] and 1 on every ciphertext upload.
+    // An omitted key version falls back to 1 on every ciphertext upload.
     let again = update_calendar(
         &mut user,
         &created.id.0,
@@ -982,7 +987,7 @@ async fn a_new_ciphertext_name_replaces_tokens_and_key_version() {
         },
     )
     .await;
-    assert_eq!(again.blind_index_tokens.as_deref(), Some("[]"));
+    assert_eq!(again.blind_index_tokens, None);
     assert_eq!(again.encryption_key_version, 1);
 }
 

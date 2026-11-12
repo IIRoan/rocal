@@ -98,7 +98,6 @@ export const encryptedIcsImportEventSchema = z.object({
   allDay: z.boolean(), timezone: timezoneSchema,
   recurrence: z.string().optional(),
   encryptedContent: z.string().min(1),
-  blindIndexTokens: z.array(z.string()).optional(),
   encryptionKeyVersion: z.number().int().min(1).optional(),
   participants: z.array(eventParticipantInputSchema).optional(),
 }).strict().superRefine((event, ctx) => {

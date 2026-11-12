@@ -534,40 +534,20 @@ struct Total {
     total: i32,
 }
 
-/// Full-text matches of `text` (or a title substring) and blind-index token matches, best first, with the total.
+/// Full-text matches of `text` (or a title substring), best first, with the total.
 pub async fn search<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
     text: &str,
-    tokens: Vec<String>,
     dates: Option<(time::PrimitiveDateTime, time::PrimitiveDateTime)>,
     limit: i64,
     offset: i64,
 ) -> Result<(Vec<SearchRow>, i64), sea_orm::DbErr> {
-    let has_text = !text.is_empty();
     let vector = "to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))";
-    let text_filter = if has_text {
-        format!("{vector} @@ plainto_tsquery('english', $2) OR e.title ILIKE '%' || $2 || '%'")
-    } else {
-        "FALSE".into()
-    };
-    let rank = if has_text {
-        format!("ts_rank({vector}, plainto_tsquery('english', $2))")
-    } else {
-        "0".into()
-    };
+    let text_filter =
+        format!("{vector} @@ plainto_tsquery('english', $2) OR e.title ILIKE '%' || $2 || '%'");
+    let rank = format!("ts_rank({vector}, plainto_tsquery('english', $2))");
     let mut values: Vec<SqlValue> = vec![user_id.into(), text.into()];
-    let mut token_filter = String::new();
-    if !tokens.is_empty() {
-        let placeholders: Vec<String> = (0..tokens.len())
-            .map(|i| format!("${}", values.len() + i + 1))
-            .collect();
-        token_filter = format!(
-            "OR (e.blind_index_tokens IS NOT NULL AND e.blind_index_tokens::jsonb ?| ARRAY[{}])",
-            placeholders.join(", ")
-        );
-        values.extend(tokens.into_iter().map(SqlValue::from));
-    }
     let mut date_filter = String::new();
     if let Some((start, end)) = dates {
         date_filter = format!(
@@ -578,8 +558,7 @@ pub async fn search<C: ConnectionTrait>(
         values.push(start.into());
         values.push(end.into());
     }
-    let where_clause =
-        format!("WHERE e.user_id = $1 AND ({text_filter} {token_filter}) {date_filter}");
+    let where_clause = format!("WHERE e.user_id = $1 AND ({text_filter}) {date_filter}");
     let count_values = values.clone();
     let (limit_at, offset_at) = (values.len() + 1, values.len() + 2);
     values.push(limit.into());

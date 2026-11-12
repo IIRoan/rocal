@@ -53,7 +53,7 @@ export interface E2eeProvider {
 
   hydrateEncryptedEvents(events: CalendarEvent[]): Promise<CalendarEvent[]>;
 
-  /** Blind index tokens for a search query; empty when no E2EE session is active. */
+  /** Keyed tokens of a value, used for ICS import ids; empty when no E2EE session is active. */
   createBlindIndexTokens(value: string): Promise<string[]>;
 
   /** Seals a JSON value with the account key; throws instead of sending plaintext when no session is active. */

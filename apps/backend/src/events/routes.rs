@@ -120,7 +120,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(bulk))
 }
 
-/// Plaintext full-text search, with blind-index tokens for encrypted events.
+/// Plaintext full-text search kept for shipped binaries; their `blindIndexTokens` are ignored, since the server keeps none.
 #[utoipa::path(get, path = "/api/events/search", operation_id = "searchEvents", tag = "Events", params(("q" = String, Query), ("limit" = Option<i64>, Query), ("blindIndexTokens" = Option<String>, Query), ("offset" = Option<i64>, Query), ("startDate" = Option<String>, Query), ("endDate" = Option<String>, Query)), responses((status = 200, body = EventSearchResults)))]
 #[tracing::instrument(skip_all)]
 pub async fn search(

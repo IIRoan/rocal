@@ -10,15 +10,11 @@ jest.mock("../../lib/e2ee-bootstrap", () => ({
 
 jest.mock("../../lib/e2ee-crypto", () => ({
   encryptJsonPayload: jest.fn(),
-  createBlindIndexTokens: jest.fn(),
 }));
 
 import { waitForPendingE2eeBootstrap } from "../../lib/e2ee-bootstrap";
 import { getActiveE2eeSession } from "../../lib/e2ee-session";
-import {
-  createBlindIndexTokens,
-  encryptJsonPayload,
-} from "../../lib/e2ee-crypto";
+import { encryptJsonPayload } from "../../lib/e2ee-crypto";
 import {
   attachCalendarEncryptionShadow,
   attachCategoryEncryptionShadow,
@@ -35,8 +31,6 @@ const mockWaitForPendingE2eeBootstrap =
 const mockEncryptJsonPayload = encryptJsonPayload as jest.MockedFunction<
   typeof encryptJsonPayload
 >;
-const mockCreateBlindIndexTokens =
-  createBlindIndexTokens as jest.MockedFunction<typeof createBlindIndexTokens>;
 
 const activeSession = {
   userId: "user-1",
@@ -56,7 +50,6 @@ describe("e2ee payload helpers", () => {
       iv: "iv",
       ciphertext: "ciphertext",
     });
-    mockCreateBlindIndexTokens.mockResolvedValue(["idx-1", "idx-2"]);
   });
 
   it("refuses to send plaintext content when no active session exists", async () => {
@@ -81,7 +74,6 @@ describe("e2ee payload helpers", () => {
       attachCalendarEncryptionShadow({ isVisible: false }),
     ).resolves.toEqual({ isVisible: false });
     expect(mockEncryptJsonPayload).not.toHaveBeenCalled();
-    expect(mockCreateBlindIndexTokens).not.toHaveBeenCalled();
   });
 
   it("skips event encryption and drops the blank title", async () => {
@@ -149,10 +141,6 @@ describe("e2ee payload helpers", () => {
       },
       "event-content:v1",
     );
-    expect(mockCreateBlindIndexTokens).toHaveBeenCalledWith(
-      activeSession.blindIndexKey,
-      "Secret event hidden agenda Room 7",
-    );
     expect(result).toEqual({
       start: request.start,
       end: request.end,
@@ -163,7 +151,6 @@ describe("e2ee payload helpers", () => {
         iv: "iv",
         ciphertext: "ciphertext",
       }),
-      blindIndexTokens: ["idx-1", "idx-2"],
       encryptionKeyVersion: 1,
       attributesEncrypted: true,
     });
@@ -179,10 +166,6 @@ describe("e2ee payload helpers", () => {
       { name: "Work" },
       "calendar-name:v1",
     );
-    expect(mockCreateBlindIndexTokens).toHaveBeenCalledWith(
-      activeSession.blindIndexKey,
-      "Work",
-    );
     expect(result).toEqual({
       color: request.color,
       encryptedName: JSON.stringify({
@@ -191,7 +174,6 @@ describe("e2ee payload helpers", () => {
         iv: "iv",
         ciphertext: "ciphertext",
       }),
-      blindIndexTokens: ["idx-1", "idx-2"],
       encryptionKeyVersion: 1,
     });
     expect(result).not.toHaveProperty("name");
@@ -207,10 +189,6 @@ describe("e2ee payload helpers", () => {
       { name: "Personal" },
       "category-name:v1",
     );
-    expect(mockCreateBlindIndexTokens).toHaveBeenCalledWith(
-      activeSession.blindIndexKey,
-      "Personal",
-    );
     expect(result).toEqual({
       color: request.color,
       encryptedName: JSON.stringify({
@@ -219,7 +197,6 @@ describe("e2ee payload helpers", () => {
         iv: "iv",
         ciphertext: "ciphertext",
       }),
-      blindIndexTokens: ["idx-1", "idx-2"],
       encryptionKeyVersion: 1,
     });
     expect(result).not.toHaveProperty("name");
