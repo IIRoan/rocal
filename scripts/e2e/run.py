@@ -11,6 +11,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from common import APPS, REPO, backend_pid, directory
+import connectivity
 
 CALENDAR_START = ("01-authentication", "02-calendar-management")
 CONVERSATION_JOURNEYS = frozenset(("07-conversation-first-message", "08-conversation-replies", "09-conversation-reader"))
@@ -80,13 +81,13 @@ def trace_entries(traces):
         except (OSError, ValueError):
             continue
         if isinstance(entries, list):
-            yield entries
+            yield source, entries
 
 
 def collect_reader_timings(traces):
     measurements = []
     observed = set()
-    for entries in trace_entries(traces):
+    for _, entries in trace_entries(traces):
         tap = None
         for entry in entries:
             try:
@@ -111,31 +112,62 @@ def collect_reader_timings(traces):
     return measurements
 
 
+def failed_trace_step(traces):
+    failed = None
+    for source, entries in trace_entries(traces):
+        tap_finished = None
+        for step, entry in enumerate(entries, start=1):
+            if not isinstance(entry, dict) or not isinstance(entry.get("metadata"), dict):
+                continue
+            metadata = entry["metadata"]
+            command = entry.get("command", {})
+            timestamp, duration = metadata.get("timestamp"), metadata.get("duration")
+            duration_valid = type(duration) is int and 0 <= duration <= 1_200_000
+            timestamp_valid = type(timestamp) is int and timestamp > 0
+            if isinstance(command, dict) and any(kind.removesuffix("Command") == "tapOnElement" for kind in command) and metadata.get("status") == "COMPLETED":
+                tap_finished = timestamp + duration if timestamp_valid and duration_valid else None
+            if metadata.get("status") != "FAILED":
+                continue
+            if not isinstance(command, dict) or not command:
+                continue
+            kind = next(iter(command)).removesuffix("Command")
+            if kind in ("runFlow", "repeat", "retry"):
+                continue
+            sequence = metadata.get("sequenceNumber")
+            step = sequence + 1 if type(sequence) is int and 0 <= sequence < 1_200_000 else step
+            if failed is None or step >= failed[1]:
+                gap = timestamp - tap_finished if timestamp_valid and tap_finished is not None else None
+                failed = (source, step, command, metadata, kind, duration if duration_valid else None,
+                          gap if gap is not None and 0 <= gap <= 1_200_000 else None)
+    return failed
+
+
 def failure_details(log, report, traces, reason, exit_code=None):
     exception = re.search(r"\b((?:maestro|java|javax|io|org|com|kotlin)\.(?:[A-Za-z_$][\w$]*\.)*[A-Za-z_$][\w$]*(?:Exception|Error))\b", failure_content(log, report))
-    details = {"reason": reason, "exceptionType": exception.group(1)[:200] if exception else None, "command": None, "step": None, "assertionTarget": None, "exitCode": exit_code}
+    details = {"reason": reason, "exceptionType": exception.group(1)[:200] if exception else None, "command": None, "step": None,
+               "assertionTarget": None, "exitCode": exit_code, "commandDurationMs": None, "msSincePreviousTap": None, "commandTimeoutMs": None}
+    failed = failed_trace_step(traces)
+    if failed is None:
+        return details
+    _, step, command, metadata, kind, duration, gap = failed
     commands = {"launchApp", "clearState", "tapOnElement", "inputText", "eraseText", "pressKey", "assertCondition", "scrollUntilVisible",
-                "waitForAnimation", "runFlow", "takeScreenshot", "swipe", "hideKeyboard", "evalScript"}
-    for entries in trace_entries(traces):
-        for step, entry in enumerate(entries, start=1):
-            if not isinstance(entry, dict) or not isinstance(entry.get("metadata"), dict) or entry["metadata"].get("status") != "FAILED":
-                continue
-            command = entry.get("command", {})
-            if isinstance(command, dict):
-                kinds = (kind.removesuffix("Command") for kind in command)
-                kind = next((kind for kind in kinds if kind in commands), None)
-                if kind is None:
-                    continue
-                details["command"] = kind
-                details["step"] = step
-                details["assertionTarget"] = None
-                assertion = command.get("assertConditionCommand", command.get("assertCondition"))
-                if kind == "assertCondition" and isinstance(assertion, dict):
-                    encoded = json.dumps(assertion)
-                    for selector, target in (("(q|Q)", "software-keyboard"), ("sign-in-email", "sign-in-email"), ("Welcome back", "sign-in-screen")):
-                        if selector in encoded:
-                            details["assertionTarget"] = target
-                            break
+                "waitForAnimationToEnd", "takeScreenshot", "swipe", "hideKeyboard", "evalScript"}
+    details.update(command=kind if kind in commands else "other", step=step, commandDurationMs=duration, msSincePreviousTap=gap)
+    assertion = command.get("assertConditionCommand", command.get("assertCondition"))
+    if kind == "assertCondition" and isinstance(assertion, dict):
+        encoded = json.dumps(assertion)
+        for selector, target in (("(q|Q)", "software-keyboard"), ("sign-in-email", "sign-in-email"), ("Welcome back", "sign-in-screen")):
+            if selector in encoded:
+                details["assertionTarget"] = target
+                break
+        evaluated = metadata.get("evaluatedCommand", command)
+        if isinstance(evaluated, dict):
+            condition = evaluated.get("assertConditionCommand", evaluated.get("assertCondition"))
+            timeout = condition.get("timeout") if isinstance(condition, dict) else None
+            if isinstance(timeout, str) and len(timeout) <= 7 and timeout.isascii() and timeout.isdecimal():
+                timeout = int(timeout)
+            if type(timeout) is int and 0 <= timeout <= 1_200_000:
+                details["commandTimeoutMs"] = timeout
     return details
 
 
@@ -191,6 +223,38 @@ def sanitized_hierarchy(node, fixture, hidden=False):
     return result
 
 
+def export_failed_step_hierarchy(traces, fixture, name, details):
+    failed = failed_trace_step(traces)
+    if failed is None or failed[1] != details["step"]:
+        return False
+    source, step = failed[:2]
+    matched = None
+    candidates = [source.parent / "screen-hierarchy" / f"step-{step:03d}.json"]
+    candidates.extend(sorted((source.parent / "screen-hierarchy").glob(f"step-{step:03d}-*.json")))
+    for candidate in candidates:
+        try:
+            if candidate.is_symlink() or not candidate.is_file() or not candidate.resolve().is_relative_to(source.parent.resolve()):
+                continue
+            if candidate.stat().st_size > 8 * 1024 * 1024:
+                continue
+        except OSError:
+            continue
+        matched = candidate
+        break
+    if matched is None:
+        return False
+    try:
+        tree = json.loads(matched.read_text())
+        if not isinstance(tree, dict) or not (isinstance(tree.get("attributes"), dict) or isinstance(tree.get("children"), list)):
+            return False
+        target = directory() / "artifacts/hierarchy"
+        target.mkdir(exist_ok=True)
+        (target / f"{name}.json").write_text(json.dumps(sanitized_hierarchy(tree, fixture), indent=2))
+        return True
+    except (OSError, ValueError, RecursionError):
+        return False
+
+
 def capture_failure_hierarchy(tool, device, fixture, name):
     root = directory()
     source = root / f"private/{name}-hierarchy.json"
@@ -208,6 +272,7 @@ def capture_failure_hierarchy(tool, device, fixture, name):
         target = root / "artifacts/hierarchy"
         target.mkdir(exist_ok=True)
         (target / f"{name}.json").write_text(json.dumps(sanitized_hierarchy(tree, fixture), indent=2))
+        return True
     except subprocess.TimeoutExpired:
         print(f"Failure hierarchy unavailable (timeout): {name}", flush=True)
     except ValueError:
@@ -240,7 +305,7 @@ def publish(results, summary=False):
         Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(table + "\n")
 
 
-def run_journey(platform, app, flow, results):
+def run_journey(platform, app, flow, results, backend_expected=True):
     root = directory()
     device = json.loads((root / "private/device.json").read_text())
     fixture = json.loads((root / "private/fixture.json").read_text())
@@ -264,14 +329,15 @@ def run_journey(platform, app, flow, results):
     if results and platform == "android":
         command.insert(4, "--no-reinstall-driver")
     print(f"Running {platform}: {app}/{name}", flush=True)
-    for attempt in range(2):
-        if attempt:
-            # Maestro's iOS driver dies under runner load (mobile-dev-inc/maestro#3538); a new invocation starts a fresh one.
-            print(f"Retrying {platform}: {app}/{name} after the device driver disconnected", flush=True)
-            shutil.rmtree(screenshots)
-            screenshots.mkdir(parents=True)
-        reason = None
-        exit_code = None
+    # The emulator reaches the API only through adb reverse mappings, which vanish when its adb connection restarts.
+    preflight, blocked = connectivity.prepare(device["id"], backend_expected) if platform == "android" else (None, None)
+    restored = bool(preflight and preflight["reverseRestored"])
+    if restored:
+        print(f"Restored Android port forwarding before {app}/{name}", flush=True)
+    passed, reason, exit_code = False, blocked, None
+    # Without the API the journey would only report a sign-in or loading assertion that says nothing about the app.
+    if not blocked:
+        # A failed journey runs once: a replay would start from app and server state it already changed, such as a completed sign-in.
         try:
             with (root / f"private/{app}-{name}.log").open("wb") as log:
                 completed = subprocess.run(command, cwd=REPO, env=maestro_environment(), check=False, timeout=1200 if platform == "ios" else 600, stdout=log, stderr=subprocess.STDOUT)
@@ -280,10 +346,7 @@ def run_journey(platform, app, flow, results):
             if not passed:
                 reason = failure_kind(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml")
         except subprocess.TimeoutExpired:
-            passed = False
             reason = "journey-timeout"
-        if platform != "ios" or reason != "driver-connection":
-            break
     if app == "mail" and name in CONVERSATION_JOURNEYS:
         timings = collect_reader_timings(screenshots)
         target = root / "artifacts/reader-timings"
@@ -295,13 +358,27 @@ def run_journey(platform, app, flow, results):
     if not passed:
         failures = root / "artifacts/failures"
         failures.mkdir(exist_ok=True)
-        details = failure_details(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml", screenshots, reason, exit_code)
+        original_hierarchy = False
+        if blocked:
+            details = {"reason": reason, "exceptionType": None, "command": None, "step": None, "assertionTarget": None, "exitCode": None,
+                       "commandDurationMs": None, "msSincePreviousTap": None, "commandTimeoutMs": None, "hierarchySource": None}
+        else:
+            details = failure_details(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml", screenshots, reason, exit_code)
+            original_hierarchy = export_failed_step_hierarchy(screenshots, fixture, f"{app}-{name}", details)
+            details["hierarchySource"] = "failed-step" if original_hierarchy else None
+        if platform == "android":
+            # After a failed journey this only observes: repairing here would hide what the journey ran against.
+            details["connectivity"] = preflight if blocked else connectivity.observe(device["id"], backend_expected)
         (failures / f"{app}-{name}.json").write_text(json.dumps(details, indent=2))
-        capture_failure_screenshot(platform, device, f"{app}-{name}")
-        capture_failure_hierarchy(tool, device, fixture, f"{app}-{name}")
+        if not blocked:
+            capture_failure_screenshot(platform, device, f"{app}-{name}")
+            if not original_hierarchy and capture_failure_hierarchy(tool, device, fixture, f"{app}-{name}"):
+                details["hierarchySource"] = "post-failure"
+                (failures / f"{app}-{name}.json").write_text(json.dumps(details, indent=2))
     status = "PASS" if passed else f"FAIL ({reason})"
     print(f"{status}: {app}/{name}; inspect the journey report and screenshots", flush=True)
-    results.append({"app": app, "name": name, "passed": passed, "seconds": round(time.monotonic() - started, 2), "reason": reason})
+    results.append({"app": app, "name": name, "passed": passed, "seconds": round(time.monotonic() - started, 2), "reason": reason,
+                    **({"deviceForwardingRestored": True} if restored else {})})
     publish(results)
     return passed
 
@@ -341,7 +418,7 @@ def run_mail_tail(platform, scenarios, results):
         raise RuntimeError("Refusing to suspend a process outside the disposable backend")
     os.kill(backend, signal.SIGSTOP)
     try:
-        offline_passed = run_journey(platform, "mail", scenarios / "mail/offline.yaml", results)
+        offline_passed = run_journey(platform, "mail", scenarios / "mail/offline.yaml", results, backend_expected=False)
     finally:
         os.kill(backend, signal.SIGCONT)
     if not offline_passed:

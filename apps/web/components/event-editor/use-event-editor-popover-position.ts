@@ -23,8 +23,12 @@ export function useEventEditorPopoverPosition({
   useLayoutEffect(() => {
     if (!open || !anchorPosition) {
       if (!open) {
-        queueMicrotask(() => setPosition(null));
+        let cancelled = false;
+        queueMicrotask(() => {
+          if (!cancelled) setPosition(null);
+        });
         positionRef.current = null;
+        return () => { cancelled = true; };
       }
 
       return;

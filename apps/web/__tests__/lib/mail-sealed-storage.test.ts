@@ -13,7 +13,7 @@ jest.mock("@/lib/mail/api-service", () => ({
 }));
 
 const mockDecryptMessage = jest.fn<
-  (input: { armoredMessage: string }) => Promise<{ plaintext: string }>
+  (input: { armoredMessage: string }) => Promise<MailDecryptResult>
 >();
 const mockVerificationContext = { publicKeyArmored: "synthetic-public", fingerprint: "synthetic-fingerprint", ownAddresses: ["alice@solace.onl"] };
 jest.mock("@/lib/mail/worker-client", () => ({
@@ -25,7 +25,8 @@ jest.mock("@/lib/mail/worker-client", () => ({
 }));
 
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
-import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
+import { parseDecryptedMailContent } from "@workspace/calendar-core/mail-mime-parser";
+import type { MailDecryptResult } from "@/lib/mail/types";
 
 const ATTACHMENT_BYTES = new TextEncoder().encode("quarterly numbers: 42, 17, 99");
 const ATTACHMENT_BASE64 = Buffer.from(ATTACHMENT_BYTES).toString("base64");
@@ -65,7 +66,13 @@ beforeAll(async () => {
       message: await openpgp.readMessage({ armoredMessage }),
       decryptionKeys: privateKey,
     });
-    return { plaintext: String(data) };
+    const parsed = parseDecryptedMailContent(String(data));
+    return {
+      ...parsed,
+      plaintext: parsed.text,
+      hasVerifiedSignature: false,
+      signatureVerificationState: "not_signed",
+    };
   });
 });
 
@@ -114,13 +121,10 @@ describe("drafts and Sent copies sealed to the account key", () => {
     expect(getBlobAsText).toHaveBeenCalledWith({}, ciphertext.blobId);
     expect(opened.text).toBe("Meet at the harbour at nine");
     expect(opened.html).toBe("<p>Meet at the <b>harbour</b> at nine</p>");
-    const reopened = await parseDecryptedMailContent(
-      (await mockDecryptMessage({ armoredMessage: stored })).plaintext,
-    );
+    expect(opened.truncated).toBe(false);
+    const reopened = await mockDecryptMessage({ armoredMessage: stored });
     expect(reopened.attachments).toHaveLength(1);
-    expect(reopened.attachments[0]?.filename).toBe("numbers.txt");
-    expect(new Uint8Array(reopened.attachments[0]?.content as ArrayBuffer)).toEqual(
-      ATTACHMENT_BYTES,
-    );
+    expect(reopened.attachments?.[0]?.filename).toBe("numbers.txt");
+    expect(reopened.attachments?.[0]?.content).toEqual(ATTACHMENT_BYTES);
   });
 });

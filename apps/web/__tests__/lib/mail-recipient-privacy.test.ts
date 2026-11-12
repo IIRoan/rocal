@@ -18,7 +18,7 @@ import {
   encryptForRecipients,
   loadActiveMailVault,
 } from "@/lib/mail/mail-encryption-engine";
-import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
+import { parseDecryptedMailContent } from "@workspace/calendar-core/mail-mime-parser";
 
 jest.mock("openpgp", () => {
   const actual = jest.requireActual<typeof import("openpgp")>("openpgp");
@@ -196,7 +196,7 @@ it("preserves rich text and attachments through the actual engine", async () => 
   expect(parsed.text).toBe(TEXT);
   expect(parsed.html).toBe(`<p>${TEXT}</p>`);
   const attachment = parsed.attachments[0];
-  if (!attachment || !(attachment.content instanceof ArrayBuffer)) {
+  if (!attachment) {
     throw new Error("Expected decrypted attachment bytes");
   }
   expect(new Uint8Array(attachment.content)).toEqual(ATTACHMENT);

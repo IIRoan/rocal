@@ -7,6 +7,7 @@ import {
   jest,
 } from "@jest/globals";
 import * as openpgp from "openpgp";
+import { getMailDraftSizeError, MAX_MAIL_DISPLAY_CHARACTERS } from "@workspace/calendar-core/mail-mime-limits";
 import { MailCryptoWorkerClient } from "@/lib/mail/worker-client-core";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type {
@@ -349,9 +350,27 @@ it("opens an HTML-only image draft without returning raw MIME as its editable te
   expect(result.rawMimeFallback).toBeUndefined();
 });
 
+it("reports a draft clipped at the read limit so it is refused before the editor is seeded", async () => {
+  const armoredMessage = await actualPgp.encrypt({
+    message: await actualPgp.createMessage({
+      text:
+        "Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" +
+        ("abc=20".repeat(12) + "=\r\n").repeat(30_000),
+    }),
+    encryptionKeys: await actualPgp.readKey({ armoredKey: fixtures.keyFor("sender").publicKeyArmored }),
+    format: "armored",
+  });
+  jest.mocked(client.getBlobAsText).mockResolvedValue(armoredMessage);
+  const result = await decrypt();
+  expect(result.truncated).toBe(true);
+  expect(result.text?.length).toBeLessThanOrEqual(MAX_MAIL_DISPLAY_CHARACTERS);
+  expect(getMailDraftSizeError({ text: result.text, html: result.html })).toBeNull();
+  expect(getMailDraftSizeError({ text: result.text, html: result.html, truncated: result.truncated })).toContain("saved draft has not been changed");
+});
+
 it("identifies a non-limit MIME parse fallback so draft editing can refuse it", async () => {
-  const mime = await import("@/lib/mail/decrypted-mail-content");
-  const parse = jest.spyOn(mime, "parseDecryptedMailContent").mockRejectedValueOnce(new Error("MIME parse failed"));
+  const mime = await import("@workspace/calendar-core/mail-mime-parser");
+  const parse = jest.spyOn(mime, "parseDecryptedMailContent").mockImplementationOnce(() => { throw new Error("MIME parse failed"); });
   try {
     const result = await decrypt();
     expect(result.rawMimeFallback).toBe(true);
