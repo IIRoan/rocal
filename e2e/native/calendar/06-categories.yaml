@@ -129,6 +129,12 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     notVisible: "Maestro renamed category.*"
     timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: category-create
+      enabled: true
+    timeout: 30000
+- assertNotVisible: "Maestro renamed category.*"
 - runFlow: ../common/open-app.yaml
 - runFlow:
     file: ../common/open-event.yaml

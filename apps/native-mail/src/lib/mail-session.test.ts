@@ -8,6 +8,8 @@ import { clearAttachmentCache } from "./mail/attachment-cache";
 import { holdVaultUnlock } from "./mail/mail-crypto";
 import { hydrateMailOfflineSnapshot } from "./mail/mail-offline-snapshot";
 import { setMailSyncState } from "./mail/mail-sync";
+import { getMailAccountStatus, getMailConfig } from "./mail/mail-api";
+import { restoreWithTimeout } from "@workspace/native-core/lib/session-restore";
 
 const mockLoadSnapshot = jest.fn<
   Promise<{ emailState: string } | null>,
@@ -65,7 +67,10 @@ describe("restoreMailSession", () => {
   const snapshot = { emailState: "s1" };
 
   beforeEach(() => { activateSessionData("u1"); clearMailSendAttempts(); jest.clearAllMocks(); mockLoadSnapshot.mockReset(); });
-  afterEach(() => queryClient.clear());
+  afterEach(() => {
+    jest.useRealTimers();
+    queryClient.clear();
+  });
 
   it("cancels an old owner's pending attempt on account switch without sign-out", async () => {
     mockLoadSnapshot.mockResolvedValueOnce(null);
@@ -118,6 +123,37 @@ describe("restoreMailSession", () => {
     await expect(prepareMailSession(input)).rejects.toThrow("Offline");
     expect(queryClient.getQueryData(QUERY_KEYS.mailRuntime())).toBe(savedRuntime);
   });
+
+  it.each([false, true])(
+    "applies a snapshot that loads after the launch budget only until live preparation begins (retired: %s)",
+    async (retiredFirst) => {
+      jest.useFakeTimers();
+      await MAIL_AUTH_LIFECYCLE.onSignedOut?.();
+      jest.clearAllMocks();
+      jest.mocked(getMailConfig).mockResolvedValue({ signupEnabled: false } as Awaited<ReturnType<typeof getMailConfig>>);
+      jest.mocked(getMailAccountStatus).mockResolvedValue({ provisioned: false } as Awaited<ReturnType<typeof getMailAccountStatus>>);
+      let finish: (value: typeof snapshot) => void = () => undefined;
+      mockLoadSnapshot.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+      let retired = false;
+      const restore = restoreWithTimeout(
+        (isCancelled) => restoreMailSession({ ...input, isCancelled }),
+        () => retired,
+      );
+      await jest.advanceTimersByTimeAsync(1_500);
+      await expect(restore.inTime).resolves.toBe(false);
+      retired = retiredFirst;
+      finish(snapshot);
+      await expect(restore.settled).resolves.toBe(!retiredFirst);
+      expect(holdVaultUnlock).toHaveBeenCalledTimes(retiredFirst ? 0 : 1);
+      expect(hydrateMailOfflineSnapshot).toHaveBeenCalledTimes(retiredFirst ? 0 : 1);
+      expect(setMailSyncState).toHaveBeenCalledTimes(retiredFirst ? 0 : 1);
+
+      jest.useRealTimers();
+      await prepareMailSession(input);
+      // A refused snapshot must leave live preparation on its full path instead of finishing a restore that never happened.
+      expect(getMailConfig).toHaveBeenCalledTimes(retiredFirst ? 1 : 0);
+    },
+  );
 
   it.each(["sign-out", "cancellation", "new restore"])(
     "discards a pending snapshot after %s",
