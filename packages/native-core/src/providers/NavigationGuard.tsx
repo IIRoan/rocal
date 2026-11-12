@@ -186,18 +186,30 @@ export function NavigationGuard({
     let cancelled = false;
     let restoreAttempted = false;
     let encryptionReady = false;
+    let restoreRetired = false;
 
     const initializeSession = async () => {
       dispatchStartup({ type: "started" });
       if (restoreSession && !restoreAttempted) {
         restoreAttempted = true;
-        const restored = await restoreWithTimeout(
+        // Live preparation or a lock's sign-out owns the vault lock and caches from then on, so a snapshot must never land after that.
+        const restore = restoreWithTimeout(
           (isCancelled) =>
             restoreSession({ queryClient, userId: user.id, isCancelled }),
-          () => cancelled,
+          () => cancelled || restoreRetired,
         );
+        const restored = await restore.inTime;
         if (cancelled) return;
         dispatchStartup({ type: "restored", userId: user.id, restored });
+        if (!restored) {
+          void restore.settled
+            .then((late) => {
+              if (late && !cancelled && !restoreRetired) {
+                dispatchStartup({ type: "restored", userId: user.id, restored: true });
+              }
+            })
+            .catch(() => undefined);
+        }
       }
 
       if (!encryptionReady) {
@@ -205,6 +217,7 @@ export function NavigationGuard({
         if (cancelled) return;
         // An authoritative lock ends the session; an unavailable API keeps the password for the next attempt.
         if (lock) {
+          restoreRetired = true;
           await signOut(
             lock === "cannot-open"
               ? UNLOCK_FAILED_NOTICE
@@ -215,6 +228,7 @@ export function NavigationGuard({
         encryptionReady = true;
       }
 
+      restoreRetired = true;
       await prepareSession?.({
         queryClient,
         userId: user.id,

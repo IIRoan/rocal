@@ -1,26 +1,17 @@
 const RESTORE_TIMEOUT_MS = 1_500;
 
-/** Expired or superseded restores must not apply data after startup moves on. */
-export async function restoreWithTimeout(
+/** The budget only decides the first render; the caller's predicate, never expiry, cancels a restore that finishes later. */
+export function restoreWithTimeout(
   restore: (isCancelled: () => boolean) => Promise<boolean>,
   isCancelled: () => boolean,
-): Promise<boolean> {
-  let expired = false;
+): { inTime: Promise<boolean>; settled: Promise<boolean> } {
+  const settled = (async () => restore(isCancelled))().catch(() => false);
   let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      restore(() => expired || isCancelled()),
-      new Promise<boolean>((resolve) => {
-        timer = setTimeout(() => {
-          expired = true;
-          resolve(false);
-        }, RESTORE_TIMEOUT_MS);
-      }),
-    ]);
-  } catch {
-    return false;
-  } finally {
-    expired = true;
-    clearTimeout(timer);
-  }
+  const inTime = Promise.race([
+    settled,
+    new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), RESTORE_TIMEOUT_MS);
+    }),
+  ]).finally(() => clearTimeout(timer));
+  return { inTime, settled };
 }
