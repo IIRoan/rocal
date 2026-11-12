@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
@@ -10,21 +10,23 @@ import {
 } from "../lib/push-notifications";
 
 let consumedLaunchNotificationResponse = false;
+let launchNotificationResponse: Promise<Notifications.NotificationResponse | null> | null = null;
 
 async function consumeLaunchNotificationResponse(
   openFromNotification: (
     notification: Notifications.Notification | null | undefined,
     source: "launch" | "tap",
-  ) => void,
+  ) => boolean,
 ): Promise<void> {
   if (consumedLaunchNotificationResponse) {
     return;
   }
-  consumedLaunchNotificationResponse = true;
-
-  const lastResponse = await Notifications.getLastNotificationResponseAsync();
-  if (lastResponse) {
-    openFromNotification(lastResponse.notification, "launch");
+  launchNotificationResponse ??= Notifications.getLastNotificationResponseAsync();
+  const lastResponse = await launchNotificationResponse;
+  if (consumedLaunchNotificationResponse) return;
+  if (!lastResponse || openFromNotification(lastResponse.notification, "launch")) {
+    consumedLaunchNotificationResponse = true;
+    launchNotificationResponse = null;
   }
 }
 
@@ -38,13 +40,15 @@ export function PushNotificationNavigation({
   const { isAuthenticated } = useAuth();
   const router = useRouter();
   const routerRef = useRef(router);
-  routerRef.current = router;
   const navigationReadyRef = useRef(navigationReady);
-  navigationReadyRef.current = navigationReady;
   const handledTapIdsRef = useRef(new Set<string>());
   const pendingRouteRef = useRef<string | null>(null);
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+  useLayoutEffect(() => {
+    routerRef.current = router;
+    navigationReadyRef.current = navigationReady;
+    handlerRef.current = handler;
+  }, [router, navigationReady, handler]);
 
   const openFromNotification = useCallback(
     (
@@ -93,14 +97,24 @@ export function PushNotificationNavigation({
       return;
     }
 
+    let active = true;
+    const openWhileActive = (
+      notification: Notifications.Notification | null | undefined,
+      source: "launch" | "tap",
+    ) => {
+      if (!active) return false;
+      openFromNotification(notification, source);
+      return true;
+    };
     const responseSubscription =
       Notifications.addNotificationResponseReceivedListener((response) => {
-        openFromNotification(response.notification, "tap");
+        openWhileActive(response.notification, "tap");
       });
 
-    void consumeLaunchNotificationResponse(openFromNotification).catch(() => {});
+    void consumeLaunchNotificationResponse(openWhileActive).catch(() => {});
 
     return () => {
+      active = false;
       responseSubscription.remove();
     };
   }, [isAuthenticated, openFromNotification]);
