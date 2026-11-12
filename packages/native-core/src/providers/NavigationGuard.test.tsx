@@ -18,7 +18,7 @@ const mockPrepareSession = jest.fn(
   async (_input: AuthenticatedSessionInput) => undefined,
 );
 const mockRestoreSession = jest.fn(
-  async ({ userId }: Pick<AuthenticatedSessionInput, "userId">) =>
+  async ({ userId }: Pick<AuthenticatedSessionInput, "userId" | "isCancelled">) =>
     userId === "restored",
 );
 let mockBootstrap = jest.fn(() => new Promise<string | null>(() => undefined));
@@ -295,6 +295,173 @@ it.each(["offline", "503"])(
     expect(mockSignOut).not.toHaveBeenCalled();
   },
 );
+
+/** Holds a restore that, like restoreMailSession, applies its snapshot only if it is still not cancelled when it finishes. */
+const holdRestore = () => {
+  const held: { applied: boolean | null; finish: (failure?: Error) => void } = { applied: null, finish: () => undefined };
+  mockRestoreSession.mockImplementationOnce(
+    ({ isCancelled }: Pick<AuthenticatedSessionInput, "userId" | "isCancelled">) =>
+      new Promise<boolean>((resolve, reject) => {
+        held.finish = (failure) => {
+          if (failure) {
+            reject(failure);
+            return;
+          }
+          held.applied = !isCancelled();
+          resolve(held.applied);
+        };
+      }),
+  );
+  return held;
+};
+
+const isWorkspaceHidden = () =>
+  container
+    .querySelector('[data-testid="workspace-action"]')
+    ?.closest('[aria-hidden="true"]') !== null;
+
+it("shows a valid offline workspace whose restore finishes after the launch budget while the API stays unreachable", async () => {
+  jest.useFakeTimers();
+  mockBootstrap = jest.fn(() => Promise.reject(new Error("offline")));
+  const restore = holdRestore();
+  signIn("restored");
+  await renderGuard();
+  await act(async () => {
+    jest.advanceTimersByTime(2_000);
+  });
+  expect(container.querySelector('[role="status"]')).not.toBeNull();
+
+  await act(async () => {
+    restore.finish();
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(60_000);
+  });
+
+  expect(restore.applied).toBe(true);
+  expect(mockRestoreSession).toHaveBeenCalledTimes(1);
+  expect(mockBootstrap.mock.calls.length).toBeGreaterThan(1);
+  expect(mockPrepareSession).not.toHaveBeenCalled();
+  expect(container.querySelector('[role="status"]')).toBeNull();
+  expect(isWorkspaceHidden()).toBe(false);
+});
+
+it("never applies a late snapshot once live mail preparation has begun", async () => {
+  jest.useFakeTimers();
+  mockE2eeReady = true;
+  mockBootstrap = jest.fn(() => Promise.resolve(null));
+  let finishPrepare: () => void = () => undefined;
+  mockPrepareSession.mockImplementationOnce(() => new Promise<undefined>((resolve) => {
+    finishPrepare = () => resolve(undefined);
+  }));
+  const restore = holdRestore();
+  signIn("restored");
+  await renderGuard();
+  await act(async () => {
+    jest.advanceTimersByTime(1_500);
+  });
+  expect(mockPrepareSession).toHaveBeenCalledTimes(1);
+
+  await act(async () => {
+    restore.finish();
+  });
+  expect(restore.applied).toBe(false);
+  expect(isWorkspaceHidden()).toBe(true);
+
+  await act(async () => {
+    finishPrepare();
+  });
+  expect(container.querySelector('[role="status"]')).toBeNull();
+  expect(mockPrepareSession).toHaveBeenCalledTimes(1);
+});
+
+it("never applies a late snapshot while an authoritative lock's sign-out is still pending", async () => {
+  jest.useFakeTimers();
+  mockBootstrap = jest.fn(() => Promise.resolve("cannot-open"));
+  mockSignOut.mockImplementationOnce(() => new Promise<undefined>(() => undefined));
+  const restore = holdRestore();
+  signIn("restored");
+  await renderGuard();
+  await act(async () => {
+    jest.advanceTimersByTime(1_500);
+  });
+  expect(mockSignOut).toHaveBeenCalledWith(UNLOCK_FAILED_NOTICE);
+
+  await act(async () => {
+    restore.finish();
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(60_000);
+  });
+
+  expect(restore.applied).toBe(false);
+  expect(isWorkspaceHidden()).toBe(true);
+  expect(mockPrepareSession).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["another account signs in", () => signIn("fresh")],
+  ["the user signs out", () => { mockAuth = { ...mockAuth, isAuthenticated: false, user: null }; }],
+])("never applies a late snapshot after %s", async (_case, change) => {
+  jest.useFakeTimers();
+  mockBootstrap = jest.fn(() => Promise.reject(new Error("offline")));
+  const restore = holdRestore();
+  signIn("restored");
+  await renderGuard();
+  await act(async () => {
+    jest.advanceTimersByTime(2_000);
+  });
+  change();
+  await renderGuard();
+
+  await act(async () => {
+    restore.finish();
+  });
+
+  expect(restore.applied).toBe(false);
+  expect(mockRestoreSession).toHaveBeenCalledTimes(mockAuth.user ? 2 : 1);
+  expect(mockAuth.user === null || isWorkspaceHidden()).toBe(true);
+});
+
+it("never applies a late snapshot after the guard unmounts", async () => {
+  jest.useFakeTimers();
+  mockBootstrap = jest.fn(() => Promise.reject(new Error("offline")));
+  const restore = holdRestore();
+  signIn("restored");
+  await renderGuard();
+  await act(async () => {
+    jest.advanceTimersByTime(2_000);
+  });
+  await act(async () => {
+    root.render(null);
+  });
+  await act(async () => {
+    restore.finish();
+  });
+
+  expect(restore.applied).toBe(false);
+});
+
+it("keeps the workspace covered when a late restore fails", async () => {
+  jest.useFakeTimers();
+  mockBootstrap = jest.fn(() => Promise.reject(new Error("offline")));
+  const restore = holdRestore();
+  signIn("restored");
+  await renderGuard();
+  await act(async () => {
+    jest.advanceTimersByTime(2_000);
+  });
+  await act(async () => {
+    restore.finish(new Error("Storage unavailable"));
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(60_000);
+  });
+
+  expect(mockRestoreSession).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("Waiting to reconnect…");
+  expect(isWorkspaceHidden()).toBe(true);
+});
 
 it("backs off repeated failures and stops retrying after recovery", async () => {
   jest.useFakeTimers();

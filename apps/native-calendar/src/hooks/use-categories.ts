@@ -19,6 +19,8 @@ import {
   sortCategories,
 } from "../lib/categories-model";
 
+export { useCategoryDeletePending } from "@workspace/calendar-client/use-category-delete-pending";
+
 type CategoriesSnapshot = { previous: EventCategory[] | undefined };
 
 async function snapshotCategories(queryClient: QueryClient): Promise<CategoriesSnapshot> {
@@ -112,6 +114,7 @@ export function useDeleteCategory(categoryId: string) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
+    mutationKey: QUERY_KEYS.categoryDelete(),
     mutationFn: () => calendarApiService.deleteCategory(categoryId),
     onMutate: async () => {
       const snapshot = await snapshotCategories(queryClient);

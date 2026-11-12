@@ -4,10 +4,10 @@ describe("restoreWithTimeout", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it("cancels slow restores before startup continues", async () => {
+  it("reports a slow restore as late without cancelling it", async () => {
     let finish: () => void = () => undefined;
     const applied = jest.fn();
-    const restored = restoreWithTimeout(
+    const restore = restoreWithTimeout(
       async (isCancelled) => {
         await new Promise<void>((resolve) => {
           finish = resolve;
@@ -20,45 +20,45 @@ describe("restoreWithTimeout", () => {
     );
 
     await jest.advanceTimersByTimeAsync(1_500);
-    await expect(restored).resolves.toBe(false);
+    await expect(restore.inTime).resolves.toBe(false);
     finish();
-    await Promise.resolve();
-    expect(applied).not.toHaveBeenCalled();
+    await expect(restore.settled).resolves.toBe(true);
+    expect(applied).toHaveBeenCalledTimes(1);
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it("passes session cancellation through to the restore", async () => {
-    let cancelled = false;
-    const restored = restoreWithTimeout(
+  it("leaves cancellation to the caller's predicate", async () => {
+    let finish: () => void = () => undefined;
+    let retired = false;
+    const restore = restoreWithTimeout(
       async (isCancelled) => {
-        cancelled = true;
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
         return !isCancelled();
       },
-      () => cancelled,
+      () => retired,
     );
-    await expect(restored).resolves.toBe(false);
+    await jest.advanceTimersByTimeAsync(1_500);
+    retired = true;
+    finish();
+    await expect(restore.settled).resolves.toBe(false);
+  });
+
+  it("returns the same result in time and clears the timeout", async () => {
+    const restore = restoreWithTimeout(async () => true, () => false);
+    await expect(restore.inTime).resolves.toBe(true);
+    await expect(restore.settled).resolves.toBe(true);
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it("clears the timeout after a successful restore", async () => {
-    await expect(
-      restoreWithTimeout(
-        async () => true,
-        () => false,
-      ),
-    ).resolves.toBe(true);
-    expect(jest.getTimerCount()).toBe(0);
-  });
-
-  it("falls back when storage fails", async () => {
-    await expect(
-      restoreWithTimeout(
-        async () => {
-          throw new Error("Storage unavailable");
-        },
-        () => false,
-      ),
-    ).resolves.toBe(false);
+  it.each([
+    ["rejects", async () => { throw new Error("Storage unavailable"); }],
+    ["throws synchronously", () => { throw new Error("Storage unavailable"); }],
+  ])("falls back when storage %s", async (_case, restore: () => Promise<boolean>) => {
+    const result = restoreWithTimeout(restore, () => false);
+    await expect(result.inTime).resolves.toBe(false);
+    await expect(result.settled).resolves.toBe(false);
     expect(jest.getTimerCount()).toBe(0);
   });
 });
