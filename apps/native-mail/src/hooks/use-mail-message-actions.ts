@@ -1,3 +1,4 @@
+import { captureSessionDataScope } from "@workspace/native-core/lib/session-data-lifecycle";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
@@ -21,6 +22,7 @@ import { useMailListSettings } from "./use-mail-list-settings";
 import { useMailUndoToast } from "./use-mail-undo-toast";
 import {
   shareCachedAttachment,
+  releaseCachedAttachment,
   writeAttachmentToCache,
 } from "../lib/mail/attachment-cache";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
@@ -31,6 +33,7 @@ export type MessageSheetView = "menu" | "move" | "label" | "html" | null;
 export type MailAttachmentPreview = {
   attachment: JmapAttachment;
   kind: MailAttachmentPreviewKind;
+  cacheKey: string;
 };
 
 export function useMailMessageActions({
@@ -71,11 +74,19 @@ export function useMailMessageActions({
 
   const isFlagged = Boolean(message?.keywords?.["$flagged"]);
   const isSeen = Boolean(message?.keywords?.["$seen"]);
+  const loadedMessageId = message?.id;
   const { mutate: markAsReadMutate } = markAsRead;
 
   // Mark read once per visit; a mid-visit "mark unread" also claims the id so it is not undone.
   useEffect(() => {
-    if (!runtime || !messageId || isSeen || !listSettingsLoaded) return;
+    if (
+      !runtime ||
+      !messageId ||
+      loadedMessageId !== messageId ||
+      isSeen ||
+      !listSettingsLoaded
+    )
+      return;
     if (markAsReadDelayMs === null) return;
     if (markReadHandledIdRef.current === messageId) return;
     const markRead = () => {
@@ -91,6 +102,7 @@ export function useMailMessageActions({
     return () => clearTimeout(timer);
   }, [
     isSeen,
+    loadedMessageId,
     listSettingsLoaded,
     markAsReadDelayMs,
     markAsReadMutate,
@@ -132,11 +144,14 @@ export function useMailMessageActions({
     deleteMessage.isPending ||
     moveToMailbox.isPending;
 
+  const scope = captureSessionDataScope();
+
   const cacheAttachment = (attachment: JmapAttachment, cacheKey: string) =>
     writeAttachmentToCache({
       attachment,
       cacheKey,
       runtime,
+      scope,
     });
 
   // Stable per preview so the modal loads once instead of on every screen render.
@@ -145,9 +160,9 @@ export function useMailMessageActions({
     const { attachment } = preview;
     return writeAttachmentToCache({
       attachment,
-      cacheKey:
-        attachment.blobId ?? `preview-${attachment.name ?? "attachment"}`,
+      cacheKey: preview.cacheKey,
       runtime,
+      scope,
     });
   };
 
@@ -161,14 +176,16 @@ export function useMailMessageActions({
     });
 
     if (kind) {
-      setPreview({ attachment, kind });
+      setPreview({ attachment, kind, cacheKey });
       return;
     }
 
     setDownloadingBlobId(cacheKey);
     try {
       const cached = await cacheAttachment(attachment, cacheKey);
-      await shareCachedAttachment(cached);
+      await shareCachedAttachment(cached).finally(() =>
+        releaseCachedAttachment(cached),
+      );
     } catch (err) {
       toast(getErrorMessage(err, "Could not download attachment."), "error");
     }
@@ -313,13 +330,19 @@ export function useMailMessageActions({
     target: JmapEmailMessage,
     mode: SimpleLoginActionMode,
   ) => {
-    simpleLoginAction.mutate({ message: target, mode }, {
-      onSuccess: (result) => {
-        if (result.mode === "run") toast(result.action.doneLabel, "success");
+    simpleLoginAction.mutate(
+      { message: target, mode },
+      {
+        onSuccess: (result) => {
+          if (result.mode === "run") toast(result.action.doneLabel, "success");
+        },
+        onError: (error) =>
+          toast(
+            getErrorMessage(error, "Could not reach SimpleLogin."),
+            "error",
+          ),
       },
-      onError: (error) =>
-        toast(getErrorMessage(error, "Could not reach SimpleLogin."), "error"),
-    });
+    );
   };
 
   return {

@@ -199,6 +199,7 @@ export function useMailListController() {
       : "Mail",
     unreadThreadCount: list.unreadThreadCount,
     listFilterActive: search.listFilterActive,
+    searchCoverageText: search.searchCoverageText,
     openCommandPalette,
     openCompose,
     clearSelection: selection.clearSelection,

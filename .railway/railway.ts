@@ -29,7 +29,6 @@ export default defineRailway(() => {
   const postgresApp = postgres("Postgres", { region: "europe-west4-drams3a" });
   postgresApp.networking = {
     privateNetworkEndpoint: "postgres",
-    tcpProxies: { "5432": {} },
   };
   const postgresStalwart = postgres("Postgres-stalwart", {
     region: "europe-west4-drams3a",
@@ -69,6 +68,10 @@ export default defineRailway(() => {
   });
   // Private; the API serves uploaded profile pictures through /api/profiles/avatars/:id.
   const profilePictures = bucket("profile-pictures", { region: "ams" });
+  // Keep the encrypted cutover checkpoints through the recovery retention window.
+  const upgradeRecovery = bucket("mail-upgrade-recovery-181", {
+    region: "ams",
+  });
   const gatusData = volume("gatus-data", {
     region: "europe-west4-drams3a",
     sizeMB: 1000,
@@ -133,6 +136,9 @@ export default defineRailway(() => {
       ipv6EgressEnabled: true,
       drainingSeconds: 120,
       overlapSeconds: 90,
+      // Old images must never receive PGPASSWORD or POSTGRES_PASSWORD for the rotated store.
+      startCommand:
+        '/bin/sh -ec \'test -r /usr/local/bin/upgrade-1.1.0.py; /usr/local/bin/stalwart --version | grep -Eq "(^|[[:space:]])v?1[.]1[.]0($|[[:space:]])"; export PGPASSWORD="$SOLACE_MAIL_PG_PASSWORD_V110"; exec /usr/local/bin/railway-entrypoint.sh\'',
     },
     env: {
       BUCKET: ref(stalwartBlobs, "BUCKET"),
@@ -150,11 +156,16 @@ export default defineRailway(() => {
       FRPS_ADDR: preserve(),
       PGDATABASE: "stalwart_v1",
       PGHOST: ref(postgresStalwart, "PGHOST"),
-      PGPASSWORD: ref(postgresStalwart, "PGPASSWORD"),
+      SOLACE_MAIL_PG_PASSWORD_V110: ref(postgresStalwart, "PGPASSWORD"),
       PGPORT: ref(postgresStalwart, "PGPORT"),
       PGUSER: ref(postgresStalwart, "PGUSER"),
       PORT: preserve(),
       STALWART_ADMIN_TOKEN: preserve(),
+      STALWART_APPROVED_STORE_ID: preserve(),
+      STALWART_APPROVED_VERSION: "1.1.0",
+      STALWART_RECOVERY_ISOLATION: preserve(),
+      STALWART_SERVICE_ALLOWLIST_JSON: preserve(),
+      STALWART_UPGRADE_PHASE: preserve(),
       SOLACE_ADMIN_AUTH_URL: preserve(),
       SOLACE_ADMIN_LOGIN_URL: `${fromApi("FRONTEND_URL")}/login`,
       STALWART_ADMIN_GATE_KEY: preserve(),
@@ -209,8 +220,8 @@ export default defineRailway(() => {
       FRONTEND_URL: "https://solace.onl",
       MAIL_BRIDGE_HMAC_KEY: preserve(),
       MOBILE_AUTH_CALLBACK_URL: preserve(),
-      // The same Stalwart admin token the server itself is configured with.
-      STALWART_ADMIN_TOKEN: ref(stalwartMail, "STALWART_ADMIN_TOKEN"),
+      // Provisioning uses its dedicated credential without access to other mailboxes.
+      STALWART_PROVISION_TOKEN: preserve(),
       STALWART_ADMIN_USER_IDS: preserve(),
       STALWART_ADMIN_GATE_KEY: preserve(),
       STALWART_BASE_URL: `http://${ref(stalwartMail, "RAILWAY_PRIVATE_DOMAIN")}:8081`,
@@ -277,6 +288,7 @@ export default defineRailway(() => {
       postgresStalwartVolume,
       stalwartBlobs,
       profilePictures,
+      upgradeRecovery,
       monitoring,
       apiGroup,
       mailServer,

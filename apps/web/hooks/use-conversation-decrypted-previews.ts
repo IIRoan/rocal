@@ -2,6 +2,7 @@
 
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import type { MailDemoConfig } from "@workspace/calendar-core";
+import { limitMailDisplayContent } from "@workspace/calendar-core/mail-mime-limits";
 import { createLogger } from "@workspace/logger";
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
 import {
@@ -80,12 +81,13 @@ async function resolveDecryptedPreview(input: {
 
   if (encryption === "inline_pgp" || encryption === "pgp_mime") {
     try {
-      return await decryptMessageForCompose({
+      const decrypted = await decryptMessageForCompose({
         client: input.client,
         session: input.session,
         message: fullMessage,
         config: input.config,
       });
+      return { ...decrypted, ...limitMailDisplayContent(decrypted) };
     } catch {
       log.warn("Failed to decrypt conversation preview", {
         messageId: input.message.id,

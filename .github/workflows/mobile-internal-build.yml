@@ -68,7 +68,7 @@ jobs:
         with:
           # A PR's merge commit has the base branch tip as its first parent.
           fetch-depth: 2
-      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+      - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
       # Compare with the last successful run (it built, or matched the build before it), so a cancelled or failed build is retried; dispatches always build.
@@ -102,6 +102,8 @@ jobs:
 
   ios:
     needs: [meta, checks]
+    # Dependabot PRs build native E2E apps instead of credentialed internal releases.
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: macos-latest
     timeout-minutes: 60
     strategy:
@@ -114,18 +116,18 @@ jobs:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
 
-      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+      - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
+      - uses: chainguard-actions/expo-expo-github-action@f202d68400237adfeabf5142b03e4b5aea4e70f8 # 8.2.1
         with:
           eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
@@ -176,6 +178,8 @@ jobs:
 
   android:
     needs: [meta, checks]
+    # Dependabot PRs build native E2E apps instead of credentialed internal releases.
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -197,15 +201,15 @@ jobs:
           df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP" /tmp
 
       - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
 
-      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+      - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
 
-      - uses: chainguard-actions/actions-setup-java@4abbff4c3bfc93084ea2ff1796c8b4e0c255e47d # v6.1.0
+      - uses: chainguard-actions/actions-setup-java@10a5b64fe4498a8d2446baf16c05892e3042a31e # v6.1.0
         with:
           distribution: temurin
           java-version: "17"
@@ -213,7 +217,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
+      - uses: chainguard-actions/expo-expo-github-action@f202d68400237adfeabf5142b03e4b5aea4e70f8 # 8.2.1
         with:
           eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
@@ -263,11 +267,11 @@ jobs:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
 
-      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+      - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
 

@@ -22,6 +22,8 @@ import {
   resolveInlinePgpArmoredCiphertext,
 } from "./message-security";
 import type { JmapEmailMessage, JmapIdentity } from "./types";
+import { getMailDraftSizeError, limitMailQuoteContent } from "@workspace/calendar-core/mail-mime-limits";
+import { MAIL_DRAFT_TEXT_LIMITS } from "@workspace/calendar-core/mail-mime-parser";
 
 const EMPTY_FIELDS: ComposeTextFields = {
   to: "",
@@ -149,6 +151,7 @@ export function planComposeSeed({
       if (isEncrypted(sourceMessage)) {
         return runtime ? { kind: "decrypt-draft", draftId: sourceMessage.id } : null;
       }
+      if (getMailDraftSizeError(extractMessageBodies(sourceMessage))) return null;
       return {
         kind: "fields",
         draftId: sourceMessage.id,
@@ -172,7 +175,9 @@ function isEncrypted(message: JmapEmailMessage): boolean {
 export async function decryptMessagePlaintext(
   runtime: MailRuntime,
   message: JmapEmailMessage,
+  forDraft = false,
 ): Promise<string> {
+  const limits = forDraft ? MAIL_DRAFT_TEXT_LIMITS : undefined;
   const decrypted =
     classifyMessageEncryption(message) === "inline_pgp"
       ? await decryptMailMessage(
@@ -183,19 +188,28 @@ export async function decryptMessagePlaintext(
             fetchBlob: (blobId) =>
               runtime.client.getBlobAsText(runtime.session, blobId),
           }),
+          undefined,
+          limits,
         )
-      : await decryptPgpMimeMessage(runtime, message.id, message.bodyStructure);
+      : await decryptPgpMimeMessage(runtime, message.id, message.bodyStructure, undefined, limits);
+  if (forDraft && decrypted.rawMimeFallback) {
+    throw new Error("This draft could not be opened safely here. Edit it on the web. The saved draft has not been changed.");
+  }
+  const content = { text: decrypted.plaintext, html: decrypted.html, truncated: decrypted.truncated };
+  if (!forDraft) return limitMailQuoteContent({ text: content.text, truncated: content.truncated }).text ?? "";
+  const sizeError = getMailDraftSizeError(content);
+  if (sizeError) throw new Error(sizeError);
   return decrypted.plaintext;
 }
 
-/** Decrypts a saved encrypted draft for editing; a failure still opens its headers with an empty body. */
+/** A failed draft read returns headers for the error state; the editor closes before seeding or autosaving. */
 export async function decryptDraftFields(
   runtime: MailRuntime,
   message: JmapEmailMessage,
 ): Promise<{ fields: ComposeTextFields; error: string | null }> {
   const headers = draftHeaders(message);
   try {
-    return { fields: { ...headers, body: await decryptMessagePlaintext(runtime, message) }, error: null };
+    return { fields: { ...headers, body: await decryptMessagePlaintext(runtime, message, true) }, error: null };
   } catch (err) {
     return {
       fields: headers,

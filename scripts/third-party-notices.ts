@@ -28,6 +28,8 @@ const AGPL_COMPATIBLE = new Set([
 
 /** Assets outside node_modules that ship in an app. */
 const EXTRA_PACKAGES = [
+  { name: "WHATWG HTML named character references", version: "Living Standard", license: "BSD-3-Clause", file: "packages/calendar-core/src/vendor/WHATWG-LICENSE.txt" },
+  { name: "postal-mime (HTML entity data)", version: "2.7.4", license: "MIT-0", file: "packages/calendar-core/src/vendor/postal-mime-LICENSE.txt" },
   { name: "Inter", version: "4.1", license: "OFL-1.1", file: "packages/ui/src/font/inter-font/LICENSE.txt" },
 ];
 

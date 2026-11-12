@@ -14,6 +14,7 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { createRoot, type Root } from "react-dom/client";
+import { MessageReaderReplyActions } from "@/components/mail/message-reader/message-reader-reply-actions";
 
 // jsdom does not implement matchMedia
 Object.defineProperty(window, "matchMedia", {
@@ -1087,6 +1088,41 @@ describe("MessageReader — archive button", () => {
 });
 
 describe("MessageReader — reply button in toolbar", () => {
+  it("mobile Reply all closes the drawer and respects the disabled state", () => {
+    const onReply = jest.fn();
+    const onReplyAll = jest.fn();
+    const onClose = jest.fn();
+    const draw = (disabled: boolean) => act(() => root.render(
+      <MessageReaderReplyActions onReply={onReply} onReplyAll={onReplyAll} onForward={() => {}} onClose={onClose} disabled={disabled} />,
+    ));
+    draw(false);
+    const findReplyAll = () => Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Reply all");
+    expect(findReplyAll()).toBeDefined();
+    act(() => findReplyAll()?.click());
+    expect(onReplyAll).toHaveBeenCalledTimes(1);
+    expect(onReply).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    draw(true);
+    act(() => findReplyAll()?.click());
+    expect(onReplyAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers a separate Reply all action with the same busy guard", () => {
+    const onReply = jest.fn();
+    const onReplyAll = jest.fn();
+    render({ onReply, onReplyAll });
+    const button = container.querySelector<HTMLButtonElement>("[aria-label='Reply all']");
+    expect(button).not.toBeNull();
+    act(() => button?.click());
+    expect(onReplyAll).toHaveBeenCalledTimes(1);
+    expect(onReply).not.toHaveBeenCalled();
+    render({ onReplyAll, isBusy: true });
+    const busyButton = container.querySelector<HTMLButtonElement>("[aria-label='Reply all']");
+    expect(busyButton?.getAttribute("aria-disabled")).toBe("true");
+    act(() => busyButton?.click());
+    expect(onReplyAll).toHaveBeenCalledTimes(1);
+  });
+
   it("renders Reply button in toolbar", () => {
     render();
     const btn = container.querySelector("[aria-label='Reply']");
@@ -1512,6 +1548,28 @@ describe("MessageReader — reply bar", () => {
     );
   });
 
+  it("keeps replacement reply edits when an old completion says its editor is retired", async () => {
+    let finish: ((value: boolean) => void) | undefined;
+    const onSendReply = jest.fn<(text: string, files: File[]) => Promise<boolean>>(() => new Promise((resolve) => { finish = resolve; }));
+    render({ onSendReply });
+    expandReplyBar();
+    const fill = (value: string) => {
+      const textarea = container.querySelector<HTMLTextAreaElement>("textarea[aria-label*='Reply to']");
+      if (!textarea) throw new Error("Missing reply editor");
+      act(() => {
+        Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, value);
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    };
+    fill("Old reply");
+    await act(async () => { container.querySelector<HTMLButtonElement>("[aria-label='Send reply']")?.click(); await Promise.resolve(); });
+    render({ message: { ...baseMessage, id: "new-message", from: [{ email: "new@example.test", name: "New sender" }] }, onSendReply });
+    expandReplyBar();
+    fill("Keep replacement reply");
+    await act(async () => { finish?.(false); await Promise.resolve(); });
+    expect(container.querySelector<HTMLTextAreaElement>("textarea[aria-label*='Reply to']")?.value).toBe("Keep replacement reply");
+  });
+
   it("clears the typed reply when switching to another message", () => {
     render();
     expandReplyBar();
@@ -1776,4 +1834,8 @@ describe("MessageReader — thread", () => {
     expect(container.querySelector('[aria-label="People in this thread"]')).toBeNull();
     expect(container.textContent).not.toContain("In this thread");
   });
+});
+
+it("shows changed sender identity separately from a valid historical signature",()=>{
+ render({signatureVerificationState:"verified",senderKeyTrustState:{kind:"key_changed",oldFingerprint:"A".repeat(40),newFingerprint:"B".repeat(40)}});expect(container.textContent).toContain("Sender key changed");expect(container.textContent).toContain("previously saved key");expect(container.textContent).not.toContain("PGP encrypted & verified");
 });

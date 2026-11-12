@@ -5,10 +5,12 @@ import {
   orderByIds,
   searchIndexedMailbox,
   type MailSearchFilters,
+  type PrivateMailSearchResult,
+  unknownPrivateSearchCoverage,
 } from "@workspace/calendar-core";
 import { getActiveE2eeSession } from "@/lib/e2ee-session";
 import { isPrivateContentIndexEnabled } from "@/lib/search/private-index-flags";
-import { loadLocalMailSearchDocuments } from "@/lib/search/private-title-index";
+import { loadPrivateTitleIndex } from "@/lib/search/private-title-index";
 import type { StalwartJmapClient } from "./jmap-client";
 import type { JmapEmailMessage, JmapSession } from "./types";
 
@@ -21,13 +23,14 @@ export async function searchMailbox(input: {
   filters: MailSearchFilters | null;
   timezone?: string | null;
   limit: number;
-}): Promise<JmapEmailMessage[]> {
+}): Promise<PrivateMailSearchResult<JmapEmailMessage>> {
   const { client, session, mailboxId, text, filters, timezone, limit } = input;
 
   if (isPrivateContentIndexEnabled()) {
     const accountId = getActiveE2eeSession()?.userId;
     // While the index builds or recovers this finds nothing, rather than sending the words to the server.
-    const documents = accountId ? await loadLocalMailSearchDocuments(accountId) : [];
+    const snapshot = accountId ? await loadPrivateTitleIndex(accountId) : null;
+    const documents = snapshot?.documents ?? [];
     const conditions = filters?.conditions ?? [];
     const filtersMessages = conditions.some(
       (condition) => condition.hasAttachment || condition.isFlagged || condition.isUnread,
@@ -43,22 +46,48 @@ export async function searchMailbox(input: {
       ids.length > 0
         ? await client.getMessagesByIds(session, ids, { includeBodies: false })
         : [];
-    return orderByIds(messages, ids)
+    const filtered = orderByIds(messages, ids)
       // The index can still list a message in a folder it has left, such as one moved to Trash.
       .filter((message) => message.mailboxIds?.[mailboxId] === true)
       .filter((message) => matchesMessageConditions(message, conditions))
       .slice(0, limit);
+    return {
+      messages: filtered,
+      coverage: snapshot?.coverage ?? unknownPrivateSearchCoverage(),
+      matchCount: ids.length,
+      limit,
+    };
   }
 
   if (!filters) {
-    return (await client.searchMailboxMessages(session, mailboxId, text, limit)).messages;
+    const result = await client.searchMailboxMessages(
+      session,
+      mailboxId,
+      text,
+      limit,
+    );
+    return {
+      messages: result.messages,
+      coverage: null,
+      matchCount: result.messages.length,
+      limit,
+    };
   }
   const jmapFilter = buildJmapFilter(
     mailboxId,
     { ...filters, text: text || filters.text?.trim() || undefined },
     { timezone },
   );
-  return (
-    await client.searchMailboxMessagesWithFilter(session, mailboxId, jmapFilter, limit)
-  ).messages;
+  const result = await client.searchMailboxMessagesWithFilter(
+    session,
+    mailboxId,
+    jmapFilter,
+    limit,
+  );
+  return {
+    messages: result.messages,
+    coverage: null,
+    matchCount: result.messages.length,
+    limit,
+  };
 }

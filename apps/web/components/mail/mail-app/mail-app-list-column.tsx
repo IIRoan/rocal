@@ -21,6 +21,18 @@ import type { MailAppContentController } from "../use-mail-app-content-controlle
 
 const log = createLogger("mail-app-list-column");
 
+function MailSearchState({ loading, query, mailbox }: { loading: boolean; query: string; mailbox: string }) {
+  if (loading) {
+    return <div className="flex flex-1 items-center justify-center p-8"><p className="text-sm text-muted-foreground">Searching…</p></div>;
+  }
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-1 p-8 text-center">
+      <p className="max-w-full break-words text-sm text-foreground">{query ? `No results for “${query}”` : "No messages match these filters"}</p>
+      <p className="text-xs text-muted-foreground">Search covers {mailbox} only. Open another folder to search there.</p>
+    </div>
+  );
+}
+
 export function MailAppListColumn({
   controller,
 }: {
@@ -45,6 +57,7 @@ export function MailAppListColumn({
     isSearching,
     isSearchDebouncing,
     searchActive,
+    searchCoverageText,
     showSearchLoadingState,
     searchInputRef,
     clearListSearch,
@@ -131,13 +144,22 @@ export function MailAppListColumn({
               "flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-[var(--bg-l2-solid)]",
               // Only narrowing animates (stacked rows follow the edge under the sliding reader); on close the list is already full width beneath it.
               desktopDetailPaneActive
-                // repo-rules-allow motion-compositor-only: width narrows under the covering reader pane (READER-TRANSITION.md); a transform-only swap would reintroduce the Firefox stutter.
-                ? cn(MAIL_LIST_NARROW_WIDTH_CLASS, "transition-[width]", MAIL_READER_MOTION_CLASS)
+                ? cn(
+                    MAIL_LIST_NARROW_WIDTH_CLASS,
+                    // repo-rules-allow motion-compositor-only: width narrows under the covering reader pane (READER-TRANSITION.md); a transform-only swap would reintroduce the Firefox stutter.
+                    "transition-[width]",
+                    MAIL_READER_MOTION_CLASS,
+                  )
                 : "w-full",
             )
       }
     >
       <div ref={contentRef} className="flex min-h-0 flex-1 flex-col">
+        {searchCoverageText ? (
+          <p role="status" className="px-3 py-2 text-xs text-muted-foreground">
+            {searchCoverageText}
+          </p>
+        ) : null}
         {!isMobile && (
           <MailMailboxHeader
             title={listTitle}
@@ -188,128 +210,116 @@ export function MailAppListColumn({
           {listStatus}
         </p>
         <div className="flex min-h-0 flex-1 flex-col">
-          {showSearchLoadingState ? (
-            <div className="flex flex-1 items-center justify-center p-8">
-              <p className="text-sm text-muted-foreground">Searching…</p>
-            </div>
-          ) : searchActive && shownCount === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-1 p-8 text-center">
-              <p className="max-w-full break-words text-sm text-foreground">
-                {searchQuery
-                  ? `No results for “${searchQuery}”`
-                  : "No messages match these filters"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Search covers {listTitle} only. Open another folder to search there.
-              </p>
-            </div>
+          {showSearchLoadingState || (searchActive && shownCount === 0) ? (
+            <MailSearchState loading={showSearchLoadingState} query={searchQuery} mailbox={listTitle} />
           ) : (
             <MessageList
-            key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
-            messages={filteredListMessages}
-            relatedMessages={listThreadRelatedMessages}
-            selectedMessageId={selectedMessageId}
-            onSelect={handleSelectMessage}
-            mailboxes={activeMailbox.mailboxes}
-            currentMailboxId={activeMailbox.selectedMailboxId}
-            onDelete={(id) =>
-              void handleDeleteMessage(id).catch((error) =>
-                log.error("Failed to delete message", error),
-              )
-            }
-            onMove={(id, targetId) =>
-              void handleMoveMessage(targetId, id).catch((error) =>
-                log.error("Failed to move message", error),
-              )
-            }
-            onMarkAsUnread={(id) =>
-              void handleMarkAsUnread(id).catch((error) =>
-                log.error("Failed to mark message as unread", error),
-              )
-            }
-            onMarkAsRead={(id) =>
-              void handleMarkAsRead(id).catch((error) =>
-                log.error("Failed to mark message as read", error),
-              )
-            }
-            onBulkDelete={(ids) =>
-              void handleBulkDelete(ids).catch((error) =>
-                log.error("Failed to delete messages", error),
-              )
-            }
-            onBulkMove={(ids, targetId) =>
-              void handleBulkMove(ids, targetId).catch((error) =>
-                log.error("Failed to move messages", error),
-              )
-            }
-            onBulkMarkAsUnread={(ids) =>
-              void handleBulkMarkAsUnread(ids).catch((error) =>
-                log.error("Failed to mark messages as unread", error),
-              )
-            }
-            onBulkMarkAsRead={(ids) =>
-              void handleBulkMarkAsRead(ids).catch((error) =>
-                log.error("Failed to mark messages as read", error),
-              )
-            }
-            onToggleFlagged={(id) =>
-              void handleToggleFlagged(id).catch((error) =>
-                log.error("Failed to toggle flagged", error),
-              )
-            }
-            onReportSpam={(id) =>
-              void handleReportSpam(id).catch((error) =>
-                log.error("Failed to report spam", error),
-              )
-            }
-            onNotSpam={(id) =>
-              void handleNotSpam(id).catch((error) =>
-                log.error("Failed to move out of spam", error),
-              )
-            }
-            onBulkReportSpam={(ids) =>
-              void handleBulkReportSpam(ids).catch((error) =>
-                log.error("Failed to report messages as spam", error),
-              )
-            }
-            onSetLabel={(messageId, labelId, assigned) =>
-              void handleSetMessageLabel(messageId, labelId, assigned).catch(
-                (error) => log.error("Failed to set message label", error),
-              )
-            }
-            labels={labels}
-            timeFormat={timeFormat}
-            timezone={timezone}
-            onLoadMore={
-              searchActive
-                ? undefined
-                : () =>
-                    void loadMoreMessages().catch((error) =>
-                      log.error("Failed to load more messages", error),
-                    )
-            }
-            hasMore={searchActive ? false : hasMoreMessages}
-            isLoadingMore={isLoadingMore}
-            density={listSettings.density}
-            showLabelChips={listSettings.showLabelChipsInList}
-            threadExpandEnabled={listSettings.threadExpandInList}
-            preserveMessageOrder={searchActive}
-            narrow={desktopDetailPaneActive}
-            onExpandThread={
-              activeMailbox
-                ? async (threadId: string) => {
-                    try {
-                      const messages = await activeMailbox.client.getThreadMessages(
-                        activeMailbox.session,
-                        threadId,
-                      );
-                      return messages;
-                    } catch {
-                      return [];
+              key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
+              messages={filteredListMessages}
+              relatedMessages={listThreadRelatedMessages}
+              selectedMessageId={selectedMessageId}
+              onSelect={handleSelectMessage}
+              mailboxes={activeMailbox.mailboxes}
+              currentMailboxId={activeMailbox.selectedMailboxId}
+              onDelete={(id) =>
+                void handleDeleteMessage(id).catch((error) =>
+                  log.error("Failed to delete message", error),
+                )
+              }
+              onMove={(id, targetId) =>
+                void handleMoveMessage(targetId, id).catch((error) =>
+                  log.error("Failed to move message", error),
+                )
+              }
+              onMarkAsUnread={(id) =>
+                void handleMarkAsUnread(id).catch((error) =>
+                  log.error("Failed to mark message as unread", error),
+                )
+              }
+              onMarkAsRead={(id) =>
+                void handleMarkAsRead(id).catch((error) =>
+                  log.error("Failed to mark message as read", error),
+                )
+              }
+              onBulkDelete={(ids) =>
+                void handleBulkDelete(ids).catch((error) =>
+                  log.error("Failed to delete messages", error),
+                )
+              }
+              onBulkMove={(ids, targetId) =>
+                void handleBulkMove(ids, targetId).catch((error) =>
+                  log.error("Failed to move messages", error),
+                )
+              }
+              onBulkMarkAsUnread={(ids) =>
+                void handleBulkMarkAsUnread(ids).catch((error) =>
+                  log.error("Failed to mark messages as unread", error),
+                )
+              }
+              onBulkMarkAsRead={(ids) =>
+                void handleBulkMarkAsRead(ids).catch((error) =>
+                  log.error("Failed to mark messages as read", error),
+                )
+              }
+              onToggleFlagged={(id) =>
+                void handleToggleFlagged(id).catch((error) =>
+                  log.error("Failed to toggle flagged", error),
+                )
+              }
+              onReportSpam={(id) =>
+                void handleReportSpam(id).catch((error) =>
+                  log.error("Failed to report spam", error),
+                )
+              }
+              onNotSpam={(id) =>
+                void handleNotSpam(id).catch((error) =>
+                  log.error("Failed to move out of spam", error),
+                )
+              }
+              onBulkReportSpam={(ids) =>
+                void handleBulkReportSpam(ids).catch((error) =>
+                  log.error("Failed to report messages as spam", error),
+                )
+              }
+              onSetLabel={(messageId, labelId, assigned) =>
+                void handleSetMessageLabel(messageId, labelId, assigned).catch(
+                  (error) => log.error("Failed to set message label", error),
+                )
+              }
+              labels={labels}
+              timeFormat={timeFormat}
+              timezone={timezone}
+              onLoadMore={
+                searchActive
+                  ? undefined
+                  : () =>
+                      void loadMoreMessages().catch((error) =>
+                        log.error("Failed to load more messages", error),
+                      )
+              }
+              hasMore={searchActive ? false : hasMoreMessages}
+              isLoadingMore={isLoadingMore}
+              density={listSettings.density}
+              showLabelChips={listSettings.showLabelChipsInList}
+              threadExpandEnabled={listSettings.threadExpandInList}
+              preserveMessageOrder={searchActive}
+              narrow={desktopDetailPaneActive}
+              onExpandThread={
+                activeMailbox
+                  ? async (threadId: string) => {
+                      try {
+                        const messages =
+                          await activeMailbox.client.getThreadMessages(
+                            activeMailbox.session,
+                            threadId,
+                          );
+                        return messages;
+                      } catch {
+                        return [];
+                      }
                     }
-                  }
-                : undefined
-            }
+                  : undefined
+              }
             />
           )}
         </div>

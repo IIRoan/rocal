@@ -1,0 +1,3 @@
+*.eml -text -diff
+*.mime -text -diff
+*.asc -text -diff

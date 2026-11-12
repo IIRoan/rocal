@@ -37,7 +37,7 @@ jobs:
           test "$GITHUB_EVENT_NAME" = workflow_dispatch
           test "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH"
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
-      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+      - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile

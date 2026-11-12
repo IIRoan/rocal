@@ -1,3 +1,4 @@
+import { clearMailSendAttempts } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import { authClient, signOut } from "@/lib/auth-client";
 import type { E2eeLock } from "@workspace/e2ee";
@@ -16,7 +17,10 @@ import {
   listRecoverableE2eeDevices,
 } from "@/lib/e2ee-storage";
 import { clearLocalMailSettings } from "@/lib/mail/mail-settings-storage";
+import { clearMailTrustAnchors } from "@/lib/mail/mail-trust-anchor-storage";
+import { cancelMailTrustReview } from "@/lib/mail/mail-trust-lifecycle";
 import { MAIL_VAULT_DATABASE_NAME } from "@/lib/mail/vault-storage";
+import { suspendPrivateSearch } from "@/lib/search/private-index-lifecycle";
 import { clearLocalSearchIndexDatabase } from "@/lib/search/local-index-store";
 
 const log = createLogger("auth-local-state");
@@ -36,6 +40,9 @@ function deleteDatabase(name: string): Promise<void> {
 
 /** Remove client artifacts that must never survive sign-out or an unauthenticated visit. */
 export function clearSolaceClientAuthArtifacts(): void {
+  cancelMailTrustReview();
+  suspendPrivateSearch();
+  clearMailSendAttempts();
   clearAuthPasswords();
   resetE2eeBootstrap();
   clearLocalMailSettings();
@@ -44,6 +51,7 @@ export function clearSolaceClientAuthArtifacts(): void {
     deleteRecoverableE2eeDevices(),
     deleteDatabase(MAIL_VAULT_DATABASE_NAME),
     clearLocalSearchIndexDatabase(),
+    clearMailTrustAnchors(),
   ]).catch((error: unknown) => {
     log.warn("Local key stores could not be deleted", { error });
   });
@@ -51,12 +59,18 @@ export function clearSolaceClientAuthArtifacts(): void {
 
 /** Drop encryption artifacts left when the session is gone but a prior device's key material remains. */
 export function clearOrphanedClientAuthArtifacts(): void {
+  cancelMailTrustReview();
+  void clearMailTrustAnchors().catch(() => log.warn("Local key history cleanup will retry"));
+  clearMailSendAttempts();
   clearLegacyRememberedPassword();
   clearLocalMailSettings();
 }
 
 /** Best-effort server sign-out plus a full local auth artifact wipe. */
 export async function signOutAndClearLocalState(): Promise<void> {
+  cancelMailTrustReview();
+  suspendPrivateSearch();
+  clearMailSendAttempts();
   // A device row is useless once its key is gone, and deleting it needs the session that sign-out ends.
   await Promise.all(
     (await listRecoverableE2eeDevices()).map((record) =>

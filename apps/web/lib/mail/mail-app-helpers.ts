@@ -1,17 +1,20 @@
 import {
   normalizeEmailAddress,
   sealOutgoingMessageBody,
+  MAIL_KEY_CONTINUITY_ENABLED,
   type JmapAttachmentInput,
   type MailSealer,
   type MailServerPolicy,
   type OutgoingMessageBody,
   type OutgoingMimeAttachment,
 } from "@workspace/calendar-core";
-import { type Attachment as ParsedMailAttachment } from "postal-mime";
+import type { ParsedMailAttachment } from "@workspace/calendar-core/mail-mime-parser";
+import { assertMailVerificationContext, captureMailVerificationContext } from "./mail-sender-verification";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import { mergeMailMessage, mergeMailMessagePreservingKeywords } from "@/lib/mail/mail-message-body";
 import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
+import { guardMailKeywords, type MailKeywordGuard } from "@workspace/calendar-core";
 import type {
   JmapEmailMessage,
   JmapIdentity,
@@ -147,15 +150,11 @@ function toParsedMailAttachment(
   };
 }
 
-/** The parts of a decrypted PGP/MIME message the reader lists as attachments. */
+/** The parser returns only the parts the reader lists, so every one becomes an attachment row. */
 export function listedDecryptedAttachments(
-  attachments: ParsedMailAttachment[],
+  attachments: ParsedMailAttachment[] = [],
 ): MailAttachment[] {
-  return attachments.flatMap((attachment) =>
-    attachment.disposition === "attachment" && !attachment.related
-      ? [toParsedMailAttachment(attachment)]
-      : [],
-  );
+  return attachments.map(toParsedMailAttachment);
 }
 
 export async function resolveAttachmentBlob(input: {
@@ -258,12 +257,27 @@ export async function buildTextAttachmentPreview(
 export function createMailSealer(
   mailbox: Pick<ActiveMailboxState, "client" | "session" | "unlockedVault">,
 ): MailSealer {
-  return {
-    selfPublicKeyArmored: mailbox.unlockedVault.publicKeyArmored,
-    encrypt: (input) => mailCryptoWorkerClient.encryptForRecipients(input),
-    upload: (armoredMessage) =>
-      mailbox.client.uploadTextBlob(mailbox.session, armoredMessage, "text/plain"),
+  const context = captureMailVerificationContext();
+  if (context.fingerprint.toUpperCase() !== mailbox.unlockedVault.publicKeyFingerprint.toUpperCase()) {
+    throw new Error("Mail encryption session changed.");
+  }
+  const sealer: MailSealer = {
+    selfPublicKeyArmored: context.publicKeyArmored,
+    isCurrent: () => mailCryptoWorkerClient.isVerificationContextCurrent(context),
+    encrypt: async (input) => {
+      assertMailVerificationContext(context);
+      const result = await mailCryptoWorkerClient.encryptForRecipients(input);
+      assertMailVerificationContext(context);
+      return result;
+    },
+    upload: async (armoredMessage) => {
+      assertMailVerificationContext(context);
+      const result = await mailbox.client.uploadTextBlob(mailbox.session, armoredMessage, "text/plain");
+      assertMailVerificationContext(context);
+      return result;
+    },
   };
+  return sealer;
 }
 
 export function resolveOutgoingMessageBody(input: {
@@ -274,6 +288,7 @@ export function resolveOutgoingMessageBody(input: {
   internalDomain: string | null;
   mimeAttachments?: OutgoingMimeAttachment[];
 }): Promise<OutgoingMessageBody> {
+  const verificationContext = captureMailVerificationContext();
   return sealOutgoingMessageBody({
     recipients: input.recipients,
     senderEmail: input.activeMailbox.email,
@@ -284,8 +299,11 @@ export function resolveOutgoingMessageBody(input: {
       attachments: input.mimeAttachments,
     },
     sealer: createMailSealer(input.activeMailbox),
-    getRecipientPublicKey: async (email) =>
-      (await mailDemoApiService.getRecipientKey(email)).publicKeyArmored,
+    getRecipientPublicKey: async (email) => {
+      if (!MAIL_KEY_CONTINUITY_ENABLED) return (await mailDemoApiService.getRecipientKey(email)).publicKeyArmored;
+      const { resolveTrustedMailRecipient } = await import("./mail-trust");
+      return resolveTrustedMailRecipient(email, verificationContext);
+    },
   });
 }
 
@@ -321,6 +339,7 @@ export function mergeMessagesForMailbox(
   currentMessages: JmapEmailMessage[],
   mailboxId: string,
   sync: MailSyncResponse["email"],
+  keywordGuard?: MailKeywordGuard,
 ): JmapEmailMessage[] {
   if (sync.records.length === 0 && sync.destroyed.length === 0) {
     return currentMessages;
@@ -338,9 +357,12 @@ export function mergeMessagesForMailbox(
   for (const message of sync.records) {
     if (message.mailboxIds?.[mailboxId]) {
       const existing = nextMessages.get(message.id);
+      const guarded = keywordGuard
+        ? guardMailKeywords(message, existing, keywordGuard)
+        : message;
       nextMessages.set(
         message.id,
-        existing ? mergeMailMessage(existing, message) : message,
+        existing ? mergeMailMessage(existing, guarded) : guarded,
       );
     } else {
       nextMessages.delete(message.id);

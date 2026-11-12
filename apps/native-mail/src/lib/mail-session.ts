@@ -1,3 +1,5 @@
+import { bindMailSendOwner, clearMailSendAttempts } from "@workspace/calendar-core";
+import { captureSessionDataScope, getSessionDataScope, isSessionDataScopeCurrent, subscribeSessionDataScope } from "@workspace/native-core/lib/session-data-lifecycle";
 import type { QueryClient } from "@tanstack/react-query";
 import type { AuthLifecycle } from "@workspace/native-core/providers/AuthProvider";
 import type { AuthenticatedSessionInput } from "@workspace/native-core/lib/startup-crypto";
@@ -36,6 +38,24 @@ const RUNTIME_STALE_MS = 5 * 60_000;
 let restoredUserId: string | null = null;
 let restoreGeneration = 0;
 let launchCleanupDone = false;
+let launchCleanup: Promise<void> | null = null;
+
+subscribeSessionDataScope(() => {
+  const scope = getSessionDataScope();
+  if (scope) bindMailSendOwner(scope.accountId);
+});
+
+async function clearLaunchArtifacts(): Promise<void> {
+  if (launchCleanupDone) return;
+  if (launchCleanup) return launchCleanup;
+  const operation = Promise.all([
+    clearAttachmentCache(), clearMailVaultPassword(), clearDerivedVaultKey(),
+  ]).then(() => { launchCleanupDone = true; }).finally(() => {
+    if (launchCleanup === operation) launchCleanup = null;
+  });
+  launchCleanup = operation;
+  return operation;
+}
 
 /** Seeds the cache from the encrypted snapshot before E2EE starts, so the mailbox opens without the loading screen. */
 export async function restoreMailSession(input: {
@@ -43,9 +63,13 @@ export async function restoreMailSession(input: {
   userId: string;
   isCancelled: () => boolean;
 }): Promise<boolean> {
+  const scope = captureSessionDataScope(input.userId);
+  if (isSessionDataScopeCurrent(scope)) bindMailSendOwner(input.userId);
   const generation = ++restoreGeneration;
+  await clearLaunchArtifacts();
+  if (!isSessionDataScopeCurrent(scope) || input.isCancelled()) return false;
   const snapshot = await loadMailOfflineSnapshot(input.userId);
-  if (!snapshot || input.isCancelled() || generation !== restoreGeneration) {
+  if (!snapshot || input.isCancelled() || generation !== restoreGeneration || !isSessionDataScopeCurrent(scope)) {
     return false;
   }
   holdVaultUnlock();
@@ -82,19 +106,17 @@ async function finishRestoredMailSession(
 export async function prepareMailSession(
   input: AuthenticatedSessionInput,
 ): Promise<void> {
-  const setPhase = (phase: string) => input.onPhaseChange?.(phase);
+  const scope = captureSessionDataScope(input.userId);
+  const current = () => isSessionDataScopeCurrent(scope) && !input.isCancelled();
+  if (!current()) return;
+  bindMailSendOwner(input.userId);
+  const setPhase = (phase: string) => { if (current()) input.onPhaseChange?.(phase); };
 
   // The guard only calls this once E2EE bootstrap settled, so waiting vault unlocks can proceed.
   releaseVaultUnlock();
-  // Once per launch: earlier launches' attachments are no longer open in a viewer, and the password and derived key are what older versions stored.
-  if (!launchCleanupDone) {
-    launchCleanupDone = true;
-    await Promise.all([
-      clearAttachmentCache().catch(() => undefined),
-      clearMailVaultPassword(),
-      clearDerivedVaultKey(),
-    ]);
-  }
+  // Remove older launches' plaintext files before a restored runtime can expose attachment actions.
+  await clearLaunchArtifacts();
+  if (!current()) return;
   if (restoredUserId === input.userId) {
     await finishRestoredMailSession(input);
     return;
@@ -115,6 +137,7 @@ export async function prepareMailSession(
     }),
   ]);
 
+  if (!current()) return;
   let mailAccount = initialMailAccount;
 
   if (!mailAccount.provisioned && mailConfig.signupEnabled) {
@@ -130,6 +153,7 @@ export async function prepareMailSession(
       displayName: input.displayName ?? null,
     });
 
+    if (!current()) return;
     mailAccount = {
       email: provisioned.email,
       displayName: provisioned.displayName,
@@ -150,9 +174,9 @@ export async function prepareMailSession(
     staleTime: RUNTIME_STALE_MS,
   });
   // Anchor sync before the first list loads so that list is never refetched just to set a baseline.
-  setMailSyncState(
-    await runtime.client.getEmailState(runtime.session).catch(() => null),
-  );
+  const emailState = await runtime.client.getEmailState(runtime.session).catch(() => null);
+  if (!current()) return;
+  setMailSyncState(emailState);
 
   setPhase("Unlocking encrypted mail…");
   await ensureVaultLoaded(runtime);
@@ -161,17 +185,25 @@ export async function prepareMailSession(
 /** Wipes every vault secret and decrypted copy on sign-out. */
 export const MAIL_AUTH_LIFECYCLE: AuthLifecycle = {
   async onSignedOut() {
+    clearMailSendAttempts();
     restoreGeneration += 1;
     restoredUserId = null;
-    await clearMailVaultPassword();
-    await clearDerivedVaultKey();
-    await clearCachedPrivateKey();
-    await clearMailSettings();
-    await clearMailListSettings();
-    await clearMailOfflineSnapshot();
-    await clearAttachmentCache();
     resetMailSync();
     clearVaultCache();
     clearSenderKeyCache();
+    const results = await Promise.allSettled([
+      clearMailVaultPassword(),
+      clearDerivedVaultKey(),
+      clearCachedPrivateKey(),
+      clearMailSettings(),
+      clearMailListSettings(),
+      clearMailOfflineSnapshot(),
+      clearAttachmentCache(),
+    ]);
+    if (results.some((result) => result.status === "rejected")) {
+      throw new Error(
+        "Some local mail data could not be removed. Please retry cleanup.",
+      );
+    }
   },
 };

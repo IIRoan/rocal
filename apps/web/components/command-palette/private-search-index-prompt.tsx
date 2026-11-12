@@ -35,12 +35,12 @@ export function PrivateSearchIndexPrompt({
     >
       <DialogContent className="w-[calc(100dvw-1rem)] sm:w-auto sm:max-w-md">
         <DialogHeader className="pr-12">
-          <DialogTitle>Search your full history on this device?</DialogTitle>
+          <DialogTitle>Enable on-device search?</DialogTitle>
           <DialogDescription>
-            Solace can keep encrypted titles of your mail and events, and the
-            start of each message, on this device so older items stay
-            searchable. The index never leaves the device, and encrypted event
-            bodies stay encrypted on the server.
+            This is off until you choose to enable it. Solace keeps an encrypted
+            index on this device. Mail search covers recent indexed messages and
+            excerpts, so older mail may be missing. The index and private search
+            words stay on this device.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

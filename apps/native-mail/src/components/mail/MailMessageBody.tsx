@@ -1,3 +1,4 @@
+import { getMailReadLimitNotice } from "@workspace/calendar-core/mail-mime-limits";
 import { useState } from "react";
 import {
   Pressable,
@@ -11,6 +12,9 @@ import {
 import { Feather } from "@expo/vector-icons";
 import {
   getErrorMessage,
+  getMailSenderTrustNotice,
+  getMailSignatureVerificationLabel,
+  MAIL_KEY_CONTINUITY_ENABLED,
   resolveMailContentIsDark,
   resolveReaderRemoteContent,
 } from "@workspace/calendar-core";
@@ -87,6 +91,7 @@ export function MailMessageBody({
       theme={theme}
       styles={styles}
       state={decryptResult.signatureVerificationState}
+      trust={decryptResult.senderKeyTrustState ?? (MAIL_KEY_CONTINUITY_ENABLED ? { kind: "unavailable", reason: "history" } : undefined)}
     />
   ) : null;
 
@@ -106,6 +111,7 @@ export function MailMessageBody({
 
   return (
     <>
+      {decryptResult && (decryptResult.senderKeyTrustState || MAIL_KEY_CONTINUITY_ENABLED) ? <SenderKeyTrustNotice result={decryptResult} /> : null}
       {isEventReminderEmail && linkedCalendarEventId ? (
         <EventReminderBanner
           loading={isReminderEventLoading}
@@ -145,7 +151,7 @@ export function MailMessageBody({
         <DecryptErrorCard
           theme={theme}
           styles={styles}
-          error={getErrorMessage(decryptError, "Decryption failed")}
+          error={getMailReadLimitNotice(decryptError) ?? getErrorMessage(decryptError, "Decryption failed")}
           onRetry={() => content.refetchDecrypt()}
         />
       ) : isEventReminderEmail && eventReminderView && isLinkedEventSuccess ? (
@@ -286,14 +292,23 @@ function RemoteContentBanner({
   );
 }
 
+function SenderKeyTrustNotice({ result }: { result: MailDecryptResult }) {
+  const { theme } = useTheme();
+  const notice = getMailSenderTrustNotice(result.senderKeyTrustState ?? { kind: "unavailable", reason: "history" });
+  if (!notice) return null;
+  return <Text accessibilityRole="alert" style={{ color: theme.colors.destructive, fontSize: theme.typography.fontSize.sm.size }}>{notice.label}. {notice.description}</Text>;
+}
+
 function SignatureBadge({
   theme,
   styles,
   state,
+  trust,
 }: {
   theme: ThemeTokens;
   styles: ReturnType<typeof createStyles>;
   state: MailDecryptResult["signatureVerificationState"];
+  trust: MailDecryptResult["senderKeyTrustState"];
 }) {
   if (state !== "verified" && state !== "failed") return null;
 
@@ -308,7 +323,7 @@ function SignatureBadge({
         color={color}
       />
       <Text style={[styles.signatureBadgeText, { color }]}>
-        {verified ? "Signature verified" : "Signature verification failed"}
+        {getMailSignatureVerificationLabel(state, trust)}
       </Text>
     </View>
   );

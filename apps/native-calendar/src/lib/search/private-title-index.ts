@@ -5,6 +5,7 @@ import {
 import { loadEventSearchCorpus } from "@workspace/calendar-client";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import {
+  captureNativeTitleIndexRequest,
   loadNativeTitleIndex,
   saveNativeTitleIndex,
 } from "@workspace/native-core/lib/search/title-index-store";
@@ -21,10 +22,19 @@ async function loadCalendarTitles(
 
 export async function rebuildNativeTitleIndex(input: {
   accountId: string;
+  isCurrent?: () => boolean;
   signal?: AbortSignal;
 }): Promise<TitleIndexDocument[]> {
+  const owner = captureNativeTitleIndexRequest(input.accountId);
+  const request = { ...owner, isCurrent: () => owner.isCurrent() && (input.isCurrent?.() ?? true) };
+  if (!request.isCurrent()) throw new Error("Private search was cancelled.");
   const documents = await loadCalendarTitles(input.signal);
-  await saveNativeTitleIndex({ accountId: input.accountId, documents });
+  await saveNativeTitleIndex({
+    accountId: input.accountId,
+    documents,
+    request,
+  });
+  if (!request.isCurrent()) throw new Error("Private search was cancelled.");
   return documents;
 }
 

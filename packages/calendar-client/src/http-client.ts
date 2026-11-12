@@ -24,10 +24,14 @@ export interface HttpClientConfig {
   onAuthError?: (statusCode: 401) => void;
   /** Optional callback invoked when passkey step-up is required. */
   onPasskeyStepUpRequired?: () => void;
-  onResponseHeaders?: (headers: Headers, requestHeaders: Headers) => void | Promise<void>;
+  onResponseHeaders?: (
+    headers: Headers,
+    requestHeaders: Headers,
+  ) => void | Promise<void>;
 }
 
 export interface RequestOptions extends RequestInit {
+  isCurrent?: () => boolean;
   timeout?: number;
   retries?: number;
 }
@@ -93,8 +97,7 @@ export class HttpClient {
   private retryDelay: number;
   private credentials: RequestCredentials;
   private getHeaders?: () =>
-    | Record<string, string>
-    | Promise<Record<string, string>>;
+    Record<string, string> | Promise<Record<string, string>>;
   private onAuthError?: (statusCode: 401) => void;
   private onPasskeyStepUpRequired?: () => void;
   private onResponseHeaders?: HttpClientConfig["onResponseHeaders"];
@@ -128,7 +131,9 @@ export class HttpClient {
     if (typeof record.status === "number") {
       return record.status;
     }
-    return typeof record.statusCode === "number" ? record.statusCode : undefined;
+    return typeof record.statusCode === "number"
+      ? record.statusCode
+      : undefined;
   }
 
   /** A POST may already be applied when it fails or times out, so it repeats only on answers that mean "not processed". */
@@ -200,6 +205,7 @@ export class HttpClient {
     const {
       timeout = this.timeout,
       retries = this.retries,
+      isCurrent,
       ...fetchOptions
     } = options;
 
@@ -210,6 +216,7 @@ export class HttpClient {
 
     // Resolve platform-specific headers once per request
     const extraHeaders = this.getHeaders ? await this.getHeaders() : {};
+    if (isCurrent && !isCurrent()) throw new Error("Account session changed.");
 
     let lastError: unknown;
 
@@ -219,8 +226,7 @@ export class HttpClient {
 
       // Wire external AbortSignal (if provided) to our internal controller
       const externalSignal = (fetchOptions as RequestInit).signal as
-        | AbortSignal
-        | undefined;
+        AbortSignal | undefined;
       let abortListener: (() => void) | null = null;
       if (externalSignal) {
         if (externalSignal.aborted) {
@@ -234,7 +240,8 @@ export class HttpClient {
       }
 
       const rawBody = (fetchOptions as RequestInit).body;
-      const hasBody = rawBody !== undefined && rawBody !== null && rawBody !== "";
+      const hasBody =
+        rawBody !== undefined && rawBody !== null && rawBody !== "";
 
       const requestOptions: RequestInit = {
         ...fetchOptions,
@@ -249,6 +256,8 @@ export class HttpClient {
       };
 
       try {
+        if (isCurrent && !isCurrent())
+          throw new Error("Account session changed.");
         const response = await fetch(fullUrl, requestOptions);
         clearTimeout(timeoutId);
         if (abortListener && externalSignal) {
@@ -256,7 +265,10 @@ export class HttpClient {
           abortListener = null;
         }
 
-        await this.onResponseHeaders?.(response.headers, new Headers(requestOptions.headers));
+        await this.onResponseHeaders?.(
+          response.headers,
+          new Headers(requestOptions.headers),
+        );
 
         if (!response.ok) {
           const retryAfterHeader = response.headers.get("retry-after");

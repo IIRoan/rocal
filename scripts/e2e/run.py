@@ -11,6 +11,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from common import APPS, REPO, backend_pid, directory
+import connectivity
 
 CALENDAR_START = ("01-authentication", "02-calendar-management")
 CONVERSATION_JOURNEYS = frozenset(("07-conversation-first-message", "08-conversation-replies", "09-conversation-reader"))
@@ -50,7 +51,15 @@ def failure_kind(log, report=None):
         return "app-crash"
     if "DeviceUnreachableException" in content:
         return "driver-connection"
-    if any(marker in content for marker in ("TimeoutException", "DEADLINE_EXCEEDED", "OperationTimeout")):
+    if any(marker in content for marker in ("process main thread busy", "Your app is doing heavy work on the main/UI thread")):
+        return "app-main-thread-busy"
+    if any(marker in content for marker in ("Timed out while evaluating UI query", "Your app screen might be too complex")):
+        return "ax-query-timeout"
+    if any(marker in content for marker in ("the app is not running", "The app is not running", "App not running during")):
+        return "app-not-running"
+    if any(marker in content for marker in ("kAXError", "failed, because of unknown reason")):
+        return "driver-ax-error"
+    if any(marker in content for marker in ("TimeoutException", "DEADLINE_EXCEEDED", "OperationTimeout", "Maestro driver timed out")):
         return "driver-timeout"
     if any(marker in content for marker in ("Connection refused", "Failed to connect to", "UNAVAILABLE: io exception", "DeviceServerDiedException")):
         return "driver-connection"
@@ -191,15 +200,21 @@ def capture_failure_hierarchy(tool, device, fixture, name):
             completed = subprocess.run([tool, "--device", device["id"], "hierarchy", "--no-reinstall-driver", "--no-ansi"],
                                        cwd=REPO, env=maestro_environment(), check=False, timeout=60, stdout=output, stderr=log)
         if completed.returncode != 0:
+            print(f"Failure hierarchy unavailable (exit-status={completed.returncode}): {name}", flush=True)
             return
         tree = json.loads(source.read_text())
         if not isinstance(tree, dict):
+            print(f"Failure hierarchy unavailable (invalid-shape): {name}", flush=True)
             return
         target = root / "artifacts/hierarchy"
         target.mkdir(exist_ok=True)
         (target / f"{name}.json").write_text(json.dumps(sanitized_hierarchy(tree, fixture), indent=2))
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        print(f"Failure hierarchy unavailable: {name}", flush=True)
+    except subprocess.TimeoutExpired:
+        print(f"Failure hierarchy unavailable (timeout): {name}", flush=True)
+    except ValueError:
+        print(f"Failure hierarchy unavailable (invalid-json): {name}", flush=True)
+    except OSError:
+        print(f"Failure hierarchy unavailable (os-error): {name}", flush=True)
 
 
 def publish(results, summary=False):
@@ -226,7 +241,7 @@ def publish(results, summary=False):
         Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(table + "\n")
 
 
-def run_journey(platform, app, flow, results):
+def run_journey(platform, app, flow, results, backend_expected=True):
     root = directory()
     device = json.loads((root / "private/device.json").read_text())
     fixture = json.loads((root / "private/fixture.json").read_text())
@@ -250,7 +265,16 @@ def run_journey(platform, app, flow, results):
     if results and platform == "android":
         command.insert(4, "--no-reinstall-driver")
     print(f"Running {platform}: {app}/{name}", flush=True)
+    # The emulator reaches the API only through adb reverse mappings, which vanish when its adb connection restarts.
+    preflight, blocked = connectivity.prepare(device["id"], backend_expected) if platform == "android" else (None, None)
+    restored = bool(preflight and preflight["reverseRestored"])
+    if restored:
+        print(f"Restored Android port forwarding before {app}/{name}", flush=True)
+    passed, reason, exit_code = False, blocked, None
     for attempt in range(2):
+        if blocked:
+            # Without the API the journey would only report a sign-in or loading assertion that says nothing about the app.
+            break
         if attempt:
             # Maestro's iOS driver dies under runner load (mobile-dev-inc/maestro#3538); a new invocation starts a fresh one.
             print(f"Retrying {platform}: {app}/{name} after the device driver disconnected", flush=True)
@@ -281,13 +305,21 @@ def run_journey(platform, app, flow, results):
     if not passed:
         failures = root / "artifacts/failures"
         failures.mkdir(exist_ok=True)
-        details = failure_details(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml", screenshots, reason, exit_code)
+        if blocked:
+            details = {"reason": reason, "exceptionType": None, "command": None, "step": None, "assertionTarget": None, "exitCode": None}
+        else:
+            details = failure_details(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml", screenshots, reason, exit_code)
+        if platform == "android":
+            # After a failed journey this only observes: repairing here would hide what the journey ran against.
+            details["connectivity"] = preflight if blocked else connectivity.observe(device["id"], backend_expected)
         (failures / f"{app}-{name}.json").write_text(json.dumps(details, indent=2))
-        capture_failure_screenshot(platform, device, f"{app}-{name}")
-        capture_failure_hierarchy(tool, device, fixture, f"{app}-{name}")
+        if not blocked:
+            capture_failure_screenshot(platform, device, f"{app}-{name}")
+            capture_failure_hierarchy(tool, device, fixture, f"{app}-{name}")
     status = "PASS" if passed else f"FAIL ({reason})"
     print(f"{status}: {app}/{name}; inspect the journey report and screenshots", flush=True)
-    results.append({"app": app, "name": name, "passed": passed, "seconds": round(time.monotonic() - started, 2), "reason": reason})
+    results.append({"app": app, "name": name, "passed": passed, "seconds": round(time.monotonic() - started, 2), "reason": reason,
+                    **({"deviceForwardingRestored": True} if restored else {})})
     publish(results)
     return passed
 
@@ -327,7 +359,7 @@ def run_mail_tail(platform, scenarios, results):
         raise RuntimeError("Refusing to suspend a process outside the disposable backend")
     os.kill(backend, signal.SIGSTOP)
     try:
-        offline_passed = run_journey(platform, "mail", scenarios / "mail/offline.yaml", results)
+        offline_passed = run_journey(platform, "mail", scenarios / "mail/offline.yaml", results, backend_expected=False)
     finally:
         os.kill(backend, signal.SIGCONT)
     if not offline_passed:

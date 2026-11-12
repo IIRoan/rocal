@@ -9,6 +9,8 @@ import {
 } from "@workspace/ui/solace";
 import {
   resolveLabelDisplayColor,
+  getMailSenderTrustNotice,
+  MAIL_KEY_CONTINUITY_ENABLED,
   type MailThreadParticipant,
 } from "@workspace/calendar-core";
 import { SenderAvatar } from "../mail-avatar";
@@ -27,13 +29,7 @@ export function MessageReaderTitle({
   controller: MessageReaderController;
   view: MessageReaderViewModel;
 }) {
-  const { isMobile, isBusy, isFlagged, messageLabels, props } = controller;
-  const {
-    signatureVerificationState,
-    decryptError,
-    accountEncryptedAtRest,
-    onToggleFlagged,
-  } = props;
+  const { isMobile, messageLabels } = controller;
   const {
     messageState,
     orderedConversationMessages,
@@ -42,6 +38,7 @@ export function MessageReaderTitle({
     threadParticipants,
     threadAttachments,
   } = view;
+
   const threadCount = orderedConversationMessages.length;
 
   return (
@@ -66,35 +63,10 @@ export function MessageReaderTitle({
             ) : null}
           </Typography>
         </h2>
-        <div className="mt-0.5 flex shrink-0 items-center gap-1">
-          {onToggleFlagged && (
-            <button
-              type="button"
-              onClick={onToggleFlagged}
-              disabled={isBusy}
-              aria-label={isFlagged ? "Unstar" : "Star"}
-              className="inline-flex size-7 cursor-pointer items-center justify-center rounded outline-none transition-colors hover:bg-[var(--bg-overlay-tertiary)] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-            >
-              <Star
-                className={cn(
-                  "size-4 transition-colors",
-                  isFlagged
-                    ? "fill-warning text-warning"
-                    : "text-[var(--icon-tertiary)] hover:text-warning",
-                )}
-                strokeWidth={2}
-              />
-            </button>
-          )}
-          <MailSecurityBadge
-            messageState={messageState}
-            accountEncryptedAtRest={accountEncryptedAtRest}
-            signatureVerificationState={signatureVerificationState}
-            decryptionFailed={Boolean(decryptError)}
-          />
-        </div>
+        <MessageReaderTitleActions controller={controller} view={view} />
       </div>
 
+      <ReaderTrustNotice controller={controller} />
       {threadCount > 1 && (
         <div
           className={cn(
@@ -195,5 +167,65 @@ function ThreadParticipants({
         </li>
       ) : null}
     </ul>
+  );
+}
+
+function ReaderTrustNotice({
+  controller,
+}: {
+  controller: MessageReaderController;
+}) {
+  const { senderKeyTrustState, signatureVerificationState } = controller.props;
+  const state =
+    senderKeyTrustState ??
+    (MAIL_KEY_CONTINUITY_ENABLED && signatureVerificationState !== "not_signed"
+      ? { kind: "unavailable" as const, reason: "history" as const }
+      : undefined);
+  const notice = getMailSenderTrustNotice(state);
+  if (!notice) return null;
+  return (
+    <p role="status" className="px-4 pb-2 text-xs text-destructive">
+      {notice.label}. {notice.description}
+    </p>
+  );
+}
+function MessageReaderTitleActions({
+  controller,
+  view,
+}: {
+  controller: MessageReaderController;
+  view: MessageReaderViewModel;
+}) {
+  const { isBusy, isFlagged, props } = controller;
+  return (
+    <div className="mt-0.5 flex shrink-0 items-center gap-1">
+      {props.onToggleFlagged ? (
+        <button
+          type="button"
+          onClick={props.onToggleFlagged}
+          disabled={isBusy}
+          aria-label={isFlagged ? "Unstar" : "Star"}
+          className="inline-flex size-7 cursor-pointer items-center justify-center rounded outline-none transition-colors hover:bg-[var(--bg-overlay-tertiary)] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+        >
+          <Star
+            className={cn(
+              "size-4 transition-colors",
+              isFlagged
+                ? "fill-warning text-warning"
+                : "text-[var(--icon-tertiary)] hover:text-warning",
+            )}
+            strokeWidth={2}
+          />
+        </button>
+      ) : null}
+      <MailSecurityBadge
+        messageState={view.messageState}
+        accountEncryptedAtRest={props.accountEncryptedAtRest}
+        signatureVerificationState={props.signatureVerificationState}
+        senderKeyTrustState={props.senderKeyTrustState}
+        senderEmail={props.message?.from?.[0]?.email}
+        decryptionFailed={Boolean(props.decryptError)}
+      />
+    </div>
   );
 }

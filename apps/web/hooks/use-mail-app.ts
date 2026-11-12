@@ -1,5 +1,9 @@
 "use client";
 
+import type { MailSenderKeyTrustState } from "@workspace/calendar-core";
+
+import { getMailDraftSizeError, getMailReadLimitNotice, limitMailDisplayContent } from "@workspace/calendar-core/mail-mime-limits";
+
 import {
   useEffect,
   useEffectEvent,
@@ -10,7 +14,13 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getErrorMessage,
+  createMailSendSessionId,
+  createMailSendScopeLifetime,
+  discardMailSendAttempt,
+  isMailSendScopeOpen,
+  completeMailSendAttempt,
   normalizeEmailAddress,
+  collectOwnMailAddresses,
   parsedAddressesToEmails,
   capIdentitiesForPicker,
   resolveMailServerPolicy,
@@ -18,6 +28,7 @@ import {
   resolveMessageReplyRecipients,
   validateComposeRecipients,
   prepareOutgoingAttachments,
+  uploadPlaintextMailAttachments,
   runTasksWithConcurrencyLimit,
   validateUploadedAttachmentSet,
   validateMailboxCreate,
@@ -27,6 +38,7 @@ import {
   isCurrentUserMailAddress,
   resolveEncryptionInternalDomain,
   shouldEncryptOutgoingMail,
+  isMailAccountEncryptedAtRest,
   type JmapAttachmentInput,
   type OutgoingMimeAttachment,
   resolveAttachmentPreviewKind,
@@ -49,6 +61,7 @@ import {
 } from "@/lib/auth-navigation";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { useMailRealtime } from "@/hooks/use-mail-realtime";
+import { useMailKeywordReconciliation } from "@/hooks/use-mail-keyword-reconciliation";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { useSimpleLoginAliasAction } from "@/hooks/use-simplelogin-alias-action";
 import {
@@ -59,7 +72,10 @@ import { resolveAvatarUrl } from "@/lib/profile-picture";
 import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
-import { clearMailOpenPrefetch, ensureMailOpenPrefetch } from "@/lib/mail/mail-open-prefetch";
+import {
+  clearMailOpenPrefetch,
+  ensureMailOpenPrefetch,
+} from "@/lib/mail/mail-open-prefetch";
 import {
   deleteStoredDerivedVaultKey,
   getStoredDerivedVaultKey,
@@ -78,7 +94,10 @@ import {
   prefetchMailMessageBodies,
   seedMailMessageCache,
 } from "@/lib/mail/mail-message-query";
-import { mergeMailMessagePreservingKeywords, messageHasLoadedBody } from "@/lib/mail/mail-message-body";
+import {
+  mergeMailMessagePreservingKeywords,
+  messageHasLoadedBody,
+} from "@/lib/mail/mail-message-body";
 import {
   findInboxMailbox,
   findSpamMailbox,
@@ -87,15 +106,24 @@ import {
 } from "@/lib/mail/mail-mailbox-roles";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import { getMailComposeBridge, settleComposeDraftSave } from "@/components/mail/mail-compose-bridge";
+import { assertMailVerificationContext, captureMailVerificationContext, resolveMailSenderVerification } from "@/lib/mail/mail-sender-verification";
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
 import { useConversationDecryptedPreviews } from "@/hooks/use-conversation-decrypted-previews";
 import { replaceSavedDraftInMailboxList } from "@/lib/mail/compose-draft-cache";
 import { getDraftsMailboxId } from "@/lib/mail/draft-utils";
-import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
-import { hasComposeHtmlBody, resolveOutgoingComposeBodies } from "@/lib/mail/signature-utils";
-import { mergeRefreshedMailboxMessages } from "@/lib/mail/mail-list-merge";
-import { readMailListSettings, MARK_AS_READ_DELAY_MS } from "@/lib/mail/mail-list-settings";
-import { rewriteComposeInlineImages, htmlHasUnhydratedInlinePlaceholders } from "@/lib/mail/compose-editor-utils";
+import {
+  hasComposeHtmlBody,
+  resolveOutgoingComposeBodies,
+} from "@/lib/mail/signature-utils";
+import { mergeRefreshedIntoCurrentMessages } from "@/lib/mail/mail-list-merge";
+import {
+  readMailListSettings,
+  MARK_AS_READ_DELAY_MS,
+} from "@/lib/mail/mail-list-settings";
+import {
+  rewriteComposeInlineImages,
+  htmlHasUnhydratedInlinePlaceholders,
+} from "@/lib/mail/compose-editor-utils";
 import {
   getComposeInlineImages,
   readBlobAsDataUrl,
@@ -117,7 +145,10 @@ import {
   unlockEncryptedMailVaultWithDerivedKey,
   createEncryptedMailVault,
 } from "@/lib/mail/vault-crypto";
-import { getStoredMailVault, putStoredMailVault } from "@/lib/mail/vault-storage";
+import {
+  getStoredMailVault,
+  putStoredMailVault,
+} from "@/lib/mail/vault-storage";
 import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
 import type {
   JmapEmailMessage,
@@ -253,7 +284,10 @@ export function useMailApp() {
   const { recordUsage } = useRecentContacts();
   const { settings } = useSettings();
   const timeFormat = useUserTimeFormat();
-  const quoteDateOptions: QuotedDateOptions = { timeFormat, timezone: settings?.timezone };
+  const quoteDateOptions: QuotedDateOptions = {
+    timeFormat,
+    timezone: settings?.timezone,
+  };
 
   const [isBusy, setIsBusy] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -270,8 +304,9 @@ export function useMailApp() {
     useState<string | null>(null);
   const [relatedConversationMessages, setRelatedConversationMessages] =
     useState<JmapEmailMessage[]>([]);
-  const [listThreadRelatedMessages, setListThreadRelatedMessages] =
-    useState<JmapEmailMessage[]>([]);
+  const [listThreadRelatedMessages, setListThreadRelatedMessages] = useState<
+    JmapEmailMessage[]
+  >([]);
   const threadPrefetchedMailboxRef = useRef<string | null>(null);
   const [optimisticConversationMessages, setOptimisticConversationMessages] =
     useState<JmapEmailMessage[]>([]);
@@ -284,6 +319,7 @@ export function useMailApp() {
     selectedMessageSignatureVerificationState,
     setSelectedMessageSignatureVerificationState,
   ] = useState<MailSignatureVerificationState>("not_signed");
+  const [selectedMessageSenderKeyTrustState, setSelectedMessageSenderKeyTrustState] = useState<MailSenderKeyTrustState | undefined>(undefined);
   const [selectedMessageDecryptError, setSelectedMessageDecryptError] =
     useState<string | null>(null);
   const [selectedMessageIsDecrypting, setSelectedMessageIsDecrypting] =
@@ -302,6 +338,25 @@ export function useMailApp() {
   >(new Map());
   const attachmentHoverPreviewUrlsRef = useRef<Set<string>>(new Set());
   const activeMailboxRef = useRef<ActiveMailboxState | null>(null);
+  const keywordReconciliation = useMailKeywordReconciliation({
+    accountId: activeMailbox
+      ? getPrimaryMailAccountId(activeMailbox.session)
+      : null,
+    activeMailboxRef,
+    setActiveMailbox,
+  });
+  const trackAutoReadWrite = useEffectEvent(
+    (enabled: boolean, messageId: string, write: () => Promise<void>) =>
+      keywordReconciliation.trackWrite(
+        [{ messageId, keyword: "$seen", enabled }],
+        write,
+      ),
+  );
+  const composeSendInFlightRef = useRef(false);
+  const quickReplySendInFlightRef = useRef(false);
+  const quickReplyScopeRef = useRef<{ messageId: string; scope: string } | null>(null);
+  const [quickReplyLifetime] = useState(createMailSendScopeLifetime);
+  useEffect(() => quickReplyLifetime.activate(() => quickReplyScopeRef.current?.scope ?? null), [quickReplyLifetime]);
   /** Message the user explicitly marked unread while it remains open. */
   const manualUnreadWhileOpenRef = useRef<string | null>(null);
   /** Bumped to cancel pending/in-flight auto-read for a message. */
@@ -457,6 +512,14 @@ export function useMailApp() {
     ) ?? null;
   const selectedMessage =
     selectedConversationMessage ?? selectedMailboxMessage ?? null;
+  useEffect(() => {
+    const reply = quickReplyScopeRef.current;
+    if (reply && reply.messageId !== selectedMessage?.id) {
+      discardMailSendAttempt(reply.scope);
+      quickReplyScopeRef.current = null;
+    }
+  }, [selectedMessage?.id]);
+
   const selectedMessageBodyLoaded = selectedMessage
     ? messageHasLoadedBody(selectedMessage)
     : false;
@@ -479,13 +542,15 @@ export function useMailApp() {
       return;
     }
     recordedContactMessageRef.current = recordKey;
-    recordUsage(
-      [{ email: sender.email, displayName: sender.name }],
-      "mail",
-    );
+    recordUsage([{ email: sender.email, displayName: sender.name ?? undefined }], "mail");
   }, [recordUsage, selectedMessage]);
 
   const handleSelectMessageId = (messageId: string | null) => {
+    const reply = quickReplyScopeRef.current;
+    if (reply && reply.messageId !== messageId) {
+      discardMailSendAttempt(reply.scope);
+      quickReplyScopeRef.current = null;
+    }
     setSelectedMessageId(messageId);
     setSelectedConversationMessageId(null);
   };
@@ -557,6 +622,11 @@ export function useMailApp() {
   };
 
   const handleSelectConversationMessageId = (messageId: string) => {
+    const reply = quickReplyScopeRef.current;
+    if (reply && reply.messageId !== messageId) {
+      discardMailSendAttempt(reply.scope);
+      quickReplyScopeRef.current = null;
+    }
     setSelectedConversationMessageId(messageId);
   };
 
@@ -797,7 +867,10 @@ export function useMailApp() {
       return;
     }
 
-    const neighborIds = [mailbox.messages[index - 1], mailbox.messages[index + 1]]
+    const neighborIds = [
+      mailbox.messages[index - 1],
+      mailbox.messages[index + 1],
+    ]
       .filter((message): message is JmapEmailMessage => Boolean(message))
       .map((message) => message.id);
 
@@ -837,7 +910,8 @@ export function useMailApp() {
       return;
     }
 
-    if (threadPrefetchedMailboxRef.current === mailbox.selectedMailboxId) return;
+    if (threadPrefetchedMailboxRef.current === mailbox.selectedMailboxId)
+      return;
     threadPrefetchedMailboxRef.current = mailbox.selectedMailboxId;
 
     const currentMailbox = mailbox.mailboxes.find(
@@ -886,6 +960,7 @@ export function useMailApp() {
           setSelectedMessageDecryptedHtml(null);
           setSelectedMessageDecryptedAttachments(null);
           setSelectedMessageSignatureVerificationState("not_signed");
+        setSelectedMessageSenderKeyTrustState(undefined);
           setSelectedMessageDecryptError(null);
           setSelectedMessageIsDecrypting(false);
         });
@@ -902,6 +977,7 @@ export function useMailApp() {
           setSelectedMessageDecryptedHtml(null);
           setSelectedMessageDecryptedAttachments(null);
           setSelectedMessageSignatureVerificationState("not_signed");
+        setSelectedMessageSenderKeyTrustState(undefined);
           setSelectedMessageDecryptError(null);
           setSelectedMessageIsDecrypting(false);
         });
@@ -916,6 +992,10 @@ export function useMailApp() {
         );
       });
       void (async () => {
+        const verificationContext = captureMailVerificationContext();
+        if (verificationContext.fingerprint.toUpperCase() !== mailbox.unlockedVault.publicKeyFingerprint.toUpperCase()) {
+          throw new Error("Mail encryption session changed.");
+        }
         let armoredMessage: string;
         if (encState === "inline_pgp") {
           armoredMessage = await resolveInlinePgpArmoredCiphertext({
@@ -940,31 +1020,29 @@ export function useMailApp() {
           );
         }
         if (isCancelled()) return;
-        const senderEmail = selectedMessage.from?.[0]?.email;
-        let senderPublicKeyArmored: string | undefined;
-        if (
-          senderEmail &&
-          config &&
-          senderEmail.endsWith(`@${config.defaultDomain}`)
-        ) {
-          const senderKey = await mailDemoApiService
-            .getRecipientKey(senderEmail)
-            .catch(() => null);
-          senderPublicKeyArmored = senderKey?.publicKeyArmored;
-        }
+        const verification = await resolveMailSenderVerification({
+          senderEmail: selectedMessage.from?.[0]?.email,
+          internalDomain: config?.defaultDomain,
+          context: verificationContext,
+        });
+        assertMailVerificationContext(verificationContext);
         const decrypted = await mailCryptoWorkerClient.decryptMessage({
           armoredMessage,
-          senderPublicKeyArmored,
+          senderPublicKeyArmored: verification.senderPublicKeyArmored,
+          expectedVaultFingerprint: verificationContext.fingerprint,
         });
         if (isCancelled()) return;
-        const parsed = await parseDecryptedMailContent(
-          decrypted.plaintext,
-        ).catch((parseError: unknown) => {
-          log.warn("Failed to parse decrypted MIME", parseError);
-          return null;
+        assertMailVerificationContext(verificationContext);
+        setSelectedMessageSenderKeyTrustState(verification.senderKeyTrustState);
+        // The worker already stopped at the read limit, so its truncation result supplies the notice here.
+        const shown = limitMailDisplayContent({
+          text: decrypted.plaintext ?? decrypted.sourceText,
+          html: decrypted.html,
+          truncated: decrypted.truncated || decrypted.sourceTruncated,
         });
-        if (!parsed) {
-          setSelectedMessagePlaintext(decrypted.plaintext);
+        if (decrypted.rawMimeFallback) {
+          log.warn("Failed to parse decrypted MIME");
+          setSelectedMessagePlaintext(shown.text);
           setSelectedMessageDecryptedHtml(null);
           setSelectedMessageDecryptedAttachments(
             encState === "pgp_mime" ? [] : null,
@@ -976,11 +1054,11 @@ export function useMailApp() {
           setSelectedMessageIsDecrypting(false);
           return;
         }
-        setSelectedMessageDecryptedHtml(parsed.html ?? null);
-        setSelectedMessagePlaintext(parsed.text ?? decrypted.plaintext);
+        setSelectedMessageDecryptedHtml(shown.html);
+        setSelectedMessagePlaintext(shown.text);
         if (encState === "pgp_mime") {
           setSelectedMessageDecryptedAttachments(
-            listedDecryptedAttachments(parsed.attachments),
+            listedDecryptedAttachments(decrypted.attachments),
           );
         } else {
           setSelectedMessageDecryptedAttachments(null);
@@ -999,8 +1077,9 @@ export function useMailApp() {
           encState === "pgp_mime" ? [] : null,
         );
         setSelectedMessageSignatureVerificationState("not_signed");
+        setSelectedMessageSenderKeyTrustState(undefined);
         setSelectedMessageDecryptError(
-          "Message not decrypted on this device. Reload and try again, or open it on a device that holds your key.",
+          getMailReadLimitNotice(error) ?? "Message not decrypted on this device. Reload and try again, or open it on a device that holds your key.",
         );
         setSelectedMessageIsDecrypting(false);
       });
@@ -1015,12 +1094,13 @@ export function useMailApp() {
     };
   }, [selectedMessage?.id, selectedMessageBodyLoaded, config]);
 
-  const selectedDecryptedPreview = selectedMessagePlaintext || selectedMessageDecryptedHtml
-    ? {
-      text: selectedMessagePlaintext,
-      html: selectedMessageDecryptedHtml,
-    }
-    : null;
+  const selectedDecryptedPreview =
+    selectedMessagePlaintext || selectedMessageDecryptedHtml
+      ? {
+          text: selectedMessagePlaintext,
+          html: selectedMessageDecryptedHtml,
+        }
+      : null;
 
   const {
     previews: conversationDecryptedPreviews,
@@ -1121,9 +1201,13 @@ export function useMailApp() {
       setActiveMailbox((cur) =>
         cur
           ? {
-            ...cur,
-            messages: patchMessagesKeywords(cur.messages, messageId, markRead),
-          }
+              ...cur,
+              messages: patchMessagesKeywords(
+                cur.messages,
+                messageId,
+                markRead,
+              ),
+            }
           : cur,
       );
       setRelatedConversationMessages((cur) =>
@@ -1155,13 +1239,16 @@ export function useMailApp() {
 
       applyOptimisticRead();
 
-      void currentMailbox.client
-        .markAsRead(currentMailbox.session, messageId)
+      void trackAutoReadWrite(true, messageId, () =>
+        currentMailbox.client.markAsRead(currentMailbox.session, messageId),
+      )
         .then(() => {
           if (autoReadNonceRef.current.get(messageId) !== nonce) {
-            return currentMailbox.client.markAsUnread(
-              currentMailbox.session,
-              messageId,
+            return trackAutoReadWrite(false, messageId, () =>
+              currentMailbox.client.markAsUnread(
+                currentMailbox.session,
+                messageId,
+              ),
             );
           }
           return undefined;
@@ -1185,12 +1272,11 @@ export function useMailApp() {
         activeMailbox.mailServerPolicy,
         MAILBOX_MESSAGES_PAGE_SIZE,
       );
-      const { messages, total } =
-        await activeMailbox.client.getMailboxMessages(
-          activeMailbox.session,
-          mailboxId,
-          { limit: pageSize, position: 0 },
-        );
+      const { messages, total } = await activeMailbox.client.getMailboxMessages(
+        activeMailbox.session,
+        mailboxId,
+        { limit: pageSize, position: 0 },
+      );
       setTotalMessages(total);
       seedMailMessageCache(queryClient, mailboxId, messages, total);
       setActiveMailbox((cur) =>
@@ -1204,15 +1290,14 @@ export function useMailApp() {
       });
     } catch (error) {
       log.error("Failed to load mailbox messages", error);
-      toast.error(
-        getErrorMessage(error, "Could not load messages."),
-      );
+      toast.error(getErrorMessage(error, "Could not load messages."));
     }
     setIsBusy(false);
   };
 
   const loadMoreMessages = async () => {
     if (!activeMailbox?.selectedMailboxId || isLoadingMore) return;
+    const mailboxId = activeMailbox.selectedMailboxId;
     const position = activeMailbox.messages.length;
     const pageSize = resolveMailboxMessagesPageSize(
       activeMailbox.mailServerPolicy,
@@ -1221,11 +1306,12 @@ export function useMailApp() {
     if (!hasMoreMailboxMessages(position, totalMessages, pageSize)) return;
     setIsLoadingMore(true);
     const fetchNextPage = async () => {
-      const { messages: more, total } = await activeMailbox.client.getMailboxMessages(
-        activeMailbox.session,
-        activeMailbox.selectedMailboxId,
-        { limit: pageSize, position },
-      );
+      const { messages: more, total } =
+        await activeMailbox.client.getMailboxMessages(
+          activeMailbox.session,
+          mailboxId,
+          { limit: pageSize, position },
+        );
       if (total > 0) {
         setTotalMessages(total);
       }
@@ -1233,7 +1319,6 @@ export function useMailApp() {
       if (uniqueMore.length === 0) {
         setTotalMessages(activeMailbox.messages.length);
       } else {
-        const mailboxId = activeMailbox.selectedMailboxId;
         const nextMessages = sortMessages([
           ...activeMailbox.messages,
           ...uniqueMore,
@@ -1285,9 +1370,12 @@ export function useMailApp() {
             try {
               await tokenManager.getAccessToken();
             } catch (error) {
-              log.warn("Could not refresh mail token after unauthorized response", {
-                error,
-              });
+              log.warn(
+                "Could not refresh mail token after unauthorized response",
+                {
+                  error,
+                },
+              );
             }
           },
         });
@@ -1300,17 +1388,16 @@ export function useMailApp() {
           userId: accountUserId,
         });
         email = provisioned.mailbox.email.trim().toLowerCase();
-        queryClient.setQueryData(
-          mailQueryKeys.accountStatus(accountUserId),
-          {
-            email: provisioned.mailbox.email,
-            displayName: provisioned.mailbox.displayName,
-            provisioned: true,
-          },
-        );
+        queryClient.setQueryData(mailQueryKeys.accountStatus(accountUserId), {
+          email: provisioned.mailbox.email,
+          displayName: provisioned.mailbox.displayName,
+          provisioned: true,
+        });
         // Fresh vault KDF params invalidate any pre-provision derived key.
         if (accountUserId) {
-          await deleteStoredDerivedVaultKey(accountUserId).catch(() => undefined);
+          await deleteStoredDerivedVaultKey(accountUserId).catch(
+            () => undefined,
+          );
         }
       }
 
@@ -1339,7 +1426,10 @@ export function useMailApp() {
 
       // Not on the critical path for showing inbox.
       void client.ensureEncryptOnAppendDisabled(jmapSession).catch((error) => {
-        log.warn("Failed to disable Stalwart encryptOnAppend on sign-in", error);
+        log.warn(
+          "Failed to disable Stalwart encryptOnAppend on sign-in",
+          error,
+        );
       });
 
       const mailServerPolicy = resolveMailServerPolicy({
@@ -1348,7 +1438,10 @@ export function useMailApp() {
         jmapSettings: stalwartPolicy.jmapSettings,
         configPolicy: config?.serverLimits ?? null,
       });
-      client.setMailServerPolicy(mailServerPolicy, config?.serverLimits ?? null);
+      client.setMailServerPolicy(
+        mailServerPolicy,
+        config?.serverLimits ?? null,
+      );
       const mailboxPageSize = resolveMailboxMessagesPageSize(
         mailServerPolicy,
         MAILBOX_MESSAGES_PAGE_SIZE,
@@ -1360,6 +1453,8 @@ export function useMailApp() {
           privateKeyArmored: unlockedVault.encryptedPrivateKeyArmored,
           privateKeyPassphrase: effectivePassphrase,
           publicKeyArmored: unlockedVault.publicKeyArmored,
+          ownerUserId: unlockedVault.userId,
+          ownAddresses: collectOwnMailAddresses([email, unlockedVault.email, jmapSession.username, ...identities.map((identity) => identity.email)]),
         }),
         initialMailboxId
           ? client.getMailboxMessages(jmapSession, initialMailboxId, {
@@ -1388,12 +1483,7 @@ export function useMailApp() {
         pickerIdentities: capIdentitiesForPicker(identities, mailServerPolicy),
         messages,
         unlockedVault,
-        accountEncryptedAtRest:
-          (
-            accountSettings.encryptionAtRest as
-            | { "@type"?: string }
-            | undefined
-          )?.["@type"] === "Aes256",
+        accountEncryptedAtRest: isMailAccountEncryptedAtRest(accountSettings),
         email,
         selectedMailboxId: initialMailboxId,
         mailServerPolicy,
@@ -1404,9 +1494,7 @@ export function useMailApp() {
     await openMailbox().catch((error: unknown) => {
       log.error("Mail sign-in failed", error);
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not open the mailbox.",
+        error instanceof Error ? error.message : "Could not open the mailbox.",
       );
     });
     setIsBusy(false);
@@ -1460,10 +1548,10 @@ export function useMailApp() {
     setActiveMailbox((current) =>
       current && current.session === mailbox.session
         ? {
-          ...current,
-          mailServerPolicy,
-          pickerIdentities,
-        }
+            ...current,
+            mailServerPolicy,
+            pickerIdentities,
+          }
         : current,
     );
 
@@ -1474,7 +1562,9 @@ export function useMailApp() {
     };
   };
 
-  const handleComposeImageUpload = async (file: File): Promise<InlineImageUpload | null> => {
+  const handleComposeImageUpload = async (
+    file: File,
+  ): Promise<InlineImageUpload | null> => {
     if (!activeMailbox) return null;
     const uploadImage = async () => {
       const contentType = file.type || "application/octet-stream";
@@ -1501,9 +1591,13 @@ export function useMailApp() {
     });
   };
 
-  const handleSendMessage = async (options?: { skipAttachmentCheck?: boolean }) => {
-    if (!activeMailbox) return;
-    const draft = getMailComposeBridge()?.getDraft();
+  const handleSendMessage = async (options?: {
+    skipAttachmentCheck?: boolean;
+  }) => {
+    if (!activeMailbox || composeSendInFlightRef.current) return;
+    const bridge = getMailComposeBridge();
+    const draft = bridge?.getDraft();
+    const composeSessionId = bridge?.getComposeSessionId();
     if (!draft) {
       toast.error("Compose is not available.");
       return;
@@ -1552,30 +1646,31 @@ export function useMailApp() {
       activeMailbox.mailboxes,
       "drafts",
     );
-    const sentMailboxId = getPrimaryMailboxId(
-      activeMailbox.mailboxes,
-      "sent",
-    );
+    const sentMailboxId = getPrimaryMailboxId(activeMailbox.mailboxes, "sent");
     const identity =
       activeMailbox.identities.find(
         (entry) => entry.id === composeIdentityId,
       ) ?? activeMailbox.identities[0];
     const identityId = identity?.id;
     if (!draftsMailboxId || !identityId) {
-      toast.error("This mailbox is missing a draft mailbox or sending identity.");
+      toast.error(
+        "This mailbox is missing a draft mailbox or sending identity.",
+      );
       return;
     }
 
+    composeSendInFlightRef.current = true;
     setIsBusy(true);
-    if (!plainTextMode) {
-      await waitForQuotedInlineImageHydration();
-      if (htmlHasUnhydratedInlinePlaceholders(composeHtmlBody)) {
-        toast.error("Inline images are still loading. Try again in a moment.");
-        setIsBusy(false);
-        return;
-      }
-    }
     const send = async () => {
+      if (composeSessionId == null)
+        throw new Error("Compose is not available.");
+      if (!plainTextMode) {
+        await waitForQuotedInlineImageHydration();
+        if (htmlHasUnhydratedInlinePlaceholders(composeHtmlBody))
+          throw new Error(
+            "Inline images are still loading. Try again in a moment.",
+          );
+      }
       // The send replaces the stored draft itself, so a pending autosave would only seal a throwaway copy.
       await settleComposeDraftSave();
       const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
@@ -1599,21 +1694,21 @@ export function useMailApp() {
       const { textBody: bodyWithSignature, htmlBody: htmlWithSignature } =
         plainTextMode
           ? {
-            textBody: signatureAlreadyEmbedded
-              ? composeBody
-              : resolveOutgoingComposeBodies({
-                body: composeBody,
-                htmlBody: "",
-                signature: identity,
-              }).textBody,
-            htmlBody: undefined,
-          }
+              textBody: signatureAlreadyEmbedded
+                ? composeBody
+                : resolveOutgoingComposeBodies({
+                    body: composeBody,
+                    htmlBody: "",
+                    signature: identity,
+                  }).textBody,
+              htmlBody: undefined,
+            }
           : resolveOutgoingComposeBodies({
-            body: composeBody,
-            htmlBody: composeHtmlBody,
-            signature: identity,
-            signatureAlreadyEmbedded,
-          });
+              body: composeBody,
+              htmlBody: composeHtmlBody,
+              signature: identity,
+              signatureAlreadyEmbedded,
+            });
       const internalDomain = resolveEncryptionInternalDomain(
         config?.defaultDomain,
       );
@@ -1623,7 +1718,9 @@ export function useMailApp() {
       );
       const preparedAttachments = await prepareOutgoingAttachments(
         composeAttachments,
-        { maxBytes: mailbox.mailServerPolicy.limits.maxOutgoingAttachmentBytes },
+        {
+          maxBytes: mailbox.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
+        },
       );
       const hasFileAttachments = preparedAttachments.length > 0;
       const hasInlineComposeImages = getComposeInlineImages().length > 0;
@@ -1632,28 +1729,32 @@ export function useMailApp() {
 
       const rewritten: {
         html: string | undefined;
-        attachments: ReturnType<typeof rewriteComposeInlineImages>["attachments"];
+        attachments: ReturnType<
+          typeof rewriteComposeInlineImages
+        >["attachments"];
       } =
         !plainTextMode && htmlWithSignature && !embedInlineImagesInEncryptedHtml
           ? rewriteComposeInlineImages(htmlWithSignature)
           : { html: htmlWithSignature, attachments: [] };
-      const htmlForSend = plainTextMode ? undefined : (rewritten.html ?? htmlWithSignature);
+      const htmlForSend = plainTextMode
+        ? undefined
+        : (rewritten.html ?? htmlWithSignature);
       const inlineMimeAttachments: OutgoingMimeAttachment[] =
         embedInlineImagesInEncryptedHtml
           ? []
           : getComposeInlineImages()
-            .filter((image) =>
-              rewritten.attachments.some(
-                (attachment) => attachment.cid === image.cid,
-              ),
-            )
-            .map((image) => ({
-              filename: image.name,
-              contentType: image.type,
-              content: image.content,
-              cid: image.cid,
-              disposition: "inline" as const,
-            }));
+              .filter((image) =>
+                rewritten.attachments.some(
+                  (attachment) => attachment.cid === image.cid,
+                ),
+              )
+              .map((image) => ({
+                filename: image.name,
+                contentType: image.type,
+                content: image.content,
+                cid: image.cid,
+                disposition: "inline" as const,
+              }));
       const fileMimeAttachments: OutgoingMimeAttachment[] =
         preparedAttachments.map(({ filename, contentType, content }) => ({
           filename,
@@ -1664,18 +1765,27 @@ export function useMailApp() {
         inlineMimeAttachments.length > 0 || fileMimeAttachments.length > 0
           ? [...inlineMimeAttachments, ...fileMimeAttachments]
           : undefined;
-      const { textBody, encrypted, pgpMimeCiphertext, sentCopyCiphertext } =
-        await resolveOutgoingMessageBody({
-          activeMailbox: mailbox,
-          recipients: allRecipients,
-          plaintext: bodyWithSignature,
-          html: htmlForSend,
-          internalDomain,
-          mimeAttachments:
-            plainTextMode && fileMimeAttachments.length > 0
-              ? fileMimeAttachments
-              : mimeAttachments,
-        });
+      const outgoing = await resolveOutgoingMessageBody({
+        activeMailbox: mailbox,
+        recipients: allRecipients,
+        plaintext: bodyWithSignature,
+        html: htmlForSend,
+        internalDomain,
+        mimeAttachments:
+          plainTextMode && fileMimeAttachments.length > 0
+            ? fileMimeAttachments
+            : mimeAttachments,
+      });
+      const {
+        textBody,
+        encrypted,
+        pgpMimeCiphertext,
+        pgpMimeMessage,
+        sentCopyCiphertext,
+        contentFingerprint,
+        isCurrent: isVaultCurrent,
+      } = outgoing;
+      const isCurrent = () => isMailSendScopeOpen(`compose:${composeSessionId}`) && isVaultCurrent();
       const htmlBody = encrypted || plainTextMode ? undefined : htmlForSend;
 
       if (!shouldEncryptOutgoingMail(allRecipients, internalDomain)) {
@@ -1683,76 +1793,110 @@ export function useMailApp() {
       }
 
       let uploadedAttachments: JmapAttachmentInput[] | undefined;
-      if (!pgpMimeCiphertext) {
-        // Inserted images reach the server only now, for a plaintext send; encrypted mail carries them inside its ciphertext.
-        const inlineJmapAttachments = await runTasksWithConcurrencyLimit(
-          rewritten.attachments.map(({ content, ...attachment }) => async () => ({
-            ...attachment,
-            blobId:
-              attachment.blobId ??
-              (
-                await mailbox.client.uploadPreparedAttachment(mailbox.session, {
-                  filename: attachment.name,
-                  contentType: attachment.type,
-                  size: attachment.size,
-                  content: content.slice(),
-                })
-              ).blobId,
-          })),
-          mailbox.mailServerPolicy.maxConcurrentUploads,
+      if (outgoing.kind === "plaintext") {
+        uploadedAttachments = await uploadPlaintextMailAttachments(
+          outgoing,
+          async () => {
+            // Inserted images reach the server only now, for a plaintext send; encrypted mail carries them inside its ciphertext.
+            const inlineJmapAttachments = await runTasksWithConcurrencyLimit(
+              rewritten.attachments.map(
+                ({ content, ...attachment }) =>
+                  async () => ({
+                    ...attachment,
+                    blobId:
+                      attachment.blobId ??
+                      (
+                        await uploadPlaintextMailAttachments(outgoing, () =>
+                          mailbox.client.uploadPreparedAttachment(
+                            mailbox.session,
+                            {
+                              filename: attachment.name,
+                              contentType: attachment.type,
+                              size: attachment.size,
+                              content: content.slice(),
+                            },
+                            isCurrent,
+                          ),
+                        )
+                      ).blobId,
+                  }),
+              ),
+              mailbox.mailServerPolicy.maxConcurrentUploads,
+            );
+            const fileUploads =
+              preparedAttachments.length > 0
+                ? await runTasksWithConcurrencyLimit(
+                    preparedAttachments.map(
+                      (attachment) => () =>
+                        uploadPlaintextMailAttachments(outgoing, () =>
+                          mailbox.client.uploadPreparedAttachment(
+                            mailbox.session,
+                            attachment,
+                            isCurrent,
+                          ),
+                        ),
+                    ),
+                    mailbox.mailServerPolicy.maxConcurrentUploads,
+                  )
+                : [];
+            const uploaded = [...inlineJmapAttachments, ...fileUploads];
+            if (uploaded.length > 0) {
+              validateUploadedAttachmentSet(
+                [
+                  ...rewritten.attachments.map((attachment) => ({
+                    filename: attachment.name,
+                    size: attachment.size,
+                  })),
+                  ...preparedAttachments.map((attachment) => ({
+                    filename: attachment.filename,
+                    size: attachment.size,
+                  })),
+                ],
+                uploaded,
+              );
+            }
+            return uploaded.length ? uploaded : undefined;
+          },
         );
-        const fileUploads =
-          preparedAttachments.length > 0
-            ? await mailbox.client.uploadPreparedAttachments(
-              mailbox.session,
-              preparedAttachments,
-            )
-            : [];
-        uploadedAttachments = [...inlineJmapAttachments, ...fileUploads];
-        if (uploadedAttachments.length > 0) {
-          validateUploadedAttachmentSet(
-            [
-              ...rewritten.attachments.map((attachment) => ({
-                filename: attachment.name,
-                size: attachment.size,
-              })),
-              ...preparedAttachments.map((attachment) => ({
-                filename: attachment.filename,
-                size: attachment.size,
-              })),
-            ],
-            uploadedAttachments,
-          );
-        } else {
-          uploadedAttachments = undefined;
-        }
       }
 
       const previousDraftId =
         getMailComposeBridge()?.getDraftIdRef() ?? composeDraftId ?? undefined;
 
-      const sendResult = await mailbox.client.sendMessage(
-        mailbox.session,
-        {
-          draftsMailboxId,
-          sentMailboxId,
-          fromEmail,
-          fromName,
-          to: recipients,
-          cc: ccRecipients,
-          bcc: bccRecipients,
-          subject: composeSubject.trim(),
-          textBody,
-          htmlBody,
-          identityId,
-          attachments: uploadedAttachments,
-          pgpMimeCiphertext,
-          sentCopyCiphertext,
-          inReplyTo: composeReplyContext?.inReplyTo,
-          references: composeReplyContext?.references,
-          previousDraftId,
+      const sendResult = await mailbox.client.sendMessage(mailbox.session, {
+        sendScope: `compose:${composeSessionId}`,
+        contentFingerprint,
+        isCurrent: isVaultCurrent,
+        isUiCurrent: () => isMailSendScopeOpen(`compose:${composeSessionId}`) && getMailComposeBridge()?.getComposeSessionId() === composeSessionId,
+        getCurrentDraftId: () => {
+          const current = getMailComposeBridge();
+          const sessionId = current?.getComposeSessionId();
+          return sessionId && isMailSendScopeOpen(`compose:${sessionId}`) ? current?.getDraftIdRef() ?? null : null;
         },
-      );
+        draftsMailboxId,
+        sentMailboxId,
+        fromEmail,
+        fromName,
+        to: recipients,
+        cc: ccRecipients,
+        bcc: bccRecipients,
+        subject: composeSubject.trim(),
+        textBody,
+        htmlBody,
+        identityId,
+        attachments: uploadedAttachments,
+        pgpMimeCiphertext,
+        pgpMimeMessage,
+        sentCopyCiphertext,
+        inReplyTo: composeReplyContext?.inReplyTo,
+        references: composeReplyContext?.references,
+        previousDraftId,
+      });
+      completeMailSendAttempt(getPrimaryMailAccountId(mailbox.session), `compose:${composeSessionId}`);
+      if (!isMailSendScopeOpen(`compose:${composeSessionId}`) || getMailComposeBridge()?.getComposeSessionId() !== composeSessionId) {
+        toast(encrypted ? "Encrypted message sent." : "Message sent.");
+        return;
+      }
       const effectiveThreadId =
         sendResult?.threadId ?? composeReplyContext?.threadId ?? null;
       if (composeReplyContext) {
@@ -1778,9 +1922,7 @@ export function useMailApp() {
           if (remaining.length === cur.messages.length) return cur;
           return { ...cur, messages: remaining };
         });
-        setSelectedMessageId((cur) =>
-          cur === previousDraftId ? null : cur,
-        );
+        setSelectedMessageId((cur) => (cur === previousDraftId ? null : cur));
       }
       getMailComposeBridge()?.resetDraft();
       const recentEntries = [
@@ -1789,8 +1931,7 @@ export function useMailApp() {
         ...recipientValidation.bcc,
       ]
         .filter(
-          (address) =>
-            !isCurrentUserMailAddress(address.email, mailbox.email),
+          (address) => !isCurrentUserMailAddress(address.email, mailbox.email),
         )
         .map((address) => ({
           email: address.email,
@@ -1810,9 +1951,9 @@ export function useMailApp() {
         error,
         statusCode:
           error &&
-            typeof error === "object" &&
-            "statusCode" in error &&
-            typeof (error as { statusCode?: unknown }).statusCode === "number"
+          typeof error === "object" &&
+          "statusCode" in error &&
+          typeof (error as { statusCode?: unknown }).statusCode === "number"
             ? (error as { statusCode: number }).statusCode
             : undefined,
         to: composeTo,
@@ -1822,10 +1963,9 @@ export function useMailApp() {
         hasHtmlBody: hasComposeHtmlBody(composeHtmlBody),
         isReply: Boolean(composeReplyContext),
       });
-      toast.error(
-        getErrorMessage(error, "Could not send the message."),
-      );
+      toast.error(getErrorMessage(error, "Could not send the message."));
     });
+    composeSendInFlightRef.current = false;
     setIsBusy(false);
   };
 
@@ -1871,9 +2011,7 @@ export function useMailApp() {
       : activeMailbox.selectedMailboxId;
     const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
 
-    setActiveMailbox((cur) =>
-      cur ? { ...cur, messages: remaining } : cur,
-    );
+    setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
     setSelectedMessageId((cur) =>
       cur === targetId ? (remaining[0]?.id ?? null) : cur,
     );
@@ -1893,14 +2031,20 @@ export function useMailApp() {
               if (!cur) return cur;
               const restored = [...cur.messages];
               const insertIndex = Math.min(
-                remaining.findIndex((m) =>
-                  m.receivedAt &&
-                  targetMessage.receivedAt &&
-                  Date.parse(m.receivedAt) < Date.parse(targetMessage.receivedAt)
+                remaining.findIndex(
+                  (m) =>
+                    m.receivedAt &&
+                    targetMessage.receivedAt &&
+                    Date.parse(m.receivedAt) <
+                      Date.parse(targetMessage.receivedAt),
                 ),
                 restored.length,
               );
-              restored.splice(insertIndex < 0 ? 0 : insertIndex, 0, targetMessage);
+              restored.splice(
+                insertIndex < 0 ? 0 : insertIndex,
+                0,
+                targetMessage,
+              );
               return { ...cur, messages: restored };
             });
             setSelectedMessageId(targetId);
@@ -1923,13 +2067,17 @@ export function useMailApp() {
   const selectedMessageBodyPending =
     isMessageBodyLoading && !selectedMessageBodyLoaded;
 
-  const handleReply = () => {
+  const seedMessageReply = (mode: "reply" | "reply-all") => {
     if (!selectedMessage || selectedMessageBodyPending) return;
     getMailComposeBridge()?.seedReply(
       selectedMessage,
       selectedMessagePlaintext,
+      mode,
     );
   };
+
+  const handleReply = () => seedMessageReply("reply");
+  const handleReplyAll = () => seedMessageReply("reply-all");
 
   const handleForward = () => {
     if (!selectedMessage || selectedMessageBodyPending) return;
@@ -1960,15 +2108,19 @@ export function useMailApp() {
         return current;
       }
       const withoutPrevious = input.previousDraftId
-        ? current.messages.filter((message) => message.id !== input.previousDraftId)
-        : current.messages.filter((message) => message.id !== input.savedDraftId);
+        ? current.messages.filter(
+            (message) => message.id !== input.previousDraftId,
+          )
+        : current.messages.filter(
+            (message) => message.id !== input.savedDraftId,
+          );
       const hasSaved = withoutPrevious.some(
         (message) => message.id === input.savedDraftId,
       );
       const messages = hasSaved
         ? withoutPrevious.map((message) =>
-          message.id === input.savedDraftId ? input.preview : message,
-        )
+            message.id === input.savedDraftId ? input.preview : message,
+          )
         : [input.preview, ...withoutPrevious];
       return { ...current, messages };
     });
@@ -1995,7 +2147,9 @@ export function useMailApp() {
       }
     }
 
-    let overrides: { plaintext?: string | null; html?: string | null } | undefined;
+    let overrides:
+      { plaintext?: string | null; html?: string | null } | undefined;
+    let truncated: boolean | undefined;
     const encryption = classifyMessageEncryption(draft);
     if (encryption === "inline_pgp" || encryption === "pgp_mime") {
       try {
@@ -2004,11 +2158,17 @@ export function useMailApp() {
           session: activeMailbox.session,
           message: draft,
           config,
+          editable: true,
         });
+        if (decrypted.rawMimeFallback) {
+          toast.error("This draft could not be opened safely here. The saved draft has not been changed.");
+          return;
+        }
         overrides = {
           plaintext: decrypted.text,
           html: decrypted.html,
         };
+        truncated = decrypted.truncated;
       } catch (error) {
         log.error("Failed to decrypt draft", error);
         toast.error(getErrorMessage(error, "Could not decrypt this draft."));
@@ -2017,6 +2177,12 @@ export function useMailApp() {
       }
     }
 
+    const draftBodies = extractMessageBodies(draft);
+    const draftSizeError = getMailDraftSizeError({ text: overrides?.plaintext ?? draftBodies.text, html: overrides?.html ?? draftBodies.html, truncated });
+    if (draftSizeError) {
+      toast.error(draftSizeError);
+      return;
+    }
     setSelectedMessageId(null);
     bridge.openDraftEditor(draft, overrides);
   };
@@ -2033,7 +2199,9 @@ export function useMailApp() {
         if (!current) return current;
         return {
           ...current,
-          messages: current.messages.filter((message) => message.id !== draftId),
+          messages: current.messages.filter(
+            (message) => message.id !== draftId,
+          ),
         };
       });
       setSelectedMessageId((current) => (current === draftId ? null : current));
@@ -2044,13 +2212,14 @@ export function useMailApp() {
   };
 
   const handleQuickReply = async (replyText: string, files: File[] = []) => {
-    if (!selectedMessage || !activeMailbox) return;
+    if (!selectedMessage || !activeMailbox || quickReplySendInFlightRef.current)
+      return false;
     if (selectedMessageBodyPending) {
       throw new Error("Wait for the message to finish loading.");
     }
     if (!replyText.trim()) {
       toast.error("Enter a reply message.");
-      return;
+      return false;
     }
     const sender = selectedMessage.from?.[0]?.email ?? "";
     const subject = selectedMessage.subject ?? "";
@@ -2072,15 +2241,18 @@ export function useMailApp() {
       activeMailbox.mailboxes,
       "drafts",
     );
-    const sentMailboxId = getPrimaryMailboxId(
-      activeMailbox.mailboxes,
-      "sent",
-    );
+    const sentMailboxId = getPrimaryMailboxId(activeMailbox.mailboxes, "sent");
     const identityId = identity?.id;
     if (!draftsMailboxId || !identityId) {
       toast.error("Missing draft mailbox or sending identity.");
-      return;
+      return false;
     }
+    if (quickReplyScopeRef.current?.messageId !== selectedMessage.id) {
+      if (quickReplyScopeRef.current) discardMailSendAttempt(quickReplyScopeRef.current.scope);
+      quickReplyScopeRef.current = { messageId: selectedMessage.id, scope: `quick-reply:${createMailSendSessionId()}` };
+    }
+    const sendScope = quickReplyScopeRef.current.scope;
+    quickReplySendInFlightRef.current = true;
     setIsBusy(true);
     const sendReply = async () => {
       const mailbox = await refreshActiveMailboxPolicy(activeMailbox, {
@@ -2113,29 +2285,49 @@ export function useMailApp() {
       const mimeAttachments =
         preparedAttachments.length > 0
           ? preparedAttachments.map(({ filename, contentType, content }) => ({
-            filename,
-            contentType,
-            content,
-          }))
+              filename,
+              contentType,
+              content,
+            }))
           : undefined;
-      const { textBody, encrypted, pgpMimeCiphertext, sentCopyCiphertext } =
-        await resolveOutgoingMessageBody({
-          activeMailbox: mailbox,
-          recipients,
-          plaintext: `${replyText}${quotedBody}`,
-          internalDomain,
-          mimeAttachments,
-        });
+      const outgoing = await resolveOutgoingMessageBody({
+        activeMailbox: mailbox,
+        recipients,
+        plaintext: `${replyText}${quotedBody}`,
+        internalDomain,
+        mimeAttachments,
+      });
+      const {
+        textBody,
+        encrypted,
+        pgpMimeCiphertext,
+        pgpMimeMessage,
+        sentCopyCiphertext,
+        contentFingerprint,
+        isCurrent: isVaultCurrent,
+      } = outgoing;
+      const isCurrent = () => isMailSendScopeOpen(sendScope) && isVaultCurrent();
 
       if (!shouldEncryptOutgoingMail(recipients, internalDomain)) {
         await mailbox.client.ensureEncryptOnAppendDisabled(mailbox.session);
       }
 
       let attachments: JmapAttachmentInput[] | undefined;
-      if (!pgpMimeCiphertext && preparedAttachments.length > 0) {
-        attachments = await mailbox.client.uploadPreparedAttachments(
-          mailbox.session,
-          preparedAttachments,
+      if (outgoing.kind === "plaintext" && preparedAttachments.length > 0) {
+        attachments = await uploadPlaintextMailAttachments(outgoing, () =>
+          runTasksWithConcurrencyLimit(
+            preparedAttachments.map(
+              (attachment) => () =>
+                uploadPlaintextMailAttachments(outgoing, () =>
+                  mailbox.client.uploadPreparedAttachment(
+                    mailbox.session,
+                    attachment,
+                    isCurrent,
+                  ),
+                ),
+            ),
+            mailbox.mailServerPolicy.maxConcurrentUploads,
+          ),
         );
         validateUploadedAttachmentSet(
           preparedAttachments.map((attachment) => ({
@@ -2147,24 +2339,31 @@ export function useMailApp() {
       }
 
       const replyContext = buildReplyContext(selectedMessage);
-      const sendResult = await mailbox.client.sendMessage(
-        mailbox.session,
-        {
-          draftsMailboxId,
-          sentMailboxId,
-          fromEmail,
-          fromName: identity?.name ?? null,
-          to: recipients,
-          subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
-          textBody,
-          identityId,
-          attachments,
-          pgpMimeCiphertext,
-          sentCopyCiphertext,
-          inReplyTo: replyContext.inReplyTo,
-          references: replyContext.references,
-        },
-      );
+      const sendResult = await mailbox.client.sendMessage(mailbox.session, {
+        sendScope,
+        contentFingerprint,
+        isCurrent: isVaultCurrent,
+        isUiCurrent: () => quickReplyScopeRef.current?.scope === sendScope && isMailSendScopeOpen(sendScope),
+        draftsMailboxId,
+        sentMailboxId,
+        fromEmail,
+        fromName: identity?.name ?? null,
+        to: recipients,
+        subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
+        textBody,
+        identityId,
+        attachments,
+        pgpMimeCiphertext,
+        pgpMimeMessage,
+        sentCopyCiphertext,
+        inReplyTo: replyContext.inReplyTo,
+        references: replyContext.references,
+      });
+      completeMailSendAttempt(getPrimaryMailAccountId(mailbox.session), sendScope);
+      if (quickReplyScopeRef.current?.scope !== sendScope || !isMailSendScopeOpen(sendScope)) {
+        toast(encrypted ? "Encrypted reply sent." : "Reply sent.");
+        return false;
+      }
       const effectiveThreadId =
         sendResult?.threadId ?? replyContext.threadId ?? null;
       appendConversationMessage(
@@ -2183,27 +2382,30 @@ export function useMailApp() {
       if (effectiveThreadId) {
         void loadConversationThread(effectiveThreadId);
       }
+      quickReplyScopeRef.current = null;
       toast(encrypted ? "Encrypted reply sent." : "Reply sent.");
+      return true;
     };
-    await sendReply().catch((error: unknown) => {
+    return sendReply().catch((error: unknown) => {
       log.error("Failed to send quick reply", {
         error,
         statusCode:
           error &&
-            typeof error === "object" &&
-            "statusCode" in error &&
-            typeof (error as { statusCode?: unknown }).statusCode === "number"
+          typeof error === "object" &&
+          "statusCode" in error &&
+          typeof (error as { statusCode?: unknown }).statusCode === "number"
             ? (error as { statusCode: number }).statusCode
             : undefined,
         attachmentCount: files.length,
         replyLength: replyText.length,
         recipient: sender,
       });
-      toast.error(
-        getErrorMessage(error, "Could not send reply."),
-      );
+      toast.error(getErrorMessage(error, "Could not send reply."));
+      throw error;
+    }).finally(() => {
+      quickReplySendInFlightRef.current = false;
+      setIsBusy(false);
     });
-    setIsBusy(false);
   };
 
   const handleDownloadAttachment = async (attachment: MailAttachment) => {
@@ -2227,6 +2429,14 @@ export function useMailApp() {
     }
   };
 
+  const replaceAttachmentPreview = (next: MailAttachmentPreviewState | null) => {
+    const previousUrl = attachmentPreviewUrlRef.current;
+    const nextUrl = next && "url" in next ? next.url : null;
+    attachmentPreviewUrlRef.current = nextUrl;
+    if (previousUrl && previousUrl !== nextUrl) URL.revokeObjectURL(previousUrl);
+    setAttachmentPreview(next);
+  };
+
   const handlePreviewAttachment = async (attachment: MailAttachment) => {
     const previewKind = resolveAttachmentPreviewKind(attachment);
     if (!previewKind) {
@@ -2243,35 +2453,21 @@ export function useMailApp() {
 
       if (previewKind === "text") {
         const text = (await blob.text()).slice(0, 200000);
-        setAttachmentPreview((current) => {
-          if (current?.kind !== "text") {
-            if (current && "url" in current) {
-              URL.revokeObjectURL(current.url);
-            }
-            attachmentPreviewUrlRef.current = null;
-          }
-          return {
-            kind: "text",
-            name: filename,
-            type: normalizedType,
-            text,
-          };
+        replaceAttachmentPreview({
+          kind: "text",
+          name: filename,
+          type: normalizedType,
+          text,
         });
         return;
       }
 
       const url = URL.createObjectURL(blob);
-      setAttachmentPreview((current) => {
-        if (current && "url" in current) {
-          URL.revokeObjectURL(current.url);
-        }
-        attachmentPreviewUrlRef.current = url;
-        return {
-          kind: previewKind,
-          name: filename,
-          type: normalizedType,
-          url,
-        };
+      replaceAttachmentPreview({
+        kind: previewKind,
+        name: filename,
+        type: normalizedType,
+        url,
       });
     };
     await showPreview().catch((error: unknown) => {
@@ -2318,15 +2514,7 @@ export function useMailApp() {
     return preview;
   };
 
-  const closeAttachmentPreview = () => {
-    setAttachmentPreview((current) => {
-      if (current && "url" in current) {
-        URL.revokeObjectURL(current.url);
-      }
-      attachmentPreviewUrlRef.current = null;
-      return null;
-    });
-  };
+  const closeAttachmentPreview = () => replaceAttachmentPreview(null);
 
   useEffect(() => {
     const hoverPreviewUrls = attachmentHoverPreviewUrlsRef.current;
@@ -2344,7 +2532,10 @@ export function useMailApp() {
     };
   }, []);
 
-  const handleMoveMessage = async (targetMailboxId: string, messageId?: string) => {
+  const handleMoveMessage = async (
+    targetMailboxId: string,
+    messageId?: string,
+  ) => {
     const targetId = messageId ?? selectedMessageId;
     if (!activeMailbox || !targetId) return;
     const targetMessage = activeMailbox.messages.find((m) => m.id === targetId);
@@ -2356,9 +2547,7 @@ export function useMailApp() {
     );
     const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
 
-    setActiveMailbox((cur) =>
-      cur ? { ...cur, messages: remaining } : cur,
-    );
+    setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
     setSelectedMessageId((cur) =>
       cur === targetId ? (remaining[0]?.id ?? null) : cur,
     );
@@ -2377,12 +2566,18 @@ export function useMailApp() {
             setActiveMailbox((cur) => {
               if (!cur) return cur;
               const restored = [...cur.messages];
-              const insertIndex = remaining.findIndex((m) =>
-                m.receivedAt &&
-                targetMessage.receivedAt &&
-                Date.parse(m.receivedAt) < Date.parse(targetMessage.receivedAt),
+              const insertIndex = remaining.findIndex(
+                (m) =>
+                  m.receivedAt &&
+                  targetMessage.receivedAt &&
+                  Date.parse(m.receivedAt) <
+                    Date.parse(targetMessage.receivedAt),
               );
-              restored.splice(insertIndex < 0 ? 0 : insertIndex, 0, targetMessage);
+              restored.splice(
+                insertIndex < 0 ? 0 : insertIndex,
+                0,
+                targetMessage,
+              );
               return { ...cur, messages: restored };
             });
             setSelectedMessageId(targetId);
@@ -2457,9 +2652,7 @@ export function useMailApp() {
         activeMailbox.session,
         activeMailbox.selectedMailboxId,
       );
-      setActiveMailbox((cur) =>
-        cur ? { ...cur, messages: [] } : cur,
-      );
+      setActiveMailbox((cur) => (cur ? { ...cur, messages: [] } : cur));
       setSelectedMessageId(null);
       toast(
         destroyed > 0
@@ -2470,9 +2663,7 @@ export function useMailApp() {
     await emptyMailbox().catch((error: unknown) => {
       log.error("Failed to empty mailbox", error);
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not empty the folder.",
+        error instanceof Error ? error.message : "Could not empty the folder.",
       );
     });
     setIsBusy(false);
@@ -2514,11 +2705,11 @@ export function useMailApp() {
     setActiveMailbox((cur) =>
       cur
         ? {
-          ...cur,
-          mailboxes: cur.mailboxes.map((m) =>
-            m.id === mailboxId ? { ...m, name: trimmed } : m,
-          ),
-        }
+            ...cur,
+            mailboxes: cur.mailboxes.map((m) =>
+              m.id === mailboxId ? { ...m, name: trimmed } : m,
+            ),
+          }
         : cur,
     );
     try {
@@ -2537,11 +2728,11 @@ export function useMailApp() {
       setActiveMailbox((cur) =>
         cur
           ? {
-            ...cur,
-            mailboxes: cur.mailboxes.map((m) =>
-              m.id === mailboxId ? { ...m, name: mailbox.name } : m,
-            ),
-          }
+              ...cur,
+              mailboxes: cur.mailboxes.map((m) =>
+                m.id === mailboxId ? { ...m, name: mailbox.name } : m,
+              ),
+            }
           : cur,
       );
     }
@@ -2640,9 +2831,7 @@ export function useMailApp() {
         messageIds,
         isInTrash ? null : (trashMailbox?.id ?? null),
       );
-      setActiveMailbox((cur) =>
-        cur ? { ...cur, messages: remaining } : cur,
-      );
+      setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
       setSelectedMessageId((cur) =>
         cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur,
       );
@@ -2663,7 +2852,10 @@ export function useMailApp() {
     setIsBusy(false);
   };
 
-  const handleBulkMove = async (messageIds: string[], targetMailboxId: string) => {
+  const handleBulkMove = async (
+    messageIds: string[],
+    targetMailboxId: string,
+  ) => {
     if (!activeMailbox || messageIds.length === 0) return;
     const idSet = new Set(messageIds);
     const remaining = activeMailbox.messages.filter((m) => !idSet.has(m.id));
@@ -2674,9 +2866,7 @@ export function useMailApp() {
         messageIds,
         targetMailboxId,
       );
-      setActiveMailbox((cur) =>
-        cur ? { ...cur, messages: remaining } : cur,
-      );
+      setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
       setSelectedMessageId((cur) =>
         cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur,
       );
@@ -2690,9 +2880,7 @@ export function useMailApp() {
     await moveMessages().catch((error: unknown) => {
       log.error("Failed to bulk move messages", error);
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not move the messages.",
+        error instanceof Error ? error.message : "Could not move the messages.",
       );
     });
     setIsBusy(false);
@@ -2704,20 +2892,28 @@ export function useMailApp() {
     setActiveMailbox((cur) =>
       cur
         ? {
-          ...cur,
-          messages: cur.messages.map((m) => {
-            if (!idSet.has(m.id)) return m;
-            const keywords = { ...(m.keywords ?? {}) };
-            delete keywords["$seen"];
-            return { ...m, keywords };
-          }),
-        }
+            ...cur,
+            messages: cur.messages.map((m) => {
+              if (!idSet.has(m.id)) return m;
+              const keywords = { ...(m.keywords ?? {}) };
+              delete keywords["$seen"];
+              return { ...m, keywords };
+            }),
+          }
         : cur,
     );
     try {
-      await activeMailbox.client.bulkMarkAsUnread(
-        activeMailbox.session,
-        messageIds,
+      await keywordReconciliation.trackWrite(
+        messageIds.map((messageId) => ({
+          messageId,
+          keyword: "$seen",
+          enabled: false,
+        })),
+        () =>
+          activeMailbox.client.bulkMarkAsUnread(
+            activeMailbox.session,
+            messageIds,
+          ),
       );
     } catch (error) {
       log.error("Failed to bulk mark as unread", error);
@@ -2730,19 +2926,27 @@ export function useMailApp() {
     setActiveMailbox((cur) =>
       cur
         ? {
-          ...cur,
-          messages: cur.messages.map((m) =>
-            idSet.has(m.id)
-              ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
-              : m,
-          ),
-        }
+            ...cur,
+            messages: cur.messages.map((m) =>
+              idSet.has(m.id)
+                ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
+                : m,
+            ),
+          }
         : cur,
     );
     try {
-      await activeMailbox.client.bulkMarkAsRead(
-        activeMailbox.session,
-        messageIds,
+      await keywordReconciliation.trackWrite(
+        messageIds.map((messageId) => ({
+          messageId,
+          keyword: "$seen",
+          enabled: true,
+        })),
+        () =>
+          activeMailbox.client.bulkMarkAsRead(
+            activeMailbox.session,
+            messageIds,
+          ),
       );
     } catch (error) {
       log.error("Failed to bulk mark as read", error);
@@ -2774,20 +2978,20 @@ export function useMailApp() {
     setActiveMailbox((cur) =>
       cur
         ? {
-          ...cur,
-          messages: cur.messages.map((m) =>
-            m.id === targetId ? markUnread(m) : m,
-          ),
-        }
+            ...cur,
+            messages: cur.messages.map((m) =>
+              m.id === targetId ? markUnread(m) : m,
+            ),
+          }
         : cur,
     );
     setRelatedConversationMessages((current) =>
       current.map((m) => (m.id === targetId ? markUnread(m) : m)),
     );
     try {
-      await activeMailbox.client.markAsUnread(
-        activeMailbox.session,
-        targetId,
+      await keywordReconciliation.trackWrite(
+        [{ messageId: targetId, keyword: "$seen", enabled: false }],
+        () => activeMailbox.client.markAsUnread(activeMailbox.session, targetId),
       );
     } catch (error) {
       log.error("Failed to mark message as unread", error);
@@ -2806,27 +3010,36 @@ export function useMailApp() {
     setActiveMailbox((cur) =>
       cur
         ? {
-          ...cur,
-          messages: cur.messages.map((m) =>
-            m.id === targetId
-              ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
-              : m,
-          ),
-        }
+            ...cur,
+            messages: cur.messages.map((m) =>
+              m.id === targetId
+                ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
+                : m,
+            ),
+          }
         : cur,
     );
     try {
-      await activeMailbox.client.markAsRead(activeMailbox.session, targetId);
+      await keywordReconciliation.trackWrite(
+        [{ messageId: targetId, keyword: "$seen", enabled: true }],
+        () => activeMailbox.client.markAsRead(activeMailbox.session, targetId),
+      );
     } catch (error) {
       log.error("Failed to mark message as read", error);
     }
   };
 
   const handleRealtimeSync = (result: MailSyncResponse) => {
-    let resolvedSelectedMessageId: string | null | undefined;
     const calendarImport = result.calendarImport;
+    const keywordGuard = keywordReconciliation.guardSnapshot(
+      result.accountId,
+      result.email.records,
+    );
 
-    setActiveMailbox((current) => {
+    /** The mailbox with this snapshot merged in; unchanged when the snapshot is for another account. */
+    const applySync = (
+      current: ActiveMailboxState | null,
+    ): ActiveMailboxState | null => {
       if (!current) {
         return current;
       }
@@ -2846,17 +3059,12 @@ export function useMailApp() {
         : current.selectedMailboxId;
       const nextMessages = nextSelectedMailboxId
         ? mergeMessagesForMailbox(
-          current.messages,
-          nextSelectedMailboxId,
-          result.email,
-        )
+            current.messages,
+            nextSelectedMailboxId,
+            result.email,
+            keywordGuard,
+          )
         : [];
-
-      resolvedSelectedMessageId =
-        selectedMessageId &&
-          nextMessages.some((message) => message.id === selectedMessageId)
-          ? selectedMessageId
-          : null;
 
       return {
         ...current,
@@ -2864,10 +3072,21 @@ export function useMailApp() {
         selectedMailboxId: nextSelectedMailboxId,
         messages: nextMessages,
       };
-    });
+    };
 
-    if (resolvedSelectedMessageId !== undefined) {
-      setSelectedMessageId(resolvedSelectedMessageId);
+    // The same pure merge answers whether the open message survives, so the updater has nothing to report back.
+    const latest = activeMailboxRef.current;
+    const merged = applySync(latest);
+    setActiveMailbox(applySync);
+    if (
+      merged &&
+      merged !== latest &&
+      selectedMessageId &&
+      !merged.messages.some((message) => message.id === selectedMessageId)
+    ) {
+      setSelectedMessageId((current) =>
+        current === selectedMessageId ? null : current,
+      );
     }
 
     const importedCount =
@@ -2892,40 +3111,70 @@ export function useMailApp() {
     if (!mailboxId) {
       return;
     }
-    setIsRefreshing(true);
-    try {
+    const accountId = getPrimaryMailAccountId(mailbox.session);
+    const isStillOpen = (
+      current: ActiveMailboxState | null,
+    ): current is ActiveMailboxState =>
+      current !== null &&
+      current.selectedMailboxId === mailboxId &&
+      getPrimaryMailAccountId(current.session) === accountId;
+    const refresh = async () => {
       const previousTotal = totalMessages;
       const pageSize = resolveMailboxMessagesPageSize(
         mailbox.mailServerPolicy,
         MAILBOX_MESSAGES_PAGE_SIZE,
       );
-      const { messages: refreshed, total } =
-        await mailbox.client.getMailboxMessages(
-          mailbox.session,
+      const started = activeMailboxRef.current?.messages ?? mailbox.messages;
+      const read = keywordReconciliation.beginRead();
+      const { messages: refreshed, total } = await mailbox.client
+        .getMailboxMessages(mailbox.session, mailboxId, {
+          limit: pageSize,
+          position: 0,
+        })
+        .catch((error: unknown) => {
+          keywordReconciliation.endRead(read, []);
+          throw error;
+        });
+      const keywordGuard = keywordReconciliation.endRead(
+        read,
+        refreshed.map((message) => message.id),
+      );
+      // The page was requested a while ago, so it is merged into the list as it is now and only while this mailbox is still open.
+      const mergeInto = (current: JmapEmailMessage[]) =>
+        mergeRefreshedIntoCurrentMessages({
+          started,
+          current,
+          refreshed,
+          previousTotal,
+          newTotal: total,
+          keywordGuard,
+        });
+      const latest = activeMailboxRef.current;
+      if (isStillOpen(latest)) {
+        setTotalMessages(total);
+        seedMailMessageCache(
+          queryClient,
           mailboxId,
-          { limit: pageSize, position: 0 },
+          mergeInto(latest.messages),
+          total,
         );
-      setTotalMessages(total);
-      const merged = mergeRefreshedMailboxMessages(
-        mailbox.messages,
-        refreshed,
-        previousTotal,
-        total,
-      );
-      seedMailMessageCache(queryClient, mailboxId, merged, total);
-      setActiveMailbox((cur) =>
-        cur ? { ...cur, messages: merged, selectedMailboxId: mailboxId } : cur,
-      );
+        setActiveMailbox((current) =>
+          isStillOpen(current)
+            ? { ...current, messages: mergeInto(current.messages) }
+            : current,
+        );
+      }
 
-      const accountId = getPrimaryMailAccountId(mailbox.session);
       if (accountId) {
         const result = await mailDemoApiService.syncAccount(accountId);
         handleRealtimeSync(result);
       }
-    } catch (error) {
+    };
+    setIsRefreshing(true);
+    await refresh().catch((error: unknown) => {
       log.error("Manual refresh failed", error);
       toast.error(getErrorMessage(error, "Could not refresh mail."));
-    }
+    });
     setIsRefreshing(false);
   };
 
@@ -2945,11 +3194,13 @@ export function useMailApp() {
     } catch {
       /* best-effort */
     }
+    keywordReconciliation.reset();
     setActiveMailbox(null);
     setSelectedMessageId(null);
     setSelectedMessagePlaintext(null);
     setSelectedMessageDecryptedHtml(null);
     setSelectedMessageSignatureVerificationState("not_signed");
+    setSelectedMessageSenderKeyTrustState(undefined);
     setSelectedMessageDecryptError(null);
     setSelectedMessageIsDecrypting(false);
     clearMailOpenPrefetch();
@@ -2963,7 +3214,11 @@ export function useMailApp() {
       .finally(finishNavigation);
   };
 
-  const patchMessageKeyword = (msg: JmapEmailMessage, keyword: string, enabled: boolean) => {
+  const patchMessageKeyword = (
+    msg: JmapEmailMessage,
+    keyword: string,
+    enabled: boolean,
+  ) => {
     const update = (keywords: Record<string, boolean>) => {
       if (enabled) keywords[keyword] = true;
       else delete keywords[keyword];
@@ -2972,9 +3227,9 @@ export function useMailApp() {
     setActiveMailbox((cur) =>
       cur
         ? {
-          ...cur,
-          messages: patchMessagesKeywords(cur.messages, msg.id, update),
-        }
+            ...cur,
+            messages: patchMessagesKeywords(cur.messages, msg.id, update),
+          }
         : cur,
     );
     setRelatedConversationMessages((cur) =>
@@ -2992,6 +3247,7 @@ export function useMailApp() {
   const handleSimpleLoginAction = useSimpleLoginAliasAction({
     activeMailbox,
     patchMessageKeyword,
+    trackKeywordWrite: keywordReconciliation.trackWrite,
   });
 
   const handleToggleFlagged = async (messageId?: string) => {
@@ -3007,10 +3263,14 @@ export function useMailApp() {
 
     patchMessageKeyword(msg, "$flagged", next);
     try {
-      await activeMailbox.client.toggleFlagged(
-        activeMailbox.session,
-        targetId,
-        next,
+      await keywordReconciliation.trackWrite(
+        [{ messageId: targetId, keyword: "$flagged", enabled: next }],
+        () =>
+          activeMailbox.client.toggleFlagged(
+            activeMailbox.session,
+            targetId,
+            next,
+          ),
       );
     } catch (error) {
       log.error("Failed to toggle flag", error);
@@ -3019,7 +3279,11 @@ export function useMailApp() {
     }
   };
 
-  const handleSetMessageLabel = async (messageId: string, labelId: string, assigned: boolean) => {
+  const handleSetMessageLabel = async (
+    messageId: string,
+    labelId: string,
+    assigned: boolean,
+  ) => {
     if (!activeMailbox) return;
     const keywordKey = `label:${labelId}`;
     const msg =
@@ -3031,11 +3295,15 @@ export function useMailApp() {
 
     patchMessageKeyword(msg, keywordKey, assigned);
     try {
-      await activeMailbox.client.setMessageLabel(
-        activeMailbox.session,
-        messageId,
-        labelId,
-        assigned,
+      await keywordReconciliation.trackWrite(
+        [{ messageId, keyword: keywordKey, enabled: assigned }],
+        () =>
+          activeMailbox.client.setMessageLabel(
+            activeMailbox.session,
+            messageId,
+            labelId,
+            assigned,
+          ),
       );
     } catch (error) {
       log.error("Failed to set message label", error);
@@ -3068,7 +3336,10 @@ export function useMailApp() {
     });
   };
 
-  const handleCreateLabel = async (name: string, color: string): Promise<LabelDef | null> => {
+  const handleCreateLabel = async (
+    name: string,
+    color: string,
+  ): Promise<LabelDef | null> => {
     if (!activeMailbox) return null;
     const newLabel: LabelDef = { id: crypto.randomUUID(), name, color };
     const updatedLabels = [
@@ -3118,15 +3389,16 @@ export function useMailApp() {
     }
   };
 
-  const composeMailPolicy = activeMailbox?.mailServerPolicy ??
-  resolveMailServerPolicy({ configPolicy: config?.serverLimits ?? null });
+  const composeMailPolicy =
+    activeMailbox?.mailServerPolicy ??
+    resolveMailServerPolicy({ configPolicy: config?.serverLimits ?? null });
 
   const user = session?.user
     ? {
-      name: session.user.name ?? "User",
-      email: session.user.email ?? "",
-      avatar: resolveAvatarUrl(session.user.image),
-    }
+        name: session.user.name ?? "User",
+        email: session.user.email ?? "",
+        avatar: resolveAvatarUrl(session.user.image),
+      }
     : null;
 
   return {
@@ -3157,6 +3429,7 @@ export function useMailApp() {
     selectedMessageDecryptedAttachments,
     attachmentPreview,
     selectedMessageSignatureVerificationState,
+    selectedMessageSenderKeyTrustState,
     selectedMessageDecryptError,
     selectedMessageIsDecrypting,
     isPaletteOpen,
@@ -3165,13 +3438,13 @@ export function useMailApp() {
     loadMoreMessages,
     hasMoreMessages: activeMailbox
       ? hasMoreMailboxMessages(
-        activeMailbox.messages.length,
-        totalMessages,
-        resolveMailboxMessagesPageSize(
-          activeMailbox.mailServerPolicy,
-          MAILBOX_MESSAGES_PAGE_SIZE,
-        ),
-      )
+          activeMailbox.messages.length,
+          totalMessages,
+          resolveMailboxMessagesPageSize(
+            activeMailbox.mailServerPolicy,
+            MAILBOX_MESSAGES_PAGE_SIZE,
+          ),
+        )
       : false,
     isLoadingMore,
     handleManualRefresh,
@@ -3181,6 +3454,7 @@ export function useMailApp() {
     handleComposeImageUpload,
     handleDeleteMessage,
     handleReply,
+    handleReplyAll,
     handleForward,
     handleEditDraft,
     handleDiscardDraft,

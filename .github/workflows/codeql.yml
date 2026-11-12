@@ -54,7 +54,7 @@ jobs:
         run: rustup toolchain install --profile minimal
 
       - name: Initialize CodeQL
-        uses: chainguard-actions/github-codeql-action/init@a321c5c716c880c793b7c21e00b50c5e7e864a62 # v4.39.2
+        uses: chainguard-actions/github-codeql-action/init@e4969b640f7a67163769dc6d910d19032366881b # v4.39.3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -69,6 +69,6 @@ jobs:
           -o "$RUNNER_TEMP/libSolaceNotificationService.dylib"
 
       - name: Analyze
-        uses: chainguard-actions/github-codeql-action/analyze@a321c5c716c880c793b7c21e00b50c5e7e864a62 # v4.39.2
+        uses: chainguard-actions/github-codeql-action/analyze@e4969b640f7a67163769dc6d910d19032366881b # v4.39.3
         with:
           category: /codeql/${{ matrix.language }}

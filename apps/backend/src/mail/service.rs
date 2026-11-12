@@ -21,7 +21,7 @@ use crate::db::entities::{mail_directory_entry, mail_vault_backup};
 use crate::error::AppError;
 use crate::http::zod::js_trim;
 use crate::instant;
-use crate::integrations::stalwart::admin::{Admin, AdminError};
+use crate::integrations::stalwart::admin::{Admin, AdminError, managed_marker};
 use crate::integrations::stalwart::limits;
 use crate::state::AppState;
 use crate::telemetry;
@@ -36,12 +36,26 @@ static LOCAL_PART: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// Per-process mail state, bounded by the number of users and accounts.
-#[derive(Default)]
 pub struct MailCache {
     tokens: Mutex<HashMap<String, Arc<tokio::sync::Mutex<Option<CachedToken>>>>>,
     bridge_passwords: Mutex<HashSet<String>>,
     limits: tokio::sync::Mutex<Option<(Instant, Option<MailServerLimits>)>>,
     oauth_redirect: tokio::sync::OnceCell<()>,
+    pub(super) maintenance_slots: tokio::sync::Semaphore,
+    pub(super) lock_slots: tokio::sync::Semaphore,
+}
+
+impl Default for MailCache {
+    fn default() -> Self {
+        Self {
+            tokens: Mutex::default(),
+            bridge_passwords: Mutex::default(),
+            limits: tokio::sync::Mutex::default(),
+            oauth_redirect: tokio::sync::OnceCell::new(),
+            maintenance_slots: tokio::sync::Semaphore::new(1),
+            lock_slots: tokio::sync::Semaphore::new(2),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -210,11 +224,10 @@ async fn issue_access_token(
         .await;
     let token = match login {
         Ok(token) => token,
-        Err(error) => {
+        Err(AdminError::LoginRejected) => {
             tracing::warn!(
                 account_id = mailbox.stalwart_account_id,
-                error = %telemetry::redact_pii(&error.to_string()),
-                "Stalwart bridge login failed; configuring account password and retrying once"
+                "Stalwart bridge authentication rejected; configuring account password and retrying once"
             );
             ensure_bridge_password(state, &admin, &mailbox.stalwart_account_id, &secret).await?;
             admin
@@ -228,7 +241,11 @@ async fn issue_access_token(
                 .await
                 .map_err(upstream)?
         }
+        Err(error) => return Err(upstream(error)),
     };
+    if queries::vault(&state.db, &mailbox.id).await?.is_some() {
+        reconcile_activation(&admin, user_id, &mailbox, &token.access_token).await?;
+    }
     let expires_in = token.expires_in.unwrap_or(DEFAULT_TOKEN_LIFETIME_SECONDS);
     let now = u64::try_from(instant::unix_millis(instant::now()) / 1000).unwrap_or_default();
     Ok(MailAccessToken {
@@ -323,6 +340,15 @@ pub async fn bootstrap(
     user: &RouteUser,
     request: MailBootstrapRequest,
 ) -> Result<MailSignup, AppError> {
+    let _lock = queries::acquire_provisioning_lock(state, &user.id).await?;
+    bootstrap_locked(state, user, request).await
+}
+
+async fn bootstrap_locked(
+    state: &AppState,
+    user: &RouteUser,
+    request: MailBootstrapRequest,
+) -> Result<MailSignup, AppError> {
     if !queries::mailbox_approved(&state.db, &user.id).await? {
         return Err(AppError::Forbidden(
             "This account is not approved for a mailbox yet.".into(),
@@ -339,6 +365,17 @@ pub async fn bootstrap(
     if let Some(mailbox) = &existing
         && queries::vault(&state.db, &mailbox.id).await?.is_some()
     {
+        let admin = Admin::new(state);
+        let secret = bridge::secret(
+            state.config.mail_bridge_hmac_key.as_deref(),
+            &user.id,
+            &mailbox.email,
+        )
+        .map_err(AppError::internal)?;
+        let token = owner_token(state, &admin, &mailbox.email, &secret)
+            .await
+            .map_err(upstream)?;
+        reconcile_activation(&admin, &user.id, mailbox, &token.access_token).await?;
         return Err(AppError::field(
             "A mailbox has already been provisioned for this account.",
             "email",
@@ -526,39 +563,66 @@ impl Stalwart {
     /// Resolves the domain, creates the account when there is none, registers the key and turns on encryption at rest.
     async fn provision(
         &mut self,
+        state: &AppState,
+        user_id: &str,
         admin: &Admin<'_>,
         address: &Address,
         provisioning: &Provisioning,
     ) -> Result<(), AdminError> {
+        let marker = managed_marker(user_id);
+        let secret = bridge::secret(
+            state.config.mail_bridge_hmac_key.as_deref(),
+            user_id,
+            &address.email,
+        )
+        .map_err(|error| AdminError::Failed(error.to_string()))?;
         self.domain_id = admin.resolve_domain_by_name(&address.domain).await?;
         if self.account_id.is_empty() {
             let account = admin
-                .create_account(
-                    &address.local_part,
-                    &credential_secret(),
-                    &self.domain_id,
-                    provisioning.display_name.as_deref(),
-                )
+                .create_account(&address.local_part, &secret, &self.domain_id, Some(&marker))
                 .await?;
             self.account_id = account.account_id;
             self.account_created = account.created;
+        } else {
+            admin.ensure_staging(&self.account_id, &marker).await?;
         }
-        let description = format!(
-            "{} primary OpenPGP key",
-            provisioning
-                .display_name
-                .as_deref()
-                .unwrap_or(&address.email)
-        );
-        self.public_key_id = admin
-            .register_public_key(
+        let token = owner_token(state, admin, &address.email, &secret).await?;
+        let owner = admin.with_owner_token(&token.access_token);
+        owner
+            .set_sender_name(
                 &self.account_id,
                 &address.email,
-                &provisioning.public_key_armored,
-                Some(&description),
+                provisioning
+                    .display_name
+                    .as_deref()
+                    .unwrap_or(&address.email),
             )
             .await?;
-        admin
+        // A same-create acknowledgement proves this denied account has no old key; adopted stages still need the emptiness check.
+        let prepared_keys = if self.account_created {
+            Some(Vec::new())
+        } else if queries::entry_by_account(&state.db, &self.account_id)
+            .await
+            .map_err(|_| AdminError::Failed("Mailbox directory check failed.".into()))?
+            .is_none()
+        {
+            Some(
+                owner
+                    .prepare_uncommitted_key(&self.account_id, &provisioning.public_key_armored)
+                    .await?,
+            )
+        } else {
+            None
+        };
+        self.public_key_id = owner
+            .register_public_key(
+                &self.account_id,
+                prepared_keys.as_deref(),
+                &provisioning.public_key_armored,
+                Some("Solace mailbox OpenPGP key"),
+            )
+            .await?;
+        owner
             .enable_encryption_at_rest(&self.account_id, &self.public_key_id)
             .await
     }
@@ -592,9 +656,52 @@ impl Stalwart {
     }
 }
 
-/// A random password nobody uses: mailbox logins use the bridge secret.
-fn credential_secret() -> String {
-    format!("{}{}", uuid::Uuid::new_v4(), uuid::Uuid::new_v4())
+pub(super) async fn owner_token(
+    state: &AppState,
+    admin: &Admin<'_>,
+    email: &str,
+    secret: &str,
+) -> Result<crate::integrations::stalwart::admin::OAuthToken, AdminError> {
+    let redirect = bridge::redirect_uri(&state.config);
+    state
+        .mail_cache
+        .oauth_redirect
+        .get_or_try_init(|| admin.ensure_oauth_redirect(bridge::CLIENT_ID, &redirect))
+        .await?;
+    admin
+        .issue_oauth_access_token(email, secret, bridge::CLIENT_ID, &redirect, bridge::pkce())
+        .await
+}
+
+pub(super) async fn reconcile_activation(
+    admin: &Admin<'_>,
+    user_id: &str,
+    mailbox: &mail_directory_entry::Model,
+    token: &str,
+) -> Result<(), AppError> {
+    let marker = managed_marker(user_id);
+    if !admin
+        .needs_activation(&mailbox.stalwart_account_id, &marker)
+        .await
+        .map_err(upstream)?
+    {
+        return Ok(());
+    }
+    let key_id = mailbox
+        .stalwart_public_key_id
+        .as_deref()
+        .filter(|id| !id.is_empty())
+        .ok_or_else(|| unavailable("Staged mailbox has no committed public key."))?;
+    admin
+        .with_owner_token(token)
+        .verify_encryption_at_rest(&mailbox.stalwart_account_id, key_id)
+        .await
+        .map_err(upstream)?;
+    admin
+        .activate_account(&mailbox.stalwart_account_id, &marker)
+        .await
+        .map_err(upstream)?;
+    Ok(())
 }
 
 async fn create(
@@ -617,7 +724,10 @@ async fn create(
     }
     let admin = Admin::new(state);
     let mut remote = Stalwart::new("", verified_fingerprint(&provisioning)?);
-    if let Err(error) = remote.provision(&admin, address, &provisioning).await {
+    if let Err(error) = remote
+        .provision(state, user_id, &admin, address, &provisioning)
+        .await
+    {
         tracing::error!(
             recipient_ref = telemetry::log_ref(&address.email),
             user_id,
@@ -647,6 +757,10 @@ async fn create(
         );
         return Err(persistence_error(error));
     }
+    admin
+        .activate_account(&remote.account_id, &managed_marker(user_id))
+        .await
+        .map_err(upstream)?;
     Ok(remote.signup(address, &provisioning))
 }
 
@@ -768,11 +882,23 @@ async fn repair(
     provisioning: Provisioning,
 ) -> Result<MailSignup, AppError> {
     let admin = Admin::new(state);
+    if !mailbox.stalwart_account_id.is_empty()
+        && admin
+            .managed_stage(&mailbox.stalwart_account_id, &managed_marker(user_id))
+            .await
+            .map_err(upstream)?
+            .is_none()
+    {
+        return Err(AppError::Conflict("This mailbox needs operator recovery before its vault can be replaced. Contact support.".into()));
+    }
     let mut remote = Stalwart::new(
         &mailbox.stalwart_account_id,
         verified_fingerprint(&provisioning)?,
     );
-    if let Err(error) = remote.provision(&admin, address, &provisioning).await {
+    if let Err(error) = remote
+        .provision(state, user_id, &admin, address, &provisioning)
+        .await
+    {
         tracing::error!(
             recipient_ref = telemetry::log_ref(&address.email),
             user_id,
@@ -810,6 +936,10 @@ async fn repair(
         );
         return Err(persistence_error(error));
     }
+    admin
+        .activate_account(&remote.account_id, &managed_marker(user_id))
+        .await
+        .map_err(upstream)?;
     Ok(remote.signup(address, &provisioning))
 }
 
@@ -934,11 +1064,11 @@ fn persistence_error(error: Persist) -> AppError {
     }
 }
 
-/// `getDirectoryKey`: the entry for the address, else the entry of the user signed in with it, else (for signed-in callers) Stalwart's key.
+/// Only committed directory entries are exposed, including the account's primary address.
 pub async fn directory_key(
     state: &AppState,
     email: &str,
-    allow_remote: bool,
+    _allow_remote: bool,
 ) -> Result<MailDirectoryKey, AppError> {
     let email = addresses::normalize(email);
     if let Some(entry) = queries::entry_by_email(&state.db, &email).await? {
@@ -948,9 +1078,6 @@ pub async fn directory_key(
         && let Some(entry) = queries::entry_by_user(&state.db, &user_id).await?
     {
         return Ok(directory_record(entry));
-    }
-    if allow_remote && let Some(key) = remote_directory_key(state, &email).await? {
-        return Ok(key);
     }
     Err(AppError::NotFound(
         "No internal public key was found for that email.".into(),
@@ -965,43 +1092,6 @@ fn directory_record(entry: mail_directory_entry::Model) -> MailDirectoryKey {
         source: entry.source,
         trust: entry.trust,
     }
-}
-
-/// Only addresses on the Solace domain; a Stalwart failure reads as no key.
-async fn remote_directory_key(
-    state: &AppState,
-    email: &str,
-) -> Result<Option<MailDirectoryKey>, AppError> {
-    let configured = state.config.stalwart_default_domain.trim().to_lowercase();
-    match email.rsplit_once('@') {
-        Some((local, domain)) if !local.is_empty() && domain == configured => {}
-        _ => return Ok(None),
-    }
-    let remote = match Admin::new(state).resolve_mailbox_public_key(email).await {
-        Ok(Some(remote)) => remote,
-        Ok(None) => return Ok(None),
-        Err(error) => {
-            tracing::warn!(
-                recipient_ref = telemetry::log_ref(email),
-                error = %telemetry::redact_pii(&error.to_string()),
-                "Failed to resolve mailbox public key from Stalwart"
-            );
-            return Ok(None);
-        }
-    };
-    tracing::info!(
-        recipient_ref = telemetry::log_ref(email),
-        stalwart_account_id = remote.stalwart_account_id,
-        "Resolved mailbox public key from Stalwart after missing directory entry"
-    );
-    Ok(Some(MailDirectoryKey {
-        email: email.to_owned(),
-        fingerprint: fingerprint(&remote.public_key_armored)
-            .ok_or_else(|| AppError::internal("Stalwart holds a public key that is not OpenPGP"))?,
-        public_key_armored: remote.public_key_armored,
-        source: "internal".into(),
-        trust: "verified".into(),
-    }))
 }
 
 pub async fn vault_backup(state: &AppState, user: &RouteUser) -> Result<MailVaultBackup, AppError> {
@@ -1081,10 +1171,12 @@ fn vault_record(email: String, vault: mail_vault_backup::Model) -> MailVaultBack
 
 /// `deleteMailboxForUser`: the linked Stalwart account, then any account still holding the mailbox name, then the entry.
 pub async fn delete_mailbox_for_user(state: &AppState, user_id: &str) -> Result<(), AppError> {
+    let _lock = queries::acquire_provisioning_lock(state, user_id).await?;
+    let admin = Admin::new(state);
     let Some(mailbox) = queries::entry_by_user(&state.db, user_id).await? else {
+        delete_owned_mailbox_orphans(state, &admin, user_id).await?;
         return Ok(());
     };
-    let admin = Admin::new(state);
     let purged = async {
         let linked = mailbox.stalwart_account_id.trim();
         if !linked.is_empty() {
@@ -1096,6 +1188,14 @@ pub async fn delete_mailbox_for_user(state: &AppState, user_id: &str) -> Result<
             && !remote.trim().is_empty()
             && remote.trim() != linked
         {
+            if !admin
+                .is_managed_account(&remote, &managed_marker(user_id))
+                .await?
+            {
+                return Err(AdminError::Failed(
+                    "Refusing to delete an unrelated mailbox holding the old address.".into(),
+                ));
+            }
             admin.delete_account(&remote).await?;
         }
         Ok::<_, AdminError>(())
@@ -1112,6 +1212,7 @@ pub async fn delete_mailbox_for_user(state: &AppState, user_id: &str) -> Result<
             "Could not delete the linked Stalwart mailbox. Try again in a moment.",
         ));
     }
+    delete_owned_mailbox_orphans(state, &admin, user_id).await?;
     queries::delete_entry(&state.db, &mailbox.id).await?;
     tracing::info!(
         user_id,
@@ -1119,6 +1220,27 @@ pub async fn delete_mailbox_for_user(state: &AppState, user_id: &str) -> Result<
         stalwart_account_id = mailbox.stalwart_account_id,
         "Deleted linked mailbox for Solace account"
     );
+    Ok(())
+}
+
+async fn delete_owned_mailbox_orphans(
+    state: &AppState,
+    admin: &Admin<'_>,
+    user_id: &str,
+) -> Result<(), AppError> {
+    let accounts = admin
+        .managed_accounts(&managed_marker(user_id))
+        .await
+        .map_err(upstream)?;
+    for account in accounts {
+        if let Some(account_id) = account["id"].as_str()
+            && queries::entry_by_account(&state.db, account_id)
+                .await?
+                .is_none()
+        {
+            admin.delete_account(account_id).await.map_err(upstream)?;
+        }
+    }
     Ok(())
 }
 
@@ -1144,7 +1266,7 @@ fn optional_text(value: Option<&str>) -> Option<String> {
 #[cfg(test)]
 pub mod tests {
     use sea_orm::{ConnectionTrait, Database};
-    use serde_json::json;
+    use serde_json::{Value, json};
 
     use super::*;
     use crate::config::Config;
@@ -1324,6 +1446,12 @@ pub mod tests {
 
     /// Stalwart's registry for provisioning: domain `domain-1`, account `acct-1`, key `pk-1`, and the bridge login.
     pub fn provisioning(plan: Plan) -> impl Fn(&Recorded) -> Reply {
+        let permissions = Mutex::new(
+            json!({"@type":"Merge","enabledPermissions":{},"disabledPermissions":{"emailReceive":true}}),
+        );
+        let settings = Mutex::new(json!({"@type":"Disabled"}));
+        let keys = Mutex::new(Vec::<Value>::new());
+        let description = Mutex::new(managed_marker(OWNER));
         move |request| {
             match request.path.as_str() {
                 "/api/auth" => return Reply::authenticated(request, "code-1"),
@@ -1340,10 +1468,12 @@ pub mod tests {
             let answer = match call[0].as_str().unwrap_or_default() {
                 "x:Domain/query" => json!({"ids": ["domain-1"]}),
                 "x:Domain/get" => json!({"list": [{"id": "domain-1", "name": "solace.test"}]}),
-                "x:Account/query" if plan.adopt => json!({"ids": ["acct-1"]}),
-                "x:Account/query" => json!({"ids": []}),
+                "x:Account/query" if plan.adopt => {
+                    json!({"ids": ["acct-1"],"position":0,"total":1,"queryState":"s"})
+                }
+                "x:Account/query" => json!({"ids": [],"position":0,"total":0,"queryState":"s"}),
                 "x:Account/get" => {
-                    json!({"list": [{"id": "acct-1", "name": plan.local_part, "domainId": "domain-1"}]})
+                    json!({"list": [{"id": "acct-1", "name": plan.local_part, "domainId": "domain-1", "description":*description.lock().unwrap(), "permissions":*permissions.lock().unwrap()}]})
                 }
                 "x:Account/set" if arguments.get("create").is_some() => match plan.refuse {
                     Some(description) => {
@@ -1357,12 +1487,55 @@ pub mod tests {
                 "x:Account/set" if arguments.get("destroy").is_some() => {
                     json!({"destroyed": ["acct-1"]})
                 }
-                "x:Account/set" => json!({"updated": {"acct-1": null}}),
-                "x:PublicKey/set" => json!({"created": {"pk1": {"id": "pk-1"}}}),
-                "x:AccountSettings/set" => json!({"updated": {"singleton": null}}),
+                "x:Account/set" => {
+                    if let Some(value) = arguments
+                        .pointer("/update/acct-1/description")
+                        .and_then(Value::as_str)
+                    {
+                        *description.lock().unwrap() = value.to_owned();
+                    }
+                    if let Some(value) = arguments.pointer("/update/acct-1/permissions") {
+                        *permissions.lock().unwrap() = value.clone();
+                    }
+                    json!({"updated": {"acct-1": null}})
+                }
+                "Mailbox/get" => json!({"list":[{"id":"inbox","totalEmails":0}]}),
+                "Identity/get" => {
+                    assert_eq!(
+                        request.authorization.as_deref(),
+                        Some("Bearer stalwart-access-token")
+                    );
+                    json!({"list":[{"id":"identity-1","email":format!("{}@solace.test", plan.local_part)}]})
+                }
+                "Identity/set" => {
+                    assert_eq!(
+                        request.authorization.as_deref(),
+                        Some("Bearer stalwart-access-token")
+                    );
+                    assert_eq!(arguments["accountId"], "acct-1");
+                    json!({"updated":{"identity-1":null}})
+                }
+                "x:PublicKey/query" => {
+                    json!({"ids":keys.lock().unwrap().iter().map(|key| key["id"].clone()).collect::<Vec<_>>()})
+                }
+                "x:PublicKey/get" => json!({"list":*keys.lock().unwrap()}),
+                "x:PublicKey/set" => {
+                    *keys.lock().unwrap() = vec![
+                        json!({"id":"pk-1","key":arguments["create"]["pk1"]["key"],"warnings":[],"expiresAt":null}),
+                    ];
+                    json!({"created": {"pk1": {"id": "pk-1"}}})
+                }
+                "x:AccountSettings/get" => {
+                    json!({"list":[{"id":"singleton","encryptionAtRest":*settings.lock().unwrap()}]})
+                }
+                "x:AccountSettings/set" => {
+                    *settings.lock().unwrap() =
+                        arguments["update"]["singleton"]["encryptionAtRest"].clone();
+                    json!({"updated": {"singleton": null}})
+                }
                 "x:OAuthClient/query" => json!({"ids": ["client-1"]}),
                 "x:OAuthClient/get" => {
-                    json!({"list": [{"id": "client-1", "clientId": "solace-mail-bridge", "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}}]})
+                    json!({"list": [{"id": "client-1", "clientId": "solace-mail-bridge", "scopes": {"mail":true,"settings":true}, "redirectUris": {"http://localhost:4001/api/mail/oauth/stalwart/callback": true}}]})
                 }
                 _ => return Reply::status(500),
             };
@@ -1588,6 +1761,45 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn only_newly_created_denied_accounts_skip_abandoned_key_preparation() {
+        for adopt in [false, true] {
+            let database = ScratchDatabase::create().await;
+            let fake = FakeStalwart::start(provisioning(Plan {
+                local_part: "alice",
+                adopt,
+                ..Plan::default()
+            }))
+            .await;
+            let state = mail_state(&database, &fake).await;
+            bootstrap(&state, &owner("alice@solace.test"), request())
+                .await
+                .unwrap();
+            let requests = fake.requests();
+            assert_eq!(
+                requests
+                    .iter()
+                    .filter(|request| request.first_method() == "Mailbox/get")
+                    .count(),
+                usize::from(adopt)
+            );
+            assert_eq!(
+                requests
+                    .iter()
+                    .filter(|request| request.first_method() == "x:PublicKey/query")
+                    .count(),
+                usize::from(adopt)
+            );
+            assert_eq!(
+                requests
+                    .iter()
+                    .filter(|request| request.first_method() == "Identity/set")
+                    .count(),
+                1
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn repairs_a_stale_entry_for_a_reused_account_id() {
         let database = ScratchDatabase::create().await;
         let fake = FakeStalwart::start(provisioning(Plan {
@@ -1784,5 +1996,74 @@ pub mod tests {
         delete_mailbox_for_user(&state, "someone-without-a-mailbox")
             .await
             .unwrap();
+    }
+    #[tokio::test]
+    async fn activation_failure_keeps_the_committed_vault_and_retries_without_key_replacement() {
+        let database = ScratchDatabase::create().await;
+        let handler = provisioning(Plan {
+            local_part: "alice",
+            ..Plan::default()
+        });
+        let reject = std::sync::atomic::AtomicBool::new(true);
+        let fake = FakeStalwart::start(move |request| {
+            if request.json()["methodCalls"][0][1]
+                .pointer("/update/acct-1/permissions")
+                .is_some()
+                && reject.swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                return Reply::status(503);
+            }
+            handler(request)
+        })
+        .await;
+        let state = mail_state(&database, &fake).await;
+        assert!(
+            bootstrap(&state, &owner("alice@solace.test"), request())
+                .await
+                .is_err()
+        );
+        assert_eq!(count(&state, "mail_directory_entry").await, 1);
+        assert_eq!(count(&state, "mail_vault_backup").await, 1);
+        assert!(!destroyed(&fake));
+        let retry = bootstrap(&state, &owner("alice@solace.test"), request())
+            .await
+            .unwrap_err();
+        assert!(matches!(retry, AppError::Validation { .. }));
+        assert_eq!(
+            fake.requests()
+                .iter()
+                .filter(|request| request.first_method() == "x:PublicKey/set")
+                .count(),
+            1
+        );
+        assert!(!destroyed(&fake));
+    }
+
+    #[tokio::test]
+    async fn oauth_scope_or_configuration_failures_never_reset_the_bridge_password() {
+        for preflight in [false, true] {
+            let database = ScratchDatabase::create().await;
+            let handler = provisioning(Plan::default());
+            let fake=FakeStalwart::start(move |request| {
+                if preflight && request.first_method()=="x:OAuthClient/get" {
+                    return Reply::json(json!({"methodResponses":[["x:OAuthClient/get",{"list":[{"id":"client-1","clientId":"solace-mail-bridge","scopes":{"mail":true},"redirectUris":{"http://localhost:4001/api/mail/oauth/stalwart/callback":true}}]},"c1"]]}));
+                }
+                if request.path=="/api/auth" { return Reply::json(json!({"type":"invalid","error":"invalid_scope"})); }
+                handler(request)
+            }).await;
+            let state = mail_state(&database, &fake).await;
+            seed_mailbox(&state, "acct-1").await;
+            assert!(
+                issue_access_token(&state, OWNER, "alice@solace.test")
+                    .await
+                    .is_err()
+            );
+            assert!(
+                !fake
+                    .requests()
+                    .iter()
+                    .any(|request| request.first_method() == "x:Account/set")
+            );
+        }
     }
 }

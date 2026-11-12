@@ -116,6 +116,8 @@ pub use common::{ErrorResponse, SuccessMessage, Timestamp};
     health::MailHealthFailure,
     health::ConnectionTest,
     mail::MailAccountStatus,
+    mail::MailTrust,
+    mail::PutMailTrustRequest,
     mail::MailVaultKdfParams,
     mail::MailBootstrapRequest,
     mail::MailSignup,

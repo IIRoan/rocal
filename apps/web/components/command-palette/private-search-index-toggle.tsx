@@ -14,7 +14,7 @@ export function PrivateSearchIndexToggle({
     <SettingToggleRow
       icon={Search}
       label="On-device search index"
-      description="Keep encrypted titles of your mail and events, and the start of each message, on this device so older items stay searchable."
+      description="Off until you enable it. Keep an encrypted index on this device. Mail search covers recent indexed messages and excerpts; older mail may be missing."
       checked={enabled}
       onToggle={onToggle}
     />

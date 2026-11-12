@@ -653,16 +653,60 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
 }
 
 #[tokio::test]
+async fn deletion_finishes_after_the_remote_mailbox_was_already_removed() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let account_id = bootstrap_mailbox(&app, &mut user).await;
+    let removed = admin_jmap(
+        &app,
+        json!([["x:Account/set", {"destroy":[account_id]}, "remove"]]),
+    )
+    .await;
+    assert!(
+        removed["methodResponses"][0][1]["destroyed"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(account_id))
+    );
+    let deleted: DeleteAccountResponse = ok(user
+        .delete("/api/account")
+        .await
+        .expect_status(200)
+        .and_then(|response| response.dto()));
+    assert!(deleted.success);
+    assert!(!stalwart_account_exists(&app, &account_id).await);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM \"user\" WHERE id=$1")
+            .bind(&user.id)
+            .fetch_one(&app.db)
+            .await
+            .unwrap(),
+        0
+    );
+}
+
+#[tokio::test]
 async fn a_failed_mailbox_deletion_keeps_the_account() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let stalwart_account = bootstrap_mailbox(&app, &mut user).await;
+    let domain_id: String =
+        sqlx::query_scalar("SELECT stalwart_domain_id FROM mail_directory_entry WHERE user_id=$1")
+            .bind(&user.id)
+            .fetch_one(&app.db)
+            .await
+            .unwrap();
+    let protected = admin_jmap(&app, json!([["x:Account/set", {"create":{"fixture":{"@type":"User","name":format!("delete-refusal-{}",hex(6)),"domainId":domain_id,"description":"Synthetic deletion refusal fixture","roles":{"@type":"Admin"},"permissions":{"@type":"Merge","disabledPermissions":{"emailReceive":true}},"credentials":{"0":{"@type":"Password","secret":format!("solace-test-refusal-{}",hex(16))}}}}}, "fixture"]])).await;
+    let protected_id = protected["methodResponses"][0][1]["created"]["fixture"]["id"]
+        .as_str()
+        .expect("synthetic privileged account")
+        .to_owned();
     let (needles, before) = owned_rows(&app.db, &user).await;
-    // Stalwart answers a destroy of this malformed id with notDestroyed, which the backend treats as a failure.
+    // The scoped provisioner cannot delete this synthetic privileged account, so no real admin principal is at risk.
     exec(
         &app.db,
-        "UPDATE mail_directory_entry SET stalwart_account_id = 'zzzzzzz' WHERE user_id = $1",
-        &[&user.id],
+        "UPDATE mail_directory_entry SET stalwart_account_id = $1 WHERE user_id = $2",
+        &[&protected_id, &user.id],
     )
     .await;
 
@@ -692,6 +736,17 @@ async fn a_failed_mailbox_deletion_keeps_the_account() {
     let deleted: DeleteAccountResponse = ok(user.delete("/api/account").await.dto());
     assert!(deleted.success, "a retry succeeds");
     assert!(!stalwart_account_exists(&app, &stalwart_account).await);
+    let cleanup = admin_jmap(
+        &app,
+        json!([["x:Account/set",{"destroy":[protected_id]},"cleanup"]]),
+    )
+    .await;
+    assert!(
+        cleanup["methodResponses"][0][1]["destroyed"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(protected_id))
+    );
 }
 
 #[tokio::test]

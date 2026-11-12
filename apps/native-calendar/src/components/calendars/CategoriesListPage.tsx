@@ -9,7 +9,7 @@ import {
   SheetScroll,
   SheetSection,
 } from "@workspace/native-core/components/sheet/SheetSections";
-import { useCategories, useCategoryUsageCounts } from "../../hooks/use-categories";
+import { useCategories, useCategoryDeletePending, useCategoryUsageCounts } from "../../hooks/use-categories";
 import { isOptimisticId } from "../../lib/optimistic-events";
 import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 import { CATEGORY_CREATE_PAGE, categoryEditPage } from "../../lib/calendars-sheet-pages";
@@ -19,6 +19,7 @@ export function CategoriesListPage() {
   const { theme } = useTheme();
   const { push } = useSheetPageNavigator();
   const categoriesQuery = useCategories();
+  const deleting = useCategoryDeletePending();
   const usage = useCategoryUsageCounts().data;
 
   if (categoriesQuery.isLoading) {
@@ -46,6 +47,7 @@ export function CategoriesListPage() {
         }
       >
         <SheetGroup>
+          {deleting ? <SheetItem label="Deleting category…" pending disabled /> : null}
           {categories.map((category) => (
             <SheetItem
               key={category.id}
@@ -59,9 +61,11 @@ export function CategoriesListPage() {
           ))}
           <SheetItem
             key="new-category"
+            testID="category-create"
             label="New category"
             icon="plus"
             tone="accent"
+            disabled={deleting}
             onPress={() => push(CATEGORY_CREATE_PAGE)}
           />
         </SheetGroup>

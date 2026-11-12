@@ -1,6 +1,7 @@
 import {
   CALENDARS_QUERY_KEY,
   CATEGORIES_QUERY_KEY,
+  CATEGORY_DELETE_MUTATION_KEY,
   CATEGORY_USAGE_QUERY_KEY,
   EVENTS_QUERY_KEY,
   INVITES_QUERY_KEY,
@@ -16,6 +17,7 @@ export const QUERY_KEYS = {
   events: (start: string, end: string) => ["events", start, end] as const,
   calendars: () => CALENDARS_QUERY_KEY,
   categories: () => CATEGORIES_QUERY_KEY,
+  categoryDelete: () => CATEGORY_DELETE_MUTATION_KEY,
   categoryUsage: () => CATEGORY_USAGE_QUERY_KEY,
   settings: () => SETTINGS_QUERY_KEY,
   subscriptions: () => SUBSCRIPTIONS_QUERY_KEY,
@@ -29,6 +31,7 @@ export const QUERY_KEYS = {
   mailMessagesAll: () => ["mail", "messages"] as const,
   mailMessages: (mailboxId: string | null) =>
     ["mail", "messages", mailboxId] as const,
+  mailMessageDetailsAll: () => ["mail", "message"] as const,
   mailMessage: (messageId: string) => ["mail", "message", messageId] as const,
   mailCalendarAttachments: (messageId: string) =>
     ["mail", "calendar-attachments", messageId] as const,

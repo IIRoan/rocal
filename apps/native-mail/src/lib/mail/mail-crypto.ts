@@ -1,5 +1,22 @@
+import {
+  captureSessionDataScope,
+  isSessionDataScopeCurrent,
+  subscribeSessionDataScope,
+  type SessionDataScope,
+} from "@workspace/native-core/lib/session-data-lifecycle";
 /** Native mail vault lifecycle: fetch the encrypted backup, unseal its passphrase with the E2EE key, decrypt PGP mail in-process. */
 import * as openpgp from "openpgp";
+import {
+  clipMailText,
+  getMailReadLimitNotice,
+  MAX_MAIL_DISPLAY_CHARACTERS,
+} from "@workspace/calendar-core/mail-mime-limits";
+import {
+  extractNestedPgpMimeCiphertext,
+  parseMailMimeContent,
+  type MailTextLimits,
+  type ParsedMailContent,
+} from "@workspace/calendar-core/mail-mime-parser";
 import { createLogger } from "@workspace/logger";
 import { mailFetch, upsertAccountVaultBackup } from "./mail-api";
 import { API_BASE_URL } from "@workspace/native-core/lib/constants";
@@ -14,15 +31,18 @@ import {
 } from "./mail-password-cache";
 import { unwrapVaultSecret } from "./vault-secret";
 import { extractPgpMimeCiphertextBlobId } from "./message-security";
-import { parseMimeBody } from "./mail-mime-parser";
 import type {
   JmapAttachment,
   JmapBodyStructure,
   LabelDef,
   MailVaultKdfParams,
 } from "./types";
-import { looksLikeMimeMessage, containsArmoredPgpMessage, MAX_PGP_DECRYPT_LAYERS, mergeSignatureVerificationState, resolveLayerSignatureVerificationState } from "@workspace/calendar-core";
-import type { MailVaultBackup } from "@workspace/calendar-core";
+import { looksLikeMimeMessage, decryptPgpMessageLayers, MAX_PGP_DECRYPT_BYTES } from "@workspace/calendar-core";
+import type { MailVaultBackup, MailSenderKeyTrustState } from "@workspace/calendar-core";
+import {
+  encryptMailForRecipients,
+  type MailRecipientEncryptionInput,
+} from "@workspace/calendar-core/mail-pgp-encryption";
 import type { MailRuntime } from "./mail-runtime";
 
 const log = createLogger("mail-crypto");
@@ -38,6 +58,11 @@ const KEY_MATERIAL_KDF: Partial<MailVaultKdfParams> = {
 
 export type MailDecryptResult = {
   plaintext: string;
+  rawMimeFallback?: boolean;
+  /** The text or HTML is shorter than the message, so it must not be saved back as a draft. */
+  truncated?: boolean;
+  signatureVerificationLayers?: MailSignatureVerificationState[];
+  senderKeyTrustState?: MailSenderKeyTrustState;
   /** HTML body, present after PGP/MIME decryption + MIME parse. */
   html?: string | null;
   /** Attachments extracted from decrypted PGP/MIME payload. */
@@ -47,10 +72,7 @@ export type MailDecryptResult = {
 };
 
 export type MailSignatureVerificationState =
-  | "not_signed"
-  | "unverified"
-  | "verified"
-  | "failed";
+  "not_signed" | "unverified" | "verified" | "failed";
 
 function isVaultBackupRecord(value: unknown): value is MailVaultBackup {
   if (typeof value !== "object" || value === null) return false;
@@ -73,12 +95,16 @@ type UnlockedVault = {
   privateKey: openpgp.PrivateKey;
 };
 
-
-
 let cachedVault: UnlockedVault | null = null;
+let vaultScope: SessionDataScope | null = null;
+let vaultGeneration = 0;
 let vaultLoadingPromise: Promise<UnlockedVault> | null = null;
 let unlockGate: Promise<void> | null = null;
 let openUnlockGate: (() => void) | null = null;
+
+export function isMailVaultCurrent(vault: UnlockedVault): boolean {
+  return cachedVault === vault;
+}
 
 /** Warm starts render mail before the E2EE session exists; unlocks wait for it instead of failing. */
 export function holdVaultUnlock(): void {
@@ -97,17 +123,11 @@ export function releaseVaultUnlock(): void {
 /** Clears the in-memory vault cache; call on sign-out or when the vault must reload. */
 export function clearVaultCache(): void {
   log.debug("[mail-crypto] clearVaultCache: clearing in-memory vault cache");
+  vaultGeneration += 1;
   cachedVault = null;
+  vaultScope = null;
   vaultLoadingPromise = null;
   releaseVaultUnlock();
-}
-
-async function streamToString(stream: unknown): Promise<string> {
-  if (typeof stream === "string") {
-    return stream;
-  }
-
-  return new Response(stream as BodyInit).text();
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +164,7 @@ async function fetchVaultBackup(): Promise<MailVaultBackup> {
 async function decryptVaultPrivateKey(
   vault: UserKeyVault,
   passphrase: string,
+  scope: SessionDataScope | null,
 ): Promise<openpgp.PrivateKey> {
   log.debug("[mail-crypto] decryptVaultPrivateKey: reading private key (fingerprint=%s)",
     vault.publicKeyFingerprint);
@@ -169,7 +190,7 @@ async function decryptVaultPrivateKey(
       );
     }
     // Cache the unprotected key so we skip S2K on the next app session.
-    saveCachedPrivateKey(privateKey.armor()).catch(() => { });
+    saveCachedPrivateKey(privateKey.armor(), scope).catch(() => {});
   } else {
     log.debug("[mail-crypto] decryptVaultPrivateKey: private key is already decrypted (no passphrase needed)");
   }
@@ -220,35 +241,33 @@ async function loadCachedPrivateKeyForVault(
 export async function ensureVaultLoaded(
   runtime: MailRuntime,
 ): Promise<UnlockedVault> {
-  if (cachedVault) {
-    log.debug("[mail-crypto] ensureVaultLoaded: vault already loaded, returning cached");
-    return cachedVault;
-  }
-
-  if (unlockGate) {
-    await unlockGate;
-    if (cachedVault) return cachedVault;
-  }
-
-  if (vaultLoadingPromise) {
-    log.debug("[mail-crypto] ensureVaultLoaded: vault loading in progress, awaiting...");
-    return vaultLoadingPromise;
-  }
-
-  vaultLoadingPromise = doLoadVault(runtime);
-
-  try {
-    cachedVault = await vaultLoadingPromise;
-    log.debug("[mail-crypto] ensureVaultLoaded: vault loaded and cached successfully");
-    return cachedVault;
-  } catch (err) {
-    log.error("[mail-crypto] ensureVaultLoaded: vault unlock failed");
-    vaultLoadingPromise = null;
-    throw err;
-  }
+  const scope = captureSessionDataScope();
+  const generation = vaultGeneration;
+  const current = () =>
+    isSessionDataScopeCurrent(scope) && generation === vaultGeneration;
+  if (!current()) throw new Error("The mail session ended.");
+  if (cachedVault && vaultScope === scope) return cachedVault;
+  if (unlockGate) await unlockGate;
+  if (!current()) throw new Error("The mail session ended.");
+  if (cachedVault && vaultScope === scope) return cachedVault;
+  if (vaultLoadingPromise && vaultScope === scope) return vaultLoadingPromise;
+  vaultScope = scope;
+  const load = doLoadVault(runtime, scope).then((vault) => {
+    if (!current()) throw new Error("The mail session ended.");
+    cachedVault = vault;
+    return vault;
+  });
+  vaultLoadingPromise = load;
+  return load.catch((error: unknown) => {
+    if (vaultLoadingPromise === load) vaultLoadingPromise = null;
+    throw error;
+  });
 }
 
-async function doLoadVault(runtime: MailRuntime): Promise<UnlockedVault> {
+async function doLoadVault(
+  runtime: MailRuntime,
+  scope: SessionDataScope | null,
+): Promise<UnlockedVault> {
   log.debug(
     "[mail-crypto] doLoadVault: starting vault load, backendBaseUrl=%s",
     API_BASE_URL,
@@ -298,7 +317,7 @@ async function doLoadVault(runtime: MailRuntime): Promise<UnlockedVault> {
     );
     const privateKey =
       (await loadCachedPrivateKeyForVault(unlockedVault)) ??
-      (await decryptVaultPrivateKey(unlockedVault, sealedSecret));
+      (await decryptVaultPrivateKey(unlockedVault, sealedSecret, scope));
 
     log.debug("[mail-crypto] doLoadVault: SUCCESS via sealed vault secret");
     return { vault: unlockedVault, passphrase: sealedSecret, privateKey };
@@ -311,12 +330,36 @@ async function doLoadVault(runtime: MailRuntime): Promise<UnlockedVault> {
   }
 }
 
+/** The bounded body of a decrypt result; without a text part the start of the source stands in for it. */
+function decryptedContentFields(
+  source: string,
+  parsed: ParsedMailContent | null,
+): Pick<MailDecryptResult, "plaintext" | "rawMimeFallback" | "truncated" | "html" | "attachments"> {
+  const text = parsed ? parsed.text : null;
+  const truncated =
+    Boolean(parsed?.truncated) ||
+    (text === null && source.length > MAX_MAIL_DISPLAY_CHARACTERS);
+  return {
+    plaintext: text ?? clipMailText(source, MAX_MAIL_DISPLAY_CHARACTERS),
+    ...(text === null ? { rawMimeFallback: true } : {}),
+    ...(truncated ? { truncated: true } : {}),
+    html: parsed ? parsed.html : null,
+    attachments: (parsed ? parsed.attachments : []).map((attachment) => ({
+      name: attachment.filename ?? "attachment",
+      type: attachment.mimeType,
+      size: attachment.content.byteLength,
+      content: attachment.content,
+    })),
+  };
+}
+
 /** Decrypts an armored PGP mail body with the vault key; throws when no passphrase can unlock the vault. */
 export async function decryptMailMessage(
   runtime: MailRuntime,
   messageId: string,
   armoredMessage: string,
   senderPublicKeyArmored?: string,
+  limits?: MailTextLimits,
 ): Promise<MailDecryptResult> {
   log.debug("[mail-crypto] decryptMailMessage: start id=%s armoredLength=%d", messageId, armoredMessage.length);
   const result = await decryptArmoredMessage(runtime, messageId, armoredMessage, senderPublicKeyArmored);
@@ -327,56 +370,47 @@ export async function decryptMailMessage(
       result.plaintext.length,
       result.signatureVerificationState,
     );
-    return result;
+    return {
+      ...result,
+      plaintext: clipMailText(result.plaintext, MAX_MAIL_DISPLAY_CHARACTERS),
+      ...(result.plaintext.length > MAX_MAIL_DISPLAY_CHARACTERS
+        ? { truncated: true }
+        : {}),
+    };
   }
 
-  const parsed = parseMimeBody(result.plaintext);
+  const parsed = parseMailMimeContent(result.plaintext, limits);
   log.debug(
     "[mail-crypto] decryptMailMessage: parsed inline MIME text=%s html=%s id=%s",
     parsed.text ? "yes" : "no",
     parsed.html ? "yes" : "no",
     messageId,
   );
-  return {
-    ...result,
-    plaintext: parsed.text?.trim() ?? result.plaintext,
-    html: parsed.html?.trim() ?? null,
-    attachments: parsed.attachments,
-  };
+  return { ...result, ...decryptedContentFields(result.plaintext, parsed) };
 }
 
 /** Encrypts a plaintext body for the recipient keys; callers add the sender key so sent mail stays readable here. */
-export async function encryptForRecipients(input: {
-  plaintext: string;
-  recipientPublicKeysArmored: string[];
-}): Promise<{ armoredMessage: string }> {
-  if (!cachedVault) {
+export async function encryptForRecipients(
+  input: MailRecipientEncryptionInput,
+): Promise<{ armoredMessage: string }> {
+  const vault = cachedVault;
+  if (!vault) {
     throw new Error("Mail vault is not loaded on this device.");
   }
-
-  const encryptionKeys = await Promise.all(
-    input.recipientPublicKeysArmored.map((armoredKey) =>
-      openpgp.readKey({ armoredKey }),
-    ),
+  return encryptMailForRecipients(
+    input,
+    { signingKey: vault.privateKey, isCurrent: () => cachedVault === vault },
+    openpgp,
   );
-  const encrypted = await openpgp.encrypt({
-    message: await openpgp.createMessage({ text: input.plaintext }),
-    encryptionKeys,
-    signingKeys: cachedVault.privateKey,
-    format: "armored",
-  });
-  const armoredMessage =
-    typeof encrypted === "string" ? encrypted : await streamToString(encrypted);
-
-  return { armoredMessage };
 }
 
-/** Decrypts an RFC 3156 PGP/MIME message: ciphertext lives in `bodyStructure.subParts[1]`, body is postal-mime parsed. */
+/** Decrypts an RFC 3156 PGP/MIME message: ciphertext lives in `bodyStructure.subParts[1]`, body is read by the shared MIME parser. */
 export async function decryptPgpMimeMessage(
   runtime: MailRuntime,
   messageId: string,
   bodyStructure: JmapBodyStructure | undefined,
   senderPublicKeyArmored?: string,
+  limits?: MailTextLimits,
 ): Promise<MailDecryptResult> {
   log.debug("[mail-crypto] decryptPgpMimeMessage: start id=%s", messageId);
 
@@ -414,35 +448,28 @@ export async function decryptPgpMimeMessage(
     pgpResult.plaintext.length,
     messageId,
   );
-  let parsedText: string | null = null;
-  let parsedHtml: string | null = null;
-  let parsedAttachments: JmapAttachment[] = [];
+  let parsed: ParsedMailContent | null = null;
   try {
-    const parsed = parseMimeBody(pgpResult.plaintext);
-    parsedText = parsed.text;
-    parsedHtml = parsed.html;
-    parsedAttachments = parsed.attachments;
+    parsed = parseMailMimeContent(pgpResult.plaintext, limits);
     log.debug(
       "[mail-crypto] decryptPgpMimeMessage: MIME parsed text=%s html=%s attachments=%d id=%s",
-      parsedText != null ? `${parsedText.length}b` : "null",
-      parsedHtml != null ? `${parsedHtml.length}b` : "null",
-      parsed.attachments?.length ?? 0,
+      parsed.text != null ? `${parsed.text.length}b` : "null",
+      parsed.html != null ? `${parsed.html.length}b` : "null",
+      parsed.attachments.length,
       messageId,
     );
   } catch (err) {
+    if (getMailReadLimitNotice(err)) throw err;
     log.warn(
       "[mail-crypto] decryptPgpMimeMessage: MIME parse failed, using raw plaintext id=%s: %s",
       messageId,
       err instanceof Error ? err.message : String(err),
     );
-    // Fall back to raw decrypted text
-    parsedText = pgpResult.plaintext;
   }
 
   return {
-    plaintext: parsedText ?? pgpResult.plaintext,
-    html: parsedHtml,
-    attachments: parsedAttachments,
+    ...decryptedContentFields(pgpResult.plaintext, parsed),
+    signatureVerificationLayers: pgpResult.signatureVerificationLayers,
     signatureVerificationState: pgpResult.signatureVerificationState,
     hasVerifiedSignature: pgpResult.hasVerifiedSignature,
   };
@@ -480,72 +507,26 @@ async function decryptArmoredMessage(
     }
   }
 
-  let currentArmored = armoredMessage.trim();
-  let plaintext = "";
-  let signatureVerificationState: MailSignatureVerificationState = "not_signed";
-
-  for (let layer = 0; layer < MAX_PGP_DECRYPT_LAYERS; layer++) {
-    if (!containsArmoredPgpMessage(currentArmored)) {
-      plaintext = currentArmored;
-      break;
-    }
-
-    let message: openpgp.Message<string>;
-    try {
-      message = await openpgp.readMessage({ armoredMessage: currentArmored });
-    } catch (err) {
-      throw new Error(
-        `[mail-crypto] id=${messageId}: Failed to parse PGP message: ` +
-        (err instanceof Error ? err.message : String(err)),
-      );
-    }
-
-    let decrypted: openpgp.DecryptMessageResult;
-    try {
-      decrypted = await openpgp.decrypt({
-        message,
+  if (!isMailVaultCurrent(unlockedVault)) throw new Error("Mail encryption session changed.");
+  const result = await decryptPgpMessageLayers({
+    armoredMessage,
+    extractMimeCiphertext: extractNestedPgpMimeCiphertext,
+    decryptLayer: async (currentArmored) => {
+      const decrypted = await openpgp.decrypt({
+        message: await openpgp.readMessage({ armoredMessage: currentArmored, config: { maxDecompressedMessageSize: MAX_PGP_DECRYPT_BYTES } }),
         decryptionKeys: unlockedVault.privateKey,
         verificationKeys,
+        config: { maxDecompressedMessageSize: MAX_PGP_DECRYPT_BYTES },
       });
-    } catch (err) {
-      throw new Error(
-        `[mail-crypto] id=${messageId}: PGP decryption failed: ` +
-        (err instanceof Error ? err.message : String(err)),
-      );
-    }
-
-    plaintext =
-      typeof decrypted.data === "string"
-        ? decrypted.data
-        : new TextDecoder().decode(decrypted.data as Uint8Array);
-
-    const layerSignatureState = await resolveLayerSignatureVerificationState({
-      signatures: decrypted.signatures,
-      hasVerificationKey: Boolean(verificationKeys),
-    });
-    signatureVerificationState = mergeSignatureVerificationState(
-      signatureVerificationState,
-      layerSignatureState,
-    );
-
-    if (!containsArmoredPgpMessage(plaintext)) {
-      break;
-    }
-
-    currentArmored = plaintext.trim();
-  }
-
-  if (!plaintext) {
-    throw new Error(
-      `[mail-crypto] id=${messageId}: PGP decryption did not return any plaintext.`,
-    );
-  }
-
-  return {
-    plaintext,
-    signatureVerificationState,
-    hasVerifiedSignature: signatureVerificationState === "verified",
-  };
+      return {
+        plaintext: typeof decrypted.data === "string" ? decrypted.data : new TextDecoder().decode(decrypted.data),
+        signatures: decrypted.signatures,
+        hasVerificationKey: Boolean(verificationKeys),
+      };
+    },
+  });
+  if (!isMailVaultCurrent(unlockedVault)) throw new Error("Mail encryption session changed.");
+  return result;
 }
 
 /** True while the vault is unlocked in memory; drives lock indicators in the UI. */
@@ -597,3 +578,7 @@ export async function saveVaultLabels(labels: LabelDef[]): Promise<void> {
     kdfParams: encrypted.kdfParams,
   });
 }
+
+subscribeSessionDataScope(() => {
+  if (!isSessionDataScopeCurrent(vaultScope)) clearVaultCache();
+});

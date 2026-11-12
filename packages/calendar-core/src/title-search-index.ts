@@ -1,3 +1,4 @@
+import type { PrivateSearchCoverage } from "./private-search-coverage";
 import {
   normalizeSearchText,
   tokenizeSearchQuery,
@@ -54,6 +55,7 @@ export type TitleIndexHit = {
 export type TitleIndexShardPayload = {
   documents: TitleIndexDocument[];
   indexedAt: string;
+  coverage?: PrivateSearchCoverage;
 };
 
 const PREFIX_MATCH_WEIGHT = 0.75;

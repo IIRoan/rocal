@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { invalidatePrivateSearch } from "@/lib/search/private-index-lifecycle";
 import { clearLocalSearchIndexDatabase } from "@/lib/search/local-index-store";
 import { PRIVATE_CONTENT_INDEX_ENABLED_KEY } from "@/lib/search/private-index-flags";
 
@@ -45,6 +46,7 @@ export function usePrivateSearchIndexControls() {
   };
 
   const setEnabled = (value: boolean) => {
+    invalidatePrivateSearch();
     setEnabledState(value);
     window.localStorage.setItem(ENABLED_KEY, String(value));
     setConsent(value ? "accepted" : "declined");
@@ -55,12 +57,14 @@ export function usePrivateSearchIndexControls() {
   };
 
   const setPaused = (value: boolean) => {
+    invalidatePrivateSearch();
     setPausedState(value);
     window.localStorage.setItem(PAUSED_KEY, String(value));
     notifyPrivateSearchIndexChanged();
   };
 
   const clearIndex = async () => {
+    setEnabled(false);
     setIsClearing(true);
     await clearLocalSearchIndexDatabase()
       .then(() => setEnabled(false))

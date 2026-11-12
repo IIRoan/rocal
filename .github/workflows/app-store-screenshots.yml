@@ -31,10 +31,10 @@ jobs:
         with:
           path: ${{ runner.temp }}/build/Build/Products/Release-iphonesimulator
           key: ${{ matrix.app }}-simulator-app-v2-${{ hashFiles('bun.lock', 'patches/**', 'packages/*/package.json', 'packages/*/*.json', 'packages/*/*.cjs', 'packages/*/src/**', 'packages/native-core/plugins/**', format('apps/native-{0}/app/**', matrix.app), format('apps/native-{0}/src/**', matrix.app), format('apps/native-{0}/assets/**', matrix.app), format('apps/native-{0}/*.json', matrix.app), format('apps/native-{0}/*.ts', matrix.app), format('apps/native-{0}/*.js', matrix.app), format('apps/native-{0}/*.cts', matrix.app)) }}
-      - uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+      - uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
-      - uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+      - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
       - if: steps.app.outputs.cache-hit != 'true'
@@ -44,7 +44,7 @@ jobs:
         if: steps.app.outputs.cache-hit != 'true'
         run: echo "version=$(node -p "require('../../packages/native-core/expo-apps.json').easCliVersion")" >> "$GITHUB_OUTPUT"
       - if: steps.app.outputs.cache-hit != 'true'
-        uses: chainguard-actions/expo-expo-github-action@a115edabe4756116bf41b0298fe2cd1518329995 # 8.2.1
+        uses: chainguard-actions/expo-expo-github-action@f202d68400237adfeabf5142b03e4b5aea4e70f8 # 8.2.1
         with:
           eas-version: ${{ steps.eas.outputs.version }}
           token: ${{ secrets.EXPO_TOKEN }}

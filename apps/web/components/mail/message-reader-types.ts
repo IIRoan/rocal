@@ -1,5 +1,6 @@
 import type {
   MailServerLimits,
+  MailSenderKeyTrustState,
   SimpleLoginActionMode,
   TimeFormat,
 } from "@workspace/calendar-core";
@@ -35,6 +36,7 @@ export interface MessageReaderProps {
   decryptedHtml: string | null;
   attachments?: MailAttachment[];
   signatureVerificationState: MailSignatureVerificationState;
+  senderKeyTrustState?: MailSenderKeyTrustState;
   decryptError: string | null;
   accountEncryptedAtRest: boolean;
   isBusy: boolean;
@@ -42,6 +44,7 @@ export interface MessageReaderProps {
   currentMailboxId: string | null;
   labels?: LabelDef[];
   onReply: () => void;
+  onReplyAll?: () => void;
   onForward: () => void;
   onDelete: () => void;
   onMove: (targetMailboxId: string) => void;
@@ -62,7 +65,7 @@ export interface MessageReaderProps {
   onNavigateNext?: () => void;
   navigation?: MessageReaderNavigationState;
   onArchive?: () => void;
-  onSendReply?: (text: string, files: File[]) => Promise<void>;
+  onSendReply?: (text: string, files: File[]) => Promise<void | boolean>;
   onLoadAttachmentPreview?: (attachment: MailAttachment) => Promise<
     | {
         kind: "image" | "pdf";

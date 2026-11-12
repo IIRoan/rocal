@@ -21,6 +21,10 @@ const doc = (
 });
 
 describe("buildMailBodyExcerpt", () => {
+  it("bounds preprocessing even when a giant body starts with whitespace or an unterminated style", () => {
+    expect(buildMailBodyExcerpt({ text: " ".repeat(100_000) + "outside the indexed prefix" })).toBe("");
+    expect(buildMailBodyExcerpt({ html: "<style>" + "x".repeat(100_000) + "</style><p>outside prefix</p>" })).toBe("");
+  });
   it("prefers text, collapses whitespace and truncates", () => {
     expect(
       buildMailBodyExcerpt({ text: " Hello \n\n  world ", html: "<p>x</p>" }),

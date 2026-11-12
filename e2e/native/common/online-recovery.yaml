@@ -27,5 +27,5 @@ appId: ${APP_ID}
       id: mail-message-text
       text: ".*Maestro online recovery reply.*"
     timeout: 60000
-- assertVisible: Signature verified
+- assertVisible: Signed with your local key
 - takeScreenshot: ${SCREENSHOT_DIR}/mail-recovered-without-restart

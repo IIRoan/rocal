@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -18,6 +18,10 @@ import {
 import { LAYOUT_METRICS } from "@workspace/native-core/lib/app-layout";
 import type { ComposeRequest } from "../../lib/mail/compose-request";
 import {
+  createMailSendSessionId,
+  createMailSendScopeLifetime,
+  discardMailSendAttempt,
+  isMailSendScopeOpen,
   appendPlainTextSignature,
   getErrorMessage,
   getOutgoingAttachmentSizeError,
@@ -60,7 +64,10 @@ import { ComposeHeader } from "./ComposeHeader";
 import { ComposeFormatBar } from "./ComposeFormatBar";
 import { ComposeAttachmentList } from "./ComposeAttachmentList";
 import { ComposeIdentitySheet } from "./ComposeIdentitySheet";
-import { useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
+import {
+  useMailSkin,
+  type MailSkin,
+} from "@workspace/native-core/components/mail/mail-ui";
 import { composeTitle } from "../../lib/mail/compose-display";
 
 interface ComposeSheetProps {
@@ -134,7 +141,9 @@ function ComposeSession({
   });
   const { identities, selectedIdentity, selectedIdentityId, composeContext } =
     identity;
-  const signatureOptions = { separator: composeSettings.signatureSeparatorEnabled };
+  const signatureOptions = {
+    separator: composeSettings.signatureSeparatorEnabled,
+  };
 
   const [form, dispatch] = useComposeForm({
     params,
@@ -173,7 +182,17 @@ function ComposeSession({
     setDraftSaveStatus,
   });
 
+  const currentDraftIdRef = useRef(form.draftId);
+  useEffect(() => { currentDraftIdRef.current = form.draftId; }, [form.draftId]);
+  const [sendSessionId, setSendSessionId] = useState(createMailSendSessionId);
+  const [sendLifetime] = useState(createMailSendScopeLifetime);
+  useEffect(() => sendLifetime.activate(() => `compose:${sendSessionId}`, () => visible ? currentDraftIdRef.current ?? (params.mode === "draft" ? params.messageId ?? null : null) : null), [sendLifetime, sendSessionId, visible, params.mode, params.messageId]);
+  const closeSendSession = () => {
+    discardMailSendAttempt(`compose:${sendSessionId}`);
+    onClose();
+  };
   const { send, sending, canSend } = useComposeSend({
+    sendScope: `compose:${sendSessionId}`,
     runtime,
     mode: params.mode,
     sourceMessage,
@@ -185,7 +204,11 @@ function ComposeSession({
     signatureOptions,
     settleDraftSave,
     setError,
-    onSent: onClose,
+    onSent: () => {
+      if (!isMailSendScopeOpen(`compose:${sendSessionId}`)) return;
+      closeSendSession();
+      setSendSessionId(createMailSendSessionId());
+    },
   });
 
   const { cancel, dismiss } = useComposeLeave({
@@ -198,7 +221,7 @@ function ComposeSession({
     visible,
     identityPickerOpen: identity.pickerOpen,
     closeIdentityPicker: () => identity.setPickerOpen(false),
-    onClose,
+    onClose: closeSendSession,
   });
 
   const handleInsertSignature = () => {
@@ -208,7 +231,11 @@ function ComposeSession({
       update: (current) =>
         hasPlainTextSignatureBlock(current, selectedIdentity)
           ? current
-          : appendPlainTextSignature(current, selectedIdentity, signatureOptions),
+          : appendPlainTextSignature(
+              current,
+              selectedIdentity,
+              signatureOptions,
+            ),
     });
   };
 
@@ -399,7 +426,9 @@ async function pickComposeAttachment(
     });
   };
   const base64 = await readAsset().finally(() =>
-    FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(() => undefined),
+    FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(
+      () => undefined,
+    ),
   );
   return createPendingComposeAttachment({
     name: asset.name ?? "attachment",

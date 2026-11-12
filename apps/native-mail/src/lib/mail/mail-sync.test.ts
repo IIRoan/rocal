@@ -1,3 +1,4 @@
+import { activateSessionData } from "@workspace/native-core/lib/session-data-lifecycle";
 import { QueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import type { MailRuntime } from "./mail-runtime";
@@ -54,16 +55,18 @@ describe("syncMailboxChanges", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
+    activateSessionData("u1");
     resetMailSync();
     queryClient = new QueryClient();
-    queryClient.setQueryData(QUERY_KEYS.mailMessages("inbox"), list(["a", "b"]));
+    queryClient.setQueryData(
+      QUERY_KEYS.mailMessages("inbox"),
+      list(["a", "b"]),
+    );
   });
 
   it("does nothing visible when the server reports no changes", async () => {
     setMailSyncState("s1");
-    const getEmailChanges = jest.fn(async () =>
-      changes({ newState: "s1" }),
-    );
+    const getEmailChanges = jest.fn(async () => changes({ newState: "s1" }));
 
     await syncMailboxChanges(queryClient, createRuntime({ getEmailChanges }));
 
@@ -99,9 +102,14 @@ describe("syncMailboxChanges", () => {
     setMailSyncState("s1");
     const getEmailChanges = jest
       .fn()
-      .mockResolvedValueOnce(changes({ newState: "s2", hasMoreChanges: true, updated: ["a"] }))
+      .mockResolvedValueOnce(
+        changes({ newState: "s2", hasMoreChanges: true, updated: ["a"] }),
+      )
       .mockResolvedValueOnce(changes({ oldState: "s2", newState: "s3" }));
-    const getEmailPlacements = jest.fn(async () => ({ list: [], notFound: [] }));
+    const getEmailPlacements = jest.fn(async () => ({
+      list: [],
+      notFound: [],
+    }));
 
     await syncMailboxChanges(
       queryClient,
@@ -238,8 +246,12 @@ describe("syncMailboxChanges", () => {
         .getQueryData<JmapEmailMessage[]>(QUERY_KEYS.mailThread("t1"))
         ?.map((m) => m.id),
     ).toEqual(["c"]);
-    expect(queryClient.getQueryData(QUERY_KEYS.mailDecrypted("a"))).toBeUndefined();
-    expect(queryClient.getQueryData(QUERY_KEYS.mailMessage("a"))).toBeUndefined();
+    expect(
+      queryClient.getQueryData(QUERY_KEYS.mailDecrypted("a")),
+    ).toBeUndefined();
+    expect(
+      queryClient.getQueryData(QUERY_KEYS.mailMessage("a")),
+    ).toBeUndefined();
   });
 
   it("keeps the old state when a mutation starts during the lookup so the delta replays", async () => {
@@ -277,7 +289,70 @@ describe("syncMailboxChanges", () => {
 
     await syncMailboxChanges(queryClient, createRuntime({ getEmailState }));
 
-    expect(queryClient.getQueryData(QUERY_KEYS.mailThread("t1"))).toBeUndefined();
+    expect(
+      queryClient.getQueryData(QUERY_KEYS.mailThread("t1")),
+    ).toBeUndefined();
+  });
+
+  it("replays a placement read crossed by a mutation that already finished", async () => {
+    setMailSyncState("s1");
+    let started: () => void = () => undefined;
+    const lookupStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let release: (value: {
+      list: JmapEmailPlacement[];
+      notFound: string[];
+    }) => void = () => undefined;
+    const getEmailPlacements = jest
+      .fn()
+      .mockImplementationOnce(() => {
+        started();
+        return new Promise<{ list: JmapEmailPlacement[]; notFound: string[] }>(
+          (resolve) => {
+            release = resolve;
+          },
+        );
+      })
+      .mockResolvedValue({
+        list: [{ id: "a", mailboxIds: { inbox: true }, keywords: {} }],
+        notFound: [],
+      });
+    const getEmailChanges = jest.fn(async () => changes({ updated: ["a"] }));
+    const runtime = createRuntime({ getEmailChanges, getEmailPlacements });
+    const syncing = syncMailboxChanges(queryClient, runtime);
+    await lookupStarted;
+    await queryClient
+      .getMutationCache()
+      .build(queryClient, {
+        mutationFn: async () => undefined,
+        onMutate: () => {
+          queryClient.setQueryData(QUERY_KEYS.mailMessages("inbox"), {
+            pages: [
+              { messages: [{ id: "a", keywords: {} }], total: 1, position: 0 },
+            ],
+            pageParams: [0],
+          } satisfies MailboxMessagesInfiniteData);
+        },
+      })
+      .execute(undefined);
+    expect(queryClient.isMutating()).toBe(0);
+    release({
+      list: [
+        { id: "a", mailboxIds: { inbox: true }, keywords: { $seen: true } },
+      ],
+      notFound: [],
+    });
+    await syncing;
+    expect(getMailSyncState()).toBe("s1");
+    expect(
+      queryClient.getQueryData<MailboxMessagesInfiniteData>(
+        QUERY_KEYS.mailMessages("inbox"),
+      )?.pages[0]?.messages[0]?.keywords,
+    ).toEqual({});
+    await syncMailboxChanges(queryClient, runtime);
+    expect(getEmailChanges).toHaveBeenLastCalledWith({}, "s1");
+    expect(getMailSyncState()).toBe("s2");
   });
 
   it("runs one sync at a time", async () => {

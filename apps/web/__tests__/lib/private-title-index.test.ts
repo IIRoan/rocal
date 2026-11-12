@@ -1,16 +1,26 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import {
   generateLocalSearchIndexKey,
+  decryptSearchShard,
+  encryptSearchShard,
+  type TitleIndexShardPayload,
   searchTitleIndex,
 } from "@workspace/calendar-core";
 import type { JmapEmailMessage, UserKeyVault } from "@/lib/mail/types";
 import type { SearchShardRecord } from "@/lib/search/local-index-store";
+
+jest.mock("@/lib/search/private-index-flags", () => ({
+  isPrivateContentIndexEnabled: () => true,
+}));
 
 let mockKey: CryptoKey;
 let mockRecord: SearchShardRecord | null;
 let mockMessages: JmapEmailMessage[];
 jest.mock("@/lib/search/local-index-store", () => ({
   BrowserSearchIndexStore: class {
+    async readKey() {
+      return mockKey;
+    }
     async getOrCreateKey() {
       return mockKey;
     }
@@ -34,6 +44,7 @@ jest.mock("@/lib/mail/jmap-client", () => ({
     async discoverSession() {
       return {};
     }
+    async getIdentities() { return [{ id: "synthetic-identity", email: "alice@solace.onl" }]; }
     async getMailboxes() {
       return [{ id: "inbox", name: "Inbox", role: "inbox" }];
     }
@@ -58,8 +69,11 @@ jest.mock("@/lib/mail/api-service", () => ({
     getAccountStatus: jest.fn(),
   },
 }));
+const mockVerificationContext = { publicKeyArmored: "synthetic-public", fingerprint: "synthetic-fingerprint", ownAddresses: ["alice@solace.onl"] };
 jest.mock("@/lib/mail/worker-client", () => ({
-  mailCryptoWorkerClient: { loadVault: jest.fn(), decryptMessage: jest.fn() },
+  mailCryptoWorkerClient: {
+    getVerificationContext: () => mockVerificationContext,
+    isVerificationContextCurrent: (context: unknown) => context === mockVerificationContext, loadVault: jest.fn(), decryptMessage: jest.fn() },
 }));
 jest.mock("@/lib/mail/vault-crypto", () => ({
   unlockEncryptedMailVault: jest.fn(),
@@ -83,7 +97,10 @@ import {
   setActiveE2eeSession,
   clearActiveE2eeSession,
 } from "@/lib/e2ee-session";
-import { rebuildPrivateTitleIndex } from "@/lib/search/private-title-index";
+import {
+  rebuildPrivateTitleIndex,
+  loadPrivateTitleIndex,
+} from "@/lib/search/private-title-index";
 
 const ARMOR = "-----BEGIN PGP MESSAGE-----\nabc\n-----END PGP MESSAGE-----";
 const vault = {
@@ -137,8 +154,8 @@ describe("web private body index", () => {
       .mocked(mailCryptoWorkerClient.loadVault)
       .mockResolvedValue({ fingerprint: "fingerprint" });
     jest.mocked(mailCryptoWorkerClient.decryptMessage).mockResolvedValue({
-      plaintext:
-        "Content-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\nPHA+WmVwcGVsaW4gcGxhbnM8L3A+",
+      plaintext: null,
+      html: "<p>Zeppelin plans</p>",
       hasVerifiedSignature: false,
       signatureVerificationState: "not_signed",
     });
@@ -165,6 +182,8 @@ describe("web private body index", () => {
       privateKeyArmored: "private",
       publicKeyArmored: "public",
       privateKeyPassphrase: "secret",
+      ownAddresses: expect.any(Array),
+      ownerUserId: "u1",
     });
     expect(snapshot.pendingBodies).toBe(0);
     expect(searchTitleIndex(snapshot.documents, "zeppelin", 5)).toHaveLength(1);
@@ -186,8 +205,9 @@ describe("web private body index", () => {
 
   it("does not load another account's vault without its encryption key", async () => {
     clearActiveE2eeSession();
-    const snapshot = await rebuildPrivateTitleIndex({ accountId: "u1" });
-    expect(snapshot.pendingBodies).toBe(1);
+    await expect(rebuildPrivateTitleIndex({ accountId: "u1" })).rejects.toThrow(
+      "cancelled",
+    );
     expect(mailCryptoWorkerClient.loadVault).not.toHaveBeenCalled();
   });
 
@@ -211,9 +231,27 @@ describe("web private body index", () => {
       clearActiveE2eeSession();
       return vault;
     });
-    const snapshot = await rebuildPrivateTitleIndex({ accountId: "u1" });
-    expect(snapshot.pendingBodies).toBe(1);
+    await expect(rebuildPrivateTitleIndex({ accountId: "u1" })).rejects.toThrow(
+      "cancelled",
+    );
     expect(mailCryptoWorkerClient.loadVault).not.toHaveBeenCalled();
     expect(mailCryptoWorkerClient.decryptMessage).not.toHaveBeenCalled();
+  });
+  it("keeps documents when stored coverage is malformed or from a newer version", async () => {
+    const built = await rebuildPrivateTitleIndex({ accountId: "u1" });
+    if (!mockRecord) throw new Error("Fixture index was not written.");
+    const payload = await decryptSearchShard<TitleIndexShardPayload>(
+      mockKey,
+      mockRecord.shard,
+      { additionalData: "title-index:u1" },
+    );
+    mockRecord.shard = await encryptSearchShard(
+      mockKey,
+      { ...payload, coverage: { version: 99 } },
+      { additionalData: "title-index:u1" },
+    );
+    const loaded = await loadPrivateTitleIndex("u1");
+    expect(loaded.documents).toEqual(built.documents);
+    expect(loaded.coverage.titles.state).toBe("unknown");
   });
 });

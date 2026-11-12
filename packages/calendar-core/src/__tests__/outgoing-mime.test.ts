@@ -16,6 +16,26 @@ describe("looksLikeMimeMessage", () => {
 });
 
 describe("buildOutgoingMimeMessage", () => {
+  it("keeps pasted attachment names inside one quoted header value", () => {
+    const mime = buildOutgoingMimeMessage({ text: "Body", attachments: [{
+      filename: 'note\r\nBcc: other@example.test\t".txt', contentType: "text/plain", content: new Uint8Array([1]),
+    }] });
+    expect(mime).toContain('filename="note Bcc: other@example.test _.txt"');
+    expect(mime).not.toMatch(/^Bcc:/m);
+  });
+
+  it.each([
+    { filename: "bad\u0000.txt" },
+    { contentType: "text/plain\r\nBcc: other@example.test" },
+    { cid: "logo\r\nBcc: other@example.test" },
+    { cid: "<already-wrapped>" },
+    { filename: "é".repeat(300) },
+  ])("refuses hostile attachment metadata before building MIME: %j", (change) => {
+    expect(() => buildOutgoingMimeMessage({ text: "Body", attachments: [{
+      filename: "note.txt", contentType: "text/plain", cid: "logo", disposition: "inline", content: new Uint8Array([1]), ...change,
+    }] })).toThrow("Attachment");
+  });
+
   it("wraps plain text in a single text/plain part", () => {
     const mime = buildOutgoingMimeMessage({
       text: "Hello\nWorld",

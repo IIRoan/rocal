@@ -1,3 +1,4 @@
+import type { PrivateSearchCoverage } from "./private-search-coverage";
 import type { CalendarEvent } from "./types";
 
 export type UnifiedSearchSource = "calendar" | "mail";
@@ -39,8 +40,9 @@ export interface UnifiedCalendarSearchResult extends UnifiedSearchResultBase {
   event: CalendarEvent;
 }
 
-export interface UnifiedMailSearchResult<TMessage = unknown>
-  extends UnifiedSearchResultBase {
+export interface UnifiedMailSearchResult<
+  TMessage = unknown,
+> extends UnifiedSearchResultBase {
   source: "mail";
   messageId: string;
   threadId?: string;
@@ -50,13 +52,13 @@ export interface UnifiedMailSearchResult<TMessage = unknown>
 }
 
 export type UnifiedSearchResult<TMessage = unknown> =
-  | UnifiedCalendarSearchResult
-  | UnifiedMailSearchResult<TMessage>;
+  UnifiedCalendarSearchResult | UnifiedMailSearchResult<TMessage>;
 
 export interface UnifiedSearchResponse<TMessage = unknown> {
   results: UnifiedSearchResult<TMessage>[];
   total: number;
   sourceTotals: Partial<Record<UnifiedSearchSource, number>>;
   isIndexing?: boolean;
+  coverage?: PrivateSearchCoverage;
   isLimited?: boolean;
 }

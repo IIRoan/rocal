@@ -2,6 +2,7 @@
 export const CALENDARS_QUERY_KEY = ["calendars"] as const;
 export const CATEGORIES_QUERY_KEY = ["categories"] as const;
 export const CATEGORY_USAGE_QUERY_KEY = ["category-usage"] as const;
+export const CATEGORY_DELETE_MUTATION_KEY = ["category-delete"] as const;
 export const EVENTS_QUERY_KEY = ["events"] as const;
 export const SETTINGS_QUERY_KEY = ["settings"] as const;
 export const SUBSCRIPTIONS_QUERY_KEY = ["subscriptions"] as const;

@@ -8,6 +8,7 @@ const mockSave = jest.fn(async (_input: unknown) => undefined);
 let mockPrevious: TitleIndexDocument[] = [];
 
 jest.mock("@workspace/native-core/lib/search/title-index-store", () => ({
+  captureNativeTitleIndexRequest: () => ({ isCurrent: () => true }),
   loadNativeTitleIndex: async () => mockPrevious,
   saveNativeTitleIndex: (input: unknown) => mockSave(input),
 }));

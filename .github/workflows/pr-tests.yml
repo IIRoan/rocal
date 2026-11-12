@@ -21,12 +21,12 @@ jobs:
         uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
 
       - name: Setup Bun
-        uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+        uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
 
@@ -47,6 +47,12 @@ jobs:
 
       - name: Run tests with coverage
         run: bun run scripts/run-tests.ts --coverage --summary="$GITHUB_STEP_SUMMARY"
+
+      - name: Build the web production bundle
+        working-directory: apps/web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: bun run build
 
       - name: Check mail service helpers
         run: |
@@ -97,15 +103,15 @@ jobs:
         run: rustup toolchain install
 
       - name: Cache Rust builds
-        uses: chainguard-actions/Swatinem-rust-cache@203beff8e447695cdc59f7c4f322178a54ec6be4 # v2.9.3
+        uses: chainguard-actions/Swatinem-rust-cache@b83da835517599f3f42d100dde7195b7edfb9e30 # v2.9.3
 
       - name: Setup Node.js
-        uses: chainguard-actions/actions-setup-node@4146bcb90c0bb84fc82acd734b2f9f1d95d9545b # v6
+        uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
 
       - name: Setup Bun
-        uses: chainguard-actions/oven-sh-setup-bun@6305b286b0b7ddfec25140687ddaf1b0c63dbe08 # v2.2.0
+        uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
 

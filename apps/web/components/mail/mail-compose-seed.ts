@@ -5,6 +5,7 @@ import {
   resolveMessageReplyRecipients,
   type QuotedDateOptions,
 } from "@workspace/calendar-core";
+import { limitMailQuoteContent } from "@workspace/calendar-core/mail-mime-limits";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { extractMessageBodies } from "@/lib/mail/message-security";
 import {
@@ -54,6 +55,7 @@ export function buildReplySeed(
   identities: JmapIdentity[],
   resolvedIdentityId: string | null,
   dateOptions: QuotedDateOptions,
+  mode: "reply" | "reply-all" = "reply",
 ): SeedResult {
   const settings = readMailComposeSettings();
   const replyIdentityId = resolveSeedIdentity(
@@ -71,13 +73,14 @@ export function buildReplySeed(
   );
   const currentIdentityEmail = currentIdentity?.email ?? null;
   const replyRecipients = resolveMessageReplyRecipients(message, {
-    mode: "reply",
+    mode,
     fromEmail: currentIdentityEmail,
     identities,
-  }).to;
+  });
   const subject = message.subject ?? "";
-  const { text, html } = extractMessageBodies(message);
-  const body = plaintext ?? text ?? "";
+  const rawBodies = extractMessageBodies(message);
+  const { text, html } = limitMailQuoteContent({ text: plaintext ?? rawBodies.text, html: rawBodies.html });
+  const body = text ?? "";
   const htmlBody = html ?? `<p>${escapeHtml(body).replace(/\n/g, "<br>")}</p>`;
   const date = formatQuotedMailDate(message.receivedAt, dateOptions);
   const sender = message.from?.[0]?.email ?? "";
@@ -112,8 +115,8 @@ export function buildReplySeed(
   return {
     identityId: replyIdentityId,
     patch: {
-      composeTo: replyRecipients.join(", "),
-      composeCc: "",
+      composeTo: replyRecipients.to.join(", "),
+      composeCc: replyRecipients.cc.join(", "),
       composeBcc: "",
       composeSubject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
       composeBody: plainBody,
@@ -143,8 +146,9 @@ export function buildForwardSeed(
     message,
   );
   const subject = message.subject ?? "";
-  const { text, html } = extractMessageBodies(message);
-  const body = plaintext ?? text ?? "";
+  const rawBodies = extractMessageBodies(message);
+  const { text, html } = limitMailQuoteContent({ text: plaintext ?? rawBodies.text, html: rawBodies.html });
+  const body = text ?? "";
   const htmlBody = html ?? `<p>${escapeHtml(body).replace(/\n/g, "<br>")}</p>`;
   const sender = message.from?.[0]?.email ?? "";
   const currentIdentity =
