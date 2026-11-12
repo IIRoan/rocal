@@ -3,6 +3,7 @@
 use serde_json::{Value, json};
 use solace_api_tests::seed::{fake_envelope, fake_token};
 use solace_api_types::Timestamp;
+use solace_api_types::e2ee::EncryptionUpgrades;
 use solace_api_types::events::{InvitationImportSummary, ParticipantInput};
 use solace_api_types::subscriptions::{
     CalendarSubscription, CreateSubscriptionRequest, DeleteSubscriptionResponse, EncryptedIcsEvent,
@@ -142,7 +143,9 @@ async fn create(user: &mut TestUser, url: &str) -> solace_api_tests::client::Api
     user.post(
         "/api/subscriptions",
         json_body(&CreateSubscriptionRequest {
-            name: "Holidays".into(),
+            name: None,
+            encrypted_name: Some(fake_envelope()),
+            encryption_key_version: Some(1),
             url: url.into(),
             color: None,
         }),
@@ -321,11 +324,6 @@ async fn create_validates_the_body() {
     let url = "https://example.com/feed.ics";
     let cases = [
         (
-            json!({"name": "", "url": url}),
-            "String must contain at least 1 character(s)",
-            "name",
-        ),
-        (
             json!({"name": "X", "url": "not a url"}),
             "Invalid url",
             "url",
@@ -350,6 +348,16 @@ async fn create_validates_the_body() {
             COLOR_MESSAGE,
             "color",
         ),
+        (
+            json!({"encryptedName": 7, "url": url}),
+            "Expected string, received number",
+            "encryptedName",
+        ),
+        (
+            json!({"encryptedName": fake_envelope(), "encryptionKeyVersion": 0, "url": url}),
+            "Number must be greater than or equal to 1",
+            "encryptionKeyVersion",
+        ),
     ];
     for (body, message, path) in cases {
         expect_invalid(
@@ -365,10 +373,7 @@ async fn create_validates_the_body() {
         .expect_error(400, "Validation Error", "Required"));
     assert_eq!(
         missing["details"]["issues"],
-        json!([
-            {"path": "name", "message": "Required"},
-            {"path": "url", "message": "Required"},
-        ])
+        json!([{"path": "url", "message": "Required"}])
     );
     expect_unknown_field(
         &user
@@ -383,16 +388,254 @@ async fn create_validates_the_body() {
 }
 
 #[tokio::test]
-async fn create_requires_a_non_blank_name_before_fetching() {
+async fn create_requires_exactly_one_non_blank_name_before_fetching() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
-    let response = user
-        .post(
-            "/api/subscriptions",
-            json!({"name": "   ", "url": "http://127.0.0.1/feed.ics"}),
-        )
+    let url = "http://127.0.0.1/feed.ics";
+    for (body, message, field) in [
+        (
+            json!({"name": "   ", "url": url}),
+            "Calendar name is required",
+            "name",
+        ),
+        (json!({"url": url}), "Calendar name is required", "name"),
+        (
+            json!({"encryptedName": "   ", "url": url}),
+            "Encrypted calendar name cannot be empty",
+            "encryptedName",
+        ),
+        (
+            json!({"name": "Therapy practice", "encryptedName": fake_envelope(), "url": url}),
+            "Send the calendar name either encrypted or readable, not both",
+            "name",
+        ),
+    ] {
+        expect_field_error(&user.post("/api/subscriptions", body).await, message, field);
+    }
+    assert_eq!(own_subscription_count(&app, &user).await, 0);
+}
+
+/// `(name, calendar name, encrypted name, encryption state, tokens)` of a feed and its calendar.
+async fn name_columns(
+    app: &TestApp,
+    feed: &Feed,
+) -> (String, String, Option<String>, String, Option<String>) {
+    sqlx::query_as(
+        "SELECT s.name, c.name, c.encrypted_name, c.encryption_state, c.blind_index_tokens \
+         FROM calendar_subscription s JOIN calendar c ON c.id = s.calendar_id WHERE s.id = $1",
+    )
+    .bind(&feed.subscription_id)
+    .fetch_one(&app.db)
+    .await
+    .expect("name columns")
+}
+
+async fn readable_feed_names(user: &mut TestUser) -> Vec<String> {
+    let report: EncryptionUpgrades = ok(user
+        .get("/api/e2ee/upgrades")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    report
+        .subscriptions_with_readable_names
+        .into_iter()
+        .map(|id| id.0)
+        .collect()
+}
+
+#[tokio::test]
+async fn sealing_a_feed_name_blanks_both_readable_copies_and_then_refuses_readable_renames() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let mut other = app.user().await;
+    let feed = insert_feed(&app, &user, "https://example.com/feed.ics", 0).await;
+    let path = format!("/api/subscriptions/{}", feed.subscription_id);
+    assert_eq!(
+        readable_feed_names(&mut user).await,
+        std::slice::from_ref(&feed.subscription_id)
+    );
+    assert!(readable_feed_names(&mut other).await.is_empty());
+
+    let foreign = other
+        .put(&path, json!({"encryptedName": fake_envelope()}))
         .await;
-    expect_field_error(&response, "Calendar name is required", "name");
+    assert_eq!(foreign.status.as_u16(), 404);
+    expect_field_error(
+        &user
+            .put(
+                &path,
+                json!({"name": "Clinic", "encryptedName": fake_envelope()}),
+            )
+            .await,
+        "Send the calendar name either encrypted or readable, not both",
+        "name",
+    );
+    assert_eq!(name_columns(&app, &feed).await.0, "Feed");
+
+    let sealed_name = fake_envelope();
+    let sealed: CalendarSubscription = ok(user
+        .put(
+            &path,
+            json!({"encryptedName": sealed_name, "encryptionKeyVersion": 1, "isActive": false}),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(sealed.name, "");
+    assert!(!sealed.is_active);
+    assert_eq!(
+        (
+            sealed.calendar.name.as_str(),
+            sealed.calendar.encrypted_name.as_deref(),
+            sealed.calendar.encryption_state.as_str(),
+        ),
+        ("", Some(sealed_name.as_str()), "encrypted")
+    );
+    assert_eq!(
+        name_columns(&app, &feed).await,
+        (
+            String::new(),
+            String::new(),
+            Some(sealed_name.clone()),
+            "encrypted".into(),
+            None
+        )
+    );
+    assert!(readable_feed_names(&mut user).await.is_empty());
+
+    expect_field_error(
+        &user.put(&path, json!({"name": "Clinic"})).await,
+        "This calendar's name is encrypted. Update the app to rename it.",
+        "name",
+    );
+    let recolored: CalendarSubscription = ok(user
+        .put(&path, json!({"color": "teal"}))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(recolored.calendar.color, "teal");
+    assert_eq!(name_columns(&app, &feed).await.2, Some(sealed_name));
+}
+
+#[tokio::test]
+async fn sealing_with_a_stale_name_revision_preserves_newer_readable_and_sealed_names() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let feed = insert_feed(&app, &user, "https://example.com/feed.ics", 0).await;
+    let other_feed = insert_feed(&app, &user, "https://example.com/other.ics", 0).await;
+    let path = format!("/api/subscriptions/{}", feed.subscription_id);
+    let subscriptions: Vec<CalendarSubscription> = ok(user.get("/api/subscriptions").await.dto());
+    let original = subscriptions
+        .iter()
+        .find(|entry| entry.id.0 == feed.subscription_id)
+        .expect("feed");
+    let other = subscriptions
+        .iter()
+        .find(|entry| entry.id.0 == other_feed.subscription_id)
+        .expect("other feed");
+    assert_ne!(
+        original.name_revision, other.name_revision,
+        "the revision is bound to the feed"
+    );
+    let renamed: CalendarSubscription = ok(user
+        .put(&path, json!({"name": "Clinic"}))
+        .await
+        .expect_status(200)
+        .and_then(|response| response.dto()));
+
+    ok(user
+        .put(&path, json!({"encryptedName": fake_envelope(), "expectedNameRevision": original.name_revision, "isActive": false}))
+        .await
+        .expect_error(409, "Conflict", "The calendar name changed on another device. Try again."));
+    assert_eq!(name_columns(&app, &feed).await.0, "Clinic");
+    let is_active: bool =
+        sqlx::query_scalar("SELECT is_active FROM calendar_subscription WHERE id = $1")
+            .bind(&feed.subscription_id)
+            .fetch_one(&app.db)
+            .await
+            .expect("rejected changes are rolled back");
+    assert!(is_active);
+
+    let sealed: CalendarSubscription = ok(user
+        .put(&path, json!({"encryptedName": fake_envelope(), "expectedNameRevision": renamed.name_revision}))
+        .await
+        .expect_status(200)
+        .and_then(|response| response.dto()));
+    let newest_name = fake_envelope();
+    let newest: CalendarSubscription = ok(user
+        .put(&path, json!({"encryptedName": newest_name}))
+        .await
+        .expect_status(200)
+        .and_then(|response| response.dto()));
+    assert_ne!(sealed.name_revision, newest.name_revision);
+    ok(user
+        .put(
+            &path,
+            json!({"encryptedName": fake_envelope(), "expectedNameRevision": sealed.name_revision}),
+        )
+        .await
+        .expect_error(
+            409,
+            "Conflict",
+            "The calendar name changed on another device. Try again.",
+        ));
+    assert_eq!(name_columns(&app, &feed).await.2, Some(newest_name));
+}
+
+#[tokio::test]
+async fn a_readable_rename_waiting_for_a_seal_cannot_restore_plaintext() {
+    let app = TestApp::spawn().await;
+    let user = app.user().await;
+    let feed = insert_feed(&app, &user, "https://example.com/feed.ics", 0).await;
+    let mut transaction = app.db.begin().await.expect("lock transaction");
+    sqlx::query("SELECT id FROM calendar WHERE id = $1 FOR UPDATE")
+        .bind(&feed.calendar_id)
+        .execute(&mut *transaction)
+        .await
+        .expect("hold calendar lock");
+    let mut legacy = user.agent.clone();
+    let path = format!("/api/subscriptions/{}", feed.subscription_id);
+    let rename = tokio::spawn(async move { legacy.put(&path, json!({"name": "Clinic"})).await });
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            let waiting: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock')",
+            )
+            .fetch_one(&app.db)
+            .await
+            .expect("observe blocked rename");
+            if waiting {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("rename reaches the calendar lock");
+    let ciphertext = fake_envelope();
+    sqlx::query("UPDATE calendar SET name = '', encrypted_name = $1, encryption_state = 'encrypted' WHERE id = $2")
+        .bind(&ciphertext)
+        .bind(&feed.calendar_id)
+        .execute(&mut *transaction)
+        .await
+        .expect("seal while the rename waits");
+    sqlx::query("UPDATE calendar_subscription SET name = '' WHERE id = $1")
+        .bind(&feed.subscription_id)
+        .execute(&mut *transaction)
+        .await
+        .expect("blank the feed name");
+    transaction.commit().await.expect("commit the seal");
+
+    expect_field_error(
+        &rename.await.expect("rename task").expect("rename response"),
+        "This calendar's name is encrypted. Update the app to rename it.",
+        "name",
+    );
+    let columns = name_columns(&app, &feed).await;
+    assert_eq!(
+        (columns.0, columns.1, columns.2),
+        (String::new(), String::new(), Some(ciphertext))
+    );
 }
 
 #[tokio::test]
@@ -524,6 +767,7 @@ async fn update_changes_the_feed_and_its_mirrored_calendar() {
                 color: Some("teal".into()),
                 is_active: Some(false),
                 sync_interval_minutes: Some(60),
+                ..Default::default()
             }),
         )
         .await
@@ -1637,7 +1881,7 @@ async fn encrypted_import_stores_ciphertext_as_sent_and_links_overrides() {
                 "encrypted".into(),
                 Some(series_content),
                 3,
-                Some(format!("[\"{token}\"]")),
+                None,
                 Some(r#"{"frequency":"daily","interval":1,"count":3}"#.into()),
                 None,
                 "Europe/Amsterdam".into(),
@@ -1651,7 +1895,7 @@ async fn encrypted_import_stores_ciphertext_as_sent_and_links_overrides() {
                 "encrypted".into(),
                 Some(moved_content),
                 1,
-                Some("[]".into()),
+                None,
                 None,
                 Some(series_id.clone()),
                 "UTC".into(),

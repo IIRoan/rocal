@@ -85,7 +85,6 @@ fn new_row(
     let persistence = resolve_name_persistence(NameInput {
         entity_label: "Calendar",
         encrypted_name: Some(&request.encrypted_name),
-        blind_index_tokens: request.blind_index_tokens.as_deref(),
         encryption_key_version: request.encryption_key_version,
     })?;
     assert_valid_entity_color(&request.color)?;
@@ -127,7 +126,6 @@ pub async fn update(
     let persistence = resolve_name_persistence(NameInput {
         entity_label: "Calendar",
         encrypted_name: request.encrypted_name.as_deref(),
-        blind_index_tokens: request.blind_index_tokens.as_deref(),
         encryption_key_version: request.encryption_key_version,
     })?;
     let Some(existing) = queries::find(&state.db, &user.id, id).await? else {

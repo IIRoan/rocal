@@ -263,10 +263,7 @@ fn apply_content(
         row.description = Set(None);
         row.location = Set(None);
         row.encrypted_content = Set(Some(ciphertext.to_owned()));
-        row.blind_index_tokens = Set(Some(
-            serde_json::to_string(updates.blind_index_tokens.as_deref().unwrap_or_default())
-                .map_err(AppError::internal)?,
-        ));
+        row.blind_index_tokens = Set(None);
         row.encryption_state = Set("encrypted".into());
         row.encryption_key_version = Set(updates.encryption_key_version.unwrap_or(1));
         return Ok(());
@@ -275,7 +272,7 @@ fn apply_content(
     row.description = Set(existing.description.clone());
     row.location = Set(existing.location.clone());
     row.encrypted_content = Set(existing.encrypted_content.clone());
-    row.blind_index_tokens = Set(existing.blind_index_tokens.clone());
+    row.blind_index_tokens = Set(None);
     row.encryption_state = Set(existing.encryption_state.clone());
     row.encryption_key_version = Set(existing.encryption_key_version);
     Ok(())

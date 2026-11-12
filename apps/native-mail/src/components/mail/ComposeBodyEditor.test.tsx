@@ -14,24 +14,47 @@ type WebViewProps = {
 
 const mockPages: string[] = [];
 let mockWebView: WebViewProps | null = null;
+let mockPaintDocument = true;
+let mockSetPaintDocument: ((paint: boolean) => void) | null = null;
 const mockInject = jest.fn();
 
 jest.mock("react-native", () => ({
   StyleSheet: { create: (styles: object) => styles },
   TextInput: () => null,
+  ActivityIndicator: () => <span role="progressbar" />,
+  Text: ({ children }: { children?: React.ReactNode }) => (
+    <span>{children}</span>
+  ),
+  ScrollView: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   View: ({
     children,
     accessibilityLabel,
+    accessibilityElementsHidden,
+    testID,
   }: {
     children?: React.ReactNode;
     accessibilityLabel?: string;
-  }) => <div aria-label={accessibilityLabel}>{children}</div>,
+    accessibilityElementsHidden?: boolean;
+    testID?: string;
+  }) => (
+    <div
+      aria-label={accessibilityLabel}
+      aria-hidden={accessibilityElementsHidden}
+      data-testid={testID}
+    >
+      {children}
+    </div>
+  ),
 }));
 
 jest.mock("react-native-webview", () => {
-  const { useEffect } = jest.requireActual<typeof React>("react");
+  const { useEffect, useState } = jest.requireActual<typeof React>("react");
   return {
     WebView: (props: WebViewProps) => {
+      const [paintDocument, setPaintDocument] = useState(mockPaintDocument);
+      mockSetPaintDocument = setPaintDocument;
       mockWebView = props;
       if (mockPages.at(-1) !== props.source.html)
         mockPages.push(props.source.html);
@@ -42,7 +65,14 @@ jest.mock("react-native-webview", () => {
         props.source.html,
         "text/html",
       ).body;
-      return <div dangerouslySetInnerHTML={{ __html: body.innerHTML }} />;
+      return (
+        <div
+          data-testid="mock-webview"
+          dangerouslySetInnerHTML={{
+            __html: paintDocument ? body.innerHTML : "",
+          }}
+        />
+      );
     },
   };
 });
@@ -65,6 +95,8 @@ let container: HTMLDivElement;
 beforeEach(() => {
   mockPages.length = 0;
   mockWebView = null;
+  mockPaintDocument = true;
+  mockSetPaintDocument = null;
   mockInject.mockClear();
   container = document.createElement("div");
   root = createRoot(container);
@@ -74,12 +106,16 @@ afterEach(() => {
   act(() => root.unmount());
 });
 
-function render(value: string, placeholder = "Message") {
+function render(
+  value: string,
+  placeholder = "Message",
+  onChangeText = jest.fn(),
+) {
   act(() =>
     root.render(
       <ComposeBodyEditor
         value={value}
-        onChangeText={jest.fn()}
+        onChangeText={onChangeText}
         placeholder={placeholder}
       />,
     ),
@@ -87,15 +123,59 @@ function render(value: string, placeholder = "Message") {
 }
 
 function editorReady() {
-  act(() =>
+  act(() => {
+    mockPaintDocument = true;
+    mockSetPaintDocument?.(true);
     mockWebView?.onMessage({
       nativeEvent: { data: JSON.stringify({ type: "ready" }) },
-    }),
-  );
+    });
+  });
 }
+
+it("shows the seeded body while the WebView is loading without exposing an editable field", () => {
+  mockPaintDocument = false;
+  const onChangeText = jest.fn();
+  render("Saved encrypted draft body", "Message", onChangeText);
+
+  expect(container.textContent).toContain("Saved encrypted draft body");
+  expect(container.textContent).toContain("Preparing editor…");
+  expect(
+    container.querySelector('[data-testid="compose-body-preparing"]'),
+  ).not.toBeNull();
+  const webView = container.querySelector('[data-testid="mock-webview"]');
+  expect(webView).not.toBeNull();
+  expect(webView?.closest('[aria-hidden="true"]')).not.toBeNull();
+  expect(container.querySelector('[role="textbox"]')).toBeNull();
+  expect(onChangeText).not.toHaveBeenCalled();
+
+  editorReady();
+
+  expect(
+    container.querySelector('[data-testid="compose-body-preparing"]'),
+  ).toBeNull();
+  expect(webView?.closest('[aria-hidden="true"]')).toBeNull();
+  expect(container.querySelector('[role="textbox"]')?.textContent).toBe(
+    "Saved encrypted draft body",
+  );
+  expect(mockPages).toHaveLength(1);
+  expect(onChangeText).not.toHaveBeenCalled();
+});
+
+it("keeps a late-ready editor synchronized with the latest preview value", () => {
+  mockPaintDocument = false;
+  render("First body");
+  render("Latest body");
+
+  expect(container.textContent).toContain("Latest body");
+  expect(container.textContent).not.toContain("First body");
+  editorReady();
+  expect(mockInject.mock.calls.at(-1)?.[0]).toContain("Latest body");
+  expect(mockPages).toHaveLength(1);
+});
 
 it("labels only the editable body so accessibility actions focus the text field", () => {
   render("");
+  editorReady();
   const targets = container.querySelectorAll('[aria-label="Message body"]');
   expect(targets).toHaveLength(1);
   expect(targets[0]?.getAttribute("role")).toBe("textbox");
