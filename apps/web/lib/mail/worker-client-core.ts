@@ -202,6 +202,8 @@ export class MailCryptoWorkerClient {
     armoredMessage: string;
     senderPublicKeyArmored?: string;
     expectedVaultFingerprint?: string;
+    /** A draft about to be edited keeps its whole HTML instead of the read limit. */
+    editable?: boolean;
   }): Promise<MailDecryptResult> {
     const generation = this.vaultGeneration;
     const result = await this.call<MailDecryptResult>("DECRYPT_PGP_MESSAGE", input);

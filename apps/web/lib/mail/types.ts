@@ -11,6 +11,7 @@ import {
   type MailVaultBackup as SharedMailVaultBackup,
   type MailVaultKdfParams,
 } from "@workspace/calendar-core";
+import type { ParsedMailAttachment } from "@workspace/calendar-core/mail-mime-parser";
 import { z } from "@workspace/calendar-core/zod";
 
 export type { MailDemoConfig, MailOAuthConfig, MailVaultKdfParams };
@@ -356,7 +357,16 @@ export type MailSignatureVerificationState =
   | "failed";
 
 export type MailDecryptResult = {
-  plaintext: string;
+  /** The decoded text part, shortened to the read limit; null when the message has none or could not be parsed. */
+  plaintext: string | null;
+  html?: string | null;
+  attachments?: ParsedMailAttachment[];
+  /** The text or HTML is shorter than the message, so it must not be saved back as a draft. */
+  truncated?: boolean;
+  /** The start of the decrypted source, sent only when there is no text part to show. */
+  sourceText?: string;
+  sourceTruncated?: boolean;
+  rawMimeFallback?: boolean;
   signatureVerificationLayers?: MailSignatureVerificationState[];
   senderKeyTrustState?: MailSenderKeyTrustState;
   hasVerifiedSignature: boolean;

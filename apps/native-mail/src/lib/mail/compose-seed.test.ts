@@ -1,5 +1,6 @@
 import { buildDraftMethodCalls } from "@workspace/calendar-core";
 import { MAX_MAIL_DISPLAY_CHARACTERS } from "@workspace/calendar-core/mail-mime-limits";
+import { MAIL_DRAFT_TEXT_LIMITS } from "@workspace/calendar-core/mail-mime-parser";
 import {
   decryptDraftFields,
   planComposeSeed,
@@ -201,6 +202,13 @@ describe("decryptDraftFields", () => {
     expect(result.fields.body).toBe("");
   });
 
+  it("refuses a draft whose decoding stopped at the read limit, though the returned text is short", async () => {
+    jest.mocked(decryptPgpMimeMessage).mockResolvedValueOnce({ plaintext: "decoded up to the limit", truncated: true, signatureVerificationState: "not_signed", hasVerifiedSignature: false });
+    const result = await decryptDraftFields({} as MailRuntime, draft);
+    expect(result.error).toContain("saved draft has not been changed");
+    expect(result.fields.body).toBe("");
+  });
+
   it("refuses an oversized decrypted draft without seeding any body for autosave", async () => {
     jest.mocked(decryptPgpMimeMessage).mockResolvedValueOnce({ plaintext: "x".repeat(MAX_MAIL_DISPLAY_CHARACTERS + 1), signatureVerificationState: "not_signed", hasVerifiedSignature: false });
     const result = await decryptDraftFields({} as MailRuntime, draft);
@@ -219,7 +227,7 @@ describe("decryptDraftFields", () => {
       fields: { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "Meet at nine" },
       error: null,
     });
-    expect(decryptPgpMimeMessage).toHaveBeenCalledWith(runtime, "d1", draft.bodyStructure);
+    expect(decryptPgpMimeMessage).toHaveBeenCalledWith(runtime, "d1", draft.bodyStructure, undefined, MAIL_DRAFT_TEXT_LIMITS);
   });
 
   it("still opens the headers with an error when the draft cannot be decrypted", async () => {

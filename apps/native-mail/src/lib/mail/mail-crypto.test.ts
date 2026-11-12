@@ -112,11 +112,11 @@ jest.mock("openpgp", () => ({
   readKey: (...args: unknown[]) => mockReadKey(...args),
 }));
 
-// Stub mail-mime-parser
+// Stub the shared MIME parser
 const mockParseMimeBody = jest.fn();
-jest.mock("./mail-mime-parser", () => ({
-  ...jest.requireActual("./mail-mime-parser"),
-  parseMimeBody: (...args: unknown[]) => mockParseMimeBody(...args),
+jest.mock("@workspace/calendar-core/mail-mime-parser", () => ({
+  ...jest.requireActual("@workspace/calendar-core/mail-mime-parser"),
+  parseMailMimeContent: (...args: unknown[]) => mockParseMimeBody(...args),
 }));
 
 // Allow overriding extractPgpMimeCiphertextBlobId per test
@@ -252,7 +252,7 @@ describe("mail-crypto", () => {
       armor: () => "-----BEGIN PGP PRIVATE KEY BLOCK-----\nReEncrypted\n-----END PGP PRIVATE KEY BLOCK-----",
     });
     mockExtractBlobId.mockReturnValue(null);
-    mockParseMimeBody.mockReturnValue({ text: null, html: null });
+    mockParseMimeBody.mockReturnValue({ text: null, html: null, attachments: [], truncated: false });
   });
 
   // ── ensureVaultLoaded ──────────────────────────────────────────────────────
@@ -467,7 +467,7 @@ describe("mail-crypto", () => {
         signatures: [],
       });
       mockParseMimeBody.mockImplementationOnce(
-        jest.requireActual("./mail-mime-parser").parseMimeBody,
+        jest.requireActual("@workspace/calendar-core/mail-mime-parser").parseMailMimeContent,
       );
 
       const runtime = buildRuntime();
@@ -485,7 +485,7 @@ describe("mail-crypto", () => {
       const mime = "Content-Type: text/html\r\n\r\n<p>HTML only</p>";
       mockReadMessage.mockResolvedValueOnce({});
       mockDecrypt.mockResolvedValueOnce({ data: mime, signatures: [] });
-      mockParseMimeBody.mockImplementationOnce(jest.requireActual("./mail-mime-parser").parseMimeBody);
+      mockParseMimeBody.mockImplementationOnce(jest.requireActual("@workspace/calendar-core/mail-mime-parser").parseMailMimeContent);
       const result = await decryptMailMessage(buildRuntime(), "inline-html-only", "-----BEGIN PGP MESSAGE-----");
       expect(result.plaintext).toBe(mime);
       expect(result.html).toBe("<p>HTML only</p>");
@@ -716,7 +716,7 @@ describe("mail-crypto", () => {
       mockGetBlobAsText.mockResolvedValueOnce("-----BEGIN PGP MESSAGE-----");
       mockReadMessage.mockResolvedValueOnce({});
       mockDecrypt.mockResolvedValueOnce({ data: mime, signatures: [] });
-      mockParseMimeBody.mockImplementationOnce(jest.requireActual("./mail-mime-parser").parseMimeBody);
+      mockParseMimeBody.mockImplementationOnce(jest.requireActual("@workspace/calendar-core/mail-mime-parser").parseMailMimeContent);
       const result = await decryptPgpMimeMessage(buildRuntime(), "structured-html-only", MOCK_BODY_STRUCTURE);
       expect(result.plaintext).toBe(mime);
       expect(result.rawMimeFallback).toBe(true);

@@ -6,6 +6,7 @@ import {
   resolveMessageReplyFrom,
   sealMailForSelf,
   SIMPLELOGIN_DONE_KEYWORD,
+  type MailKeywordEdit,
   type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
@@ -22,8 +23,14 @@ const log = createLogger("simplelogin-alias-action");
 export function useSimpleLoginAliasAction({
   activeMailbox,
   patchMessageKeyword,
+  trackKeywordWrite,
 }: {
   activeMailbox: ActiveMailboxState | null;
+  /** Keeps the done mark from being undone by a server answer read before its write settles. */
+  trackKeywordWrite: (
+    edits: MailKeywordEdit[],
+    write: () => Promise<void>,
+  ) => Promise<void>;
   patchMessageKeyword: (
     message: JmapEmailMessage,
     keyword: string,
@@ -34,12 +41,17 @@ export function useSimpleLoginAliasAction({
     const action = getSimpleLoginForward(message)?.action;
     if (!activeMailbox || !action) return;
     const { client, session, identities, mailboxes } = activeMailbox;
+    const doneEdit = (enabled: boolean): MailKeywordEdit[] => [
+      { messageId: message.id, keyword: SIMPLELOGIN_DONE_KEYWORD, enabled },
+    ];
 
     const openAndMark = async (url: string, done: boolean) => {
       window.open(url, "_blank", "noopener,noreferrer");
       patchMessageKeyword(message, SIMPLELOGIN_DONE_KEYWORD, done);
       try {
-        await client.setMessageKeyword(session, message.id, SIMPLELOGIN_DONE_KEYWORD, done);
+        await trackKeywordWrite(doneEdit(done), () =>
+          client.setMessageKeyword(session, message.id, SIMPLELOGIN_DONE_KEYWORD, done),
+        );
       } catch (error) {
         log.error("Failed to update SimpleLogin action state", error);
         patchMessageKeyword(message, SIMPLELOGIN_DONE_KEYWORD, !done);
@@ -65,9 +77,11 @@ export function useSimpleLoginAliasAction({
 
     const toastId = toast.loading(action.pendingLabel);
     patchMessageKeyword(message, SIMPLELOGIN_DONE_KEYWORD, true);
-    try {
-      // SimpleLogin only honours the command from the mailbox it forwards to, so it goes out from the receiving identity.
-      const target = action.target;
+    // SimpleLogin only honours the command from the mailbox it forwards to, so it goes out from the receiving identity.
+    const target = action.target;
+    let sent = false;
+    // The mark shows from now but is written only after the send, so the whole span counts as one write in flight.
+    const sendThenMark = async () => {
       const accountId = getPrimaryMailAccountId(session);
       if (!accountId) throw new Error("Your mailbox is not connected.");
       await runMailSendAction(accountId, `simplelogin:${message.id}`, async (sendScope, isActionCurrent) => {
@@ -89,17 +103,20 @@ export function useSimpleLoginAliasAction({
           sentCopyCiphertext,
         });
       });
+      sent = true;
+      toast.success(action.doneLabel, { id: toastId });
+      await client.setMessageKeyword(session, message.id, SIMPLELOGIN_DONE_KEYWORD, true);
+    };
+    try {
+      await trackKeywordWrite(doneEdit(true), sendThenMark);
     } catch (error) {
+      if (sent) {
+        log.error("Failed to mark SimpleLogin action done", error);
+        return;
+      }
       log.error("Failed to run SimpleLogin action", error);
       patchMessageKeyword(message, SIMPLELOGIN_DONE_KEYWORD, false);
       toast.error(getErrorMessage(error, "Could not reach SimpleLogin."), { id: toastId });
-      return;
-    }
-    toast.success(action.doneLabel, { id: toastId });
-    try {
-      await client.setMessageKeyword(session, message.id, SIMPLELOGIN_DONE_KEYWORD, true);
-    } catch (error) {
-      log.error("Failed to mark SimpleLogin action done", error);
     }
   };
 }
