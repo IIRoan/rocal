@@ -9,6 +9,7 @@ use reqwest::header::{
 };
 use reqwest::{Method, StatusCode};
 use sea_orm::{ConnectionTrait, Set, TransactionTrait};
+use sha2::{Digest, Sha256};
 use solace_api_types::Timestamp;
 use solace_api_types::events::ParticipantInput;
 use solace_api_types::subscriptions::{
@@ -23,6 +24,7 @@ use crate::auth::guard::RouteUser;
 use crate::db::entities::{
     calendar, calendar_event, calendar_subscription, calendar_sync_log, event_participant,
 };
+use crate::entity_metadata::{EncryptedName, NameInput, resolve_name_persistence};
 use crate::error::AppError;
 use crate::events::participants;
 use crate::events::queries as events_queries;
@@ -45,6 +47,19 @@ const HOLIDAY_SYNC_INTERVAL_MINUTES: i32 = 10080;
 const SYNC_INTERVAL_MINUTES: i32 = 15;
 const NOT_FOUND: &str = "Subscription not found";
 const CALENDAR_NOT_FOUND: &str = "Calendar not found or not owned by user";
+const BOTH_NAMES: &str = "Send the calendar name either encrypted or readable, not both";
+
+/// A feed's name as client ciphertext, stored on its mirrored calendar.
+fn sealed_name(
+    encrypted_name: Option<&str>,
+    encryption_key_version: Option<i32>,
+) -> Result<Option<EncryptedName>, AppError> {
+    resolve_name_persistence(NameInput {
+        entity_label: "Calendar",
+        encrypted_name,
+        encryption_key_version,
+    })
+}
 
 fn fetch_error_message(error: SafeFetchError) -> String {
     match error {
@@ -149,12 +164,31 @@ fn calendar_dto(model: calendar::Model) -> SubscribedCalendar {
     }
 }
 
+/// Binding the revision to the subscription prevents equal readable names from sharing a token.
+fn name_revision(feed: &calendar_subscription::Model, calendar: &calendar::Model) -> String {
+    let mut hash = Sha256::new();
+    for value in [
+        feed.id.as_str(),
+        feed.name.as_str(),
+        calendar.name.as_str(),
+        calendar.encrypted_name.as_deref().unwrap_or_default(),
+        calendar.encryption_state.as_str(),
+    ] {
+        hash.update(value.len().to_string().as_bytes());
+        hash.update(b":");
+        hash.update(value.as_bytes());
+    }
+    hash.update(calendar.encryption_key_version.to_be_bytes());
+    hex::encode(hash.finalize())
+}
+
 fn dto(
     feed: calendar_subscription::Model,
     calendar: calendar::Model,
     sync_logs: Option<i64>,
 ) -> CalendarSubscription {
     CalendarSubscription {
+        name_revision: name_revision(&feed, &calendar),
         id: feed.id.into(),
         name: feed.name,
         url: feed.url,
@@ -197,8 +231,15 @@ pub async fn create(
     user: &RouteUser,
     request: CreateSubscriptionRequest,
 ) -> Result<CalendarSubscription, AppError> {
-    let name = js_trim(&request.name);
-    if name.is_empty() {
+    let sealed = sealed_name(
+        request.encrypted_name.as_deref(),
+        request.encryption_key_version,
+    )?;
+    let name = request.name.as_deref().map(js_trim).unwrap_or_default();
+    if sealed.is_some() && !name.is_empty() {
+        return Err(AppError::field(BOTH_NAMES, "name"));
+    }
+    if sealed.is_none() && name.is_empty() {
         return Err(AppError::field("Calendar name is required", "name"));
     }
     if queries::by_url(&state.db, &user.id, &request.url)
@@ -231,7 +272,7 @@ pub async fn create(
         .into()
     });
     let calendar =
-        queries::insert_feed_calendar(&state.db, &user.id, name, &color, holiday).await?;
+        queries::insert_feed_calendar(&state.db, &user.id, name, sealed, &color, holiday).await?;
     let interval = if holiday {
         HOLIDAY_SYNC_INTERVAL_MINUTES
     } else {
@@ -240,7 +281,7 @@ pub async fn create(
     let feed = queries::insert_feed(
         &state.db,
         &user.id,
-        name,
+        &calendar.name,
         &request.url,
         &calendar.id,
         interval,
@@ -303,13 +344,33 @@ pub async fn update(
     id: &str,
     request: UpdateSubscriptionRequest,
 ) -> Result<CalendarSubscription, AppError> {
-    let Some((feed, Some(calendar))) =
-        queries::owned_with_calendar(&state.db, id, &user.id).await?
+    let transaction = state.db.begin().await?;
+    let Some((feed, calendar)) = queries::owned_for_update(&transaction, id, &user.id).await?
     else {
         return Err(AppError::NotFound(NOT_FOUND.into()));
     };
+    if let Some(expected) = &request.expected_name_revision
+        && *expected != name_revision(&feed, &calendar)
+    {
+        return Err(AppError::Conflict(
+            "The calendar name changed on another device. Try again.".into(),
+        ));
+    }
+    let sealed = sealed_name(
+        request.encrypted_name.as_deref(),
+        request.encryption_key_version,
+    )?;
     let name = request.name.as_deref().map(js_trim);
     if let Some(name) = name {
+        if sealed.is_some() {
+            return Err(AppError::field(BOTH_NAMES, "name"));
+        }
+        if calendar.encryption_state == "encrypted" {
+            return Err(AppError::field(
+                "This calendar's name is encrypted. Update the app to rename it.",
+                "name",
+            ));
+        }
         if name.is_empty() {
             return Err(AppError::field("Calendar name is required", "name"));
         }
@@ -322,11 +383,13 @@ pub async fn update(
     }
     let changes = FeedChanges {
         name,
+        sealed,
         color: request.color.as_deref(),
         is_active: request.is_active,
         sync_interval_minutes: request.sync_interval_minutes,
     };
-    let (feed, calendar) = queries::update_feed(&state.db, feed, calendar, changes).await?;
+    let (feed, calendar) = queries::update_feed(&transaction, feed, calendar, changes).await?;
+    transaction.commit().await?;
     Ok(dto(feed, calendar, None))
 }
 
@@ -709,8 +772,6 @@ pub async fn import_ics(
             }
             None => None,
         };
-        let tokens = serde_json::to_string(entry.blind_index_tokens.as_deref().unwrap_or_default())
-            .map_err(AppError::internal)?;
         let row = calendar_event::ActiveModel {
             user_id: Set(user.id.clone()),
             calendar_id: Set(calendar_id.to_owned()),
@@ -721,7 +782,6 @@ pub async fn import_ics(
             encrypted_content: Set(Some(entry.encrypted_content.clone())),
             encryption_state: Set("encrypted".into()),
             encryption_key_version: Set(entry.encryption_key_version.unwrap_or(1)),
-            blind_index_tokens: Set(Some(tokens)),
             start: Set(stored_instant(&entry.start)?),
             end: Set(stored_instant(&entry.end)?),
             all_day: Set(entry.all_day),
@@ -871,10 +931,16 @@ pub(crate) mod tests {
             interval_minutes: i32,
         ) -> calendar_subscription::Model {
             let db = &self.state.db;
-            let calendar =
-                queries::insert_feed_calendar(db, &self.user.id, "Feed", DEFAULT_COLOR, false)
-                    .await
-                    .unwrap();
+            let calendar = queries::insert_feed_calendar(
+                db,
+                &self.user.id,
+                "Feed",
+                None,
+                DEFAULT_COLOR,
+                false,
+            )
+            .await
+            .unwrap();
             // A feed URL is unique per user, so each feed gets its own query.
             let url = format!("{}{path}?feed={}", self.origin, crate::db::cuid());
             let feed = queries::insert_feed(
@@ -960,7 +1026,9 @@ pub(crate) mod tests {
 
         let fixture = fixture().await;
         let request = CreateSubscriptionRequest {
-            name: "Work".into(),
+            name: Some("Work".into()),
+            encrypted_name: None,
+            encryption_key_version: None,
             url: format!("{}/private-redirect", fixture.origin),
             color: None,
         };
@@ -977,6 +1045,40 @@ pub(crate) mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[tokio::test]
+    async fn a_sealed_name_is_stored_only_as_ciphertext_on_the_mirrored_calendar() {
+        let fixture = fixture().await;
+        let request = CreateSubscriptionRequest {
+            name: None,
+            encrypted_name: Some("sealed-name".into()),
+            encryption_key_version: Some(2),
+            url: format!("{}/feed.ics", fixture.origin),
+            color: None,
+        };
+        let created = create(&fixture.state, &fixture.user, request)
+            .await
+            .unwrap();
+        assert_eq!(created.name, "");
+        assert_eq!(
+            (
+                created.calendar.name.as_str(),
+                created.calendar.encrypted_name.as_deref(),
+                created.calendar.encryption_state.as_str(),
+                created.calendar.encryption_key_version,
+                created.calendar.blind_index_tokens.as_deref(),
+            ),
+            ("", Some("sealed-name"), "encrypted", 2, None)
+        );
+        let (feed, calendar) =
+            queries::owned_with_calendar(&fixture.state.db, &created.id.0, &fixture.user.id)
+                .await
+                .unwrap()
+                .unwrap();
+        let calendar = calendar.unwrap();
+        assert_eq!((feed.name.as_str(), calendar.name.as_str()), ("", ""));
+        assert_eq!(calendar.encrypted_name.as_deref(), Some("sealed-name"));
     }
 
     #[tokio::test]

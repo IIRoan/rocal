@@ -104,7 +104,10 @@ async fn an_encrypted_event_is_stored_as_ciphertext_only() {
     request.all_day = Some(false);
     request.encryption_key_version = Some(2);
     let ciphertext = request.encrypted_content.clone();
-    let tokens = request.blind_index_tokens.clone().expect("tokens");
+    assert!(
+        request.blind_index_tokens.is_some(),
+        "sent like a shipped binary"
+    );
 
     let created = create_event(&mut owner, &request).await;
 
@@ -128,8 +131,8 @@ async fn an_encrypted_event_is_stored_as_ciphertext_only() {
         Some(ciphertext.as_str())
     );
     assert_eq!(
-        created.blind_index_tokens,
-        Some(serde_json::to_string(&tokens).expect("tokens json"))
+        created.blind_index_tokens, None,
+        "search tokens are dropped"
     );
     assert_eq!(
         (
@@ -184,7 +187,7 @@ async fn an_encrypted_event_is_stored_as_ciphertext_only() {
             description: None,
             location: None,
             encrypted_content: Some(ciphertext),
-            blind_index_tokens: Some(serde_json::to_string(&tokens).expect("tokens json")),
+            blind_index_tokens: None,
             encryption_state: "encrypted".into(),
             encryption_key_version: 2,
         }
@@ -1348,6 +1351,11 @@ async fn an_update_stores_new_ciphertext_and_schedule() {
         &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
     )
     .await;
+    sqlx::query("UPDATE calendar_event SET blind_index_tokens = '[\"old\"]' WHERE id = $1")
+        .bind(&event.id.0)
+        .execute(&app.db)
+        .await
+        .expect("seed tokens an older server stored");
     let ciphertext = fake_envelope();
     let update = UpdateEventRequest {
         encrypted_content: Some(ciphertext.clone()),
@@ -1371,8 +1379,8 @@ async fn an_update_stores_new_ciphertext_and_schedule() {
         Some(ciphertext.as_str())
     );
     assert_eq!(
-        updated.blind_index_tokens.as_deref(),
-        Some(r#"["fresh-token"]"#)
+        updated.blind_index_tokens, None,
+        "new ciphertext clears stored tokens and stores none"
     );
     assert_eq!(updated.encryption_key_version, 3);
     assert_eq!(
@@ -1406,7 +1414,7 @@ async fn an_update_stores_new_ciphertext_and_schedule() {
             description: None,
             location: None,
             encrypted_content: Some(ciphertext),
-            blind_index_tokens: Some(r#"["fresh-token"]"#.into()),
+            blind_index_tokens: None,
             encryption_state: "encrypted".into(),
             encryption_key_version: 3,
         }
@@ -2123,7 +2131,7 @@ async fn sealing_replaces_plaintext_with_ciphertext() {
         description: None,
         location: None,
         encrypted_content: Some(ciphertext),
-        blind_index_tokens: Some(r#"["seal-token"]"#.into()),
+        blind_index_tokens: None,
         encryption_state: "encrypted".into(),
         encryption_key_version: 1,
     };

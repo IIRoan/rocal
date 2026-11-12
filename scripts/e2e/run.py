@@ -15,6 +15,11 @@ import connectivity
 
 CALENDAR_START = ("01-authentication", "02-calendar-management")
 CONVERSATION_JOURNEYS = frozenset(("07-conversation-first-message", "08-conversation-replies", "09-conversation-reader"))
+# Maestro 2.12.0's iOS driver startup and per-call timeout classes, and the fixed call names its DriverTimeout message can carry.
+STARTUP_TIMEOUT_CLASS = "xcuitest.installer.LocalXCTestInstaller$IOSDriverTimeoutException"
+CALL_TIMEOUT_CLASS = "maestro.MaestroException$DriverTimeout"
+DRIVER_CALLS = frozenset(("deviceInfo", "eraseText", "inputText", "isDarkModeEnabled", "isKeyboardVisible", "isScreenStatic", "longPress",
+                          "pressKey", "setDarkMode", "setLocation", "setOrientation", "setPermissions", "snapshot", "swipe", "takeScreenshot", "tap"))
 
 
 def maestro_environment():
@@ -142,10 +147,31 @@ def failed_trace_step(traces):
     return failed
 
 
+def has_class(content, name):
+    # A whole class token only: a longer identifier, nested class or enclosing package is a different class.
+    return re.search(rf"(?<![\w$.]){re.escape(name)}(?![\w$]|\.[\w$])", content) is not None
+
+
+def driver_timeout_details(content, reason):
+    if reason != "driver-timeout":
+        return None, None
+    if has_class(content, STARTUP_TIMEOUT_CLASS) or "iOS driver not ready in time" in content:
+        return "startup", None
+    call = re.search(r"Maestro driver timed out during (\S{1,64}) call(?![\w$])", content)
+    if call or has_class(content, CALL_TIMEOUT_CLASS):
+        return "call", call.group(1) if call and call.group(1) in DRIVER_CALLS else "other"
+    return "other", None
+
+
 def failure_details(log, report, traces, reason, exit_code=None):
-    exception = re.search(r"\b((?:maestro|java|javax|io|org|com|kotlin)\.(?:[A-Za-z_$][\w$]*\.)*[A-Za-z_$][\w$]*(?:Exception|Error))\b", failure_content(log, report))
-    details = {"reason": reason, "exceptionType": exception.group(1)[:200] if exception else None, "command": None, "step": None,
-               "assertionTarget": None, "exitCode": exit_code, "commandDurationMs": None, "msSincePreviousTap": None, "commandTimeoutMs": None}
+    content = failure_content(log, report)
+    # The generic pattern truncates nested classes (MaestroException$DriverTimeout) and skips the xcuitest package, so known timeouts come first.
+    known = next((name for name in (STARTUP_TIMEOUT_CLASS, CALL_TIMEOUT_CLASS) if has_class(content, name)), None)
+    exception = re.search(r"\b((?:maestro|java|javax|io|org|com|kotlin)\.(?:[A-Za-z_$][\w$]*\.)*[A-Za-z_$][\w$]*(?:Exception|Error))\b", content)
+    timeout_kind, timeout_call = driver_timeout_details(content, reason)
+    details = {"reason": reason, "exceptionType": known or (exception.group(1)[:200] if exception else None), "command": None, "step": None,
+               "assertionTarget": None, "exitCode": exit_code, "commandDurationMs": None, "msSincePreviousTap": None, "commandTimeoutMs": None,
+               "driverTimeoutKind": timeout_kind, "driverTimeoutCall": timeout_call}
     failed = failed_trace_step(traces)
     if failed is None:
         return details
@@ -361,7 +387,8 @@ def run_journey(platform, app, flow, results, backend_expected=True):
         original_hierarchy = False
         if blocked:
             details = {"reason": reason, "exceptionType": None, "command": None, "step": None, "assertionTarget": None, "exitCode": None,
-                       "commandDurationMs": None, "msSincePreviousTap": None, "commandTimeoutMs": None, "hierarchySource": None}
+                       "commandDurationMs": None, "msSincePreviousTap": None, "commandTimeoutMs": None, "driverTimeoutKind": None,
+                       "driverTimeoutCall": None, "hierarchySource": None}
         else:
             details = failure_details(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml", screenshots, reason, exit_code)
             original_hierarchy = export_failed_step_hierarchy(screenshots, fixture, f"{app}-{name}", details)

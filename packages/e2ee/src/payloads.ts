@@ -17,10 +17,7 @@ import {
 } from "@workspace/calendar-core";
 import type { E2eeModule, EncryptedJsonPayload } from "./e2ee-module";
 
-export type ContentEncrypter = Pick<
-  E2eeModule,
-  "encryptJsonPayload" | "createBlindIndexTokens"
->;
+export type ContentEncrypter = Pick<E2eeModule, "encryptJsonPayload">;
 export type ContentDecrypter = Pick<E2eeModule, "decryptJsonPayload">;
 
 export interface E2eeSessionKeys {
@@ -116,12 +113,6 @@ export async function encryptEventContentRequest<
       eventContentAad(keyVersion),
     ),
   );
-  // Colour and category stay out of the tokens, so they cannot link events to each other.
-  const blindIndexTokens = await e2ee.createBlindIndexTokens(
-    keys.blindIndexKey,
-    [title, description, location].filter(Boolean).join(" "),
-  );
-
   const {
     title: _title,
     description: _description,
@@ -146,7 +137,6 @@ export async function encryptEventContentRequest<
   return {
     ...wire,
     encryptedContent,
-    blindIndexTokens,
     encryptionKeyVersion: keyVersion,
     attributesEncrypted: true,
     ...(invitationContent ? { invitationContent } : {}),
@@ -174,17 +164,11 @@ export async function encryptNameRequest<T extends NameRequest>(
       encryptedNameAad(kind, keyVersion),
     ),
   );
-  const blindIndexTokens = await e2ee.createBlindIndexTokens(
-    keys.blindIndexKey,
-    name,
-  );
-
   const { name: _name, ...wire } = request;
 
   return {
     ...wire,
     encryptedName,
-    blindIndexTokens,
     encryptionKeyVersion: keyVersion,
   };
 }

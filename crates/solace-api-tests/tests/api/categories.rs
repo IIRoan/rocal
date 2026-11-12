@@ -304,8 +304,8 @@ async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
     assert_eq!(created.name, "");
     assert_eq!(created.encrypted_name.as_deref(), Some(ciphertext));
     assert_eq!(
-        created.blind_index_tokens.as_deref(),
-        Some(r#"["idx-1","idx-2"]"#)
+        created.blind_index_tokens, None,
+        "search tokens from a shipped binary are dropped"
     );
     assert_eq!(
         (
@@ -321,11 +321,7 @@ async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
             &row["encrypted_name"],
             &row["blind_index_tokens"]
         ),
-        (
-            &json!(""),
-            &json!(ciphertext),
-            &json!(r#"["idx-1","idx-2"]"#)
-        )
+        (&json!(""), &json!(ciphertext), &json!(null))
     );
 
     let twin = create_category_with(
@@ -342,11 +338,8 @@ async fn encrypted_names_are_stored_byte_for_byte_beside_a_blank_name() {
         "encrypted names are never checked for duplicates"
     );
     assert_eq!(
-        (
-            twin.blind_index_tokens.as_deref(),
-            twin.encryption_key_version
-        ),
-        (Some("[]"), 1)
+        (twin.blind_index_tokens, twin.encryption_key_version),
+        (None, 1)
     );
 }
 

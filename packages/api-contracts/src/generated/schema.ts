@@ -402,7 +402,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Plaintext full-text search, with blind-index tokens for encrypted events. */
+        /** Plaintext full-text search kept for shipped binaries; their `blindIndexTokens` are ignored, since the server keeps none. */
         get: operations["searchEvents"];
         put?: never;
         post?: never;
@@ -1276,6 +1276,8 @@ export interface components {
             /** @description `pending`, `success` or `error`. */
             lastSyncStatus: string;
             name: string;
+            /** @description An opaque revision of the two stored names, bound to this subscription and never persisted. */
+            nameRevision: string;
             /** Format: int32 */
             syncIntervalMinutes: number;
             updatedAt: components["schemas"]["Timestamp"];
@@ -1352,9 +1354,14 @@ export interface components {
         CreateInviteRequest: {
             email: string;
         };
+        /** @description Current clients send `encryptedName`; a readable `name` is only accepted from shipped binaries. */
         CreateSubscriptionRequest: {
             color?: string;
-            name: string;
+            /** @description The name sealed as a calendar name; stored on the mirrored calendar. */
+            encryptedName?: string;
+            /** Format: int32 */
+            encryptionKeyVersion?: number;
+            name?: string;
             url: string;
         };
         CreatedNotification: {
@@ -1536,6 +1543,8 @@ export interface components {
              * @description Invitation copies the server still stores readable.
              */
             readableInvitations: number;
+            /** @description Feeds whose name is still stored readable. */
+            subscriptionsWithReadableNames: components["schemas"]["SubscriptionId"][];
             /** @description Whether the app preferences are still stored readable. */
             unsealedSettings: boolean;
         };
@@ -2604,7 +2613,13 @@ export interface components {
         UpdateSubscriptionRequest: {
             /** @description Recolors the mirrored calendar. */
             color?: string;
+            encryptedName?: string;
+            /** Format: int32 */
+            encryptionKeyVersion?: number;
+            /** @description Background sealing may replace only the names read with this revision. */
+            expectedNameRevision?: string;
             isActive?: boolean;
+            /** @description A readable rename from a shipped binary; refused once the name is sealed. */
             name?: string;
             /** Format: int32 */
             syncIntervalMinutes?: number;

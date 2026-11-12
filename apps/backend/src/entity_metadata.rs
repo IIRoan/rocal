@@ -41,17 +41,16 @@ pub fn assert_valid_entity_color(color: &str) -> Result<(), AppError> {
 /// What a create or update writes to the name columns.
 pub struct EncryptedName {
     pub encrypted_name: String,
-    pub blind_index_tokens: String,
     pub encryption_key_version: i32,
 }
 
-/// Writes an `Option<EncryptedName>` onto a calendar or category row, blanking the plaintext name.
+/// Writes an `Option<EncryptedName>` onto a calendar or category row, blanking the plaintext name and any search tokens.
 macro_rules! apply_name {
     ($row:expr, $name:expr) => {
         if let Some(name) = $name {
             $row.name = sea_orm::Set(String::new());
             $row.encrypted_name = sea_orm::Set(Some(name.encrypted_name));
-            $row.blind_index_tokens = sea_orm::Set(Some(name.blind_index_tokens));
+            $row.blind_index_tokens = sea_orm::Set(None);
             $row.encryption_state = sea_orm::Set("encrypted".into());
             $row.encryption_key_version = sea_orm::Set(name.encryption_key_version);
         }
@@ -62,7 +61,6 @@ pub(crate) use apply_name;
 pub struct NameInput<'a> {
     pub entity_label: &'static str,
     pub encrypted_name: Option<&'a str>,
-    pub blind_index_tokens: Option<&'a [String]>,
     pub encryption_key_version: Option<i32>,
 }
 
@@ -80,11 +78,8 @@ pub fn resolve_name_persistence(input: NameInput<'_>) -> Result<Option<Encrypted
             "encryptedName",
         ));
     }
-    let tokens = serde_json::to_string(input.blind_index_tokens.unwrap_or_default())
-        .map_err(AppError::internal)?;
     Ok(Some(EncryptedName {
         encrypted_name: encrypted_name.to_owned(),
-        blind_index_tokens: tokens,
         encryption_key_version: input.encryption_key_version.unwrap_or(1),
     }))
 }
@@ -129,7 +124,6 @@ mod tests {
             NameInput {
                 entity_label: "Calendar",
                 encrypted_name,
-                blind_index_tokens: None,
                 encryption_key_version: None,
             }
         }

@@ -6,7 +6,10 @@ import {
   useState,
 } from "react";
 import {
+  ActivityIndicator,
+  ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   View,
   type TextStyle,
@@ -357,30 +360,57 @@ export const ComposeBodyEditor = forwardRef<
 
   return (
     <View style={styles.container}>
-      <WebView
-        ref={(instance) => {
-          injectJavaScriptRef.current =
-            instance?.injectJavaScript?.bind(instance) ?? null;
-        }}
-        originWhitelist={["about:blank", "data:"]}
-        source={{ html: document }}
-        onMessage={onMessage}
-        onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
-        hideKeyboardAccessoryView
-        keyboardDisplayRequiresUserAction={false}
-        javaScriptEnabled
-        domStorageEnabled={false}
-        mixedContentMode="never"
-        setSupportMultipleWindows={false}
-        automaticallyAdjustContentInsets={false}
-        nestedScrollEnabled
+      <View
         style={styles.webView}
-      />
+        pointerEvents={editorReady ? "auto" : "none"}
+        accessibilityElementsHidden={!editorReady}
+        importantForAccessibility={editorReady ? "auto" : "no-hide-descendants"}
+      >
+        <WebView
+          ref={(instance) => {
+            injectJavaScriptRef.current =
+              instance?.injectJavaScript?.bind(instance) ?? null;
+          }}
+          originWhitelist={["about:blank", "data:"]}
+          source={{ html: document }}
+          onMessage={onMessage}
+          onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+          hideKeyboardAccessoryView
+          keyboardDisplayRequiresUserAction={false}
+          javaScriptEnabled
+          domStorageEnabled={false}
+          mixedContentMode="never"
+          setSupportMultipleWindows={false}
+          automaticallyAdjustContentInsets={false}
+          nestedScrollEnabled
+          style={styles.webView}
+        />
+      </View>
+      {!editorReady ? (
+        <View style={styles.preparing} testID="compose-body-preparing">
+          <ScrollView style={styles.webView}>
+            <Text
+              style={[styles.previewText, !value ? styles.preparingText : null]}
+            >
+              {value || placeholder}
+            </Text>
+          </ScrollView>
+          <View style={styles.preparingNotice}>
+            <ActivityIndicator size="small" color={skin.textTertiary} />
+            <Text style={styles.preparingText}>Preparing editor…</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 });
 
 function createStyles(theme: ThemeTokens, skin: MailSkin) {
+  const bodyText = {
+    paddingHorizontal: theme.spacing["4"],
+    paddingTop: theme.spacing["3"],
+    ...skin.body,
+  };
   const view = {
     container: {
       flex: 1,
@@ -392,14 +422,32 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       minHeight: 0,
       backgroundColor: theme.colors.card,
     },
+    preparing: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: theme.colors.card,
+    },
+    preparingNotice: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing["2"],
+      paddingHorizontal: theme.spacing["4"],
+      paddingVertical: theme.spacing["3"],
+    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
     fallbackInput: {
       flex: 1,
-      paddingHorizontal: theme.spacing["4"],
-      paddingTop: theme.spacing["3"],
+      ...bodyText,
+    },
+    previewText: bodyText,
+    preparingText: {
       ...skin.body,
+      color: skin.textTertiary,
     },
   } satisfies Record<string, TextStyle>;
 

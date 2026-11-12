@@ -809,7 +809,7 @@ async fn the_reset_snapshot_returns_raw_owned_records_for_re_encryption() {
         [default.as_str(), work.as_str()],
         "owned only, default first, then by name"
     );
-    assert_eq!(snapshot.calendars[1].blind_index_tokens, ["w1", "w2"]);
+    assert!(snapshot.calendars[1].blind_index_tokens.is_empty());
     assert_eq!(snapshot.calendars[1].encryption_state, "encrypted");
     let category_ids: Vec<&str> = snapshot
         .categories
@@ -821,7 +821,7 @@ async fn the_reset_snapshot_returns_raw_owned_records_for_re_encryption() {
         [errands.as_str(), focus.as_str()],
         "active only, by name"
     );
-    assert_eq!(snapshot.categories[1].blind_index_tokens, ["c1"]);
+    assert!(snapshot.categories[1].blind_index_tokens.is_empty());
     let event_ids: Vec<&str> = snapshot.events.iter().map(|e| e.id.0.as_str()).collect();
     assert_eq!(
         event_ids,
@@ -834,13 +834,10 @@ async fn the_reset_snapshot_returns_raw_owned_records_for_re_encryption() {
         Some(older_content.as_str())
     );
     assert_eq!(
-        (
-            event.title.as_str(),
-            event.blind_index_tokens.as_slice(),
-            event.encryption_key_version
-        ),
-        ("", ["tok".to_owned()].as_slice(), 2)
+        (event.title.as_str(), event.encryption_key_version),
+        ("", 2)
     );
+    assert!(event.blind_index_tokens.is_empty());
     assert_eq!(
         (
             event.start.0.as_str(),
@@ -868,30 +865,31 @@ async fn the_reset_snapshot_returns_raw_owned_records_for_re_encryption() {
 }
 
 #[tokio::test]
-async fn unreadable_blind_index_tokens_become_an_empty_list() {
+async fn bootstrap_keeps_token_lists_empty_even_when_legacy_writers_send_them() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let cases = [
-        (Some("not json"), vec![]),
-        (Some("{\"a\":1}"), vec![]),
-        (Some("[\"a\",1,null,\"b\"]"), vec!["a", "b"]),
-        (Some(""), vec![]),
-        (None, vec![]),
+        Some("not json"),
+        Some("{\"a\":1}"),
+        Some("[\"a\",1,null,\"b\"]"),
+        Some("[\"a\",\"b\"]"),
+        Some(""),
+        None,
     ];
-    let mut expected = Vec::new();
-    for (index, (tokens, parsed)) in cases.into_iter().enumerate() {
+    let mut ids = Vec::new();
+    for (index, tokens) in cases.into_iter().enumerate() {
         let id =
             insert_calendar(&app, &user, &format!("Cal {index}"), "owned", false, tokens).await;
-        expected.push((id, parsed));
+        ids.push(id);
     }
     let state = bootstrap(&mut user).await;
-    for (id, parsed) in expected {
+    for id in ids {
         let calendar = state
             .calendars
             .iter()
             .find(|c| c.id.0 == id)
             .expect("calendar in bootstrap");
-        assert_eq!(calendar.blind_index_tokens, parsed, "{id}");
+        assert!(calendar.blind_index_tokens.is_empty(), "{id}");
     }
 }
 

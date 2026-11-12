@@ -506,6 +506,49 @@ class HarnessTests(unittest.TestCase):
                     log.write_text(message)
                     self.assertEqual(journeys.failure_kind(log), expected)
 
+    def test_driver_timeouts_export_only_a_fixed_kind_known_call_and_exact_class(self):
+        secrets = "UDID-sentinel-1B2C https://url-sentinel.test/api body-sentinel cookie-token-sentinel"
+        startup = "xcuitest.installer.LocalXCTestInstaller$IOSDriverTimeoutException"
+        call = "maestro.MaestroException$DriverTimeout"
+        cases = {
+            "startup-class-and-message": (f"{startup}: iOS driver not ready in time, consider increasing timeout by configuring "
+                                          f"MAESTRO_DRIVER_STARTUP_TIMEOUT env variable ({secrets})", None, "driver-timeout", startup, "startup", None),
+            # Fields only refine an existing driver-timeout; the classification itself is not widened.
+            "startup-message-only": (f"Error: iOS driver not ready in time {secrets}", None, "maestro-failure", None, None, None),
+            "known-call": (f"{call}: Maestro driver timed out during tap call with: {{\"errorMessage\": \"{secrets}\"}}", None,
+                           "driver-timeout", call, "call", "tap"),
+            "known-call-in-junit": ("1/1 Flow Failed", f"<testsuite><testcase><failure>Maestro driver timed out during snapshot call with: {secrets}"
+                                    "</failure></testcase></testsuite>", "driver-timeout", None, "call", "snapshot"),
+            "unknown-call": (f"Maestro driver timed out during launchRocket{secrets.split()[0]} call with: {secrets}", None,
+                             "driver-timeout", None, "call", "other"),
+            "call-class-without-message": (f"{call} {secrets}", None, "maestro-failure", call, None, None),
+            "call-class-with-timeout-marker": (f"{call} TimeoutException {secrets}", None, "driver-timeout", call, "call", "other"),
+            # Near matches keep the generic exception behavior and never count as the exact known class or call.
+            "startup-class-suffix": (f"{startup}Extra TimeoutException {secrets}", None, "driver-timeout", None, "other", None),
+            "startup-class-prefix": (f"not.{startup} TimeoutException {secrets}", None, "driver-timeout", None, "other", None),
+            "call-class-suffix": (f"{call}Handler TimeoutException {secrets}", None, "driver-timeout", "maestro.MaestroException", "other", None),
+            "call-class-nested": (f"{call}.Inner TimeoutException {secrets}", None, "driver-timeout", "maestro.MaestroException", "other", None),
+            "callback-is-not-call": (f"Maestro driver timed out during tap callback with: {secrets}", None, "driver-timeout", None, "other", None),
+            "generic-timeout": (f"java.net.SocketTimeoutException: timeout {secrets}", None, "driver-timeout", "java.net.SocketTimeoutException", "other", None),
+            "not-a-timeout": (f"Assertion is false: Welcome back is visible {secrets}", None, "assertion", None, None, None),
+            "driver-connection": (f"maestro.DeviceUnreachableException: {secrets}", None, "driver-connection", "maestro.DeviceUnreachableException", None, None),
+        }
+        for case, (console, report, reason, exception, kind, called) in cases.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                log, junit = Path(temporary) / "journey.log", Path(temporary) / "journey.xml"
+                log.write_text(console)
+                if report:
+                    junit.write_text(report)
+                self.assertEqual(journeys.failure_kind(log, junit), reason)
+                details = journeys.failure_details(log, junit, Path(temporary) / "no-traces", reason, 1)
+                self.assertEqual((details["exceptionType"], details["driverTimeoutKind"], details["driverTimeoutCall"]), (exception, kind, called))
+                self.assertEqual(set(details), {"reason", "exceptionType", "command", "step", "assertionTarget", "exitCode", "commandDurationMs",
+                                                "msSincePreviousTap", "commandTimeoutMs", "driverTimeoutKind", "driverTimeoutCall"})
+                exported = json.dumps(details)
+                for secret in secrets.split():
+                    self.assertNotIn(secret, exported)
+                self.assertNotIn("launchRocket", exported)
+
     def test_journey_output_and_driver_failures_stay_private_but_classified(self):
         timeout = "java.net.SocketTimeoutException"
         cases = {
@@ -695,7 +738,7 @@ class HarnessTests(unittest.TestCase):
                         self.assertEqual(json.loads(failure.read_text()), {
                             "reason": reason, "exceptionType": None, "command": None, "step": None, "assertionTarget": None,
                             "exitCode": None, "commandDurationMs": None, "msSincePreviousTap": None, "commandTimeoutMs": None,
-                            "hierarchySource": None, "connectivity": exported})
+                            "driverTimeoutKind": None, "driverTimeoutCall": None, "hierarchySource": None, "connectivity": exported})
                         screenshot.assert_not_called()
                         hierarchy.assert_not_called()
                     evidence = printed.getvalue() + "".join(path.read_text(errors="replace") for path in (root / "artifacts").rglob("*") if path.is_file())

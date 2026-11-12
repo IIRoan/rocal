@@ -1,3 +1,4 @@
+import type { Schema } from "@workspace/api-contracts";
 import type {
   CalendarKind,
   CalendarSubscriptionSummary,
@@ -68,13 +69,11 @@ export type {
 
 export interface NameEncryptionShadowRequest {
   encryptedName?: string;
-  blindIndexTokens?: string[];
   encryptionKeyVersion?: number;
 }
 
 export interface EventContentEncryptionShadowRequest {
   encryptedContent?: string;
-  blindIndexTokens?: string[];
   encryptionKeyVersion?: number;
   /** Colour and category travel inside `encryptedContent`, so the server clears its plaintext copies. */
   attributesEncrypted?: boolean;
@@ -467,9 +466,11 @@ export interface NotificationTestRequest {
   eventId: string;
 }
 
-export type CalendarSubscription = CalendarSubscriptionSummary;
+export type CalendarSubscription = CalendarSubscriptionSummary &
+  Partial<Pick<Schema<"CalendarSubscription">, "nameRevision">>;
 export type CreateSubscriptionRequest = CreateCalendarSubscriptionRequest;
-export type UpdateSubscriptionRequest = UpdateCalendarSubscriptionRequest;
+export type UpdateSubscriptionRequest = UpdateCalendarSubscriptionRequest &
+  Pick<Schema<"UpdateSubscriptionRequest">, "expectedNameRevision">;
 export type DeleteSubscriptionResponse = DeleteCalendarSubscriptionResponse;
 export type SyncSubscriptionResponse = CalendarSubscriptionSyncResponse;
 export type ImportICSRequest = ImportIcsRequest;

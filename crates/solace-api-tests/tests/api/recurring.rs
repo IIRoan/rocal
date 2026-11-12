@@ -797,11 +797,11 @@ async fn content_edits_need_ciphertext_and_store_no_plaintext() {
             description: None,
             location: None,
             encrypted_content: Some(ciphertext.clone()),
-            blind_index_tokens: Some("[]".into()),
+            blind_index_tokens: None,
             encryption_state: "encrypted".into(),
             encryption_key_version: 4,
         },
-        "new ciphertext without tokens stores an empty token list"
+        "new ciphertext stores no search tokens"
     );
 
     let occurrence_ciphertext = fake_envelope();
@@ -826,7 +826,7 @@ async fn content_edits_need_ciphertext_and_store_no_plaintext() {
             description: None,
             location: None,
             encrypted_content: Some(occurrence_ciphertext),
-            blind_index_tokens: Some(r#"["occurrence"]"#.into()),
+            blind_index_tokens: None,
             encryption_state: "encrypted".into(),
             encryption_key_version: 1,
         }

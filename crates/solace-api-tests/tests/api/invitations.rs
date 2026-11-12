@@ -1722,7 +1722,7 @@ async fn imports_with_ciphertext_store_no_plaintext() {
             description: None,
             location: None,
             encrypted_content: Some(ciphertext),
-            blind_index_tokens: Some(r#"["invite-token"]"#.into()),
+            blind_index_tokens: None,
             encryption_state: "encrypted".into(),
             encryption_key_version: 2,
         },
