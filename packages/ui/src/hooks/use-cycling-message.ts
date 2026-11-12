@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import {
   COMBINED_MESSAGES,
   getRandomMessage,
@@ -32,11 +32,12 @@ export function useCyclingMessage({
 
   const usedMessagesRef = useRef(new Set<string>());
 
-  // Written synchronously during render so the advance() closure always reads current values without capturing stale state.
   const messageArrayRef = useRef(messageArray);
   const currentMessageRef = useRef(currentMessage);
-  messageArrayRef.current = messageArray;
-  currentMessageRef.current = currentMessage;
+  useLayoutEffect(() => {
+    messageArrayRef.current = messageArray;
+    currentMessageRef.current = currentMessage;
+  }, [messageArray, currentMessage]);
 
   // Single effect owns the full lifecycle of the cycling timer.
   // Runs (and restarts cleanly) only when the cycling parameters actually change.

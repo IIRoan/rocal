@@ -73,6 +73,28 @@ it("bounds display and quoted text without splitting code points or rendering pa
   ).toBeNull();
 });
 
+it("carries a decoder's truncation result into display, quotes and the draft refusal", () => {
+  const shortened = { text: "decoded up to the limit", html: "<p>whole</p>", truncated: true };
+  expect(limitMailDisplayContent(shortened)).toEqual({
+    text: "decoded up to the limit\n\nThis message is too large to show in full here.",
+    html: "<p>whole</p>",
+  });
+  expect(limitMailQuoteContent(shortened).text).toBe(
+    "decoded up to the limit\n\n[Earlier message shortened.]",
+  );
+  expect(getMailDraftSizeError(shortened)).toContain(
+    "saved draft has not been changed",
+  );
+  expect(getMailDraftSizeError({ ...shortened, truncated: false })).toBeNull();
+  const shown = limitMailDisplayContent({
+    text: "a".repeat(MAX_MAIL_DISPLAY_CHARACTERS),
+    truncated: true,
+  }).text;
+  expect(limitMailQuoteContent({ text: shown }).text).toBe(
+    "a".repeat(MAX_MAIL_DISPLAY_CHARACTERS) + "\n\n[Earlier message shortened.]",
+  );
+});
+
 function nested(depth: number): string {
   let body = "Content-Type: text/plain\r\n\r\nReadable body";
   for (let i = 0; i < depth; i += 1)

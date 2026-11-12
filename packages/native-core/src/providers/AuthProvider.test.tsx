@@ -171,14 +171,22 @@ function flushPromises() {
   });
 }
 
+const mockLifecycleRender = jest.fn();
+const pendingLifecycleUpdate = new Promise<never>(() => undefined);
+function SuspendLifecycleUpdate(): React.ReactNode {
+  mockLifecycleRender();
+  throw pendingLifecycleUpdate;
+}
+
 describe("AuthProvider", () => {
   let capturedAuth: AuthContextValue | null = null;
   let container: HTMLDivElement;
   let root: Root;
 
   function AuthProbe() {
-    capturedAuth = useAuth();
-    return <div data-testid="auth-method">{capturedAuth.lastAuthMethod}</div>;
+    const auth = useAuth();
+    React.useLayoutEffect(() => { capturedAuth = auth; }, [auth]);
+    return <div data-testid="auth-method">{auth.lastAuthMethod}</div>;
   }
 
   async function renderProvider(expectLoaded = true) {
@@ -205,6 +213,25 @@ describe("AuthProvider", () => {
 
     return capturedAuth;
   }
+
+  it("keeps committed sign-out cleanup while a new lifecycle render is suspended", async () => {
+    const nextOnSignedOut = jest.fn(async () => undefined);
+    mockLifecycleRender.mockClear();
+    const tree = (suspended: boolean) => (
+      <React.Suspense fallback={<div>Pending</div>}>
+        <AuthProvider lifecycle={{ onSignedOut: suspended ? nextOnSignedOut : mockOnSignedOut }}>
+          {suspended ? <SuspendLifecycleUpdate /> : <AuthProbe />}
+        </AuthProvider>
+      </React.Suspense>
+    );
+    await act(async () => root.render(tree(false)));
+    const committedCleanupCalls = mockOnSignedOut.mock.calls.length;
+    await act(async () => { React.startTransition(() => root.render(tree(true))); });
+    expect(mockLifecycleRender).toHaveBeenCalled();
+    await act(async () => { await getAuth().signOut(); });
+    expect(mockOnSignedOut).toHaveBeenCalledTimes(committedCleanupCalls + 1);
+    expect(nextOnSignedOut).not.toHaveBeenCalled();
+  });
 
   beforeEach(() => {
     setFallbackSessionToken(null);
