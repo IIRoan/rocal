@@ -195,6 +195,156 @@ class HarnessTests(unittest.TestCase):
             self.assertIsNone(details["assertionTarget"])
             self.assertNotIn("secret-sentinel", json.dumps(details))
 
+    def test_failed_journey_uses_its_original_hierarchy_and_exports_only_bounded_timings(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(Path(temporary) / "solace-e2e")}, clear=True):
+            root = directory()
+            fixture = {"email": "email-secret-sentinel", "password": "password-secret-sentinel"}
+            private = root / "private"
+            (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+            (private / "fixture.json").write_text(json.dumps(fixture))
+            (private / "maestro-path").write_text("synthetic-maestro")
+            original = {"attributes": {"text": "Original failed screen email-secret-sentinel", "private": "never-export"},
+                        "children": [{"attributes": {"resource-id": "sign-in-password", "text": "password-secret-sentinel"}}]}
+            original_available = True
+            def execute(command, **options):
+                if "test" in command:
+                    traces = private / "maestro/calendar-synthetic/flow"
+                    hierarchy = traces / "screen-hierarchy"
+                    hierarchy.mkdir(parents=True, exist_ok=True)
+                    if original_available:
+                        (hierarchy / "step-007-private-selector-sentinel.json").write_text(json.dumps(original))
+                    entries = [
+                        {"command": {"tapOnElement": {}}, "metadata": {"status": "COMPLETED", "timestamp": 99000, "duration": 100}},
+                        {"command": {"assertConditionCommand": {"text": "private-selector-sentinel"}},
+                         "metadata": {"status": "FAILED", "timestamp": 100000, "duration": 45000, "sequenceNumber": 6,
+                                      "evaluatedCommand": {"assertConditionCommand": {"timeout": "30000", "text": "private-selector-sentinel"}}}},
+                    ]
+                    (traces / "commands.json").write_text(json.dumps(entries))
+                    options["stdout"].write(b"Assertion is false")
+                    return journeys.subprocess.CompletedProcess(command, 1)
+                options["stdout"].write(json.dumps({"attributes": {"text": "Later restarted driver screen"}}).encode())
+                return journeys.subprocess.CompletedProcess(command, 0)
+            with patch.object(journeys.subprocess, "run", side_effect=execute) as commands, \
+                    patch.object(journeys, "capture_failure_screenshot"), redirect_stdout(io.StringIO()):
+                self.assertFalse(journeys.run_journey("ios", "calendar", Path("synthetic.yaml"), []))
+            target = root / "artifacts/hierarchy/calendar-synthetic.json"
+            self.assertEqual(json.loads(target.read_text()), journeys.sanitized_hierarchy(original, fixture))
+            self.assertEqual(commands.call_count, 1)
+            details = json.loads((root / "artifacts/failures/calendar-synthetic.json").read_text())
+            self.assertEqual(details["commandDurationMs"], 45000)
+            self.assertEqual(details["msSincePreviousTap"], 900)
+            self.assertEqual(details["commandTimeoutMs"], 30000)
+            self.assertEqual(details["step"], 7)
+            self.assertEqual(details["hierarchySource"], "failed-step")
+            for path in (root / "artifacts").rglob("*"):
+                self.assertNotIn("private-selector-sentinel", path.name)
+                if path.is_file():
+                    self.assertNotIn("secret-sentinel", path.read_text())
+                    self.assertNotIn("never-export", path.read_text())
+            original_available = False
+            (private / "maestro/calendar-synthetic/flow/screen-hierarchy/step-007-private-selector-sentinel.json").unlink()
+            with patch.object(journeys.subprocess, "run", side_effect=execute) as commands, \
+                    patch.object(journeys, "capture_failure_screenshot"), redirect_stdout(io.StringIO()):
+                self.assertFalse(journeys.run_journey("ios", "calendar", Path("synthetic.yaml"), []))
+            self.assertEqual(commands.call_count, 2)
+            details = json.loads((root / "artifacts/failures/calendar-synthetic.json").read_text())
+            self.assertEqual(details["hierarchySource"], "post-failure")
+            self.assertEqual(json.loads(target.read_text())["attributes"]["text"], "Later restarted driver screen")
+
+    def test_recovered_assertion_does_not_replace_a_later_unknown_failure(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(Path(temporary) / "solace-e2e")}, clear=True):
+            root = directory()
+            traces = root / "private/traces"
+            hierarchy = traces / "screen-hierarchy"
+            hierarchy.mkdir(parents=True)
+            entries = [
+                {"command": {"runFlowCommand": {}}, "metadata": {"status": "FAILED", "sequenceNumber": 0}},
+                {"command": {"assertConditionCommand": {}}, "metadata": {"status": "FAILED", "sequenceNumber": 2}},
+                {"command": {"assertConditionCommand": {}}, "metadata": {"status": "COMPLETED", "sequenceNumber": 3}},
+                {"command": {"backCommand": {}}, "metadata": {"status": "FAILED", "sequenceNumber": 8}},
+            ]
+            (traces / "commands.json").write_text(json.dumps(entries))
+            (hierarchy / "step-003-stale.json").write_text(json.dumps({"attributes": {"text": "Recovered failure"}}))
+            expected = {"children": [{"attributes": {"text": "Current failure"}, "children": []}]}
+            (hierarchy / "step-009.json").write_text(json.dumps(expected))
+            log = root / "private/journey.log"
+            log.write_text("Failure")
+            details = journeys.failure_details(log, None, traces, "maestro-failure")
+            self.assertEqual(details["command"], "other")
+            self.assertEqual(details["step"], 9)
+            self.assertTrue(journeys.export_failed_step_hierarchy(traces, {}, "calendar-synthetic", details))
+            exported = json.loads((root / "artifacts/hierarchy/calendar-synthetic.json").read_text())
+            self.assertEqual(exported, journeys.sanitized_hierarchy(expected, {}))
+
+    def test_failure_timings_reject_unbounded_or_non_numeric_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            log = root / "log.txt"
+            log.write_text("Assertion is false")
+            traces = root / "traces"
+            traces.mkdir()
+            for invalid in (None, True, -1, 1_200_001, "private-timing-sentinel", {}):
+                with self.subTest(invalid=invalid):
+                    entries = [
+                        {"command": {"tapOnElement": {}}, "metadata": {"status": "COMPLETED", "timestamp": 99000, "duration": invalid}},
+                        {"command": {"assertConditionCommand": {"timeout": invalid}}, "metadata": {"status": "FAILED", "timestamp": 100000, "duration": invalid}},
+                    ]
+                    (traces / "commands.json").write_text(json.dumps(entries))
+                    details = journeys.failure_details(log, None, traces, "assertion")
+                    self.assertIsNone(details["commandDurationMs"])
+                    self.assertIsNone(details["msSincePreviousTap"])
+                    self.assertIsNone(details["commandTimeoutMs"])
+                    self.assertNotIn("private-timing-sentinel", json.dumps(details))
+            for timestamp in (None, True, -1, 98000, 1_500_000, "private-timing-sentinel"):
+                entries[0]["metadata"]["duration"] = 100
+                entries[1]["metadata"].update(timestamp=timestamp, duration=0)
+                (traces / "commands.json").write_text(json.dumps(entries))
+                details = journeys.failure_details(log, None, traces, "assertion")
+                self.assertEqual(details["commandDurationMs"], 0)
+                self.assertIsNone(details["msSincePreviousTap"])
+
+    def test_original_hierarchy_rejects_other_steps_invalid_json_and_path_escapes(self):
+        for kind in ("other-step", "invalid", "array", "oversized", "file-link", "directory-link", "trace-link", "root-link"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary, \
+                    patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(Path(temporary) / "solace-e2e")}, clear=True):
+                root = directory()
+                traces = root / "private/traces"
+                flow = traces / "flow"
+                hierarchy = flow / "screen-hierarchy"
+                hierarchy.mkdir(parents=True)
+                metadata = {"status": "FAILED", "sequenceNumber": 6}
+                entries = [{"command": {"assertConditionCommand": {}}, "metadata": metadata}]
+                (flow / "commands.json").write_text(json.dumps(entries))
+                outside = root / "private/outside"
+                outside.mkdir()
+                external = outside / "step-007-private-filename-sentinel.json"
+                external.write_text(json.dumps({"attributes": {"text": "private-outside-sentinel"}}))
+                target = hierarchy / external.name
+                if kind == "other-step":
+                    (hierarchy / "step-008-private-filename-sentinel.json").write_text(external.read_text())
+                elif kind in ("invalid", "array"):
+                    target.write_text("private-invalid-sentinel" if kind == "invalid" else "[]")
+                elif kind == "oversized":
+                    with target.open("wb") as output:
+                        output.truncate(8 * 1024 * 1024 + 1)
+                elif kind == "file-link":
+                    target.symlink_to(external)
+                elif kind == "directory-link":
+                    hierarchy.rmdir()
+                    hierarchy.symlink_to(outside, target_is_directory=True)
+                elif kind == "trace-link":
+                    (flow / "commands.json").unlink()
+                    (outside / "commands.json").write_text(json.dumps(entries))
+                    (flow / "commands.json").symlink_to(outside / "commands.json")
+                else:
+                    linked = root / "private/linked"
+                    linked.symlink_to(traces, target_is_directory=True)
+                    traces = linked
+                self.assertFalse(journeys.export_failed_step_hierarchy(traces, {}, "calendar-synthetic", {"step": 7, "command": "assertCondition"}))
+                self.assertFalse((root / "artifacts/hierarchy/calendar-synthetic.json").exists())
+
     def test_hierarchy_failures_report_only_fixed_categories(self):
         cases = (("exit-status=7", None, 7, b""), ("invalid-json", None, 0, b"private-invalid-json"),
                  ("invalid-shape", None, 0, b"[]"), ("timeout", journeys.subprocess.TimeoutExpired("private-command", 60), 0, b""),
@@ -496,7 +646,7 @@ class HarnessTests(unittest.TestCase):
             unknown = {"command": {"secret-output-sentinel": {"text": "private-cookie-sentinel"}}, "metadata": {"status": "FAILED"}}
             (traces / "commands.json").write_text(json.dumps([unknown]))
             details = journeys.failure_details(log, report, traces, "maestro-failure")
-            self.assertIsNone(details["command"])
+            self.assertEqual(details["command"], "other")
             self.assertIsNone(details["exceptionType"])
             outside = root / "outside.json"
             outside.write_text(json.dumps([{"command": {"inputText": {}}, "metadata": {"status": "FAILED"}}]))
