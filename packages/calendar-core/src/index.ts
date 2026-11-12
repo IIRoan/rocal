@@ -4,6 +4,7 @@ export * from "./content-encryption";
 export * from "./calendar-query-keys";
 export * from "./mail-types";
 export * from "./mail-pgp-layers";
+export * from "./mail-keyword-reconciliation";
 export * from "./mail-pgp-encryption";
 export * from "./mail-sender-verification";
 export * from "./mail-attachment-preview";

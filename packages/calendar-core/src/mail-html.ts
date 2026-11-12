@@ -1,6 +1,6 @@
+import { decodeHtmlEntities } from "./html-text";
 import {
   decodeCssEscapes,
-  decodeHtmlEntities,
   sanitizeUntrustedEmailHtml,
 } from "./sanitize-email-html";
 

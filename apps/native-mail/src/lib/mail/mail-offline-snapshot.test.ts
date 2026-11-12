@@ -1,5 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
 import * as calendarCore from "@workspace/calendar-core";
+import {
+  getMailDraftSizeError,
+  limitMailDisplayContent,
+  MAX_MAIL_DISPLAY_CHARACTERS,
+} from "@workspace/calendar-core/mail-mime-limits";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import type { MailRuntime } from "./mail-runtime";
 import type { MailboxMessagesInfiniteData } from "./mail-message-cache";
@@ -501,6 +506,60 @@ describe("decrypted content in the snapshot", () => {
         hasVerifiedSignature: true,
       },
     });
+  });
+
+  it("keeps a clipped body marked through save and restore, so it still shows its notice and cannot seed a draft", () => {
+    const source = clientWithInbox(["clipped", "long"]);
+    source.setQueryData(
+      QUERY_KEYS.mailDecrypted("clipped"),
+      decrypted("Text kept, HTML dropped", { truncated: true }),
+    );
+    source.setQueryData(
+      QUERY_KEYS.mailDecrypted("long"),
+      decrypted("z".repeat(MAX_MAIL_DISPLAY_CHARACTERS), { truncated: true }),
+    );
+    const stored: unknown = JSON.parse(
+      JSON.stringify(
+        captureMailOfflineSnapshot(source, { userId: "u1", emailState: "s1" }),
+      ),
+    );
+    if (!isMailOfflineSnapshot(stored)) throw new Error("expected a snapshot");
+
+    const queryClient = new QueryClient();
+    hydrateMailOfflineSnapshot(queryClient, stored);
+
+    const restored = queryClient.getQueryData<MailDecryptResult>(
+      QUERY_KEYS.mailDecrypted("clipped"),
+    );
+    const content = {
+      text: restored?.plaintext,
+      html: restored?.html,
+      truncated: restored?.truncated,
+    };
+    expect(restored?.truncated).toBe(true);
+    expect(
+      queryClient.getQueryState(QUERY_KEYS.mailDecrypted("clipped"))
+        ?.isInvalidated,
+    ).toBe(false);
+    expect(limitMailDisplayContent(content).text).toBe(
+      "Text kept, HTML dropped\n\nThis message is too large to show in full here.",
+    );
+    expect(getMailDraftSizeError(content)).toContain(
+      "saved draft has not been changed",
+    );
+    // A body clipped at the read limit is too large to keep whole: only a stale preview is saved, so it decrypts again and regains its mark.
+    expect(
+      queryClient.getQueryState(QUERY_KEYS.mailDecrypted("long"))
+        ?.isInvalidated,
+    ).toBe(true);
+    const resaved = captureMailOfflineSnapshot(queryClient, {
+      userId: "u1",
+      emailState: "s1",
+    });
+    expect(
+      resaved?.decrypted.find((entry) => entry.messageId === "clipped")?.result
+        .truncated,
+    ).toBe(true);
   });
 
   it("hydrates full copies as fresh and partial copies as stale so they decrypt again when shown", () => {

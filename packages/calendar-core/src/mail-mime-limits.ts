@@ -9,10 +9,20 @@ export const MAX_MAIL_DISPLAY_HTML_CHARACTERS = 8 * 1024 * 1024;
 type MailContent = {
   text?: string | null;
   html?: string | null;
+  /** Set when decoding already stopped at a limit, so the content is shorter than the message. */
+  truncated?: boolean;
 };
 
+/** A prefix of at most `maximum` characters that never ends inside a surrogate pair. */
+export function clipMailText(value: string, maximum: number): string {
+  if (value.length <= maximum) return value;
+  const prefix = value.slice(0, maximum);
+  return /[\uD800-\uDBFF]$/.test(prefix) ? prefix.slice(0, -1) : prefix;
+}
+
 export function getMailDraftSizeError(input: MailContent): string | null {
-  return (input.text?.length ?? 0) > MAX_MAIL_DISPLAY_CHARACTERS ||
+  return input.truncated ||
+    (input.text?.length ?? 0) > MAX_MAIL_DISPLAY_CHARACTERS ||
     (input.html?.length ?? 0) > MAX_MAIL_MIME_BYTES
     ? "This draft is too large to edit here. The saved draft has not been changed."
     : null;
@@ -42,14 +52,12 @@ function limitMailContent(
   const text = input.text ?? null;
   const html = input.html ?? null;
   if (
+    !input.truncated &&
     (text?.length ?? 0) <= MAX_MAIL_DISPLAY_CHARACTERS &&
     (html?.length ?? 0) <= MAX_MAIL_DISPLAY_HTML_CHARACTERS
   )
     return { text, html };
-  const prefix = text?.slice(0, MAX_MAIL_DISPLAY_CHARACTERS) ?? "";
-  const safePrefix = /[\uD800-\uDBFF]$/.test(prefix)
-    ? prefix.slice(0, -1)
-    : prefix;
+  const safePrefix = clipMailText(text ?? "", MAX_MAIL_DISPLAY_CHARACTERS);
   return {
     text: `${safePrefix}${safePrefix ? "\n\n" : ""}${notice}`,
     html: html && html.length <= MAX_MAIL_DISPLAY_HTML_CHARACTERS ? html : null,
@@ -121,6 +129,8 @@ export type MailMimeLeaf = {
   end: number;
   depth: number;
   isRelated: boolean;
+  /** Part number of the innermost enclosing multipart/alternative, 0 when there is none. */
+  alternative: number;
 };
 
 /** Scans line offsets so newline floods and nested parts cannot multiply the message's memory footprint. */
@@ -143,9 +153,11 @@ export function readMailMimeLeaves(raw: string): MailMimeLeaf[] {
     end: number,
     depth: number,
     isRelated: boolean,
+    alternative: number,
   ): void => {
     if (depth > MAX_MAIL_MIME_DEPTH || ++parts > MAX_MAIL_MIME_PARTS)
       throw new Error("Mail MIME exceeds its structural limit.");
+    const part = parts;
     let cursor = start;
     let headerEnd = end;
     let bodyStart = end;
@@ -179,7 +191,7 @@ export function readMailMimeLeaves(raw: string): MailMimeLeaf[] {
       throw new Error("Mail MIME has ambiguous content types.");
     const type = types[0]?.trim() ?? "text/plain";
     if (!/^multipart\//i.test(type) || bodyStart === end) {
-      leaves.push({ headers, bodyStart, end, depth, isRelated });
+      leaves.push({ headers, bodyStart, end, depth, isRelated, alternative });
       return;
     }
     const boundaries = [
@@ -191,6 +203,11 @@ export function readMailMimeLeaves(raw: string): MailMimeLeaf[] {
     if (!boundary || boundary.length > 70 || /[\x00-\x1f\x7f]/.test(boundary))
       throw new Error("Mail MIME has an invalid boundary.");
     const opening = `--${boundary}`;
+    const childIsRelated =
+      isRelated || /^multipart\/related(?:\s*;|\s*$)/i.test(type);
+    const childAlternative = /^multipart\/alternative(?:\s*;|\s*$)/i.test(type)
+      ? part
+      : alternative;
     let childStart: number | null = null;
     cursor = bodyStart;
     while (cursor < end) {
@@ -211,12 +228,7 @@ export function readMailMimeLeaves(raw: string): MailMimeLeaf[] {
             childEnd -= 1;
           if (childEnd > childStart && raw.charCodeAt(childEnd - 1) === 13)
             childEnd -= 1;
-          visit(
-            childStart,
-            childEnd,
-            depth + 1,
-            isRelated || /^multipart\/related(?:\s*;|\s*$)/i.test(type),
-          );
+          visit(childStart, childEnd, depth + 1, childIsRelated, childAlternative);
         }
         childStart = closing ? null : lineEnd < end ? lineEnd + 1 : end;
         if (closing) break;
@@ -224,14 +236,9 @@ export function readMailMimeLeaves(raw: string): MailMimeLeaf[] {
       cursor = lineEnd < end ? lineEnd + 1 : end;
     }
     if (childStart !== null)
-      visit(
-        childStart,
-        end,
-        depth + 1,
-        isRelated || /^multipart\/related(?:\s*;|\s*$)/i.test(type),
-      );
+      visit(childStart, end, depth + 1, childIsRelated, childAlternative);
   };
-  visit(0, raw.length, 0, false);
+  visit(0, raw.length, 0, false, 0);
   return leaves;
 }
 

@@ -23,7 +23,10 @@ import {
 import { toast } from "@workspace/ui/lib/toast";
 import { useSession } from "@/lib/auth-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { webQueryKeys } from "@/lib/query-keys";
 import { EVENTS_QUERY_KEY } from "./use-calendar-events-loader";
+
+export { useCategoryDeletePending } from "@workspace/calendar-client/use-category-delete-pending";
 
 type CategoriesSnapshot = { previous: EventCategory[] | undefined };
 
@@ -135,6 +138,7 @@ export function useUpdateCategory() {
 export function useDeleteCategory() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: webQueryKeys.categoryDelete(),
     mutationFn: (id: string) => calendarApiService.deleteCategory(id),
     onMutate: async (id) => {
       const snapshot = await snapshotCategories(queryClient);

@@ -37,7 +37,11 @@ appId: ${APP_ID}
       VERIFY_ID: category-name
 - assertVisible: Maestro category
 - hideKeyboard
-- tapOn: Create category
+- waitForAnimationToEnd
+- tapOn:
+    text: Create category
+    enabled: true
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     notVisible: Create category
     timeout: 30000
@@ -106,7 +110,11 @@ appId: ${APP_ID}
       VERIFY_ID: category-name
 - assertVisible: Maestro renamed category
 - hideKeyboard
-- tapOn: Save changes
+- waitForAnimationToEnd
+- tapOn:
+    text: Save changes
+    enabled: true
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     notVisible: Save changes
     timeout: 30000
@@ -121,6 +129,12 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     notVisible: "Maestro renamed category.*"
     timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: category-create
+      enabled: true
+    timeout: 30000
+- assertNotVisible: "Maestro renamed category.*"
 - runFlow: ../common/open-app.yaml
 - runFlow:
     file: ../common/open-event.yaml

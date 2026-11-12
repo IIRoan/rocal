@@ -14,6 +14,7 @@ import type { EventCategory } from "@workspace/calendar-core";
 
 jest.mock("../../hooks/use-categories", () => ({
   useCategories: jest.fn(),
+  useCategoryDeletePending: jest.fn(() => false),
   useCategoryUsageCounts: jest.fn(),
   useCreateCategory: jest.fn(),
   useUpdateCategory: jest.fn(),

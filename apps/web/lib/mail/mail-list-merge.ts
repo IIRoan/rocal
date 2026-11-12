@@ -1,3 +1,4 @@
+import { guardMailKeywords, type MailKeywordGuard } from "@workspace/calendar-core";
 import type { JmapEmailMessage } from "./types";
 import { mergeMailMessage } from "./mail-message-body";
 
@@ -45,4 +46,47 @@ export function mergeRefreshedMailboxMessages(
   }
 
   return sortMessagesByReceivedAt(merged);
+}
+
+/** Applies a first page requested earlier to the list as it is now, so rows removed or added while it was in flight keep their local fate. */
+export function mergeRefreshedIntoCurrentMessages(input: {
+  started: JmapEmailMessage[];
+  current: JmapEmailMessage[];
+  refreshed: JmapEmailMessage[];
+  previousTotal: number;
+  newTotal: number;
+  keywordGuard?: MailKeywordGuard;
+}): JmapEmailMessage[] {
+  const { keywordGuard } = input;
+  const startedIds = new Set(input.started.map((message) => message.id));
+  const currentById = new Map(
+    input.current.map((message) => [message.id, message]),
+  );
+  // A row listed when the request began but gone now was moved or deleted here since; the earlier page must not bring it back.
+  const refreshed = input.refreshed
+    .filter(
+      (message) => currentById.has(message.id) || !startedIds.has(message.id),
+    )
+    .map((message) =>
+      keywordGuard
+        ? guardMailKeywords(message, currentById.get(message.id), keywordGuard)
+        : message,
+    );
+  const refreshedIds = new Set(refreshed.map((message) => message.id));
+  const known = input.current.filter(
+    (message) => startedIds.has(message.id) || refreshedIds.has(message.id),
+  );
+  // A row that arrived while the request was in flight is newer than the page, so the page cannot drop it.
+  const arrived = input.current.filter(
+    (message) => !startedIds.has(message.id) && !refreshedIds.has(message.id),
+  );
+  return sortMessagesByReceivedAt([
+    ...mergeRefreshedMailboxMessages(
+      known,
+      refreshed,
+      input.previousTotal,
+      input.newTotal,
+    ),
+    ...arrived,
+  ]);
 }

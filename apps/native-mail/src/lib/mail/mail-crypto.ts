@@ -6,7 +6,17 @@ import {
 } from "@workspace/native-core/lib/session-data-lifecycle";
 /** Native mail vault lifecycle: fetch the encrypted backup, unseal its passphrase with the E2EE key, decrypt PGP mail in-process. */
 import * as openpgp from "openpgp";
-import { getMailReadLimitNotice } from "@workspace/calendar-core/mail-mime-limits";
+import {
+  clipMailText,
+  getMailReadLimitNotice,
+  MAX_MAIL_DISPLAY_CHARACTERS,
+} from "@workspace/calendar-core/mail-mime-limits";
+import {
+  extractNestedPgpMimeCiphertext,
+  parseMailMimeContent,
+  type MailTextLimits,
+  type ParsedMailContent,
+} from "@workspace/calendar-core/mail-mime-parser";
 import { createLogger } from "@workspace/logger";
 import { mailFetch, upsertAccountVaultBackup } from "./mail-api";
 import { API_BASE_URL } from "@workspace/native-core/lib/constants";
@@ -21,7 +31,6 @@ import {
 } from "./mail-password-cache";
 import { unwrapVaultSecret } from "./vault-secret";
 import { extractPgpMimeCiphertextBlobId } from "./message-security";
-import { parseMimeBody, extractNestedPgpMimeCiphertext } from "./mail-mime-parser";
 import type {
   JmapAttachment,
   JmapBodyStructure,
@@ -50,6 +59,8 @@ const KEY_MATERIAL_KDF: Partial<MailVaultKdfParams> = {
 export type MailDecryptResult = {
   plaintext: string;
   rawMimeFallback?: boolean;
+  /** The text or HTML is shorter than the message, so it must not be saved back as a draft. */
+  truncated?: boolean;
   signatureVerificationLayers?: MailSignatureVerificationState[];
   senderKeyTrustState?: MailSenderKeyTrustState;
   /** HTML body, present after PGP/MIME decryption + MIME parse. */
@@ -319,12 +330,36 @@ async function doLoadVault(
   }
 }
 
+/** The bounded body of a decrypt result; without a text part the start of the source stands in for it. */
+function decryptedContentFields(
+  source: string,
+  parsed: ParsedMailContent | null,
+): Pick<MailDecryptResult, "plaintext" | "rawMimeFallback" | "truncated" | "html" | "attachments"> {
+  const text = parsed ? parsed.text : null;
+  const truncated =
+    Boolean(parsed?.truncated) ||
+    (text === null && source.length > MAX_MAIL_DISPLAY_CHARACTERS);
+  return {
+    plaintext: text ?? clipMailText(source, MAX_MAIL_DISPLAY_CHARACTERS),
+    ...(text === null ? { rawMimeFallback: true } : {}),
+    ...(truncated ? { truncated: true } : {}),
+    html: parsed ? parsed.html : null,
+    attachments: (parsed ? parsed.attachments : []).map((attachment) => ({
+      name: attachment.filename ?? "attachment",
+      type: attachment.mimeType,
+      size: attachment.content.byteLength,
+      content: attachment.content,
+    })),
+  };
+}
+
 /** Decrypts an armored PGP mail body with the vault key; throws when no passphrase can unlock the vault. */
 export async function decryptMailMessage(
   runtime: MailRuntime,
   messageId: string,
   armoredMessage: string,
   senderPublicKeyArmored?: string,
+  limits?: MailTextLimits,
 ): Promise<MailDecryptResult> {
   log.debug("[mail-crypto] decryptMailMessage: start id=%s armoredLength=%d", messageId, armoredMessage.length);
   const result = await decryptArmoredMessage(runtime, messageId, armoredMessage, senderPublicKeyArmored);
@@ -335,23 +370,23 @@ export async function decryptMailMessage(
       result.plaintext.length,
       result.signatureVerificationState,
     );
-    return result;
+    return {
+      ...result,
+      plaintext: clipMailText(result.plaintext, MAX_MAIL_DISPLAY_CHARACTERS),
+      ...(result.plaintext.length > MAX_MAIL_DISPLAY_CHARACTERS
+        ? { truncated: true }
+        : {}),
+    };
   }
 
-  const parsed = parseMimeBody(result.plaintext);
+  const parsed = parseMailMimeContent(result.plaintext, limits);
   log.debug(
     "[mail-crypto] decryptMailMessage: parsed inline MIME text=%s html=%s id=%s",
     parsed.text ? "yes" : "no",
     parsed.html ? "yes" : "no",
     messageId,
   );
-  return {
-    ...result,
-    plaintext: parsed.text?.trim() ?? result.plaintext,
-    ...(parsed.text === null ? { rawMimeFallback: true } : {}),
-    html: parsed.html?.trim() ?? null,
-    attachments: parsed.attachments,
-  };
+  return { ...result, ...decryptedContentFields(result.plaintext, parsed) };
 }
 
 /** Encrypts a plaintext body for the recipient keys; callers add the sender key so sent mail stays readable here. */
@@ -369,12 +404,13 @@ export async function encryptForRecipients(
   );
 }
 
-/** Decrypts an RFC 3156 PGP/MIME message: ciphertext lives in `bodyStructure.subParts[1]`, body is postal-mime parsed. */
+/** Decrypts an RFC 3156 PGP/MIME message: ciphertext lives in `bodyStructure.subParts[1]`, body is read by the shared MIME parser. */
 export async function decryptPgpMimeMessage(
   runtime: MailRuntime,
   messageId: string,
   bodyStructure: JmapBodyStructure | undefined,
   senderPublicKeyArmored?: string,
+  limits?: MailTextLimits,
 ): Promise<MailDecryptResult> {
   log.debug("[mail-crypto] decryptPgpMimeMessage: start id=%s", messageId);
 
@@ -412,21 +448,14 @@ export async function decryptPgpMimeMessage(
     pgpResult.plaintext.length,
     messageId,
   );
-  let parsedText: string | null = null;
-  let parsedHtml: string | null = null;
-  let parsedAttachments: JmapAttachment[] = [];
-  let rawMimeFallback = false;
+  let parsed: ParsedMailContent | null = null;
   try {
-    const parsed = parseMimeBody(pgpResult.plaintext);
-    parsedText = parsed.text;
-    parsedHtml = parsed.html;
-    parsedAttachments = parsed.attachments;
-    rawMimeFallback = parsedText === null;
+    parsed = parseMailMimeContent(pgpResult.plaintext, limits);
     log.debug(
       "[mail-crypto] decryptPgpMimeMessage: MIME parsed text=%s html=%s attachments=%d id=%s",
-      parsedText != null ? `${parsedText.length}b` : "null",
-      parsedHtml != null ? `${parsedHtml.length}b` : "null",
-      parsed.attachments?.length ?? 0,
+      parsed.text != null ? `${parsed.text.length}b` : "null",
+      parsed.html != null ? `${parsed.html.length}b` : "null",
+      parsed.attachments.length,
       messageId,
     );
   } catch (err) {
@@ -436,16 +465,10 @@ export async function decryptPgpMimeMessage(
       messageId,
       err instanceof Error ? err.message : String(err),
     );
-    // Fall back to raw decrypted text
-    parsedText = pgpResult.plaintext;
-    rawMimeFallback = true;
   }
 
   return {
-    plaintext: parsedText ?? pgpResult.plaintext,
-    ...(rawMimeFallback ? { rawMimeFallback: true } : {}),
-    html: parsedHtml,
-    attachments: parsedAttachments,
+    ...decryptedContentFields(pgpResult.plaintext, parsed),
     signatureVerificationLayers: pgpResult.signatureVerificationLayers,
     signatureVerificationState: pgpResult.signatureVerificationState,
     hasVerifiedSignature: pgpResult.hasVerifiedSignature,

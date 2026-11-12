@@ -67,6 +67,7 @@ export function useMailMessageContent(messageId: string) {
   const { html: htmlContent, text: plainContent } = limitMailDisplayContent({
     html: decryptResult?.html ?? (isEncrypted ? null : (bodies?.html ?? null)),
     text: decryptResult?.plaintext ?? (isEncrypted ? null : (bodies?.text ?? null)),
+    truncated: decryptResult?.truncated,
   });
   const isDecrypting =
     isEncrypted && (isDecryptLoading || isDecryptFetching);

@@ -22,7 +22,8 @@ import {
   resolveInlinePgpArmoredCiphertext,
 } from "./message-security";
 import type { JmapEmailMessage, JmapIdentity } from "./types";
-import { getMailDraftSizeError } from "@workspace/calendar-core/mail-mime-limits";
+import { getMailDraftSizeError, limitMailQuoteContent } from "@workspace/calendar-core/mail-mime-limits";
+import { MAIL_DRAFT_TEXT_LIMITS } from "@workspace/calendar-core/mail-mime-parser";
 
 const EMPTY_FIELDS: ComposeTextFields = {
   to: "",
@@ -176,6 +177,7 @@ export async function decryptMessagePlaintext(
   message: JmapEmailMessage,
   forDraft = false,
 ): Promise<string> {
+  const limits = forDraft ? MAIL_DRAFT_TEXT_LIMITS : undefined;
   const decrypted =
     classifyMessageEncryption(message) === "inline_pgp"
       ? await decryptMailMessage(
@@ -186,14 +188,16 @@ export async function decryptMessagePlaintext(
             fetchBlob: (blobId) =>
               runtime.client.getBlobAsText(runtime.session, blobId),
           }),
+          undefined,
+          limits,
         )
-      : await decryptPgpMimeMessage(runtime, message.id, message.bodyStructure);
+      : await decryptPgpMimeMessage(runtime, message.id, message.bodyStructure, undefined, limits);
   if (forDraft && decrypted.rawMimeFallback) {
     throw new Error("This draft could not be opened safely here. Edit it on the web. The saved draft has not been changed.");
   }
-  const sizeError = forDraft
-    ? getMailDraftSizeError({ text: decrypted.plaintext }) ?? getMailDraftSizeError({ html: decrypted.html })
-    : null;
+  const content = { text: decrypted.plaintext, html: decrypted.html, truncated: decrypted.truncated };
+  if (!forDraft) return limitMailQuoteContent({ text: content.text, truncated: content.truncated }).text ?? "";
+  const sizeError = getMailDraftSizeError(content);
   if (sizeError) throw new Error(sizeError);
   return decrypted.plaintext;
 }
