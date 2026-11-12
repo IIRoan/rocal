@@ -9,6 +9,7 @@ appId: ${APP_ID}
     visible:
       id: workspace-ready
     timeout: 90000
+- waitForAnimationToEnd
 - assertNotVisible: Welcome back
 - runFlow:
     when:
