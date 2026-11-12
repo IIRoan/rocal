@@ -1,0 +1,33 @@
+appId: onl.solace.pickerprobe
+---
+- launchApp:
+    stopApp: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      id: probe-status
+      text: Ready
+    timeout: 60000
+- tapOn:
+    id: ${OPEN_ID}
+    retryTapIfNoChange: false
+- runFlow:
+    when:
+      visible: Allow Full Access
+    commands:
+      - tapOn: Allow Full Access
+# Same grid criterion and budget as calendar/07-profile-picture.
+- extendedWaitUntil:
+    visible: "(?i)Photo,.*"
+    timeout: 180000
+- waitForAnimationToEnd
+- tapOn:
+    text: "(Cancel|Close)"
+    enabled: true
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: probe-status
+      text: Cancelled
+    timeout: 30000

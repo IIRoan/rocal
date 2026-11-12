@@ -1,5 +1,5 @@
 name: Native end-to-end
-run-name: ${{ inputs.diagnostic && 'iOS authentication, calendar and photo diagnostics' || 'Native end-to-end' }}
+run-name: ${{ inputs.diagnostic && 'iOS photo picker probe' || 'Native end-to-end' }}
 
 on:
   pull_request:
@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       diagnostic:
-        description: Run only iOS authentication, calendar management and photo selection for diagnosis
+        description: Run only the isolated iOS photo picker probe on fresh simulators
         type: boolean
         default: false
 
@@ -42,6 +42,7 @@ concurrency:
 
 jobs:
   build-ios:
+    if: ${{ !inputs.diagnostic }}
     name: Build ${{ matrix.app }} (ios)
     strategy:
       fail-fast: false
@@ -65,18 +66,73 @@ jobs:
       app: ${{ matrix.app }}
 
   ios:
-    name: ${{ inputs.diagnostic && 'iOS diagnostics' || format('iOS {0}', matrix.app) }}
+    name: iOS ${{ matrix.app }}
     needs: build-ios
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && !inputs.diagnostic }}
     strategy:
       fail-fast: false
       matrix:
-        app: ${{ fromJSON(inputs.diagnostic && '[""]' || '["calendar", "mail"]') }}
+        app: [calendar, mail]
     uses: ./.github/workflows/native-e2e-journeys.yml
     with:
       platform: ios
-      diagnostic: ${{ inputs.diagnostic || false }}
       app: ${{ matrix.app }}
+
+  picker-probe:
+    name: iOS photo picker probe
+    if: ${{ inputs.diagnostic }}
+    runs-on: macos-latest
+    timeout-minutes: 75
+    env:
+      SOLACE_E2E: "1"
+      CI: "1"
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      SOLACE_E2E_IOS_RUNTIME: "26.5"
+      PROBE_TRIALS: "3"
+      PROBE_SECONDS: "2700"
+    steps:
+      - name: Prepare isolated test directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "SOLACE_E2E_DIR=$RUNNER_TEMP/solace-e2e" >> "$GITHUB_ENV"
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      - uses: chainguard-actions/actions-setup-java@10a5b64fe4498a8d2446baf16c05892e3042a31e # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install the harness Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install python@3.13
+          echo "$(brew --prefix python@3.13)/libexec/bin" >> "$GITHUB_PATH"
+      - name: Build the UIKit picker probe
+        timeout-minutes: 15
+        shell: bash
+        run: python3 scripts/e2e/picker_probe.py build
+      - name: Open, show and cancel the picker on fresh simulators
+        timeout-minutes: 50
+        shell: bash
+        run: python3 scripts/e2e/picker_probe.py run
+      - name: Publish probe evidence
+        if: always()
+        shell: bash
+        run: python3 scripts/e2e/run.py collect
+      - name: Upload probe evidence
+        if: always()
+        uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
+        with:
+          name: native-e2e-ios-picker-probe
+          path: ${{ runner.temp }}/solace-e2e/artifacts
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+      - name: Delete the probe's own simulators
+        if: always()
+        shell: bash
+        run: python3 scripts/e2e/picker_probe.py cleanup
 
   android:
     name: Android
