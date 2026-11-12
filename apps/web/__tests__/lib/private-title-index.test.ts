@@ -154,8 +154,8 @@ describe("web private body index", () => {
       .mocked(mailCryptoWorkerClient.loadVault)
       .mockResolvedValue({ fingerprint: "fingerprint" });
     jest.mocked(mailCryptoWorkerClient.decryptMessage).mockResolvedValue({
-      plaintext:
-        "Content-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\nPHA+WmVwcGVsaW4gcGxhbnM8L3A+",
+      plaintext: null,
+      html: "<p>Zeppelin plans</p>",
       hasVerifiedSignature: false,
       signatureVerificationState: "not_signed",
     });

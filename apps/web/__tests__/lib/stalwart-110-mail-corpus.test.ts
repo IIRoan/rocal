@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, expect, it } from "@jest/globals";
 import * as openpgp from "openpgp";
+import {
+  MAX_MAIL_DISPLAY_CHARACTERS,
+  MAX_MAIL_DISPLAY_HTML_CHARACTERS,
+} from "@workspace/calendar-core/mail-mime-limits";
 import { z } from "@workspace/calendar-core/zod";
-import { parseDecryptedMailContent } from "@/lib/mail/decrypted-mail-content";
 import { loadStalwart110MailFixtures } from "../../../../packages/calendar-core/test-fixtures/stalwart-1.1.0-mail/fixture-loader";
 
 const fixtures = loadStalwart110MailFixtures();
@@ -25,7 +28,18 @@ const replySchema = z.object({
   payload: z.unknown().optional(),
 });
 const decryptedSchema = z.object({
-  plaintext: z.string(),
+  plaintext: z.string().nullable(),
+  html: z.string().nullable(),
+  attachments: z.array(
+    z.object({
+      filename: z.string().nullable(),
+      mimeType: z.string(),
+      content: z.instanceof(Uint8Array),
+    }),
+  ),
+  truncated: z.boolean(),
+  sourceText: z.string().optional(),
+  rawMimeFallback: z.boolean().optional(),
   signatureVerificationState: z.enum([
     "verified",
     "not_signed",
@@ -89,19 +103,22 @@ it.each(fixtures.records)(
         senderPublicKeyArmored: fixtures.keyFor("sender").publicKeyArmored,
       }),
     );
-    const parsed = await parseDecryptedMailContent(result.plaintext);
     expect(result.signatureVerificationState).toBe(record.expectedSignature);
+    expect(result.truncated).toBe(false);
     if (!record.usable) {
-      expect(parsed.text).toBeNull();
-      expect(parsed.html).toBeNull();
-      expect(parsed.attachments).toHaveLength(2);
+      expect(result.plaintext).toBeNull();
+      expect(result.html).toBeNull();
+      expect(result.attachments).toEqual([]);
+      expect(result.rawMimeFallback).toBe(false);
+      expect(result.sourceText).toContain("application/pgp-encrypted");
       return;
     }
-    expect(parsed.text).toBe(fixtures.expected.text);
-    expect(parsed.html).toBe(fixtures.expected.html);
-    const attachment = parsed.attachments[0];
-    if (!attachment || !(attachment.content instanceof ArrayBuffer))
-      throw new Error("Synthetic attachment bytes missing");
+    expect(result.plaintext).toBe(fixtures.expected.text);
+    expect(result.html).toBe(fixtures.expected.html);
+    expect(result.sourceText).toBeUndefined();
+    expect(result.attachments).toHaveLength(1);
+    const attachment = result.attachments[0];
+    if (!attachment) throw new Error("Synthetic attachment bytes missing");
     expect(attachment.filename).toBe("synthetic-notes.txt");
     expect(new TextDecoder().decode(attachment.content)).toBe(
       fixtures.expected.attachmentText,
@@ -117,6 +134,46 @@ it.each(fixtures.records)(
     }
   },
 );
+
+it("returns content bounded in the worker with an explicit truncation result, and whole HTML for a draft", async () => {
+  const rows = ("abc=20".repeat(12) + "=\r\n").repeat(30_000);
+  const html = "<p>" + "x".repeat(MAX_MAIL_DISPLAY_HTML_CHARACTERS) + "</p>";
+  const armoredMessage = await openpgp.encrypt({
+    message: await openpgp.createMessage({
+      text: [
+        'Content-Type: multipart/alternative; boundary="a"',
+        "",
+        "--a",
+        "Content-Type: text/plain; charset=utf-8",
+        "Content-Transfer-Encoding: quoted-printable",
+        "",
+        rows,
+        "--a",
+        "Content-Type: text/html; charset=utf-8",
+        "",
+        html,
+        "--a--",
+      ].join("\r\n"),
+    }),
+    encryptionKeys: await openpgp.readKey({
+      armoredKey: fixtures.keyFor("ecc").publicKeyArmored,
+    }),
+    format: "armored",
+  });
+  await loadKey("ecc");
+  const shown = decryptedSchema.parse(
+    await workerCommand("DECRYPT_PGP_MESSAGE", { armoredMessage }),
+  );
+  expect(shown.truncated).toBe(true);
+  expect(shown.plaintext?.length).toBeLessThanOrEqual(MAX_MAIL_DISPLAY_CHARACTERS);
+  expect(shown.html).toBeNull();
+  expect(shown.sourceText).toBeUndefined();
+  const editable = decryptedSchema.parse(
+    await workerCommand("DECRYPT_PGP_MESSAGE", { armoredMessage, editable: true }),
+  );
+  expect(editable.truncated).toBe(true);
+  expect(editable.html === html).toBe(true);
+});
 
 it("rejects unrelated keys and modified target ciphertext through the real worker", async () => {
   const record = fixtures.records.find(

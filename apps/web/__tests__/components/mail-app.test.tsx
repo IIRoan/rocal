@@ -239,12 +239,6 @@ jest.mock("../../lib/e2ee-password-cache", () => ({
   clearLegacyRememberedPassword: jest.fn(),
 }));
 
-jest.mock("postal-mime", () => ({
-  default: {
-    parse: (jest.fn() as any).mockResolvedValue({ text: "", html: null }),
-  },
-}));
-
 jest.mock("../../lib/mail/vault-secret", () => ({
   VAULT_WRAP_ALGORITHM: "e2ee-account-key-v1",
   generateVaultSecret: () => "sealed-secret",

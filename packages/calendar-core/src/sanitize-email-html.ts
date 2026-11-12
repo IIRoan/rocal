@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import { decodeHtmlEntities } from "./html-text";
 
 export interface SanitizeEmailHtmlOptions {
   /** "reader" keeps `<style>` only because it renders in a script-less sandboxed frame. */
@@ -38,35 +39,6 @@ const URL_ATTRS = new Set(["href", "src", "background", "cite"]);
 
 const ALLOWED_TAG_SET = new Set<string>(ALLOWED_TAGS);
 const ALLOWED_ATTR_SET = new Set<string>(ALLOWED_ATTRS);
-
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&",
-  apos: "'",
-  colon: ":",
-  gt: ">",
-  lpar: "(",
-  lt: "<",
-  newline: "\n",
-  nbsp: " ",
-  quot: '"',
-  rpar: ")",
-  sol: "/",
-  tab: "\t",
-};
-
-export function decodeHtmlEntities(value: string): string {
-  return value.replace(
-    /&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));?/gi,
-    (match, hex: string | undefined, dec: string | undefined, name: string | undefined) => {
-      if (hex || dec) {
-        const code = Number.parseInt(hex ?? dec ?? "", hex ? 16 : 10);
-        if (!Number.isFinite(code) || code < 0 || code > 0x10ffff) return "";
-        return String.fromCodePoint(code);
-      }
-      return NAMED_ENTITIES[(name ?? "").toLowerCase()] ?? match;
-    },
-  );
-}
 
 /** Browsers ignore whitespace/control chars inside schemes (`java\tscript:`), so strip them first. */
 export function isSafeEmailUrl(tag: string, attr: string, rawValue: string): boolean {

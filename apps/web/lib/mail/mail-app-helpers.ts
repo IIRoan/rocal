@@ -8,7 +8,7 @@ import {
   type OutgoingMessageBody,
   type OutgoingMimeAttachment,
 } from "@workspace/calendar-core";
-import { type Attachment as ParsedMailAttachment } from "postal-mime";
+import type { ParsedMailAttachment } from "@workspace/calendar-core/mail-mime-parser";
 import { assertMailVerificationContext, captureMailVerificationContext } from "./mail-sender-verification";
 import { mailDemoApiService } from "@/lib/mail/api-service";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
@@ -149,15 +149,11 @@ function toParsedMailAttachment(
   };
 }
 
-/** The parts of a decrypted PGP/MIME message the reader lists as attachments. */
+/** The parser returns only the parts the reader lists, so every one becomes an attachment row. */
 export function listedDecryptedAttachments(
-  attachments: ParsedMailAttachment[],
+  attachments: ParsedMailAttachment[] = [],
 ): MailAttachment[] {
-  return attachments.flatMap((attachment) =>
-    attachment.disposition === "attachment" && !attachment.related
-      ? [toParsedMailAttachment(attachment)]
-      : [],
-  );
+  return attachments.map(toParsedMailAttachment);
 }
 
 export async function resolveAttachmentBlob(input: {

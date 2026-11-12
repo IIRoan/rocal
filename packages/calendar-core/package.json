@@ -29,6 +29,7 @@
     "./sanitize-email-html": "./src/sanitize-email-html.ts",
     "./mail-html": "./src/mail-html.ts",
     "./mail-mime-limits": "./src/mail-mime-limits.ts",
+    "./mail-mime-parser": "./src/mail-mime-parser.ts",
     "./mail-pgp-layers": "./src/mail-pgp-layers.ts",
     "./mail-pgp-encryption": "./src/mail-pgp-encryption.ts",
     "./event-ics-export": "./src/event-ics-export.ts",

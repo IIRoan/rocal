@@ -4,6 +4,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
+import { limitMailDisplayContent } from "@workspace/calendar-core/mail-mime-limits";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import type { MailDecryptResult } from "./mail-crypto";
 import {
@@ -72,9 +73,14 @@ export function useConversationDecryptedPreviews(
       const message = encryptedMessages[index];
       const data = results[index]?.data;
       if (message && data) {
-        map.set(message.id, {
+        const shown = limitMailDisplayContent({
           text: data.plaintext,
           html: data.html,
+          truncated: data.truncated,
+        });
+        map.set(message.id, {
+          text: shown.text,
+          html: shown.html,
           attachments: data.attachments ?? [],
         });
       }
