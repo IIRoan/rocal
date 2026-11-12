@@ -836,8 +836,19 @@ export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
         .catch(() => undefined);
       return { action, mode };
     },
-    onMutate: ({ message, mode }) => setDone(message.id, mode === "run"),
+    onMutate: async ({ message, mode }) => {
+      const resume = await cancelMailMessageReads(queryClient, [
+        QUERY_KEYS.mailMessagesAll(),
+        QUERY_KEYS.mailThreadsAll(),
+        QUERY_KEYS.mailMessageDetailsAll(),
+      ]);
+      setDone(message.id, mode === "run");
+      return resume;
+    },
     onError: (_error, { message, mode }) => setDone(message.id, mode !== "run"),
+    onSettled: (_data, _error, _variables, resume) => {
+      resume?.().catch(() => undefined);
+    },
   });
 }
 

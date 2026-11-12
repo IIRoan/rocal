@@ -95,6 +95,7 @@ Default stance: **the server should not be able to read user content, and we sho
 - Effects synchronize external systems, not derived values or user interactions: derive during render/`select`, act in event handlers, and clean up resources or guard stale async results when dependencies change. Editable drafts are local state, not mirrored server state.
 - Mutations on cached data: optimistic `onMutate` + `setQueryData` on the precise key, rollback on error, narrow `invalidateQueries` on settle. Never blanket-invalidate a root key (`["mail"]`, `["events"]`) — it refetches everything and loses scroll. Destructive moves/deletes may invalidate the affected list.
 - Decrypted content in the cache is cleared on sign-out/account switch (`queryClient.clear()`).
+- Web mail's open mailbox is React state, not a query. Its keyword writes (read, star, label) go through `useMailKeywordReconciliation` `trackWrite`, and a sync or SSE snapshot never replaces a keyword already shown: rows it disagrees with are read again, and only a read begun after an edit settled may overwrite it (`calendar-core` `mail-keyword-reconciliation.ts`).
 - `enabled` guards for missing ids/sessions/keys; `select` for derived data; no `any` query types.
 
 ## 5. Code quality (MUST)

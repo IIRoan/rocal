@@ -4,11 +4,13 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
-import { clearMailSendAttempts, resolveMailServerPolicy } from "@workspace/calendar-core";
+import { clearMailSendAttempts, resolveMailServerPolicy, SIMPLELOGIN_DONE_KEYWORD } from "@workspace/calendar-core";
 import { useSimpleLoginAliasAction } from "./use-mail";
 import { StalwartJmapClient } from "./jmap-client";
 import type { MailRuntime } from "./mail-runtime";
 import type { JmapEmailMessage } from "./types";
+import type { MailboxMessagesPage } from "./mail-message-cache";
+import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 
 jest.mock("@workspace/native-core/providers/AuthProvider", () => ({}));
 jest.mock("@workspace/native-core/providers/E2eeProvider", () => ({}));
@@ -55,7 +57,16 @@ it("runs, undoes and runs SimpleLogin again using distinct real transport attemp
   const root = createRoot(container);
   try {
     await act(async () => root.render(<QueryClientProvider client={queryClient}><Probe /></QueryClientProvider>));
+    const page: MailboxMessagesPage = { messages: [message], total: 1, position: 0 };
+    queryClient.setQueryData(QUERY_KEYS.mailMessages("inbox"), page);
+    let finishRead: ((value: MailboxMessagesPage) => void) | undefined;
+    const staleRead = queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.mailMessages("inbox"),
+      queryFn: () => new Promise<MailboxMessagesPage>((resolve) => { finishRead = resolve; }),
+    }).catch(() => undefined);
     await act(async () => { await run({ message, mode: "run" }); });
+    await act(async () => { finishRead?.(page); await staleRead; });
+    expect(queryClient.getQueryData<MailboxMessagesPage>(QUERY_KEYS.mailMessages("inbox"))?.messages[0]?.keywords?.[SIMPLELOGIN_DONE_KEYWORD]).toBe(true);
     await act(async () => { await run({ message, mode: "undo" }); });
     await act(async () => { await run({ message, mode: "run" }); });
     expect(submissionIds).toEqual(["original-1", "original-2"]);
