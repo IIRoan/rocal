@@ -3,6 +3,7 @@ import React, {
   use,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -227,7 +228,9 @@ export function AuthProvider({
   lifecycle?: AuthLifecycle;
 }): React.ReactNode {
   const lifecycleRef = useRef(lifecycle);
-  lifecycleRef.current = lifecycle;
+  useLayoutEffect(() => {
+    lifecycleRef.current = lifecycle;
+  }, [lifecycle]);
   const [
     { user, session, requiresPasskeyStepUp, lastAuthMethod },
     dispatch,

@@ -24,7 +24,7 @@ export function useKeyboardShortcuts(
   shortcuts: KeyboardShortcut[],
   options: UseKeyboardShortcutsOptions = {},
 ) {
-  const { enabled = true, target = document, ignoreInputs = false } = options;
+  const { enabled = true, target, ignoreInputs = false } = options;
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -72,12 +72,13 @@ export function useKeyboardShortcuts(
   );
 
   useEffect(() => {
-    if (!enabled || !target) return;
+    const eventTarget = target === undefined ? document : target;
+    if (!enabled || !eventTarget) return;
 
-    target.addEventListener("keydown", handleKeyDown as EventListener);
+    eventTarget.addEventListener("keydown", handleKeyDown as EventListener);
 
     return () => {
-      target.removeEventListener("keydown", handleKeyDown as EventListener);
+      eventTarget.removeEventListener("keydown", handleKeyDown as EventListener);
     };
   }, [enabled, target, handleKeyDown]);
 }

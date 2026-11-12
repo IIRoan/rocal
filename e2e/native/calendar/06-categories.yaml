@@ -37,7 +37,11 @@ appId: ${APP_ID}
       VERIFY_ID: category-name
 - assertVisible: Maestro category
 - hideKeyboard
-- tapOn: Create category
+- waitForAnimationToEnd
+- tapOn:
+    text: Create category
+    enabled: true
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     notVisible: Create category
     timeout: 30000
@@ -106,7 +110,11 @@ appId: ${APP_ID}
       VERIFY_ID: category-name
 - assertVisible: Maestro renamed category
 - hideKeyboard
-- tapOn: Save changes
+- waitForAnimationToEnd
+- tapOn:
+    text: Save changes
+    enabled: true
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     notVisible: Save changes
     timeout: 30000

@@ -19,7 +19,7 @@ import {
   encryptForRecipients,
   ensureVaultLoaded,
 } from "./mail-crypto";
-import { parseMimeBody as parseDecryptedMailContent } from "./mail-mime-parser";
+import { parseMailMimeContent as parseDecryptedMailContent } from "@workspace/calendar-core/mail-mime-parser";
 import type { UserKeyVault } from "./native-vault-crypto";
 import type { MailRuntime } from "./mail-runtime";
 

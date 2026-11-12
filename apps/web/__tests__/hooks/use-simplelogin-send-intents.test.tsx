@@ -3,7 +3,7 @@
 import { expect, it, jest } from "@jest/globals";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
-import { clearMailSendAttempts, resolveMailServerPolicy } from "@workspace/calendar-core";
+import { clearMailSendAttempts, resolveMailServerPolicy, SIMPLELOGIN_DONE_KEYWORD, type MailKeywordEdit } from "@workspace/calendar-core";
 import { useSimpleLoginAliasAction } from "@/hooks/use-simplelogin-alias-action";
 import { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type { ActiveMailboxState } from "@/lib/mail/mail-app-helpers";
@@ -45,7 +45,14 @@ it("runs, undoes and runs SimpleLogin again using distinct real transport attemp
   };
   const message: JmapEmailMessage = { id: "opaque-forward", to: [{ email: "alias@example.test" }], "header:Delivered-To:asAddresses:all": [[{ email: "owner@solace.test" }]], "header:X-Solace-SimpleLogin:asText": "forward", "header:X-SimpleLogin-Envelope-To:asAddresses": [{ email: "alias@example.test" }], "header:X-SimpleLogin-Unsub-Behaviour:asText": "alias-disable", "header:List-Unsubscribe:asURLs": ["mailto:unsubscribe@simplelogin.co?subject=un.WzIsIDEzNzQzNjAyXQ.token_-x"] };
   let run: ReturnType<typeof useSimpleLoginAliasAction> = async () => { throw new Error("Hook was not mounted"); };
-  function Probe() { run = useSimpleLoginAliasAction({ activeMailbox: mailbox, patchMessageKeyword: () => {} }); return null; }
+  const tracked: Array<{ edits: MailKeywordEdit[]; markedInside: boolean }> = [];
+  const mark = jest.spyOn(client, "setMessageKeyword");
+  const trackKeywordWrite = async (edits: MailKeywordEdit[], write: () => Promise<void>) => {
+    const before = mark.mock.calls.length;
+    await write();
+    tracked.push({ edits, markedInside: mark.mock.calls.length === before + 1 });
+  };
+  function Probe() { run = useSimpleLoginAliasAction({ activeMailbox: mailbox, patchMessageKeyword: () => {}, trackKeywordWrite }); return null; }
   const container = document.createElement("div");
   const root = createRoot(container);
   const open = jest.spyOn(window, "open").mockImplementation(() => null);
@@ -55,6 +62,8 @@ it("runs, undoes and runs SimpleLogin again using distinct real transport attemp
     await act(async () => { await run(message, "undo"); });
     await act(async () => { await run(message, "run"); });
     expect(submissionIds).toEqual(["original-1", "original-2"]);
+    const done = (enabled: boolean) => ({ edits: [{ messageId: "opaque-forward", keyword: SIMPLELOGIN_DONE_KEYWORD, enabled }], markedInside: true });
+    expect(tracked).toEqual([done(true), done(false), done(true)]);
     expect(open).toHaveBeenCalledTimes(1);
   } finally {
     await act(async () => root.unmount());
