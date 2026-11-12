@@ -11,15 +11,32 @@ appId: ${APP_ID}
     text: Attach file
     enabled: true
     retryTapIfNoChange: false
-- extendedWaitUntil:
-    visible: "(?i).*(browse|recents|recent|downloads|files).*"
-    timeout: 30000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: Cancel
+            enabled: true
+          timeout: 30000
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: "(?i).*(browse|recents|recent|downloads|files).*"
+          timeout: 30000
 - takeScreenshot: ${SCREENSHOT_DIR}/native-attachment-picker
 - runFlow:
     when:
       platform: iOS
     commands:
-      - tapOn: Cancel
+      - tapOn:
+          text: Cancel
+          enabled: true
+          retryTapIfNoChange: false
 - runFlow:
     when:
       platform: Android

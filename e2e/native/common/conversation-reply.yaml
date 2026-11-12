@@ -1,6 +1,10 @@
 appId: ${APP_ID}
 ---
-- tapOn: Reply
+- waitForAnimationToEnd
+- tapOn:
+    text: Reply
+    enabled: true
+    retryTapIfNoChange: false
 - assertVisible: Send
 - waitForAnimationToEnd
 - runFlow:
