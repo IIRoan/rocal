@@ -1,4 +1,5 @@
 import json
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -6,6 +7,54 @@ import probe_subject_search as probe
 
 
 class SubjectProbeTargetTests(unittest.TestCase):
+    def test_command_timeout_does_not_expose_arguments(self):
+        command = ["podman", "run", "-e", "PASSWORD=must-stay-private"]
+        with patch.object(probe.subprocess, "run", side_effect=subprocess.TimeoutExpired(command, 90)):
+            with self.assertRaisesRegex(RuntimeError, "run command timed out") as raised:
+                probe.podman(*command[1:])
+        self.assertNotIn("must-stay-private", str(raised.exception))
+        self.assertTrue(raised.exception.__suppress_context__)
+
+    def test_transient_network_cleanup_is_retried(self):
+        removals = []
+
+        def podman(*args):
+            if args[:2] == ("network", "rm"):
+                removals.append(args)
+                if len(removals) == 1:
+                    raise RuntimeError("Synthetic network teardown is still busy")
+            if args[0] == "inspect":
+                return json.dumps([{"NetworkSettings": {"Ports": {"8080/tcp": [
+                    {"HostIp": "127.0.0.1", "HostPort": "12345"},
+                ]}}}])
+            return ""
+
+        with patch.object(probe, "podman", side_effect=podman), patch.object(probe.time, "sleep"):
+            with probe.target("localhost/test-subject-image"):
+                pass
+        self.assertEqual(len(removals), 2)
+
+    def test_permanent_container_cleanup_failure_still_removes_the_other_resources(self):
+        calls = []
+
+        def podman(*args):
+            calls.append(args)
+            if args[0] == "inspect":
+                return json.dumps([{"NetworkSettings": {"Ports": {"8080/tcp": [
+                    {"HostIp": "127.0.0.1", "HostPort": "12345"},
+                ]}}}])
+            if args[0] == "rm" and args[-1].endswith("-mail"):
+                raise RuntimeError("Synthetic removal failure")
+            return ""
+
+        with patch.object(probe, "podman", side_effect=podman), patch.object(probe.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "cleanup failed.*container"):
+                with probe.target("localhost/test-subject-image"):
+                    pass
+        self.assertEqual(len([args for args in calls if args[0] == "rm" and args[-1].endswith("-mail")]), 3)
+        self.assertTrue(any(args[0] == "rm" and args[-1].endswith("-pg") for args in calls))
+        self.assertEqual(calls[-1][:2], ("network", "rm"))
+
     def test_mail_waits_for_postgres_tcp_instead_of_its_temporary_unix_server(self):
         tcp_checks = 0
         tcp_ready = False
