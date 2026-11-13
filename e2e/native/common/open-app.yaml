@@ -15,7 +15,9 @@ appId: ${APP_ID}
     when:
       true: ${APP_ID === "onl.solace.calendar.e2e"}
     commands:
-      - tapOn: Choose date and view
+      - tapOn:
+          text: Choose date and view
+          retryTapIfNoChange: true
       - extendedWaitUntil:
           visible: Close sheet
           timeout: 30000
@@ -33,7 +35,9 @@ appId: ${APP_ID}
           notVisible: Close sheet
           timeout: 30000
       - waitForAnimationToEnd
-      - tapOn: Choose date and view
+      - tapOn:
+          text: Choose date and view
+          retryTapIfNoChange: true
       - extendedWaitUntil:
           visible: Close sheet
           timeout: 30000
