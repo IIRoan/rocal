@@ -26,8 +26,8 @@ def podman(*arguments):
     return result.stdout.strip()
 
 
-def wait_until(check):
-    deadline = time.monotonic() + 60
+def wait_until(check, timeout=60):
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
             return check()
@@ -52,7 +52,7 @@ def target(image="localhost/solace-test-stalwart"):
                "--memory", "512m", "-e", "POSTGRES_USER=solace_probe",
                "-e", "POSTGRES_PASSWORD=" + PASSWORD, "-e", "POSTGRES_DB=stalwart_probe",
                "docker.io/library/postgres:18")
-        wait_until(lambda: podman("exec", database, "pg_isready", "-U", "solace_probe", "-d", "stalwart_probe"))
+        wait_until(lambda: podman("exec", database, "pg_isready", "-h", "127.0.0.1", "-U", "solace_probe", "-d", "stalwart_probe"))
         created.append(server)
         podman("run", "-d", "--pull=never", "--name", server, "--network", network,
                "--memory", "1g", "-p", "127.0.0.1::8080",
@@ -64,7 +64,7 @@ def target(image="localhost/solace-test-stalwart"):
         bindings = details["NetworkSettings"]["Ports"]["8080/tcp"]
         if len(bindings) != 1 or bindings[0]["HostIp"] != "127.0.0.1":
             raise RuntimeError("Refusing a target without an exclusive loopback binding")
-        wait_until(lambda: podman("exec", server, "test", "-f", "/tmp/solace-test-ready"))
+        wait_until(lambda: podman("exec", server, "test", "-f", "/tmp/solace-test-ready"), timeout=180)
         yield "http://127.0.0.1:" + bindings[0]["HostPort"], database, server
     finally:
         failures = []

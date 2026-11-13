@@ -1,0 +1,19 @@
+# Keep the upstream release profile and ship the patched source beside the binary.
+FROM rust:1.99.1-trixie@sha256:8a4e90c7946b74626488b1446f712c0fe0ed1a596cbd3d871684bc9c5433ae07 AS stalwart-builder
+
+ARG CARGO_BUILD_JOBS=4
+
+RUN apt-get update \
+    && apt-get install -yq --no-install-recommends build-essential cmake libclang-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+COPY scripts/build-stalwart.sh stalwart-subject-search.patch /build/
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/src/target \
+    sh /build/build-stalwart.sh
+
+FROM scratch
+COPY --from=stalwart-builder /output/stalwart /stalwart
+COPY --from=stalwart-builder /src /source
+USER 65532:65532
+HEALTHCHECK NONE
