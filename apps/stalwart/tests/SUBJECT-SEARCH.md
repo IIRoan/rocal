@@ -3,13 +3,20 @@
 Build the test image, then run the disposable probe:
 
 ```sh
-podman build --format docker -t localhost/solace-test-stalwart -f apps/stalwart/test-env/Dockerfile apps/stalwart
+podman build -t localhost/solace-test-stalwart -f apps/stalwart/test-env/Dockerfile apps/stalwart
 python3 apps/stalwart/tests/probe_subject_search.py --assert-fixed
+```
+
+The cleanup regression also inspects the real containers' anonymous volumes and checks that none remain:
+
+```sh
+STALWART_SUBJECT_TEST_IMAGE=localhost/solace-test-stalwart \
+  python3 -B -m unittest discover -s apps/stalwart/tests -p test_subject_search.py -v
 ```
 
 `cargo xtask test-env up` also builds the image when its mail container is not already running; the explicit build avoids using a stale image while an existing test service stays up.
 
-Each invocation creates fresh PostgreSQL 18 and Stalwart containers on an internal Podman network, publishes one random loopback port, and removes everything it created. Images must already be local; `--image` selects a different built test image. It waits for PostgreSQL TCP readiness, then up to 180 seconds for the test plan and listener restart before signing in, so the temporary database initialization server and startup retries cannot trigger failures or login bans. It imports the committed synthetic PGP/MIME fixture as drafts, searches only for those drafts, inspects the original subject's synthetic index row, and destroys them. No submission is made. There are no production URL or credential options. PR CI runs this against the patched release binary.
+Each invocation creates fresh PostgreSQL 18 and Stalwart containers on an internal Podman network, publishes one random loopback port, and removes its containers, anonymous volumes and network. Images must already be local; `--image` selects a different built test image. It waits for PostgreSQL TCP readiness, then up to 180 seconds for the test plan and listener restart before signing in, so the temporary database initialization server and startup retries cannot trigger failures or login bans. It imports the committed synthetic PGP/MIME fixture as drafts, searches only for those drafts, inspects the original subject's synthetic index row, and destroys them. No submission is made. There are no production URL or credential options. PR CI runs this against the patched release binary.
 
 Unmodified Stalwart 1.1.0 reproduces the issue: `calm`, `morning`, and the invented marker match, while `river` and the complete subject do not. The stored subject vector contains `riv`; English and simple queries produce `river`, whereas PostgreSQL's Norwegian query produces `riv` and matches. The probe checks both subject and general text filters, prefixes, quoted phrases, absent terms, English subjects and German literal words. It also rejects a phrase formed by joining the last and first words, which catches accidental concatenation of duplicate vectors. `--assert-fixed` requires the expected positive and negative results and a subject vector equal to PostgreSQL's `simple` output.
 

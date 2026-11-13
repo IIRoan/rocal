@@ -84,7 +84,7 @@ def target(image="localhost/solace-test-stalwart"):
         failures = []
         for container in reversed(created):
             try:
-                remove_owned("rm", "-f", "--ignore", "-t", "0", container)
+                remove_owned("rm", "-f", "-v", "--ignore", "-t", "0", container)
             except RuntimeError as error:
                 failures.append("container: " + str(error))
         if network_created:

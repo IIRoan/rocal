@@ -127,6 +127,11 @@ jobs:
       - name: Verify PostgreSQL subject search on encrypted drafts
         run: python3 -B apps/stalwart/tests/probe_subject_search.py --assert-fixed
 
+      - name: Verify disposable probe cleanup
+        env:
+          STALWART_SUBJECT_TEST_IMAGE: localhost/solace-test-stalwart
+        run: python3 -B -m unittest discover -s apps/stalwart/tests -p test_subject_search.py -k SubjectProbeCleanupIntegrationTests -v
+
       - name: Verify JMAP gateway access controls
         run: >-
           podman run --rm --network none
