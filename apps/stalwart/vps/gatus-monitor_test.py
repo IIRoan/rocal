@@ -83,6 +83,31 @@ class MonitorTest(unittest.TestCase):
             with self.subTest(status=status, stdout=stdout), patch.object(monitor.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout, stderr)):
                 self.assertEqual(monitor.service_active("frps"), status)
 
+    def test_postfix_queue_count_uses_only_successful_standard_output(self):
+        for stdout, returncode, expected in [
+            ("Mail queue is empty\n", 0, 0),
+            ("\nMail queue is empty\n\n", 0, 0),
+            ("-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------\nABC123 1024 Wed Nov 11 12:00:00 sender@example.test\nrecipient@example.test\n\n-- 2 Kbytes in 1 Request.\n", 0, 1),
+            ("-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------\nABC123 1024 Wed Nov 11 12:00:00 sender@example.test\nrecipient@example.test\nDEF456 1024 Wed Nov 11 12:01:00 sender@example.test\nrecipient@example.test\n\n-- 3 Kbytes in 2 Requests.\n", 0, 2),
+            ("-- 4096 Kbytes in 1001 Requests.\n", 0, 1001),
+            ("", 0, None),
+            ("\n \n", 0, None),
+            ("-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------\n", 0, None),
+            ("-- 2 Kbytes in unknown Requests.\n", 0, None),
+            ("-- 2 Kbytes in -1 Requests.\n", 0, None),
+            ("-- 2 Kbytes in 1 Request. extra\n", 0, None),
+            ("Mail queue is empty\nunexpected output\n", 0, None),
+            ("Mail queue is empty\n", 1, None),
+            ("-- 2 Kbytes in 1 Request.\n", 1, None),
+        ]:
+            with self.subTest(stdout=stdout, returncode=returncode), patch.object(monitor.subprocess, "run", return_value=subprocess.CompletedProcess([], returncode, stdout, "")):
+                self.assertEqual(monitor.postfix_queue_count(), expected)
+
+    def test_postfix_queue_probe_failures_are_unknown(self):
+        for error in [OSError("unavailable"), subprocess.TimeoutExpired("postqueue", 3)]:
+            with self.subTest(error=type(error).__name__), patch.object(monitor.subprocess, "run", side_effect=error):
+                self.assertIsNone(monitor.postfix_queue_count())
+
 
 if __name__ == "__main__":
     unittest.main()

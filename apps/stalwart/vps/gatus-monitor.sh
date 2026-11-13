@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.request
@@ -89,15 +90,16 @@ def postfix_queue_count() -> int | None:
     except (OSError, subprocess.TimeoutExpired):
         return None
 
-    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if result.returncode != 0:
+        return None
+
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     if not lines:
+        return None
+    if lines == ["Mail queue is empty"]:
         return 0
-    if lines[-1].startswith("-- "):
-        try:
-            return int(lines[-1].split()[0])
-        except (IndexError, ValueError):
-            return None
-    return len(lines)
+    summary = re.fullmatch(r"-- [0-9]+ Kbytes in ([0-9]+) Requests?\.", lines[-1])
+    return int(summary.group(1)) if summary else None
 
 
 def main() -> int:

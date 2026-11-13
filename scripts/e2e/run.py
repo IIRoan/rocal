@@ -1,12 +1,15 @@
+import contextlib
 import json
 import os
 from datetime import datetime, timedelta, timezone
+import itertools
 from pathlib import Path
 import re
 import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import xml.etree.ElementTree as ET
 
@@ -20,6 +23,17 @@ STARTUP_TIMEOUT_CLASS = "xcuitest.installer.LocalXCTestInstaller$IOSDriverTimeou
 CALL_TIMEOUT_CLASS = "maestro.MaestroException$DriverTimeout"
 DRIVER_CALLS = frozenset(("deviceInfo", "eraseText", "inputText", "isDarkModeEnabled", "isKeyboardVisible", "isScreenStatic", "longPress",
                           "pressKey", "setDarkMode", "setLocation", "setOrientation", "setPermissions", "snapshot", "swipe", "takeScreenshot", "tap"))
+# Maestro 2.12.0 flushes its session log per record (`HH:mm:ss.SSS [LEVEL] logger.method: message`); these loggers and markers are fixed in its source.
+LOG_RECORD = re.compile(r"\d\d:\d\d:\d\d\.\d{3} \[ *[A-Z]+\] (\S+)\.[^.\s:]+: ")
+INSTALLER_LOGGER = "xcuitest.installer.LocalXCTestInstaller"
+INSTALLER_MARKERS = {"runnerAlreadyRunning": "UI Test runner already running, returning",
+                     "runnerInstallStarted": "[Start] Install XCUITest runner on ",
+                     "runnerInstallDone": "[Done] Install XCUITest runner on ",
+                     "xcodebuildStarted": "[Start] Running XcUITest with `xcodebuild test-without-building`",
+                     "xcodebuildDone": "[Done] Running XcUITest with `xcodebuild test-without-building`",
+                     "driverResponded": "[Done] Perform XCUITest driver status check on "}
+PROGRESS_LOG_BYTES = 16 * 1024 * 1024
+PROGRESS_LOG_LINES = 400_000
 
 
 def maestro_environment():
@@ -197,6 +211,118 @@ def failure_details(log, report, traces, reason, exit_code=None):
     return details
 
 
+def linked(path, private):
+    # Any link below the private root, even one resolving inside it, could point a read at another invocation's files.
+    try:
+        parts = path.relative_to(private).parts
+    except ValueError:
+        return True
+    return any((private / Path(*parts[:index])).is_symlink() for index in range(1, len(parts) + 1))
+
+
+def only_directory(parent, private):
+    # Exactly one real folder is this invocation's; none is proven absent, and anything else is unknown.
+    try:
+        if linked(parent, private):
+            return None, "unavailable"
+        if not parent.exists():
+            return None, "missing"
+        if not parent.is_dir():
+            return None, "unavailable"
+        entries = list(itertools.islice(parent.iterdir(), 17))
+        if len(entries) > 16 or any(entry.is_symlink() for entry in entries):
+            return None, "unavailable"
+        folders = [entry for entry in entries if entry.is_dir()]
+    except OSError:
+        return None, "unavailable"
+    return (folders[0], "found") if len(folders) == 1 else (None, "missing" if not folders else "unavailable")
+
+
+def log_records(path, private):
+    try:
+        if linked(path, private):
+            return "unavailable", []
+        if not path.exists():
+            return "missing", []
+        if not path.is_file():
+            return "unavailable", []
+        with path.open("rb") as log:
+            data = log.read(PROGRESS_LOG_BYTES + 1)
+    except OSError:
+        return "unavailable", []
+    text, status = data[:PROGRESS_LOG_BYTES], "complete"
+    if len(data) > PROGRESS_LOG_BYTES or not text.endswith(b"\n"):
+        # A cap or a killed writer can cut the last record, so only whole lines are read and nothing after them is proven absent.
+        text, status = text[:text.rfind(b"\n") + 1], "truncated" if text else "complete"
+    try:
+        lines = text.decode("utf-8").splitlines()
+    except UnicodeDecodeError:
+        return "unavailable", []
+    records = []
+    for index, line in enumerate(lines):
+        if index >= PROGRESS_LOG_LINES:
+            status = "truncated"
+            break
+        match = LOG_RECORD.match(line)
+        if match:
+            records.append([match.group(1), line[match.end():], line])
+        elif records:
+            # A multi-line message continues its record; the console listener's status word ends its last line.
+            records[-1][2] = line
+    # Text without a single recognizable record is an unknown format, not proof that nothing happened.
+    return (status, records) if records or not data.strip() else ("unavailable", [])
+
+
+def maestro_progress(state, traces):
+    private = directory() / "private"
+    session, found = only_directory(state / "maestro/tests", private)
+    status, records = log_records(session / "maestro.log", private) if session else ("missing" if found == "missing" else "unavailable", [])
+    complete = status == "complete"
+    def seen(value):
+        # A truncated or unreadable log proves only what it shows, never an absence.
+        return True if value else (False if complete else None)
+    progress = {"sessionLog": status}
+    installer = [message for logger, message, _ in records if logger == INSTALLER_LOGGER]
+    for key, marker in INSTALLER_MARKERS.items():
+        progress[key] = seen(any(message.startswith(marker) for message in installer))
+    progress["flowStarted"] = seen(any(logger == "maestro.cli.runner.TestSuiteInteractor" and message.lstrip().startswith("Running flow ")
+                                       for logger, message, _ in records))
+    run, found = only_directory(traces, private)
+    flow, found = only_directory(run, private) if run else (None, found)
+    progress["flowDirectory"] = found
+    for key, name in (("flowLog", "logs/maestro.log"), ("commandsJson", "commands.json")):
+        try:
+            target = flow / name if flow else None
+            progress[key] = (False if found == "missing" else None) if target is None else (None if linked(target, private) else target.is_file())
+        except OSError:
+            progress[key] = None
+    ends = [last for logger, _, last in records if logger == "maestro.cli.runner.CliConsoleListener"]
+    progress["commandsStarted"] = sum(last.endswith(" RUNNING") for last in ends) if complete else None
+    progress["commandsFinished"] = sum(last.endswith((" COMPLETED", " FAILED", " SKIPPED", " WARNED")) for last in ends) if complete else None
+    progress["lastCommandOpen"] = bool(ends) and ends[-1].endswith(" RUNNING") if complete else None
+    # The furthest stage the private evidence proves, not where the journey was guaranteed to stop.
+    stages = (("flow-ended", progress["commandsJson"]), ("inside-command", progress["lastCommandOpen"]),
+              ("between-commands", bool(progress["commandsStarted"])), ("flow-setup", progress["flowStarted"] or found == "found"),
+              ("driver-channel", progress["runnerAlreadyRunning"] or progress["runnerInstallDone"] or progress["xcodebuildDone"]),
+              ("driver-install", progress["runnerInstallStarted"]), ("before-driver", complete))
+    progress["furthestStage"] = next((stage for stage, proven in stages if proven), None)
+    return progress
+
+
+def run_maestro(command, environment, log, timeout):
+    # A new session puts Maestro and its host children, such as xcodebuild, in one group that a timeout or interruption stops together.
+    process = subprocess.Popen(command, cwd=REPO, env=environment, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        return process.wait(timeout=timeout)
+    except BaseException:
+        # Only an unreaped leader still reserves its group id; after a normal wait that id may name an unrelated group.
+        if process.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGKILL)
+            process.wait()
+        raise
+
+
 def capture_failure_screenshot(platform, device, name):
     root = directory()
     target = root / f"artifacts/screenshots/native/{name}.png"
@@ -281,13 +407,13 @@ def export_failed_step_hierarchy(traces, fixture, name, details):
         return False
 
 
-def capture_failure_hierarchy(tool, device, fixture, name):
+def capture_failure_hierarchy(tool, device, fixture, name, environment):
     root = directory()
     source = root / f"private/{name}-hierarchy.json"
     try:
         with source.open("wb") as output, (root / f"private/{name}-hierarchy.log").open("wb") as log:
             completed = subprocess.run([tool, "--device", device["id"], "hierarchy", "--no-reinstall-driver", "--no-ansi"],
-                                       cwd=REPO, env=maestro_environment(), check=False, timeout=60, stdout=output, stderr=log)
+                                       cwd=REPO, env=environment, check=False, timeout=60, stdout=output, stderr=log)
         if completed.returncode != 0:
             print(f"Failure hierarchy unavailable (exit-status={completed.returncode}): {name}", flush=True)
             return
@@ -354,6 +480,14 @@ def run_journey(platform, app, flow, results, backend_expected=True):
             command[-1:-1] = ["--env", f"{variable}={fixture[key]}"]
     if results and platform == "android":
         command.insert(4, "--no-reinstall-driver")
+    environment, state = maestro_environment(), None
+    if platform == "ios":
+        # Each iOS invocation logs into its own state folder, so its progress cannot mix with another Maestro session's log.
+        (root / "private/maestro-state").mkdir(exist_ok=True)
+        state = Path(tempfile.mkdtemp(prefix=f"{app}-{name}-", dir=root / "private/maestro-state"))
+        environment["XDG_STATE_HOME"] = str(state)
+        # The progress parser reads Maestro's default record format, which this variable would replace.
+        environment.pop("MAESTRO_CLI_LOG_PATTERN_FILE", None)
     print(f"Running {platform}: {app}/{name}", flush=True)
     # The emulator reaches the API only through adb reverse mappings, which vanish when its adb connection restarts.
     preflight, blocked = connectivity.prepare(device["id"], backend_expected) if platform == "android" else (None, None)
@@ -366,9 +500,8 @@ def run_journey(platform, app, flow, results, backend_expected=True):
         # A failed journey runs once: a replay would start from app and server state it already changed, such as a completed sign-in.
         try:
             with (root / f"private/{app}-{name}.log").open("wb") as log:
-                completed = subprocess.run(command, cwd=REPO, env=maestro_environment(), check=False, timeout=1200 if platform == "ios" else 600, stdout=log, stderr=subprocess.STDOUT)
-            passed = completed.returncode == 0
-            exit_code = completed.returncode
+                exit_code = run_maestro(command, environment, log, 1200 if platform == "ios" else 600)
+            passed = exit_code == 0
             if not passed:
                 reason = failure_kind(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml")
         except subprocess.TimeoutExpired:
@@ -397,9 +530,13 @@ def run_journey(platform, app, flow, results, backend_expected=True):
             # After a failed journey this only observes: repairing here would hide what the journey ran against.
             details["connectivity"] = preflight if blocked else connectivity.observe(device["id"], backend_expected)
         (failures / f"{app}-{name}.json").write_text(json.dumps(details, indent=2))
+        if state:
+            # Read before any later capture starts another Maestro session in the same environment.
+            (root / "artifacts/progress").mkdir(exist_ok=True)
+            (root / f"artifacts/progress/{app}-{name}.json").write_text(json.dumps(maestro_progress(state, screenshots), indent=2))
         if not blocked:
             capture_failure_screenshot(platform, device, f"{app}-{name}")
-            if not original_hierarchy and capture_failure_hierarchy(tool, device, fixture, f"{app}-{name}"):
+            if not original_hierarchy and capture_failure_hierarchy(tool, device, fixture, f"{app}-{name}", environment):
                 details["hierarchySource"] = "post-failure"
                 (failures / f"{app}-{name}.json").write_text(json.dumps(details, indent=2))
     status = "PASS" if passed else f"FAIL ({reason})"
