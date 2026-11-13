@@ -197,6 +197,156 @@ class HarnessTests(unittest.TestCase):
             self.assertIsNone(details["assertionTarget"])
             self.assertNotIn("secret-sentinel", json.dumps(details))
 
+    def test_failed_journey_uses_its_original_hierarchy_and_exports_only_bounded_timings(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(Path(temporary) / "solace-e2e")}, clear=True):
+            root = directory()
+            fixture = {"email": "email-secret-sentinel", "password": "password-secret-sentinel"}
+            private = root / "private"
+            (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+            (private / "fixture.json").write_text(json.dumps(fixture))
+            (private / "maestro-path").write_text("synthetic-maestro")
+            original = {"attributes": {"text": "Original failed screen email-secret-sentinel", "private": "never-export"},
+                        "children": [{"attributes": {"resource-id": "sign-in-password", "text": "password-secret-sentinel"}}]}
+            original_available = True
+            def execute(command, **options):
+                if "test" in command:
+                    traces = private / "maestro/calendar-synthetic/flow"
+                    hierarchy = traces / "screen-hierarchy"
+                    hierarchy.mkdir(parents=True, exist_ok=True)
+                    if original_available:
+                        (hierarchy / "step-007-private-selector-sentinel.json").write_text(json.dumps(original))
+                    entries = [
+                        {"command": {"tapOnElement": {}}, "metadata": {"status": "COMPLETED", "timestamp": 99000, "duration": 100}},
+                        {"command": {"assertConditionCommand": {"text": "private-selector-sentinel"}},
+                         "metadata": {"status": "FAILED", "timestamp": 100000, "duration": 45000, "sequenceNumber": 6,
+                                      "evaluatedCommand": {"assertConditionCommand": {"timeout": "30000", "text": "private-selector-sentinel"}}}},
+                    ]
+                    (traces / "commands.json").write_text(json.dumps(entries))
+                    options["stdout"].write(b"Assertion is false")
+                    return journeys.subprocess.CompletedProcess(command, 1)
+                options["stdout"].write(json.dumps({"attributes": {"text": "Later restarted driver screen"}}).encode())
+                return journeys.subprocess.CompletedProcess(command, 0)
+            with patch.object(journeys.subprocess, "run", side_effect=execute) as commands, \
+                    patch.object(journeys, "capture_failure_screenshot"), redirect_stdout(io.StringIO()):
+                self.assertFalse(journeys.run_journey("ios", "calendar", Path("synthetic.yaml"), []))
+            target = root / "artifacts/hierarchy/calendar-synthetic.json"
+            self.assertEqual(json.loads(target.read_text()), journeys.sanitized_hierarchy(original, fixture))
+            self.assertEqual(commands.call_count, 1)
+            details = json.loads((root / "artifacts/failures/calendar-synthetic.json").read_text())
+            self.assertEqual(details["commandDurationMs"], 45000)
+            self.assertEqual(details["msSincePreviousTap"], 900)
+            self.assertEqual(details["commandTimeoutMs"], 30000)
+            self.assertEqual(details["step"], 7)
+            self.assertEqual(details["hierarchySource"], "failed-step")
+            for path in (root / "artifacts").rglob("*"):
+                self.assertNotIn("private-selector-sentinel", path.name)
+                if path.is_file():
+                    self.assertNotIn("secret-sentinel", path.read_text())
+                    self.assertNotIn("never-export", path.read_text())
+            original_available = False
+            (private / "maestro/calendar-synthetic/flow/screen-hierarchy/step-007-private-selector-sentinel.json").unlink()
+            with patch.object(journeys.subprocess, "run", side_effect=execute) as commands, \
+                    patch.object(journeys, "capture_failure_screenshot"), redirect_stdout(io.StringIO()):
+                self.assertFalse(journeys.run_journey("ios", "calendar", Path("synthetic.yaml"), []))
+            self.assertEqual(commands.call_count, 2)
+            details = json.loads((root / "artifacts/failures/calendar-synthetic.json").read_text())
+            self.assertEqual(details["hierarchySource"], "post-failure")
+            self.assertEqual(json.loads(target.read_text())["attributes"]["text"], "Later restarted driver screen")
+
+    def test_recovered_assertion_does_not_replace_a_later_unknown_failure(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(Path(temporary) / "solace-e2e")}, clear=True):
+            root = directory()
+            traces = root / "private/traces"
+            hierarchy = traces / "screen-hierarchy"
+            hierarchy.mkdir(parents=True)
+            entries = [
+                {"command": {"runFlowCommand": {}}, "metadata": {"status": "FAILED", "sequenceNumber": 0}},
+                {"command": {"assertConditionCommand": {}}, "metadata": {"status": "FAILED", "sequenceNumber": 2}},
+                {"command": {"assertConditionCommand": {}}, "metadata": {"status": "COMPLETED", "sequenceNumber": 3}},
+                {"command": {"backCommand": {}}, "metadata": {"status": "FAILED", "sequenceNumber": 8}},
+            ]
+            (traces / "commands.json").write_text(json.dumps(entries))
+            (hierarchy / "step-003-stale.json").write_text(json.dumps({"attributes": {"text": "Recovered failure"}}))
+            expected = {"children": [{"attributes": {"text": "Current failure"}, "children": []}]}
+            (hierarchy / "step-009.json").write_text(json.dumps(expected))
+            log = root / "private/journey.log"
+            log.write_text("Failure")
+            details = journeys.failure_details(log, None, traces, "maestro-failure")
+            self.assertEqual(details["command"], "other")
+            self.assertEqual(details["step"], 9)
+            self.assertTrue(journeys.export_failed_step_hierarchy(traces, {}, "calendar-synthetic", details))
+            exported = json.loads((root / "artifacts/hierarchy/calendar-synthetic.json").read_text())
+            self.assertEqual(exported, journeys.sanitized_hierarchy(expected, {}))
+
+    def test_failure_timings_reject_unbounded_or_non_numeric_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            log = root / "log.txt"
+            log.write_text("Assertion is false")
+            traces = root / "traces"
+            traces.mkdir()
+            for invalid in (None, True, -1, 1_200_001, "private-timing-sentinel", {}):
+                with self.subTest(invalid=invalid):
+                    entries = [
+                        {"command": {"tapOnElement": {}}, "metadata": {"status": "COMPLETED", "timestamp": 99000, "duration": invalid}},
+                        {"command": {"assertConditionCommand": {"timeout": invalid}}, "metadata": {"status": "FAILED", "timestamp": 100000, "duration": invalid}},
+                    ]
+                    (traces / "commands.json").write_text(json.dumps(entries))
+                    details = journeys.failure_details(log, None, traces, "assertion")
+                    self.assertIsNone(details["commandDurationMs"])
+                    self.assertIsNone(details["msSincePreviousTap"])
+                    self.assertIsNone(details["commandTimeoutMs"])
+                    self.assertNotIn("private-timing-sentinel", json.dumps(details))
+            for timestamp in (None, True, -1, 98000, 1_500_000, "private-timing-sentinel"):
+                entries[0]["metadata"]["duration"] = 100
+                entries[1]["metadata"].update(timestamp=timestamp, duration=0)
+                (traces / "commands.json").write_text(json.dumps(entries))
+                details = journeys.failure_details(log, None, traces, "assertion")
+                self.assertEqual(details["commandDurationMs"], 0)
+                self.assertIsNone(details["msSincePreviousTap"])
+
+    def test_original_hierarchy_rejects_other_steps_invalid_json_and_path_escapes(self):
+        for kind in ("other-step", "invalid", "array", "oversized", "file-link", "directory-link", "trace-link", "root-link"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary, \
+                    patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(Path(temporary) / "solace-e2e")}, clear=True):
+                root = directory()
+                traces = root / "private/traces"
+                flow = traces / "flow"
+                hierarchy = flow / "screen-hierarchy"
+                hierarchy.mkdir(parents=True)
+                metadata = {"status": "FAILED", "sequenceNumber": 6}
+                entries = [{"command": {"assertConditionCommand": {}}, "metadata": metadata}]
+                (flow / "commands.json").write_text(json.dumps(entries))
+                outside = root / "private/outside"
+                outside.mkdir()
+                external = outside / "step-007-private-filename-sentinel.json"
+                external.write_text(json.dumps({"attributes": {"text": "private-outside-sentinel"}}))
+                target = hierarchy / external.name
+                if kind == "other-step":
+                    (hierarchy / "step-008-private-filename-sentinel.json").write_text(external.read_text())
+                elif kind in ("invalid", "array"):
+                    target.write_text("private-invalid-sentinel" if kind == "invalid" else "[]")
+                elif kind == "oversized":
+                    with target.open("wb") as output:
+                        output.truncate(8 * 1024 * 1024 + 1)
+                elif kind == "file-link":
+                    target.symlink_to(external)
+                elif kind == "directory-link":
+                    hierarchy.rmdir()
+                    hierarchy.symlink_to(outside, target_is_directory=True)
+                elif kind == "trace-link":
+                    (flow / "commands.json").unlink()
+                    (outside / "commands.json").write_text(json.dumps(entries))
+                    (flow / "commands.json").symlink_to(outside / "commands.json")
+                else:
+                    linked = root / "private/linked"
+                    linked.symlink_to(traces, target_is_directory=True)
+                    traces = linked
+                self.assertFalse(journeys.export_failed_step_hierarchy(traces, {}, "calendar-synthetic", {"step": 7, "command": "assertCondition"}))
+                self.assertFalse((root / "artifacts/hierarchy/calendar-synthetic.json").exists())
+
     def test_hierarchy_failures_report_only_fixed_categories(self):
         cases = (("exit-status=7", None, 7, b""), ("invalid-json", None, 0, b"private-invalid-json"),
                  ("invalid-shape", None, 0, b"[]"), ("timeout", journeys.subprocess.TimeoutExpired("private-command", 60), 0, b""),
@@ -356,6 +506,49 @@ class HarnessTests(unittest.TestCase):
                     log.write_text(message)
                     self.assertEqual(journeys.failure_kind(log), expected)
 
+    def test_driver_timeouts_export_only_a_fixed_kind_known_call_and_exact_class(self):
+        secrets = "UDID-sentinel-1B2C https://url-sentinel.test/api body-sentinel cookie-token-sentinel"
+        startup = "xcuitest.installer.LocalXCTestInstaller$IOSDriverTimeoutException"
+        call = "maestro.MaestroException$DriverTimeout"
+        cases = {
+            "startup-class-and-message": (f"{startup}: iOS driver not ready in time, consider increasing timeout by configuring "
+                                          f"MAESTRO_DRIVER_STARTUP_TIMEOUT env variable ({secrets})", None, "driver-timeout", startup, "startup", None),
+            # Fields only refine an existing driver-timeout; the classification itself is not widened.
+            "startup-message-only": (f"Error: iOS driver not ready in time {secrets}", None, "maestro-failure", None, None, None),
+            "known-call": (f"{call}: Maestro driver timed out during tap call with: {{\"errorMessage\": \"{secrets}\"}}", None,
+                           "driver-timeout", call, "call", "tap"),
+            "known-call-in-junit": ("1/1 Flow Failed", f"<testsuite><testcase><failure>Maestro driver timed out during snapshot call with: {secrets}"
+                                    "</failure></testcase></testsuite>", "driver-timeout", None, "call", "snapshot"),
+            "unknown-call": (f"Maestro driver timed out during launchRocket{secrets.split()[0]} call with: {secrets}", None,
+                             "driver-timeout", None, "call", "other"),
+            "call-class-without-message": (f"{call} {secrets}", None, "maestro-failure", call, None, None),
+            "call-class-with-timeout-marker": (f"{call} TimeoutException {secrets}", None, "driver-timeout", call, "call", "other"),
+            # Near matches keep the generic exception behavior and never count as the exact known class or call.
+            "startup-class-suffix": (f"{startup}Extra TimeoutException {secrets}", None, "driver-timeout", None, "other", None),
+            "startup-class-prefix": (f"not.{startup} TimeoutException {secrets}", None, "driver-timeout", None, "other", None),
+            "call-class-suffix": (f"{call}Handler TimeoutException {secrets}", None, "driver-timeout", "maestro.MaestroException", "other", None),
+            "call-class-nested": (f"{call}.Inner TimeoutException {secrets}", None, "driver-timeout", "maestro.MaestroException", "other", None),
+            "callback-is-not-call": (f"Maestro driver timed out during tap callback with: {secrets}", None, "driver-timeout", None, "other", None),
+            "generic-timeout": (f"java.net.SocketTimeoutException: timeout {secrets}", None, "driver-timeout", "java.net.SocketTimeoutException", "other", None),
+            "not-a-timeout": (f"Assertion is false: Welcome back is visible {secrets}", None, "assertion", None, None, None),
+            "driver-connection": (f"maestro.DeviceUnreachableException: {secrets}", None, "driver-connection", "maestro.DeviceUnreachableException", None, None),
+        }
+        for case, (console, report, reason, exception, kind, called) in cases.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                log, junit = Path(temporary) / "journey.log", Path(temporary) / "journey.xml"
+                log.write_text(console)
+                if report:
+                    junit.write_text(report)
+                self.assertEqual(journeys.failure_kind(log, junit), reason)
+                details = journeys.failure_details(log, junit, Path(temporary) / "no-traces", reason, 1)
+                self.assertEqual((details["exceptionType"], details["driverTimeoutKind"], details["driverTimeoutCall"]), (exception, kind, called))
+                self.assertEqual(set(details), {"reason", "exceptionType", "command", "step", "assertionTarget", "exitCode", "commandDurationMs",
+                                                "msSincePreviousTap", "commandTimeoutMs", "driverTimeoutKind", "driverTimeoutCall"})
+                exported = json.dumps(details)
+                for secret in secrets.split():
+                    self.assertNotIn(secret, exported)
+                self.assertNotIn("launchRocket", exported)
+
     def test_journey_output_and_driver_failures_stay_private_but_classified(self):
         timeout = "java.net.SocketTimeoutException"
         cases = {
@@ -417,16 +610,16 @@ class HarnessTests(unittest.TestCase):
                     self.assertNotIn(b"secret-output-sentinel", exported)
                     self.assertNotIn(b"cookie-token-sentinel", exported)
 
-    def test_only_a_disconnected_ios_driver_retries_the_journey_once_with_fresh_evidence(self):
-        unreachable = b"maestro.DeviceUnreachableException: Device became unreachable during viewHierarchy"
+    def test_a_failed_journey_never_replays_and_keeps_its_first_attempt_evidence(self):
+        # PR188 Mail: the first attempt signed in before the driver dropped, so a replay from the top waited for a sign-in screen that no longer existed.
+        unreachable = b"first-attempt-sentinel\nmaestro.DeviceUnreachableException: Device became unreachable during viewHierarchy"
         cases = {
-            "recovers": ("ios", [(unreachable, 1), (b"1/1 Flow Passed", 0)], True, None),
-            "stays-unreachable": ("ios", [(unreachable, 1), (unreachable, 1)], False, "driver-connection"),
-            "unreachable-after-timeout": ("ios", [(b"java.net.SocketTimeoutException\n" + unreachable, 1), (b"1/1 Flow Passed", 0)], True, None),
-            "assertion": ("ios", [(b"Assertion is false: sign-in-email is visible", 1)], False, "assertion"),
-            "android-unreachable": ("android", [(unreachable, 1)], False, "driver-connection"),
+            "ios-disconnect-after-progress": ("ios", unreachable, "driver-connection"),
+            "ios-unreachable-after-timeout": ("ios", b"first-attempt-sentinel\njava.net.SocketTimeoutException\n" + unreachable, "driver-connection"),
+            "ios-assertion": ("ios", b"first-attempt-sentinel\nAssertion is false: sign-in-email is visible", "assertion"),
+            "android-disconnect": ("android", unreachable, "driver-connection"),
         }
-        for case, (platform, attempts, passed, reason) in cases.items():
+        for case, (platform, output, reason) in cases.items():
             with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary) / "solace-e2e"
                 with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
@@ -434,24 +627,38 @@ class HarnessTests(unittest.TestCase):
                     (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
                     (private / "fixture.json").write_text(json.dumps({"email": "journey@solace.test", "password": "synthetic"}))
                     (private / "maestro-path").write_text("synthetic-maestro")
-                    outcomes = iter(attempts)
-                    evidence = private / "maestro/calendar-synthetic/first-attempt.png"
-                    stale_evidence = []
+                    evidence = private / "maestro/mail-synthetic/first-attempt.png"
+                    invocations = []
                     def maestro(command, **options):
-                        stale_evidence.append(evidence.exists())
-                        evidence.write_bytes(b"screenshot")
-                        output, code = next(outcomes)
+                        invocations.append(command)
+                        report = Path(command[command.index("--output") + 1])
+                        if len(invocations) > 1:
+                            # A replay against the already signed-in app would pass or fail for reasons unrelated to the first run.
+                            report.write_text('<testsuites><testsuite name="replay-sentinel"/></testsuites>')
+                            options["stdout"].write(b"replay-sentinel\n1/1 Flow Passed")
+                            return journeys.subprocess.CompletedProcess([], 0)
+                        evidence.write_bytes(b"signed-in-before-disconnect")
+                        report.write_text('<testsuites><testsuite name="first-attempt-report"><testcase name="synthetic"/></testsuite></testsuites>')
                         options["stdout"].write(output)
-                        return journeys.subprocess.CompletedProcess([], code)
-                    results = []
+                        return journeys.subprocess.CompletedProcess([], 1)
+                    results, console = [], io.StringIO()
                     with patch.object(journeys.subprocess, "run", side_effect=maestro), \
                             patch.object(connectivity, "prepare", return_value=({**ANDROID_READY, "reverseRestored": False}, None)), \
                             patch.object(connectivity, "observe", return_value=ANDROID_READY), \
                             patch.object(journeys, "capture_failure_screenshot"), \
-                            patch.object(journeys, "capture_failure_hierarchy"), redirect_stdout(io.StringIO()):
-                        self.assertEqual(journeys.run_journey(platform, "calendar", Path("synthetic.yaml"), results), passed)
-                    self.assertEqual(stale_evidence, [False] * len(attempts))
-                    self.assertEqual([(result["passed"], result["reason"]) for result in results], [(passed, reason)])
+                            patch.object(journeys, "capture_failure_hierarchy"), redirect_stdout(console):
+                        self.assertFalse(journeys.run_journey(platform, "mail", Path("synthetic.yaml"), results))
+                    self.assertEqual(len(invocations), 1)
+                    self.assertNotIn("Retrying", console.getvalue())
+                    self.assertEqual([(result["passed"], result["reason"]) for result in results], [(False, reason)])
+                    self.assertEqual(evidence.read_bytes(), b"signed-in-before-disconnect")
+                    log = (private / "mail-synthetic.log").read_bytes()
+                    self.assertIn(b"first-attempt-sentinel", log)
+                    self.assertNotIn(b"replay-sentinel", log)
+                    report = (private / "mail-synthetic.xml").read_text()
+                    self.assertIn("first-attempt-report", report)
+                    self.assertNotIn("replay-sentinel", report)
+                    self.assertEqual(json.loads((root / "artifacts/failures/mail-synthetic.json").read_text())["reason"], reason)
 
     def test_android_journeys_start_only_when_the_api_and_both_port_mappings_are_reachable(self):
         ready = {"backendAlive": True, "hostHealthy": True, "deviceState": "device", "reverse": {"4001": True, "59000": True}}
@@ -506,8 +713,8 @@ class HarnessTests(unittest.TestCase):
                     results = []
                     printed = io.StringIO()
                     with patch.object(journeys.subprocess, "run", side_effect=tools), patch.object(connectivity, "wait_url", side_effect=health), \
-                            patch.object(journeys, "capture_failure_screenshot") as screenshot, patch.object(journeys, "capture_failure_hierarchy"), \
-                            redirect_stdout(printed):
+                            patch.object(journeys, "capture_failure_screenshot") as screenshot, \
+                            patch.object(journeys, "capture_failure_hierarchy") as hierarchy, redirect_stdout(printed):
                         options = {} if backend_expected else {"backend_expected": False}
                         passed = journeys.run_journey("android", "calendar", Path("synthetic.yaml"), results, **options)
                     maestro = [index for index, command in enumerate(calls) if command[0] == "synthetic-maestro"]
@@ -527,10 +734,13 @@ class HarnessTests(unittest.TestCase):
                     if reason is None:
                         self.assertFalse(failure.exists())
                     else:
+                        # A journey that never ran keeps the same fixed schema, with every per-step field null.
                         self.assertEqual(json.loads(failure.read_text()), {
                             "reason": reason, "exceptionType": None, "command": None, "step": None, "assertionTarget": None,
-                            "exitCode": None, "connectivity": exported})
+                            "exitCode": None, "commandDurationMs": None, "msSincePreviousTap": None, "commandTimeoutMs": None,
+                            "driverTimeoutKind": None, "driverTimeoutCall": None, "hierarchySource": None, "connectivity": exported})
                         screenshot.assert_not_called()
+                        hierarchy.assert_not_called()
                     evidence = printed.getvalue() + "".join(path.read_text(errors="replace") for path in (root / "artifacts").rglob("*") if path.is_file())
                     self.assertNotIn("private-adb-sentinel", evidence)
                     self.assertNotIn("private-response-sentinel", evidence)
@@ -630,7 +840,7 @@ class HarnessTests(unittest.TestCase):
             unknown = {"command": {"secret-output-sentinel": {"text": "private-cookie-sentinel"}}, "metadata": {"status": "FAILED"}}
             (traces / "commands.json").write_text(json.dumps([unknown]))
             details = journeys.failure_details(log, report, traces, "maestro-failure")
-            self.assertIsNone(details["command"])
+            self.assertEqual(details["command"], "other")
             self.assertIsNone(details["exceptionType"])
             outside = root / "outside.json"
             outside.write_text(json.dumps([{"command": {"inputText": {}}, "metadata": {"status": "FAILED"}}]))
