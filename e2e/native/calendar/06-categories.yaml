@@ -82,11 +82,18 @@ appId: ${APP_ID}
 - tapOn: "Categories(,.*)?"
 - tapOn: "Maestro category.*"
 - waitForAnimationToEnd
-- tapOn:
-    id: category-name
-    point: 95%,50%
-    retryTapIfNoChange: false
-- eraseText
+- retry:
+    maxRetries: 1
+    commands:
+      - tapOn:
+          id: category-name
+          point: 95%,50%
+          retryTapIfNoChange: false
+      - waitForAnimationToEnd
+      - eraseText
+      - assertNotVisible:
+          id: category-name
+          text: "Maestro.*"
 - waitForAnimationToEnd
 - runFlow:
     file: ../common/refocus-input.yaml
