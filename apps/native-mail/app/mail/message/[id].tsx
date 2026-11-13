@@ -227,7 +227,8 @@ export default function MailMessageScreen() {
                       ),
                   );
                 }}
-                decryptionFailed={Boolean(content.decryptError)}
+                readState={content.readState}
+                messageContext={content.messageContext}
                 attachments={content.threadAttachments}
                 downloadingBlobId={actions.downloadingBlobId}
                 onOpenAttachment={actions.handleOpenAttachment}

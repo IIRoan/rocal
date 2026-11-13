@@ -1,10 +1,13 @@
 import React from "react";
-import { Key, Shield } from "lucide-react";
+import { Key, Mail, Shield } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import { usePrivateSearchIndexControls } from "@/hooks/use-private-search-index-controls";
 import { PasswordSection } from "./password-section";
 import { PrivateSearchIndexToggle } from "./private-search-index-toggle";
-import { EVENT_ENCRYPTION_HINT } from "@workspace/calendar-core";
+import {
+  EVENT_ENCRYPTION_HINT,
+  MAIL_ENCRYPTION_HINT,
+} from "@workspace/calendar-core";
 import {
   PaletteIconBox,
   PaletteNavRow,
@@ -51,6 +54,22 @@ export function SecuritySettings({
             </div>
             <div className="text-[13px] leading-[130%] text-muted-foreground">
               {EVENT_ENCRYPTION_HINT}
+            </div>
+          </div>
+        </div>
+      </PaletteSection>
+
+      <PaletteSection label="Mail Encryption">
+        <div className="flex items-start gap-3 p-2">
+          <PaletteIconBox>
+            <Mail className="size-4" />
+          </PaletteIconBox>
+          <div className="min-w-0">
+            <div className="text-[15px] leading-[130%] text-foreground">
+              Mail Encryption
+            </div>
+            <div className="text-[13px] leading-[130%] text-muted-foreground">
+              {MAIL_ENCRYPTION_HINT}
             </div>
           </div>
         </div>

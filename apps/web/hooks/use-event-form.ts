@@ -882,7 +882,7 @@ export function useEventForm({
               "Invalid data - please check all fields and try again";
           }
         } else if (error.statusCode === 404) {
-          errorMessage = "Event not found - it may have been deleted";
+          errorMessage = "This event is no longer available.";
           setSelectedEvent(null);
         } else if (error.statusCode === 403) {
           errorMessage = "You don't have permission to save this event";

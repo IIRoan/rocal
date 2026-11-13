@@ -7,23 +7,16 @@ import {
   MAIL_READABLE_METADATA,
   MAIL_KEY_CONTINUITY_ENABLED,
   type MailSenderKeyTrustState,
+  type MailSecurityNoticeInput,
 } from "@workspace/calendar-core";
 import { DropdownPanel } from "@workspace/ui/solace";
 import { Button } from "@workspace/ui/components/ui/button";
 import { cn } from "@workspace/ui/lib/utils";
-import type {
-  MailSignatureVerificationState,
-  MessageEncryptionState,
-} from "@/lib/mail/types";
-
-export function MailSecurityBadge(props: {
-  messageState: MessageEncryptionState;
-  accountEncryptedAtRest: boolean;
-  signatureVerificationState: MailSignatureVerificationState;
-  decryptionFailed: boolean;
-  senderKeyTrustState?: MailSenderKeyTrustState;
-  senderEmail?: string;
-}) {
+export function MailSecurityBadge(
+  props: MailSecurityNoticeInput & {
+    senderEmail?: string;
+  },
+) {
   const meta = getMailSecurityNotice(props);
   const Icon =
     meta.tone === "encrypted"

@@ -11,6 +11,7 @@ import { Feather } from "@expo/vector-icons";
 import type { Passkey as AuthPasskey } from "@better-auth/passkey/client";
 import {
   EVENT_ENCRYPTION_HINT,
+  MAIL_ENCRYPTION_HINT,
   getErrorMessage,
 } from "@workspace/calendar-core";
 import { SettingsPage } from "../SettingsPage";
@@ -147,13 +148,20 @@ export function SecuritySettingsContent() {
   return (
     <SettingsPage title="Security">
       <SheetScroll>
-        <SheetSection title="Encryption" footer={EVENT_ENCRYPTION_HINT}>
+        <SheetSection
+          title="Encryption"
+          footer={APP_SCHEME === CALENDAR_SCHEME ? EVENT_ENCRYPTION_HINT : MAIL_ENCRYPTION_HINT}
+        >
           <SheetGroup>
             <SheetSwitchItem
               key="title-index"
               icon="search"
               label="On-device search index"
-              detail={APP_SCHEME === CALENDAR_SCHEME ? "On by default. Keep an encrypted search index of your events on this device." : "On by default. Keep an encrypted index of recent mail and excerpts on this device. Older mail may be missing."}
+              detail={
+                APP_SCHEME === CALENDAR_SCHEME
+                  ? "On by default. Keep an encrypted search index of your events on this device."
+                  : "On by default. Keep an encrypted index of recent mail and excerpts on this device. Search covers only indexed mail."
+              }
               value={titleIndexEnabled}
               onValueChange={(value) => {
                 setTitleIndexEnabled(value);

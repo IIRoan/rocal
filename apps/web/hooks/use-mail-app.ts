@@ -1,6 +1,6 @@
 "use client";
 
-import type { MailSenderKeyTrustState } from "@workspace/calendar-core";
+import type { MailReadState, MailSenderKeyTrustState } from "@workspace/calendar-core";
 
 import { getMailDraftSizeError, getMailReadLimitNotice, limitMailDisplayContent } from "@workspace/calendar-core/mail-mime-limits";
 
@@ -39,6 +39,7 @@ import {
   resolveEncryptionInternalDomain,
   shouldEncryptOutgoingMail,
   isMailAccountEncryptedAtRest,
+  resolveMailReadState,
   type JmapAttachmentInput,
   type OutgoingMimeAttachment,
   resolveAttachmentPreviewKind,
@@ -315,6 +316,10 @@ export function useMailApp() {
   const [selectedMessagePlaintext, setSelectedMessagePlaintext] = useState<
     string | null
   >(null);
+  const [selectedMessageRead, setSelectedMessageRead] = useState<{
+    messageId: string;
+    state: MailReadState;
+  } | null>(null);
   const [
     selectedMessageSignatureVerificationState,
     setSelectedMessageSignatureVerificationState,
@@ -957,6 +962,7 @@ export function useMailApp() {
         queueMicrotask(() => {
           if (isCancelled()) return;
           setSelectedMessagePlaintext(null);
+          setSelectedMessageRead(null);
           setSelectedMessageDecryptedHtml(null);
           setSelectedMessageDecryptedAttachments(null);
           setSelectedMessageSignatureVerificationState("not_signed");
@@ -974,6 +980,7 @@ export function useMailApp() {
         queueMicrotask(() => {
           if (isCancelled()) return;
           setSelectedMessagePlaintext(null);
+          setSelectedMessageRead(null);
           setSelectedMessageDecryptedHtml(null);
           setSelectedMessageDecryptedAttachments(null);
           setSelectedMessageSignatureVerificationState("not_signed");
@@ -986,6 +993,10 @@ export function useMailApp() {
       queueMicrotask(() => {
         if (isCancelled()) return;
         setSelectedMessageIsDecrypting(true);
+        setSelectedMessageRead({
+          messageId: selectedMessage.id,
+          state: "pending",
+        });
         setSelectedMessageDecryptError(null);
         setSelectedMessageDecryptedAttachments(
           encState === "pgp_mime" ? [] : null,
@@ -1008,11 +1019,9 @@ export function useMailApp() {
             selectedMessage.bodyStructure,
           );
           if (!blobId) {
-            setSelectedMessageDecryptError(
+            throw new Error(
               "Message not decrypted: its encrypted part is missing. Ask the sender to send it again.",
             );
-            setSelectedMessageIsDecrypting(false);
-            return;
           }
           armoredMessage = await mailbox.client.getBlobAsText(
             mailbox.session,
@@ -1043,6 +1052,10 @@ export function useMailApp() {
         if (decrypted.rawMimeFallback) {
           log.warn("Failed to parse decrypted MIME");
           setSelectedMessagePlaintext(shown.text);
+          setSelectedMessageRead({
+            messageId: selectedMessage.id,
+            state: "decrypted",
+          });
           setSelectedMessageDecryptedHtml(null);
           setSelectedMessageDecryptedAttachments(
             encState === "pgp_mime" ? [] : null,
@@ -1056,6 +1069,10 @@ export function useMailApp() {
         }
         setSelectedMessageDecryptedHtml(shown.html);
         setSelectedMessagePlaintext(shown.text);
+        setSelectedMessageRead({
+          messageId: selectedMessage.id,
+          state: "decrypted",
+        });
         if (encState === "pgp_mime") {
           setSelectedMessageDecryptedAttachments(
             listedDecryptedAttachments(decrypted.attachments),
@@ -1072,6 +1089,10 @@ export function useMailApp() {
         if (isCancelled()) return;
         log.warn("Failed to decrypt message", error);
         setSelectedMessagePlaintext(null);
+        setSelectedMessageRead({
+          messageId: selectedMessage.id,
+          state: resolveMailReadState({ error, decrypted: false }),
+        });
         setSelectedMessageDecryptedHtml(null);
         setSelectedMessageDecryptedAttachments(
           encState === "pgp_mime" ? [] : null,
@@ -3198,6 +3219,7 @@ export function useMailApp() {
     setActiveMailbox(null);
     setSelectedMessageId(null);
     setSelectedMessagePlaintext(null);
+    setSelectedMessageRead(null);
     setSelectedMessageDecryptedHtml(null);
     setSelectedMessageSignatureVerificationState("not_signed");
     setSelectedMessageSenderKeyTrustState(undefined);
@@ -3401,6 +3423,16 @@ export function useMailApp() {
       }
     : null;
 
+  let selectedMessageReadState: MailReadState = "pending";
+  if (
+    !isMessageBodyLoading &&
+    selectedMessageRead &&
+    selectedMessage &&
+    selectedMessageRead.messageId === selectedMessage.id
+  ) {
+    selectedMessageReadState = selectedMessageRead.state;
+  }
+
   return {
     session,
     isSessionPending,
@@ -3432,6 +3464,7 @@ export function useMailApp() {
     selectedMessageSenderKeyTrustState,
     selectedMessageDecryptError,
     selectedMessageIsDecrypting,
+    selectedMessageReadState,
     isPaletteOpen,
     setIsPaletteOpen,
     refreshMailboxMessages,

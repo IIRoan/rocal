@@ -37,7 +37,7 @@ it("opens explicit changed-sender review from the reader notice and does not cla
       <MailSecurityBadge
         messageState="inline_pgp"
         accountEncryptedAtRest
-        decryptionFailed={false}
+        readState="decrypted"
         signatureVerificationState="failed"
         senderKeyTrustState={{
           kind: "key_changed",
@@ -60,3 +60,32 @@ it("opens explicit changed-sender review from the reader notice and does not cla
   expect(container.textContent).toContain("Reopen this message");
   act(() => root.unmount());
 });
+
+it.each([
+  {
+    readState: "decrypted" as const,
+    expected:
+      "The body and attachments inside the encrypted MIME payload are protected.",
+  },
+  { readState: "read_limit" as const, expected: "Reading limit reached" },
+  { readState: "pending" as const, expected: "PGP content detected" },
+])(
+  "renders the MIME reading outcome: $readState",
+  ({ readState, expected }) => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        <MailSecurityBadge
+          messageState="pgp_mime"
+          accountEncryptedAtRest
+          readState={readState}
+        />,
+      ),
+    );
+    expect(container.textContent).toContain(expected);
+    expect(container.textContent).not.toMatch(/\bmay\b/i);
+    expect(container.textContent).not.toContain("Decryption failed");
+    act(() => root.unmount());
+  },
+);

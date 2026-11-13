@@ -451,6 +451,7 @@ jest.mock("../../components/mail/message-list", () => ({
 jest.mock("../../components/mail/message-reader", () => ({
   MessageReader: ({
     message,
+    readState,
     conversationMessages = [],
     onReply,
     onReplyAll,
@@ -459,7 +460,7 @@ jest.mock("../../components/mail/message-reader", () => ({
     onPreviewAttachment,
   }: any) =>
     message ? (
-      <div>
+      <div data-mail-read-state={readState}>
         <button type="button" aria-label="Close message" onClick={onClose} />
         <div>{message.subject}</div>
         <button type="button" aria-label="Preview image" onClick={() => onPreviewAttachment?.({ name: "synthetic.png", type: "image/png", content: new Uint8Array([1, 2, 3]) })}>
@@ -901,6 +902,8 @@ describe("MailApp", () => {
       vaultVersion: 1,
       createdAt: "2026-05-06T21:00:00.000Z",
     });
+    mockWorkerClient.decryptMessage.mockReset();
+    mockJmapClient.getBlobAsText.mockReset();
     mockWorkerClient.getVerificationContext.mockReturnValue(mockVerificationContext);
     mockWorkerClient.isVerificationContextCurrent.mockReturnValue(true);
     mockJmapClient.uploadPreparedAttachment.mockReset();
@@ -1062,6 +1065,65 @@ describe("MailApp", () => {
       refetch: jest.fn(() => Promise.resolve()),
     });
   }
+
+  it.each([
+    { outcome: "decrypted", error: null, missingPayload: false },
+    {
+      outcome: "read_limit",
+      error: "Mail MIME exceeds its structural limit.",
+      missingPayload: false,
+    },
+    { outcome: "failed", error: "Invalid ciphertext", missingPayload: false },
+    { outcome: "failed", error: null, missingPayload: true },
+  ])("passes the actual MIME reader outcome to the popup: $outcome ($missingPayload)", async ({ outcome, error, missingPayload }) => {
+    const message = {
+      id: "mime-message",
+      subject: "Encrypted MIME message",
+      from: [{ email: "bob@solace.onl" }],
+      receivedAt: "2026-11-13T10:00:00Z",
+      bodyValues: {},
+      bodyStructure: {
+        type: "multipart/encrypted",
+        subParts: [
+          { type: "application/pgp-encrypted" },
+          {
+            type: "application/octet-stream",
+            blobId: missingPayload ? undefined : "ciphertext",
+          },
+        ],
+      },
+    };
+    mockJmapClient.getMailboxMessages.mockResolvedValue({
+      messages: [message],
+      total: 1,
+    });
+    mockJmapClient.getMessagesByIds.mockResolvedValue([message]);
+    mockJmapClient.getThreadMessages.mockResolvedValue([message]);
+    mockJmapClient.getBlobAsText.mockResolvedValue("synthetic ciphertext");
+    if (error) {
+      mockWorkerClient.decryptMessage.mockRejectedValue(new Error(error));
+    } else {
+      mockWorkerClient.decryptMessage.mockResolvedValue({
+        plaintext: "Decrypted MIME body",
+        hasVerifiedSignature: false,
+        signatureVerificationState: "not_signed",
+      });
+    }
+    await renderApp();
+    await waitForExpectation(() =>
+      expect(container.textContent).toContain(message.subject),
+    );
+    await act(async () => {
+      Array.from(container.querySelectorAll("button"))
+        .find((button) => button.textContent === message.subject)
+        ?.click();
+    });
+    await waitForExpectation(() =>
+      expect(
+        container.querySelector("[data-mail-read-state]")?.getAttribute("data-mail-read-state"),
+      ).toBe(outcome),
+    );
+  });
 
   it("releases each replaced, closed and unmounted attachment URL once in Strict Mode", async () => {
     const previousCreate = Object.getOwnPropertyDescriptor(URL, "createObjectURL");

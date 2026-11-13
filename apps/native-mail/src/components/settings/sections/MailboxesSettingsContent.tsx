@@ -118,7 +118,7 @@ export function MailboxesSettingsContent() {
     if (!runtime) return;
     Alert.alert(
       "Delete mailbox?",
-      `Delete “${getMailboxDisplayName(mailbox)}”? Messages in it may be removed.`,
+      `Delete “${getMailboxDisplayName(mailbox)}”? Move messages to another mailbox before deleting this one.`,
       [
         { text: "Cancel", style: "cancel" },
         {

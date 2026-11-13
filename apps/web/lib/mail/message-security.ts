@@ -3,6 +3,7 @@ import {
   getMailSecurityNotice,
   isCompleteArmoredPgpMessage,
   stripHtmlTags,
+  type MailReadState,
 } from "@workspace/calendar-core";
 import type {
   JmapBodyStructure,
@@ -146,7 +147,7 @@ export function resolveMessageSecurityLabel(input: {
   messageState: MessageEncryptionState;
   accountEncryptedAtRest: boolean;
   signatureVerificationState: MailSignatureVerificationState;
-  decryptionFailed: boolean;
+  readState: MailReadState;
 }): string {
   return getMailSecurityNotice(input).label;
 }

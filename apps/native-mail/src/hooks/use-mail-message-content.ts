@@ -1,4 +1,8 @@
-import { MAIL_KEY_CONTINUITY_ENABLED } from "@workspace/calendar-core";
+import {
+  MAIL_KEY_CONTINUITY_ENABLED,
+  resolveMailMessageContext,
+  resolveMailReadState,
+} from "@workspace/calendar-core";
 import { useQuery } from "@tanstack/react-query";
 import { limitMailDisplayContent } from "@workspace/calendar-core/mail-mime-limits";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
@@ -66,13 +70,15 @@ export function useMailMessageContent(messageId: string) {
 
   const { html: htmlContent, text: plainContent } = limitMailDisplayContent({
     html: decryptResult?.html ?? (isEncrypted ? null : (bodies?.html ?? null)),
-    text: decryptResult?.plaintext ?? (isEncrypted ? null : (bodies?.text ?? null)),
+    text:
+      decryptResult?.plaintext ?? (isEncrypted ? null : (bodies?.text ?? null)),
     truncated: decryptResult?.truncated,
   });
-  const isDecrypting =
-    isEncrypted && (isDecryptLoading || isDecryptFetching);
+  const isDecrypting = isEncrypted && (isDecryptLoading || isDecryptFetching);
   const decryptError = isEncrypted ? decryptQueryError : null;
-  const rawHtmlSource = limitMailDisplayContent({ html: decryptResult?.html ?? bodies?.html ?? null }).html;
+  const rawHtmlSource = limitMailDisplayContent({
+    html: decryptResult?.html ?? bodies?.html ?? null,
+  }).html;
 
   const displayAttachments = resolveDisplayAttachments({
     encryption,
@@ -119,6 +125,14 @@ export function useMailMessageContent(messageId: string) {
     isDecryptSuccess,
     isDecrypting,
     decryptError,
+    readState: resolveMailReadState({
+      error: decryptError,
+      decrypted: isDecryptSuccess,
+      isDecrypting,
+    }),
+    messageContext: message
+      ? resolveMailMessageContext(message, runtime?.mailboxes ?? [])
+      : "received",
     refetchDecrypt,
     htmlContent,
     plainContent,
