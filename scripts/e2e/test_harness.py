@@ -4,9 +4,11 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
 from contextlib import redirect_stdout
@@ -21,9 +23,96 @@ specification = importlib.util.spec_from_file_location("native_journeys", Path(_
 journeys = importlib.util.module_from_spec(specification)
 specification.loader.exec_module(journeys)
 ANDROID_READY = {"backendAlive": True, "hostHealthy": True, "deviceState": "device", "reverse": {"4001": True, "59000": True}}
+RUN_MAESTRO = journeys.run_maestro
+# A Maestro stand-in: its host child signals readiness, then acts only once the test opens the gate after the parent's deadline.
+GATED_PARENT = """
+import pathlib, subprocess, sys, time
+work = pathlib.Path(sys.argv[1])
+child = '''
+import os, pathlib, sys, time
+work = pathlib.Path(sys.argv[1])
+(work / "child-ready").write_text(str(os.getpid()))
+deadline = time.monotonic() + 60
+while not (work / "gate").exists() and time.monotonic() < deadline:
+    time.sleep(0.02)
+(work / "acted").write_text("child acted")
+'''
+subprocess.Popen([sys.executable, "-c", child, str(work)])
+while not (work / "child-ready").exists():
+    time.sleep(0.02)
+print("leader-ready", flush=True)
+if sys.argv[2] == "sleep":
+    time.sleep(600)
+"""
 
 
 class HarnessTests(unittest.TestCase):
+    def setUp(self):
+        # Journey tests answer Maestro through their subprocess.run fakes; the owned process group is tested with real processes below.
+        routed = patch.object(journeys, "run_maestro", side_effect=lambda command, environment, log, timeout: journeys.subprocess.run(
+            command, cwd=journeys.REPO, env=environment, check=False, timeout=timeout, stdout=log, stderr=journeys.subprocess.STDOUT).returncode)
+        routed.start()
+        self.addCleanup(routed.stop)
+
+    def gated_maestro(self, mode, timeout):
+        work = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: (work / "gate").touch())
+        log_path = work / "maestro.log"
+        reserved, real_killpg = [], os.killpg
+        def killpg(group, number):
+            # Signal 0 reaches an unreaped leader; once reaped, its id is free for reuse and must never be signaled as a group.
+            try:
+                os.kill(group, 0)
+                reserved.append(True)
+            except ProcessLookupError:
+                reserved.append(False)
+            real_killpg(group, number)
+        with log_path.open("wb") as log, patch.object(journeys.os, "killpg", side_effect=killpg):
+            try:
+                code = RUN_MAESTRO([sys.executable, "-c", GATED_PARENT, str(work), mode], dict(os.environ), log, timeout)
+            except BaseException as error:
+                code = error
+        self.assertTrue(all(reserved))
+        self.assertEqual(len(reserved), 0 if mode == "exit" else 1)
+        # The child was alive and ready before the parent's deadline, so a missing action below is never a startup race.
+        self.assertTrue((work / "child-ready").exists())
+        self.assertIn(b"leader-ready", log_path.read_bytes())
+        (work / "gate").touch()
+        time.sleep(0.5)
+        return code, (work / "acted").exists()
+
+    def test_maestro_keeps_normal_exit_codes_output_and_never_kills_a_reaped_group(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(journeys.os, "killpg", wraps=os.killpg) as killpg:
+            for expected in (0, 3):
+                log_path = Path(temporary) / f"exit-{expected}.log"
+                with log_path.open("wb") as log:
+                    script = f"import sys; print('normal-output', flush=True); print('normal-error', file=sys.stderr, flush=True); sys.exit({expected})"
+                    self.assertEqual(RUN_MAESTRO([sys.executable, "-c", script], dict(os.environ), log, 30), expected)
+                self.assertEqual(sorted(log_path.read_text().split()), ["normal-error", "normal-output"])
+            # The leader was reaped by a normal wait, so its group id may already name an unrelated process group.
+            code, acted = self.gated_maestro("exit", 30)
+            self.assertEqual(code, 0)
+            self.assertTrue(acted)
+            killpg.assert_not_called()
+
+    def test_maestro_timeout_stops_its_host_children_before_reaping_the_leader(self):
+        code, acted = self.gated_maestro("sleep", 3)
+        self.assertIsInstance(code, journeys.subprocess.TimeoutExpired)
+        self.assertFalse(acted)
+
+    def test_an_interrupted_maestro_run_does_not_orphan_its_new_session(self):
+        def interrupt(*_):
+            raise KeyboardInterrupt
+        previous = signal.signal(signal.SIGALRM, interrupt)
+        signal.setitimer(signal.ITIMER_REAL, 2)
+        try:
+            code, acted = self.gated_maestro("sleep", 60)
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, previous)
+        self.assertIsInstance(code, KeyboardInterrupt)
+        self.assertFalse(acted)
+
     def test_macos_and_container_mail_fixtures_use_the_same_stalwart_release(self):
         repository = Path(__file__).resolve().parents[2]
         dockerfile = (repository / "apps/stalwart/test-env/Dockerfile").read_text()
@@ -363,7 +452,7 @@ class HarnessTests(unittest.TestCase):
                 with patch.dict(os.environ, {"SOLACE_E2E":"1", "SOLACE_E2E_DIR":str(root)}, clear=True), \
                         patch.object(journeys.subprocess, "run", side_effect=execute), redirect_stdout(console):
                     directory()
-                    journeys.capture_failure_hierarchy("test-maestro", {"id":"test-device"}, {}, "test-flow")
+                    journeys.capture_failure_hierarchy("test-maestro", {"id":"test-device"}, {}, "test-flow", {})
                 self.assertIn(f"({reason}): test-flow", console.getvalue())
                 self.assertNotIn("private", console.getvalue())
 
@@ -548,6 +637,209 @@ class HarnessTests(unittest.TestCase):
                 for secret in secrets.split():
                     self.assertNotIn(secret, exported)
                 self.assertNotIn("launchRocket", exported)
+
+    def test_ios_failures_export_fixed_maestro_progress_from_their_own_private_logs(self):
+        email, password, device = "journey@solace.test", "progress-password-sentinel", "UDID-progress-sentinel"
+        installer, interactor, console = ("xcuitest.installer.LocalXCTestInstaller", "maestro.cli.runner.TestSuiteInteractor",
+                                          "maestro.cli.runner.CliConsoleListener")
+        def record(logger, message, method="start"):
+            return f"03:35:41.123 [ INFO] {logger}.{method}: {message}"
+        install = [record(installer, "start()"), record(installer, f"[Start] Install XCUITest runner on {device}"),
+                   record(installer, "Installing driver with xcodebuild"),
+                   # Another logger repeating an installer marker proves nothing about the installer.
+                   record("maestro.cli.report.TestDebugReporter", f"[Done] Install XCUITest runner on {device}", "logSystemInfo"),
+                   record(installer, f"[Start] Running XcUITest with `xcodebuild test-without-building` with 22087 and config: {device}")]
+        built = install + [record(installer, "[Done] Running XcUITest with `xcodebuild test-without-building`"),
+                           record(installer, f"[Done] Install XCUITest runner on {device}"),
+                           record(installer, f"[Failed] Perform XCUITest driver status check on {device}, exception: java.net.ConnectException")]
+        ready = built + [record(installer, f"[Done] Perform XCUITest driver status check on {device}"),
+                         record(interactor, " Running flow 01-authentication", "runFlow"),
+                         # A command description can quote an installer marker; only the installer's own records count.
+                         record(console, f'Assert that "[Done] Install XCUITest runner on {device}" is visible COMPLETED', "onCommandFinished")]
+        # PENDING is the listener's reset callback: the command is queued to run again, not finished.
+        launched = ready + [record(console, 'Launch app "onl.solace.calendar.e2e" RUNNING', "onCommandStart"),
+                            record(console, 'Launch app "onl.solace.calendar.e2e" COMPLETED', "onCommandFinished"),
+                            record(console, 'Launch app "onl.solace.calendar.e2e" PENDING', "onCommandReset")]
+        # A multi-line description keeps its status word on the record's last line.
+        typing = launched + [record(console, f"Input text {password}", "onCommandStart"), f"second line {email} RUNNING"]
+        failed = launched + [record(console, "Assert that Create new event is visible RUNNING", "onCommandStart"),
+                             record(console, "Assert that Create new event is visible FAILED", "onCommandFinished")]
+        unknown = dict.fromkeys(("runnerAlreadyRunning", "runnerInstallStarted", "runnerInstallDone", "xcodebuildStarted", "xcodebuildDone",
+                                 "driverResponded", "flowStarted", "commandsStarted", "commandsFinished", "lastCommandOpen", "furthestStage"))
+        quiet = {"runnerAlreadyRunning": False, "driverResponded": False, "flowStarted": False, "commandsStarted": 0, "commandsFinished": 0,
+                 "lastCommandOpen": False, "flowDirectory": "missing", "flowLog": False, "commandsJson": False}
+        cases = {
+            # name: (session log, flow folder files, timed out, expected progress fields)
+            "driver-install": (install, None, True, {**quiet, "sessionLog": "complete", "runnerInstallStarted": True, "runnerInstallDone": False,
+                                                     "xcodebuildStarted": True, "xcodebuildDone": False, "furthestStage": "driver-install"}),
+            "driver-channel": (built, None, True, {**quiet, "sessionLog": "complete", "runnerInstallDone": True, "xcodebuildDone": True,
+                                                   "furthestStage": "driver-channel"}),
+            "flow-setup": (ready, ["logs/maestro.log"], True, {"sessionLog": "complete", "driverResponded": True, "flowStarted": True,
+                                                                "flowDirectory": "found", "flowLog": True, "commandsJson": False, "commandsStarted": 0,
+                                                                "commandsFinished": 1, "lastCommandOpen": False, "furthestStage": "flow-setup"}),
+            "between-commands": (launched, ["logs/maestro.log"], True, {"commandsStarted": 1, "commandsFinished": 2, "lastCommandOpen": False,
+                                                                        "furthestStage": "between-commands"}),
+            "inside-command": (typing, ["logs/maestro.log"], True, {"commandsStarted": 2, "commandsFinished": 2, "lastCommandOpen": True,
+                                                                    "furthestStage": "inside-command"}),
+            "flow-ended": (failed, ["logs/maestro.log", "commands.json"], False, {"commandsJson": True, "lastCommandOpen": False,
+                                                                                 "furthestStage": "flow-ended"}),
+            # Maestro never logged, so nothing about the driver is proven either way; the empty output folder still is.
+            "missing-log": (None, None, True, {**unknown, "sessionLog": "missing", "flowDirectory": "missing", "flowLog": False, "commandsJson": False}),
+            "symlinked-log": ("symlink", None, True, {**unknown, "sessionLog": "unavailable"}),
+            "symlinked-log-file": ("symlink-file", None, True, {**unknown, "sessionLog": "unavailable"}),
+            "two-sessions": ("two", None, True, {**unknown, "sessionLog": "unavailable"}),
+            "unrecognized-format": ([f"[INFO] {line}" for line in install], None, True, {**unknown, "sessionLog": "unavailable"}),
+            # A killed writer can stop mid-record: the cut record proves nothing, and nothing after it is proven absent.
+            "unterminated-record": (("\n".join(install) + "\n" + record(installer, "[Done] Install XCUITest run")).encode(), None, True,
+                                    {"sessionLog": "truncated", "runnerInstallStarted": True, "runnerInstallDone": None, "commandsStarted": None,
+                                     "commandsFinished": None, "lastCommandOpen": None, "furthestStage": "driver-install"}),
+            "invalid-utf8": (("\n".join(install) + "\n").encode() + b"\xff\xfe" + record(console, "Input text RUNNING").encode() + b"\n", None, True,
+                             {**unknown, "sessionLog": "unavailable"}),
+            "dangling-log": ("dangling-file", None, True, {**unknown, "sessionLog": "unavailable"}),
+            "dangling-session": ("dangling-folder", None, True, {**unknown, "sessionLog": "unavailable"}),
+            # A link between the private root and the log can lead to another invocation's real files, even inside private/.
+            "linked-state-ancestor": ("linked-ancestor", None, True, {**unknown, "sessionLog": "unavailable"}),
+            "linked-flow-ancestor": (ready, "linked-ancestor", True, {"flowDirectory": "unavailable", "flowLog": None, "commandsJson": None}),
+            # Linked files inside a real flow folder must not count as this flow's finalized trace or log.
+            "linked-flow-files": (ready, "linked-files", True, {"flowDirectory": "found", "flowLog": None, "commandsJson": None,
+                                                               "furthestStage": "flow-setup"}),
+            "symlinked-flow": (ready, "symlink", True, {"flowDirectory": "unavailable", "flowLog": None, "commandsJson": None,
+                                                        "furthestStage": "flow-setup"}),
+            # A cap leaves later records unread: what was seen stays true, and nothing unseen becomes false.
+            "truncated": (install + [record(console, "Filler RUNNING")] * 200 + built[len(install):], None, True,
+                          {"sessionLog": "truncated", "runnerInstallStarted": True, "runnerInstallDone": None, "driverResponded": None,
+                           "commandsStarted": None, "lastCommandOpen": None, "furthestStage": "driver-install"}),
+            "line-cap": (built, None, True, {"sessionLog": "truncated", "xcodebuildDone": True, "runnerInstallDone": None, "driverResponded": None,
+                                             "commandsFinished": None, "furthestStage": "driver-channel"}),
+        }
+        keys = {"sessionLog", "runnerAlreadyRunning", "runnerInstallStarted", "runnerInstallDone", "xcodebuildStarted", "xcodebuildDone",
+                "driverResponded", "flowStarted", "flowDirectory", "flowLog", "commandsJson", "commandsStarted", "commandsFinished",
+                "lastCommandOpen", "furthestStage"}
+        for case, (log, flow_files, timed_out, expected) in cases.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "solace-e2e"
+                outside = Path(temporary) / "outside-progress-path-sentinel"
+                outside.mkdir()
+                (outside / "maestro.log").write_text("\n".join(typing))
+                with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True), \
+                        patch.object(journeys, "PROGRESS_LOG_BYTES", len(("\n".join(install) + "\n").encode()) if case == "truncated"
+                                     else journeys.PROGRESS_LOG_BYTES), \
+                        patch.object(journeys, "PROGRESS_LOG_LINES", 6 if case == "line-cap" else journeys.PROGRESS_LOG_LINES):
+                    private = directory() / "private"
+                    (private / "device.json").write_text(json.dumps({"id": device}))
+                    (private / "fixture.json").write_text(json.dumps({"email": email, "password": password}))
+                    (private / "maestro-path").write_text("synthetic-maestro")
+                    environments, observed = [], {}
+                    def maestro(command, **options):
+                        environments.append(options["env"])
+                        tests = Path(options["env"]["XDG_STATE_HOME"]) / "maestro/tests"
+                        session = tests / "2026-11-13_033540"
+                        if log == "symlink":
+                            tests.mkdir(parents=True)
+                            session.symlink_to(outside, target_is_directory=True)
+                        elif log == "symlink-file":
+                            session.mkdir(parents=True)
+                            (session / "maestro.log").symlink_to(outside / "maestro.log")
+                        elif log == "dangling-file":
+                            session.mkdir(parents=True)
+                            (session / "maestro.log").symlink_to(outside / "missing.log")
+                        elif log == "dangling-folder":
+                            tests.mkdir(parents=True)
+                            session.symlink_to(outside / "missing", target_is_directory=True)
+                        elif log == "linked-ancestor":
+                            other = private / "maestro-state/other-invocation/maestro"
+                            (other / "tests/2026-11-13_033540").mkdir(parents=True)
+                            (other / "tests/2026-11-13_033540/maestro.log").write_text("\n".join(typing) + "\n")
+                            (Path(options["env"]["XDG_STATE_HOME"]) / "maestro").symlink_to(other, target_is_directory=True)
+                        elif isinstance(log, bytes):
+                            session.mkdir(parents=True)
+                            (session / "maestro.log").write_bytes(log)
+                        elif log == "two":
+                            for name in ("2026-11-13_033540", "2026-11-13_033541"):
+                                (tests / name).mkdir(parents=True)
+                                (tests / name / "maestro.log").write_text("\n".join(typing))
+                        elif log is not None:
+                            session.mkdir(parents=True)
+                            (session / "maestro.log").write_text("\n".join(log) + "\n")
+                        run = Path(command[command.index("--test-output-dir") + 1]) / "2026-11-13_033540"
+                        if log is not None:
+                            run.mkdir()
+                        if flow_files == "symlink":
+                            (run / "01-authentication").symlink_to(outside, target_is_directory=True)
+                        if flow_files == "linked-files":
+                            (run / "01-authentication/logs").mkdir(parents=True)
+                            (run / "01-authentication/logs/maestro.log").symlink_to(outside / "maestro.log")
+                            (run / "01-authentication/commands.json").symlink_to(outside / "maestro.log")
+                        if flow_files == "linked-ancestor":
+                            (run / "01-authentication/logs").mkdir(parents=True)
+                            (run / "01-authentication/logs/maestro.log").write_text("other invocation")
+                            # The journey's own output folder now resolves, through private/maestro, to another invocation's folder.
+                            (private / "maestro").rename(private / "other-maestro")
+                            (private / "maestro").symlink_to(private / "other-maestro", target_is_directory=True)
+                        for name in flow_files if isinstance(flow_files, list) else []:
+                            (run / "01-authentication" / name).parent.mkdir(parents=True, exist_ok=True)
+                            (run / "01-authentication" / name).write_text(f"{password} {email}")
+                        options["stdout"].write(f"{password} {device}".encode())
+                        if timed_out:
+                            raise journeys.subprocess.TimeoutExpired(command, 1200)
+                        return journeys.subprocess.CompletedProcess([], 1)
+                    def hierarchy(tool, device_info, fixture, name, environment):
+                        observed["environment"] = environment
+                        observed["progressFirst"] = (root / f"artifacts/progress/{name}.json").is_file()
+                    results, console_output = [], io.StringIO()
+                    with patch.object(journeys.subprocess, "run", side_effect=maestro), \
+                            patch.object(journeys, "capture_failure_screenshot"), \
+                            patch.object(journeys, "capture_failure_hierarchy", side_effect=hierarchy), redirect_stdout(console_output):
+                        self.assertFalse(journeys.run_journey("ios", "calendar", Path("01-authentication.yaml"), results))
+                    self.assertEqual(results[0]["reason"], "journey-timeout" if timed_out else "maestro-failure")
+                    state = Path(environments[0]["XDG_STATE_HOME"])
+                    self.assertEqual(state.parent, private / "maestro-state")
+                    # The later hierarchy CLI reuses the journey's environment, after its progress was already read.
+                    self.assertIs(observed["environment"], environments[0])
+                    self.assertTrue(observed["progressFirst"])
+                    progress = json.loads((root / "artifacts/progress/calendar-01-authentication.json").read_text())
+                    self.assertEqual(set(progress), keys)
+                    self.assertEqual({key: progress[key] for key in expected}, expected)
+                    failure = json.loads((root / "artifacts/failures/calendar-01-authentication.json").read_text())
+                    self.assertEqual(set(failure), {"reason", "exceptionType", "command", "step", "assertionTarget", "exitCode", "commandDurationMs",
+                                                    "msSincePreviousTap", "commandTimeoutMs", "driverTimeoutKind", "driverTimeoutCall", "hierarchySource"})
+                    exported = console_output.getvalue().encode() + b"".join(path.read_bytes() for path in (root / "artifacts").rglob("*") if path.is_file())
+                    for sentinel in (password, email, device, "progress-path-sentinel", "22087", "Create new event", "onl.solace"):
+                        self.assertNotIn(sentinel.encode(), exported)
+
+    def test_only_ios_journeys_get_a_unique_maestro_state_and_passing_journeys_export_no_progress(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root), "XDG_STATE_HOME": str(Path(temporary) / "inherited"),
+                                         "MAESTRO_CLI_LOG_PATTERN_FILE": "%msg%n"}, clear=True):
+                private = directory() / "private"
+                (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+                (private / "fixture.json").write_text(json.dumps({"email": "journey@solace.test", "password": "synthetic"}))
+                (private / "maestro-path").write_text("synthetic-maestro")
+                environments, timeouts = [], []
+                def maestro(command, environment, log, timeout):
+                    environments.append(environment)
+                    timeouts.append(timeout)
+                    return 1 if len(environments) == 3 else 0
+                results = []
+                with patch.object(journeys, "run_maestro", side_effect=maestro), \
+                        patch.object(connectivity, "prepare", return_value=({**ANDROID_READY, "reverseRestored": False}, None)), \
+                        patch.object(connectivity, "observe", return_value=ANDROID_READY), \
+                        patch.object(journeys, "capture_failure_screenshot"), patch.object(journeys, "capture_failure_hierarchy"), \
+                        redirect_stdout(io.StringIO()):
+                    for platform in ("ios", "ios", "android"):
+                        journeys.run_journey(platform, "mail", Path("synthetic.yaml"), results)
+                ios = [Path(environment["XDG_STATE_HOME"]) for environment in environments[:2]]
+                self.assertNotEqual(ios[0], ios[1])
+                self.assertTrue(all(path.parent == private / "maestro-state" and path.is_dir() for path in ios))
+                # An inherited log format cannot change the records an iOS progress export parses.
+                self.assertTrue(all("MAESTRO_CLI_LOG_PATTERN_FILE" not in environment for environment in environments[:2]))
+                # Android keeps its existing stable Maestro state across journeys for driver reuse.
+                self.assertEqual(environments[2]["XDG_STATE_HOME"], str(Path(temporary) / "inherited"))
+                self.assertEqual(environments[2]["MAESTRO_CLI_LOG_PATTERN_FILE"], "%msg%n")
+                self.assertEqual([result["passed"] for result in results], [True, True, False])
+                self.assertEqual(timeouts, [1200, 1200, 600])
+                self.assertFalse((root / "artifacts/progress").exists())
 
     def test_journey_output_and_driver_failures_stay_private_but_classified(self):
         timeout = "java.net.SocketTimeoutException"
