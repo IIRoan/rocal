@@ -1,9 +1,28 @@
 import json
+import os
 import subprocess
 import unittest
 from unittest.mock import patch
 
 import probe_subject_search as probe
+
+
+@unittest.skipUnless(os.environ.get("STALWART_SUBJECT_TEST_IMAGE"), "Set STALWART_SUBJECT_TEST_IMAGE to the built test mail image")
+class SubjectProbeCleanupIntegrationTests(unittest.TestCase):
+    def test_owned_anonymous_volumes_are_removed(self):
+        volumes = set()
+        try:
+            with probe.target(os.environ["STALWART_SUBJECT_TEST_IMAGE"]) as (_, database, server):
+                for container in (database, server):
+                    details = json.loads(probe.podman("inspect", container))[0]
+                    volumes.update(mount["Name"] for mount in details["Mounts"] if mount["Type"] == "volume")
+            self.assertTrue(volumes, "The image fixtures must exercise anonymous volumes")
+            for volume in volumes:
+                result = subprocess.run(["podman", "volume", "exists", volume], capture_output=True, timeout=30)
+                self.assertEqual(result.returncode, 1, "The probe retained an anonymous volume")
+        finally:
+            for volume in volumes:
+                subprocess.run(["podman", "volume", "rm", volume], capture_output=True, timeout=30)
 
 
 class SubjectProbeTargetTests(unittest.TestCase):
