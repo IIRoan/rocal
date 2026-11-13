@@ -38,6 +38,7 @@ start_stalwart() {
 	STALWART_PID=$!
 	i=0
 	until curl -fsS --max-time 2 -u "${STALWART_RECOVERY_ADMIN}" "${ADMIN_URL}/jmap/session" >/dev/null 2>&1; do
+		kill -0 "$STALWART_PID" 2>/dev/null || die "Stalwart exited during startup."
 		i=$((i + 1))
 		[ "$i" -lt 60 ] || die "Stalwart JMAP did not come up."
 		sleep 1

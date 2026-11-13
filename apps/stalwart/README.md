@@ -1,6 +1,6 @@
 # Stalwart on Railway (Solace mail)
 
-The image builds the pinned official Stalwart 1.1.0 source with a narrow PostgreSQL subject-search patch. See [the regression and deployment notes](tests/SUBJECT-SEARCH.md) for the literal matching behavior, disposable test and required application reindex after rollout.
+The image installs a checksummed Stalwart 1.1.0 binary with a narrow PostgreSQL subject-search patch. The [versioned release](https://github.com/IIRoan/rocal/releases/tag/stalwart-v1.1.0-solace.1) includes its corresponding source and build recipe. See [the regression and deployment notes](tests/SUBJECT-SEARCH.md) for the literal matching behavior, disposable test, binary update procedure and required application reindex after rollout.
 
 Stalwart runs on [Railway](https://railway.app). Public JMAP at
 `https://mail.solace.onl` go directly through Railway HTTPS to the restricted public

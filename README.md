@@ -111,4 +111,6 @@ Notes:
 
 Solace is free software, licensed under the [GNU Affero General Public License v3.0 only](LICENSE). If you run a modified version as a network service, AGPL section 13 requires you to offer its source code to its users.
 
+The mail image uses Stalwart 1.1.0 with Solace's PostgreSQL subject-search patch. Its corresponding source, patch and build recipe accompany the binary in the [stalwart-v1.1.0-solace.1 release](https://github.com/IIRoan/rocal/releases/tag/stalwart-v1.1.0-solace.1), distributed under AGPL-3.0-only.
+
 Third-party packages keep their own licenses; `bun run notices` checks that each is AGPL-compatible and regenerates the notices shown at `/licenses` and in each app's Open source licenses page. The Inter font is under the SIL Open Font License (`packages/ui/src/font/inter-font/LICENSE.txt`).

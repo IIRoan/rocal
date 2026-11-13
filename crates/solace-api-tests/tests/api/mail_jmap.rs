@@ -409,24 +409,10 @@ async fn subject_search_finds_literal_words_in_an_encrypted_draft() {
         "../../../../packages/calendar-core/test-fixtures/stalwart-1.1.0-mail/ecc-rfc3156-import.eml"
     )
     .replace("SYNTHETIC proper RFC3156 import", subject);
-    let token = access_token(&mut owner.user).await.access_token;
-    let uploaded: Value = reqwest::Client::new()
-        .post(format!(
-            "{}/api/mail/jmap/jmap/upload/{account}/",
-            app.base_url
-        ))
-        .bearer_auth(token)
-        .header("content-type", "message/rfc822")
-        .header("x-forwarded-for", owner.user.agent.client_ip())
-        .body(raw)
-        .send()
-        .await
-        .expect("fixture upload")
-        .error_for_status()
-        .expect("fixture accepted")
-        .json()
-        .await
-        .expect("upload JSON");
+    let upload = session_upload(&app, &owner, raw.as_bytes(), None, "message/rfc822").await;
+    let uploaded = ok(upload
+        .expect_status(200)
+        .and_then(|response| response.value()));
     let imported = owner
         .jmap(json!([["Email/import", {"accountId": account, "emails": {"draft": {
             "blobId": uploaded["blobId"], "mailboxIds": {drafts.clone(): true}, "keywords": {"$draft": true}
@@ -482,6 +468,7 @@ async fn session_upload(
     owner: &Mailbox,
     bytes: &[u8],
     bearer: Option<&str>,
+    content_type: &str,
 ) -> ApiResponse {
     let cookie = owner
         .user
@@ -499,7 +486,7 @@ async fn session_upload(
         ))
         .header("cookie", cookie)
         .header("origin", &app.origin)
-        .header("content-type", "application/octet-stream")
+        .header("content-type", content_type)
         .header("x-forwarded-for", owner.user.agent.client_ip())
         .body(bytes.to_vec());
     if let Some(bearer) = bearer {
@@ -522,13 +509,20 @@ async fn large_uploads_with_a_refused_token_retry_with_a_fresh_one() {
 
     // Setting the bridge password again revokes the bearer the backend cached while provisioning.
     set_bridge_password(&app, owner.account_id(), &owner.user.id, &owner.user.email).await;
-    let cached = session_upload(&app, &owner, &bytes, None).await;
+    let cached = session_upload(&app, &owner, &bytes, None, "application/octet-stream").await;
     assert_eq!(cached.status.as_u16(), 200, "{}", cached.text());
     assert_eq!(auth_source(&cached), ("session".into(), "1".into()));
     assert_eq!(ok(cached.value())["size"], json!(bytes.len()));
 
     // A refused client bearer falls back to the session, as smaller bodies do.
-    let stale = session_upload(&app, &owner, &bytes, Some("Bearer stale-token")).await;
+    let stale = session_upload(
+        &app,
+        &owner,
+        &bytes,
+        Some("Bearer stale-token"),
+        "application/octet-stream",
+    )
+    .await;
     assert_eq!(stale.status.as_u16(), 200, "{}", stale.text());
     assert_eq!(auth_source(&stale), ("session".into(), "1".into()));
 }
