@@ -20,10 +20,24 @@ CAPABILITIES = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"]
 
 
 def podman(*arguments):
-    result = subprocess.run(["podman", *arguments], capture_output=True, text=True, timeout=90)
+    try:
+        result = subprocess.run(["podman", *arguments], capture_output=True, text=True, timeout=90)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"Disposable container {arguments[0]} command timed out") from None
     if result.returncode:
-        raise RuntimeError("Disposable container command failed")
+        raise RuntimeError(f"Disposable container {arguments[0]} command failed (exit {result.returncode})")
     return result.stdout.strip()
+
+
+def remove_owned(*arguments):
+    for attempt in range(3):
+        try:
+            podman(*arguments)
+            return
+        except RuntimeError:
+            if attempt == 2:
+                raise
+            time.sleep(0.5)
 
 
 def wait_until(check, timeout=60):
@@ -70,16 +84,16 @@ def target(image="localhost/solace-test-stalwart"):
         failures = []
         for container in reversed(created):
             try:
-                podman("rm", "-f", "--ignore", container)
-            except RuntimeError:
-                failures.append("container")
+                remove_owned("rm", "-f", "--ignore", "-t", "0", container)
+            except RuntimeError as error:
+                failures.append("container: " + str(error))
         if network_created:
             try:
-                podman("network", "rm", network)
-            except RuntimeError:
-                failures.append("network")
+                remove_owned("network", "rm", "-f", network)
+            except RuntimeError as error:
+                failures.append("network: " + str(error))
         if failures:
-            raise RuntimeError("Disposable target cleanup failed")
+            raise RuntimeError("Disposable target cleanup failed (" + ", ".join(failures) + ")")
 
 
 class Probe:
@@ -198,7 +212,7 @@ def main():
     arguments = parser.parse_args()
     with target(arguments.image) as (base, database, server):
         report = Probe(base).run(database, server)
-    print(json.dumps(report, indent=2))
+        print(json.dumps(report, indent=2), flush=True)
     return 1 if arguments.assert_fixed and not report["passed"] else 0
 
 
