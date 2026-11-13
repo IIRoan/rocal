@@ -398,6 +398,84 @@ async fn uploads_and_downloads_relay_binary_bodies_unchanged() {
     assert_eq!(download.bytes().await.expect("bytes").to_vec(), bytes);
 }
 
+#[tokio::test]
+async fn subject_search_finds_literal_words_in_an_encrypted_draft() {
+    let app = TestApp::spawn().await;
+    let mut owner = mailbox(&app).await;
+    let account = owner.account_id().to_owned();
+    let drafts = owner.mailbox_id("drafts").await;
+    let subject = "calm morning river zivhltjjiztavuxvdhhhncfflylqx";
+    let raw = include_str!(
+        "../../../../packages/calendar-core/test-fixtures/stalwart-1.1.0-mail/ecc-rfc3156-import.eml"
+    )
+    .replace("SYNTHETIC proper RFC3156 import", subject);
+    let token = access_token(&mut owner.user).await.access_token;
+    let uploaded: Value = reqwest::Client::new()
+        .post(format!(
+            "{}/api/mail/jmap/jmap/upload/{account}/",
+            app.base_url
+        ))
+        .bearer_auth(token)
+        .header("content-type", "message/rfc822")
+        .header("x-forwarded-for", owner.user.agent.client_ip())
+        .body(raw)
+        .send()
+        .await
+        .expect("fixture upload")
+        .error_for_status()
+        .expect("fixture accepted")
+        .json()
+        .await
+        .expect("upload JSON");
+    let imported = owner
+        .jmap(json!([["Email/import", {"accountId": account, "emails": {"draft": {
+            "blobId": uploaded["blobId"], "mailboxIds": {drafts.clone(): true}, "keywords": {"$draft": true}
+        }}}, "i"]]))
+        .await;
+    let identifier = method(&imported, "i")["created"]["draft"]["id"]
+        .as_str()
+        .expect("imported encrypted draft")
+        .to_owned();
+
+    let mut indexed = false;
+    for _ in 0..100 {
+        let reply = owner
+            .jmap(json!([["Email/query", {"accountId": account,
+                "filter": {"inMailbox": drafts, "subject": "zivhltjjiztavuxvdhhhncfflylqx"}}, "q"]]))
+            .await;
+        if method(&reply, "q")["ids"] == json!([identifier]) {
+            indexed = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+    assert!(indexed, "the encrypted draft entered the search index");
+    for field in ["subject", "text"] {
+        for query in [
+            "calm",
+            "morning",
+            "river",
+            subject,
+            "river*",
+            "\"morning river\"",
+        ] {
+            let reply = owner
+                .jmap(json!([["Email/query", {"accountId": account,
+                    "filter": {"inMailbox": drafts, field: query}}, "q"]]))
+                .await;
+            assert_eq!(
+                method(&reply, "q")["ids"],
+                json!([identifier]),
+                "{field}: {query}"
+            );
+        }
+    }
+    let removed = owner
+        .jmap(json!([["Email/set", {"accountId": account, "destroy": [identifier]}, "d"]]))
+        .await;
+    assert_eq!(method(&removed, "d")["destroyed"], json!([identifier]));
+}
+
 /// A session upload through the proxy, with an optional client bearer next to the session cookie.
 async fn session_upload(
     app: &TestApp,

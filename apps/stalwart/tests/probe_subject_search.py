@@ -37,7 +37,7 @@ def wait_until(check):
 
 
 @contextlib.contextmanager
-def target():
+def target(image="localhost/solace-test-stalwart"):
     name = "solace-subject-probe-" + secrets.token_hex(6)
     network = name + "-network"
     database = name + "-pg"
@@ -47,29 +47,30 @@ def target():
     try:
         podman("network", "create", "--internal", network)
         network_created = True
+        created.append(database)
         podman("run", "-d", "--pull=never", "--name", database, "--network", network,
                "--memory", "512m", "-e", "POSTGRES_USER=solace_probe",
                "-e", "POSTGRES_PASSWORD=" + PASSWORD, "-e", "POSTGRES_DB=stalwart_probe",
                "docker.io/library/postgres:18")
-        created.append(database)
         wait_until(lambda: podman("exec", database, "pg_isready", "-U", "solace_probe", "-d", "stalwart_probe"))
+        created.append(server)
         podman("run", "-d", "--pull=never", "--name", server, "--network", network,
                "--memory", "1g", "-p", "127.0.0.1::8080",
                "-e", "PGHOST=" + database, "-e", "PGDATABASE=stalwart_probe", "-e", "PGUSER=solace_probe",
                "-e", "PGPASSWORD=" + PASSWORD, "-e", "SOLACE_TEST_ADMIN_PASSWORD=" + PASSWORD,
                "-e", "SOLACE_TEST_PROVISIONER_PASSWORD=" + PASSWORD, "-e", "SOLACE_TEST_NOREPLY_PASSWORD=" + PASSWORD,
-               "localhost/solace-test-stalwart")
-        created.append(server)
+               image)
         details = json.loads(podman("inspect", server))[0]
         bindings = details["NetworkSettings"]["Ports"]["8080/tcp"]
         if len(bindings) != 1 or bindings[0]["HostIp"] != "127.0.0.1":
             raise RuntimeError("Refusing a target without an exclusive loopback binding")
+        wait_until(lambda: podman("exec", server, "test", "-f", "/tmp/solace-test-ready"))
         yield "http://127.0.0.1:" + bindings[0]["HostPort"], database, server
     finally:
         failures = []
         for container in reversed(created):
             try:
-                podman("rm", "-f", container)
+                podman("rm", "-f", "--ignore", container)
             except RuntimeError:
                 failures.append("container")
         if network_created:
@@ -106,8 +107,42 @@ class Probe:
         account = session["primaryAccounts"]["urn:ietf:params:jmap:mail"]
         mailboxes = self.call("Mailbox/get", {"accountId": account})["list"]
         drafts = next(mailbox["id"] for mailbox in mailboxes if mailbox.get("role") == "drafts")
+        subjects = {
+            "original": (SUBJECT, {
+                "calm": ("calm", True), "morning": ("morning", True), "river": ("river", True),
+                "marker": (MARKER, True), "fullSubject": (SUBJECT, True),
+                "prefix": ("river*", True), "phrase": ('"morning river"', True),
+                "reversedPhrase": ('"' + MARKER + ' calm"', False),
+            }),
+            "german": ("Die Versicherungen werden nach unserer Besprechung morgen alle Rechnungen prüfen. " + MARKER, {
+                "literal": ("Rechnungen", True), "literal2": ("Besprechung", True),
+                "prefix": ("Rechn*", True), "phrase": ('"Besprechung morgen"', True),
+                "absent": ("neverpresent", False),
+            }),
+            "english": ("Quarterly reports for the river project " + MARKER, {
+                "literal": ("reports", True), "singular": ("report", False),
+                "prefix": ("report*", True),
+                "stopword": ("the", True), "phrase": ('"the river"', True),
+                "absent": ("neverpresent", False),
+            }),
+        }
+        checks = {}
+        original = None
+        for name, (subject, queries) in subjects.items():
+            result = self.probe_subject(session, account, drafts, subject, queries, database)
+            checks[name] = result
+            if name == "original":
+                original = result
+        return {
+            "stalwart": podman("exec", server, "/usr/local/bin/stalwart", "--version"),
+            "checks": checks,
+            "passed": all(result["passed"] for result in checks.values()),
+            "reproduced": original["queries"]["subject"]["river"] is False,
+        }
+
+    def probe_subject(self, session, account, drafts, subject, queries, database):
         message = email.message_from_bytes(FIXTURE.read_bytes(), policy=email.policy.SMTP)
-        message.replace_header("Subject", SUBJECT)
+        message.replace_header("Subject", subject)
         upload_path = urllib.parse.urlsplit(session["uploadUrl"].replace("{accountId}", account)).path
         if not upload_path.startswith("/jmap/upload/"):
             raise RuntimeError("Unexpected disposable upload path")
@@ -119,9 +154,9 @@ class Probe:
         if not identifier:
             raise RuntimeError("Synthetic draft import refused")
         try:
-            def matches(text):
+            def matches(text, field="subject"):
                 result = self.call("Email/query", {"accountId": account,
-                    "filter": {"subject": text, "inMailbox": drafts}, "limit": 100})
+                    "filter": {field: text, "inMailbox": drafts}, "limit": 100})
                 return identifier in result["ids"]
 
             def indexed():
@@ -129,23 +164,27 @@ class Probe:
                     raise RuntimeError("Synthetic draft has not entered the index")
 
             wait_until(indexed)
-            queries = {name: matches(text) for name, text in {
-                "calm": "calm", "morning": "morning", "river": "river", "marker": MARKER, "fullSubject": SUBJECT,
-            }.items()}
+            actual = {field: {name: matches(text, field) for name, (text, _) in queries.items()}
+                      for field in ("subject", "text")}
+            report = {
+                "queries": actual,
+                "passed": all(values[name] == expected
+                              for values in actual.values() for name, (_, expected) in queries.items()),
+            }
+            if subject != SUBJECT:
+                return report
             sql = """SELECT json_build_object(
                 'storedSubject', subj::text,
+                'matchesSimpleVector', subj = to_tsvector('simple', 'calm morning river zivhltjjiztavuxvdhhhncfflylqx'),
                 'matchesNorwegianVector', subj = to_tsvector('norwegian', 'calm morning river zivhltjjiztavuxvdhhhncfflylqx'),
                 'englishRiverMatches', subj @@ plainto_tsquery('english', 'river'),
                 'simpleRiverMatches', subj @@ plainto_tsquery('simple', 'river'),
                 'norwegianRiverMatches', subj @@ plainto_tsquery('norwegian', 'river'))
                 FROM s_email WHERE subj @@ plainto_tsquery('simple', 'zivhltjjiztavuxvdhhhncfflylqx')"""
             index = json.loads(podman("exec", database, "psql", "-U", "solace_probe", "-d", "stalwart_probe", "-Atc", sql))
-            return {
-                "stalwart": podman("exec", server, "/usr/local/bin/stalwart", "--version"),
-                "queries": queries,
-                "index": index,
-                "reproduced": queries == {"calm": True, "morning": True, "river": False, "marker": True, "fullSubject": False},
-            }
+            report["index"] = index
+            report["passed"] = report["passed"] and index["matchesSimpleVector"]
+            return report
         finally:
             removed = self.call("Email/set", {"accountId": account, "destroy": [identifier]})
             if identifier not in removed.get("destroyed", []):
@@ -154,12 +193,13 @@ class Probe:
 
 def main():
     parser = argparse.ArgumentParser(description="Probe subject indexing on fresh, outbound-isolated PostgreSQL/Stalwart containers.")
-    parser.add_argument("--assert-fixed", action="store_true", help="Fail unless every synthetic subject query finds the draft.")
+    parser.add_argument("--assert-fixed", action="store_true", help="Fail unless every synthetic search has its expected result.")
+    parser.add_argument("--image", default="localhost/solace-test-stalwart", help="Already-built local test image to exercise.")
     arguments = parser.parse_args()
-    with target() as (base, database, server):
+    with target(arguments.image) as (base, database, server):
         report = Probe(base).run(database, server)
     print(json.dumps(report, indent=2))
-    return 1 if arguments.assert_fixed and not all(report["queries"].values()) else 0
+    return 1 if arguments.assert_fixed and not report["passed"] else 0
 
 
 if __name__ == "__main__":
