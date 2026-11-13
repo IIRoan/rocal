@@ -9,6 +9,7 @@ import {
 } from "@workspace/ui/solace";
 import {
   resolveLabelDisplayColor,
+  resolveMailMessageContext,
   getMailSenderTrustNotice,
   MAIL_KEY_CONTINUITY_ENABLED,
   type MailThreadParticipant,
@@ -224,7 +225,8 @@ function MessageReaderTitleActions({
         signatureVerificationState={props.signatureVerificationState}
         senderKeyTrustState={props.senderKeyTrustState}
         senderEmail={props.message?.from?.[0]?.email}
-        decryptionFailed={Boolean(props.decryptError)}
+        readState={props.readState ?? "pending"}
+        messageContext={resolveMailMessageContext(view.message, props.mailboxes)}
       />
     </div>
   );

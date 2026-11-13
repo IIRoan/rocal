@@ -1,6 +1,7 @@
 import type {
   MailServerLimits,
   MailSenderKeyTrustState,
+  MailReadState,
   SimpleLoginActionMode,
   TimeFormat,
 } from "@workspace/calendar-core";
@@ -38,6 +39,7 @@ export interface MessageReaderProps {
   signatureVerificationState: MailSignatureVerificationState;
   senderKeyTrustState?: MailSenderKeyTrustState;
   decryptError: string | null;
+  readState?: MailReadState;
   accountEncryptedAtRest: boolean;
   isBusy: boolean;
   mailboxes: JmapMailbox[];

@@ -166,7 +166,7 @@ it("keeps sender continuity notices separate from historical cryptographic signa
       getMailSecurityNotice({
         messageState: "inline_pgp",
         accountEncryptedAtRest: true,
-        decryptionFailed: false,
+        readState: "decrypted",
         signatureVerificationState: "verified",
         senderKeyTrustState: state,
       }).tone,
@@ -175,7 +175,7 @@ it("keeps sender continuity notices separate from historical cryptographic signa
   const notice = getMailSecurityNotice({
     messageState: "inline_pgp",
     accountEncryptedAtRest: true,
-    decryptionFailed: false,
+    readState: "decrypted",
     signatureVerificationState: "verified",
     senderKeyTrustState: {
       kind: "key_changed",

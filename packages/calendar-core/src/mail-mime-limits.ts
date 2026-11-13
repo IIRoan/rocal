@@ -75,6 +75,7 @@ const MAIL_READ_LIMIT_ERRORS = new Set([
   "Maximum decompressed size exceeded",
   "Error decrypting message: Maximum decompressed message size exceeded",
   "Error decrypting message: Maximum decompressed size exceeded",
+  "This message is too large or complex to open here.",
 ]);
 
 export function getMailReadLimitNotice(error: unknown): string | null {

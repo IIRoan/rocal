@@ -276,7 +276,7 @@ export function getMailSenderTrustNotice(
         return {
           label: "Local key-history protection unavailable",
           description:
-            "The signature was checked with the saved key, but this device could not save or check its local history revision. Older server history may go undetected after restarting.",
+          "The signature was checked with the saved key, but this device could not save or check its local history revision. After restarting, older server history cannot be checked against that unsaved revision.",
         };
       return state.reason === "directory"
         ? {

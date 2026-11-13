@@ -103,7 +103,9 @@ export default function PrivacyPage() {
             readable until one of your devices opens Solace, which encrypts your
             copy; a declined invitation keeps no readable text.
             Subscribed and public calendars are fetched by the server, so their
-            feed names, URLs and event details are readable.
+            URLs and event details remain readable. Names you give subscribed
+            calendars are encrypted on your device. Opening Solace starts
+            encryption upgrades for older readable names.
           </p>
         </div>
 
@@ -137,8 +139,8 @@ export default function PrivacyPage() {
             waits in the mail queues until it is delivered, for at most about
             five days. Emails Solace sends
             for you, such as invitations and reminders, come from a no-reply
-            address that keeps no copy. Mail stored before these protections,
-            including older drafts and sent copies, may still be readable.
+            address that keeps no copy. Older mail without an encrypted payload,
+            including drafts and Sent copies, remains readable to the mail server.
           </p>
           <p className="mt-3">
             When a sender encrypts with your OpenPGP public key before sending,
@@ -245,8 +247,8 @@ export default function PrivacyPage() {
             choose Account, then Delete account. On the web, open the command
             palette and choose Account. After you confirm, Solace removes
             the mailbox, profile pictures and account-owned application records.
-            Other organizers may retain participant addresses, and recipients
-            retain messages already delivered to them.
+            Account deletion does not remove participant addresses held by other
+            organizers, and recipients retain messages already delivered to them.
           </p>
         </section>
         <section id="device-data" aria-labelledby="privacy-device-data">
@@ -260,8 +262,8 @@ export default function PrivacyPage() {
             The native apps keep authentication and encryption material in
             secure storage. Mail’s offline snapshot is encrypted with a key
             bound to that device. Signing out clears app sessions and saved app
-            caches, and removes encryption keys unless the device may hold their
-            only copy. An optional on-device search index is
+            caches. Device encryption keys are removed only after Solace confirms
+            that the password-protected key backup holds them. An optional on-device search index is
             encrypted; Solace does not persist its query cache as a separate
             unencrypted store.
           </p>
@@ -405,8 +407,9 @@ function PrivacyDataUse() {
         sidebar; there are no tracking or advertising cookies. Your password is
         never stored: the website holds it in memory only while it opens your
         encryption keys at sign-in. Your browser keeps those keys in its own
-        storage as keys that cannot be exported, and signing out removes them
-        unless this browser may hold their only copy. The apps keep their
+        storage as keys that cannot be exported. Signing out removes those keys
+        only after Solace confirms that the password-protected key backup holds
+        them. The apps keep their
         session in the device&apos;s secure storage.
       </p>
     </section>

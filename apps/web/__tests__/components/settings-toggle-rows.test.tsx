@@ -82,6 +82,9 @@ describe("settings toggle rows", () => {
     expect(html).toContain("participants remain readable to the server");
     expect(html).toContain("invitations share readable details");
     expect(html).not.toContain("Full Event Encryption");
+    expect(html).toContain("Mail Encryption");
+    expect(html).toContain("Drafts and Sent copies, including their attachments");
+    expect(html).not.toMatch(/\bmay\b/i);
   });
 
   it("renders email and app toggles plus registered devices", () => {

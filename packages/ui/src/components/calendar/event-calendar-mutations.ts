@@ -70,7 +70,7 @@ export function toastEventMutationError(
 
   if (error?.statusCode === 404) {
     toast.error("Event not found", {
-      description: "This event may have already been deleted",
+      description: "This event is no longer available.",
       position: "bottom-left",
     });
     return;

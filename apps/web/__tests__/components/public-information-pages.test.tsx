@@ -59,6 +59,19 @@ it("keeps the wallpaper one viewport tall however long the page is", () => {
   expect(page.querySelector(".sticky.top-0.h-dvh")).not.toBeNull();
 });
 
+it("describes sealed feed names and encrypted mail attachments without speculative copy", () => {
+  const page = render(<PrivacyPage />);
+  const text = page.textContent?.replace(/\s+/g, " ");
+  expect(text).toContain(
+    "Names you give subscribed calendars are encrypted on your device",
+  );
+  expect(text).not.toContain("feed names, URLs and event details are readable");
+  expect(text).not.toMatch(/\bmay\b/i);
+  expect(page.querySelector("#mail-encryption")?.textContent).toContain(
+    "Drafts and the copies of mail you send are encrypted",
+  );
+});
+
 it("publishes the AGPL notice, the source and the bundled packages' licenses", () => {
   const page = render(<LicensesPage />);
   expect(page.textContent).toContain("GNU Affero General Public License");

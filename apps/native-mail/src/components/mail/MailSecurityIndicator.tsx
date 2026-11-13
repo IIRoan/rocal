@@ -6,6 +6,8 @@ import {
   MAIL_READABLE_METADATA,
   MAIL_KEY_CONTINUITY_ENABLED,
   type MailSenderKeyTrustState,
+  type MailReadState,
+  type MailMessageContext,
 } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -16,7 +18,8 @@ type MailSecurityIndicatorProps = {
   encryption: MessageEncryptionState;
   encryptedAtRest: boolean;
   signatureVerificationState?: MailSignatureVerificationState;
-  decryptionFailed: boolean;
+  readState: MailReadState;
+  messageContext?: MailMessageContext;
   senderKeyTrustState?: MailSenderKeyTrustState;
   onReviewSenderKey?: () => void;
 };
@@ -29,7 +32,8 @@ export function MailSecurityIndicator(props: MailSecurityIndicatorProps) {
     accountEncryptedAtRest: props.encryptedAtRest,
     signatureVerificationState: props.signatureVerificationState,
     senderKeyTrustState: props.senderKeyTrustState,
-    decryptionFailed: props.decryptionFailed,
+    readState: props.readState,
+    messageContext: props.messageContext,
   });
   const icon =
     meta.tone === "encrypted"

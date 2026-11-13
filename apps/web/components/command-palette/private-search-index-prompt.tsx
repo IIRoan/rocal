@@ -38,8 +38,8 @@ export function PrivateSearchIndexPrompt({
           <DialogTitle>Enable on-device search?</DialogTitle>
           <DialogDescription>
             This is off until you choose to enable it. Solace keeps an encrypted
-            index on this device. Mail search covers recent indexed messages and
-            excerpts, so older mail may be missing. The index and private search
+            index on this device. Mail search covers only indexed messages and
+            excerpts. The index and private search
             words stay on this device.
           </DialogDescription>
         </DialogHeader>

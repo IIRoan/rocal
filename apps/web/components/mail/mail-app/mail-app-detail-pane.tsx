@@ -41,6 +41,7 @@ export function MailAppDetailPane({
     selectedMessageSignatureVerificationState,
     selectedMessageSenderKeyTrustState,
     selectedMessageDecryptError,
+    selectedMessageReadState,
     activeMailbox,
     isBusy,
     handleReply,
@@ -117,6 +118,7 @@ export function MailAppDetailPane({
             }
             senderKeyTrustState={selectedMessageSenderKeyTrustState}
             decryptError={selectedMessageDecryptError}
+            readState={selectedMessageReadState}
             accountEncryptedAtRest={activeMailbox.accountEncryptedAtRest}
             isBusy={isBusy}
             mailboxes={activeMailbox.mailboxes}

@@ -68,14 +68,16 @@ describe("native mail encryption notice", () => {
         <MailSecurityIndicator
           encryption="plain"
           encryptedAtRest
-          decryptionFailed={false}
+          readState="decrypted"
         />,
       ),
     );
     mockPressable?.onPress();
     expect(Alert.alert).toHaveBeenCalledWith(
       "Mailbox encryption enabled",
-      expect.stringContaining("does not confirm encryption of this message"),
+      expect.stringContaining(
+        "No encrypted message body was detected in this message.",
+      ),
     );
   });
 
@@ -85,7 +87,7 @@ describe("native mail encryption notice", () => {
         <MailSecurityIndicator
           encryption="inline_pgp"
           encryptedAtRest
-          decryptionFailed={false}
+          readState="decrypted"
           signatureVerificationState="failed"
         />,
       ),
@@ -101,7 +103,7 @@ describe("native mail encryption notice", () => {
         <MailSecurityIndicator
           encryption="inline_pgp"
           encryptedAtRest
-          decryptionFailed={false}
+          readState="decrypted"
           signatureVerificationState="verified"
           senderKeyTrustState={{
             kind: "key_changed",
@@ -126,7 +128,7 @@ describe("native mail encryption notice", () => {
         <MailSecurityIndicator
           encryption="inline_pgp"
           encryptedAtRest
-          decryptionFailed={false}
+          readState="decrypted"
           signatureVerificationState="failed"
           senderKeyTrustState={{
             kind: "key_changed",
@@ -147,4 +149,40 @@ describe("native mail encryption notice", () => {
     action?.onPress?.();
     expect(review).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    {
+      readState: "decrypted" as const,
+      expected:
+        "The body and attachments inside the encrypted MIME payload are protected.",
+    },
+    {
+      readState: "read_limit" as const,
+      expected:
+        "This message exceeds the size or complexity limits for this reader.",
+    },
+    {
+      readState: "pending" as const,
+      expected: "This device has not finished opening the PGP payload.",
+    },
+  ])(
+    "shows the MIME reading outcome: $readState",
+    ({ readState, expected }) => {
+      act(() =>
+        root.render(
+          <MailSecurityIndicator
+            encryption="pgp_mime"
+            encryptedAtRest
+            readState={readState}
+          />,
+        ),
+      );
+      mockPressable?.onPress();
+      expect(Alert.alert).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.stringContaining(expected),
+      );
+      expect(mockPressable?.accessibilityLabel).not.toBe("Decryption failed");
+    },
+  );
 });

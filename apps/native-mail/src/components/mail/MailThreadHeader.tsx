@@ -10,6 +10,8 @@ import { Feather, FontAwesome } from "@expo/vector-icons";
 import {
   formatMailThreadDateRange,
   type MailSenderKeyTrustState,
+  type MailReadState,
+  type MailMessageContext,
   getMailThreadParticipants,
   type MailThreadParticipant,
 } from "@workspace/calendar-core";
@@ -48,7 +50,8 @@ type MailThreadHeaderProps = {
   encryption: MessageEncryptionState;
   encryptedAtRest: boolean;
   signatureVerificationState?: MailSignatureVerificationState;
-  decryptionFailed: boolean;
+  readState: MailReadState;
+  messageContext: MailMessageContext;
   senderKeyTrustState?: MailSenderKeyTrustState;
   onReviewSenderKey?: () => void;
   attachments: KeyedAttachment[];
@@ -70,7 +73,8 @@ export function MailThreadHeader({
   signatureVerificationState,
   senderKeyTrustState,
   onReviewSenderKey,
-  decryptionFailed,
+  readState,
+  messageContext,
   attachments,
   downloadingBlobId,
   onOpenAttachment,
@@ -104,7 +108,8 @@ export function MailThreadHeader({
             signatureVerificationState={signatureVerificationState}
             senderKeyTrustState={senderKeyTrustState}
             onReviewSenderKey={onReviewSenderKey}
-            decryptionFailed={decryptionFailed}
+            readState={readState}
+            messageContext={messageContext}
           />
           <Pressable
             onPress={onToggleStar}

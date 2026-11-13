@@ -150,7 +150,7 @@ describe("mail message security helpers", () => {
         messageState: "inline_pgp",
         accountEncryptedAtRest: false,
         signatureVerificationState: "unverified",
-        decryptionFailed: false,
+        readState: "decrypted",
       }),
     ).toBe("PGP encrypted, signature not verified");
 
@@ -159,7 +159,7 @@ describe("mail message security helpers", () => {
         messageState: "inline_pgp",
         accountEncryptedAtRest: false,
         signatureVerificationState: "failed",
-        decryptionFailed: false,
+        readState: "decrypted",
       }),
     ).toBe("PGP encrypted, signature check failed");
   });
