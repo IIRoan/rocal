@@ -13,7 +13,27 @@ appId: ${APP_ID}
 - waitForAnimationToEnd
 - tapOn: All day
 - tapOn: "Repeat:.*"
-- tapOn: "Every week on .*"
+- extendedWaitUntil:
+    visible: "Every week on .*"
+    timeout: 15000
+- waitForAnimationToEnd
+# The Custom option identifies the picker without matching the selected editor row.
+- retry:
+    maxRetries: 1
+    commands:
+      - runFlow:
+          when:
+            visible: "Custom…"
+          commands:
+            - tapOn:
+                text: "Every week on .*"
+                retryTapIfNoChange: false
+      - extendedWaitUntil:
+          notVisible: "Custom…"
+          timeout: 15000
+      - extendedWaitUntil:
+          visible: "Repeat: Every week on .*"
+          timeout: 15000
 - tapOn: Save
 - extendedWaitUntil:
     visible: "Maestro recurring event.*"
