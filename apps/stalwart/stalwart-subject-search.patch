@@ -1,0 +1,25 @@
+--- a/crates/store/src/backend/postgres/search.rs
++++ b/crates/store/src/backend/postgres/search.rs
+@@ -10,8 +10,8 @@
+         into_pool_error, is_timeout_error,
+     },
+     search::{
+-        IndexDocument, KeyValueMatch, SearchField, SearchFilter, SearchQuery, SearchResults,
+-        SearchValue, TextMatch, TracingSearchField,
++        EmailSearchField, IndexDocument, KeyValueMatch, SearchField, SearchFilter, SearchQuery,
++        SearchResults, SearchValue, TextMatch, TracingSearchField,
+     },
+     write::SearchIndex,
+ };
+@@ -116,8 +116,9 @@
+             if field.is_text() {
+                 let (values, configs) = values
+                     .map(|value| {
+-                        let config = match value {
+-                            Some(SearchValue::Text { language, .. }) => self.ts_config(language),
++                        let config = match (field, value) {
++                            (SearchField::Email(EmailSearchField::Subject), _) => PG_UNSTEMMED_LANG,
++                            (_, Some(SearchValue::Text { language, .. })) => self.ts_config(language),
+                             _ => PG_UNSTEMMED_LANG,
+                         };
+                         (value, config)

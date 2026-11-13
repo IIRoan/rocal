@@ -1,3 +1,16 @@
+FROM rust:1.99.1-trixie@sha256:8a4e90c7946b74626488b1446f712c0fe0ed1a596cbd3d871684bc9c5433ae07 AS stalwart-builder
+
+ARG CARGO_BUILD_JOBS=4
+
+RUN apt-get update \
+    && apt-get install -yq --no-install-recommends build-essential cmake libclang-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+COPY scripts/build-stalwart.sh stalwart-subject-search.patch /build/
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/src/target \
+    sh /build/build-stalwart.sh
+
 FROM cgr.dev/chainguard/go:latest@sha256:135d3f59bd1ad5093d831f430bd29f31e753aac2fe9d88c08e849bb3f019aa03 AS frpc-builder
 
 ARG FRPC_COMMIT=bafec21abce5f91ae4a05b4bd19c55543c263128
@@ -14,6 +27,12 @@ ARG STALWART_CLI_VERSION=1.0.14
 ARG BUILD_TIMESTAMP=2026-11-10-v1.1.0
 
 USER root
+
+RUN /usr/local/bin/stalwart --version > /tmp/stalwart-upstream-version
+COPY --from=stalwart-builder --chmod=755 /output/stalwart /usr/local/bin/stalwart
+RUN test "$(/usr/local/bin/stalwart --version)" = "$(cat /tmp/stalwart-upstream-version)" \
+    && rm /tmp/stalwart-upstream-version \
+    && setcap 'cap_net_bind_service=+ep' /usr/local/bin/stalwart
 
 RUN apt-get -o Acquire::Retries=0 update \
     && apt-get -o Acquire::Retries=0 upgrade -yq \

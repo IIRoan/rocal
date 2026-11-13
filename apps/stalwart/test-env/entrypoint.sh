@@ -84,4 +84,5 @@ if [ -n "${STALWART_GATE_KEY:-}" ]; then
 	log info "Backend gate on :${STALWART_GATE_PORT}."
 fi
 
+touch /tmp/solace-test-ready
 wait "$STALWART_PID"
