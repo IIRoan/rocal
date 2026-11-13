@@ -15,12 +15,7 @@ appId: ${APP_ID}
     when:
       true: ${APP_ID === "onl.solace.calendar.e2e"}
     commands:
-      - tapOn:
-          text: Choose date and view
-          retryTapIfNoChange: true
-      - extendedWaitUntil:
-          visible: Close sheet
-          timeout: 30000
+      - runFlow: open-calendar-view-sheet.yaml
       - runFlow:
           when:
             notVisible: ${AGENDA_DATE_LABEL}
@@ -35,12 +30,7 @@ appId: ${APP_ID}
           notVisible: Close sheet
           timeout: 30000
       - waitForAnimationToEnd
-      - tapOn:
-          text: Choose date and view
-          retryTapIfNoChange: true
-      - extendedWaitUntil:
-          visible: Close sheet
-          timeout: 30000
+      - runFlow: open-calendar-view-sheet.yaml
       - assertVisible: Agenda
       - runFlow:
           when:

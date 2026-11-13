@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+---
+# Automatic tap retries can dismiss a sheet that is still opening.
+- retry:
+    maxRetries: 1
+    commands:
+      - runFlow:
+          when:
+            notVisible: Close sheet
+          commands:
+            - tapOn:
+                text: Choose date and view
+                retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible: Close sheet
+          timeout: 30000
