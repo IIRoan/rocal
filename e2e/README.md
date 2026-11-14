@@ -85,3 +85,44 @@ python3 scripts/e2e/services.py stop
 ```
 
 Use `ios` for the three platform arguments on macOS. The server refuses non-loopback services and reads no developer `.env` overrides. Starting it recreates only `solace_test_e2e`. Cleanup stops owned API/device processes; local Linux shared test containers are retained. CI always cleans up, including after failures.
+
+# Web end-to-end tests
+
+`Web end-to-end` (`.github/workflows/web-e2e.yml`) serves the **production web build** (`next build`, then `next start` on `localhost:4100`, with the real CSP and React Compiler output) against the same disposable API, Postgres, Stalwart and S3 mock as the native journeys, and drives it with Playwright in Chromium. Every key page is scanned with axe for WCAG 2.2 AA; any serious or critical violation fails the run, and violations are fixed in the app rather than allowlisted. It runs on relevant pull requests, default-branch/testing pushes and manual dispatches; it is not a required check.
+
+| Journey | Assertions |
+| --- | --- |
+| Sign-up (`signup.spec.ts`) | The seeded invite opens sign-up, which creates the account and its encryption keys on the device; after sign-out a new sign-in unlocks the calendar from the password envelope. Axe: sign-up and sign-in. |
+| Calendar (`calendar.spec.ts`) | Create an event in the editor, edit its title, reload and see the decrypted edit, delete a second event after the confirmation and keep "Playwright kept event" for `verify`. Axe: week view in light and dark, the editor and the delete confirmation. |
+| Mail (`mail.spec.ts`) | The first visit provisions the mailbox; compose and send to the same account, wait for Inbox delivery, open it and read the decrypted body. Axe: composer, Inbox in light and dark, and the reader (the sender's sandboxed HTML frame is excluded because axe cannot run inside it). |
+| Settings (`settings.spec.ts`) | Command palette → Calendar Defaults: a working-day toggle survives a reload, which proves the sealed preferences round trip, and is restored. Axe: the settings panel. |
+| Public pages (`public-pages.spec.ts`) | Axe on `/privacy`, `/support` and `/licenses`. |
+
+`xtask e2e seed` also writes an unclaimed invite for `browser@solace.test` to `private/fixture.json`; the `signup` project runs first and the others depend on it. The other journeys sign in as the seeded `journey@solace.test` from a fresh browser context, so each is a new device unlocking from the password envelope (`storageState` cannot carry non-extractable IndexedDB keys). Journeys never retry, for the same reason as the native suite. Fixture text starts with "Playwright", and `xtask e2e verify calendar` fails if any of it reaches a readable column.
+
+To add a journey, put a `*.spec.ts` in `e2e/web/tests/`, sign in with `signIn` from `support/session.ts` (it waits for the loading overlays and entrance motion), use role and label locators, prefix fixture text with "Playwright", and call `expectNoSeriousViolations(page, "<name>")` from `support/axe.ts` on every new surface, in both color schemes where the surface has its own dark styling.
+
+## Evidence
+
+The Playwright output (traces, failure screenshots, page snapshots) goes to `private/playwright` and is never uploaded: traces record typed credentials. There is no HTML reporter, because it copies traces. CI uploads only `artifacts/web`: `junit.xml`, `results.json`, one `axe/<name>.json` per scan with rule ids, impact and node counts (no page content), and on failure the screenshots, which show only synthetic accounts.
+
+## Local execution
+
+Build the web app against the loopback API first; the suite refuses a build whose CSP allows any other API. Ports 4001 and 4100 must be free.
+
+```sh
+export SOLACE_E2E=1 SOLACE_E2E_DIR="$(mktemp -d)/solace-e2e"
+cargo build -p xtask
+python3 scripts/e2e/services.py start
+./target/debug/xtask e2e serve > "$SOLACE_E2E_DIR/private/backend.log" 2>&1 &
+echo "$!" > "$SOLACE_E2E_DIR/private/backend.pid"
+python3 scripts/e2e/services.py wait-api
+./target/debug/xtask e2e seed
+NEXT_PUBLIC_API_URL=http://localhost:4001 NEXT_PUBLIC_APP_URL=http://localhost:4100 NEXT_TELEMETRY_DISABLED=1 bun run build:web
+bunx playwright install --only-shell chromium
+bun run test:e2e:web
+./target/debug/xtask e2e verify calendar
+python3 scripts/e2e/services.py stop
+```
+
+Playwright starts and stops `next start` itself. Mail provisions `journey@solace.test` in Stalwart, which refuses to adopt a mailbox left by an earlier run's account, so a second local run needs fresh test containers.
