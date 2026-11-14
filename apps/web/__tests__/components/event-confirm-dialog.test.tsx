@@ -50,7 +50,7 @@ it("insets the title, description and buttons from the dialog edges", async () =
   expect(header?.parentElement).toBe(content);
   expect(footer?.parentElement).toBe(content);
   expect(header?.textContent).toContain("Delete “Planning”?");
-  expect(header?.textContent).toContain("You can’t undo this.");
+  expect(header?.textContent).toContain("It moves to Trash for 30 days.");
   expect(footer?.textContent).toContain("Delete event");
   expect(classesOf("[data-slot='dialog-header']")).toEqual(
     expect.arrayContaining(["px-5", "pt-5", "pb-3"]),

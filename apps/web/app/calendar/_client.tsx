@@ -268,7 +268,6 @@ function MobileLayoutContent() {
         onCreateEvent={calendarData.createEvent}
         onUpdateEvent={calendarData.updateEvent}
         onMoveRecurringEvent={moveRecurringEvent}
-        onDeleteEvent={calendarData.deleteEvent}
         onCreateCategory={calendarData.createCategory}
         onDateRangeChange={calendarData.setDateRange}
         showWeekNumbers={settings?.showWeekNumbers}

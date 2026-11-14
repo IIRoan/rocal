@@ -14,6 +14,7 @@ import {
   Loader2,
   Plus,
   Tag,
+  Trash2,
 } from "lucide-react";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarIcsExport } from "@/hooks/use-calendar-ics-export";
@@ -155,12 +156,14 @@ export function CalendarListView({
   onEdit,
   onGoToSubscriptions,
   onGoToCategories,
+  onGoToTrash,
 }: {
   onBack: () => void;
   onCreate: () => void;
   onEdit: (calendar: Calendar) => void;
   onGoToSubscriptions: (calendarId?: string) => void;
   onGoToCategories: () => void;
+  onGoToTrash: () => void;
 }) {
   const { calendars } = useSharedCalendarData();
   const { ownedCalendars, publicCalendars, subscribedCalendars } =
@@ -186,6 +189,7 @@ export function CalendarListView({
             onClick={() => onGoToSubscriptions()}
           />
           <ActionRow icon={Tag} label="Categories" onClick={onGoToCategories} />
+          <ActionRow icon={Trash2} label="Trash" onClick={onGoToTrash} />
           <ActionRow
             icon={Download}
             label={icsExport.isPending ? "Exporting…" : "Export all calendars"}

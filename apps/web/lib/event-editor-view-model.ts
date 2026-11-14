@@ -35,7 +35,7 @@ export function getEventDeleteConfirmCopy(eventTitle: string, removeOnly: boolea
       }
     : {
         title: `Delete “${title}”?`,
-        description: "This permanently deletes the event. You can’t undo this.",
+        description: "It moves to Trash for 30 days.",
         confirmLabel: "Delete event",
       };
 }

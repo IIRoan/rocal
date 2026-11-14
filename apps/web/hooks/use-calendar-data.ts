@@ -33,6 +33,7 @@ import {
   type RecurrenceDeleteScope,
   type RecurrenceEditScope,
 } from "@workspace/calendar-core";
+import { invalidateEventTrash } from "@workspace/calendar-client/event-trash-query-options";
 import {
   persistRecurringEventDelete as deleteRecurringWith,
   persistRecurringEventEdit as editRecurringWith,
@@ -232,9 +233,10 @@ export interface UseCalendarDataReturn {
     id: string,
     event: UpdateEventRequest,
   ) => Promise<CalendarEvent>;
-  deleteEvent: (id: string) => Promise<void>;
+  /** Resolves to the trash entry an Undo can restore, or null when the delete was permanent. */
+  deleteEvent: (id: string) => Promise<string | null>;
   editRecurringEvent: (input: EditRecurringEventInput) => Promise<CalendarEvent>;
-  deleteRecurringEvent: (input: DeleteRecurringEventInput) => Promise<void>;
+  deleteRecurringEvent: (input: DeleteRecurringEventInput) => Promise<string | null>;
   createCalendar: (calendar: CreateCalendarRequest) => Promise<Calendar>;
   updateCalendar: (
     id: string,
@@ -386,6 +388,7 @@ export function useCalendarData(
       }
       invalidateEventRanges(queryClient, cached.start, cached.end, timezone);
     },
+    onSettled: () => invalidateEventTrash(queryClient),
   });
 
   const editRecurringEventMutation = useMutation({
@@ -441,6 +444,7 @@ export function useCalendarData(
       restoreEventCache(queryClient, context?.snapshot);
     },
     onSettled: (_data, _error, { event, scope }) => {
+      invalidateEventTrash(queryClient);
       if (scope === "this_only") {
         invalidateEventRanges(queryClient, event.start, event.end, timezone);
         return;
@@ -599,16 +603,14 @@ export function useCalendarData(
   const updateEvent = (id: string, event: UpdateEventRequest) =>
     updateEventMutation.mutateAsync({ id, event });
 
-  const deleteEvent = async (id: string) => {
-    await deleteEventMutation.mutateAsync(id);
-  };
+  const deleteEvent = async (id: string) =>
+    (await deleteEventMutation.mutateAsync(id)).trashId ?? null;
 
   const editRecurringEvent = (input: EditRecurringEventInput) =>
     editRecurringEventMutation.mutateAsync(input);
 
-  const deleteRecurringEvent = async (input: DeleteRecurringEventInput) => {
-    await deleteRecurringEventMutation.mutateAsync(input);
-  };
+  const deleteRecurringEvent = (input: DeleteRecurringEventInput) =>
+    deleteRecurringEventMutation.mutateAsync(input);
 
   const createCalendar = (calendar: CreateCalendarRequest) =>
     createCalendarMutation.mutateAsync(calendar);

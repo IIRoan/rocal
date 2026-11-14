@@ -7,8 +7,10 @@ import type {
 } from "@workspace/calendar-core";
 import type { RecurringScope } from "../components/event/RecurringScopeModal";
 
-function confirmDelete(onConfirm: () => void) {
-  Alert.alert("Delete event?", "This action cannot be undone.", [
+/** Whole events and series go to the trash; one occurrence or the rest of a series is deleted for good. */
+function confirmDelete(scope: RecurrenceDeleteScope | undefined, onConfirm: () => void) {
+  const permanent = scope === "this_only" || scope === "this_and_future";
+  Alert.alert("Delete event?", permanent ? "This action cannot be undone." : "It moves to Trash for 30 days.", [
     { text: "Cancel", style: "cancel" },
     { text: "Delete", style: "destructive", onPress: onConfirm },
   ]);
@@ -39,7 +41,7 @@ export function useRecurringScopeActions({
 
   const handleDeletePress = useCallback(() => {
     if (!isRecurring) {
-      confirmDelete(() => onDelete({}));
+      confirmDelete(undefined, () => onDelete({}));
       return;
     }
     setScopeAction("delete");
@@ -51,7 +53,7 @@ export function useRecurringScopeActions({
       if (!scopeVisible) return;
       setScopeVisible(false);
       if (scopeAction === "edit") onStartEdit(scope);
-      else confirmDelete(() => onDelete({ scope }));
+      else confirmDelete(scope, () => onDelete({ scope }));
     },
     [scopeVisible, scopeAction, onStartEdit, onDelete],
   );

@@ -49,6 +49,7 @@ export * from "./event-editor-options";
 export * from "./view-model";
 export * from "./validation";
 export * from "./calendar-helpers";
+export * from "./event-trash";
 export * from "./calendar-month-ranges";
 export * from "./calendar-navigation";
 export * from "./auth-accounts";

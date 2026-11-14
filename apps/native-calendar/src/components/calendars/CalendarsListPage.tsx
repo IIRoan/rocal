@@ -18,6 +18,7 @@ import {
   CALENDAR_CREATE_PAGE,
   CATEGORIES_PAGE,
   SUBSCRIPTION_CREATE_PAGE,
+  TRASH_PAGE,
   calendarEditPage,
   subscriptionEditPage,
 } from "../../lib/calendars-sheet-pages";
@@ -108,6 +109,7 @@ export function CalendarsListPage() {
             chevron
             onPress={() => push(CATEGORIES_PAGE)}
           />
+          <SheetItem label="Trash" icon="trash-2" chevron onPress={() => push(TRASH_PAGE)} />
         </SheetGroup>
       </SheetSection>
 

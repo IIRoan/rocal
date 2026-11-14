@@ -56,7 +56,6 @@ export interface MobileEventCalendarProps {
   onCreateEvent?: (event: unknown) => Promise<unknown>;
   onUpdateEvent?: (id: string, event: unknown) => Promise<unknown>;
   onMoveRecurringEvent?: MoveRecurringCalendarEvent;
-  onDeleteEvent?: (id: string) => Promise<void>;
   onCreateCategory?: (category: unknown) => Promise<unknown>;
   onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
   showWeekNumbers?: boolean;
@@ -98,7 +97,6 @@ export function MobileEventCalendar({
   error = null,
   onUpdateEvent,
   onMoveRecurringEvent,
-  onDeleteEvent,
   showWeekNumbers = false,
   compactView = false,
   timeFormat,

@@ -10,6 +10,7 @@ import { SubscriptionEditPage } from "./SubscriptionEditPage";
 import { CategoriesListPage } from "./CategoriesListPage";
 import { CategoryCreatePage } from "./CategoryCreatePage";
 import { CategoryEditPage } from "./CategoryEditPage";
+import { TrashPage } from "./TrashPage";
 
 interface CalendarsSheetProps {
   visible: boolean;
@@ -91,6 +92,12 @@ export function CalendarsSheetContent({
       return (
         <SheetSubPage title="Edit category" backLabel="Back to categories">
           <CategoryEditPage id={page.id} />
+        </SheetSubPage>
+      );
+    case "trash":
+      return (
+        <SheetSubPage title="Trash" backLabel="Back to calendars">
+          <TrashPage />
         </SheetSubPage>
       );
   }

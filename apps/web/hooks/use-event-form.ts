@@ -60,6 +60,7 @@ import {
 import { useRecentContacts } from "./use-recent-contacts";
 import type { UseCalendarDataReturn } from "./use-calendar-data";
 import { EVENTS_QUERY_KEY } from "./use-calendar-events-loader";
+import { useEventTrashUndo } from "./use-event-trash";
 import {
   RECURRING_DELETE_FAILURE_MESSAGES,
   RECURRING_DELETE_SUCCESS_MESSAGES,
@@ -291,6 +292,7 @@ export function useEventForm({
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const { recordUsage } = useRecentContacts();
+  const showTrashUndo = useEventTrashUndo();
   // Use ref to store calendars to avoid infinite loops
   const calendarsRef = useRef(calendars);
   useEffect(() => {
@@ -922,8 +924,9 @@ export function useEventForm({
 
     setEventSaving(true);
     const deleteEvent = async () => {
-      await calendarData.deleteEvent(selectedEvent.id);
-      toast.success(`Event "${eventTitle}" deleted`);
+      const trashId = await calendarData.deleteEvent(selectedEvent.id);
+      if (trashId) showTrashUndo({ trashId, calendarId: selectedEvent.calendarId });
+      else toast.success(`Event "${eventTitle}" deleted`);
       onEventSaved?.();
 
       setTimeout(() => {
@@ -947,11 +950,12 @@ export function useEventForm({
     setShowRecurringDeleteModal(false);
     setEventSaving(true);
     const deleteOccurrences = async () => {
-      await calendarData.deleteRecurringEvent({
+      const trashId = await calendarData.deleteRecurringEvent({
         event: selectedEvent,
         scope,
       });
-      toast.success(RECURRING_DELETE_SUCCESS_MESSAGES[scope]);
+      if (trashId) showTrashUndo({ trashId, calendarId: selectedEvent.calendarId });
+      else toast.success(RECURRING_DELETE_SUCCESS_MESSAGES[scope]);
       onEventSaved?.();
       onClose();
     };

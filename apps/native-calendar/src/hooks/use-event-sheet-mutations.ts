@@ -13,6 +13,7 @@ import {
   persistRecurringEventDelete,
   persistRecurringEventEdit,
 } from "@workspace/calendar-client";
+import { invalidateEventTrash } from "@workspace/calendar-client/event-trash-query-options";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import { toastOperationWarnings } from "@workspace/native-core/lib/operation-warnings";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
@@ -33,6 +34,7 @@ import {
   rollbackFromSnapshot,
   type CacheSnapshot,
 } from "../lib/optimistic-events";
+import { useRestoreTrashedEvent } from "./use-event-trash";
 
 export function useCreateEventMutation(input: {
   userId: string | undefined;
@@ -193,6 +195,7 @@ export function useDeleteEventMutation(input: {
   const eventId = event?.id;
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { mutate: restore } = useRestoreTrashedEvent();
   const snapshotRef = useRef<CacheSnapshot>([]);
 
   return useMutation({
@@ -201,10 +204,9 @@ export function useDeleteEventMutation(input: {
         throw new Error("An existing event is required to delete it.");
       }
       if (scope) {
-        await persistRecurringEventDelete(calendarApiService, { event, scope });
-        return;
+        return persistRecurringEventDelete(calendarApiService, { event, scope });
       }
-      await calendarApiService.deleteEvent(event.id);
+      return (await calendarApiService.deleteEvent(event.id)).trashId ?? null;
     },
     onMutate: async () => {
       if (eventId) {
@@ -215,19 +217,27 @@ export function useDeleteEventMutation(input: {
         onDismiss();
       }
     },
-    onSuccess: () => {
+    onSuccess: (trashId) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventsRoot() });
       if (eventId) {
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.eventDetail(eventId),
         });
       }
-      toast("Event deleted");
+      if (!trashId || !event) {
+        toast("Event deleted");
+        return;
+      }
+      const target = { trashId, calendarId: event.calendarId };
+      toast("Event moved to Trash", "success", {
+        action: { label: "Undo", onPress: () => restore(target) },
+      });
     },
     onError: (err: unknown) => {
       rollbackFromSnapshot(queryClient, snapshotRef.current);
       toast(getErrorMessage(err, "Failed to delete event"), "error");
     },
+    onSettled: () => invalidateEventTrash(queryClient),
   });
 }
 

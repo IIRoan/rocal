@@ -275,6 +275,9 @@ export function useCommandPaletteController({
       case "newCategory":
         goForward("category-create");
         break;
+      case "openTrash":
+        goForward("trash");
+        break;
       case "newPasskey":
         dispatchChrome({ type: "setPasskeyAddMode", enabled: true });
         goForward("passkeys", { preservePasskeyAddMode: true });
