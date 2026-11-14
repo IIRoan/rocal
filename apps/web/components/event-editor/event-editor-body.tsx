@@ -24,6 +24,7 @@ import { EventEditorDateTimeFields } from "./event-editor-datetime-fields";
 import { EventEditorOptionalFields } from "./event-editor-optional-fields";
 import { EventEditorReadView } from "./event-editor-read-view";
 import { EventEditorRow } from "./event-editor-row";
+import { QuickAddSuggestion } from "./quick-add-suggestion";
 import { chipClass } from "./event-editor-styles";
 import type { EventEditorBodyProps } from "./types";
 
@@ -187,6 +188,13 @@ export function EventEditorBody({
             autoFocus={desktop && !eventForm.selectedEvent?.id}
             className="-mx-2 h-11 w-[calc(100%+1rem)] rounded-md border-0 bg-transparent px-2 text-xl font-semibold text-foreground shadow-none placeholder:text-muted-foreground hover:bg-hover/40 focus-visible:bg-hover/40 focus-visible:ring-2 focus-visible:ring-ring"
           />
+          {eventForm.selectedEvent?.id ? null : (
+            <QuickAddSuggestion
+              localSettings={localSettings}
+              onApply={eventForm.applyQuickAdd}
+              title={eventForm.eventTitle}
+            />
+          )}
 
           <EventEditorDateTimeFields
             desktop={desktop}

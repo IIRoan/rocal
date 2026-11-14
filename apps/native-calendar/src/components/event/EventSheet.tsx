@@ -317,6 +317,8 @@ export function EventSheet({
               initialReminders={isCreate ? undefined : eventReminders}
               timezone={resolvedTimezone}
               timeFormat={timeFormat}
+              isCreate={isCreate}
+              defaultDurationMinutes={settings?.defaultEventDuration}
             />
           </View>
         )}

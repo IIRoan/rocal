@@ -24,6 +24,7 @@ import {
   resolveSubmittedCategoryId,
   resolveTimezone,
   storedEventId,
+  type QuickAddResult,
   type RecurrenceDeleteScope,
   type RecurrenceEditScope,
 } from "@workspace/calendar-core";
@@ -236,6 +237,7 @@ interface UseEventFormReturn {
   handleStartTimeChange: (newStartTime: string) => void;
   handleEndTimeChange: (newEndTime: string) => void;
   handleNotificationChange: (notifications: EventNotification[]) => void;
+  applyQuickAdd: (result: QuickAddResult) => void;
   loadEventData: (event: CalendarEvent) => void;
   resetForm: () => void;
   handleEventSave: (
@@ -573,6 +575,20 @@ export function useEventForm({
 
   const handleNotificationChange = (notifications: EventNotification[]) => {
     setEventNotifications(notifications);
+  };
+
+  const applyQuickAdd = (result: QuickAddResult) => {
+    const { startDate, endDate } = getEventPickerDateRange(
+      result,
+      localSettings.timezone,
+    );
+    setEventTitle(result.title);
+    setEventAllDay(result.allDay);
+    setEventStartDate(startDate);
+    setEventEndDate(endDate);
+    setEventStartTime(formatTimeForInput(result.start, localSettings.timezone));
+    setEventEndTime(formatTimeForInput(result.end, localSettings.timezone));
+    setTimeErrors({});
   };
 
   const handleEventSave = async (
@@ -1005,6 +1021,7 @@ export function useEventForm({
     handleStartTimeChange,
     handleEndTimeChange,
     handleNotificationChange,
+    applyQuickAdd,
     loadEventData,
     resetForm,
     handleEventSave,

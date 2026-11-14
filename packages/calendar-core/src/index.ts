@@ -31,6 +31,7 @@ export * from "./search-types";
 export * from "./mail-search-relevance";
 export * from "./search-query";
 export * from "./calendar-search-filter";
+export * from "./quick-add";
 export * from "./search-index-crypto";
 export * from "./title-search-index";
 export * from "./mail-body-index";

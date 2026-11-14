@@ -98,7 +98,7 @@ function operatorPredicate(
   }
 }
 
-/** Applies typed operators on the device; any operator calendar search cannot honour empties the result, so a mail-only query shows only mail. */
+/** Applies typed operators on the device; one it cannot honour empties the result, so mail-only queries show mail. */
 export function filterEventsBySearchOperators(
   events: CalendarEvent[],
   operators: SearchQueryOperator[],

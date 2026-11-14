@@ -67,6 +67,16 @@ export function createEventFormStyles(theme: ThemeTokens) {
     reminderRemovePressed: {
       backgroundColor: theme.colors.accent,
     },
+    quickAddRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
+      minHeight: 44,
+      paddingHorizontal: 4,
+    },
+    quickAddRowPressed: {
+      opacity: 0.6,
+    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -94,6 +104,13 @@ export function createEventFormStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.destructive,
+    },
+    quickAddText: {
+      flex: 1,
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      color: theme.colors.primaryBase,
     },
   } satisfies Record<string, TextStyle>;
 
