@@ -37,6 +37,7 @@ import {
   type MailSkin,
 } from "@workspace/native-core/components/mail/mail-ui";
 import { useMailDisplaySettings } from "../../hooks/use-mail-settings";
+import { useMailLinkPress } from "../../hooks/use-mail-link-press";
 
 type MailMessageBodyProps = {
   messageId: string;
@@ -70,6 +71,7 @@ export function MailMessageBody({
   } = calendar;
   const { decryptError, decryptResult, htmlContent, plainContent } = content;
   const { settings: displaySettings, addTrustedSender } = useMailDisplaySettings();
+  const onLinkPress = useMailLinkPress();
   const [loadedMessageId, setLoadedMessageId] = useState<string | null>(null);
   const senderEmail = content.message?.from?.[0]?.email ?? null;
   const emailIsDark = isDark && resolveMailContentIsDark(displaySettings) && !showOriginalLook;
@@ -192,6 +194,7 @@ export function MailMessageBody({
             theme={theme}
             blockRemoteImages={remoteContent.blockRemoteImages}
             blockTrackingPixels={displaySettings.blockTrackingPixels}
+            onLinkPress={onLinkPress}
           />
         </>
       ) : plainContent ? (

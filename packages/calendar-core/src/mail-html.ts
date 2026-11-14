@@ -1,4 +1,4 @@
-import { decodeHtmlEntities } from "./html-text";
+import { decodeHtmlEntities, stripHtmlTags } from "./html-text";
 import {
   decodeCssEscapes,
   sanitizeUntrustedEmailHtml,
@@ -11,6 +11,8 @@ export interface ProcessEmailHtmlOptions {
   blockRemoteImages?: boolean;
   /** Dark canvas that email whites are translated onto; defaults to the reader canvas. */
   canvasColor?: string;
+  /** Returns a replacement href for a link (shown originals go in `title`), or null to keep it. */
+  rewriteLink?: (link: { href: string; text: string }) => string | null;
 }
 
 export interface BuildEmailHtmlDocumentOptions {
@@ -261,6 +263,7 @@ export function processEmailHtml({
   blockTrackingPixels,
   blockRemoteImages = false,
   canvasColor,
+  rewriteLink,
 }: ProcessEmailHtmlOptions): string {
   // The transforms below run on sanitized markup, where every `<` starts a closed tag, so hostile input cannot make their regexes quadratic.
   let processed = sanitizeUntrustedEmailHtml(extractBodyHtml(html), { profile: "reader" });
@@ -273,6 +276,8 @@ export function processEmailHtml({
     });
   }
 
+  if (rewriteLink) processed = rewriteEmailAnchors(processed, rewriteLink);
+
   if (isDark && !DARK_SCHEME_PATTERN.test(html)) {
     processed = darkenEmailColors(processed, canvasLightnessOf(canvasColor));
   } else if (!isDark) {
@@ -281,6 +286,67 @@ export function processEmailHtml({
 
   // Always last: nothing after this point may reintroduce untrusted markup.
   return sanitizeUntrustedEmailHtml(processed, { profile: "reader" });
+}
+
+const ANCHOR_TAG_PATTERN =
+  /<(\/?)a((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/gi;
+const LINK_TEXT_MAX_LENGTH = 512;
+const LINK_TITLE_MAX_LENGTH = 200;
+
+function escapeAttributeValue(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Browsers keep `&name=` literal inside attributes, so a query key such as `&tab=` must not decode to a tab. */
+function decodeAttributeUrl(raw: string): string {
+  return decodeHtmlEntities(raw.replace(/&(?=[a-z]+[=0-9])/gi, "&amp;"));
+}
+
+function linkText(html: string): string {
+  return decodeHtmlEntities(stripHtmlTags(html)).replace(/\s+/g, " ").trim().slice(0, LINK_TEXT_MAX_LENGTH);
+}
+
+function rewriteAnchorAttributes(
+  attributes: string,
+  readText: () => string,
+  rewriteLink: NonNullable<ProcessEmailHtmlOptions["rewriteLink"]>,
+): string | null {
+  const parsed = [...attributes.matchAll(ATTRIBUTE_PATTERN)].map((attribute) => ({
+    name: (attribute[1] ?? "").toLowerCase(),
+    value: decodeAttributeUrl(attribute[2] ?? attribute[3] ?? attribute[4] ?? ""),
+  }));
+  const href = parsed.find((attribute) => attribute.name === "href")?.value;
+  if (href === undefined) return null;
+  const replacement = rewriteLink({ href, text: readText() });
+  if (replacement === null) return null;
+  return [
+    ...parsed.filter((attribute) => attribute.name !== "href" && attribute.name !== "title"),
+    { name: "href", value: replacement },
+    { name: "title", value: href.slice(0, LINK_TITLE_MAX_LENGTH) },
+  ]
+    .map((attribute) => ` ${attribute.name}="${escapeAttributeValue(attribute.value)}"`)
+    .join("");
+}
+
+/** One scan records every anchor tag and link text runs to the next one, so an unclosed `<a>` cannot make this quadratic. */
+function rewriteEmailAnchors(
+  html: string,
+  rewriteLink: NonNullable<ProcessEmailHtmlOptions["rewriteLink"]>,
+): string {
+  const tags = [...html.matchAll(ANCHOR_TAG_PATTERN)];
+  let out = "";
+  let last = 0;
+  tags.forEach((match, index) => {
+    out += html.slice(last, match.index);
+    last = match.index + match[0].length;
+    const textEnd = tags[index + 1]?.index ?? html.length;
+    const textStart = last;
+    const attributes = match[1]
+      ? null
+      : rewriteAnchorAttributes(match[2] ?? "", () => linkText(html.slice(textStart, textEnd)), rewriteLink);
+    out += attributes === null ? match[0] : `<a${attributes}>`;
+  });
+  return out + html.slice(last);
 }
 
 /** Remote images are allowed only once the user opted in for this message or sender. */

@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useEffectEvent,
   useReducer,
   useRef,
   useState,
@@ -16,11 +17,13 @@ import {
   hasComposeUserContent,
   type ComposeTextFields,
   type MailServerLimits,
+  type MailtoDraft,
   type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
 import { resetComposeInlineImages } from "@/lib/mail/compose-inline-images";
+import { takePendingMailto } from "@/lib/mail/mail-link-handoff";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
 import {
   cancelComposeDraftSave,
@@ -31,6 +34,7 @@ import {
 import {
   buildDraftSeed,
   buildForwardSeed,
+  buildMailtoSeed,
   buildNewMessageSeed,
   buildOpenNewComposeSeed,
   buildReplySeed,
@@ -380,6 +384,20 @@ export function useMailComposeController({
     applySeed(buildNewMessageSeed(recipient, identities, resolvedIdentityId));
   };
 
+  const seedMailto = (draft: MailtoDraft) => {
+    applySeed(buildMailtoSeed(draft, identities, resolvedIdentityId));
+  };
+
+  // A mailto link from another tab's message waits in the handoff slot until this tab's identities load.
+  const seedPendingMailto = useEffectEvent(() => {
+    const draft = takePendingMailto();
+    if (draft) seedMailto(draft);
+  });
+  const hasIdentities = identities.length > 0;
+  useEffect(() => {
+    if (hasIdentities) seedPendingMailto();
+  }, [hasIdentities]);
+
   const seedDraft = (
     message: JmapEmailMessage,
     overrides?: {
@@ -444,6 +462,7 @@ export function useMailComposeController({
       seedReply,
       seedForward,
       seedNewMessage,
+      seedMailto,
       seedDraft,
       openDraftEditor,
       markDirty,

@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   buildEmailHtmlDocument,
   processEmailHtml,
 } from "@workspace/calendar-core/mail-html";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
+import {
+  createMailLinkRewriter,
+  registerMailLinks,
+} from "@/lib/mail/mail-link-handoff";
 import { fadeInMailReaderContent } from "../mail-app/mail-reader-transition";
 import { mailBodySurfaceClassName } from "./constants";
 
@@ -20,17 +24,22 @@ export function HtmlEmailRenderer({
   isDark: boolean;
 }) {
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [linkToken] = useState(() => crypto.randomUUID());
   const prefersReducedMotion = usePrefersReducedMotion();
+  const { links, rewriteLink } = createMailLinkRewriter(linkToken);
   const srcDoc = buildEmailHtmlDocument({
     processedHtml: processEmailHtml({
       html,
       isDark,
       blockTrackingPixels,
       blockRemoteImages,
+      rewriteLink,
     }),
     blockRemoteImages,
     isDark,
   });
+
+  useEffect(() => registerMailLinks(links), [links]);
 
   // The frame paints nothing until its document loads, so it stays hidden over a matching surface and fades in once.
   return (

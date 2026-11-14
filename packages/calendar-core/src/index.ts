@@ -71,6 +71,7 @@ export * from "./mail-signature";
 export * from "./mail-reply-identity";
 export * from "./mail-reply-context";
 export * from "./mail-simplelogin";
+export * from "./mail-mailto";
 export * from "./mail-auth-results";
 
 export * from "./recurring-event-target";

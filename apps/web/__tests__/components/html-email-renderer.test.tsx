@@ -52,4 +52,14 @@ describe("HtmlEmailRenderer", () => {
     expect(srcDoc).toContain("img-src data: blob: cid: https: http:");
     expect(srcDoc).toContain("https://example.com/banner.png");
   });
+
+  it("hands mailto links to the opaque link page instead of the OS", () => {
+    const frame = renderFrame('<a href="mailto:a@example.org?subject=Hi">Write</a><a href="mailto:b@example.org">B</a>', true);
+    const srcDoc = frame.getAttribute("srcdoc") ?? "";
+
+    expect(srcDoc).not.toContain('href="mailto:');
+    const ids = [...srcDoc.matchAll(/href="http:\/\/localhost\/mail\/link#([0-9a-f-]{36})\.(\d+)"/g)];
+    expect(ids.map((match) => match[2])).toEqual(["0", "1"]);
+    expect(ids[0]?.[1]).toBe(ids[1]?.[1]);
+  });
 });

@@ -7,9 +7,9 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import * as WebBrowser from "expo-web-browser";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { stripHtmlTags } from "@workspace/calendar-core";
+import { z } from "@workspace/calendar-core/zod";
 import {
   buildEmailHtmlDocument,
   processEmailHtml,
@@ -30,9 +30,15 @@ try {
   WebView = null;
 }
 
-/** Injected after load: scale wide tables to device width, then report the visual height so the host can resize. */
+/** Injected after load: hand link taps to the host, scale wide tables to device width, then report the visual height so the host can resize. */
 const FIT_AND_REPORT_SCRIPT = `
 (function() {
+  document.addEventListener('click', function(e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    e.preventDefault();
+    window.ReactNativeWebView.postMessage('link:' + JSON.stringify({ href: a.href, text: (a.textContent || '').slice(0, 512) }));
+  }, true);
   var lastH = 0;
   function run() {
     var dw = window.innerWidth;
@@ -65,6 +71,22 @@ const FIT_AND_REPORT_SCRIPT = `
 })();
 `;
 
+export type MailLinkPress = (link: { href: string; text: string }) => void;
+
+const linkMessageSchema = z.strictObject({
+  href: z.string().max(16_384),
+  text: z.string().max(512),
+});
+
+function parseLinkMessage(message: string): { href: string; text: string } | null {
+  try {
+    const parsed = linkMessageSchema.safeParse(JSON.parse(message));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 interface HtmlEmailViewProps {
   html: string;
   isDark: boolean;
@@ -72,6 +94,7 @@ interface HtmlEmailViewProps {
   blockRemoteImages?: boolean;
   blockTrackingPixels?: boolean;
   style?: ViewStyle;
+  onLinkPress: MailLinkPress;
 }
 
 export function HtmlEmailView({
@@ -81,6 +104,7 @@ export function HtmlEmailView({
   blockRemoteImages = true,
   blockTrackingPixels = true,
   style,
+  onLinkPress,
 }: HtmlEmailViewProps) {
   const [webViewHeight, setWebViewHeight] = useState(400);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -116,17 +140,17 @@ export function HtmlEmailView({
     if (msg.startsWith("h:")) {
       const h = parseInt(msg.slice(2), 10);
       if (!isNaN(h) && h > 20) setWebViewHeight(h);
+    } else if (msg.startsWith("link:")) {
+      const link = parseLinkMessage(msg.slice(5));
+      if (link) onLinkPress(link);
     }
   };
 
-  // data: is refused because a data:text/html page would run with JavaScript enabled.
+  // A navigation the tap listener missed still goes to the host; data: is refused because a data:text/html page would run with JavaScript enabled.
   const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest) => {
     const url = request.url;
     if (url === "about:blank") return true;
-    if (/^https?:/i.test(url)) {
-      WebBrowser.openBrowserAsync(url).catch(() => {});
-      return false;
-    }
+    if (/^(?:https?|mailto|tel):/i.test(url)) onLinkPress({ href: url, text: "" });
     return false;
   };
 
@@ -135,8 +159,8 @@ export function HtmlEmailView({
   return (
     <View style={[{ height: webViewHeight }, style]}>
       <WebView
-        // data: is listed only so it reaches onShouldStartLoadWithRequest and is refused there.
-        originWhitelist={["about:blank", "data:", "http://*", "https://*"]}
+        // data: is listed only so it reaches onShouldStartLoadWithRequest and is refused there; mailto/tel so the library never hands them to Linking.
+        originWhitelist={["about:blank", "data:", "http://*", "https://*", "mailto:*", "tel:*"]}
         source={{ html: document }}
         injectedJavaScript={FIT_AND_REPORT_SCRIPT}
         onMessage={onMessage}

@@ -78,6 +78,13 @@ export function planComposeSeed({
   runtime,
   sourcePlaintext,
 }: ComposeSeedInput): ComposeSeedPlan | null {
+  if (params.mailto) {
+    const { to, cc, bcc, subject, body } = params.mailto;
+    return {
+      kind: "fields",
+      fields: { to: to.join(", "), cc: cc.join(", "), bcc: bcc.join(", "), subject, body },
+    };
+  }
   if (params.to) {
     const name = params.toName?.trim();
     return {

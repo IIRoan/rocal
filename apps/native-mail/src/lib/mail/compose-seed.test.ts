@@ -65,6 +65,14 @@ describe("planComposeSeed", () => {
     });
   });
 
+  it("fills every field from a mailto link in a message", () => {
+    const mailto = { to: ["a@example.com", "b@example.com"], cc: ["c@example.com"], bcc: [], subject: "Hi", body: "Line one\nLine two" };
+    expect(plan({ params: { mailto }, sourceMessage: null })).toEqual({
+      kind: "fields",
+      fields: { to: "a@example.com, b@example.com", cc: "c@example.com", bcc: "", subject: "Hi", body: "Line one\nLine two" },
+    });
+  });
+
   it("waits for the source message and compose settings", () => {
     expect(plan({ params: { mode: "reply" }, sourceMessage: null })).toBeNull();
     expect(plan({ params: { mode: "reply" }, settingsLoaded: false })).toBeNull();

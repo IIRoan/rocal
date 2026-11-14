@@ -1,3 +1,4 @@
+import type { MailtoDraft } from "@workspace/calendar-core";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 
 export type ComposeMode = "new" | "reply" | "forward" | "draft";
@@ -40,6 +41,7 @@ export type MailComposeBridge = {
   ) => void;
   seedForward: (message: JmapEmailMessage, plaintext: string | null) => void;
   seedNewMessage: (recipient: { email: string; name?: string | null }) => void;
+  seedMailto: (draft: MailtoDraft) => void;
   seedDraft: (
     message: JmapEmailMessage,
     overrides?: {

@@ -39,6 +39,8 @@ const UNITS = [
   "<u x",
   "<li",
   "<br ",
+  "<a href=x>",
+  "<a href=x",
 ];
 
 const ENTRY_POINTS: Record<string, (html: string) => unknown> = {
@@ -46,6 +48,8 @@ const ENTRY_POINTS: Record<string, (html: string) => unknown> = {
   "compose sanitizer": (html) => sanitizeUntrustedEmailHtml(html),
   "dark reader": (html) => processEmailHtml({ html, isDark: true, blockTrackingPixels: true, blockRemoteImages: true }),
   "light reader": (html) => processEmailHtml({ html, isDark: false, blockTrackingPixels: true, blockRemoteImages: true }),
+  "link rewrite": (html) =>
+    processEmailHtml({ html, isDark: false, blockTrackingPixels: true, rewriteLink: () => "https://solace.test/mail/link#x" }),
   "remote content check": (html) => emailHtmlHasRemoteContent({ html, isDark: true, blockTrackingPixels: true }),
   "search excerpt": (html) => buildMailBodyExcerpt({ html }),
   "search ranking": (html) =>

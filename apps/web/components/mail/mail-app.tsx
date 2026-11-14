@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { MailTrustReview } from "./mail-trust-review";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useComposeDraftAutosave } from "@/hooks/use-compose-draft-autosave";
 import { useMailSyncedSettingsHydration } from "@/lib/mail/use-mail-synced-settings-hydration";
+import { startMailLinkResponder } from "@/lib/mail/mail-link-handoff";
 import {
   MailComposeProvider,
 } from "./mail-compose-context";
@@ -54,6 +56,7 @@ function MailComposeAutosave({
 export function MailApp() {
   const mail = useMailApp();
   useMailSyncedSettingsHydration();
+  useEffect(() => startMailLinkResponder(), []);
   const isOpeningMailbox =
     Boolean(mail.session?.user) &&
     !mail.activeMailbox &&

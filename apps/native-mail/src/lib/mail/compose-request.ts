@@ -1,3 +1,5 @@
+import type { MailtoDraft } from "@workspace/calendar-core";
+
 export type ComposeMode = "reply" | "reply-all" | "forward" | "draft";
 
 /** What the compose drawer opens with; an empty request starts a blank message. */
@@ -6,4 +8,5 @@ export interface ComposeRequest {
   messageId?: string;
   to?: string;
   toName?: string;
+  mailto?: MailtoDraft;
 }

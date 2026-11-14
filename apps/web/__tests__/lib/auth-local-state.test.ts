@@ -64,6 +64,9 @@ jest.mock("@/lib/search/local-index-store", () => ({
   clearLocalSearchIndexDatabase: () => mockClearLocalSearchIndexDatabase(),
 }));
 
+const mockClearMailLinkHandoff = jest.fn();
+jest.mock("@/lib/mail/mail-link-handoff", () => ({ clearMailLinkHandoff: () => mockClearMailLinkHandoff() }));
+
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
     info: jest.fn(),
@@ -105,6 +108,7 @@ describe("auth-local-state", () => {
 
     expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
     expect(mockResetE2eeBootstrap).toHaveBeenCalledTimes(1);
+    expect(mockClearMailLinkHandoff).toHaveBeenCalledTimes(1);
   });
 
   it("deletes recoverable device keys, the mail vault key and the search index from disk", () => {
@@ -144,6 +148,7 @@ describe("auth-local-state", () => {
 
     expect(result).toEqual({ status: "unauthenticated" });
     expect(mockClearLegacyRememberedPassword).toHaveBeenCalledTimes(1);
+    expect(mockClearMailLinkHandoff).toHaveBeenCalledTimes(1);
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 

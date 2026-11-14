@@ -330,3 +330,41 @@ describe("processEmailHtml", () => {
     expect(processed).toContain("banner.png");
   });
 });
+
+describe("processEmailHtml link rewrite", () => {
+  it("hands each link and its text to rewriteLink and keeps the original in the title", () => {
+    const seen: { href: string; text: string }[] = [];
+    const processed = processEmailHtml({
+      html: '<a href="mailto:a@example.org?subject=x&amp;body=y" title="Sender title"><b>Write</b>  to us</a><a href="https://example.org/">site</a>',
+      isDark: false,
+      blockTrackingPixels: false,
+      rewriteLink: (link) => {
+        seen.push(link);
+        return link.href.startsWith("mailto:") ? "https://solace.test/mail/link#id.0" : null;
+      },
+    });
+
+    expect(seen).toEqual([
+      { href: "mailto:a@example.org?subject=x&body=y", text: "Write to us" },
+      { href: "https://example.org/", text: "site" },
+    ]);
+    expect(processed).toContain('href="https://solace.test/mail/link#id.0"');
+    expect(processed).toContain('title="mailto:a@example.org?subject=x&amp;body=y"');
+    expect(processed).not.toContain("Sender title");
+    expect(processed).toContain('href="https://example.org/"');
+  });
+
+  it("keeps a legacy `&name=` query key literal when it decodes the href", () => {
+    const hrefs: string[] = [];
+    processEmailHtml({
+      html: '<a href="https://example.org/?view=1&tab=inbox&amp;lt=2">x</a>',
+      isDark: false,
+      blockTrackingPixels: false,
+      rewriteLink: ({ href }) => {
+        hrefs.push(href);
+        return null;
+      },
+    });
+    expect(hrefs).toEqual(["https://example.org/?view=1&tab=inbox&lt=2"]);
+  });
+});

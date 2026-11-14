@@ -3,6 +3,7 @@ import {
   formatQuotedMailDate,
   resolveMessageReplyFrom,
   resolveMessageReplyRecipients,
+  type MailtoDraft,
   type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import { limitMailQuoteContent } from "@workspace/calendar-core/mail-mime-limits";
@@ -233,6 +234,43 @@ export function buildNewMessageSeed(
       composeSubject: "",
       composeBody: seeded.body,
       composeHtmlBody: seeded.htmlBody,
+      composeAttachments: [],
+      composeReplyContext: null,
+      composeMode: "new",
+      quotedAttachments: [],
+      signatureAlreadyEmbedded: seeded.signatureAlreadyEmbedded,
+      draftId: null,
+      draftSaveStatus: "idle",
+      isComposeOpen: true,
+      isFullCompose: false,
+    },
+  };
+}
+
+/** A mailto link opens a new message with its fields, its body above the signature. */
+export function buildMailtoSeed(
+  draft: MailtoDraft,
+  identities: JmapIdentity[],
+  resolvedIdentityId: string | null,
+): SeedResult {
+  const identity =
+    identities.find((entry) => entry.id === resolvedIdentityId) ??
+    identities[0] ??
+    null;
+  const seeded = buildNewComposeBodies(identity);
+  const plainTextMode = readMailComposeSettings().plainTextMode;
+
+  return {
+    patch: {
+      composeTo: draft.to.join(", "),
+      composeCc: draft.cc.join(", "),
+      composeBcc: draft.bcc.join(", "),
+      composeSubject: draft.subject,
+      composeBody: plainTextMode ? draft.body + seeded.body : seeded.body,
+      composeHtmlBody:
+        plainTextMode || !draft.body
+          ? seeded.htmlBody
+          : `<p>${escapeHtml(draft.body).replace(/\n/g, "<br>")}</p>${seeded.htmlBody}`,
       composeAttachments: [],
       composeReplyContext: null,
       composeMode: "new",
