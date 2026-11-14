@@ -1,6 +1,7 @@
 import {
   LIST_DENSITY_OPTIONS,
   MAIL_AUTO_ADVANCE_OPTIONS,
+  MAIL_SWIPE_ACTION_OPTIONS,
   MARK_AS_READ_DELAY_OPTIONS,
   UNDO_TOAST_DURATION_OPTIONS,
 } from "@workspace/calendar-core";
@@ -90,6 +91,12 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
     label: option.label,
     location: `${LIST} · Undo window`,
     keywords: "toast",
+  })),
+  ...["Swipe right", "Swipe left"].map((label) => ({
+    pageId: "mail-list",
+    label,
+    location: `${LIST} · ${label}`,
+    keywords: `gesture ${MAIL_SWIPE_ACTION_OPTIONS.map((option) => option.label).join(" ")}`,
   })),
   {
     pageId: "mail-list",

@@ -19,6 +19,7 @@ interface MailRowHandlersParams {
   isInTrash: boolean;
   orderedMessageIds: string[];
   onToggleSelect: (message: JmapEmailMessage, selectableIds: string[]) => void;
+  onMove: (ids: string[]) => void;
   showMoveToast: ReturnType<typeof useMailUndoToast>;
 }
 
@@ -29,6 +30,7 @@ export function useMailRowHandlers({
   isInTrash,
   orderedMessageIds,
   onToggleSelect,
+  onMove,
   showMoveToast,
 }: MailRowHandlersParams): MailThreadRowHandlers {
   const router = useRouter();
@@ -45,6 +47,8 @@ export function useMailRowHandlers({
   const markReadMutate = mutations.bulkMarkAsRead.mutate;
   const markUnreadMutate = mutations.bulkMarkAsUnread.mutate;
   const moveToTrashMutate = mutations.bulkMoveToTrash.mutate;
+  const moveToMailboxMutate = mutations.bulkMoveToMailbox.mutate;
+  const toggleFlaggedMutate = mutations.toggleFlagged.mutate;
 
   const handleOpenMessage = (message: JmapEmailMessage) => {
     const mailboxes = runtime?.mailboxes ?? [];
@@ -81,10 +85,46 @@ export function useMailRowHandlers({
     });
   };
 
+  const archiveMailboxId =
+    runtime?.mailboxes.find((m) => m.role?.toLowerCase() === "archive")?.id ??
+    null;
+
+  const handleSwipeArchive = (ids: string[]) => {
+    if (ids.length === 0 || !archiveMailboxId) return;
+    const targetMailboxId = archiveMailboxId;
+    return new Promise<void>((resolve) => {
+      moveToMailboxMutate(
+        { messageIds: ids, targetMailboxId },
+        {
+          onSuccess: (_data, _input, snapshot) =>
+            showMoveToast("Archived", snapshot),
+          onError: (error) =>
+            toast(getErrorMessage(error, "Failed to archive."), "error"),
+          onSettled: () => resolve(),
+        },
+      );
+    });
+  };
+
+  const handleSwipeToggleStar = (messageId: string, flagged: boolean) => {
+    toggleFlaggedMutate(
+      { messageId, flagged: !flagged },
+      {
+        onError: (error) =>
+          toast(getErrorMessage(error, "Failed to update message."), "error"),
+      },
+    );
+  };
+
+  const canArchive = Boolean(archiveMailboxId) && mailboxId !== archiveMailboxId;
+
   return ({
     onOpen: handleOpenMessage,
     onToggleSelect,
     onToggleRead: handleSwipeToggleRead,
     onTrash: isInTrash ? undefined : handleSwipeTrash,
+    onArchive: canArchive ? handleSwipeArchive : undefined,
+    onToggleStar: handleSwipeToggleStar,
+    onMove,
   });
 }

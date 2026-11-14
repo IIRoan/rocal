@@ -27,11 +27,12 @@ import { useMailListSearch } from "./use-mail-list-search";
 import { useMailListSelection } from "./use-mail-list-selection";
 import { useMailListSettings } from "./use-mail-list-settings";
 import { useMailRowHandlers } from "./use-mail-row-handlers";
+import { useMailSwipeMove } from "./use-mail-swipe-move";
 import { useMailUndoToast } from "./use-mail-undo-toast";
 import { useMailboxThreadRows } from "./use-mailbox-thread-rows";
 import type { JmapIdentity, JmapMailbox } from "../lib/mail/types";
 
-type ListSheetView = "bulkMore" | "bulkMove" | "bulkLabel" | null;
+type ListSheetView = "bulkMore" | "bulkMove" | "bulkLabel" | "swipeMove" | null;
 
 const SENDER_AS_RECIPIENT_ROLES = new Set(["sent", "drafts"]);
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
@@ -125,6 +126,17 @@ export function useMailListController() {
     showMoveToast,
   });
 
+  const swipeMove = useMailSwipeMove({
+    mutations,
+    mailboxes,
+    bulk,
+    bulkIds: selection.bulkIds,
+    activeSheetView,
+    openSwipeMoveSheet: () => setActiveSheetView("swipeMove"),
+    closeSheet,
+    showMoveToast,
+  });
+
   const rowHandlers = useMailRowHandlers({
     mutations,
     runtime,
@@ -132,6 +144,7 @@ export function useMailListController() {
     isInTrash,
     orderedMessageIds: list.threadRows.map((row) => row.latestMessage.id),
     onToggleSelect: selection.handleToggleSelect,
+    onMove: swipeMove.startSwipeMove,
     showMoveToast,
   });
 
@@ -255,6 +268,9 @@ export function useMailListController() {
     bulkMoveTargets,
     sheetPadCompact: sheetCompactBottomPadding(insets.bottom),
     ...bulk,
+    moveSheetOpen: swipeMove.moveSheetOpen,
+    moveSheetDisabled: swipeMove.moveSheetDisabled,
+    handleMoveSheetSelect: swipeMove.handleMoveSheetSelect,
 
     // Drawer / filter / account sheets
     drawerOpen,
@@ -274,7 +290,7 @@ export function useMailListController() {
 
 // The move sheet grows with the folder count; the other panels have a fixed height.
 function bulkSheetSnapPointsFor(view: ListSheetView, moveTargetCount: number) {
-  if (view !== "bulkMove") {
+  if (view !== "bulkMove" && view !== "swipeMove") {
     return view === "bulkLabel" ? [0.55] : [0.4];
   }
   const fraction = 0.2 + Math.min(Math.max(moveTargetCount, 1), 7) * 0.05;

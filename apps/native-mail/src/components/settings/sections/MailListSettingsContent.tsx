@@ -2,8 +2,10 @@ import React from "react";
 import {
   LIST_DENSITY_OPTIONS,
   MAIL_AUTO_ADVANCE_OPTIONS,
+  MAIL_SWIPE_ACTION_OPTIONS,
   MARK_AS_READ_DELAY_OPTIONS,
   UNDO_TOAST_DURATION_OPTIONS,
+  type MailListSettings,
 } from "@workspace/calendar-core";
 import { SettingsPage } from "@workspace/native-core/components/settings/SettingsPage";
 import {
@@ -15,6 +17,11 @@ import {
   SheetSwitchItem,
 } from "@workspace/native-core/components/sheet/SheetSections";
 import { useMailListSettings } from "../../../hooks/use-mail-list-settings";
+
+const SWIPE_SECTIONS = [
+  { key: "swipeRight", title: "Swipe right" },
+  { key: "swipeLeft", title: "Swipe left" },
+] as const satisfies readonly { key: keyof MailListSettings; title: string }[];
 
 export function MailListSettingsContent() {
   const { settings, isLoaded, updateSettings } = useMailListSettings();
@@ -117,6 +124,30 @@ export function MailListSettingsContent() {
             })}
           </SheetGroup>
         </SheetSection>
+
+        {SWIPE_SECTIONS.map(({ key, title }) => (
+          <SheetSection
+            key={key}
+            title={title}
+            footer="Swipe a message in the list to run this action."
+          >
+            <SheetGroup>
+              {MAIL_SWIPE_ACTION_OPTIONS.map((option) => {
+                const active = settings[key] === option.value;
+                return (
+                  <SheetItem
+                    key={option.value}
+                    label={option.label}
+                    checked={active}
+                    onPress={() => updateSettings({ [key]: option.value })}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
+                  />
+                );
+              })}
+            </SheetGroup>
+          </SheetSection>
+        ))}
 
         <SheetSection title="Conversations">
           <SheetGroup>

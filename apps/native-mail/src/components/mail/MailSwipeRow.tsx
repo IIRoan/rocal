@@ -15,33 +15,36 @@ import { Feather } from "@expo/vector-icons";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { memoizeStyles } from "../../lib/memoize-styles";
+import type { MailSwipeSpec } from "../../lib/mail/mail-swipe-actions";
 
 const ACTION_THRESHOLD = 88;
 const MAX_SWIPE = 140;
+const DISMISS_X = 600;
 const SPRING = { damping: 26, stiffness: 260, mass: 0.8 };
 
 interface MailSwipeRowProps {
   children: React.ReactNode;
   enabled: boolean;
-  read: boolean;
-  onToggleRead: () => void;
-  /** Return a promise to keep the row offscreen until the trash settles. */
-  onTrash?: () => void | Promise<unknown>;
+  /** Runs on a swipe right; a dismissing spec keeps the row offscreen until its promise settles. */
+  right?: MailSwipeSpec;
+  left?: MailSwipeSpec;
+  accessibilityActions: MailSwipeSpec[];
 }
 
-/** Swipe right to toggle read, swipe left to trash. */
+/** Swipe right or left past the threshold to run that side's configured action. */
 export function MailSwipeRow({
   children,
   enabled,
-  read,
-  onToggleRead,
-  onTrash,
+  right,
+  left,
+  accessibilityActions,
 }: MailSwipeRowProps) {
   const { theme } = useTheme();
   const styles = getStyles(theme);
   const translateX = useSharedValue(0);
   const armed = useSharedValue(false);
-  const canTrash = Boolean(onTrash);
+  const canSwipeRight = Boolean(right);
+  const canSwipeLeft = Boolean(left);
 
   const pulse = () => {
     // Haptics are unavailable on some devices; a dropped pulse is harmless.
@@ -50,21 +53,30 @@ export function MailSwipeRow({
     );
   };
 
-  const runTrash = () => {
-    const reset = () => {
-      translateX.set(withSpring(0, SPRING));
-    };
-    void Promise.resolve(onTrash?.()).then(reset, reset);
+  const reset = () => {
+    translateX.set(withSpring(0, SPRING));
   };
 
+  // Each action toasts its own failures; the row only needs it started.
+  const runRight = () => {
+    void Promise.resolve(right?.run()).then(reset, reset);
+  };
+  const runLeft = () => {
+    void Promise.resolve(left?.run()).then(reset, reset);
+  };
+
+  const rightDismisses = right?.dismisses === true;
+  const leftDismisses = left?.dismisses === true;
+
   const pan = Gesture.Pan()
-    .enabled(enabled)
+    .enabled(enabled && (canSwipeRight || canSwipeLeft))
     .activeOffsetX([-12, 12])
     .failOffsetY([-10, 10])
     .onUpdate((e) => {
       "worklet";
-      const minX = canTrash ? -MAX_SWIPE : 0;
-      translateX.set(Math.max(minX, Math.min(MAX_SWIPE, e.translationX)));
+      const minX = canSwipeLeft ? -MAX_SWIPE : 0;
+      const maxX = canSwipeRight ? MAX_SWIPE : 0;
+      translateX.set(Math.max(minX, Math.min(maxX, e.translationX)));
       const past = Math.abs(translateX.get()) >= ACTION_THRESHOLD;
       if (past !== armed.get()) {
         armed.set(past);
@@ -75,17 +87,30 @@ export function MailSwipeRow({
       "worklet";
       const x = translateX.get();
       armed.set(false);
-      if (x >= ACTION_THRESHOLD) {
-        scheduleOnRN(onToggleRead);
+      if (x >= ACTION_THRESHOLD && canSwipeRight) {
+        if (rightDismisses) {
+          translateX.set(
+            withTiming(DISMISS_X, { duration: 180 }, () => {
+              scheduleOnRN(runRight);
+            }),
+          );
+          return;
+        }
         translateX.set(withSpring(0, SPRING));
+        scheduleOnRN(runRight);
         return;
       }
-      if (x <= -ACTION_THRESHOLD && canTrash) {
-        translateX.set(
-          withTiming(-600, { duration: 180 }, () => {
-            scheduleOnRN(runTrash);
-          }),
-        );
+      if (x <= -ACTION_THRESHOLD && canSwipeLeft) {
+        if (leftDismisses) {
+          translateX.set(
+            withTiming(-DISMISS_X, { duration: 180 }, () => {
+              scheduleOnRN(runLeft);
+            }),
+          );
+          return;
+        }
+        translateX.set(withSpring(0, SPRING));
+        scheduleOnRN(runLeft);
         return;
       }
       translateX.set(withSpring(0, SPRING));
@@ -95,7 +120,7 @@ export function MailSwipeRow({
     transform: [{ translateX: translateX.get() }],
   }));
 
-  const readActionStyle = useAnimatedStyle(() => ({
+  const rightActionStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       translateX.get(),
       [0, 24, ACTION_THRESHOLD],
@@ -104,7 +129,7 @@ export function MailSwipeRow({
     ),
   }));
 
-  const trashActionStyle = useAnimatedStyle(() => ({
+  const leftActionStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       translateX.get(),
       [-ACTION_THRESHOLD, -24, 0],
@@ -113,45 +138,63 @@ export function MailSwipeRow({
     ),
   }));
 
-  const accessibilityActions = [
-    { name: "toggleRead", label: read ? "Mark as unread" : "Mark as read" },
-    ...(canTrash ? [{ name: "trash", label: "Move to trash" }] : []),
-  ];
-
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={[styles.action, styles.readAction, readActionStyle]}
-        pointerEvents="none"
-      >
-        <Feather
-          name={read ? "mail" : "check"}
-          size={20}
-          color={theme.colors.primaryBase}
-        />
-      </Animated.View>
-      {canTrash ? (
+      {right ? (
         <Animated.View
-          style={[styles.action, styles.trashAction, trashActionStyle]}
+          style={[
+            styles.action,
+            styles.rightAction,
+            right.destructive ? styles.destructiveAction : styles.accentAction,
+            rightActionStyle,
+          ]}
           pointerEvents="none"
         >
           <Feather
-            name="trash-2"
+            name={right.icon}
             size={20}
-            color={theme.colors.destructiveForeground}
+            color={
+              right.destructive
+                ? theme.colors.destructiveForeground
+                : theme.colors.primaryBase
+            }
+          />
+        </Animated.View>
+      ) : null}
+      {left ? (
+        <Animated.View
+          style={[
+            styles.action,
+            styles.leftAction,
+            left.destructive ? styles.destructiveAction : styles.accentAction,
+            leftActionStyle,
+          ]}
+          pointerEvents="none"
+        >
+          <Feather
+            name={left.icon}
+            size={20}
+            color={
+              left.destructive
+                ? theme.colors.destructiveForeground
+                : theme.colors.primaryBase
+            }
           />
         </Animated.View>
       ) : null}
       <GestureDetector gesture={pan}>
         <Animated.View
           style={rowStyle}
-          accessibilityActions={accessibilityActions}
+          accessibilityActions={accessibilityActions.map(({ name, label }) => ({
+            name,
+            label,
+          }))}
           onAccessibilityAction={(e) => {
-            if (e.nativeEvent.actionName === "toggleRead") onToggleRead();
-            // The trash handler toasts its own failures; the row only needs it started.
-            if (e.nativeEvent.actionName === "trash") {
-              void Promise.resolve(onTrash?.()).catch(() => undefined);
-            }
+            const action = accessibilityActions.find(
+              (spec) => spec.name === e.nativeEvent.actionName,
+            );
+            // Each action toasts its own failures; the row only needs it started.
+            if (action) void Promise.resolve(action.run()).catch(() => undefined);
           }}
         >
           {children}
@@ -174,12 +217,16 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center",
       paddingHorizontal: 28,
     } as ViewStyle,
-    readAction: {
+    rightAction: {
       justifyContent: "flex-start",
+    } as ViewStyle,
+    leftAction: {
+      justifyContent: "flex-end",
+    } as ViewStyle,
+    accentAction: {
       backgroundColor: theme.colors.primaryBase + "40",
     } as ViewStyle,
-    trashAction: {
-      justifyContent: "flex-end",
+    destructiveAction: {
       backgroundColor: theme.colors.destructive,
     } as ViewStyle,
   });
