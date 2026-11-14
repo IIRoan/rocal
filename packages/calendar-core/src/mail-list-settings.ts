@@ -147,3 +147,21 @@ export function resolveMarkAsReadDelayMs(delay: MarkAsReadDelay): number | null 
   if (delay === "never") return null;
   return delay === "delayed" ? MARK_AS_READ_DELAY_MS : 0;
 }
+
+/** The message to open after removing `removedIds`, walking from `currentId` without wrapping; `null` returns to the list. */
+export function resolveMailAutoAdvanceTarget(
+  orderedIds: readonly string[],
+  removedIds: readonly string[],
+  currentId: string,
+  mode: MailAutoAdvance,
+): string | null {
+  const start = orderedIds.indexOf(currentId);
+  if (mode === "list" || start < 0) return null;
+  const removed = new Set(removedIds);
+  const step = mode === "next" ? 1 : -1;
+  for (let index = start + step; index >= 0 && index < orderedIds.length; index += step) {
+    const id = orderedIds[index];
+    if (id !== undefined && !removed.has(id)) return id;
+  }
+  return null;
+}

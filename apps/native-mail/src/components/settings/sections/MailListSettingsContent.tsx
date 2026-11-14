@@ -1,6 +1,7 @@
 import React from "react";
 import {
   LIST_DENSITY_OPTIONS,
+  MAIL_AUTO_ADVANCE_OPTIONS,
   MARK_AS_READ_DELAY_OPTIONS,
   UNDO_TOAST_DURATION_OPTIONS,
 } from "@workspace/calendar-core";
@@ -65,6 +66,27 @@ export function MailListSettingsContent() {
                   onPress={() =>
                     updateSettings({ markAsReadDelay: option.value })
                   }
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: active }}
+                />
+              );
+            })}
+          </SheetGroup>
+        </SheetSection>
+
+        <SheetSection
+          title="After archiving or deleting"
+          footer="What the reader shows after the open message leaves the list."
+        >
+          <SheetGroup>
+            {MAIL_AUTO_ADVANCE_OPTIONS.map((option) => {
+              const active = settings.autoAdvance === option.value;
+              return (
+                <SheetItem
+                  key={option.value}
+                  label={option.label}
+                  checked={active}
+                  onPress={() => updateSettings({ autoAdvance: option.value })}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}
                 />

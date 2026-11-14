@@ -130,6 +130,7 @@ export function useMailListController() {
     runtime,
     mailboxId: resolvedMailboxId,
     isInTrash,
+    orderedMessageIds: list.threadRows.map((row) => row.latestMessage.id),
     onToggleSelect: selection.handleToggleSelect,
     showMoveToast,
   });

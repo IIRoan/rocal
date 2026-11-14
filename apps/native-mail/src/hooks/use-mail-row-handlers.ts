@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useRouter } from "expo-router";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -8,6 +9,7 @@ import type { MailRuntime } from "../lib/mail/mail-runtime";
 import type { JmapEmailMessage } from "../lib/mail/types";
 import type { MailThreadRowHandlers } from "../components/mail/MailThreadListRow";
 import { useMailCompose } from "../providers/MailComposeProvider";
+import { useMailSelection } from "../providers/MailSelectionProvider";
 import type { useMailUndoToast } from "./use-mail-undo-toast";
 
 interface MailRowHandlersParams {
@@ -15,6 +17,7 @@ interface MailRowHandlersParams {
   runtime: MailRuntime | undefined;
   mailboxId: string | null;
   isInTrash: boolean;
+  orderedMessageIds: string[];
   onToggleSelect: (message: JmapEmailMessage, selectableIds: string[]) => void;
   showMoveToast: ReturnType<typeof useMailUndoToast>;
 }
@@ -24,12 +27,19 @@ export function useMailRowHandlers({
   runtime,
   mailboxId,
   isInTrash,
+  orderedMessageIds,
   onToggleSelect,
   showMoveToast,
 }: MailRowHandlersParams): MailThreadRowHandlers {
   const router = useRouter();
   const { openCompose } = useMailCompose();
+  const { setReaderOrder } = useMailSelection();
   const { toast } = useToast();
+  // Read at tap time so the handlers keep their identity and memoized rows don't re-render.
+  const orderedMessageIdsRef = useRef(orderedMessageIds);
+  useEffect(() => {
+    orderedMessageIdsRef.current = orderedMessageIds;
+  }, [orderedMessageIds]);
 
   // `mutate` is stable while the mutation result object is not; rows stay memoized across swipes.
   const markReadMutate = mutations.bulkMarkAsRead.mutate;
@@ -42,6 +52,7 @@ export function useMailRowHandlers({
       openCompose({ mode: "draft", messageId: message.id });
       return;
     }
+    setReaderOrder(orderedMessageIdsRef.current);
     router.push(mailMessageRoute(message.id) as never);
   };
 

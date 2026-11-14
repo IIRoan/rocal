@@ -1,7 +1,10 @@
 "use client";
 
 import { useMailboxSearch } from "@/hooks/use-mailbox-search";
-import { privateSearchCoverageText } from "@workspace/calendar-core";
+import {
+  privateSearchCoverageText,
+  resolveMailAutoAdvanceTarget,
+} from "@workspace/calendar-core";
 
 import {
   useEffect,
@@ -95,7 +98,7 @@ export function useMailAppContentController(
     isLoadingMore,
     handleSendMessage,
     handleComposeImageUpload,
-    handleDeleteMessage,
+    handleDeleteMessage: deleteMessage,
     handleReply,
     handleReplyAll,
     handleForward,
@@ -106,11 +109,11 @@ export function useMailAppContentController(
     loadAttachmentHoverPreview,
     handleDownloadAttachment,
     closeAttachmentPreview,
-    handleMoveMessage,
-    handleUntrash,
-    handleReportSpam,
-    handleNotSpam,
-    handleBulkReportSpam,
+    handleMoveMessage: moveMessage,
+    handleUntrash: untrashMessage,
+    handleReportSpam: reportSpam,
+    handleNotSpam: markNotSpam,
+    handleBulkReportSpam: bulkReportSpam,
     handleEmptyMailbox,
     handleCreateMailbox,
     handleDeleteMailbox,
@@ -118,8 +121,8 @@ export function useMailAppContentController(
     handleReorderMailboxes,
     handleMarkAsUnread,
     handleMarkAsRead,
-    handleBulkDelete,
-    handleBulkMove,
+    handleBulkDelete: bulkDelete,
+    handleBulkMove: bulkMove,
     handleBulkMarkAsUnread,
     handleBulkMarkAsRead,
     handleToggleFlagged,
@@ -366,6 +369,34 @@ export function useMailAppContentController(
     if (hasNext) handleSelectMessage(filteredListMessages[selectedIndex + 1].id);
   };
 
+  const { settings: listSettings } = useMailListSettings();
+
+  /** The open message is skipped by the walk, so single removes pass no ids. */
+  const advanceAfter = (removedIds: readonly string[] = []) => ({
+    advanceTo: resolveMailAutoAdvanceTarget(
+      filteredListMessages.map((message) => message.id),
+      removedIds,
+      selectedMessageId ?? "",
+      listSettings.autoAdvance,
+    ),
+  });
+  const handleDeleteMessage = (messageId?: string) =>
+    deleteMessage(messageId, advanceAfter());
+  const handleMoveMessage = (targetMailboxId: string, messageId?: string) =>
+    moveMessage(targetMailboxId, messageId, advanceAfter());
+  const handleUntrash = (messageId?: string) =>
+    untrashMessage(messageId, advanceAfter());
+  const handleReportSpam = (messageId?: string) =>
+    reportSpam(messageId, advanceAfter());
+  const handleNotSpam = (messageId?: string) =>
+    markNotSpam(messageId, advanceAfter());
+  const handleBulkDelete = (messageIds: string[]) =>
+    bulkDelete(messageIds, advanceAfter(messageIds));
+  const handleBulkMove = (messageIds: string[], targetMailboxId: string) =>
+    bulkMove(messageIds, targetMailboxId, advanceAfter(messageIds));
+  const handleBulkReportSpam = (messageIds: string[]) =>
+    bulkReportSpam(messageIds, advanceAfter(messageIds));
+
   const handleCloseMessage = () => {
     if (selectedIsDraft) {
       handleDismissCompose();
@@ -407,8 +438,6 @@ export function useMailAppContentController(
           log.error("Failed to move message", error),
         )
     : undefined;
-
-  const { settings: listSettings } = useMailListSettings();
 
   useMailKeyboardShortcuts(
     {

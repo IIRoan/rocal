@@ -4,6 +4,7 @@ import {
   MIN_UNDO_TOAST_DURATION_MS,
   normalizeMailListSettings,
   parseMailListSettings,
+  resolveMailAutoAdvanceTarget,
   resolveMarkAsReadDelayMs,
   serializeMailListSettings,
 } from "../mail-list-settings";
@@ -84,5 +85,17 @@ describe("mail list settings", () => {
     expect(resolveMarkAsReadDelayMs("instant")).toBe(0);
     expect(resolveMarkAsReadDelayMs("delayed")).toBe(3000);
     expect(resolveMarkAsReadDelayMs("never")).toBeNull();
+  });
+
+  it("resolves the auto-advance target without wrapping", () => {
+    const ids = ["a", "b", "c", "d"];
+    expect(resolveMailAutoAdvanceTarget(ids, ["b"], "b", "next")).toBe("c");
+    expect(resolveMailAutoAdvanceTarget(ids, ["b"], "b", "previous")).toBe("a");
+    expect(resolveMailAutoAdvanceTarget(ids, ["d"], "d", "next")).toBeNull();
+    expect(resolveMailAutoAdvanceTarget(ids, ["a"], "a", "previous")).toBeNull();
+    expect(resolveMailAutoAdvanceTarget(ids, ["b", "c"], "b", "next")).toBe("d");
+    expect(resolveMailAutoAdvanceTarget(ids, ["c", "d"], "c", "next")).toBeNull();
+    expect(resolveMailAutoAdvanceTarget(ids, ["b"], "b", "list")).toBeNull();
+    expect(resolveMailAutoAdvanceTarget(ids, ["x"], "x", "next")).toBeNull();
   });
 });

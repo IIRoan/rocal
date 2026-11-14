@@ -188,6 +188,9 @@ import {
 
 export type { ActiveMailboxState } from "@/lib/mail/mail-app-helpers";
 
+/** The message the reader opens when a remove takes away the open one; absent or `null` closes it. */
+type MailAdvanceOptions = { advanceTo?: string | null };
+
 const log = createLogger("mail-app");
 
 /** The account's vault backup, preferring the server copy and caching it on this device. */
@@ -1991,7 +1994,10 @@ export function useMailApp() {
     setIsBusy(false);
   };
 
-  const handleDeleteMessage = async (messageId?: string) => {
+  const handleDeleteMessage = async (
+    messageId?: string,
+    options?: MailAdvanceOptions,
+  ) => {
     const targetId = messageId ?? selectedMessageId;
     if (!activeMailbox || !targetId) return;
     const trashMailbox = activeMailbox.mailboxes.find(
@@ -2012,7 +2018,7 @@ export function useMailApp() {
           cur ? { ...cur, messages: remaining } : cur,
         );
         setSelectedMessageId((cur) =>
-          cur === targetId ? (remaining[0]?.id ?? null) : cur,
+          cur === targetId ? (options?.advanceTo ?? null) : cur,
         );
         toast("Message deleted.");
       } catch (error) {
@@ -2035,7 +2041,7 @@ export function useMailApp() {
 
     setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
     setSelectedMessageId((cur) =>
-      cur === targetId ? (remaining[0]?.id ?? null) : cur,
+      cur === targetId ? (options?.advanceTo ?? null) : cur,
     );
 
     const listSettings = readMailListSettings();
@@ -2557,6 +2563,7 @@ export function useMailApp() {
   const handleMoveMessage = async (
     targetMailboxId: string,
     messageId?: string,
+    options?: MailAdvanceOptions,
   ) => {
     const targetId = messageId ?? selectedMessageId;
     if (!activeMailbox || !targetId) return;
@@ -2571,7 +2578,7 @@ export function useMailApp() {
 
     setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
     setSelectedMessageId((cur) =>
-      cur === targetId ? (remaining[0]?.id ?? null) : cur,
+      cur === targetId ? (options?.advanceTo ?? null) : cur,
     );
 
     const listSettings = readMailListSettings();
@@ -2627,17 +2634,23 @@ export function useMailApp() {
     }, undoMs);
   };
 
-  const handleUntrash = async (messageId?: string) => {
+  const handleUntrash = async (
+    messageId?: string,
+    options?: MailAdvanceOptions,
+  ) => {
     if (!activeMailbox) return;
     const inboxMailbox = findInboxMailbox(activeMailbox.mailboxes);
     if (!inboxMailbox) {
       toast.error("Inbox mailbox not found.");
       return;
     }
-    await handleMoveMessage(inboxMailbox.id, messageId);
+    await handleMoveMessage(inboxMailbox.id, messageId, options);
   };
 
-  const handleReportSpam = async (messageId?: string) => {
+  const handleReportSpam = async (
+    messageId?: string,
+    options?: MailAdvanceOptions,
+  ) => {
     const targetId = messageId ?? selectedMessageId;
     if (!activeMailbox || !targetId) return;
     const spamMailbox = findSpamMailbox(activeMailbox.mailboxes);
@@ -2651,11 +2664,14 @@ export function useMailApp() {
     if (isSpamMailboxRole(currentRole)) {
       return;
     }
-    await handleMoveMessage(spamMailbox.id, targetId);
+    await handleMoveMessage(spamMailbox.id, targetId, options);
   };
 
-  const handleNotSpam = async (messageId?: string) => {
-    await handleUntrash(messageId);
+  const handleNotSpam = async (
+    messageId?: string,
+    options?: MailAdvanceOptions,
+  ) => {
+    await handleUntrash(messageId, options);
   };
 
   const handleEmptyMailbox = async () => {
@@ -2838,7 +2854,10 @@ export function useMailApp() {
     setIsBusy(false);
   };
 
-  const handleBulkDelete = async (messageIds: string[]) => {
+  const handleBulkDelete = async (
+    messageIds: string[],
+    options?: MailAdvanceOptions,
+  ) => {
     if (!activeMailbox || messageIds.length === 0) return;
     const trashMailbox = activeMailbox.mailboxes.find(
       (m) => m.role === "trash",
@@ -2855,7 +2874,7 @@ export function useMailApp() {
       );
       setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
       setSelectedMessageId((cur) =>
-        cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur,
+        cur && idSet.has(cur) ? (options?.advanceTo ?? null) : cur,
       );
       toast(
         isInTrash
@@ -2877,6 +2896,7 @@ export function useMailApp() {
   const handleBulkMove = async (
     messageIds: string[],
     targetMailboxId: string,
+    options?: MailAdvanceOptions,
   ) => {
     if (!activeMailbox || messageIds.length === 0) return;
     const idSet = new Set(messageIds);
@@ -2890,7 +2910,7 @@ export function useMailApp() {
       );
       setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
       setSelectedMessageId((cur) =>
-        cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur,
+        cur && idSet.has(cur) ? (options?.advanceTo ?? null) : cur,
       );
       const targetMailbox = activeMailbox.mailboxes.find(
         (m) => m.id === targetMailboxId,
@@ -2975,14 +2995,17 @@ export function useMailApp() {
     }
   };
 
-  const handleBulkReportSpam = async (messageIds: string[]) => {
+  const handleBulkReportSpam = async (
+    messageIds: string[],
+    options?: MailAdvanceOptions,
+  ) => {
     if (!activeMailbox || messageIds.length === 0) return;
     const spamMailbox = findSpamMailbox(activeMailbox.mailboxes);
     if (!spamMailbox) {
       toast.error("Spam folder not found.");
       return;
     }
-    await handleBulkMove(messageIds, spamMailbox.id);
+    await handleBulkMove(messageIds, spamMailbox.id, options);
   };
 
   const handleMarkAsUnread = async (messageId?: string) => {

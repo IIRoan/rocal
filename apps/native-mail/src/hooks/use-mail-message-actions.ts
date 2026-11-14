@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import {
   getErrorMessage,
   resolveAttachmentPreviewKind,
+  resolveMailAutoAdvanceTarget,
   resolveMarkAsReadDelayMs,
   MAIL_UNSUBSCRIBE_LABELS,
   type MailAttachmentPreviewKind,
@@ -12,6 +13,8 @@ import {
 } from "@workspace/calendar-core";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import { useMailCompose } from "../providers/MailComposeProvider";
+import { useMailSelection } from "../providers/MailSelectionProvider";
+import { mailMessageRoute } from "../lib/mail-routes";
 import {
   releaseMarkAsReadSuppression,
   suppressMarkAsRead,
@@ -47,7 +50,8 @@ export function useMailMessageActions({
   message: JmapEmailMessage | null;
   runtime: MailRuntime | undefined;
 }) {
-  const { back } = useRouter();
+  const { back, replace } = useRouter();
+  const { readerOrder, setReaderOrder } = useMailSelection();
   const { openCompose: presentCompose } = useMailCompose();
   const { toast } = useToast();
   const {
@@ -148,6 +152,22 @@ export function useMailMessageActions({
     moveToMailbox.isPending;
 
   const scope = captureSessionDataScope();
+
+  /** Opens the next message in list order after the open one leaves, or returns to the list. */
+  const leaveAfterRemoval = (removedId: string) => {
+    const next = resolveMailAutoAdvanceTarget(
+      readerOrder,
+      [removedId],
+      removedId,
+      listSettings.autoAdvance,
+    );
+    setReaderOrder(readerOrder.filter((id) => id !== removedId));
+    if (next) {
+      replace(mailMessageRoute(next) as never);
+      return;
+    }
+    back();
+  };
 
   const cacheAttachment = (attachment: JmapAttachment, cacheKey: string) =>
     writeAttachmentToCache({
@@ -257,7 +277,7 @@ export function useMailMessageActions({
         } else {
           showMoveToast("Message moved to trash", snapshot);
         }
-        back();
+        leaveAfterRemoval(targetMessageId);
       },
       onError: (error) =>
         toast(
@@ -284,7 +304,7 @@ export function useMailMessageActions({
         onSuccess: (_data, _input, snapshot) => {
           setActiveSheetView(null);
           showMoveToast(successMessage, snapshot);
-          back();
+          leaveAfterRemoval(message.id);
         },
         onError: (error) =>
           toast(getErrorMessage(error, failureMessage), "error"),

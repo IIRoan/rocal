@@ -1,5 +1,6 @@
 import {
   LIST_DENSITY_OPTIONS,
+  MAIL_AUTO_ADVANCE_OPTIONS,
   MARK_AS_READ_DELAY_OPTIONS,
   UNDO_TOAST_DURATION_OPTIONS,
 } from "@workspace/calendar-core";
@@ -77,6 +78,12 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
     label: option.label,
     location: `${LIST} · Mark as read`,
     keywords: "read opened",
+  })),
+  ...MAIL_AUTO_ADVANCE_OPTIONS.map((option) => ({
+    pageId: "mail-list",
+    label: option.label,
+    location: `${LIST} · After archiving or deleting`,
+    keywords: "auto advance next previous reader",
   })),
   ...UNDO_TOAST_DURATION_OPTIONS.map((option) => ({
     pageId: "mail-list",
