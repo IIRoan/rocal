@@ -106,6 +106,7 @@ export type JmapEmailMessage = MailSimpleLoginFields & MailUnsubscribeFields & M
   bcc?: MailAddress[];
   receivedAt?: string;
   keywords?: Record<string, boolean>;
+  size?: number;
   bodyStructure?: JmapBodyStructure;
   bodyValues?: Record<string, JmapBodyValue>;
   textBody?: JmapBodyPartRef[];

@@ -231,6 +231,7 @@ const EMAIL_LIST_GET_PROPERTIES = [
   "receivedAt",
   "from",
   "to",
+  "cc",
   "subject",
   "preview",
   "hasAttachment",

@@ -196,6 +196,7 @@ const EMAIL_GET_PROPERTIES = [
   "subject",
   "receivedAt",
   "keywords",
+  "size",
   "bodyStructure",
   "bodyValues",
   "textBody",

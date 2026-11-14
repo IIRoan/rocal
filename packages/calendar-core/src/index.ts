@@ -85,6 +85,7 @@ export * from "./recurring-event-target";
 export * from "./event-categories";
 export * from "./mail-list-settings";
 export * from "./mail-search-filter";
+export * from "./mail-search-operators";
 export * from "./mail-local-search";
 export * from "./mail-jmap-email-set";
 export * from "./mail-outgoing-crypto";

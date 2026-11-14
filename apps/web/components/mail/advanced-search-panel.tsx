@@ -36,13 +36,14 @@ const QUICK_BOOLEAN_FIELDS = SEARCH_FILTER_FIELDS.filter((f) => f.type === "bool
 function removeConditionField(
   conditions: MailSearchFilterCondition[],
   field: keyof MailSearchFilterCondition,
-  value: string | boolean,
+  value: MailSearchChip["value"],
 ): MailSearchFilterCondition[] {
   return conditions.flatMap((condition) => {
     const next = { ...condition };
     if (next[field] === value) delete next[field];
-    const active = Object.values(next).some(
-      (entry) => entry !== undefined && entry !== false && entry !== "",
+    const active = Object.entries(next).some(
+      ([key, entry]) =>
+        key !== "negated" && entry !== undefined && entry !== false && entry !== "",
     );
     return active ? [next] : [];
   });
@@ -68,7 +69,9 @@ export function AdvancedSearchPanel({
 
   const activeBooleanFields = new Set<keyof MailSearchFilterCondition>(
     QUICK_BOOLEAN_FIELDS.flatMap((field) =>
-      filters.conditions.some((condition) => condition[field.field] === true)
+      filters.conditions.some(
+        (condition) => condition[field.field] === true && !condition.negated,
+      )
         ? [field.field]
         : [],
     ),

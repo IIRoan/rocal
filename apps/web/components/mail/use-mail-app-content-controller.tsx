@@ -2,6 +2,10 @@
 
 import { useMailboxSearch } from "@/hooks/use-mailbox-search";
 import {
+  hasMailSearchConditions,
+  liftMailSearchOperators,
+  mergeMailSearchFilters,
+  parseMailSearchQuery,
   privateSearchCoverageText,
   resolveMailAutoAdvanceTarget,
 } from "@workspace/calendar-core";
@@ -196,9 +200,22 @@ export function useMailAppContentController(
     text: advancedFilters.text,
     conditions: advancedFilters.conditions,
   });
+  // Folder and label names resolve here on the device; only ids reach the search.
+  const searchContext = { mailboxes: activeMailbox?.mailboxes ?? [], labels };
+  const parsedSearch = parseMailSearchQuery(trimmedDebouncedMailListSearch, searchContext);
+  const typedOperators = hasMailSearchConditions(parsedSearch);
+  // Unusable operators are dropped rather than searched as words.
+  const searchText =
+    typedOperators || parsedSearch.unresolved
+      ? parsedSearch.text
+      : trimmedDebouncedMailListSearch;
+  const searchFilters = typedOperators
+    ? mergeMailSearchFilters(advancedFilters, parsedSearch.filters)
+    : hasAdvancedFilters
+      ? advancedFilters
+      : null;
   const searchUiActive = Boolean(trimmedMailListSearch) || hasAdvancedFilters;
-  const searchActive =
-    Boolean(trimmedDebouncedMailListSearch) || hasAdvancedFilters;
+  const searchActive = Boolean(searchText) || searchFilters !== null;
   const isSearchDebouncing =
     Boolean(trimmedMailListSearch) &&
     trimmedMailListSearch !== trimmedDebouncedMailListSearch;
@@ -213,8 +230,8 @@ export function useMailAppContentController(
           client: activeMailbox.client,
           session: activeMailbox.session,
           mailboxId,
-          text: trimmedDebouncedMailListSearch,
-          filters: hasAdvancedFilters ? advancedFilters : null,
+          text: searchText,
+          filters: searchFilters,
           timezone: settings?.timezone,
           limit: 40,
         }
@@ -234,11 +251,11 @@ export function useMailAppContentController(
         ? (activeMailbox?.messages ?? [])
         : serverSearchResults === undefined
           ? []
-          : trimmedDebouncedMailListSearch
+          : searchText && !typedOperators
             ? mergeInlineSearchResults(
                 serverSearchResults.messages,
                 activeMailbox?.messages ?? [],
-                trimmedDebouncedMailListSearch,
+                searchText,
               )
             : serverSearchResults.messages
       : (activeMailbox?.messages ?? []);
@@ -572,9 +589,18 @@ export function useMailAppContentController(
   };
 
   const handleSearchEnter = () => {
-    dispatchListChrome({
-      type: "patch",
-      patch: { debouncedMailListSearch: mailListSearch },
+    if (!hasMailSearchConditions(parseMailSearchQuery(mailListSearch, searchContext))) {
+      dispatchListChrome({
+        type: "patch",
+        patch: { debouncedMailListSearch: mailListSearch },
+      });
+      return;
+    }
+    const lifted = liftMailSearchOperators(mailListSearch, advancedFilters, searchContext);
+    patchListChrome({
+      mailListSearch: lifted.text,
+      debouncedMailListSearch: lifted.text,
+      advancedFilters: lifted.filters,
     });
   };
 
@@ -628,6 +654,7 @@ export function useMailAppContentController(
       searchActive && serverSearchResults?.coverage
         ? privateSearchCoverageText(serverSearchResults.coverage)
         : null,
+    searchIssues: parsedSearch.issues,
     isSearchDebouncing,
     showSearchLoadingState,
     showMobileDetailPane,
