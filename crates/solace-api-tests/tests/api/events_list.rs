@@ -554,7 +554,43 @@ async fn listed_series_apply_their_occurrence_exceptions() {
     .filter_map(|e| e.recurrence_exceptions)
     .flatten()
     .collect();
-    assert!(exceptions.is_empty(), "the corpus does not load exceptions");
+    assert!(
+        exceptions.is_empty(),
+        "the corpus loads exceptions only when asked"
+    );
+
+    let exported = corpus(&mut user, "limit=200&includeExceptions=true").await;
+    let series_row = exported
+        .events
+        .iter()
+        .find(|e| e.id == weekly.id)
+        .expect("series row");
+    assert_eq!(kinds(series_row), expected);
+    let override_row = exported
+        .events
+        .iter()
+        .find(|e| e.id == modified.id)
+        .expect("override row");
+    assert_eq!(
+        override_row.recurrence_exceptions, None,
+        "only rows with a rule carry exceptions"
+    );
+    let plain = corpus(&mut user, "limit=200&includeExceptions=false").await;
+    assert!(
+        plain
+            .events
+            .iter()
+            .all(|e| e.recurrence_exceptions.is_none())
+    );
+    let error = ok(user
+        .get("/api/events/search-corpus?includeExceptions=maybe")
+        .await
+        .expect_status(400)
+        .and_then(|r| r.value()));
+    assert_eq!(
+        error["details"]["issues"][0]["path"],
+        json!("includeExceptions")
+    );
 }
 
 #[tokio::test]

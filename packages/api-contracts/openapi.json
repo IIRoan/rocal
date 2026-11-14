@@ -920,6 +920,14 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "includeExceptions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -4873,6 +4881,13 @@
         "type": "object",
         "description": "`GET /api/events/search-corpus`: pages of the owner's events for on-device indexing.",
         "properties": {
+          "includeExceptions": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Series rows carry `recurrenceExceptions`, for an export built on the device."
+          },
           "limit": {
             "type": [
               "integer",

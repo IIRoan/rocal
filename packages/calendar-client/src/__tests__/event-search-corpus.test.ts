@@ -5,10 +5,12 @@ import type {
   EventSearchCorpusResult,
 } from "@workspace/calendar-core";
 
+import { CalendarApiService } from "../calendar-api-service";
 import {
   loadEventSearchCorpus,
   sealReadableInvitations,
 } from "../event-search-corpus";
+import { HttpClient } from "../http-client";
 
 const event = (id: string): CalendarEvent => ({
   id,
@@ -44,6 +46,24 @@ describe("loadEventSearchCorpus", () => {
     expect(getEventSearchCorpus.mock.calls.map(([params]) => params)).toEqual([
       { limit: 100, offset: 0 },
       { limit: 100, offset: 100 },
+    ]);
+  });
+});
+
+describe("CalendarApiService.getEventSearchCorpus", () => {
+  it("asks for series exceptions only when an export needs them", async () => {
+    const client = new HttpClient({ baseURL: "https://api.test", retries: 0 });
+    const get = jest
+      .spyOn(client, "get")
+      .mockResolvedValue({ events: [], total: 0, nextOffset: null } as never);
+    const service = new CalendarApiService(client);
+
+    await loadEventSearchCorpus(service, { includeExceptions: true });
+    await loadEventSearchCorpus(service);
+
+    expect(get.mock.calls.map(([path]) => path)).toEqual([
+      "/api/events/search-corpus?limit=100&offset=0&includeExceptions=true",
+      "/api/events/search-corpus?limit=100&offset=0",
     ]);
   });
 });

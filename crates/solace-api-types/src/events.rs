@@ -340,6 +340,9 @@ pub struct EventSearchCorpusQuery {
     /// Only invitation copies still stored readable, declined ones included, for the device to seal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub readable_invitations: Option<bool>,
+    /// Series rows carry `recurrenceExceptions`, for an export built on the device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_exceptions: Option<bool>,
 }
 
 /// `GET /api/events/invitations/by-external-id`.

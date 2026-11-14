@@ -35,6 +35,8 @@ export interface EventSearchCorpusParams {
   offset?: number;
   updatedAfter?: string;
   readableInvitations?: boolean;
+  /** Series carry `recurrenceExceptions`, which a calendar export needs. */
+  includeExceptions?: boolean;
 }
 
 export type EventColor =
@@ -133,6 +135,11 @@ export interface CalendarEvent {
   stalwartUid?: string | null;
   stalwartSyncedAt?: string | null;
   participants?: EventParticipant[];
+  recurrenceExceptions?: Array<{
+    exceptionDate: string;
+    modifiedEventId: string | null;
+    type: string;
+  }>;
 }
 
 export interface EventParticipant {

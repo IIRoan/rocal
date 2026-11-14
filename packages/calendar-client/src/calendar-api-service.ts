@@ -605,6 +605,9 @@ export class CalendarApiService {
     if (params.readableInvitations) {
       searchParams.set("readableInvitations", "true");
     }
+    if (params.includeExceptions) {
+      searchParams.set("includeExceptions", "true");
+    }
 
     const query = searchParams.toString();
     return this.client.get<Schema<"EventSearchCorpus">>(

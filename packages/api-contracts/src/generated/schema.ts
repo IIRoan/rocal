@@ -1717,6 +1717,8 @@ export interface components {
         };
         /** @description `GET /api/events/search-corpus`: pages of the owner's events for on-device indexing. */
         EventSearchCorpusQuery: {
+            /** @description Series rows carry `recurrenceExceptions`, for an export built on the device. */
+            includeExceptions?: boolean | null;
             /** Format: int64 */
             limit?: number | null;
             /** Format: int64 */
@@ -3327,6 +3329,7 @@ export interface operations {
                 offset?: number;
                 updatedAfter?: string;
                 readableInvitations?: boolean;
+                includeExceptions?: boolean;
             };
             header?: never;
             path?: never;
