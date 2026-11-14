@@ -46,6 +46,14 @@ import {
   type MailboxNameCipher,
   type MailServerPolicy,
   type MailServerPolicyConfig,
+  buildVacationResponseGetCall,
+  buildVacationResponseSetCall,
+  parseVacationResponseGet,
+  assertVacationResponseSet,
+  vacationResponseAccountId,
+  VACATION_RESPONSE_USING,
+  type VacationResponse,
+  type VacationResponseUpdate,
 } from "@workspace/calendar-core";
 import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
 import { createLogger } from "@workspace/logger";
@@ -659,6 +667,29 @@ export class StalwartJmapClient {
       "Identity/get",
     );
     return result.list ?? [];
+  }
+
+  async getVacationResponse(session: JmapSession): Promise<VacationResponse | null> {
+    const accountId = vacationResponseAccountId(session, this.requirePrimaryAccountId(session));
+    const envelope = await this.call(session, VACATION_RESPONSE_USING, [
+      buildVacationResponseGetCall(accountId),
+    ]);
+    return parseVacationResponseGet(
+      this.getMethodResult<unknown>(envelope, "VacationResponse/get"),
+    );
+  }
+
+  async setVacationResponse(
+    session: JmapSession,
+    update: VacationResponseUpdate,
+  ): Promise<void> {
+    const accountId = vacationResponseAccountId(session, this.requirePrimaryAccountId(session));
+    const envelope = await this.call(session, VACATION_RESPONSE_USING, [
+      buildVacationResponseSetCall(accountId, update),
+    ]);
+    assertVacationResponseSet(
+      this.getMethodResult<unknown>(envelope, "VacationResponse/set"),
+    );
   }
 
   async getMailboxMessages(

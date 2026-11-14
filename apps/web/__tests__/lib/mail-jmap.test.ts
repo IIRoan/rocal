@@ -177,6 +177,38 @@ describe("StalwartJmapClient", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("reads and saves the auto-reply with the vacation capability", async () => {
+    const reply = (body: unknown) =>
+      new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    const fetcher = jest
+      .fn<(input: string, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValueOnce(
+        reply({ methodResponses: [["VacationResponse/get", { list: [{ id: "singleton", isEnabled: true, textBody: "Away" }] }, "v1"]] }),
+      )
+      .mockResolvedValueOnce(
+        reply({ methodResponses: [["VacationResponse/set", { notUpdated: { singleton: { description: "Field could not be set." } } }, "v1"]] }),
+      );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+      accounts: { acc1: {} },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1", "urn:ietf:params:jmap:vacationresponse": "vac1" },
+    };
+
+    await expect(client.getVacationResponse(session)).resolves.toMatchObject({ isEnabled: true, textBody: "Away" });
+    const update = { isEnabled: false, fromDate: null, toDate: null, subject: null, textBody: null, htmlBody: null };
+    await expect(client.setVacationResponse(session, update)).rejects.toThrow("Field could not be set.");
+
+    const bodies = fetcher.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies[0].using).toEqual(["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:vacationresponse"]);
+    expect(bodies[0].methodCalls[0]).toEqual(["VacationResponse/get", { accountId: "vac1", ids: ["singleton"] }, "v1"]);
+    expect(bodies[1].methodCalls[0][1]).toEqual({ accountId: "vac1", update: { singleton: update } });
+  });
+
   it("supports bearer tokens for proxied JMAP discovery", async () => {
     const fetcher = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>

@@ -248,6 +248,25 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     });
   }
 
+  it("reads and saves the auto-reply with the vacation capability", async () => {
+    const fetcher = jest
+      .fn(async (_url: string, _init?: RequestInit) => jsonOk({ methodResponses: [] }))
+      .mockResolvedValueOnce(
+        jsonOk({ methodResponses: [["VacationResponse/get", { list: [{ id: "singleton", isEnabled: true, textBody: "Away" }] }, "v1"]] }),
+      )
+      .mockResolvedValueOnce(
+        jsonOk({ methodResponses: [["VacationResponse/set", { notUpdated: { singleton: { description: "Field could not be set." } } }, "v1"]] }),
+      );
+    const client = createClient(fetcher);
+    await expect(client.getVacationResponse(session)).resolves.toMatchObject({ isEnabled: true, textBody: "Away" });
+    const update = { isEnabled: false, fromDate: null, toDate: null, subject: null, textBody: null, htmlBody: null };
+    await expect(client.setVacationResponse(session, update)).rejects.toThrow("Field could not be set.");
+    const read = parseJmapRequest(fetcher.mock.calls[0][1]);
+    expect(read.using).toEqual(["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:vacationresponse"]);
+    expect(read.methodCalls[0]).toEqual(["VacationResponse/get", { accountId: "acc1", ids: ["singleton"] }, "v1"]);
+    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1]).toEqual({ accountId: "acc1", update: { singleton: update } });
+  });
+
   it("creates a mailbox with Mailbox/set and returns the created folder", async () => {
     const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
       jsonOk({

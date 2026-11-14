@@ -17,7 +17,8 @@ export type SettingsMailId =
   | "contacts"
   | "composing"
   | "mail-display"
-  | "mail-list";
+  | "mail-list"
+  | "auto-reply";
 
 export type SettingsSectionId = SettingsHubId | SettingsMailId;
 
@@ -110,6 +111,11 @@ export const SETTINGS_MAIL_ITEMS: readonly SettingsNavItem<SettingsMailId>[] = [
     id: "mail-list",
     label: "Message list",
     description: "Density, mark-as-read delay, and undo toasts",
+  },
+  {
+    id: "auto-reply",
+    label: "Auto-reply",
+    description: "Reply automatically while you're away",
   },
 ] as const;
 

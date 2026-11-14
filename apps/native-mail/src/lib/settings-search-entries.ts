@@ -45,6 +45,12 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
     keywords: "keywords forgot",
   },
   {
+    pageId: "auto-reply",
+    label: "Auto-reply",
+    location: "Auto-reply",
+    keywords: "vacation away out of office",
+  },
+  {
     pageId: "mail-display",
     label: "Remote images",
     location: `${DISPLAY} · Remote images`,

@@ -93,6 +93,11 @@ export function MailAppOverlays({
             log.error("Failed to open message", error),
           )
         }
+        mailConnection={
+          activeMailbox
+            ? { client: activeMailbox.client, session: activeMailbox.session }
+            : null
+        }
       />
 
       <ComposeDialog

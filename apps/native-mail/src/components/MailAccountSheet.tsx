@@ -21,6 +21,7 @@ import { MailDisplaySettingsContent } from "./settings/sections/MailDisplaySetti
 import { MailListSettingsContent } from "./settings/sections/MailListSettingsContent";
 import { MailSettingsContent } from "./settings/sections/MailSettingsContent";
 import { MailboxesSettingsContent } from "./settings/sections/MailboxesSettingsContent";
+import { VacationReplySettingsContent } from "./settings/sections/VacationReplySettingsContent";
 
 const MAIL_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
   groups: buildAccountSheetGroups(
@@ -42,6 +43,7 @@ const MAIL_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
     "mail-display": MailDisplaySettingsContent,
     "mail-list": MailListSettingsContent,
     mailboxes: MailboxesSettingsContent,
+    "auto-reply": VacationReplySettingsContent,
   },
   icons: { ...SETTINGS_HUB_ICONS, ...SETTINGS_MAIL_ICONS },
 };

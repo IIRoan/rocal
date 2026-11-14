@@ -32,6 +32,8 @@ export const mailQueryKeys = {
   hiddenMailboxIds: () => [...mailQueryKeys.all, "hiddenMailboxIds"] as const,
   syncedSettings: (userId: string | null) =>
     [...mailQueryKeys.all, "syncedSettings", userId] as const,
+  vacationResponse: (userId: string | null) =>
+    [...mailQueryKeys.all, "vacation-response", userId] as const,
 } as const;
 
 import type { MailSearchFilters } from "@/lib/mail/mail-search-filter";

@@ -3,6 +3,7 @@ import {
   Eye,
   Inbox,
   ListFilter,
+  Reply,
   Tag,
   Users,
   type LucideIcon,
@@ -14,7 +15,8 @@ export type MailSettingsView =
   | "contacts"
   | "composing"
   | "mail-display"
-  | "mail-list";
+  | "mail-list"
+  | "auto-reply";
 
 export interface MailSettingsNavItem {
   id: MailSettingsView;
@@ -85,7 +87,15 @@ export const MAIL_SETTINGS_NAV_ITEMS: MailSettingsNavItem[] = [
       "mark as read",
       "thread",
       "expand",
+      "advance",
     ],
+  },
+  {
+    id: "auto-reply",
+    label: "Auto-reply",
+    icon: Reply,
+    description: "Reply automatically while you're away",
+    keywords: ["vacation", "away", "out of office", "auto reply", "autoresponder"],
   },
 ];
 

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ComponentType } from "react";
 import { Monitor, Moon, Shield, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
@@ -19,6 +20,8 @@ import type { MailPaletteView } from "./mail-command-palette-ui-state";
 import { MailDisplaySettingsPanel } from "./mail-display-settings-panel";
 import { MailListSettingsPanel } from "./mail-list-settings-panel";
 import { MailSettingsHub } from "./mail-settings-hub";
+import { VacationReplySettingsPanel } from "./vacation-reply-settings-panel";
+import type { MailConnection } from "@/hooks/use-mail-vacation-response";
 import { TrustedSendersPanel } from "./trusted-senders-panel";
 import { MailboxManager } from "./mailbox-manager";
 import { LabelManager } from "./label-manager";
@@ -89,6 +92,8 @@ export type MailCommandPaletteViewContentProps = {
     updates: { name: string; color: string },
   ) => Promise<void>;
   onDeleteLabel?: (id: string) => Promise<void>;
+  mailConnection: MailConnection | null;
+  userId: string | null;
 };
 
 function MailAppearanceView({ goBack }: { goBack: () => void }) {
@@ -283,9 +288,20 @@ export function MailCommandPaletteViewContent(
       onCreateLabel={props.onCreateLabel}
       onUpdateLabel={props.onUpdateLabel}
       onDeleteLabel={props.onDeleteLabel}
+      mailConnection={props.mailConnection}
+      userId={props.userId}
+      timezone={localSettings?.timezone}
     />
   );
 }
+
+const BACK_ONLY_PANELS: Partial<
+  Record<MailPaletteView, ComponentType<{ goBack: () => void }>>
+> = {
+  composing: ComposeSettingsPanel,
+  "mail-list": MailListSettingsPanel,
+  contacts: ContactsSettingsPanel,
+};
 
 type MailPreferencesViewContentProps = Pick<
   MailCommandPaletteViewContentProps,
@@ -301,7 +317,9 @@ type MailPreferencesViewContentProps = Pick<
   | "onCreateLabel"
   | "onUpdateLabel"
   | "onDeleteLabel"
->;
+  | "mailConnection"
+  | "userId"
+> & { timezone?: string | null };
 
 function MailPreferencesViewContent(props: MailPreferencesViewContentProps) {
   const { currentView, goBack, goForward } = props;
@@ -349,10 +367,6 @@ function MailPreferencesViewContent(props: MailPreferencesViewContentProps) {
     );
   }
 
-  if (currentView === "composing") {
-    return <ComposeSettingsPanel goBack={goBack} />;
-  }
-
   if (currentView === "mail-display") {
     return (
       <MailDisplaySettingsPanel
@@ -370,12 +384,20 @@ function MailPreferencesViewContent(props: MailPreferencesViewContentProps) {
     );
   }
 
-  if (currentView === "mail-list") {
-    return <MailListSettingsPanel goBack={goBack} />;
+  const Panel = BACK_ONLY_PANELS[currentView];
+  if (Panel) {
+    return <Panel goBack={goBack} />;
   }
 
-  if (currentView === "contacts") {
-    return <ContactsSettingsPanel goBack={goBack} />;
+  if (currentView === "auto-reply") {
+    return (
+      <VacationReplySettingsPanel
+        goBack={goBack}
+        connection={props.mailConnection}
+        userId={props.userId}
+        timezone={props.timezone}
+      />
+    );
   }
 
   return null;

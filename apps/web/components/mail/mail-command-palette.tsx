@@ -11,6 +11,7 @@ import { TransitionContainer } from "../command-palette/transition-container";
 import { MailCommandPaletteViewContent } from "./mail-command-palette-view-content";
 import { useMailCommandPaletteController } from "./use-mail-command-palette-controller";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
+import type { MailConnection } from "@/hooks/use-mail-vacation-response";
 
 const EMPTY_MAILBOXES: JmapMailbox[] = [];
 const EMPTY_LABELS: LabelDef[] = [];
@@ -34,6 +35,7 @@ export interface MailCommandPaletteProps {
   initialView?: string;
   messages?: JmapEmailMessage[];
   onSelectMessage?: (id: string) => void;
+  mailConnection?: MailConnection | null;
 }
 
 export function MailCommandPalette({
@@ -51,6 +53,7 @@ export function MailCommandPalette({
   onDeleteLabel,
   initialView,
   onSelectMessage,
+  mailConnection = null,
 }: MailCommandPaletteProps) {
   const c = useMailCommandPaletteController({
     open,
@@ -124,6 +127,8 @@ export function MailCommandPalette({
                 onCreateLabel={c.onCreateLabel}
                 onUpdateLabel={c.onUpdateLabel}
                 onDeleteLabel={c.onDeleteLabel}
+                mailConnection={mailConnection}
+                userId={c.session?.user?.id ?? null}
               />
             </TransitionContainer>
           </div>
