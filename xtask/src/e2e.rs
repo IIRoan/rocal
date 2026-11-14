@@ -16,6 +16,9 @@ const EMAIL: &str = "journey@solace.test";
 const PASSWORD: &str = "solace-test-ui-password";
 const PEER_EMAIL: &str = "correspondent@solace.test";
 const PEER_PASSWORD: &str = "solace-test-peer-password";
+/// The web suite signs this account up through the invite form, so it meets the form's password rules.
+const BROWSER_EMAIL: &str = "browser@solace.test";
+const BROWSER_PASSWORD: &str = "Solace-test-browser-1";
 
 pub async fn run(args: &[&str]) -> anyhow::Result<()> {
     let env = TestEnv::from_env()?;
@@ -113,6 +116,15 @@ async fn seed(env: &TestEnv) -> anyhow::Result<()> {
             .await?
             .expect_status(200)?;
     }
+    let invite_token = hex(32);
+    insert_invite(
+        &mut db,
+        &format!("e2e{}", hex(8)),
+        &invite_token,
+        "e2einviter",
+        BROWSER_EMAIL,
+    )
+    .await?;
     let root = std::path::PathBuf::from(std::env::var("SOLACE_E2E_DIR")?);
     ensure!(
         root.is_absolute() && root.file_name().is_some_and(|name| name == "solace-e2e"),
@@ -126,6 +138,9 @@ async fn seed(env: &TestEnv) -> anyhow::Result<()> {
             "password": PASSWORD,
             "peerEmail": PEER_EMAIL,
             "peerPassword": PEER_PASSWORD,
+            "inviteToken": invite_token,
+            "inviteEmail": BROWSER_EMAIL,
+            "invitePassword": BROWSER_PASSWORD,
         }))?,
     )?;
     println!("Created two disposable journey accounts; encryption is initialized by the apps");
@@ -138,7 +153,7 @@ async fn verify(env: &TestEnv, calendar: bool, mail: bool) -> anyhow::Result<()>
         .bind(EMAIL)
         .fetch_one(&mut db)
         .await?;
-    let readable: i64 = sqlx::query_scalar("SELECT (SELECT count(*) FROM calendar_event WHERE user_id = $1 AND (title LIKE 'Maestro%' OR coalesce(description, '') LIKE '%Maestro%' OR coalesce(location, '') LIKE '%Maestro%')) + (SELECT count(*) FROM calendar WHERE user_id = $1 AND name LIKE '%Maestro%') + (SELECT count(*) FROM event_category WHERE user_id = $1 AND name LIKE '%Maestro%')").bind(&user).fetch_one(&mut db).await?;
+    let readable: i64 = sqlx::query_scalar("SELECT (SELECT count(*) FROM calendar_event WHERE user_id = $1 AND (title ~ '^(Maestro|Playwright)' OR coalesce(description, '') ~ '(Maestro|Playwright)' OR coalesce(location, '') ~ '(Maestro|Playwright)')) + (SELECT count(*) FROM calendar WHERE user_id = $1 AND name ~ '(Maestro|Playwright)') + (SELECT count(*) FROM event_category WHERE user_id = $1 AND name ~ '(Maestro|Playwright)')").bind(&user).fetch_one(&mut db).await?;
     ensure!(
         readable == 0,
         "UI left readable event, calendar or category names in the database"
