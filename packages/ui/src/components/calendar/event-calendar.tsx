@@ -18,6 +18,7 @@ import { CalendarShortcutsDialog } from "./calendar-shortcuts-dialog";
 import { EventCalendarContextMenu } from "./event-calendar-context-menu";
 import {
   persistDraggedCalendarEvent,
+  type DraggedEventVerb,
   type MoveRecurringCalendarEvent,
 } from "./event-calendar-mutations";
 import { EventCalendarToolbar } from "./event-calendar-toolbar";
@@ -226,7 +227,11 @@ export function EventCalendar({
     onEventEdit?.(event);
   };
 
-  const handleEventCreate = (startTime: Date) => {
+  const handleEventCreate = (
+    startTime: Date,
+    endTime?: Date,
+    anchor?: { x: number; y: number },
+  ) => {
     startTime.setSeconds(0);
     startTime.setMilliseconds(0);
 
@@ -234,7 +239,7 @@ export function EventCalendar({
       id: "",
       title: "",
       start: startTime,
-      end: addMinutesToDate(startTime, defaultEventDuration),
+      end: endTime ?? addMinutesToDate(startTime, defaultEventDuration),
       allDay: false,
       calendarId: defaultCalendarId || "",
       userId: "",
@@ -242,7 +247,7 @@ export function EventCalendar({
       updatedAt: new Date(),
       timezone: resolvedTimezone,
     };
-    const anchorPos = lastClickPositionRef.current;
+    const anchorPos = anchor ?? lastClickPositionRef.current;
     if (anchorPos) {
       onEventEdit?.(newEvent, { mode: "popover", anchorPosition: anchorPos });
       return;
@@ -255,7 +260,10 @@ export function EventCalendar({
     if (event) onEventDeleteRequest?.(event);
   };
 
-  const handleEventUpdate = (updatedEvent: CalendarEvent) =>
+  const handleEventUpdate = (
+    updatedEvent: CalendarEvent,
+    verb?: DraggedEventVerb,
+  ) =>
     persistDraggedCalendarEvent({
       timezone: resolvedTimezone,
       timeFormat,
@@ -263,6 +271,7 @@ export function EventCalendar({
       moveRecurringEvent: onMoveRecurringEvent,
       originalEvent: events.find((event) => event.id === updatedEvent.id),
       updatedEvent,
+      verb,
     });
 
   if (loading) {

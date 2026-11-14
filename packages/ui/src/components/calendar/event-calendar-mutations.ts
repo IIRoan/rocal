@@ -111,6 +111,8 @@ export type MoveRecurringCalendarEvent = (
   update: DraggedEventUpdate,
 ) => Promise<boolean>;
 
+export type DraggedEventVerb = "moved" | "resized";
+
 export async function persistDraggedCalendarEvent({
   timezone,
   timeFormat,
@@ -118,6 +120,7 @@ export async function persistDraggedCalendarEvent({
   moveRecurringEvent,
   originalEvent,
   updatedEvent,
+  verb = "moved",
 }: {
   timezone: string;
   timeFormat: TimeFormat;
@@ -125,6 +128,7 @@ export async function persistDraggedCalendarEvent({
   moveRecurringEvent?: MoveRecurringCalendarEvent;
   originalEvent?: CalendarEvent;
   updatedEvent: CalendarEvent;
+  verb?: DraggedEventVerb;
 }) {
   try {
     const update = buildDraggedEventUpdate(updatedEvent, timezone);
@@ -136,7 +140,7 @@ export async function persistDraggedCalendarEvent({
       await updateEvent(updatedEvent.id, update);
     }
 
-    toast.success(`Event "${updatedEvent.title}" moved`, {
+    toast.success(`Event "${updatedEvent.title}" ${verb}`, {
       description: formatInUserTimezone(
         new Date(updatedEvent.start),
         timezone,
@@ -146,10 +150,11 @@ export async function persistDraggedCalendarEvent({
     });
   } catch (error: unknown) {
     log.error("Failed to update event:", error);
+    const action = verb === "resized" ? "resize" : "move";
     toastEventMutationError(
       error as EventMutationError,
-      "Failed to move event",
-      "You don't have permission to move this event",
+      `Failed to ${action} event`,
+      `You don't have permission to ${action} this event`,
     );
   }
 }

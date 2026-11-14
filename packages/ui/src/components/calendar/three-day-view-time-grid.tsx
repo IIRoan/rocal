@@ -12,6 +12,9 @@ import { cn } from "../../lib/utils";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
+import { EventResizeHandles } from "./event-resize-handle";
+import { TimeGridSelection } from "./time-grid-selection";
+import { useTimeGridPointerRange } from "./use-time-grid-pointer-range";
 import type { PositionedTimelineEvent } from "./timeline-layout";
 import { THREE_DAY_GRID_COLS } from "./three-day-view-utils";
 import type { CalendarEvent } from "./types";
@@ -39,7 +42,11 @@ export function ThreeDayViewTimeGrid({
     mouseEvent: React.MouseEvent,
     dayIndex: number,
   ) => void;
-  onEventCreate: (startTime: Date) => void;
+  onEventCreate: (
+    startTime: Date,
+    endTime?: Date,
+    anchor?: { x: number; y: number },
+  ) => void;
   onEventDelete?: (event: CalendarEvent) => void;
   onEventEdit?: (event: CalendarEvent) => void;
   onEventView?: (event: CalendarEvent) => void;
@@ -48,6 +55,8 @@ export function ThreeDayViewTimeGrid({
   timeFormat: TimeFormat;
   timezone: string;
 }) {
+  const pointer = useTimeGridPointerRange({ timezone, onCreate: onEventCreate });
+
   return (
     <div
       ref={scrollRef}
@@ -82,8 +91,9 @@ export function ThreeDayViewTimeGrid({
       {days.map((day, dayIndex) => (
         <div
           key={formatCalendarDayKey(day)}
+          {...pointer.columnProps(day)}
           className={cn(
-            "relative min-w-0 border-r border-border/50 last:border-r-0",
+            "relative min-w-0 select-none border-r border-border/50 last:border-r-0",
             isTodayInTimezone(day, timezone) && "bg-accent/5",
           )}
         >
@@ -122,8 +132,20 @@ export function ThreeDayViewTimeGrid({
                   />
                 )}
               </div>
+              <EventResizeHandles
+                event={positionedEvent.event}
+                onResizeStart={(pointerEvent, edge) =>
+                  pointer.startResize(pointerEvent, positionedEvent.event, edge, day)
+                }
+              />
             </div>
           ))}
+          {pointer.selection?.dayKey === formatCalendarDayKey(day) ? (
+            <TimeGridSelection
+              startQuarter={pointer.selection.startQuarter}
+              endQuarter={pointer.selection.endQuarter}
+            />
+          ) : null}
 
           {currentTimeVisible && isTodayInTimezone(day, timezone) && (
             <CurrentTimeIndicator position={currentTimePosition} />

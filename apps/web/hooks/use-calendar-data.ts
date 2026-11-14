@@ -85,7 +85,7 @@ async function snapshotEventCache(
   });
 }
 
-function restoreEventCache(
+export function restoreEventCache(
   queryClient: QueryClient,
   snapshot: EventCacheSnapshot | undefined,
 ) {
@@ -126,6 +126,23 @@ function toOccurrencePatch(
   if (updates.end) patch.end = new Date(updates.end);
   if (updates.allDay !== undefined) patch.allDay = updates.allDay;
   return patch;
+}
+
+/** Moves the cached event to its new times before the server answers, so a drag or resize lands at once. */
+export async function patchCachedEventTiming(
+  queryClient: QueryClient,
+  id: string,
+  { start, end, allDay }: UpdateEventRequest,
+) {
+  const previous = findEventInCache(queryClient, id);
+  const snapshot = await snapshotEventCache(queryClient);
+  const patch = toOccurrencePatch({ start, end, allDay });
+  mapCachedEvents(queryClient, (events) =>
+    events.map((candidate) =>
+      candidate.id === id ? { ...candidate, ...patch } : candidate,
+    ),
+  );
+  return { previous, snapshot };
 }
 
 function isAtOrAfter(event: CalendarEvent, instant: Date | string) {
@@ -320,12 +337,17 @@ export function useCalendarData(
   const updateEventMutation = useMutation({
     mutationFn: ({ id, event }: { id: string; event: UpdateEventRequest }) =>
       calendarApiService.updateEvent(id, event),
-    onSuccess: (_data, { id, event }) => {
+    onMutate: ({ id, event }) => patchCachedEventTiming(queryClient, id, event),
+    onError: (_error, _input, context) => {
+      restoreEventCache(queryClient, context?.snapshot);
+    },
+    onSuccess: (_data, { id, event }, context) => {
       if (hasRecurrence(event)) {
         queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
-      const cached = findEventInCache(queryClient, id);
+      // The pre-update copy, so the range the event left is refreshed too.
+      const cached = context?.previous ?? findEventInCache(queryClient, id);
       if (hasRecurrence(cached)) {
         queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;

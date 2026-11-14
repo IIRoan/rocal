@@ -186,6 +186,13 @@ export default function CalendarScreen() {
     [openEventSheet],
   );
 
+  const handleTimeRangeCreate = useCallback(
+    (range: { start: string; end: string }) => {
+      openEventSheet({ type: "create", start: range.start, end: range.end });
+    },
+    [openEventSheet],
+  );
+
   const handleNewEvent = useCallback(() => {
     openEventSheet({ type: "create" });
   }, [openEventSheet]);
@@ -254,10 +261,12 @@ export default function CalendarScreen() {
             weekStartDay={settings?.weekStartDay ?? 1}
             workingDays={workingDays}
             timeFormat={timeFormat}
+            defaultEventDuration={settings?.defaultEventDuration ?? 60}
             swipeEnabled
             isLoading={detailEventsLoading}
             onEventPress={handleTimelineEventPress}
             onTimeSlotPress={handleTimeSlotPress}
+            onTimeRangeCreate={handleTimeRangeCreate}
             onDateChange={handleTimelineDateChange}
             onEventMove={handleTimelineEventMove}
           />

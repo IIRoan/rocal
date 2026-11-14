@@ -351,6 +351,19 @@ export function kitDropToVisibleDate(
   return parseKitVisibleDate(start, timezone);
 }
 
+/** A range swept on the timeline as UTC instants; null when the kit sends dates without times. */
+export function kitCreatedRangeToInstants(created: {
+  start: KitDateOrDateTime;
+  end: KitDateOrDateTime;
+}): { start: string; end: string } | null {
+  const start = new Date(kitDateTime(created.start) ?? "");
+  const end = new Date(kitDateTime(created.end) ?? "");
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    return null;
+  }
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 export function kitBackgroundToCreateSlot(
   slot: KitDateOrDateTime,
   timezone: string,

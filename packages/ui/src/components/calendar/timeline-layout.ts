@@ -10,6 +10,7 @@ import {
   isSameCalendarDayInTimezone,
 } from "@workspace/calendar-core";
 
+import { EndHour, StartHour } from "./constants";
 import { CalendarEvent } from "./types";
 
 type TimelineWidthStrategy =
@@ -330,4 +331,39 @@ export function layoutTimelineEvents(
       zIndex: 10 + columnIndex,
     };
   });
+}
+
+/** Quarter-hour rows in a time grid column, from StartHour to the end of EndHour. */
+export const TIME_GRID_QUARTERS = (EndHour - StartHour + 1) * 4;
+
+export type TimeGridRangeMode = "create" | "resize-start" | "resize-end";
+
+export type TimeGridQuarterRange = { startQuarter: number; endQuarter: number };
+
+/** Quarters a pointer drag covers, end exclusive and never under one quarter; a resize keeps its other edge at `anchorQuarter`. */
+export function normalizeTimeGridRange(
+  anchorQuarter: number,
+  currentQuarter: number,
+  mode: TimeGridRangeMode,
+): TimeGridQuarterRange {
+  const clamp = (quarter: number) =>
+    Math.min(Math.max(quarter, 0), TIME_GRID_QUARTERS);
+  if (mode === "resize-end") {
+    const startQuarter = clamp(anchorQuarter);
+    return {
+      startQuarter,
+      endQuarter: clamp(Math.max(currentQuarter + 1, startQuarter + 1)),
+    };
+  }
+  if (mode === "resize-start") {
+    const endQuarter = clamp(anchorQuarter);
+    return {
+      startQuarter: clamp(Math.min(currentQuarter, endQuarter - 1)),
+      endQuarter,
+    };
+  }
+  return {
+    startQuarter: clamp(Math.min(anchorQuarter, currentQuarter)),
+    endQuarter: clamp(Math.max(anchorQuarter, currentQuarter) + 1),
+  };
 }

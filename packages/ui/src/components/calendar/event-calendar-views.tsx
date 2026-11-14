@@ -14,7 +14,11 @@ type EventCalendarViewStageProps = {
   compactView?: boolean;
   currentDate: Date;
   events: CalendarEvent[];
-  onEventCreate: (startTime: Date) => void;
+  onEventCreate: (
+    startTime: Date,
+    endTime?: Date,
+    anchor?: { x: number; y: number },
+  ) => void;
   onEventDelete: (eventId: string) => void;
   onEventEdit?: (
     event: CalendarEvent,

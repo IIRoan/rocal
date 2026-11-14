@@ -144,7 +144,7 @@ export function MobileEventCalendar({
     onEventEdit?.(event);
   };
 
-  const handleEventCreate = (startTime: Date) => {
+  const handleEventCreate = (startTime: Date, endTime?: Date) => {
     startTime.setSeconds(0);
     startTime.setMilliseconds(0);
 
@@ -152,7 +152,7 @@ export function MobileEventCalendar({
       id: "",
       title: "",
       start: startTime,
-      end: addMinutesToDate(startTime, defaultEventDuration),
+      end: endTime ?? addMinutesToDate(startTime, defaultEventDuration),
       allDay: false,
       calendarId: defaultCalendarId || "",
       userId: "",
@@ -224,7 +224,7 @@ export function MobileEventCalendar({
         }
       >
         <CalendarDndProvider
-          onEventUpdate={(updatedEvent) =>
+          onEventUpdate={(updatedEvent, verb) =>
             persistDraggedCalendarEvent({
               timezone: resolvedTimezone,
               timeFormat,
@@ -234,6 +234,7 @@ export function MobileEventCalendar({
                 (event) => event.id === updatedEvent.id,
               ),
               updatedEvent,
+              verb,
             })
           }
           timezone={timezone}

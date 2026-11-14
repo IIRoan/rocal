@@ -23,7 +23,11 @@ interface MobileThreeDayViewProps {
   currentDate: Date;
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
-  onEventCreate: (startTime: Date) => void;
+  onEventCreate: (
+    startTime: Date,
+    endTime?: Date,
+    anchor?: { x: number; y: number },
+  ) => void;
   timeFormat: TimeFormat;
   weekStartDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   workingDays?: number[];

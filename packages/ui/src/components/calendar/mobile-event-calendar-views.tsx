@@ -28,7 +28,7 @@ export function MobileEventCalendarViews({
   currentDate: Date;
   events: CalendarEvent[];
   isMobile: boolean;
-  onEventCreate: (startTime: Date) => void;
+  onEventCreate: (startTime: Date, endTime?: Date) => void;
   onEventSelect: (event: CalendarEvent) => void;
   showWeekNumbers?: boolean;
   timeFormat: TimeFormat;
