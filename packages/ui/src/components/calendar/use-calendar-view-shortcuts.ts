@@ -76,8 +76,9 @@ function isShortcutBlocked(event: KeyboardEvent) {
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
     target.isContentEditable ||
+    // Dialogs stay mounted while closed for their exit motion, and focus can stay behind in one.
     target.closest(
-      "dialog, [role='dialog'], [role='alertdialog'], [role='menu']",
+      "dialog[open], :is([role='dialog'], [role='alertdialog'], [role='menu']):not([data-state='closed'])",
     ) !== null
   );
 }

@@ -126,6 +126,19 @@ describe("useCalendarShortcuts", () => {
     expect(onViewChange).not.toHaveBeenCalled();
   });
 
+  it("works again once a dialog closed with focus still inside it", () => {
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.dataset.state = "closed";
+    const button = document.createElement("button");
+    dialog.appendChild(button);
+    document.body.appendChild(dialog);
+
+    press(button, "m");
+
+    expect(onViewChange).toHaveBeenCalledWith("month");
+  });
+
   it.each([
     ["j", "onNext"],
     ["k", "onPrevious"],
