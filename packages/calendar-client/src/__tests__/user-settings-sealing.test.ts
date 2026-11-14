@@ -94,6 +94,30 @@ describe("sealed user settings", () => {
     expect(blob).toMatchObject({ theme: "dark", showWeekNumbers: true, weekStartDay: 0 });
   });
 
+  it("keeps preference keys a newer client wrote when it saves its own change", async () => {
+    const server = statefulServer({
+      encryptedPreferences: sealed({ theme: "dark", futureKey: { nested: true } }),
+    });
+
+    await server.service.updateUserSettings({ weekStartDay: 0 });
+
+    expect(server.preferences()).toMatchObject({
+      theme: "dark",
+      weekStartDay: 0,
+      futureKey: { nested: true },
+    });
+  });
+
+  it("round-trips the keyboard shortcuts switch sealed", async () => {
+    const server = statefulServer({});
+
+    await server.service.updateUserSettings({ keyboardShortcuts: false });
+
+    expect(server.preferences()).toMatchObject({ keyboardShortcuts: false });
+    expect(server.row).not.toHaveProperty("keyboardShortcuts");
+    expect((await server.service.getUserSettings()).keyboardShortcuts).toBe(false);
+  });
+
   it("seals the Riot ID and frequent stores instead of sending readable integration settings", async () => {
     const riftbound = { ...DEFAULT_RIFTBOUND_PREFERENCES, riotId: "Fixture User#EU" };
     const { put, service } = setup({});

@@ -28,6 +28,14 @@ describe("mail compose settings", () => {
     ).toEqual(["ok"]);
   });
 
+  it("strips image metadata by default and keeps an explicit choice and unknown keys", () => {
+    expect(DEFAULT_MAIL_COMPOSE_SETTINGS.stripImageMetadata).toBe(true);
+    expect(parseMailComposeSettings(JSON.stringify({ stripImageMetadata: "no" })).stripImageMetadata).toBe(true);
+    expect(
+      parseMailComposeSettings(JSON.stringify({ stripImageMetadata: false, futureKey: 1 })),
+    ).toMatchObject({ stripImageMetadata: false, futureKey: 1 });
+  });
+
   it("adds lowercase keywords once", () => {
     expect(addAttachmentReminderKeyword(["attached"], " Enclosed ")).toEqual([
       "attached",

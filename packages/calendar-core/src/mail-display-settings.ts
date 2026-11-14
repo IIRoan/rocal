@@ -10,6 +10,7 @@ export type MailDisplaySettings = {
   blockTrackingPixels: boolean;
   hideInlineImageAttachments: boolean;
   attachmentImagePreviewsEnabled: boolean;
+  confirmExternalLinks: boolean;
 };
 
 /** Pre-JSON web storage values; native has no legacy keys. */
@@ -39,6 +40,7 @@ export const DEFAULT_MAIL_DISPLAY_SETTINGS: MailDisplaySettings = {
   blockTrackingPixels: true,
   hideInlineImageAttachments: true,
   attachmentImagePreviewsEnabled: true,
+  confirmExternalLinks: true,
 };
 
 export const TRUSTED_SENDER_DESCRIPTION =
@@ -65,6 +67,7 @@ function booleanOr(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+/** Unknown keys from newer clients are kept beside the validated fields. */
 export function normalizeMailDisplaySettings(
   input: unknown,
   legacy: LegacyMailDisplayValues = {},
@@ -103,6 +106,7 @@ export function normalizeMailDisplaySettings(
   }
 
   return {
+    ...parsed,
     externalContentPolicy,
     emailAppearance,
     trustedSenders: normalizeTrustedSenders(parsed.trustedSenders),
@@ -114,6 +118,10 @@ export function normalizeMailDisplaySettings(
     attachmentImagePreviewsEnabled: booleanOr(
       parsed.attachmentImagePreviewsEnabled,
       DEFAULT_MAIL_DISPLAY_SETTINGS.attachmentImagePreviewsEnabled,
+    ),
+    confirmExternalLinks: booleanOr(
+      parsed.confirmExternalLinks,
+      DEFAULT_MAIL_DISPLAY_SETTINGS.confirmExternalLinks,
     ),
   };
 }

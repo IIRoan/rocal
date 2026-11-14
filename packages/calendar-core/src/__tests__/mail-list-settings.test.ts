@@ -33,6 +33,25 @@ describe("mail list settings", () => {
     });
   });
 
+  it("defaults auto-advance and swipes to today's behaviour and resets unknown values per field", () => {
+    expect(DEFAULT_MAIL_LIST_SETTINGS).toMatchObject({
+      autoAdvance: "next",
+      swipeRight: "read",
+      swipeLeft: "trash",
+    });
+    expect(
+      normalizeMailListSettings({ autoAdvance: "list", swipeRight: "star", swipeLeft: "spam" }),
+    ).toMatchObject({ autoAdvance: "list", swipeRight: "star", swipeLeft: "trash" });
+    expect(normalizeMailListSettings({ autoAdvance: 1 }).autoAdvance).toBe("next");
+  });
+
+  it("keeps keys from a newer client", () => {
+    const parsed = parseMailListSettings(JSON.stringify({ futureKey: "kept" }));
+    expect(parseMailListSettings(serializeMailListSettings(parsed))).toMatchObject({
+      futureKey: "kept",
+    });
+  });
+
   it("rejects undo durations outside the allowed window", () => {
     for (const undoToastDurationMs of [
       MIN_UNDO_TOAST_DURATION_MS - 1,

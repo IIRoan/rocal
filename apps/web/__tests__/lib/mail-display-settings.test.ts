@@ -10,6 +10,7 @@ import {
   removeTrustedSender,
   resolveMailContentIsDark,
   resolveReaderRemoteContent,
+  writeMailDisplaySettings,
 } from "@/lib/mail/mail-display-settings";
 import { emailHtmlHasRemoteContent } from "@workspace/calendar-core/mail-html";
 import { clearLocalMailSettings } from "@/lib/mail/mail-settings-storage";
@@ -159,6 +160,18 @@ describe("mail-display-settings", () => {
     localStorage.setItem("mail:displaySettings", JSON.stringify({ trustedSenders: ["legacy@example.com"] }));
     expect(readMailDisplaySettings().trustedSenders).toEqual(["legacy@example.com"]);
     expect(localStorage.getItem("mail:displaySettings")).not.toContain("legacy@example.com");
+  });
+
+  it("keeps the link confirmation switch and a newer client's keys in local storage", () => {
+    expect(readMailDisplaySettings().confirmExternalLinks).toBe(true);
+    localStorage.setItem("mail:displaySettings", JSON.stringify({ futureKey: "kept" }));
+    writeMailDisplaySettings((current) => ({ ...current, confirmExternalLinks: false }), {
+      sync: false,
+    });
+    expect(readMailDisplaySettings()).toMatchObject({
+      confirmExternalLinks: false,
+      futureKey: "kept",
+    });
   });
 
   it("removes trusted senders case-insensitively", () => {

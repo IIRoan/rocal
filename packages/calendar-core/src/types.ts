@@ -392,6 +392,8 @@ export interface UserSettings {
   showDeclinedEvents: boolean;
   riftbound?: import("./riftbound-settings").RiftboundPreferences;
   riftboundImportedIds?: string[];
+  /** Absent means on; off disables every single-key shortcut (WCAG 2.1.4). */
+  keyboardShortcuts?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

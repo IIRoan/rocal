@@ -7,6 +7,7 @@ export type MailComposeSettings = {
   signaturePosition: MailSignaturePosition;
   signatureSeparatorEnabled: boolean;
   autoSelectReplyIdentity: boolean;
+  stripImageMetadata: boolean;
 };
 
 export const DEFAULT_ATTACHMENT_REMINDER_KEYWORDS = [
@@ -46,18 +47,21 @@ export const DEFAULT_MAIL_COMPOSE_SETTINGS: MailComposeSettings = {
   signaturePosition: "below_quote",
   signatureSeparatorEnabled: true,
   autoSelectReplyIdentity: false,
+  stripImageMetadata: true,
 };
 
 function booleanOr(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+/** Unknown keys from newer clients are kept beside the validated fields. */
 export function normalizeMailComposeSettings(input: unknown): MailComposeSettings {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return DEFAULT_MAIL_COMPOSE_SETTINGS;
   }
   const parsed = input as Record<string, unknown>;
   return {
+    ...parsed,
     plainTextMode: booleanOr(parsed.plainTextMode, DEFAULT_MAIL_COMPOSE_SETTINGS.plainTextMode),
     attachmentReminderEnabled: booleanOr(
       parsed.attachmentReminderEnabled,
@@ -80,6 +84,10 @@ export function normalizeMailComposeSettings(input: unknown): MailComposeSetting
     autoSelectReplyIdentity: booleanOr(
       parsed.autoSelectReplyIdentity,
       DEFAULT_MAIL_COMPOSE_SETTINGS.autoSelectReplyIdentity,
+    ),
+    stripImageMetadata: booleanOr(
+      parsed.stripImageMetadata,
+      DEFAULT_MAIL_COMPOSE_SETTINGS.stripImageMetadata,
     ),
   };
 }

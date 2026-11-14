@@ -189,6 +189,14 @@ describe("mail display settings", () => {
     expect(parseMailDisplaySettings(serializeMailDisplaySettings(stored))).toEqual(stored);
   });
 
+  it("confirms external links by default and keeps an explicit choice and unknown keys", () => {
+    expect(DEFAULT_MAIL_DISPLAY_SETTINGS.confirmExternalLinks).toBe(true);
+    expect(parseMailDisplaySettings(JSON.stringify({ confirmExternalLinks: 0 })).confirmExternalLinks).toBe(true);
+    expect(
+      parseMailDisplaySettings(JSON.stringify({ confirmExternalLinks: false, futureKey: "x" })),
+    ).toMatchObject({ confirmExternalLinks: false, futureKey: "x" });
+  });
+
   it("drops invalid and duplicate trusted senders", () => {
     const parsed = parseMailDisplaySettings(
       JSON.stringify({ trustedSenders: ["A@b.co", "a@b.co", 3, ""] }),

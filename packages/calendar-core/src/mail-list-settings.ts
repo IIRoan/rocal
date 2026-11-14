@@ -1,5 +1,7 @@
 export type ListDensity = "compact" | "comfortable";
 export type MarkAsReadDelay = "instant" | "delayed" | "never";
+export type MailAutoAdvance = "next" | "previous" | "list";
+export type MailSwipeAction = "none" | "read" | "archive" | "trash" | "star" | "move";
 
 export type MailListSettings = {
   density: ListDensity;
@@ -8,6 +10,9 @@ export type MailListSettings = {
   undoToastDurationMs: number;
   showLabelChipsInList: boolean;
   keyboardShortcutsEnabled: boolean;
+  autoAdvance: MailAutoAdvance;
+  swipeRight: MailSwipeAction;
+  swipeLeft: MailSwipeAction;
 };
 
 export const DEFAULT_MAIL_LIST_SETTINGS: MailListSettings = {
@@ -17,6 +22,9 @@ export const DEFAULT_MAIL_LIST_SETTINGS: MailListSettings = {
   undoToastDurationMs: 5000,
   showLabelChipsInList: true,
   keyboardShortcutsEnabled: true,
+  autoAdvance: "next",
+  swipeRight: "read",
+  swipeLeft: "trash",
 };
 
 export const MARK_AS_READ_DELAY_MS = 3000;
@@ -44,6 +52,29 @@ export const UNDO_TOAST_DURATION_OPTIONS: { value: number; label: string }[] = [
   { value: 15000, label: "15 seconds" },
 ];
 
+export const MAIL_AUTO_ADVANCE_OPTIONS: { value: MailAutoAdvance; label: string }[] = [
+  { value: "next", label: "Open the next message" },
+  { value: "previous", label: "Open the previous message" },
+  { value: "list", label: "Return to the list" },
+];
+
+export const MAIL_SWIPE_ACTION_OPTIONS: { value: MailSwipeAction; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "read", label: "Mark read or unread" },
+  { value: "archive", label: "Archive" },
+  { value: "trash", label: "Move to trash" },
+  { value: "star", label: "Star or unstar" },
+  { value: "move", label: "Move to…" },
+];
+
+function isMailAutoAdvance(value: unknown): value is MailAutoAdvance {
+  return MAIL_AUTO_ADVANCE_OPTIONS.some((option) => option.value === value);
+}
+
+function isMailSwipeAction(value: unknown): value is MailSwipeAction {
+  return MAIL_SWIPE_ACTION_OPTIONS.some((option) => option.value === value);
+}
+
 function isUndoToastDuration(value: unknown): value is number {
   return (
     typeof value === "number" &&
@@ -53,13 +84,14 @@ function isUndoToastDuration(value: unknown): value is number {
   );
 }
 
-/** Coerces stored settings field by field so one bad value never resets the rest. */
+/** Coerces stored settings field by field so one bad value never resets the rest; unknown keys from newer clients are kept. */
 export function normalizeMailListSettings(value: unknown): MailListSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return DEFAULT_MAIL_LIST_SETTINGS;
   }
-  const parsed = value as Partial<Record<keyof MailListSettings, unknown>>;
+  const parsed = value as Record<string, unknown>;
   return {
+    ...parsed,
     density:
       parsed.density === "comfortable" || parsed.density === "compact"
         ? parsed.density
@@ -85,6 +117,15 @@ export function normalizeMailListSettings(value: unknown): MailListSettings {
       typeof parsed.keyboardShortcutsEnabled === "boolean"
         ? parsed.keyboardShortcutsEnabled
         : DEFAULT_MAIL_LIST_SETTINGS.keyboardShortcutsEnabled,
+    autoAdvance: isMailAutoAdvance(parsed.autoAdvance)
+      ? parsed.autoAdvance
+      : DEFAULT_MAIL_LIST_SETTINGS.autoAdvance,
+    swipeRight: isMailSwipeAction(parsed.swipeRight)
+      ? parsed.swipeRight
+      : DEFAULT_MAIL_LIST_SETTINGS.swipeRight,
+    swipeLeft: isMailSwipeAction(parsed.swipeLeft)
+      ? parsed.swipeLeft
+      : DEFAULT_MAIL_LIST_SETTINGS.swipeLeft,
   };
 }
 

@@ -966,6 +966,8 @@ export class CalendarApiService {
     }
     return this.e2ee.encryptJson(
       {
+        // Keys this build does not know stay, so a newer client's preferences survive this write.
+        ...(typeof opened === "object" && !Array.isArray(opened) ? opened : {}),
         ...pickUserSettingsPreferences(current as UserSettings),
         ...readUserSettingsPreferences(opened),
         ...changes,
