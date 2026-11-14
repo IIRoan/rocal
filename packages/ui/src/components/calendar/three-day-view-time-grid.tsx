@@ -51,7 +51,14 @@ export function ThreeDayViewTimeGrid({
   return (
     <div
       ref={scrollRef}
-      className={cn("grid min-h-0 flex-1 overflow-y-auto", THREE_DAY_GRID_COLS)}
+      // Focusable so keyboard users can scroll empty days (WCAG 2.1.1).
+      role="region"
+      aria-label="3-day schedule"
+      tabIndex={0}
+      className={cn(
+        "grid min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+        THREE_DAY_GRID_COLS,
+      )}
       style={{ scrollBehavior: "smooth", scrollbarGutter: "stable" }}
     >
       <div className="border-r border-border/50 bg-background">

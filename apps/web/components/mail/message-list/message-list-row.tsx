@@ -163,8 +163,8 @@ function MessageListRowSubject({
             event.stopPropagation();
             onToggleThreadExpand(thread.id);
           }}
-          // The 16px chevron gets a 24px hit area (WCAG 2.5.8); the text clip sits on the sibling so it can't cut it.
-          className="relative z-2 mr-1 shrink-0 rounded p-0.5 text-[var(--icon-tertiary)] after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-1/2 hover:text-[var(--icon-primary)]"
+          // A 24px target (WCAG 2.5.8) whose negative margins keep the chevron's 16px slot; the text clip sits on the sibling so it can't cut it.
+          className="relative z-2 -my-1 -ml-1 shrink-0 rounded p-1.5 text-[var(--icon-tertiary)] hover:text-[var(--icon-primary)]"
           aria-label="Show thread messages"
           aria-expanded={thread.expanded}
         >

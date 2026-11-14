@@ -112,7 +112,11 @@ export function DayView({
 
       <div
         ref={scrollContainerRef}
-        className="grid flex-1 grid-cols-[3rem_1fr] overflow-y-auto [scrollbar-gutter:stable] relative min-h-0"
+        // Focusable so keyboard users can scroll an empty day (WCAG 2.1.1).
+        role="region"
+        aria-label="Day schedule"
+        tabIndex={0}
+        className="grid flex-1 grid-cols-[3rem_1fr] overflow-y-auto [scrollbar-gutter:stable] relative min-h-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <div>
           {WEEK_HOUR_VALUES.map((hourValue) => (

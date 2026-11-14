@@ -62,10 +62,11 @@ export function RecipientPopover({
       align="start"
       width={300}
       trigger={
+        // Padding cancelled by margin gives the inline name a 24px target (WCAG 2.5.8) without moving the text.
         <button
           type="button"
           className={cn(
-            "min-w-0 cursor-pointer text-left transition-colors",
+            "-my-1 min-w-0 cursor-pointer py-1 text-left transition-colors",
             className,
           )}
         >

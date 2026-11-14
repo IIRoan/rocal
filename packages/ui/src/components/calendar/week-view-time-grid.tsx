@@ -37,7 +37,11 @@ export function WeekViewTimeGrid({
   return (
     <div
       ref={scrollRef}
-      className="grid flex-1 grid-cols-[3rem_repeat(7,minmax(0,1fr))] overflow-y-auto [scrollbar-gutter:stable] min-h-0"
+      // Focusable so keyboard users can scroll an empty week (WCAG 2.1.1).
+      role="region"
+      aria-label="Week schedule"
+      tabIndex={0}
+      className="grid flex-1 grid-cols-[3rem_repeat(7,minmax(0,1fr))] overflow-y-auto [scrollbar-gutter:stable] min-h-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       style={{ scrollBehavior: "auto" }}
     >
       <div className="grid auto-cols-fr">
