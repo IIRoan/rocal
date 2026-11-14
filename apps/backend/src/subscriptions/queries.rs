@@ -137,17 +137,27 @@ pub async fn insert_feed_calendar<C: ConnectionTrait>(
     row.insert(db).await
 }
 
+/// What a sealed feed keeps in `url`: unique per user, no user data, and refused by safe fetch.
+pub fn sealed_url_placeholder(id: &str) -> String {
+    format!("sealed:{id}")
+}
+
+/// A sealed URL is stored instead of the readable one, which then never reaches the row.
 pub async fn insert_feed<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
     name: &str,
     url: &str,
+    encrypted_url: Option<&str>,
     calendar_id: &str,
     sync_interval_minutes: i32,
 ) -> Result<calendar_subscription::Model, sea_orm::DbErr> {
+    let id = cuid();
     calendar_subscription::ActiveModel {
+        url: Set(encrypted_url.map_or_else(|| url.to_owned(), |_| sealed_url_placeholder(&id))),
+        encrypted_url: Set(encrypted_url.map(str::to_owned)),
+        id: Set(id),
         name: Set(name.to_owned()),
-        url: Set(url.to_owned()),
         user_id: Set(user_id.to_owned()),
         calendar_id: Set(calendar_id.to_owned()),
         last_sync_status: Set("pending".into()),
@@ -165,6 +175,7 @@ pub struct FeedChanges<'a> {
     pub color: Option<&'a str>,
     pub is_active: Option<bool>,
     pub sync_interval_minutes: Option<i32>,
+    pub sealed_url: Option<&'a str>,
 }
 
 /// The caller holds both row locks until its transaction commits; a sealed name blanks both readable copies.
@@ -192,6 +203,7 @@ pub async fn update_feed<C: ConnectionTrait>(
     } else {
         calendar
     };
+    let placeholder = sealed_url_placeholder(&feed.id);
     let mut row: calendar_subscription::ActiveModel = feed.into();
     if let Some(name) = name {
         row.name = Set(name.to_owned());
@@ -201,6 +213,10 @@ pub async fn update_feed<C: ConnectionTrait>(
     }
     if let Some(minutes) = changes.sync_interval_minutes {
         row.sync_interval_minutes = Set(minutes);
+    }
+    if let Some(sealed_url) = changes.sealed_url {
+        row.url = Set(placeholder);
+        row.encrypted_url = Set(Some(sealed_url.to_owned()));
     }
     let feed = row.update(db).await?;
     Ok((feed, calendar))
@@ -584,13 +600,14 @@ pub async fn upsert_modified_exception<C: ConnectionTrait>(
     .map(|_| ())
 }
 
-/// Active feeds never synced or last synced before `synced_before`, oldest first (never-synced ones last, as Postgres sorts nulls).
+/// Active readable feeds never synced or last synced before `synced_before`, oldest first (never-synced ones last, as Postgres sorts nulls); sealed feeds sync only when a client sends their URL.
 pub async fn due<C: ConnectionTrait>(
     db: &C,
     synced_before: TimeDateTime,
 ) -> Result<Vec<calendar_subscription::Model>, sea_orm::DbErr> {
     calendar_subscription::Entity::find()
         .filter(calendar_subscription::Column::IsActive.eq(true))
+        .filter(calendar_subscription::Column::EncryptedUrl.is_null())
         .filter(
             Condition::any()
                 .add(calendar_subscription::Column::LastSyncAt.is_null())

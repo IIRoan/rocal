@@ -5,7 +5,7 @@ use axum::extract::{Path, State};
 use solace_api_types::subscriptions::{
     CalendarSubscription, CreateSubscriptionRequest, DeleteSubscriptionQuery,
     DeleteSubscriptionResponse, EncryptedIcsImportRequest, ImportIcsResponse,
-    SubscriptionSyncResult, UpdateSubscriptionRequest,
+    SubscriptionSyncResult, SyncSubscriptionRequest, UpdateSubscriptionRequest,
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -24,6 +24,7 @@ request_schema!(CreateSubscriptionRequest => zod::object([
     ("encryptedName", zod::string().optional()),
     ("encryptionKeyVersion", key_version_schema()),
     ("url", zod::string().url()),
+    ("encryptedUrl", sealed_url_schema()),
     ("color", calendar_color_schema().optional()),
 ])
 .strict());
@@ -36,11 +37,21 @@ request_schema!(UpdateSubscriptionRequest => zod::object([
     ("color", calendar_color_schema().optional()),
     ("isActive", zod::boolean().optional()),
     ("syncIntervalMinutes", zod::number().int().min(5).max(1440).optional()),
+    ("encryptedUrl", sealed_url_schema()),
+])
+.strict());
+
+request_schema!(SyncSubscriptionRequest => zod::object([
+    ("url", zod::string().url().optional()),
 ])
 .strict());
 
 fn key_version_schema() -> zod::Schema {
     zod::number().int().gte(1.0).max(zod::I32_MAX).optional()
+}
+
+fn sealed_url_schema() -> zod::Schema {
+    zod::string().min(1).max(4096).optional()
 }
 
 request_schema!(DeleteSubscriptionQuery => zod::object([
@@ -106,15 +117,17 @@ pub async fn delete(
     ))
 }
 
-/// Syncs a feed now, paused or not; a failed fetch is recorded and answered as an error.
-#[utoipa::path(post, path = "/api/subscriptions/{id}/sync", operation_id = "syncSubscription", tag = "Calendar Subscriptions", params(("id" = String, Path)), responses((status = 200, body = SubscriptionSyncResult)))]
+/// Syncs a feed now, paused or not; a sealed feed's URL comes in the body. A failed fetch is recorded and answered as an error.
+#[utoipa::path(post, path = "/api/subscriptions/{id}/sync", operation_id = "syncSubscription", tag = "Calendar Subscriptions", params(("id" = String, Path)), request_body = Option<SyncSubscriptionRequest>, responses((status = 200, body = SubscriptionSyncResult)))]
 #[tracing::instrument(skip_all)]
 pub async fn sync(
     State(state): State<AppState>,
     user: RouteUser,
     Path(id): Path<String>,
+    body: Option<ValidJson<SyncSubscriptionRequest>>,
 ) -> Result<Json<SubscriptionSyncResult>, AppError> {
-    Ok(Json(service::sync(&state, &user, &id).await?))
+    let url = body.and_then(|ValidJson(body)| body.url);
+    Ok(Json(service::sync(&state, &user, &id, url).await?))
 }
 
 /// Imports client-encrypted events into an owned calendar.

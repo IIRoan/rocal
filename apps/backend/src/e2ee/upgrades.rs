@@ -20,7 +20,7 @@ use crate::state::AppState;
 const BATCH: u64 = 200;
 
 pub async fn report(state: &AppState, user: &RouteUser) -> Result<EncryptionUpgrades, AppError> {
-    let (attributes, reminders, invitations, settings, feeds) = tokio::try_join!(
+    let (attributes, reminders, invitations, settings, feeds, urls) = tokio::try_join!(
         events_with_readable_attributes(&state.db, &user.id),
         events_with_unsealed_reminders(&state.db, &user.id),
         corpus_page(&state.db, &user.id, None, true, 1, 0),
@@ -28,6 +28,7 @@ pub async fn report(state: &AppState, user: &RouteUser) -> Result<EncryptionUpgr
             .filter(user_settings::Column::UserId.eq(&user.id))
             .one(&state.db),
         subscriptions_with_readable_names(&state.db, &user.id),
+        subscriptions_with_readable_urls(&state.db, &user.id),
     )?;
     Ok(EncryptionUpgrades {
         events_with_readable_attributes: attributes.into_iter().map(Into::into).collect(),
@@ -35,7 +36,25 @@ pub async fn report(state: &AppState, user: &RouteUser) -> Result<EncryptionUpgr
         readable_invitations: i64::try_from(invitations.1).unwrap_or(i64::MAX),
         unsealed_settings: settings.is_some_and(|row| row.encrypted_preferences.is_none()),
         subscriptions_with_readable_names: feeds.into_iter().map(Into::into).collect(),
+        subscriptions_with_readable_urls: urls.into_iter().map(Into::into).collect(),
     })
+}
+
+/// Feeds whose URL an older client stored readable.
+async fn subscriptions_with_readable_urls<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+) -> Result<Vec<String>, sea_orm::DbErr> {
+    calendar_subscription::Entity::find()
+        .select_only()
+        .column(calendar_subscription::Column::Id)
+        .filter(calendar_subscription::Column::UserId.eq(user_id))
+        .filter(calendar_subscription::Column::EncryptedUrl.is_null())
+        .order_by_asc(calendar_subscription::Column::Id)
+        .limit(BATCH)
+        .into_tuple()
+        .all(db)
+        .await
 }
 
 /// Feeds an older client named in readable text, on the feed or its calendar.

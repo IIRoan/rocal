@@ -51,6 +51,27 @@ async function sealSubscriptionNames(
   });
 }
 
+/** Re-saving a readable feed URL seals it into `encryptedUrl` and leaves the server only a placeholder. */
+async function sealSubscriptionUrls(
+  api: UpgradeApi,
+  ids: string[],
+): Promise<void> {
+  if (ids.length === 0) return;
+  const subscriptions = new Map(
+    (await api.getSubscriptions()).map((subscription) => [
+      subscription.id,
+      subscription,
+    ]),
+  );
+  await inBatches(ids, async (id) => {
+    const subscription = subscriptions.get(id);
+    const url = subscription?.encryptedUrl ? undefined : subscription?.url.trim();
+    if (!url) return false;
+    await api.updateSubscription(id, { url });
+    return true;
+  });
+}
+
 /** Re-seals what the server reports this account still stores in an older form; true when the settings were sealed. */
 export async function upgradeStoredEncryption(
   api: UpgradeApi,
@@ -69,6 +90,9 @@ export async function upgradeStoredEncryption(
     api.sealPendingReminders(id),
   );
   await sealSubscriptionNames(api, report.subscriptionsWithReadableNames).catch(
+    () => undefined,
+  );
+  await sealSubscriptionUrls(api, report.subscriptionsWithReadableUrls).catch(
     () => undefined,
   );
   return settingsSealed;

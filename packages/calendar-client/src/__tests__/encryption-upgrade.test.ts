@@ -103,6 +103,7 @@ describe("upgradeStoredEncryption", () => {
     readableInvitations?: number;
     unsealedSettings?: boolean;
     subscriptionsWithReadableNames?: string[];
+    subscriptionsWithReadableUrls?: string[];
   }) {
     return {
       getEncryptionUpgrades: jest.fn(async () => ({
@@ -111,6 +112,7 @@ describe("upgradeStoredEncryption", () => {
         readableInvitations: 0,
         unsealedSettings: false,
         subscriptionsWithReadableNames: [],
+        subscriptionsWithReadableUrls: [],
         ...report,
       })),
       ensureSealedUserSettings: jest.fn(async () => true),
@@ -122,8 +124,8 @@ describe("upgradeStoredEncryption", () => {
       }),
       sealPendingReminders: jest.fn(async () => true),
       getSubscriptions: jest.fn(async () => [
-        { id: "s1", name: " Therapy practice ", nameRevision: "original-revision" },
-        { id: "s2", name: "" },
+        { id: "s1", name: " Therapy practice ", nameRevision: "original-revision", url: " https://example.com/private.ics " },
+        { id: "s2", name: "", url: "sealed:s2", encryptedUrl: "sealed-url" },
       ] as never),
       updateSubscription: jest.fn(async (_id: string, _request: UpdateSubscriptionRequest) => ({}) as never),
     };
@@ -151,6 +153,14 @@ describe("upgradeStoredEncryption", () => {
       name: "Therapy practice",
       expectedNameRevision: "original-revision",
     }]]);
+  });
+
+  it("seals readable feed URLs by saving each feed's own URL, and skips sealed ones", async () => {
+    const api = fakeApi({ subscriptionsWithReadableUrls: ["s1", "s2", "gone"] });
+
+    await upgradeStoredEncryption(api);
+
+    expect(api.updateSubscription.mock.calls).toEqual([["s1", { url: "https://example.com/private.ics" }]]);
   });
 
   it("keeps a newer rename when the subscription changes after the sweep reads it", async () => {

@@ -1,7 +1,7 @@
 //! Validated bodies and queries: parsed the way Elysia parses them, checked by a Zod-compatible schema, then deserialized into the DTO.
 
 use axum::body::Bytes;
-use axum::extract::{FromRequest, FromRequestParts, Path, Request};
+use axum::extract::{FromRequest, FromRequestParts, OptionalFromRequest, Path, Request};
 use axum::http::header;
 use axum::http::request::Parts;
 use serde::de::DeserializeOwned;
@@ -87,6 +87,21 @@ pub fn form_object(bytes: &[u8]) -> Map<String, Value> {
         .collect()
 }
 
+async fn request_body<S: Send + Sync>(
+    request: Request,
+    state: &S,
+) -> Result<Option<Value>, AppError> {
+    let content_type = request
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let bytes = Bytes::from_request(request, state)
+        .await
+        .map_err(|_| AppError::Parse)?;
+    parse_body(content_type.as_deref(), &bytes)
+}
+
 impl<S, T> FromRequest<S> for ValidJson<T>
 where
     S: Send + Sync,
@@ -95,16 +110,24 @@ where
     type Rejection = AppError;
 
     async fn from_request(request: Request, state: &S) -> Result<Self, Self::Rejection> {
-        let content_type = request
-            .headers()
-            .get(header::CONTENT_TYPE)
-            .and_then(|value| value.to_str().ok())
-            .map(str::to_owned);
-        let bytes = Bytes::from_request(request, state)
-            .await
-            .map_err(|_| AppError::Parse)?;
-        let body = parse_body(content_type.as_deref(), &bytes)?;
+        let body = request_body(request, state).await?;
         validate(body.as_ref()).map(ValidJson)
+    }
+}
+
+/// `Option<ValidJson<T>>`: no body or a JSON `null` is `None`, as OpenAPI documents an optional body; any other body is validated.
+impl<S, T> OptionalFromRequest<S> for ValidJson<T>
+where
+    S: Send + Sync,
+    T: RequestSchema + DeserializeOwned,
+{
+    type Rejection = AppError;
+
+    async fn from_request(request: Request, state: &S) -> Result<Option<Self>, Self::Rejection> {
+        match request_body(request, state).await? {
+            None | Some(Value::Null) => Ok(None),
+            Some(body) => validate(Some(&body)).map(|dto| Some(ValidJson(dto))),
+        }
     }
 }
 

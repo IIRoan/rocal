@@ -19,6 +19,8 @@ pub struct EncryptionUpgrades {
     pub unsealed_settings: bool,
     /// Feeds whose name is still stored readable.
     pub subscriptions_with_readable_names: Vec<SubscriptionId>,
+    /// Feeds whose URL is still stored readable.
+    pub subscriptions_with_readable_urls: Vec<SubscriptionId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

@@ -2627,7 +2627,7 @@
         "tags": [
           "Calendar Subscriptions"
         ],
-        "summary": "Syncs a feed now, paused or not; a failed fetch is recorded and answered as an error.",
+        "summary": "Syncs a feed now, paused or not; a sealed feed's URL comes in the body. A failed fetch is recorded and answered as an error.",
         "operationId": "syncSubscription",
         "parameters": [
           {
@@ -2639,6 +2639,22 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SyncSubscriptionRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -3061,6 +3077,7 @@
           "name",
           "nameRevision",
           "url",
+          "encryptedUrl",
           "isActive",
           "syncIntervalMinutes",
           "lastSyncAt",
@@ -3086,6 +3103,13 @@
           },
           "createdAt": {
             "$ref": "#/components/schemas/Timestamp"
+          },
+          "encryptedUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The feed URL sealed on the device; the server cannot open it."
           },
           "etag": {
             "type": [
@@ -3140,7 +3164,8 @@
             "$ref": "#/components/schemas/Timestamp"
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "The feed URL, or `sealed:<id>` once `encryptedUrl` holds it."
           },
           "userId": {
             "$ref": "#/components/schemas/UserId"
@@ -3407,6 +3432,9 @@
             "type": "string",
             "description": "The name sealed as a calendar name; stored on the mirrored calendar."
           },
+          "encryptedUrl": {
+            "type": "string"
+          },
           "encryptionKeyVersion": {
             "type": "integer",
             "format": "int32"
@@ -3415,7 +3443,8 @@
             "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "Probed and synced once, then stored only as `encryptedUrl` when that is sent."
           }
         },
         "additionalProperties": false
@@ -4105,7 +4134,8 @@
           "eventsWithUnsealedReminders",
           "readableInvitations",
           "unsealedSettings",
-          "subscriptionsWithReadableNames"
+          "subscriptionsWithReadableNames",
+          "subscriptionsWithReadableUrls"
         ],
         "properties": {
           "eventsWithReadableAttributes": {
@@ -4133,6 +4163,13 @@
               "$ref": "#/components/schemas/SubscriptionId"
             },
             "description": "Feeds whose name is still stored readable."
+          },
+          "subscriptionsWithReadableUrls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionId"
+            },
+            "description": "Feeds whose URL is still stored readable."
           },
           "unsealedSettings": {
             "type": "boolean",
@@ -7773,6 +7810,16 @@
           }
         }
       },
+      "SyncSubscriptionRequest": {
+        "type": "object",
+        "description": "Body of `POST /api/subscriptions/:id/sync`; a sealed feed needs its URL, which is used once and never stored.",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "Timestamp": {
         "type": "string",
         "format": "date-time",
@@ -8031,6 +8078,10 @@
           },
           "encryptedName": {
             "type": "string"
+          },
+          "encryptedUrl": {
+            "type": "string",
+            "description": "Replaces the readable URL with this sealed one."
           },
           "encryptionKeyVersion": {
             "type": "integer",

@@ -61,6 +61,7 @@ export * from "./notification-settings";
 export * from "./encryption-notices";
 export * from "./settings-navigation";
 export * from "./push-device";
+export * from "./subscription-feed";
 export * from "./mail-calendar-invite";
 export * from "./mail-invitation-staging";
 export * from "./invitation-encryption";

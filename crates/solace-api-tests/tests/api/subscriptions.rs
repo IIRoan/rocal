@@ -147,6 +147,7 @@ async fn create(user: &mut TestUser, url: &str) -> solace_api_tests::client::Api
             encrypted_name: Some(fake_envelope()),
             encryption_key_version: Some(1),
             url: url.into(),
+            encrypted_url: None,
             color: None,
         }),
     )
@@ -1339,7 +1340,7 @@ async fn manual_sync_also_runs_for_paused_feeds() {
         .expect("pause feed");
     let path = format!("/api/subscriptions/{}/sync", feed.subscription_id);
     expect_field_error(&user.post(&path, json!({})).await, PRIVATE_NETWORK, "url");
-    // The route reads no body.
+    // Shipped binaries may send no body at all.
     let no_body = ok(user
         .agent
         .send(reqwest::Method::POST, &path, None, &[])
@@ -1354,6 +1355,189 @@ async fn manual_sync_also_runs_for_paused_feeds() {
         .await,
         2
     );
+}
+
+/// `(url, encrypted_url)` of a feed as stored.
+async fn stored_url(app: &TestApp, feed: &Feed) -> (String, Option<String>) {
+    sqlx::query_as("SELECT url, encrypted_url FROM calendar_subscription WHERE id = $1")
+        .bind(&feed.subscription_id)
+        .fetch_one(&app.db)
+        .await
+        .expect("feed url")
+}
+
+async fn readable_feed_urls(user: &mut TestUser) -> Vec<String> {
+    let report: EncryptionUpgrades = ok(user
+        .get("/api/e2ee/upgrades")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    report
+        .subscriptions_with_readable_urls
+        .into_iter()
+        .map(|id| id.0)
+        .collect()
+}
+
+#[tokio::test]
+async fn sealing_a_feed_url_leaves_only_a_placeholder_and_the_ciphertext() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let mut other = app.user().await;
+    let feed = insert_feed(
+        &app,
+        &user,
+        "https://example.com/private.ics?token=secret",
+        0,
+    )
+    .await;
+    let path = format!("/api/subscriptions/{}", feed.subscription_id);
+    assert_eq!(
+        readable_feed_urls(&mut user).await,
+        std::slice::from_ref(&feed.subscription_id)
+    );
+    assert!(readable_feed_urls(&mut other).await.is_empty());
+    expect_invalid(
+        &user.put(&path, json!({"encryptedUrl": ""})).await,
+        "String must contain at least 1 character(s)",
+        "encryptedUrl",
+    );
+    let foreign = other
+        .put(&path, json!({"encryptedUrl": fake_envelope()}))
+        .await;
+    assert_eq!(foreign.status.as_u16(), 404);
+
+    let sealed_url = fake_envelope();
+    let sealed: CalendarSubscription = ok(user
+        .put(&path, json!({"encryptedUrl": sealed_url}))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    let placeholder = format!("sealed:{}", feed.subscription_id);
+    assert_eq!(
+        (sealed.url.as_str(), sealed.encrypted_url.as_deref()),
+        (placeholder.as_str(), Some(sealed_url.as_str()))
+    );
+    assert_eq!(
+        stored_url(&app, &feed).await,
+        (placeholder.clone(), Some(sealed_url.clone()))
+    );
+    let listed: Vec<CalendarSubscription> = ok(user.get("/api/subscriptions").await.dto());
+    assert_eq!(
+        listed[0].encrypted_url.as_deref(),
+        Some(sealed_url.as_str())
+    );
+    assert_eq!(listed[0].url, placeholder);
+    assert!(readable_feed_urls(&mut user).await.is_empty());
+}
+
+#[tokio::test]
+async fn a_sealed_feed_syncs_only_from_the_url_in_the_request() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let sealed = insert_feed(&app, &user, "https://example.com/sealed.ics", 0).await;
+    let readable = insert_feed(&app, &user, "http://10.0.0.1/feed.ics", 0).await;
+    ok(user
+        .put(
+            &format!("/api/subscriptions/{}", sealed.subscription_id),
+            json!({"encryptedUrl": fake_envelope()}),
+        )
+        .await
+        .expect_status(200));
+    let sync = |feed: &Feed| format!("/api/subscriptions/{}/sync", feed.subscription_id);
+    let update = "Update the app to sync this calendar.";
+
+    expect_field_error(&user.post(&sync(&sealed), json!({})).await, update, "url");
+    expect_field_error(&user.post(&sync(&sealed), json!(null)).await, update, "url");
+    let no_body = ok(user
+        .agent
+        .send(reqwest::Method::POST, &sync(&sealed), None, &[])
+        .await);
+    expect_field_error(&no_body, update, "url");
+    expect_invalid(
+        &user.post(&sync(&sealed), json!({"url": "not a url"})).await,
+        "Invalid url",
+        "url",
+    );
+    expect_unknown_field(
+        &user
+            .post(
+                &sync(&sealed),
+                json!({"url": "https://example.com/x.ics", "id": "x"}),
+            )
+            .await,
+        "id",
+    );
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_sync_log WHERE subscription_id = $1",
+            &sealed.subscription_id
+        )
+        .await,
+        0,
+        "refused requests never start a sync"
+    );
+
+    // The body URL is fetched, so its refusal is recorded; the stored placeholder would answer an unsupported scheme.
+    expect_field_error(
+        &user
+            .post(&sync(&sealed), json!({"url": "http://127.0.0.1/feed.ics"}))
+            .await,
+        PRIVATE_NETWORK,
+        "url",
+    );
+    let state = subscription_state(&app, &sealed.subscription_id).await;
+    assert_eq!(
+        (state.3.as_str(), state.4.as_deref()),
+        ("error", Some(PRIVATE_NETWORK))
+    );
+    assert_eq!(
+        stored_url(&app, &sealed).await.0,
+        format!("sealed:{}", sealed.subscription_id),
+        "the body URL is never stored"
+    );
+
+    // A readable feed keeps syncing its stored URL, whatever the body says.
+    expect_field_error(
+        &user
+            .post(
+                &sync(&readable),
+                json!({"url": "ftp://example.com/feed.ics"}),
+            )
+            .await,
+        PRIVATE_NETWORK,
+        "url",
+    );
+}
+
+#[tokio::test]
+async fn a_sealed_create_with_a_private_url_is_refused_and_stores_nothing() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let response = user
+        .post(
+            "/api/subscriptions",
+            json!({
+                "encryptedName": fake_envelope(),
+                "url": "http://169.254.169.254/latest/meta-data",
+                "encryptedUrl": fake_envelope(),
+            }),
+        )
+        .await;
+    expect_field_error(&response, &create_error(PRIVATE_NETWORK), "url");
+    expect_invalid(
+        &user
+            .post(
+                "/api/subscriptions",
+                json!({"encryptedName": fake_envelope(), "url": "https://example.com/feed.ics", "encryptedUrl": "x".repeat(4097)}),
+            )
+            .await,
+        "String must contain at most 4096 character(s)",
+        "encryptedUrl",
+    );
+    assert_eq!(own_subscription_count(&app, &user).await, 0);
+    assert_eq!(own_calendar_count(&app, &user).await, 0);
 }
 
 #[tokio::test]

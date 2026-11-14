@@ -170,6 +170,7 @@ async fn the_report_lists_what_an_older_client_left_readable_until_it_is_reseale
             readable_invitations: 0,
             unsealed_settings: false,
             subscriptions_with_readable_names: vec![],
+            subscriptions_with_readable_urls: vec![],
         }
     );
 }

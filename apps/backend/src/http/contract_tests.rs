@@ -340,6 +340,7 @@ fn checked() -> Vec<(String, Vec<String>)> {
         check::<recent_contacts::PutRecentContactsRequest>(),
         check::<e2ee::RegisterDeviceRequest>(),
         check::<push_devices::RegisterPushDeviceRequest>(),
+        check::<subscriptions::SyncSubscriptionRequest>(),
         check::<events::RsvpRequest>(),
         check::<events::SealEncryptionRequest>(),
         check::<notifications::SealEventRemindersRequest>(),

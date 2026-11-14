@@ -184,7 +184,7 @@ function SubscriptionEditForm({
               detail={lastSynced}
               icon="refresh-cw"
               pending={syncSubscription.isPending}
-              onPress={() => syncSubscription.mutate(subscription.id)}
+              onPress={() => syncSubscription.mutate(subscription)}
             />
           )}
         </SheetGroup>

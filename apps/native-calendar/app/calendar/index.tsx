@@ -36,6 +36,7 @@ import { useCalendarViewNavigation } from "../../src/components/calendar/use-cal
 import { NativeAgendaView } from "../../src/components/calendar/NativeAgendaView";
 import type { KitEventMove } from "../../src/components/calendar/calendar-kit-adapter";
 import { useNativeRiftboundAutoSync } from "../../src/hooks/use-riftbound";
+import { useFeedSyncWhileOpen } from "../../src/hooks/use-calendar-management";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 
@@ -69,6 +70,7 @@ export default function CalendarScreen() {
   } = useCalendarScreenSettings();
   const settingsLoading = settingsPending && !settings;
   useNativeRiftboundAutoSync(settings?.riftbound);
+  useFeedSyncWhileOpen();
   const resolvedTimezone = resolveTimezone(settings?.timezone);
   const {
     timelineRef,

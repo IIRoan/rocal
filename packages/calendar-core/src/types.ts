@@ -469,10 +469,13 @@ export interface NotificationTestRequest {
 }
 
 export type CalendarSubscription = CalendarSubscriptionSummary &
-  Partial<Pick<Schema<"CalendarSubscription">, "nameRevision">>;
+  Partial<Pick<Schema<"CalendarSubscription">, "nameRevision" | "encryptedUrl">>;
 export type CreateSubscriptionRequest = CreateCalendarSubscriptionRequest;
+/** `url` never leaves the device readable: the client sends it sealed as `encryptedUrl`. */
 export type UpdateSubscriptionRequest = UpdateCalendarSubscriptionRequest &
-  Pick<Schema<"UpdateSubscriptionRequest">, "expectedNameRevision">;
+  Pick<Schema<"UpdateSubscriptionRequest">, "expectedNameRevision"> & {
+    url?: string;
+  };
 export type DeleteSubscriptionResponse = DeleteCalendarSubscriptionResponse;
 export type SyncSubscriptionResponse = CalendarSubscriptionSyncResponse;
 export type ImportICSRequest = ImportIcsRequest;

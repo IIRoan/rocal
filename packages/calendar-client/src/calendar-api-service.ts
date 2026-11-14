@@ -22,6 +22,9 @@ import {
   splitUserSettingsUpdate,
   type UserSettingsPreferences,
   storedEventId,
+  SUBSCRIPTION_URL_AAD,
+  feedSyncUrl,
+  isFeedSyncDue,
 } from "@workspace/calendar-core";
 import type {
   CalendarEvent,
@@ -1277,16 +1280,40 @@ export class CalendarApiService {
 
   // ─── Subscriptions ───────────────────────────────────────────────────────────
 
-  /** A feed's name is sealed as its mirrored calendar's name, so both are opened from there. */
+  /** A feed's name is sealed as its mirrored calendar's name, so both are opened from there; a sealed URL that does not open keeps its placeholder and is never synced. */
   private async hydrateSubscription<
     T extends Omit<CalendarSubscription, "_count">,
   >(subscription: T): Promise<T> {
-    const calendar = await this.hydrateCalendar(subscription.calendar as Calendar);
+    const [calendar, url] = await Promise.all([
+      this.hydrateCalendar(subscription.calendar as Calendar),
+      this.openSubscriptionUrl(subscription),
+    ]);
     return {
       ...subscription,
       name: calendar.name,
+      url,
       calendar: { ...subscription.calendar, ...calendar },
     };
+  }
+
+  private async openSubscriptionUrl(
+    subscription: Pick<CalendarSubscription, "url" | "encryptedUrl">,
+  ): Promise<string> {
+    if (!subscription.encryptedUrl) return subscription.url;
+    const opened = await this.e2ee
+      .decryptJson(subscription.encryptedUrl, SUBSCRIPTION_URL_AAD)
+      .catch(() => null);
+    return typeof opened === "object" &&
+      opened !== null &&
+      "url" in opened &&
+      typeof opened.url === "string"
+      ? opened.url
+      : subscription.url;
+  }
+
+  /** Throws instead of sending a feed URL readable when no session is active. */
+  private sealSubscriptionUrl(url: string): Promise<string> {
+    return this.e2ee.encryptJson({ url }, SUBSCRIPTION_URL_AAD);
   }
 
   /** Seals a feed name as a calendar name; throws instead of sending it readable when no session is active. */
@@ -1312,14 +1339,23 @@ export class CalendarApiService {
     }
   }
 
+  /** The server cannot compare sealed URLs, so duplicates are found in the decrypted list. */
   async createSubscription(
     request: CreateSubscriptionRequest,
   ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
       const { name, ...rest } = request;
+      const sealed = {
+        ...(await this.sealSubscriptionName(name)),
+        encryptedUrl: await this.sealSubscriptionUrl(request.url),
+      };
+      const url = request.url.trim();
+      if ((await this.getSubscriptions()).some((subscription) => subscription.url.trim() === url)) {
+        throw new Error("You are already subscribed to this calendar URL");
+      }
       const created = (await this.client.post<Schema<"CalendarSubscription">>(
         "/api/subscriptions",
-        { ...rest, ...(await this.sealSubscriptionName(name)) } satisfies Schema<"CreateSubscriptionRequest">,
+        { ...rest, ...sealed } satisfies Schema<"CreateSubscriptionRequest">,
       )) as Omit<CalendarSubscription, "_count">;
       return await this.hydrateSubscription(created);
     } catch (error) {
@@ -1332,12 +1368,13 @@ export class CalendarApiService {
     request: UpdateSubscriptionRequest,
   ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
-      const { name, ...rest } = request;
+      const { name, url, ...rest } = request;
       const updated = (await this.client.put<Schema<"CalendarSubscription">>(
         `/api/subscriptions/${encodeURIComponent(id)}`,
         {
           ...rest,
           ...(name === undefined ? {} : await this.sealSubscriptionName(name)),
+          ...(url === undefined ? {} : { encryptedUrl: await this.sealSubscriptionUrl(url) }),
         } satisfies Schema<"UpdateSubscriptionRequest">,
       )) as Omit<CalendarSubscription, "_count">;
       return await this.hydrateSubscription(updated);
@@ -1357,15 +1394,31 @@ export class CalendarApiService {
     }
   }
 
-  async syncSubscription(id: string): Promise<SyncSubscriptionResponse> {
+  /** A sealed feed syncs only from `url`, its URL opened on this device (`feedSyncUrl`); the server never stores it. */
+  async syncSubscription(id: string, url?: string): Promise<SyncSubscriptionResponse> {
     try {
       return (await this.client.post<Schema<"SubscriptionSyncResult">>(
         `/api/subscriptions/${encodeURIComponent(id)}/sync`,
-        {},
+        (url === undefined ? {} : { url }) satisfies Schema<"SyncSubscriptionRequest">,
       )) as SyncSubscriptionResponse;
     } catch (error) {
       throw this.transformError(error, "Failed to sync subscription");
     }
+  }
+
+  /** Syncs the sealed feeds whose interval has passed, one at a time; resolves to how many it tried. */
+  async syncDueSubscriptions(now: number = Date.now()): Promise<number> {
+    if (!(await this.e2ee.hasActiveSession())) return 0;
+    const due = (await this.getSubscriptions()).filter((subscription) =>
+      isFeedSyncDue(subscription, now),
+    );
+    for (const subscription of due) {
+      // A failed fetch is recorded on the feed, so one bad feed never stops the rest.
+      await this.syncSubscription(subscription.id, feedSyncUrl(subscription)).catch(
+        () => undefined,
+      );
+    }
+    return due.length;
   }
 
   // ─── Bulk Operations ─────────────────────────────────────────────────────────

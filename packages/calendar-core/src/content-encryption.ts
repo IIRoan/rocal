@@ -34,6 +34,9 @@ export function encryptedNameAad(
   return `${kind}-name:v${keyVersion}`;
 }
 
+/** A feed URL is sealed with the account key; the server keeps only `sealed:<id>` in its readable column. */
+export const SUBSCRIPTION_URL_AAD = "subscription-url:v1";
+
 export function eventContentAad(
   keyVersion: number = CONTENT_ENCRYPTION_KEY_VERSION,
 ): string {

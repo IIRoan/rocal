@@ -1126,7 +1126,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Syncs a feed now, paused or not; a failed fetch is recorded and answered as an error. */
+        /** Syncs a feed now, paused or not; a sealed feed's URL comes in the body. A failed fetch is recorded and answered as an error. */
         post: operations["syncSubscription"];
         delete?: never;
         options?: never;
@@ -1267,6 +1267,8 @@ export interface components {
             calendar: components["schemas"]["SubscribedCalendar"];
             calendarId: components["schemas"]["CalendarId"];
             createdAt: components["schemas"]["Timestamp"];
+            /** @description The feed URL sealed on the device; the server cannot open it. */
+            encryptedUrl: string | null;
             etag: string | null;
             id: components["schemas"]["SubscriptionId"];
             isActive: boolean;
@@ -1281,6 +1283,7 @@ export interface components {
             /** Format: int32 */
             syncIntervalMinutes: number;
             updatedAt: components["schemas"]["Timestamp"];
+            /** @description The feed URL, or `sealed:<id>` once `encryptedUrl` holds it. */
             url: string;
             userId: components["schemas"]["UserId"];
         };
@@ -1359,9 +1362,11 @@ export interface components {
             color?: string;
             /** @description The name sealed as a calendar name; stored on the mirrored calendar. */
             encryptedName?: string;
+            encryptedUrl?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
             name?: string;
+            /** @description Probed and synced once, then stored only as `encryptedUrl` when that is sent. */
             url: string;
         };
         CreatedNotification: {
@@ -1545,6 +1550,8 @@ export interface components {
             readableInvitations: number;
             /** @description Feeds whose name is still stored readable. */
             subscriptionsWithReadableNames: components["schemas"]["SubscriptionId"][];
+            /** @description Feeds whose URL is still stored readable. */
+            subscriptionsWithReadableUrls: components["schemas"]["SubscriptionId"][];
             /** @description Whether the app preferences are still stored readable. */
             unsealedSettings: boolean;
         };
@@ -2516,6 +2523,10 @@ export interface components {
             /** Format: int64 */
             syncLogs: number;
         };
+        /** @description Body of `POST /api/subscriptions/:id/sync`; a sealed feed needs its URL, which is used once and never stored. */
+        SyncSubscriptionRequest: {
+            url?: string;
+        };
         /**
          * Format: date-time
          * @description A UTC instant as JavaScript's `toISOString()` writes it: three fractional digits and `Z`.
@@ -2614,6 +2625,8 @@ export interface components {
             /** @description Recolors the mirrored calendar. */
             color?: string;
             encryptedName?: string;
+            /** @description Replaces the readable URL with this sealed one. */
+            encryptedUrl?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
             /** @description Background sealing may replace only the names read with this revision. */
@@ -4691,7 +4704,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SyncSubscriptionRequest"] | null;
+            };
+        };
         responses: {
             200: {
                 headers: {

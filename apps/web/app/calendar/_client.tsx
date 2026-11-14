@@ -41,6 +41,7 @@ import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { useRecurringMovePrompt } from "@/hooks/use-recurring-move-prompt";
 import { RecurringScopeModal } from "@/components/command-palette/recurring-scope-modal";
 import { RiftboundCalendarSync } from "@/components/riftbound-calendar-sync";
+import { useFeedSyncWhileOpen } from "@/hooks/use-subscriptions";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
 import { resolveAvatarUrl } from "@/lib/profile-picture";
@@ -323,6 +324,7 @@ export function CalendarShell({ children }: { children: ReactNode }) {
   } = useCommandPalette();
   const hasSession = Boolean(session?.user);
   const showAuthGate = isPending || !hasSession;
+  useFeedSyncWhileOpen(hasSession);
   const redirectToLogin = useEffectEvent(() => {
     if (isAuthNavigationPending()) return;
     const currentPath =

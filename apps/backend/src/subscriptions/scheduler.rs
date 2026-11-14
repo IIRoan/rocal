@@ -76,9 +76,10 @@ pub async fn sync_due(state: &AppState) {
             }
             // Its own task, so a feed that panics the parser cannot stop every later sync.
             let (task_state, task_feed) = (state.clone(), feed.clone());
-            let synced =
-                tokio::spawn(async move { service::sync_feed(&task_state, &task_feed).await })
-                    .await;
+            let synced = tokio::spawn(async move {
+                service::sync_feed(&task_state, &task_feed, &task_feed.url).await
+            })
+            .await;
             match synced {
                 Ok(Ok(_)) => {}
                 Ok(Err(error)) => tracing::error!(

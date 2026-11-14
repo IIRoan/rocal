@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SUBSCRIPTIONS_QUERY_KEY } from "@workspace/calendar-core";
+import { useFeedSync } from "@workspace/calendar-client/use-feed-sync";
+import { SUBSCRIPTIONS_QUERY_KEY, feedSyncUrl } from "@workspace/calendar-core";
 import { toast } from "@workspace/ui/lib/toast";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { getErrorMessage } from "@/lib/calendar-ui-helpers";
@@ -86,7 +87,13 @@ export function useSyncSubscriptionMutation(
   const { refetchCalendars, subscriptions } = input;
 
   return useMutation<SyncSubscriptionResponse, ApiError, string>({
-    mutationFn: (id: string) => calendarApiService.syncSubscription(id),
+    mutationFn: (id: string) => {
+      const subscription = subscriptions.find((entry) => entry.id === id);
+      return calendarApiService.syncSubscription(
+        id,
+        subscription ? feedSyncUrl(subscription) : undefined,
+      );
+    },
     onSuccess: async (_: SyncSubscriptionResponse, id: string) => {
       await refreshSubscriptionViews(queryClient, refetchCalendars);
       const sub = subscriptions.find((subscription) => subscription.id === id);
@@ -95,6 +102,11 @@ export function useSyncSubscriptionMutation(
     onError: (error: ApiError) =>
       toast.error(getErrorMessage(error, "Failed to sync subscription")),
   });
+}
+
+/** Sealed feeds sync only while a Calendar client is open, because the server keeps no URL to fetch. */
+export function useFeedSyncWhileOpen(enabled: boolean) {
+  useFeedSync({ api: calendarApiService, enabled });
 }
 
 export function useUpdateSubscriptionMutation(

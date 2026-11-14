@@ -189,6 +189,7 @@ pub use common::{ErrorResponse, SuccessMessage, Timestamp};
     subscriptions::SyncLogCount,
     subscriptions::CreateSubscriptionRequest,
     subscriptions::UpdateSubscriptionRequest,
+    subscriptions::SyncSubscriptionRequest,
     subscriptions::DeleteSubscriptionQuery,
     subscriptions::DeleteSubscriptionResponse,
     subscriptions::SubscriptionSyncResult,
