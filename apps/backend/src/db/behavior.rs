@@ -68,6 +68,7 @@ behavior! {
     event_category: id, created_at, updated_at;
     event_notification: id, created_at, updated_at;
     event_participant: id, created_at, updated_at;
+    event_trash: id;
     invite: id, created_at, updated_at;
     mail_directory_entry: id, created_at, updated_at;
     mail_jmap_sync_state: id, created_at, updated_at;

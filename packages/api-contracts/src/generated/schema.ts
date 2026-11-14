@@ -429,6 +429,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's deleted events, newest first, restorable for 30 days. */
+        get: operations["listTrashedEvents"];
+        put?: never;
+        post?: never;
+        /** Deletes every event in the caller's trash for good. */
+        delete: operations["emptyEventTrash"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/trash/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deletes one trashed event for good. */
+        delete: operations["deleteTrashedEvent"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/trash/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restores a trashed event under its id, into its calendar or the default one when that is gone. */
+        post: operations["restoreTrashedEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events/{id}": {
         parameters: {
             query?: never;
@@ -1656,6 +1708,8 @@ export interface components {
             deletedEventId: components["schemas"]["EventId"];
             message: string;
             success: boolean;
+            /** @description The trash entry that can restore the event for 30 days; absent when the delete was permanent. */
+            trashId?: components["schemas"]["TrashedEventId"];
         };
         EventId: string;
         EventList: {
@@ -2285,6 +2339,8 @@ export interface components {
             deletedEventId: components["schemas"]["EventId"];
             message: string;
             success: boolean;
+            /** @description Set when `delete_all` moved the series to the trash. */
+            trashId?: components["schemas"]["TrashedEventId"];
         };
         RecurringUpdates: {
             allDay?: boolean;
@@ -2534,6 +2590,32 @@ export interface components {
          * @description A UTC instant as JavaScript's `toISOString()` writes it: three fractional digits and `Z`.
          */
         Timestamp: string;
+        /** @description A deleted event in the trash, read from its stored row: ciphertext only, restorable until `purgeAt`. */
+        TrashedEvent: {
+            allDay: boolean;
+            calendarId: components["schemas"]["CalendarId"];
+            /** @description The original calendar is gone or read-only, so a restore lands in the default calendar. */
+            calendarMissing: boolean;
+            encryptedContent: string | null;
+            /** Format: int32 */
+            encryptionKeyVersion: number;
+            encryptionState: string;
+            end: components["schemas"]["Timestamp"];
+            /** @description The id the event keeps when restored. */
+            eventId: components["schemas"]["EventId"];
+            id: components["schemas"]["TrashedEventId"];
+            purgeAt: components["schemas"]["Timestamp"];
+            recurrence: string | null;
+            start: components["schemas"]["Timestamp"];
+            timezone: string;
+            title: string;
+            trashedAt: components["schemas"]["Timestamp"];
+        };
+        TrashedEventId: string;
+        /** @description `GET /api/events/trash`, newest first. */
+        TrashedEventList: {
+            events: components["schemas"]["TrashedEvent"][];
+        };
         /** @description Without a token every device of the user is removed. */
         UnregisterPushDeviceRequest: {
             token?: string;
@@ -3344,6 +3426,100 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EventSearchCorpus"];
                 };
+            };
+        };
+    };
+    listTrashedEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashedEventList"];
+                };
+            };
+        };
+    };
+    emptyEventTrash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessMessage"];
+                };
+            };
+        };
+    };
+    deleteTrashedEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessMessage"];
+                };
+            };
+            /** @description Not in the caller's trash */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    restoreTrashedEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            /** @description Not in the caller's trash */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

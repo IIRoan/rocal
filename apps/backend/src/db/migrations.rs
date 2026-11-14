@@ -10,6 +10,7 @@ mod m20261110_085151_discard_search_tokens;
 mod m20261110_160000_encrypted_mail_trust;
 mod m20261110_170000_mail_policy_monitor;
 mod m20261114_190556_sealed_feed_url;
+mod m20261114_190718_event_trash;
 
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, TransactionTrait};
 use sea_orm_migration::{MigrationTrait, MigratorTrait};
@@ -34,6 +35,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261106_121932_clear_search_tokens::Migration),
             Box::new(m20261110_085151_discard_search_tokens::Migration),
             Box::new(m20261114_190556_sealed_feed_url::Migration),
+            Box::new(m20261114_190718_event_trash::Migration),
         ]
     }
 }

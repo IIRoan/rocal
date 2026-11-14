@@ -96,6 +96,8 @@ pub use common::{ErrorResponse, SuccessMessage, Timestamp};
     events::SearchLabel,
     events::EventSearchCorpus,
     events::EventDeleted,
+    events::TrashedEvent,
+    events::TrashedEventList,
     events::BulkEventResult,
     events::InvitationLookup,
     events::InvitationImportSummary,

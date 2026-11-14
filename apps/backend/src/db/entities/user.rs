@@ -37,6 +37,8 @@ pub enum Relation {
     EventCategory,
     #[sea_orm(has_many = "super::event_participant::Entity")]
     EventParticipant,
+    #[sea_orm(has_many = "super::event_trash::Entity")]
+    EventTrash,
     #[sea_orm(has_many = "super::invite::Entity")]
     Invite,
     #[sea_orm(has_one = "super::mail_directory_entry::Entity")]
@@ -96,6 +98,12 @@ impl Related<super::event_category::Entity> for Entity {
 impl Related<super::event_participant::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::EventParticipant.def()
+    }
+}
+
+impl Related<super::event_trash::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::EventTrash.def()
     }
 }
 

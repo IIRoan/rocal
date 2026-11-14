@@ -239,8 +239,19 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
         role: None,
         status: None,
     }]);
-    import(user, &calendar, vec![series, moved]).await;
+    let binned = encrypted_event(
+        "binned",
+        "2099-11-06T09:00:00.000Z",
+        "2099-11-06T10:00:00.000Z",
+    );
+    import(user, &calendar, vec![series, moved, binned]).await;
     let series_id = event_id(db, &calendar, "series").await;
+    // A deleted event waits in the trash, which the user row's cascade must take along.
+    let binned_id = event_id(db, &calendar, "binned").await;
+    ok(user
+        .delete(&format!("/api/events/{binned_id}"))
+        .await
+        .expect_status(200));
     ok(user
         .put(
             &format!("/api/notifications/event/{series_id}"),

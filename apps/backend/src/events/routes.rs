@@ -4,16 +4,17 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
+use solace_api_types::SuccessMessage;
 use solace_api_types::events::{
     BulkEventRequest, BulkEventResult, CreateEventRequest, Event, EventDeleted, EventList,
     EventListQuery, EventSearchCorpus, EventSearchCorpusQuery, EventSearchQuery,
     EventSearchResults, InvitationByExternalIdQuery, InvitationLookup, RsvpRequest, RsvpResult,
-    SealEncryptionRequest, UpdateEventRequest,
+    SealEncryptionRequest, TrashedEventList, UpdateEventRequest,
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use super::{listing, rsvp, service};
+use super::{listing, rsvp, service, trash};
 use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidQuery};
@@ -113,6 +114,9 @@ pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(search))
         .routes(routes!(search_corpus))
+        .routes(routes!(list_trash, empty_trash))
+        .routes(routes!(restore_trashed))
+        .routes(routes!(purge_trashed))
         .routes(routes!(list, create))
         .routes(routes!(invitation_by_external_id))
         .routes(routes!(rsvp))
@@ -141,6 +145,48 @@ pub async fn search_corpus(
     ValidQuery(query): ValidQuery<EventSearchCorpusQuery>,
 ) -> Result<Json<EventSearchCorpus>, AppError> {
     Ok(Json(listing::search_corpus(&state, &user, query).await?))
+}
+
+/// The caller's deleted events, newest first, restorable for 30 days.
+#[utoipa::path(get, path = "/api/events/trash", operation_id = "listTrashedEvents", tag = "Events", responses((status = 200, body = TrashedEventList)))]
+#[tracing::instrument(skip_all)]
+pub async fn list_trash(
+    State(state): State<AppState>,
+    user: RouteUser,
+) -> Result<Json<TrashedEventList>, AppError> {
+    Ok(Json(trash::list(&state, &user).await?))
+}
+
+/// Deletes every event in the caller's trash for good.
+#[utoipa::path(delete, path = "/api/events/trash", operation_id = "emptyEventTrash", tag = "Events", responses((status = 200, body = SuccessMessage)))]
+#[tracing::instrument(skip_all)]
+pub async fn empty_trash(
+    State(state): State<AppState>,
+    user: RouteUser,
+) -> Result<Json<SuccessMessage>, AppError> {
+    Ok(Json(trash::empty(&state, &user).await?))
+}
+
+/// Restores a trashed event under its id, into its calendar or the default one when that is gone.
+#[utoipa::path(post, path = "/api/events/trash/{id}/restore", operation_id = "restoreTrashedEvent", tag = "Events", params(("id" = String, Path)), responses((status = 200, body = Event), (status = 404, description = "Not in the caller's trash")))]
+#[tracing::instrument(skip_all)]
+pub async fn restore_trashed(
+    State(state): State<AppState>,
+    user: RouteUser,
+    Path(id): Path<String>,
+) -> Result<Json<Event>, AppError> {
+    Ok(Json(trash::restore(&state, &user, &id).await?))
+}
+
+/// Deletes one trashed event for good.
+#[utoipa::path(delete, path = "/api/events/trash/{id}", operation_id = "deleteTrashedEvent", tag = "Events", params(("id" = String, Path)), responses((status = 200, body = SuccessMessage), (status = 404, description = "Not in the caller's trash")))]
+#[tracing::instrument(skip_all)]
+pub async fn purge_trashed(
+    State(state): State<AppState>,
+    user: RouteUser,
+    Path(id): Path<String>,
+) -> Result<Json<SuccessMessage>, AppError> {
+    Ok(Json(trash::purge(&state, &user, &id).await?))
 }
 
 /// The caller's events in a range, with recurring instances, categories and calendars.

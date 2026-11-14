@@ -1618,6 +1618,7 @@ async fn deleting_one_occurrence_records_a_deleted_exception() {
             message: "Single occurrence deleted successfully".into(),
             deleted_event_id: series.id.clone(),
             action: "delete_occurrence".into(),
+            trash_id: None,
         }
     );
     ok(owner
@@ -1688,6 +1689,7 @@ async fn deleting_this_and_future_ends_the_series() {
             message: "Future occurrences deleted successfully".into(),
             deleted_event_id: series.id.clone(),
             action: "delete_future".into(),
+            trash_id: None,
         }
     );
     assert_eq!(
@@ -1811,6 +1813,7 @@ async fn deleting_all_removes_the_series_and_its_children() {
             message: "Entire recurring series deleted successfully".into(),
             deleted_event_id: series.id.clone(),
             action: "delete_all".into(),
+            trash_id: deleted.trash_id.clone(),
         }
     );
     for (id, expected) in [
@@ -1832,9 +1835,9 @@ async fn deleting_all_removes_the_series_and_its_children() {
     }
     assert_eq!(exceptions(&app, &series.id.0).await, []);
     assert_eq!(
-        exceptions(&app, &future.id.0).await.len(),
-        1,
-        "the split half's own exceptions are left behind"
+        exceptions(&app, &future.id.0).await,
+        [],
+        "the split half's own exceptions go to the trash with it"
     );
     assert_eq!(
         count(

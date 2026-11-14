@@ -8,6 +8,7 @@ pub use super::calendar_sync_log::Entity as CalendarSyncLog;
 pub use super::event_category::Entity as EventCategory;
 pub use super::event_notification::Entity as EventNotification;
 pub use super::event_participant::Entity as EventParticipant;
+pub use super::event_trash::Entity as EventTrash;
 pub use super::invite::Entity as Invite;
 pub use super::mail_directory_entry::Entity as MailDirectoryEntry;
 pub use super::mail_jmap_sync_state::Entity as MailJmapSyncState;

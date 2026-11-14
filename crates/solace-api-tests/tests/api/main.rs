@@ -15,6 +15,7 @@ mod edges;
 mod encrypted_blobs;
 mod encryption_upgrades;
 mod event_fixtures;
+mod event_trash;
 mod events;
 mod events_import;
 mod events_list;

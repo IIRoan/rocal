@@ -141,8 +141,8 @@ describe("persistRecurringEventEdit", () => {
 describe("persistRecurringEventDelete", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    api.deleteRecurringEvent.mockResolvedValue(undefined as never);
-    api.deleteEvent.mockResolvedValue(undefined as never);
+    api.deleteRecurringEvent.mockResolvedValue({ success: true, message: "", deletedEventId: "series-1", action: "delete_all" });
+    api.deleteEvent.mockResolvedValue({ success: true, message: "", trashId: "trash-1" });
   });
 
   it.each([
@@ -160,10 +160,12 @@ describe("persistRecurringEventDelete", () => {
   });
 
   it("deletes a detached occurrence row for this event only", async () => {
-    await persistRecurringEventDelete({
-      event: { ...occurrence, id: "exception-1", isRecurringInstance: false },
-      scope: "this_only",
-    });
+    await expect(
+      persistRecurringEventDelete({
+        event: { ...occurrence, id: "exception-1", isRecurringInstance: false },
+        scope: "this_only",
+      }),
+    ).resolves.toBe("trash-1");
 
     expect(api.deleteEvent).toHaveBeenCalledWith("exception-1");
     expect(api.deleteRecurringEvent).not.toHaveBeenCalled();

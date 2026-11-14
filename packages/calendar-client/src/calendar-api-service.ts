@@ -39,6 +39,7 @@ import type {
   CreateCategoryRequest,
   UpdateCategoryRequest,
   DeleteResponse,
+  TrashedCalendarEvent,
   ApiError,
   UserSettings,
   UpdateSettingsRequest,
@@ -691,6 +692,7 @@ export class CalendarApiService {
     }
   }
 
+  /** An event the caller owns goes to the trash (`trashId`); an invitation copy is declined or removed for good. */
   async deleteEvent(id: string): Promise<DeleteResponse> {
     try {
       return await this.client.delete<Schema<"EventDeleted">>(
@@ -698,6 +700,83 @@ export class CalendarApiService {
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete event");
+    }
+  }
+
+  // ─── Trash ───────────────────────────────────────────────────────────────────
+
+  /** Deleted events of the last 30 days, newest first, with titles opened on this device. */
+  async listTrashedEvents(): Promise<TrashedCalendarEvent[]> {
+    try {
+      const { events } = await this.client.get<Schema<"TrashedEventList">>(
+        "/api/events/trash",
+      );
+      return await Promise.all(events.map((entry) => this.hydrateTrashedEvent(entry)));
+    } catch (error) {
+      throw this.transformError(error, "Failed to load deleted events");
+    }
+  }
+
+  private async hydrateTrashedEvent(
+    entry: ApiResponse<"TrashedEvent">,
+  ): Promise<TrashedCalendarEvent> {
+    const start = new Date(entry.start);
+    const end = new Date(entry.end);
+    const trashedAt = new Date(entry.trashedAt);
+    const { title } = await this.hydrateEncryptedEventContent({
+      ...entry,
+      id: entry.eventId,
+      encryptionState: entry.encryptionState as CalendarEvent["encryptionState"],
+      start,
+      end,
+      userId: "",
+      createdAt: trashedAt,
+      updatedAt: trashedAt,
+    });
+    return {
+      id: entry.id,
+      eventId: entry.eventId,
+      calendarId: entry.calendarId,
+      calendarMissing: entry.calendarMissing,
+      title,
+      start,
+      end,
+      allDay: entry.allDay,
+      timezone: entry.timezone,
+      recurrence: entry.recurrence,
+      trashedAt,
+      purgeAt: new Date(entry.purgeAt),
+    };
+  }
+
+  /** Restores under the same id and ciphertext; a `calendarId` other than the entry's means its calendar was gone. */
+  async restoreTrashedEvent(id: string): Promise<CalendarEvent> {
+    try {
+      const response = await this.client.post<Schema<"Event">>(
+        `/api/events/trash/${encodeURIComponent(id)}/restore`,
+        {},
+      );
+      return await this.hydrateEncryptedEvent(response as CalendarEvent);
+    } catch (error) {
+      throw this.transformError(error, "Failed to restore event");
+    }
+  }
+
+  async deleteTrashedEvent(id: string): Promise<Schema<"SuccessMessage">> {
+    try {
+      return await this.client.delete<Schema<"SuccessMessage">>(
+        `/api/events/trash/${encodeURIComponent(id)}`,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to delete event permanently");
+    }
+  }
+
+  async emptyEventTrash(): Promise<Schema<"SuccessMessage">> {
+    try {
+      return await this.client.delete<Schema<"SuccessMessage">>("/api/events/trash");
+    } catch (error) {
+      throw this.transformError(error, "Failed to empty the trash");
     }
   }
 

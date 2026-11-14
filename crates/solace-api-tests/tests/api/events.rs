@@ -1238,6 +1238,7 @@ async fn recurring_instance_ids_resolve_to_their_series() {
             success: true,
             message: "Event deleted successfully".into(),
             deleted_event_id: series.id.clone(),
+            trash_id: deleted.trash_id.clone(),
         },
         "deleting an instance id deletes the whole series"
     );
@@ -1637,6 +1638,7 @@ async fn deleting_an_event_removes_its_reminders_and_logs() {
             success: true,
             message: "Event deleted successfully".into(),
             deleted_event_id: event.id.clone(),
+            trash_id: deleted.trash_id.clone(),
         }
     );
     for table in [

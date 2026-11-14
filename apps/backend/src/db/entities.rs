@@ -10,6 +10,7 @@ pub mod calendar_sync_log;
 pub mod event_category;
 pub mod event_notification;
 pub mod event_participant;
+pub mod event_trash;
 pub mod invite;
 pub mod mail_directory_entry;
 pub mod mail_jmap_sync_state;

@@ -171,7 +171,7 @@ export function persistRecurringEventEdit(
 
 export function persistRecurringEventDelete(
   input: DeleteRecurringEventInput,
-): Promise<void> {
+): Promise<string | null> {
   return deleteRecurringWith(calendarApiService, input);
 }
 

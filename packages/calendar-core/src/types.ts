@@ -351,6 +351,25 @@ export interface DeleteResponse {
   success: boolean;
   message: string;
   deletedEventId?: string;
+  /** Set when the event went to the trash, where `restoreTrashedEvent` can bring it back for 30 days. */
+  trashId?: string;
+}
+
+/** A trash entry with its title opened on this device; `id` is the entry, `eventId` the id a restore keeps. */
+export interface TrashedCalendarEvent {
+  id: string;
+  eventId: string;
+  calendarId: string;
+  /** The original calendar is gone or read-only, so a restore lands in the default calendar. */
+  calendarMissing: boolean;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  timezone: string;
+  recurrence: string | null;
+  trashedAt: Date;
+  purgeAt: Date;
 }
 
 export interface ApiError {

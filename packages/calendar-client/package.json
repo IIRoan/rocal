@@ -25,6 +25,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./account-query-options": "./src/account-query-options.ts",
+    "./event-trash-query-options": "./src/event-trash-query-options.ts",
     "./use-riftbound": "./src/use-riftbound.ts",
     "./use-feed-sync": "./src/use-feed-sync.ts",
     "./use-category-delete-pending": "./src/use-category-delete-pending.ts",

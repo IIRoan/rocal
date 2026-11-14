@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use sea_orm::Set;
+use sea_orm::{Set, TransactionTrait};
 use solace_api_types::events::{Event, ParticipantInput};
 use solace_api_types::recurring::{
     DeleteRecurringQuery, EditRecurringRequest, PreviewInstance, PreviewRecurrenceRequest,
@@ -20,10 +20,11 @@ use crate::error::AppError;
 use crate::events::encryption::resolve_invitation_content;
 use crate::events::recurrence::{generate_instances, validate_rule};
 use crate::events::service::{
-    assert_editable, invitation_event, is_writable, refuse_plaintext, refuse_synced,
+    assert_editable, invitation_event, is_attendee_invitation, is_writable, refuse_plaintext,
+    refuse_synced,
 };
 use crate::events::view::{Relations, event_dto};
-use crate::events::{participants, queries as events};
+use crate::events::{participants, queries as events, trash};
 use crate::http::zod::non_blank;
 use crate::instant;
 use crate::invitations::request;
@@ -477,6 +478,7 @@ pub async fn delete(
     let existing = series(state, &user.id, id).await?;
     refuse_synced(&existing.row, "delete")?;
     let occurrence = query.occurrence_date.as_deref();
+    let mut trash_id = None;
     let (message, action) = match query.delete_scope.as_str() {
         "this_only" => {
             let date = column(occurrence_date(occurrence, "this_only", "delete")?)?;
@@ -498,7 +500,16 @@ pub async fn delete(
             ("Future occurrences deleted successfully", "delete_future")
         }
         _ => {
-            queries::delete_series(&state.db, &user.id, id).await?;
+            let transaction = state.db.begin().await?;
+            if is_attendee_invitation(&user.id, &existing.row, &existing.participants) {
+                queries::delete_series(&transaction, &user.id, id).await?;
+            } else {
+                trash_id = trash::trash_events(&transaction, &user.id, &[id.to_owned()])
+                    .await?
+                    .into_iter()
+                    .next();
+            }
+            transaction.commit().await?;
             ("Entire recurring series deleted successfully", "delete_all")
         }
     };
@@ -507,6 +518,7 @@ pub async fn delete(
         message: message.into(),
         deleted_event_id: id.to_owned().into(),
         action: action.into(),
+        trash_id: trash_id.map(Into::into),
     })
 }
 

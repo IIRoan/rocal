@@ -943,6 +943,110 @@
         }
       }
     },
+    "/api/events/trash": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "The caller's deleted events, newest first, restorable for 30 days.",
+        "operationId": "listTrashedEvents",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashedEventList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Deletes every event in the caller's trash for good.",
+        "operationId": "emptyEventTrash",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/trash/{id}": {
+      "delete": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Deletes one trashed event for good.",
+        "operationId": "deleteTrashedEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not in the caller's trash"
+          }
+        }
+      }
+    },
+    "/api/events/trash/{id}/restore": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Restores a trashed event under its id, into its calendar or the default one when that is gone.",
+        "operationId": "restoreTrashedEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not in the caller's trash"
+          }
+        }
+      }
+    },
     "/api/events/{id}": {
       "get": {
         "tags": [
@@ -4645,6 +4749,10 @@
           },
           "success": {
             "type": "boolean"
+          },
+          "trashId": {
+            "$ref": "#/components/schemas/TrashedEventId",
+            "description": "The trash entry that can restore the event for 30 days; absent when the delete was permanent."
           }
         }
       },
@@ -6946,6 +7054,10 @@
           },
           "success": {
             "type": "boolean"
+          },
+          "trashId": {
+            "$ref": "#/components/schemas/TrashedEventId",
+            "description": "Set when `delete_all` moved the series to the trash."
           }
         }
       },
@@ -7839,6 +7951,101 @@
         "type": "string",
         "format": "date-time",
         "description": "A UTC instant as JavaScript's `toISOString()` writes it: three fractional digits and `Z`."
+      },
+      "TrashedEvent": {
+        "type": "object",
+        "description": "A deleted event in the trash, read from its stored row: ciphertext only, restorable until `purgeAt`.",
+        "required": [
+          "id",
+          "eventId",
+          "calendarId",
+          "calendarMissing",
+          "title",
+          "encryptedContent",
+          "encryptionState",
+          "encryptionKeyVersion",
+          "start",
+          "end",
+          "allDay",
+          "timezone",
+          "recurrence",
+          "trashedAt",
+          "purgeAt"
+        ],
+        "properties": {
+          "allDay": {
+            "type": "boolean"
+          },
+          "calendarId": {
+            "$ref": "#/components/schemas/CalendarId"
+          },
+          "calendarMissing": {
+            "type": "boolean",
+            "description": "The original calendar is gone or read-only, so a restore lands in the default calendar."
+          },
+          "encryptedContent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "encryptionKeyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "encryptionState": {
+            "type": "string"
+          },
+          "end": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "eventId": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The id the event keeps when restored."
+          },
+          "id": {
+            "$ref": "#/components/schemas/TrashedEventId"
+          },
+          "purgeAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "recurrence": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "trashedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "TrashedEventId": {
+        "type": "string"
+      },
+      "TrashedEventList": {
+        "type": "object",
+        "description": "`GET /api/events/trash`, newest first.",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrashedEvent"
+            }
+          }
+        }
       },
       "UnregisterPushDeviceRequest": {
         "type": "object",

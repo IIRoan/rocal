@@ -40,5 +40,6 @@ Hourly (`:17`), the worker deletes ephemeral rows in batches of 500 (`DELETE ...
 | `notification_job`                           | `sent` after 7d; any other non-pending status after 30d (pending/leased never touched) |
 | `notification_log`                           | `created_at` older than 30 days                                  |
 | `push_device`                                | `last_seen_at` older than 180 days (app re-registers on launch)  |
+| `event_trash`                                | `trashed_at` older than 30 days (deleted events' restore window) |
 
 `calendar_sync_log` is pruned by the backend (latest 50 per subscription). Account deletion is handled by the API (`apps/backend/src/account/`).

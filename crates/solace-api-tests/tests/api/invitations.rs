@@ -1210,6 +1210,7 @@ async fn attendee_copies_are_read_only_and_deleting_declines() {
             success: true,
             message: "Invitation declined and removed from your calendar".into(),
             deleted_event_id: copy.id.clone(),
+            trash_id: None,
         }
     );
     assert_eq!(
@@ -1245,6 +1246,16 @@ async fn attendee_copies_are_read_only_and_deleting_declines() {
         "a bulk delete declines but keeps the tombstone"
     );
     assert_eq!(sent_mail(&app, &owner.email, 2).await.len(), 2);
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM event_trash WHERE user_id = $1",
+            &attendee.id
+        )
+        .await,
+        0,
+        "invitation copies are never trashed"
+    );
 }
 
 #[tokio::test]
