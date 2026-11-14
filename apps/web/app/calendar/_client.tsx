@@ -283,6 +283,7 @@ function MobileLayoutContent() {
         onEventEdit={openEventEditor}
         getCachedEventsForRange={calendarData.getCachedEventsForRange}
         prefetchRange={calendarData.prefetchRange}
+        keyboardShortcuts={settings?.keyboardShortcuts !== false}
       />
       <RecurringScopeModal action="edit" {...scopePrompt} />
     </>

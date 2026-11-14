@@ -30,7 +30,7 @@ import {
 } from "./event-calendar-mutations";
 import { MobileEventCalendarToolbar } from "./mobile-event-calendar-toolbar";
 import { MobileEventCalendarViews } from "./mobile-event-calendar-views";
-import { useCalendarViewShortcuts } from "./use-calendar-view-shortcuts";
+import { useCalendarShortcuts } from "./use-calendar-view-shortcuts";
 import type { EventNotification } from "./notification-manager";
 import type { CalendarEvent, CalendarView, User } from "./types";
 import { addMinutesToDate } from "./utils";
@@ -86,6 +86,8 @@ export interface MobileEventCalendarProps {
   onSidebarToggle?: () => void;
   onViewChange?: (view: CalendarView) => void;
   user?: User;
+  /** Single-key view shortcuts; the account's sealed preference, on unless turned off. */
+  keyboardShortcuts?: boolean;
 }
 
 export function MobileEventCalendar({
@@ -109,6 +111,7 @@ export function MobileEventCalendar({
   onEventEdit,
   onViewChange,
   currentDateOverride,
+  keyboardShortcuts = true,
 }: MobileEventCalendarProps) {
   const { currentDate: contextCurrentDate, currentView, setCurrentDate, setCurrentView } =
     useCalendarContext();
@@ -123,7 +126,7 @@ export function MobileEventCalendar({
     onViewChange?.(nextView);
   };
 
-  useCalendarViewShortcuts(setView);
+  useCalendarShortcuts({ onViewChange: setView }, keyboardShortcuts);
 
   const navigateTo = (newDate: Date) => {
     setCurrentDate(newDate);

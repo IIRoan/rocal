@@ -9,10 +9,18 @@ jest.mock("lucide-react", () => {
 
   return {
     ArrowLeft: Icon,
+    BookOpen: Icon,
+    Calendar: Icon,
+    Check: Icon,
+    CheckIcon: Icon,
+    ChevronDownIcon: Icon,
     ChevronLeft: Icon,
     ChevronRight: Icon,
+    ChevronUpIcon: Icon,
     Bell: Icon,
     Key: Icon,
+    Keyboard: Icon,
+    Loader2: Icon,
     Mail: Icon,
     Search: Icon,
     Send: Icon,
@@ -55,10 +63,20 @@ jest.mock("../../lib/calendar-api-service", () => ({
   },
 }));
 
+jest.mock("../../components/calendar-data-provider", () => ({
+  useSharedCalendarData: () => ({
+    calendars: [],
+    updateCalendar: jest.fn(),
+    refetchCalendars: jest.fn(),
+  }),
+}));
+
 import {
   PUSH_DEVICES_SECTION,
   SOLACE_CALENDAR_IOS_BUNDLE_ID,
 } from "@workspace/calendar-core";
+import type { UserSettings } from "@/lib/types/calendar";
+import { CalendarDefaultsSettings } from "../../components/command-palette/calendar-defaults-settings";
 import { NotificationSettingsView } from "../../components/command-palette/notification-settings";
 import { SecuritySettings } from "../../components/command-palette/security-settings";
 
@@ -161,5 +179,30 @@ describe("settings toggle rows", () => {
     expect(html).not.toContain(PUSH_DEVICES_SECTION.error);
     expect(html).not.toContain(PUSH_DEVICES_SECTION.empty);
     expect(html).not.toContain("Last seen");
+  });
+
+  it.each([
+    [undefined, "true"],
+    [true, "true"],
+    [false, "false"],
+  ])("renders keyboard shortcuts %s as checked=%s", (keyboardShortcuts, checked) => {
+    const settings: Pick<
+      UserSettings,
+      "defaultView" | "weekStartDay" | "keyboardShortcuts"
+    > = { defaultView: "week", weekStartDay: 1, keyboardShortcuts };
+    const html = renderToStaticMarkup(
+      <CalendarDefaultsSettings
+        localSettings={settings as UserSettings}
+        updateSetting={jest.fn()}
+        goBack={() => {}}
+        workingDaysList={[1, 2, 3, 4, 5]}
+      />,
+    );
+
+    expect(html).toContain("Keyboard shortcuts");
+    expect(html).toContain("press ? for the list");
+    expect(html).toMatch(
+      new RegExp(`role="switch" aria-checked="${checked}"[^>]*>(?:(?!role="switch").)*Keyboard shortcuts`),
+    );
   });
 });
