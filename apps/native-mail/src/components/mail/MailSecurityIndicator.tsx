@@ -35,18 +35,8 @@ export function MailSecurityIndicator(props: MailSecurityIndicatorProps) {
     readState: props.readState,
     messageContext: props.messageContext,
   });
-  const icon =
-    meta.tone === "encrypted"
-      ? "shield"
-      : meta.tone === "warning"
-        ? "alert-triangle"
-        : "lock";
-  const color =
-    meta.tone === "encrypted"
-      ? theme.colors.primaryBase
-      : meta.tone === "warning"
-        ? theme.colors.destructive
-        : theme.colors.mutedForeground;
+  const readingLimit = props.readState === "read_limit";
+  if (meta.tone !== "warning" && !readingLimit) return null;
 
   return (
     <Pressable
@@ -67,7 +57,15 @@ export function MailSecurityIndicator(props: MailSecurityIndicatorProps) {
       accessibilityRole="button"
       accessibilityLabel={meta.label}
     >
-      <Feather name={icon} size={16} color={color} />
+      <Feather
+        name={readingLimit ? "info" : "alert-triangle"}
+        size={16}
+        color={
+          readingLimit
+            ? theme.colors.mutedForeground
+            : theme.colors.destructive
+        }
+      />
     </Pressable>
   );
 }

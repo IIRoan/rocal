@@ -91,8 +91,11 @@ describe("validateCalendarName", () => {
 });
 
 describe("row details", () => {
-  it("flags default, name encryption, and hidden owned calendars", () => {
+  it("flags default and hidden owned calendars without repeating encryption status", () => {
     expect(ownedCalendarDetail(calendar({}))).toBeUndefined();
+    expect(
+      ownedCalendarDetail(calendar({ encryptionState: "encrypted" })),
+    ).toBeUndefined();
     expect(
       ownedCalendarDetail(
         calendar({
@@ -101,7 +104,7 @@ describe("row details", () => {
           isVisible: false,
         }),
       ),
-    ).toBe("Default · Name encrypted · Hidden");
+    ).toBe("Default · Hidden");
   });
 
   it("shows last sync only for feeds, after the hidden flag", () => {

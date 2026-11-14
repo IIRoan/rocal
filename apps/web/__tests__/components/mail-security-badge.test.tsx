@@ -8,6 +8,7 @@ jest.mock("lucide-react", () => ({
   ShieldCheck: () => null,
   ShieldAlert: () => null,
   Lock: () => null,
+  Info: () => null,
 }));
 
 const mockReview = jest
@@ -29,6 +30,50 @@ jest.mock("@workspace/ui/solace", () => ({
   ),
 }));
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+it.each([
+  ["plain", false],
+  ["plain", true],
+  ["inline_pgp", true],
+  ["pgp_mime", true],
+  ["internal_e2ee", true],
+] as const)("hides routine %s status with mailbox encryption=%s", (messageState, accountEncryptedAtRest) => {
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  act(() =>
+    root.render(
+      <MailSecurityBadge
+        messageState={messageState}
+        accountEncryptedAtRest={accountEncryptedAtRest}
+        readState="decrypted"
+        signatureVerificationState="not_signed"
+      />,
+    ),
+  );
+  expect(container.innerHTML).toBe("");
+  act(() => root.unmount());
+});
+
+it.each([
+  ["inline_pgp", "failed", "not_signed", "Decryption failed"],
+  ["inline_pgp", "decrypted", "failed", "PGP encrypted, signature check failed"],
+  ["unknown_encrypted", "decrypted", "not_signed", "Encryption unconfirmed"],
+] as const)("keeps %s warnings visible: %s / %s", (messageState, readState, signatureVerificationState, label) => {
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  act(() =>
+    root.render(
+      <MailSecurityBadge
+        messageState={messageState}
+        accountEncryptedAtRest
+        readState={readState}
+        signatureVerificationState={signatureVerificationState}
+      />,
+    ),
+  );
+  expect(container.textContent).toContain(label);
+  act(() => root.unmount());
+});
+
 it("opens explicit changed-sender review from the reader notice and does not claim a failed signature matches the old key", async () => {
   const container = document.createElement("div");
   const root = createRoot(container);
@@ -64,11 +109,10 @@ it("opens explicit changed-sender review from the reader notice and does not cla
 it.each([
   {
     readState: "decrypted" as const,
-    expected:
-      "The body and attachments inside the encrypted MIME payload are protected.",
+    expected: "",
   },
   { readState: "read_limit" as const, expected: "Reading limit reached" },
-  { readState: "pending" as const, expected: "PGP content detected" },
+  { readState: "pending" as const, expected: "" },
 ])(
   "renders the MIME reading outcome: $readState",
   ({ readState, expected }) => {
@@ -83,7 +127,8 @@ it.each([
         />,
       ),
     );
-    expect(container.textContent).toContain(expected);
+    if (expected) expect(container.textContent).toContain(expected);
+    else expect(container.innerHTML).toBe("");
     expect(container.textContent).not.toMatch(/\bmay\b/i);
     expect(container.textContent).not.toContain("Decryption failed");
     act(() => root.unmount());

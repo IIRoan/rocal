@@ -9,18 +9,12 @@ jest.mock("react-native", () => ({
 jest.mock("@expo/vector-icons", () => ({ Feather: "Feather" }));
 
 describe("native event encryption notice", () => {
-  it("explains encrypted fields when the badge is pressed", () => {
+  it("hides routine encryption status", () => {
     const badge = EncryptionStatusIcon({
       item: { encryptionState: "encrypted" },
       color: "muted",
     });
-    expect(badge.props.accessibilityLabel).toBe("End-to-end encrypted");
-    expect(badge.props.children.props.name).toBe("shield");
-    badge.props.onPress();
-    expect(Alert.alert).toHaveBeenCalledWith(
-      "End-to-end encrypted",
-      expect.stringContaining("encrypted on your device"),
-    );
+    expect(badge).toBeNull();
   });
 
   it("marks plaintext feed events as not encrypted", () => {
@@ -28,7 +22,13 @@ describe("native event encryption notice", () => {
       item: { encryptionState: "plaintext" },
       color: "muted",
     });
+    if (!badge) throw new Error("Plaintext event warning missing");
     expect(badge.props.accessibilityLabel).toBe("Not encrypted");
     expect(badge.props.children.props.name).toBe("unlock");
+    badge.props.onPress();
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Not encrypted",
+      expect.stringContaining("Event details are readable to the server."),
+    );
   });
 });

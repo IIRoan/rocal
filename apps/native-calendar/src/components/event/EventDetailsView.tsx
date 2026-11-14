@@ -89,13 +89,11 @@ export function EventDetailsView({
         >
           {event.title || "Untitled event"}
         </Text>
-        <View style={styles.titleIcon}>
-          <EncryptionStatusIcon
-            item={event}
-            color={theme.colors.mutedForeground}
-            size={16}
-          />
-        </View>
+        <EncryptionStatusIcon
+          item={event}
+          color={theme.colors.mutedForeground}
+          size={16}
+        />
       </View>
       {event.isSynced ? (
         <Text style={styles.viewSyncedHint}>
