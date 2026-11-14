@@ -1,7 +1,6 @@
 import type { ComponentType } from "react";
 import type { Calendar } from "@workspace/calendar-core";
 import {
-  EncryptionStatusBadge,
   getColorSwatchValue,
   useCalendarContext,
 } from "@workspace/ui/components/calendar";
@@ -76,12 +75,6 @@ function CalendarRow({
             </div>
           ) : null}
         </div>
-        <EncryptionStatusBadge
-          item={calendar}
-          kind="calendar"
-          asIcon
-          className="opacity-80"
-        />
         <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" />
       </button>
       <button

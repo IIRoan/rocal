@@ -27,6 +27,8 @@ export function EncryptionStatusBadge({
   iconSize = "sm",
 }: EncryptionStatusBadgeProps) {
   const meta = getEncryptionStatusMeta(item, kind);
+  if (meta.state === "encrypted" || hidePlaintext) return null;
+
   const { Icon } = meta;
   const summary = [
     meta.description,
@@ -35,8 +37,6 @@ export function EncryptionStatusBadge({
   ]
     .filter(Boolean)
     .join(" ");
-
-  if (hidePlaintext && meta.state === "plaintext") return null;
 
   if (asIcon) {
     return (

@@ -29,8 +29,6 @@ function formatTimestamp(value?: string) {
 
 function encryptionLabel(result: Result) {
   switch (result.encryptionStatus) {
-    case "encrypted-indexed":
-      return "Encrypted";
     case "encrypted-locked":
       return "Locked";
     case "metadata-only":
@@ -40,6 +38,26 @@ function encryptionLabel(result: Result) {
     default:
       return null;
   }
+}
+
+function searchResultDetails(result: Result) {
+  return {
+    hasAttachment:
+      result.source === "mail" && (result.message.attachments?.length ?? 0) > 0,
+    hasLocation:
+      result.source === "calendar" && Boolean(result.event.location),
+    subtext:
+      result.source === "mail" && result.from && !isBodyOnlyMatch(result.matchedFields)
+        ? result.from
+        : (result.snippet ?? null),
+  };
+}
+
+function searchColumnStyle(resultCount: number, hasBoth: boolean) {
+  return {
+    width: hasBoth ? "50%" : resultCount > 0 ? "100%" : "0%",
+    opacity: resultCount > 0 ? 1 : 0,
+  };
 }
 
 // The parent staggers row entry, so rows carry no animation of their own.
@@ -58,14 +76,7 @@ function SearchResultRow({
 }) {
   const timestamp = formatTimestamp(result.timestamp);
   const encryption = encryptionLabel(result);
-  const hasAttachment =
-    result.source === "mail" && (result.message.attachments?.length ?? 0) > 0;
-  const hasLocation =
-    result.source === "calendar" && Boolean(result.event.location);
-  const subtext =
-    result.source === "mail" && result.from && !isBodyOnlyMatch(result.matchedFields)
-      ? result.from
-      : (result.snippet ?? null);
+  const { hasAttachment, hasLocation, subtext } = searchResultDetails(result);
 
   return (
     <button
@@ -155,8 +166,6 @@ export function UnifiedSearchResults({
   const calendarResults = results.filter((r) => r.source === "calendar");
   const calendarBaseIndex = baseIndex + mailResults.length;
   const hasBoth = mailResults.length > 0 && calendarResults.length > 0;
-  const hasOnlyMail = mailResults.length > 0 && calendarResults.length === 0;
-  const hasOnlyCalendar = calendarResults.length > 0 && mailResults.length === 0;
   const hasResults = results.length > 0;
 
   // Stable key: only changes when the actual set of result IDs changes
@@ -199,10 +208,7 @@ export function UnifiedSearchResults({
         aria-label="Mail"
         data-source-section="messages"
         className="min-w-0 overflow-hidden"
-        style={{
-          width: hasBoth ? "50%" : hasOnlyMail ? "100%" : "0%",
-          opacity: hasOnlyCalendar ? 0 : 1,
-        }}
+        style={searchColumnStyle(mailResults.length, hasBoth)}
       >
         {mailResults.length > 0 && (
           <>
@@ -236,10 +242,7 @@ export function UnifiedSearchResults({
         aria-label="Calendar"
         data-source-section="calendar"
         className="min-w-0 overflow-hidden"
-        style={{
-          width: hasBoth ? "50%" : hasOnlyCalendar ? "100%" : "0%",
-          opacity: hasOnlyMail ? 0 : 1,
-        }}
+        style={searchColumnStyle(calendarResults.length, hasBoth)}
       >
         {calendarResults.length > 0 && (
           <>

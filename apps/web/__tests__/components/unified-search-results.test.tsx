@@ -113,6 +113,7 @@ describe("UnifiedSearchResults", () => {
     expect(sections).toEqual(["messages", "calendar"]);
     expect(container.textContent).toContain("Attachment");
     expect(container.textContent).toContain("Location");
+    expect(container.textContent).not.toContain("Encrypted");
     expect(container.innerHTML).not.toContain("group-hover:opacity-100");
     const options = container.querySelectorAll('[role="option"]');
     expect(options[0]?.id).toBe("result-0");
