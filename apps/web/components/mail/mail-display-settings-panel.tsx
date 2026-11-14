@@ -87,7 +87,7 @@ export function MailDisplaySettingsPanel({
         <SettingToggleRow
           icon={Image}
           label="Block tracking pixels"
-          description="Remove tiny invisible tracker images from HTML email"
+          description="Blocks known trackers and tiny tracking images."
           checked={settings.blockTrackingPixels}
           onToggle={() =>
             updateSettings({

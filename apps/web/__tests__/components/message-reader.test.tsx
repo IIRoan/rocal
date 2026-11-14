@@ -1839,3 +1839,26 @@ describe("MessageReader — thread", () => {
 it("shows changed sender identity separately from a valid historical signature",()=>{
  render({signatureVerificationState:"verified",senderKeyTrustState:{kind:"key_changed",oldFingerprint:"A".repeat(40),newFingerprint:"B".repeat(40)}});expect(container.textContent).toContain("Sender key changed");expect(container.textContent).toContain("previously saved key");expect(container.textContent).not.toContain("PGP encrypted & verified");
 });
+
+describe("MessageReader — tracker line", () => {
+  it("says how many trackers stayed blocked and lists their hosts", () => {
+    render({
+      decryptedHtml:
+        '<p>Hi</p><img src="https://us5.list-manage.com/track/open.php?u=1" width="600"><img src="https://cdn.example/p.gif" width="1" height="1">',
+    });
+    const trigger = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Blocked 2 trackers",
+    );
+    expect(trigger).toBeDefined();
+
+    act(() => trigger!.click());
+    expect(document.body.textContent).toContain("us5.list-manage.com");
+    expect(document.body.textContent).toContain("cdn.example");
+    expect(document.body.textContent).toContain("They never load, even after you load images.");
+  });
+
+  it("shows no tracker line for mail without trackers", () => {
+    render({ decryptedHtml: '<p>Hi</p><img src="https://cdn.example/banner.png" width="600">' });
+    expect(container.textContent).not.toContain("tracker");
+  });
+});

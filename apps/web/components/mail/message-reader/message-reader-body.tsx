@@ -18,6 +18,7 @@ import {
 import { fadeInMailReaderContent } from "../mail-app/mail-reader-transition";
 import { MessageDecryptingSkeleton } from "../message-decrypting-loader";
 import { HtmlEmailRenderer } from "./html-email-renderer";
+import { MessageReaderTrackerLine } from "./message-reader-trackers";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
@@ -47,6 +48,7 @@ export function MessageReaderBody({
     isBodyExpanded,
     isEventReminderEmail,
     linkedCalendarEvent,
+    isMobile,
     props,
   } = controller;
   const {
@@ -56,6 +58,7 @@ export function MessageReaderBody({
     cleanHtml,
     htmlHasQuote,
     remoteContentPrompt,
+    trackers,
     shouldReplaceBodyWithEventReminder,
     isReminderEventLoading,
     eventReminderView,
@@ -89,6 +92,7 @@ export function MessageReaderBody({
     <EventReminderMessageBodyLoading isDark={isDark} />
   ) : renderAsHtml ? (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)]">
+      <MessageReaderTrackerLine trackers={trackers} isMobile={isMobile} />
       {remoteContentPrompt && (
         <div className="shrink-0 border-b border-[var(--border-tertiary)] bg-[var(--bg-overlay-tertiary)] px-4 py-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

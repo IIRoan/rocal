@@ -10,7 +10,7 @@ import {
   withoutTrustedSender,
   type MailDisplaySettings,
 } from "../mail-display-settings";
-import { emailHtmlHasRemoteContent } from "../mail-html";
+import { analyzeEmailHtml } from "../mail-html";
 
 const REMOTE_HTML = '<p>Hi</p><img src="https://tracker.example/pixel.png">';
 
@@ -26,11 +26,11 @@ function resolveFor(input: {
 }) {
   return resolveReaderRemoteContent({
     settings: input.settings,
-    hasRemoteContent: emailHtmlHasRemoteContent({
+    hasRemoteContent: analyzeEmailHtml({
       html: input.html,
       isDark: false,
       blockTrackingPixels: input.settings.blockTrackingPixels,
-    }),
+    }).hasRemoteContent,
     senderEmail: input.senderEmail,
     loadedForMessage: input.loadedForMessage,
   });

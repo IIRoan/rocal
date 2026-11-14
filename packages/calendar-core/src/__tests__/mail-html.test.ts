@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  analyzeEmailHtml,
   buildEmailContentSecurityPolicy,
   buildEmailHtmlDocument,
   darkenCssColor,
@@ -380,5 +381,39 @@ describe("processEmailHtml tracking parameters", () => {
     expect(processed).toContain('href="https://shop.example/p?id=7&amp;copy=2"');
     expect(processed).not.toMatch(/utm_source|fbclid/);
     expect(processed).toContain('href="https://example.org/"');
+  });
+});
+
+describe("known trackers", () => {
+  const TRACKERS =
+    '<p>Hi</p><img src="https://us5.list-manage.com/track/open.php?u=1" width="600" height="200">' +
+    '<img data-src="https://cdn.example/ok.png" src="https://mailtrack.io/trace/mail/a.png">' +
+    '<img src="https://us5.list-manage.com/track/open.php?u=2" alt="a>b">' +
+    '<img src="https://cdn.example/p.gif" width="1" height="1"><img src="cid:logo" width="1" height="1">' +
+    '<table background="https://mandrillapp.com/track/open.php?u=1"><tr><td>x</td></tr></table>' +
+    '<img src="https://cdn.example/banner.png" width="600">';
+
+  it("removes known trackers of any size even when remote images are allowed", () => {
+    const processed = processEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: true, blockRemoteImages: false });
+
+    expect(processed).not.toMatch(/list-manage|mailtrack|mandrillapp|p\.gif|cid:logo/);
+    expect(processed).toContain("banner.png");
+    expect(processed).toContain("<table>");
+  });
+
+  it("counts remote trackers once per image and lists unique hosts", () => {
+    expect(analyzeEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: true })).toEqual({
+      hasRemoteContent: true,
+      trackers: {
+        count: 5,
+        hosts: ["cdn.example", "mailtrack.io", "mandrillapp.com", "us5.list-manage.com"],
+      },
+    });
+  });
+
+  it("counts nothing when tracker blocking is off", () => {
+    const result = analyzeEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: false });
+    expect(result.trackers).toEqual({ count: 0, hosts: [] });
+    expect(processEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: false })).toContain("list-manage");
   });
 });

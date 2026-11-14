@@ -48,7 +48,7 @@ import {
   resolveReaderRemoteContent,
   useMailDisplaySettings,
 } from "@/lib/mail/mail-display-settings";
-import { emailHtmlHasRemoteContent } from "@workspace/calendar-core/mail-html";
+import { analyzeEmailHtml } from "@workspace/calendar-core/mail-html";
 import {
   extractLinkedCalendarEventId,
   extractReminderLeadMinutes,
@@ -118,6 +118,7 @@ export type MessageReaderViewModel = {
   cleanHtml: string;
   htmlHasQuote: boolean;
   remoteContentPrompt: ReturnType<typeof resolveReaderRemoteContent>["prompt"];
+  trackers: ReturnType<typeof analyzeEmailHtml>["trackers"];
   shouldReplaceBodyWithEventReminder: boolean;
   isReminderEventLoading: boolean;
   eventReminderView: ReturnType<typeof buildEventReminderMailView> | null;
@@ -498,13 +499,14 @@ export function useMessageReaderController(props: MessageReaderProps) {
     _displayHtml ?? "",
   );
   const renderedHtml = showQuote ? (_displayHtml ?? "") : cleanHtml;
+  const { hasRemoteContent, trackers } = analyzeEmailHtml({
+    html: renderedHtml,
+    isDark,
+    blockTrackingPixels,
+  });
   const { blockRemoteImages, prompt: remoteContentPrompt } = resolveReaderRemoteContent({
     settings: displaySettings,
-    hasRemoteContent: emailHtmlHasRemoteContent({
-      html: renderedHtml,
-      isDark,
-      blockTrackingPixels,
-    }),
+    hasRemoteContent,
     senderEmail: externalContentSenderEmail,
     loadedForMessage: allowExternalContent,
   });
@@ -596,6 +598,7 @@ export function useMessageReaderController(props: MessageReaderProps) {
       cleanHtml,
       htmlHasQuote,
       remoteContentPrompt,
+      trackers,
       shouldReplaceBodyWithEventReminder,
       isReminderEventLoading,
       eventReminderView,

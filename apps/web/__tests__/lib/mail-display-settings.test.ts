@@ -12,7 +12,7 @@ import {
   resolveReaderRemoteContent,
   writeMailDisplaySettings,
 } from "@/lib/mail/mail-display-settings";
-import { emailHtmlHasRemoteContent } from "@workspace/calendar-core/mail-html";
+import { analyzeEmailHtml } from "@workspace/calendar-core/mail-html";
 import { clearLocalMailSettings } from "@/lib/mail/mail-settings-storage";
 
 describe("mail-display-settings", () => {
@@ -98,7 +98,7 @@ describe("mail-display-settings", () => {
       '<div style="background-image:url(&quot;https://example.com/bg.png&quot;)">Hi</div>',
     ],
   ])("offers to load remote content in a %s", (_label, html) => {
-    const hasRemoteContent = emailHtmlHasRemoteContent({
+    const { hasRemoteContent } = analyzeEmailHtml({
       html,
       isDark: false,
       blockTrackingPixels: true,
@@ -119,7 +119,7 @@ describe("mail-display-settings", () => {
     ["tracking pixel", '<img src="https://example.com/p.gif" width="1" height="1">'],
   ])("does not prompt for a %s", (_label, html) => {
     expect(
-      emailHtmlHasRemoteContent({ html, isDark: false, blockTrackingPixels: true }),
+      analyzeEmailHtml({ html, isDark: false, blockTrackingPixels: true }).hasRemoteContent,
     ).toBe(false);
   });
 

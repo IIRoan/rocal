@@ -1,7 +1,7 @@
 import { stripHtmlTags } from "../html-text";
 import { buildMailBodyExcerpt } from "../mail-body-index";
 import { htmlToComposeText } from "../mail-compose-format";
-import { emailHtmlHasRemoteContent, processEmailHtml } from "../mail-html";
+import { analyzeEmailHtml, processEmailHtml } from "../mail-html";
 import { scoreMailSearchMessage } from "../mail-search-relevance";
 import { htmlToPlainText } from "../mail-signature";
 import { sanitizeUntrustedEmailHtml } from "../sanitize-email-html";
@@ -50,7 +50,7 @@ const ENTRY_POINTS: Record<string, (html: string) => unknown> = {
   "light reader": (html) => processEmailHtml({ html, isDark: false, blockTrackingPixels: true, blockRemoteImages: true }),
   "link rewrite": (html) =>
     processEmailHtml({ html, isDark: false, blockTrackingPixels: true, rewriteLink: () => "https://solace.test/mail/link#x" }),
-  "remote content check": (html) => emailHtmlHasRemoteContent({ html, isDark: true, blockTrackingPixels: true }),
+  "remote content and tracker check": (html) => analyzeEmailHtml({ html, isDark: true, blockTrackingPixels: true }),
   "search excerpt": (html) => buildMailBodyExcerpt({ html }),
   "search ranking": (html) =>
     scoreMailSearchMessage({ id: "m", subject: "x", htmlBody: [{ partId: "1" }], bodyValues: { "1": { value: html } } }, "solace"),

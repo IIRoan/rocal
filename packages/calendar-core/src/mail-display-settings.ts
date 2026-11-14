@@ -201,7 +201,7 @@ export function resolveRemoteContentPrompt(input: {
   };
 }
 
-/** Reader decision for one message; `hasRemoteContent` must come from `emailHtmlHasRemoteContent` so the prompt matches what gets blocked. */
+/** Reader decision for one message; `hasRemoteContent` must come from `analyzeEmailHtml` so the prompt matches what gets blocked. */
 export function resolveReaderRemoteContent(input: {
   settings: Pick<MailDisplaySettings, "externalContentPolicy" | "trustedSenders">;
   hasRemoteContent: boolean;

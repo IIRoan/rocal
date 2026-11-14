@@ -1,5 +1,10 @@
 import { decodeHtmlEntities, stripHtmlTags } from "./html-text";
-import { stripTrackingParams } from "./mail-links";
+import { getLinkHost, stripTrackingParams } from "./mail-links";
+import {
+  matchKnownTracker,
+  normalizeMailImageUrl,
+  type EmailTrackerSummary,
+} from "./mail-trackers";
 import {
   decodeCssEscapes,
   sanitizeUntrustedEmailHtml,
@@ -258,22 +263,51 @@ function darkenEmailColors(html: string, canvasLightness: number): string {
     );
 }
 
-export function processEmailHtml({
-  html,
-  isDark,
-  blockTrackingPixels,
-  blockRemoteImages = false,
-  canvasColor,
-  rewriteLink,
-}: ProcessEmailHtmlOptions): string {
+export function processEmailHtml(options: ProcessEmailHtmlOptions): string {
+  return processEmailHtmlInternal(options);
+}
+
+/** `onBlockedTracker` gets the host of each remote tracker removed: a known endpoint of any size, or a tiny remote image. */
+function processEmailHtmlInternal(
+  {
+    html,
+    isDark,
+    blockTrackingPixels,
+    blockRemoteImages = false,
+    canvasColor,
+    rewriteLink,
+  }: ProcessEmailHtmlOptions,
+  onBlockedTracker?: (host: string) => void,
+): string {
   // The transforms below run on sanitized markup, where every `<` starts a closed tag, so hostile input cannot make their regexes quadratic.
   let processed = sanitizeUntrustedEmailHtml(extractBodyHtml(html), { profile: "reader" });
 
   if (blockTrackingPixels || blockRemoteImages) {
-    processed = processed.replace(/<img\b[^>]*>/gi, (tag) => {
-      if (blockRemoteImages && isRemoteImageTag(tag)) return "";
-      if (blockTrackingPixels && isTrackingPixelTag(tag)) return "";
+    processed = processed.replace(IMG_TAG_PATTERN, (tag, attributes: string) => {
+      const src = attributeValueOf(attributes, "src");
+      if (blockTrackingPixels) {
+        const knownHost = matchKnownTracker(src);
+        if (knownHost || isTrackingPixelTag(tag)) {
+          const host = knownHost ?? (isRemoteUrl(src) ? getLinkHost(normalizeMailImageUrl(src)) : null);
+          if (host) onBlockedTracker?.(host);
+          return "";
+        }
+      }
+      if (blockRemoteImages && isRemoteUrl(src)) return "";
       return tag;
+    });
+  }
+
+  if (blockTrackingPixels) {
+    processed = processed.replace(TAG_PATTERN, (tag, name: string, attributes: string) => {
+      if (!BACKGROUND_ATTRIBUTE_TAGS.has(name.toLowerCase())) return tag;
+      const knownHost = matchKnownTracker(attributeValueOf(attributes, "background"));
+      if (!knownHost) return tag;
+      onBlockedTracker?.(knownHost);
+      const kept = [...attributes.matchAll(ATTRIBUTE_PATTERN)]
+        .filter((attribute) => (attribute[1] ?? "").toLowerCase() !== "background")
+        .map((attribute) => ` ${attribute[0]}`);
+      return `<${name}${kept.join("")}>`;
     });
   }
 
@@ -418,18 +452,18 @@ function extractBodyHtml(html: string): string {
   return headStyles.join("") + body;
 }
 
-function isRemoteImageTag(tag: string): boolean {
-  return isRemoteUrl(decodeHtmlEntities(getAttribute(tag, "src") ?? ""));
+/** The first attribute named exactly `name`, decoded; `data-src` and friends never count as `src`. */
+function attributeValueOf(attributes: string, name: string): string {
+  for (const attribute of attributes.matchAll(ATTRIBUTE_PATTERN)) {
+    if ((attribute[1] ?? "").toLowerCase() === name) {
+      return decodeHtmlEntities(attribute[2] ?? attribute[3] ?? attribute[4] ?? "");
+    }
+  }
+  return "";
 }
 
-/** Browsers ignore whitespace/control chars in URLs and read `\` as `/`, so normalize the same way. */
 function isRemoteUrl(value: string): boolean {
-  const normalized = value
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x20\x7f-\x9f]+/g, "")
-    .replace(/\\/g, "/")
-    .toLowerCase();
-  return /^(?:https?:|\/\/)/.test(normalized);
+  return /^https?:/i.test(normalizeMailImageUrl(value));
 }
 
 /** `@import` and `@font-face` stay blocked by the style-src/font-src policy, so only image URLs count. */
@@ -449,6 +483,8 @@ function cssHasRemoteUrl(css: string): boolean {
 }
 
 const STYLE_BLOCK_PATTERN = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
+const IMG_TAG_PATTERN =
+  /<img\b((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/gi;
 const TAG_PATTERN =
   /<([a-z][a-z0-9-]*)((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/gi;
 const ATTRIBUTE_PATTERN = /([^\s"'>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
@@ -476,14 +512,17 @@ function sanitizedHtmlHasRemoteContent(html: string): boolean {
   return false;
 }
 
-/** True when the rendered message would fetch http(s) content once the user allows remote content. */
-export function emailHtmlHasRemoteContent(
-  options: Omit<ProcessEmailHtmlOptions, "blockRemoteImages">,
-): boolean {
-  if (!options.html.trim()) return false;
-  return sanitizedHtmlHasRemoteContent(
-    processEmailHtml({ ...options, blockRemoteImages: false }),
-  );
+/** One sanitize pass: whether the message would fetch http(s) content once allowed, and the trackers that stay blocked regardless. */
+export function analyzeEmailHtml(
+  options: Omit<ProcessEmailHtmlOptions, "blockRemoteImages" | "rewriteLink">,
+): { hasRemoteContent: boolean; trackers: EmailTrackerSummary } {
+  if (!options.html.trim()) return { hasRemoteContent: false, trackers: { count: 0, hosts: [] } };
+  const hosts: string[] = [];
+  const processed = processEmailHtmlInternal({ ...options, blockRemoteImages: false }, (host) => hosts.push(host));
+  return {
+    hasRemoteContent: sanitizedHtmlHasRemoteContent(processed),
+    trackers: { count: hosts.length, hosts: [...new Set(hosts)].sort() },
+  };
 }
 
 function isTrackingPixelTag(tag: string): boolean {
