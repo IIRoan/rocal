@@ -1,4 +1,5 @@
 import {
+  buildIcsCalendar,
   buildIcsEventFile,
   type IcsBuildEventInput,
   type IcsRecurrenceRule,
@@ -44,46 +45,55 @@ function toIcsRecurrenceRule(raw?: string | null): IcsRecurrenceRule | undefined
   };
 }
 
+function isStillEncrypted(event: CalendarEvent): boolean {
+  return event.encryptionState === "encrypted" && !isDecryptedEventReminderContent(event);
+}
+
+function eventUid(event: CalendarEvent): string {
+  return event.externalId || `${event.id}@${ICS_UID_DOMAIN}`;
+}
+
+function toIcsEvent(event: CalendarEvent): IcsBuildEventInput {
+  return {
+    uid: eventUid(event),
+    title: event.title,
+    description: event.description,
+    start: new Date(event.start),
+    end: new Date(event.end),
+    allDay: event.allDay,
+    timezone: event.timezone,
+    location: event.location,
+    recurrence: toIcsRecurrenceRule(event.recurrence),
+    createdAt: new Date(event.createdAt),
+    updatedAt: new Date(event.updatedAt),
+    participants: event.participants?.length
+      ? event.participants.map((participant) => ({
+          email: participant.email,
+          displayName: participant.displayName ?? undefined,
+          role: participant.role,
+          status: participant.status,
+        }))
+      : undefined,
+  };
+}
+
 /** Builds the .ics on-device from the decrypted event, so encrypted events export without the server seeing content. */
 export function buildEventIcsExport(
   event: CalendarEvent,
   options: { calendarName?: string | null; timezone?: string | null } = {},
 ): EventIcsExport {
-  if (event.encryptionState === "encrypted" && !isDecryptedEventReminderContent(event)) {
+  if (isStillEncrypted(event)) {
     throw new EventIcsExportError(
       "This event is still encrypted on this device, so it can't be exported yet.",
     );
   }
 
   const start = new Date(event.start);
-  const end = new Date(event.end);
   const occurrence = event.isRecurringInstance === true;
   const baseUid = event.externalId || event.parentEventId || event.id;
-  const participants = event.participants?.length
-    ? event.participants.map((participant) => ({
-        email: participant.email,
-        displayName: participant.displayName ?? undefined,
-        role: participant.role,
-        status: participant.status,
-      }))
-    : undefined;
-
-  const icsEvent: IcsBuildEventInput = {
-    uid: occurrence
-      ? `${baseUid}-${start.toISOString()}@${ICS_UID_DOMAIN}`
-      : event.externalId || `${event.id}@${ICS_UID_DOMAIN}`,
-    title: event.title,
-    description: event.description,
-    start,
-    end,
-    allDay: event.allDay,
-    timezone: event.timezone,
-    location: event.location,
-    recurrence: occurrence ? undefined : toIcsRecurrenceRule(event.recurrence),
-    createdAt: new Date(event.createdAt),
-    updatedAt: new Date(event.updatedAt),
-    participants,
-  };
+  const icsEvent: IcsBuildEventInput = occurrence
+    ? { ...toIcsEvent(event), uid: `${baseUid}-${start.toISOString()}@${ICS_UID_DOMAIN}`, recurrence: undefined }
+    : toIcsEvent(event);
 
   const icsContent = buildIcsEventFile({
     calendar: {
@@ -98,5 +108,54 @@ export function buildEventIcsExport(
     filename: toSafeIcsFilename(
       occurrence ? `${event.title}-${start.toISOString().slice(0, 10)}` : event.title,
     ),
+  };
+}
+
+/** Builds a whole calendar's .ics on-device from the decrypted corpus: series with their exceptions, overrides under the series UID, and every other row on its own. */
+export function buildCalendarIcsExport(
+  events: CalendarEvent[],
+  options: { calendarName: string; timezone?: string | null },
+): EventIcsExport {
+  if (events.some(isStillEncrypted)) {
+    throw new EventIcsExportError(
+      "Some events are still encrypted on this device, so the calendar can't be exported yet.",
+    );
+  }
+
+  const exportedIds = new Set(events.map((event) => event.id));
+  const overrides = new Map<string, { uid: string; recurrenceId: Date }>();
+  const exceptionDates = new Map<string, Date[]>();
+  for (const series of events) {
+    if (!series.recurrence) continue;
+    const excluded: Date[] = [];
+    for (const exception of series.recurrenceExceptions ?? []) {
+      const date = new Date(exception.exceptionDate);
+      const childId = exception.type === "modified" ? exception.modifiedEventId : null;
+      if (childId && exportedIds.has(childId)) {
+        overrides.set(childId, { uid: eventUid(series), recurrenceId: date });
+      } else {
+        // The server hides every excepted occurrence, so one whose replacement isn't in the file is excluded too.
+        excluded.push(date);
+      }
+    }
+    exceptionDates.set(series.id, excluded);
+  }
+
+  const icsEvents = events.map((event): IcsBuildEventInput => {
+    const override = overrides.get(event.id);
+    return {
+      ...toIcsEvent(event),
+      ...(override ? { uid: override.uid, recurrence: undefined, recurrenceId: override.recurrenceId } : null),
+      exceptionDates: exceptionDates.get(event.id),
+      status: event.isCancelled ? "CANCELLED" : undefined,
+    };
+  });
+
+  return {
+    icsContent: buildIcsCalendar({
+      calendar: { name: options.calendarName, timezone: resolveTimezone(options.timezone) },
+      events: icsEvents,
+    }),
+    filename: toSafeIcsFilename(options.calendarName),
   };
 }

@@ -42,6 +42,17 @@ jest.mock("../../lib/calendar-api-service", () => ({
   },
 }));
 
+jest.mock("../../hooks/use-settings", () => ({
+  useSettings: () => ({ settings: { timezone: "Europe/Amsterdam" } }),
+}));
+
+jest.mock("../../lib/ics-download", () => ({ saveIcsFile: jest.fn() }));
+
+jest.mock("@workspace/calendar-client", () => ({
+  ...jest.requireActual<object>("@workspace/calendar-client"),
+  loadCalendarIcsExport: jest.fn(async () => ({ icsContent: "BEGIN:VCALENDAR", filename: "solace-calendars.ics" })),
+}));
+
 jest.mock("sonner", () => ({
   toast: {
     error: jest.fn(),
@@ -87,6 +98,7 @@ jest.mock("lucide-react", () => {
     ChevronRight: Icon,
     CircleX: Icon,
     Copy: Icon,
+    Download: Icon,
     Eye: Icon,
     EyeOff: Icon,
     Globe: Icon,
@@ -102,7 +114,9 @@ jest.mock("lucide-react", () => {
   };
 });
 
+import { loadCalendarIcsExport } from "@workspace/calendar-client";
 import { useSharedCalendarData } from "../../components/calendar-data-provider";
+import { saveIcsFile } from "../../lib/ics-download";
 import { handleCalendarDelete } from "../../components/command-palette/calendar-utils";
 import { calendarApiService } from "../../lib/calendar-api-service";
 import { CalendarManager } from "../../components/calendar-manager";
@@ -182,6 +196,45 @@ describe("CalendarManager", () => {
     expect(
       container.querySelector('[data-testid="badge-cal-1"]'),
     ).not.toBeNull();
+  });
+
+  it("exports every owned calendar as one file built in the browser", async () => {
+    mockUseSharedCalendarData.mockReturnValue({
+      calendars: [
+        { color: "blue", id: "cal-1", isDefault: true, isSyncOnly: false, kind: "owned", name: "Primary" },
+        { color: "red", id: "feed-1", isDefault: false, isSyncOnly: true, kind: "owned", name: "Feed mirror" },
+        { color: "red", id: "hol-1", isDefault: false, isSyncOnly: false, kind: "public_holiday", name: "Holidays" },
+      ],
+    } as any);
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <CalendarManager
+            currentView="calendars"
+            onBack={() => {}}
+            onGoToSubscriptions={() => {}}
+            onNavigateTo={() => {}}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll("button"))
+        .find((element) => element.textContent?.includes("Export all calendars"))
+        ?.click();
+      await Promise.resolve();
+    });
+
+    expect(loadCalendarIcsExport).toHaveBeenCalledWith(calendarApiService, {
+      calendars: [expect.objectContaining({ id: "cal-1" })],
+      timezone: "Europe/Amsterdam",
+    });
+    expect(saveIcsFile).toHaveBeenCalledWith({
+      icsContent: "BEGIN:VCALENDAR",
+      filename: "solace-calendars.ics",
+    });
   });
 
   it("asks before deleting a calendar and all of its events", async () => {

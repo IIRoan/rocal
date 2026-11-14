@@ -235,6 +235,9 @@ export interface IcsBuildEventInput {
   sequence?: number;
   sourceUrl?: string;
   participants?: IcsParticipant[];
+  /** The original start of the series occurrence this override replaces. */
+  recurrenceId?: Date | null;
+  exceptionDates?: Date[];
 }
 
 const WEEKDAY_INDEX_TO_CODE = [
@@ -252,6 +255,10 @@ const ICS_MAX_LINE_OCTETS = 75;
 const ICS_CONTINUATION_MAX_LINE_OCTETS = 74;
 const TEXT_ENCODER = new TextEncoder();
 const DATE_PARTS_FORMATTER_CACHE = new Map<string, Intl.DateTimeFormat>();
+const DATE_TIME_PARTS_FORMATTER_CACHE = new Map<string, Intl.DateTimeFormat>();
+const VTIMEZONE_CACHE = new Map<string, string[]>();
+const MINUTE_MS = 60_000;
+const DAY_MS = 86_400_000;
 
 function escapeIcsText(value: string): string {
   return value
@@ -324,6 +331,154 @@ function formatDateStampInTimeZone(date: Date, timezone: string): string {
   }
 
   return formatDateStamp(date);
+}
+
+function getDateTimePartsFormatter(timezone: string): Intl.DateTimeFormat {
+  const cachedFormatter = DATE_TIME_PARTS_FORMATTER_CACHE.get(timezone);
+  if (cachedFormatter) {
+    return cachedFormatter;
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  DATE_TIME_PARTS_FORMATTER_CACHE.set(timezone, formatter);
+  return formatter;
+}
+
+/** The wall clock in `timezone` as UTC fields; `% 24` because some engines print midnight as hour 24. */
+function zonedWallClock(date: Date, timezone: string): Date {
+  const parts = getDateTimePartsFormatter(timezone).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((entry) => entry.type === type)?.value);
+  return new Date(
+    Date.UTC(
+      part("year"),
+      part("month") - 1,
+      part("day"),
+      part("hour") % 24,
+      part("minute"),
+      part("second"),
+    ),
+  );
+}
+
+/** `YYYYMMDDTHHMMSS` wall-clock time in `timezone`, the value of a TZID date-time property. */
+export function formatLocalDateTimeStamp(date: Date, timezone: string): string {
+  return formatDateTimeStamp(zonedWallClock(date, timezone)).slice(0, -1);
+}
+
+function utcOffsetMinutes(instant: number, timezone: string): number {
+  const date = new Date(instant);
+  return Math.round(
+    (zonedWallClock(date, timezone).getTime() - date.getTime()) / MINUTE_MS,
+  );
+}
+
+function formatUtcOffset(minutes: number): string {
+  const absolute = Math.abs(minutes);
+  return `${minutes < 0 ? "-" : "+"}${pad2(Math.floor(absolute / 60))}${pad2(absolute % 60)}`;
+}
+
+type OffsetTransition = { at: number; from: number; to: number };
+
+function findOffsetTransitions(timezone: string, year: number): OffsetTransition[] {
+  const transitions: OffsetTransition[] = [];
+  let previous = utcOffsetMinutes(Date.UTC(year, 0, 1), timezone);
+  for (let day = Date.UTC(year, 0, 2); day <= Date.UTC(year + 1, 0, 1); day += DAY_MS) {
+    const current = utcOffsetMinutes(day, timezone);
+    if (current === previous) continue;
+    let before = day - DAY_MS;
+    let after = day;
+    while (after - before > MINUTE_MS) {
+      const middle = before + Math.floor((after - before) / 2 / MINUTE_MS) * MINUTE_MS;
+      if (utcOffsetMinutes(middle, timezone) === previous) before = middle;
+      else after = middle;
+    }
+    transitions.push({ at: after, from: previous, to: current });
+    previous = current;
+  }
+  return transitions;
+}
+
+function observanceLines({ at, from, to }: OffsetTransition): string[] {
+  const onset = new Date(at + from * MINUTE_MS);
+  const month = onset.getUTCMonth();
+  const day = onset.getUTCDate();
+  const weekday = onset.getUTCDay();
+  const daysInMonth = new Date(Date.UTC(onset.getUTCFullYear(), month + 1, 0)).getUTCDate();
+  const nth = day + 7 > daysInMonth ? -1 : Math.ceil(day / 7);
+  const firstWeekday1970 = new Date(Date.UTC(1970, month, 1)).getUTCDay();
+  const lastDay1970 = new Date(Date.UTC(1970, month + 1, 0));
+  const anchorDay =
+    nth === -1
+      ? lastDay1970.getUTCDate() - ((lastDay1970.getUTCDay() - weekday + 7) % 7)
+      : 1 + ((weekday - firstWeekday1970 + 7) % 7) + (nth - 1) * 7;
+  const anchor = new Date(
+    Date.UTC(1970, month, anchorDay, onset.getUTCHours(), onset.getUTCMinutes()),
+  );
+  const kind = to > from ? "DAYLIGHT" : "STANDARD";
+  return [
+    `BEGIN:${kind}`,
+    `DTSTART:${formatDateTimeStamp(anchor).slice(0, -1)}`,
+    `TZOFFSETFROM:${formatUtcOffset(from)}`,
+    `TZOFFSETTO:${formatUtcOffset(to)}`,
+    `RRULE:FREQ=YEARLY;BYMONTH=${month + 1};BYDAY=${nth}${WEEKDAY_INDEX_TO_CODE[weekday]}`,
+    `END:${kind}`,
+  ];
+}
+
+/** The zone's rules in `referenceYear`, anchored in 1970 so every year expands; years before a rule change get approximate offsets. */
+export function buildVTimezoneLines(timezone: string, referenceYear: number): string[] {
+  const cacheKey = `${timezone}|${referenceYear}`;
+  const cached = VTIMEZONE_CACHE.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const january = utcOffsetMinutes(Date.UTC(referenceYear, 0, 1), timezone);
+  const july = utcOffsetMinutes(Date.UTC(referenceYear, 6, 1), timezone);
+  const observances =
+    january === july
+      ? [
+          "BEGIN:STANDARD",
+          "DTSTART:19700101T000000",
+          `TZOFFSETFROM:${formatUtcOffset(january)}`,
+          `TZOFFSETTO:${formatUtcOffset(january)}`,
+          "END:STANDARD",
+        ]
+      : findOffsetTransitions(timezone, referenceYear).flatMap(observanceLines);
+  const lines = ["BEGIN:VTIMEZONE", `TZID:${timezone}`, ...observances, "END:VTIMEZONE"];
+  VTIMEZONE_CACHE.set(cacheKey, lines);
+  return lines;
+}
+
+/** A series or override keeps its wall-clock zone so other clients expand it across DST; every other timed event stays in UTC. */
+function seriesTimezoneId(
+  event: Pick<IcsBuildEventInput, "allDay" | "recurrence" | "recurrenceId" | "timezone">,
+  calendarTimezone?: string,
+): string | undefined {
+  if (event.allDay || (!event.recurrence && !event.recurrenceId)) {
+    return undefined;
+  }
+  const timezone = normalizeIcsTimezone(event.timezone ?? calendarTimezone);
+  if (!timezone || timezone === "UTC") {
+    return undefined;
+  }
+  try {
+    getDateTimePartsFormatter(timezone);
+    return timezone;
+  } catch {
+    return undefined;
+  }
 }
 
 function addDaysToDateStamp(dateStamp: string, days: number): string {
@@ -491,20 +646,28 @@ function buildEventLines(
     `SUMMARY:${escapeIcsText(event.title.trim() || "Untitled Event")}`,
   ];
 
-  if (allDay) {
-    const timezone =
-      normalizeIcsTimezone(event.timezone ?? calendarTimezone) || "UTC";
-    const startDateStamp = formatDateStampInTimeZone(start, timezone);
-    const endExclusiveDateStamp = addDaysToDateStamp(
-      formatDateStampInTimeZone(end, timezone),
-      1,
-    );
+  const allDayTimezone =
+    normalizeIcsTimezone(event.timezone ?? calendarTimezone) || "UTC";
+  const tzid = seriesTimezoneId(event, calendarTimezone);
+  const dateProperty = (name: string, dates: Date[]): string => {
+    if (allDay) {
+      return `${name};VALUE=DATE:${dates.map((date) => formatDateStampInTimeZone(date, allDayTimezone)).join(",")}`;
+    }
+    if (tzid) {
+      return `${name};TZID=${tzid}:${dates.map((date) => formatLocalDateTimeStamp(date, tzid)).join(",")}`;
+    }
+    return `${name}:${dates.map(formatDateTimeStamp).join(",")}`;
+  };
 
-    lines.push(`DTSTART;VALUE=DATE:${startDateStamp}`);
-    lines.push(`DTEND;VALUE=DATE:${endExclusiveDateStamp}`);
-  } else {
-    lines.push(`DTSTART:${formatDateTimeStamp(start)}`);
-    lines.push(`DTEND:${formatDateTimeStamp(end)}`);
+  lines.push(dateProperty("DTSTART", [start]));
+  lines.push(
+    allDay
+      ? `DTEND;VALUE=DATE:${addDaysToDateStamp(formatDateStampInTimeZone(end, allDayTimezone), 1)}`
+      : dateProperty("DTEND", [end]),
+  );
+
+  if (event.recurrenceId && !Number.isNaN(event.recurrenceId.getTime())) {
+    lines.push(dateProperty("RECURRENCE-ID", [event.recurrenceId]));
   }
 
   if (event.description?.trim()) {
@@ -573,6 +736,12 @@ function buildEventLines(
     if (rrule) {
       lines.push(`RRULE:${rrule}`);
     }
+    const exceptionDates = (event.exceptionDates ?? []).filter(
+      (date) => !Number.isNaN(date.getTime()),
+    );
+    if (exceptionDates.length) {
+      lines.push(dateProperty("EXDATE", exceptionDates));
+    }
   }
 
   lines.push("END:VEVENT");
@@ -610,6 +779,15 @@ export function buildIcsCalendar(options: {
 
   if (options.calendar.sourceUrl?.trim()) {
     lines.push(`URL:${sanitizeIcsUri(options.calendar.sourceUrl.trim())}`);
+  }
+
+  const timezoneIds = new Set(
+    options.events.flatMap(
+      (event) => seriesTimezoneId(event, options.calendar.timezone) ?? [],
+    ),
+  );
+  for (const timezone of timezoneIds) {
+    lines.push(...buildVTimezoneLines(timezone, dtStamp.getUTCFullYear()));
   }
 
   for (const event of options.events) {

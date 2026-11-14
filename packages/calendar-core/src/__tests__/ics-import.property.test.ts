@@ -50,6 +50,18 @@ function localDateStamp(instant: Date, timezone: string): string {
     .format(instant);
 }
 
+const wallClock = (instant: number, timezone: string) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: timezone, hourCycle: "h23", dateStyle: "short", timeStyle: "medium" })
+    .format(instant);
+
+/** A series exports in its zone with today's DST rules, so it reads back exactly from 2012 on, outside the repeated fall-back hour. */
+function readsBackExactly(event: { start: Date; end: Date; allDay: boolean; timezone: string; recurrence?: unknown }) {
+  if (!event.recurrence || event.allDay || event.timezone === "UTC") return true;
+  const unambiguous = (instant: number) =>
+    [-60, -30, 30, 60].every((minutes) => wallClock(instant + minutes * 60_000, event.timezone) !== wallClock(instant, event.timezone));
+  return event.start.getUTCFullYear() >= 2012 && unambiguous(event.start.getTime()) && unambiguous(event.end.getTime());
+}
+
 const validIcsArb = icsEventArb.map((event) => buildIcsEventFile({ calendar: { name: "x" }, event }));
 
 const mutationArb = fc.array(
@@ -88,7 +100,7 @@ describe("parseIcsImport", () => {
 
   it("reads back the event buildIcsEventFile wrote", () => {
     fc.assert(
-      fc.property(icsEventArb, (event) => {
+      fc.property(icsEventArb.filter(readsBackExactly), (event) => {
         const parsed = parseIcsImport(buildIcsEventFile({ calendar: { name: "x" }, event }), "UTC");
         expect(parsed.errors).toEqual([]);
         expect(parsed.events).toHaveLength(1);
@@ -96,8 +108,7 @@ describe("parseIcsImport", () => {
         expect(imported?.title).toBe(event.title.trim());
         expect(imported?.description).toBe(event.description.trim() || undefined);
         expect(imported?.location).toBe(event.location.trim() || undefined);
-        // Exports write every time in UTC, so only a UTC event keeps its zone; C1 adds TZID for series.
-        if (event.timezone === "UTC") expect(imported?.timezone).toBe("UTC");
+        if (event.timezone === "UTC" || (event.recurrence && !event.allDay)) expect(imported?.timezone).toBe(event.timezone);
         if (event.allDay) {
           const startDay = Date.parse(`${localDateStamp(event.start, event.timezone)}T00:00:00.000Z`);
           const endDay = Date.parse(`${localDateStamp(event.end, event.timezone)}T00:00:00.000Z`);

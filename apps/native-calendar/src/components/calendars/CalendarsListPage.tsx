@@ -4,6 +4,7 @@ import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useToggleCalendarVisibility } from "../../hooks/use-toggle-calendar-visibility";
 import { useCalendarSubscriptions, useCalendars } from "../../hooks/use-calendar-management";
 import { useCategories } from "../../hooks/use-categories";
+import { useCalendarIcsExport } from "../../hooks/use-calendar-ics-export";
 import { useSheetPageNavigator } from "@workspace/native-core/components/sheet/SheetPageStack";
 import {
   SheetCenteredState,
@@ -36,6 +37,7 @@ export function CalendarsListPage() {
   const subscriptionsQuery = useCalendarSubscriptions();
   const categoryCount = useCategories().data?.length ?? 0;
   const { toggle, pendingCalendarId } = useToggleCalendarVisibility();
+  const icsExport = useCalendarIcsExport();
 
   const model = useMemo(
     () => buildCalendarsSheetModel(calendarsQuery.data ?? [], subscriptionsQuery.data ?? []),
@@ -128,6 +130,20 @@ export function CalendarsListPage() {
             icon="rss"
             chevron
             onPress={() => push(SUBSCRIPTION_CREATE_PAGE)}
+          />
+        </SheetGroup>
+      </SheetSection>
+
+      <SheetSection footer="One .ics file with every event in your own calendars.">
+        <SheetGroup>
+          <SheetItem
+            label="Export all calendars"
+            icon="share"
+            pending={icsExport.isPending}
+            disabled={icsExport.isPending}
+            onPress={() =>
+              icsExport.mutate(model.owned.filter((calendar) => !calendar.isSyncOnly))
+            }
           />
         </SheetGroup>
       </SheetSection>

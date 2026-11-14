@@ -1,4 +1,5 @@
 import {
+  buildCalendarIcsExport,
   buildEventIcsExport,
   EventIcsExportError,
   toSafeIcsFilename,
@@ -101,5 +102,80 @@ describe("buildEventIcsExport", () => {
       buildEventIcsExport(makeEvent({ encryptionState: "encrypted" })).icsContent,
     );
     expect(ics).toContain("SUMMARY:Team standup");
+  });
+});
+
+describe("buildCalendarIcsExport", () => {
+  const series = makeEvent({
+    id: "series",
+    title: "Weekly sync",
+    recurrence: JSON.stringify({ frequency: "weekly", interval: 1 }),
+    recurrenceExceptions: [
+      { exceptionDate: "2025-06-23T07:00:00.000Z", modifiedEventId: null, type: "deleted" },
+      { exceptionDate: "2025-06-30T07:00:00.000Z", modifiedEventId: "override", type: "modified" },
+      { exceptionDate: "2025-07-07T07:00:00.000Z", modifiedEventId: "elsewhere", type: "modified" },
+    ],
+  });
+  const override = makeEvent({
+    id: "override",
+    title: "Weekly sync moved",
+    parentEventId: "series",
+    start: new Date("2025-06-30T09:00:00.000Z"),
+    end: new Date("2025-06-30T09:30:00.000Z"),
+  });
+  const splitHalf = makeEvent({
+    id: "split",
+    title: "Weekly sync new time",
+    parentEventId: "series",
+    start: new Date("2025-08-04T08:00:00.000Z"),
+    end: new Date("2025-08-04T08:30:00.000Z"),
+    recurrence: JSON.stringify({ frequency: "weekly", interval: 1 }),
+  });
+  const cancelled = makeEvent({ id: "cancelled", title: "Offsite", isCancelled: true });
+  const standalone = makeEvent({ id: "dentist", title: "Dentist", externalId: "imported-uid" });
+
+  function exportBlocks() {
+    const { icsContent, filename } = buildCalendarIcsExport(
+      [series, override, splitHalf, cancelled, standalone],
+      { calendarName: "Work", timezone: "Europe/Amsterdam" },
+    );
+    const blocks = unfold(icsContent).split("BEGIN:VEVENT").slice(1);
+    const block = (summary: string) => blocks.find((entry) => entry.includes(`SUMMARY:${summary}\r\n`)) ?? "";
+    return { icsContent: unfold(icsContent), filename, block };
+  }
+
+  it("exports a series with its deleted and unexported occurrences excluded in its zone", () => {
+    const { icsContent, block } = exportBlocks();
+    expect(icsContent).toContain("BEGIN:VTIMEZONE");
+    expect(block("Weekly sync")).toContain("UID:series@solace-calendar.local");
+    expect(block("Weekly sync")).toContain("RRULE:FREQ=WEEKLY");
+    expect(block("Weekly sync")).toContain("EXDATE;TZID=Europe/Amsterdam:20250623T090000,20250707T090000");
+  });
+
+  it("exports a modified occurrence as an override under the series UID", () => {
+    const moved = exportBlocks().block("Weekly sync moved");
+    expect(moved).toContain("UID:series@solace-calendar.local");
+    expect(moved).toContain("RECURRENCE-ID;TZID=Europe/Amsterdam:20250630T090000");
+    expect(moved).toContain("DTSTART;TZID=Europe/Amsterdam:20250630T110000");
+    expect(moved).not.toContain("RRULE");
+  });
+
+  it("exports a split half, cancelled and standalone events under their own UIDs", () => {
+    const { block, filename } = exportBlocks();
+    expect(filename).toBe("work.ics");
+    expect(block("Weekly sync new time")).toContain("UID:split@solace-calendar.local");
+    expect(block("Weekly sync new time")).toContain("RRULE:FREQ=WEEKLY");
+    expect(block("Offsite")).toContain("STATUS:CANCELLED");
+    expect(block("Dentist")).toContain("UID:imported-uid");
+    expect(block("Dentist")).toContain("DTSTART:20250616T070000Z");
+  });
+
+  it("refuses the whole export while any event is still locked", () => {
+    expect(() =>
+      buildCalendarIcsExport(
+        [series, makeEvent({ id: "locked", title: "Encrypted event", encryptionState: "encrypted" })],
+        { calendarName: "Work" },
+      ),
+    ).toThrow("Some events are still encrypted on this device");
   });
 });
