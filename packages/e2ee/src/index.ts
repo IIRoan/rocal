@@ -7,6 +7,7 @@ export { createE2eeModule } from "./e2ee-module";
 export {
   lockWithoutDeviceKeys,
   resolveDeviceEnvelopeSalt,
+  shouldUpgradePasswordEnvelope,
   type E2eeLock,
   type UnlockPassword,
 } from "./device-key";

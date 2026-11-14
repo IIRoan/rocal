@@ -3,7 +3,7 @@ import fc from "fast-check";
 import { webcrypto } from "node:crypto";
 
 import type { CryptoProvider } from "../crypto-provider";
-import { createE2eeModule } from "../e2ee-module";
+import { bytesToBase64Url, createE2eeModule } from "../e2ee-module";
 import type { E2eeModule } from "../e2ee-module";
 
 /**
@@ -98,6 +98,47 @@ describe("Password envelope round-trip - Property Tests", () => {
       );
     }, 60_000);
   });
+
+  it("writes PBKDF2-SHA-256 envelopes at 600000 iterations", async () => {
+    const envelope = await e2eeModule.createPasswordEnvelope(
+      await e2eeModule.generateAccountKey(),
+      await e2eeModule.generateBlindIndexKey(),
+      "pw",
+    );
+    expect(envelope).toMatchObject({ kdfAlgorithm: "PBKDF2-SHA-256", kdfIterations: 600000 });
+  });
+
+  it("still opens an envelope written at the former 310000 iterations", async () => {
+    const accountKey = await e2eeModule.generateAccountKey();
+    const blindIndexKey = await e2eeModule.generateBlindIndexKey();
+    const kdfSalt = e2eeModule.generatePasswordSalt();
+    const wrappingKey = await e2eeModule.derivePasswordWrappingKey("pw", kdfSalt, 310000);
+    const wrap = async (key: CryptoKey, aad: string) => {
+      const iv = nodeCrypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await nodeCrypto.subtle.encrypt(
+        { name: "AES-GCM", iv, additionalData: new TextEncoder().encode(aad) },
+        wrappingKey,
+        await nodeCrypto.subtle.exportKey("raw", key),
+      );
+      return JSON.stringify({
+        version: 1,
+        algorithm: "AES-GCM",
+        iv: bytesToBase64Url(iv),
+        ciphertext: bytesToBase64Url(new Uint8Array(ciphertext)),
+      });
+    };
+
+    const recovered = await e2eeModule.unwrapPasswordEnvelope("pw", {
+      kdfSalt,
+      kdfIterations: 310000,
+      wrappedAccountKey: await wrap(accountKey, "account-key:1"),
+      wrappedSearchKey: await wrap(blindIndexKey, "blind-index-key:1"),
+      keyVersion: 1,
+    });
+
+    const sealed = await e2eeModule.encryptJsonPayload(accountKey, "legacy");
+    await expect(e2eeModule.decryptJsonPayload(recovered.accountKey, sealed)).resolves.toBe("legacy");
+  }, 30_000);
 
   describe("Unwrapping with a wrong password fails", () => {
     it("should throw an error when unwrapping with a different password", async () => {

@@ -25,7 +25,7 @@ const PASSWORD_SALT_BYTES = 16;
 
 export const PASSWORD_KDF_ALGORITHM = "PBKDF2-SHA-256";
 export const PASSWORD_WRAP_ALGORITHM = "AES-GCM-256";
-export const DEFAULT_PASSWORD_KDF_ITERATIONS = 310000;
+export const DEFAULT_PASSWORD_KDF_ITERATIONS = 600000;
 /** Mirrors `apps/backend/src/auth/password.rs`; changing any of these locks every account out. */
 const AUTH_KEY_PREFIX = "solace-ak1:";
 const AUTH_KEY_SALT_PREFIX = "solace-auth-key-v1:";

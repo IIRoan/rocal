@@ -10,9 +10,11 @@ import {
   createE2eeModule,
   lockWithoutDeviceKeys,
   resolveDeviceEnvelopeSalt,
+  shouldUpgradePasswordEnvelope,
   type E2eeLock,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
+  type PasswordEnvelopeInput,
   type PasswordEnvelopePayload,
 } from "@workspace/e2ee";
 import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
@@ -34,6 +36,23 @@ import { useAuth } from "./AuthProvider";
 import { setActiveE2eeSession } from "../lib/e2ee-session";
 
 const log = createLogger("native:e2ee");
+
+/** Rewraps an envelope weaker than a new one with the sign-in password, once it is known to hold this session's key. */
+async function upgradePasswordEnvelope(input: {
+  envelope: PasswordEnvelopeInput | null;
+  deviceEnvelopeSalt: string | null | undefined;
+  password: string | null;
+  userId: string;
+  store: (password: string) => Promise<void>;
+}): Promise<void> {
+  if (!input.password || !shouldUpgradePasswordEnvelope(input)) return;
+  await input.store(input.password).catch((error: unknown) => {
+    log.warn("Failed to rewrap the E2EE password envelope", {
+      userId: input.userId,
+      error,
+    });
+  });
+}
 
 
 export interface E2eeContextValue {
@@ -193,21 +212,31 @@ export function E2eeProvider({
           setActiveE2eeSession(sessionRef.current);
           const pendingPassword = peekPendingAuthPassword();
           // Keys minted while another key's envelope existed must survive sign-out, so a changed envelope is checked again.
-          await resolveDeviceEnvelopeSalt(e2ee, {
+          const deviceEnvelopeSalt = await resolveDeviceEnvelopeSalt(e2ee, {
             storedSalt: envelopeSalt,
             envelope: bootstrapData.passwordEnvelope,
             password: pendingPassword,
             accountKey,
           })
-            .then((salt) =>
-              salt === envelopeSalt ? undefined : rememberDeviceEnvelopeSalt(salt),
-            )
+            .then(async (salt) => {
+              if (salt !== envelopeSalt) await rememberDeviceEnvelopeSalt(salt);
+              return salt;
+            })
             .catch((error: unknown) => {
               log.warn("Failed to check the device key against the envelope", {
                 userId,
                 error,
               });
+              return null;
             });
+          await upgradePasswordEnvelope({
+            envelope: bootstrapData.passwordEnvelope,
+            deviceEnvelopeSalt,
+            password: pendingPassword,
+            userId,
+            store: (password) =>
+              storePasswordEnvelopeForActiveSession({ e2ee, userId, apiBaseUrl, password }),
+          });
           // An account whose first envelope write failed gets another try whenever the sign-in password is at hand.
           if (!bootstrapData.passwordEnvelope && pendingPassword) {
             await storePasswordEnvelopeForActiveSession({
@@ -270,6 +299,14 @@ export function E2eeProvider({
 
           sessionRef.current = nextSession;
           setActiveE2eeSession(nextSession);
+          await upgradePasswordEnvelope({
+            envelope,
+            deviceEnvelopeSalt: envelope.kdfSalt,
+            password: pendingPassword,
+            userId,
+            store: (password) =>
+              storePasswordEnvelopeForActiveSession({ e2ee, userId, apiBaseUrl, password }),
+          });
           clearPendingAuthPassword();
           log.info("Unlocked native E2EE with pending auth password", {
             userId,

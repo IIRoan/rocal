@@ -1,7 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
 import { webcrypto } from "node:crypto";
 import type { CryptoProvider } from "../crypto-provider";
-import { lockWithoutDeviceKeys, resolveDeviceEnvelopeSalt } from "../device-key";
+import {
+  lockWithoutDeviceKeys,
+  resolveDeviceEnvelopeSalt,
+  shouldUpgradePasswordEnvelope,
+} from "../device-key";
 import { createE2eeModule } from "../e2ee-module";
 
 // Node's WebCrypto matches the provider at runtime; only the DOM-shaped declarations differ.
@@ -90,6 +94,20 @@ describe("resolveDeviceEnvelopeSalt", () => {
         accountKey,
       }),
     ).resolves.toBeNull();
+  });
+});
+
+describe("shouldUpgradePasswordEnvelope", () => {
+  const legacy = { kdfSalt: "salt", kdfIterations: 310000 };
+
+  it.each([
+    ["rewraps an older envelope that holds this device's key", legacy, "salt", true],
+    ["leaves an envelope that may hold another key", legacy, "other-salt", false],
+    ["leaves an envelope no remembered salt vouches for", legacy, null, false],
+    ["leaves an envelope as strong as a new one", { ...legacy, kdfIterations: 600000 }, "salt", false],
+    ["has nothing to rewrap without an envelope", null, "salt", false],
+  ])("%s", (_case, envelope, deviceEnvelopeSalt, expected) => {
+    expect(shouldUpgradePasswordEnvelope({ envelope, deviceEnvelopeSalt })).toBe(expected);
   });
 });
 
