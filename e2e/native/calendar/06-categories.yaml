@@ -15,26 +15,31 @@ appId: ${APP_ID}
     visible: Category name
     timeout: 30000
 - waitForAnimationToEnd
-- runFlow:
-    file: ../common/refocus-input.yaml
-    env:
-      INPUT_ID: category-name
-      BLUR_TARGET: Name
-- runFlow:
-    when:
-      platform: Android
+- retry:
+    maxRetries: 1
     commands:
-      - extendedWaitUntil:
-          visible:
-            id: category-name
-            focused: true
-          timeout: 15000
-- runFlow:
-    file: ../common/type.yaml
-    env:
-      TEXT: Maestro category
-      VERIFY_TEXT: "true"
-      VERIFY_ID: category-name
+      - runFlow:
+          file: ../common/refocus-input.yaml
+          env:
+            INPUT_ID: category-name
+            BLUR_TARGET: Name
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: category-name
+                  focused: true
+                timeout: 15000
+      # Clear the unsaved field so a dropped-input retry cannot append a duplicate prefix.
+      - eraseText
+      - runFlow:
+          file: ../common/type.yaml
+          env:
+            TEXT: Maestro category
+            VERIFY_TEXT: "true"
+            VERIFY_ID: category-name
 - assertVisible: Maestro category
 - hideKeyboard
 - waitForAnimationToEnd
