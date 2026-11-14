@@ -17,6 +17,7 @@ export * from "./mail-identity-badge";
 export * from "./mail-recipient";
 export * from "./outgoing-mime";
 export * from "./mail-outgoing-attachments";
+export * from "./mail-image-metadata";
 export * from "./mail-hidden-mailboxes";
 export * from "./mail-mailbox-names";
 export * from "./mail-label-colors";

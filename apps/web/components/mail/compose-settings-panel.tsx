@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlignLeft, Paperclip, X } from "lucide-react";
+import { AlignLeft, MapPinOff, Paperclip, X } from "lucide-react";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
 import { useMailComposeSettings } from "@/lib/mail/compose-settings";
 import {
@@ -42,6 +42,16 @@ export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
         checked={settings.plainTextMode}
         onToggle={() =>
           updateSettings({ plainTextMode: !settings.plainTextMode })
+        }
+      />
+
+      <SettingToggleRow
+        icon={MapPinOff}
+        label="Remove photo location"
+        description="Removes location and camera details from attached photos."
+        checked={settings.stripImageMetadata}
+        onToggle={() =>
+          updateSettings({ stripImageMetadata: !settings.stripImageMetadata })
         }
       />
 

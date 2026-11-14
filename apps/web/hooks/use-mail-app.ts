@@ -134,6 +134,7 @@ import {
 } from "@/lib/mail/compose-inline-images";
 import type { InlineImageUpload } from "@/components/mail/rich-text-editor";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
+import { prepareOutgoingImageFiles } from "@/lib/mail/strip-image-metadata";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "@/lib/mail/mail-pagination";
 import {
   classifyMessageEncryption,
@@ -1588,10 +1589,12 @@ export function useMailApp() {
   };
 
   const handleComposeImageUpload = async (
-    file: File,
+    original: File,
   ): Promise<InlineImageUpload | null> => {
     if (!activeMailbox) return null;
     const uploadImage = async () => {
+      const [prepared] = await prepareOutgoingImageFiles([original]);
+      const file = prepared ?? original;
       const contentType = file.type || "application/octet-stream";
       const [dataUrl, content] = await Promise.all([
         readBlobAsDataUrl(file),
@@ -1611,7 +1614,7 @@ export function useMailApp() {
     };
     return uploadImage().catch((error: unknown) => {
       log.error("Inline image upload failed", error);
-      toast.error(`Failed to upload ${file.name}`);
+      toast.error(`Failed to upload ${original.name}`);
       return null;
     });
   };

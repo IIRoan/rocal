@@ -42,6 +42,7 @@ import {
   cleanInviteMailText,
 } from "@/lib/mail/invite-boilerplate";
 import { messageHasLoadedBody } from "@/lib/mail/mail-message-body";
+import { prepareOutgoingImageFiles } from "@/lib/mail/strip-image-metadata";
 import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
 import {
   resolveMailContentIsDark,
@@ -450,16 +451,17 @@ export function useMessageReaderController(props: MessageReaderProps) {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const accepted = pickOutgoingAttachmentFiles(
-      Array.from(e.target.files ?? []),
-      {
-        maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
-        onReject: (error) => toast.error(error),
-      },
-    );
-    if (accepted.length > 0) {
-      dispatchMessageUi({ type: "appendAttachedFiles", files: accepted });
-    }
+    void prepareOutgoingImageFiles(Array.from(e.target.files ?? []))
+      .then((prepared) => {
+        const accepted = pickOutgoingAttachmentFiles(prepared, {
+          maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
+          onReject: (error) => toast.error(error),
+        });
+        if (accepted.length > 0) {
+          dispatchMessageUi({ type: "appendAttachedFiles", files: accepted });
+        }
+      })
+      .catch(() => toast.error("Could not attach the file."));
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 

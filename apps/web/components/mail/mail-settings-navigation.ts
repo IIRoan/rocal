@@ -51,7 +51,7 @@ export const MAIL_SETTINGS_NAV_ITEMS: MailSettingsNavItem[] = [
     label: "Composing",
     icon: AlignLeft,
     description: "Plain text mode, signatures, attachment reminders",
-    keywords: ["compose", "signature", "reply", "attachment"],
+    keywords: ["compose", "signature", "reply", "attachment", "photo", "location", "metadata"],
   },
   {
     id: "mail-display",

@@ -31,6 +31,12 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
     location: `${COMPOSING} · Signature position`,
     keywords: "above below quote reply forward",
   },
+  {
+    pageId: "composing",
+    label: "Remove photo location",
+    location: COMPOSING,
+    keywords: "image metadata exif gps camera",
+  },
   { pageId: "composing", label: "Signature separator", location: COMPOSING },
   {
     pageId: "composing",

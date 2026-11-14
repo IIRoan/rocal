@@ -68,6 +68,12 @@ export function ComposeSettingsContent() {
               value={settings.plainTextMode}
               onValueChange={(value) => updateSettings({ plainTextMode: value })}
             />
+            <SheetSwitchItem
+              label="Remove photo location"
+              detail="Removes location and camera details from attached photos."
+              value={settings.stripImageMetadata}
+              onValueChange={(value) => updateSettings({ stripImageMetadata: value })}
+            />
           </SheetGroup>
         </SheetSection>
 

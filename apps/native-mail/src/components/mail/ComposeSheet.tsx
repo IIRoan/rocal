@@ -43,6 +43,10 @@ import {
   type PendingComposeAttachment,
 } from "../../lib/mail/compose-attachments";
 import { decodeBase64ToBytes } from "../../lib/mail/binary-utils";
+import {
+  stripPickedImageMetadata,
+  type StrippedImageFile,
+} from "../../lib/mail/strip-image-metadata";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useMailComposeSettings } from "../../hooks/use-mail-settings";
@@ -257,6 +261,7 @@ function ComposeSession({
   const handleAttach = async () => {
     await pickComposeAttachment(
       runtime?.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
+      composeSettings.stripImageMetadata ? setError : null,
     )
       .then((attachment) => {
         if (attachment) dispatch({ type: "attach", attachment });
@@ -402,9 +407,10 @@ function ComposeSession({
   );
 }
 
-/** Picks one file; the picker's cache copy is plaintext, so it is deleted once read or refused. */
+/** Picks one file; the picker's cache copy is plaintext, so it is deleted once read or refused; photos are re-encoded unless `reportStripNotice` is null. */
 async function pickComposeAttachment(
   maxBytes: number | undefined,
+  reportStripNotice: ((notice: string) => void) | null,
 ): Promise<PendingComposeAttachment | null> {
   const result = await DocumentPicker.getDocumentAsync({
     type: "*/*",
@@ -421,20 +427,26 @@ async function pickComposeAttachment(
       maxBytes,
     );
     if (sizeError) throw new Error(sizeError);
-    return FileSystem.readAsStringAsync(asset.uri, {
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, {
       encoding: FileSystem.EncodingType.Base64,
     });
+    const file: StrippedImageFile = {
+      name: asset.name ?? "attachment",
+      type: asset.mimeType,
+      bytes: decodeBase64ToBytes(base64),
+    };
+    return reportStripNotice ? stripPickedImageMetadata(asset.uri, file) : file;
   };
-  const base64 = await readAsset().finally(() =>
+  const { notice, ...file } = await readAsset().finally(() =>
     FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(
       () => undefined,
     ),
   );
-  return createPendingComposeAttachment({
-    name: asset.name ?? "attachment",
-    type: asset.mimeType,
-    bytes: decodeBase64ToBytes(base64),
-  });
+  if (notice) reportStripNotice?.(notice);
+  // Re-encoding can grow a photo, so the limit is checked again on what is sent.
+  const sizeError = getOutgoingAttachmentSizeError(file.name, file.bytes.length, maxBytes);
+  if (sizeError) throw new Error(sizeError);
+  return createPendingComposeAttachment(file);
 }
 
 const EMPTY_COMPOSE_FIELDS: ComposeTextFields = {

@@ -74,6 +74,7 @@ import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type { JmapSession } from "@/lib/mail/types";
 import { serializeEditorContent } from "./quoted-html";
 import { plainTextToComposerBody } from "@/lib/mail/compose-editor-utils";
+import { prepareOutgoingImageFiles } from "@/lib/mail/strip-image-metadata";
 import { toast } from "@workspace/ui/lib/toast";
 import { cn } from "@workspace/ui/lib/utils";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
@@ -493,17 +494,23 @@ export function ComposeForm({
     isMobile ? "w-10" : "w-14",
   );
 
+  // Size limits apply to the re-encoded files.
+  const addAttachments = (files: File[]) => {
+    prepareOutgoingImageFiles(files)
+      .then((prepared) => {
+        const accepted = pickOutgoingAttachmentFiles(prepared, {
+          maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
+          onReject: (error) => toast.error(error),
+        });
+        if (accepted.length > 0) {
+          setComposeAttachments((prev) => [...prev, ...accepted]);
+        }
+      })
+      .catch(() => toast.error("Could not attach the file."));
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const accepted = pickOutgoingAttachmentFiles(
-      Array.from(e.target.files ?? []),
-      {
-        maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
-        onReject: (error) => toast.error(error),
-      },
-    );
-    if (accepted.length > 0) {
-      setComposeAttachments((prev) => [...prev, ...accepted]);
-    }
+    addAttachments(Array.from(e.target.files ?? []));
     e.target.value = "";
   };
 
@@ -512,16 +519,6 @@ export function ComposeForm({
       prev.filter((attachment) => attachment !== file),
     );
   };
-
-  function addDroppedFiles(files: File[]) {
-    const accepted = pickOutgoingAttachmentFiles(files, {
-      maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
-      onReject: (error) => toast.error(error),
-    });
-    if (accepted.length > 0) {
-      setComposeAttachments((prev) => [...prev, ...accepted]);
-    }
-  }
 
   function clearDragState() {
     if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
@@ -565,7 +562,7 @@ export function ComposeForm({
     event.stopPropagation();
     clearDragState();
     if (event.dataTransfer.files?.length) {
-      addDroppedFiles(Array.from(event.dataTransfer.files));
+      addAttachments(Array.from(event.dataTransfer.files));
     }
   }
 
