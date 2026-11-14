@@ -47,6 +47,7 @@ describe("buildContentSecurityPolicy", () => {
     expect(csp.get("base-uri")).toEqual(["'self'"]);
     expect(csp.get("default-src")).toEqual(["'self'"]);
     expect(csp.get("script-src")).toEqual(["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"]);
+    expect(csp.get("script-src-attr")).toEqual(["'none'"]);
     expect(csp.get("worker-src")).toEqual(["'self'", "blob:"]);
     expect(csp.get("img-src")).toEqual(["'self'", "data:", "blob:", "https:", "https://api.solace.onl"]);
     expect(csp.has("upgrade-insecure-requests")).toBe(true);
@@ -58,6 +59,7 @@ describe("buildContentSecurityPolicy", () => {
     );
 
     expect(csp.get("script-src")).toContain("'unsafe-eval'");
+    expect(csp.get("script-src-attr")).toEqual(["'none'"]);
     expect(csp.get("connect-src")).toEqual(
       expect.arrayContaining(["http://localhost:4001", "ws:", "wss:"]),
     );

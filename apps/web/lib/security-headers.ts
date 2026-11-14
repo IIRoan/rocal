@@ -32,6 +32,8 @@ export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
       // wasm-unsafe-eval: hash-wasm (argon2id vault KDF). unsafe-eval only for React dev tooling.
       ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", ...(isDev ? ["'unsafe-eval'"] : [])],
     ],
+    // Inline event handlers stay blocked even though Next's inline RSC scripts need 'unsafe-inline'.
+    ["script-src-attr", ["'none'"]],
     // Inline styles come from React, next/font, and mail HTML in the srcdoc reader frame.
     ["style-src", ["'self'", "'unsafe-inline'"]],
     // https: covers avatar URLs and opted-in mail images; the reader frame's CSP still blocks them.
