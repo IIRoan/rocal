@@ -1,10 +1,10 @@
-# Plan 005: Learnings from Aster — security, mail and calendar in one PR
+# Plan 005: Security, mail and calendar improvements in one PR
 
-Status: PARTLY DONE (2026-11-14, PR `feat/aster-learnings`). Implemented: S2 (without the `native-release` environment), S3 Part A, S5 (without the GitHub-advisory Contact line), S6, S9, M1–M6, M8–M10, C1–C6, T1, T2, and R1–R3. Still open, waiting on the owner's decisions: S1, S3 Part B, S4, S7 (with R8), S8, M7 and the S2 environment; their sections below remain the specification.
+Status: PARTLY DONE (2026-11-14, PR #199). Implemented: S2 (without the `native-release` environment), S3 Part A, S5 (without the GitHub-advisory Contact line), S6, S9, M1–M6, M8–M10, C1–C6, T1, T2, and R1–R3. Still open, waiting on the owner's decisions: S1, S3 Part B, S4, S7 (with R8), S8, M7 and the S2 environment; their sections below remain the specification.
 
 Planned on 2026-11-14 against commit `ee7fb5511647555967242204ed19eef584f66f21` (branch `ui/reduce-encryption-notices`, which is 10 commits ahead of `master` `95fa8e79`). Priority P1–P3 mixed. Effort XL. Rollout risk is HIGH because of S7, S8, M7 and C6.
 
-The ideas come from a read-only comparison with Aster (`github.com/Aster-Privacy`: Aster-Mail, Aster-Calendar, Aster-Android, Aster-Bridge, aster-ui, Security; AGPL clients, closed backend). **Take ideas only and never copy Aster code.** Aster's own weaknesses (OPAQUE with a password-hash fallback, ratchet plus plaintext escrow, a cross-origin passphrase handoff, a server image proxy, a server-side unsubscribe catalog, a duress PIN that only wipes local state) are deliberately not adopted.
+Deliberately not adopted: OPAQUE with a password-hash fallback, a ratchet with plaintext escrow, a cross-origin passphrase handoff, a server image proxy, a server-side unsubscribe catalog, and a duress PIN that only wipes local state.
 
 Read this whole plan and root `AGENTS.md` before implementing. Then:
 
@@ -754,7 +754,6 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
     - self-XSS;
     - reports that only repeat the documented known gaps and accepted trade-offs in AGENTS.md §2 (plaintext `EventParticipant` email and name, and the listed "Known gaps");
     - third-party services (Railway, Vercel, Expo, Apple);
-    - the untracked `webmail/` reference.
   - **Response targets** (D2): acknowledge within 5 business days, assessment within 14 days, fix critical issues within 30 days. Coordinated disclosure after a fix or 90 days. Credit on request. No bounty.
   - **Safe harbour:** good-faith research under this policy is authorized and will not be pursued legally, provided you:
     - use only accounts you own or have permission to test;
@@ -1433,7 +1432,7 @@ Shared ground for M1–M4, verified in code (line numbers as of `ee7fb551`):
   - The `(id, {href, text})` pairs collected while building `srcDoc` go into an in-memory registry in an effect. The registry is a module `Map` capped at 2,000 entries (oldest evicted) and cleared on sign-out.
   - The click opens `/mail/link#<id>` in a new tab, as it already would. That page drops the fragment (`history.replaceState`) and asks over `BroadcastChannel("solace:mail-link")`: `{type:"resolve", id}`. The reader tab's responder (started once in `MailApp`) answers `{type:"resolved", id, href, text}`. Both directions are validated with strict Zod schemas from `@workspace/calendar-core/zod`; the id must match `^[0-9a-f-]{36}\.\d{1,5}$`, `href` ≤ 16,384 characters and `text` ≤ 512.
   - With no answer within 5 s the page shows "This link has expired. Open it again from the message."
-  - For a `mailto:`, the page stores the parsed draft in a module-level pending slot and `router.replace("/mail")`. The compose controller consumes the slot once identities are loaded and calls a new `seedMailto(draft)`. Compose opens in the new tab, like webmail mailto handling.
+  - For a `mailto:`, the page stores the parsed draft in a module-level pending slot and `router.replace("/mail")`. The compose controller consumes the slot once identities are loaded and calls a new `seedMailto(draft)`. Compose opens in the new tab.
   - Only an opaque random id is ever in a URL.
 **Changes.**
 - packages/calendar-core
@@ -1625,7 +1624,7 @@ Shared ground for M1–M4, verified in code (line numbers as of `ee7fb551`):
 
 ### M4. Unsubscribe for any mail with List-Unsubscribe
 **Effort** M · **Risk** med · **Touches** packages/calendar-core, apps/web, apps/native-mail
-**Why.** Unsubscribe exists only for SimpleLogin forwards. Every list mail with an authenticated `List-Unsubscribe` should get it, executed from the device and never through the Solace server. Aster's server-side catalog would violate §2.
+**Why.** Unsubscribe exists only for SimpleLogin forwards. Every list mail with an authenticated `List-Unsubscribe` should get it, executed from the device and never through the Solace server. A server-side subscription catalog would violate §2.
 **Current state.**
 - `header:List-Unsubscribe:asURLs` is already fetched through `SIMPLELOGIN_JMAP_PROPERTIES` (`mail-simplelogin.ts:15-22`):
   - Web: `apps/web/lib/mail/jmap-client.ts:233-256` `EMAIL_FULL_GET_PROPERTIES`, with Zod in `apps/web/lib/mail/types.ts:259`.

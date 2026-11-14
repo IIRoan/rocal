@@ -27,7 +27,6 @@ Please include:
 - Self-XSS.
 - Reports that only repeat the known gaps and accepted trade-offs documented in `AGENTS.md` §2, such as the plaintext `EventParticipant` email and name and the listed "Known gaps".
 - Third-party services (Railway, Vercel, Expo, Apple).
-- The untracked `webmail/` reference.
 
 ## What to expect
 
