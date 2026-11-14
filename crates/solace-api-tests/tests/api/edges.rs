@@ -62,6 +62,23 @@ async fn health_and_root_routes() {
 }
 
 #[tokio::test]
+async fn security_txt_is_served_as_plain_text() {
+    let app = TestApp::spawn().await;
+    let mut agent = app.anonymous();
+    let response = ok(agent
+        .get("/.well-known/security.txt")
+        .await
+        .expect_status(200));
+    assert_eq!(
+        header(&response, "content-type"),
+        Some("text/plain; charset=utf-8")
+    );
+    let body = String::from_utf8_lossy(&response.body);
+    assert!(body.starts_with("Contact: "), "{body}");
+    assert_security_headers(&app, &response, "same-site");
+}
+
+#[tokio::test]
 async fn every_kind_of_response_carries_the_security_headers() {
     let app = TestApp::spawn().await;
     let mut agent = app.anonymous();

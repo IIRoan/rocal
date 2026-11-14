@@ -1,4 +1,4 @@
-//! Health and root routes: liveness, mail server reachability, the connectivity test and the root redirect.
+//! Health and root routes: liveness, mail server reachability, the connectivity test, the root redirect and security.txt.
 
 use axum::Json;
 use axum::extract::{RawQuery, State};
@@ -133,4 +133,30 @@ pub async fn root_redirect(State(state): State<AppState>, RawQuery(query): RawQu
         response.headers_mut().insert(header::LOCATION, value);
     }
     response
+}
+
+const SECURITY_TXT: &str = include_str!("../security.txt");
+
+/// RFC 9116 contact file; the web and mail copies must stay identical (`scripts/tests/security-txt.test.ts`).
+pub async fn security_txt() -> Response {
+    (
+        [
+            (header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        SECURITY_TXT,
+    )
+        .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SECURITY_TXT;
+
+    #[test]
+    fn security_txt_names_the_api_as_a_canonical_location() {
+        assert!(
+            SECURITY_TXT.contains("Canonical: https://api.solace.onl/.well-known/security.txt\n")
+        );
+    }
 }

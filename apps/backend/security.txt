@@ -1,0 +1,7 @@
+Contact: mailto:support@solace.onl
+Expires: 2027-11-01T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://solace.onl/.well-known/security.txt
+Canonical: https://api.solace.onl/.well-known/security.txt
+Canonical: https://mail.solace.onl/.well-known/security.txt
+Policy: https://github.com/IIRoan/rocal/blob/master/SECURITY.md
