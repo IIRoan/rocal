@@ -86,6 +86,7 @@ describe("parseQuickAdd", () => {
     "Plan 1/2",
     "Trip 31 feb",
     "Note re: https://x.test",
+    `${"x".repeat(250)} tomorrow 1pm`,
     "",
   ])("finds nothing in %j", (input) => {
     expect(parseQuickAdd(input, options)).toBeNull();

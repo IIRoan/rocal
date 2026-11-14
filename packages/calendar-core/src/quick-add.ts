@@ -15,6 +15,9 @@ export type QuickAddResult = { title: string; start: Date; end: Date; allDay: bo
 
 export type QuickAddOptions = { now: Date; timezone: string; defaultDurationMinutes: number };
 
+/** Titles are capped at 255 characters, so longer text is never parsed on each keystroke. */
+const QUICK_ADD_MAX_LENGTH = 255;
+
 type Span = { start: number; end: number };
 type ClockTime = { hours: number; minutes: number };
 type RawTime = { hour: string; minute?: string; meridiem?: string };
@@ -186,6 +189,7 @@ function buildTitle(input: string, spans: Span[]): string {
 
 /** Parses "Lunch with Ana tomorrow 1pm" on the device; English only, null without a date or time. */
 export function parseQuickAdd(input: string, options: QuickAddOptions): QuickAddResult | null {
+  if (input.length > QUICK_ADD_MAX_LENGTH) return null;
   const { now, timezone, defaultDurationMinutes } = options;
   const today = utcToPickerDate(now, timezone);
   const spans: Span[] = [];
