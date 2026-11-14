@@ -18,25 +18,27 @@ import {
   type MailRuntime,
 } from "./mail-runtime";
 import {
+  getMailUnsubscribe,
   getSimpleLoginForward,
-  runMailSendAction,
+  MAIL_UNSUBSCRIBED_KEYWORD,
   completeMailSendAttempt,
   resolveEncryptionInternalDomain,
   resolveMailboxMessagesPageSize,
   resolveMessageReplyFrom,
-  sealMailForSelf,
   shouldEncryptOutgoingMail,
   SIMPLELOGIN_DONE_KEYWORD,
   type JmapAttachmentInput,
   type JmapPgpMimeCiphertext,
   type MailListFilters,
   type MailSearchFieldValues,
+  type MailUnsubscribeTarget,
   type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { getPrimaryMailAccountId } from "./jmap-client";
 import { getPrimaryMailboxId, sortMessagesByDate } from "./mail-helpers";
 import { searchMailboxLocally } from "../search/local-mail-search";
-import { createMailSealer } from "./outgoing-message-crypto";
+import { postOneClickUnsubscribe } from "./one-click-unsubscribe";
+import { sendMailCommand } from "./send-mail-command";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "./mail-pagination";
 import {
   flattenMailboxMessagesCache,
@@ -753,19 +755,33 @@ export function resolveComposeContext(
   };
 }
 
+function setMessageKeywordInCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  messageId: string,
+  keyword: string,
+  enabled: boolean,
+) {
+  const patch = (msg: JmapEmailMessage) => {
+    const keywords = { ...msg.keywords };
+    if (enabled) keywords[keyword] = true;
+    else delete keywords[keyword];
+    return { keywords };
+  };
+  patchMessageInCache(queryClient, messageId, patch);
+  patchSingleMessageInCache(queryClient, messageId, patch);
+}
+
+/** Lists and SimpleLogin honour a command only from the address the message was delivered to. */
+function resolveReceivingContext(runtime: MailRuntime, message: JmapEmailMessage) {
+  const replyFrom = resolveMessageReplyFrom(runtime.identities, message);
+  return replyFrom ? resolveComposeContext(runtime, replyFrom.identityId) : null;
+}
+
 /** Runs or undoes a SimpleLogin forward's alias action and keeps the message's done keyword in sync. */
 export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
   const queryClient = useQueryClient();
-  const setDone = (messageId: string, done: boolean) => {
-    const patch = (msg: JmapEmailMessage) => {
-      const keywords = { ...msg.keywords };
-      if (done) keywords[SIMPLELOGIN_DONE_KEYWORD] = true;
-      else delete keywords[SIMPLELOGIN_DONE_KEYWORD];
-      return { keywords };
-    };
-    patchMessageInCache(queryClient, messageId, patch);
-    patchSingleMessageInCache(queryClient, messageId, patch);
-  };
+  const setDone = (messageId: string, done: boolean) =>
+    setMessageKeywordInCaches(queryClient, messageId, SIMPLELOGIN_DONE_KEYWORD, done);
 
   return useMutation({
     mutationFn: async ({
@@ -793,38 +809,13 @@ export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
       if (action.target.type === "https") {
         await WebBrowser.openBrowserAsync(action.target.url);
       } else {
-        // SimpleLogin only honours the command from the mailbox it forwards to.
-        const replyFrom = resolveMessageReplyFrom(runtime.identities, message);
-        const context = replyFrom
-          ? resolveComposeContext(runtime, replyFrom.identityId)
-          : null;
+        const context = resolveReceivingContext(runtime, message);
         if (!context) {
           throw new Error(
             "Could not find the address this message was sent to.",
           );
         }
-        const target = action.target;
-        const accountId = getPrimaryMailAccountId(runtime.session);
-        if (!accountId) throw new Error("Your mailbox is not connected.");
-        await runMailSendAction(accountId, `simplelogin:${message.id}`, async (sendScope, isActionCurrent) => {
-          await runtime.client.ensureEncryptOnAppendDisabled(runtime.session);
-          const sealer = await createMailSealer(runtime);
-          const sentCopyCiphertext = await sealMailForSelf({ text: target.body }, sealer);
-          if (!isActionCurrent()) throw new Error("This mail action was closed before sending.");
-          await runtime.client.sendMessage(runtime.session, {
-            isCurrent: sealer.isCurrent,
-            sendScope,
-            draftsMailboxId: context.draftsMailboxId,
-            sentMailboxId: context.sentMailboxId,
-            fromEmail: context.fromEmail,
-            fromName: context.fromName,
-            to: [target.to],
-            subject: target.subject,
-            textBody: target.body,
-            identityId: context.identityId,
-            sentCopyCiphertext,
-          });
-        });
+        await sendMailCommand(runtime, context, `simplelogin:${message.id}`, action.target);
       }
       await runtime.client
         .setMessageKeyword(
@@ -846,6 +837,65 @@ export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
       return resume;
     },
     onError: (_error, { message, mode }) => setDone(message.id, mode !== "run"),
+    onSettled: (_data, _error, _variables, resume) => {
+      resume?.().catch(() => undefined);
+    },
+  });
+}
+
+async function runUnsubscribeTarget(
+  runtime: MailRuntime,
+  context: ReturnType<typeof resolveReceivingContext>,
+  message: JmapEmailMessage,
+  target: MailUnsubscribeTarget,
+): Promise<void> {
+  if (target.type === "one-click") {
+    await postOneClickUnsubscribe(target.url);
+  } else if (target.type === "https") {
+    await WebBrowser.openBrowserAsync(target.url);
+  } else if (context) {
+    await sendMailCommand(runtime, context, `unsubscribe:${message.id}`, target);
+  } else {
+    throw new Error("Could not find the address this message was sent to.");
+  }
+}
+
+/** Unsubscribes on the device by the first method that works: one-click POST, the mailto command, then the sender's page. */
+export function useMailUnsubscribeAction(runtime: MailRuntime | undefined) {
+  const queryClient = useQueryClient();
+  const setUnsubscribed = (messageId: string, done: boolean) =>
+    setMessageKeywordInCaches(queryClient, messageId, MAIL_UNSUBSCRIBED_KEYWORD, done);
+
+  return useMutation({
+    mutationFn: async (message: JmapEmailMessage) => {
+      if (!runtime) throw new Error("Your mailbox is not connected.");
+      const context = resolveReceivingContext(runtime, message);
+      const unsubscribe = getMailUnsubscribe(message, { allowOneClick: true, allowMailto: context !== null });
+      if (!unsubscribe) throw new Error("This message can't be unsubscribed here.");
+      let failure: unknown = null;
+      for (const target of unsubscribe.targets) {
+        try {
+          await runUnsubscribeTarget(runtime, context, message, target);
+          await runtime.client
+            .setMessageKeyword(runtime.session, message.id, MAIL_UNSUBSCRIBED_KEYWORD, true)
+            .catch(() => undefined);
+          return;
+        } catch (error) {
+          failure = error;
+        }
+      }
+      throw failure;
+    },
+    onMutate: async (message) => {
+      const resume = await cancelMailMessageReads(queryClient, [
+        QUERY_KEYS.mailMessagesAll(),
+        QUERY_KEYS.mailThreadsAll(),
+        QUERY_KEYS.mailMessageDetailsAll(),
+      ]);
+      setUnsubscribed(message.id, true);
+      return resume;
+    },
+    onError: (_error, message) => setUnsubscribed(message.id, false),
     onSettled: (_data, _error, _variables, resume) => {
       resume?.().catch(() => undefined);
     },

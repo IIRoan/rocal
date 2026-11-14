@@ -1862,3 +1862,52 @@ describe("MessageReader — tracker line", () => {
     expect(container.textContent).not.toContain("tracker");
   });
 });
+
+describe("MessageReader — unsubscribe", () => {
+  const listMessage = {
+    ...baseMessage,
+    to: [{ email: "bob@example.com" }],
+    "header:Authentication-Results:asText:all": ["mx.solace.test; dkim=pass header.d=news.example"],
+    "header:List-Unsubscribe:asURLs": ["mailto:leave@news.example", "https://news.example/u"],
+  };
+  const findButton = (text: string) =>
+    Array.from(document.body.querySelectorAll("button")).find((button) => button.textContent === text);
+
+  it("confirms with what will happen, then unsubscribes", () => {
+    const onUnsubscribe = jest.fn();
+    render({
+      message: listMessage as any,
+      identities: [{ id: "bob", email: "bob@example.com" }],
+      onUnsubscribe,
+    });
+
+    act(() => findButton("Unsubscribe")!.click());
+    expect(document.body.textContent).toContain("Unsubscribe?");
+    expect(document.body.textContent).toContain(
+      "Solace sends an unsubscribe email from bob@example.com to leave@news.example.",
+    );
+    const confirm = Array.from(document.body.querySelectorAll('[role="dialog"] button')).find(
+      (button) => button.textContent === "Unsubscribe",
+    ) as HTMLButtonElement | undefined;
+    act(() => confirm!.click());
+    expect(onUnsubscribe).toHaveBeenCalledWith(expect.objectContaining({ id: "msg-1" }));
+  });
+
+  it("offers the sender's page when the message did not reach one of your addresses", () => {
+    render({ message: listMessage as any, identities: [], onUnsubscribe: jest.fn() });
+    act(() => findButton("Unsubscribe")!.click());
+    expect(document.body.textContent).toContain("Opens the sender's unsubscribe page at news.example.");
+  });
+
+  it("shows the done state and hides the line for unauthenticated mail", () => {
+    render({ message: { ...listMessage, keywords: { $unsubscribed: true } } as any, onUnsubscribe: jest.fn() });
+    expect(container.textContent).toContain("Unsubscribed");
+    expect(findButton("Unsubscribe")).toBeUndefined();
+
+    render({
+      message: { ...listMessage, id: "msg-2", "header:Authentication-Results:asText:all": ["mx; dkim=fail"] } as any,
+      onUnsubscribe: jest.fn(),
+    });
+    expect(container.textContent).not.toContain("Unsubscribe");
+  });
+});

@@ -253,6 +253,8 @@ export default function MailMessageScreen() {
                   identities={runtime?.identities ?? []}
                   simpleLoginPending={actions.isSimpleLoginPending}
                   onSimpleLoginAction={actions.handleSimpleLoginAction}
+                  unsubscribePending={actions.isUnsubscribePending}
+                  onUnsubscribe={actions.handleUnsubscribe}
                   timeFormat={timeFormat}
                   timezone={userSettings?.timezone}
                 />

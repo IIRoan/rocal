@@ -6,6 +6,7 @@ import {
   getErrorMessage,
   resolveAttachmentPreviewKind,
   resolveMarkAsReadDelayMs,
+  MAIL_UNSUBSCRIBE_LABELS,
   type MailAttachmentPreviewKind,
   type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
@@ -15,6 +16,7 @@ import {
   releaseMarkAsReadSuppression,
   suppressMarkAsRead,
   useMailMutations,
+  useMailUnsubscribeAction,
   useSimpleLoginAliasAction,
 } from "../lib/mail/use-mail";
 import { isSpamMailboxRole } from "../lib/mail/mail-helpers";
@@ -58,6 +60,7 @@ export function useMailMessageActions({
     setMessageLabel,
   } = useMailMutations(runtime, null);
   const simpleLoginAction = useSimpleLoginAliasAction(runtime);
+  const unsubscribeAction = useMailUnsubscribeAction(runtime);
   const { settings: listSettings, isLoaded: listSettingsLoaded } =
     useMailListSettings();
   const showMoveToast = useMailUndoToast(runtime);
@@ -345,6 +348,14 @@ export function useMailMessageActions({
     );
   };
 
+  const handleUnsubscribe = (target: JmapEmailMessage) => {
+    unsubscribeAction.mutate(target, {
+      onSuccess: () => toast(MAIL_UNSUBSCRIBE_LABELS.done, "success"),
+      onError: (error) =>
+        toast(getErrorMessage(error, "Couldn't unsubscribe. Try again."), "error"),
+    });
+  };
+
   return {
     activeSheetView,
     setActiveSheetView,
@@ -376,6 +387,8 @@ export function useMailMessageActions({
     handleSetLabel,
     handleSimpleLoginAction,
     isSimpleLoginPending: simpleLoginAction.isPending,
+    handleUnsubscribe,
+    isUnsubscribePending: unsubscribeAction.isPending,
   };
 }
 

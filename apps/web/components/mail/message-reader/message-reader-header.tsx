@@ -16,6 +16,7 @@ import { AuthResultsBadge } from "../auth-results-badge";
 import { MessageReaderHeaderAttachments } from "./message-reader-header-attachments";
 import { MessageReaderMobileActionsDrawer } from "./message-reader-mobile-actions-drawer";
 import { MessageReaderSimpleLoginLine } from "./message-reader-simplelogin";
+import { MessageReaderUnsubscribeLine } from "./message-reader-unsubscribe";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
@@ -106,6 +107,7 @@ export function MessageReaderHeader({
             </div>
           )}
           <MessageReaderSimpleLoginLine controller={controller} />
+          <MessageReaderUnsubscribeLine controller={controller} />
         </div>
       </div>
 

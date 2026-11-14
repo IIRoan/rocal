@@ -38,6 +38,7 @@ jest.mock("../lib/mail/use-mail", () => ({
     setMessageLabel: {},
   }),
   useSimpleLoginAliasAction: () => ({}),
+  useMailUnsubscribeAction: () => ({}),
   releaseMarkAsReadSuppression: jest.fn(),
   suppressMarkAsRead: jest.fn(),
 }));

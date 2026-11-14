@@ -65,6 +65,7 @@ import { useMailRealtime } from "@/hooks/use-mail-realtime";
 import { useMailKeywordReconciliation } from "@/hooks/use-mail-keyword-reconciliation";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { useSimpleLoginAliasAction } from "@/hooks/use-simplelogin-alias-action";
+import { useMailUnsubscribeAction } from "@/hooks/use-mail-unsubscribe-action";
 import {
   hasActiveE2eeSession,
   subscribeActiveE2eeSession,
@@ -3272,6 +3273,12 @@ export function useMailApp() {
     trackKeywordWrite: keywordReconciliation.trackWrite,
   });
 
+  const handleUnsubscribe = useMailUnsubscribeAction({
+    activeMailbox,
+    patchMessageKeyword,
+    trackKeywordWrite: keywordReconciliation.trackWrite,
+  });
+
   const handleToggleFlagged = async (messageId?: string) => {
     const targetId = messageId ?? selectedMessageId;
     if (!activeMailbox || !targetId) return;
@@ -3516,6 +3523,7 @@ export function useMailApp() {
     handleToggleFlagged,
     handleSetMessageLabel,
     handleSimpleLoginAction,
+    handleUnsubscribe,
     handleCreateLabel,
     handleDeleteLabel,
     handleUpdateLabel,

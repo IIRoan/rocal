@@ -53,6 +53,7 @@ export function MailAppDetailPane({
     handleToggleFlagged,
     handleSetMessageLabel,
     handleSimpleLoginAction,
+    handleUnsubscribe,
     handleCreateLabel,
     handleUpdateLabel,
     handleDeleteLabel,
@@ -160,6 +161,11 @@ export function MailAppDetailPane({
             onSimpleLoginAction={(message, mode) =>
               void handleSimpleLoginAction(message, mode).catch((error) =>
                 log.error("Failed to run SimpleLogin action", error),
+              )
+            }
+            onUnsubscribe={(message) =>
+              void handleUnsubscribe(message).catch((error) =>
+                log.error("Failed to unsubscribe", error),
               )
             }
             onCreateLabel={(name, color) => handleCreateLabel(name, color)}
