@@ -67,6 +67,21 @@ describe("buildContentSecurityPolicy", () => {
     expect(csp.has("upgrade-insecure-requests")).toBe(false);
   });
 
+  it("skips upgrade-insecure-requests only for an http loopback API", () => {
+    const upgrades = (apiUrl: string) =>
+      directives(buildContentSecurityPolicy({ NODE_ENV: "production", NEXT_PUBLIC_API_URL: apiUrl })).has(
+        "upgrade-insecure-requests",
+      );
+
+    expect(upgrades("http://localhost:4001")).toBe(false);
+    expect(upgrades("http://127.0.0.1:4001")).toBe(false);
+    expect(upgrades("http://[::1]:4001")).toBe(false);
+    expect(upgrades("https://api.solace.onl")).toBe(true);
+    expect(upgrades("https://localhost:4001")).toBe(true);
+    expect(upgrades("http://api.solace.test")).toBe(true);
+    expect(upgrades("http://localhost.evil.test:4001")).toBe(true);
+  });
+
   it("ignores missing or non-http env values", () => {
     const csp = directives(
       buildContentSecurityPolicy({ NODE_ENV: "production", NEXT_PUBLIC_API_URL: "javascript:alert(1)" }),

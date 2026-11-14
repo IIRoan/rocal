@@ -17,6 +17,14 @@ function toOrigin(value: string | undefined): string | null {
   }
 }
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+function isLoopbackHttp(origin: string | null): boolean {
+  if (!origin) return false;
+  const url = new URL(origin);
+  return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+}
+
 function unique(values: Array<string | null>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 }
@@ -62,7 +70,8 @@ export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
   ];
 
   const policy = directives.map(([name, sources]) => `${name} ${sources.join(" ")}`);
-  if (!isDev) policy.push("upgrade-insecure-requests");
+  // An http loopback API (the web E2E stack) cannot be upgraded; deployed APIs are https.
+  if (!isDev && !isLoopbackHttp(apiOrigin)) policy.push("upgrade-insecure-requests");
   return policy.join("; ");
 }
 
