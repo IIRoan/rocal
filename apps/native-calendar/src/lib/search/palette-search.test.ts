@@ -82,4 +82,34 @@ describe("mergePaletteSearchResults", () => {
       "trip",
     ]);
   });
+
+  it("filters in-memory events by operators and drops index stubs", () => {
+    const results = mergePaletteSearchResults({
+      titleDocuments: [
+        {
+          id: "calendar:stub",
+          source: "calendar",
+          title: "Board offsite",
+          eventId: "stub",
+          encryptionStatus: "encrypted-indexed",
+        },
+      ],
+      query: "offsite calendar:home is:allday",
+      events: [
+        event({ id: "home", allDay: true, calendarId: "cal-home" }),
+        event({ id: "work", allDay: true }),
+        event({ id: "timed", calendarId: "cal-home" }),
+      ],
+      limit: 8,
+      context: {
+        timezone: "Europe/Amsterdam",
+        calendars: [
+          { id: "cal-1", name: "Work" },
+          { id: "cal-home", name: "Home" },
+        ],
+      },
+    });
+
+    expect(results.map((result) => result.eventId)).toEqual(["home"]);
+  });
 });

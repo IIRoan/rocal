@@ -7,11 +7,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CalendarEvent } from "@workspace/calendar-core";
 import { loadEventSearchCorpus } from "@workspace/calendar-client";
 import { useUnifiedSearch } from "@/hooks/use-unified-search";
+import type { JmapEmailMessage } from "@/lib/mail/types";
 
 jest.mock("@workspace/calendar-client", () => ({
   loadEventSearchCorpus: jest.fn(),
 }));
-jest.mock("@/lib/calendar-api-service", () => ({ calendarApiService: {} }));
+jest.mock("@/lib/calendar-api-service", () => ({
+  calendarApiService: {
+    getCalendars: jest.fn(async () => [{ id: "cal-1", name: "Work" }]),
+  },
+}));
 jest.mock("@/lib/mail/api-service", () => ({ mailDemoApiService: {} }));
 jest.mock("@/lib/mail/jmap-client", () => ({ StalwartJmapClient: jest.fn() }));
 jest.mock("@/lib/mail/oauth-client", () => ({
@@ -21,7 +26,19 @@ jest.mock("@/lib/search/private-title-index", () => ({
   mailDocumentToMessageStub: jest.fn(),
 }));
 jest.mock("@/hooks/use-private-title-index", () => ({
-  usePrivateTitleIndex: () => ({ documents: [], enabled: true, isIndexing: false }),
+  usePrivateTitleIndex: () => ({
+    documents: [
+      {
+        id: "calendar:stub-1",
+        source: "calendar",
+        title: "Quarterly planning stub",
+        eventId: "stub-1",
+        encryptionStatus: "encrypted-indexed",
+      },
+    ],
+    enabled: true,
+    isIndexing: false,
+  }),
 }));
 
 const mockLoadCorpus = jest.mocked(loadEventSearchCorpus);
@@ -40,9 +57,41 @@ const planning: CalendarEvent = {
 let root: Root;
 let container: HTMLDivElement;
 
-function Harness({ query }: { query: string }) {
-  const { results } = useUnifiedSearch({ query, includeMail: false });
-  return <p>{results.map((result) => result.id).join(",")}</p>;
+const mailMessage = {
+  id: "mail-1",
+  subject: "Quarterly planning notes",
+  receivedAt: "2026-04-02T10:00:00.000Z",
+  mailboxIds: { inbox: true },
+} as JmapEmailMessage;
+
+function Harness({
+  query,
+  mailMessages,
+}: {
+  query: string;
+  mailMessages?: JmapEmailMessage[];
+}) {
+  const { results } = useUnifiedSearch({
+    query,
+    includeMail: Boolean(mailMessages),
+    mailMessages,
+    timezone: "Europe/Amsterdam",
+  });
+  return <p>{results.map((result) => result.id).sort().join(",")}</p>;
+}
+
+async function renderSearch(query: string, mailMessages?: JmapEmailMessage[]) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await act(async () => {
+    root.render(
+      <QueryClientProvider client={client}>
+        <Harness query={query} mailMessages={mailMessages} />
+      </QueryClientProvider>,
+    );
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 
 beforeEach(() => {
@@ -60,21 +109,30 @@ afterEach(() => {
 });
 
 it("searches calendar events on the device without sending the search words", async () => {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  await act(async () => {
-    root.render(
-      <QueryClientProvider client={client}>
-        <Harness query="budget" />
-      </QueryClientProvider>,
-    );
-  });
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await renderSearch("budget");
 
   expect(mockLoadCorpus).toHaveBeenCalledTimes(1);
   expect(JSON.stringify(mockLoadCorpus.mock.calls[0]?.slice(0, 2))).not.toContain(
     "budget",
   );
   expect(container.textContent).toBe("calendar:event-1");
+});
+
+it("keeps index stubs and mail for a plain query", async () => {
+  await renderSearch("quarterly", [mailMessage]);
+
+  expect(container.textContent).toBe("calendar:event-1,calendar:stub-1,mail:mail-1");
+});
+
+it("applies calendar operators on the device and leaves out mail and index stubs", async () => {
+  await renderSearch("quarterly calendar:work before:2026-06-01", [mailMessage]);
+
+  expect(container.textContent).toBe("calendar:event-1");
+  expect(JSON.stringify(mockLoadCorpus.mock.calls)).not.toContain("work");
+});
+
+it("skips calendar for an operator only mail understands", async () => {
+  await renderSearch("from:ana quarterly");
+
+  expect(container.textContent).toBe("");
 });

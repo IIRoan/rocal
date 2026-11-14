@@ -327,6 +327,7 @@ export function useCommandPaletteController({
     onOpenChange,
     executeCommand,
     goForward,
+    timezone: settings?.timezone,
     onSearchResultSelect: handleSearchResultSelect,
   });
 

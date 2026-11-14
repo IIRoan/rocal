@@ -215,6 +215,7 @@ export function useMailCommandPaletteController({
       includeMail: true,
       includeCalendar: true,
       limit: 15,
+      timezone: settings?.timezone,
     });
 
   // Palette renders messages before events; keyboard indices must follow that order.
