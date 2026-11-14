@@ -119,6 +119,8 @@ export const READER_PARITY = [
     html: '<style><!-- p::before{content:"<b>"} --></style><p>x</p>',
     output: '<style>  p::before{content:"\\3c b>"}  </style><p>x</p>',
   },
+  // Found by the property tests: blank output must stay empty on a second pass.
+  { html: " <a ", output: "" },
 ];
 
 export const READER_KEEPS = {

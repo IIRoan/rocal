@@ -232,6 +232,11 @@ function sanitizeWithoutDom(input: string, reader: boolean): string {
   return out;
 }
 
+/** Blank output is empty like blank input, so sanitizing it again changes nothing. */
+function emptyWhenBlank(html: string): string {
+  return html.trim() ? html : "";
+}
+
 type DomPurifyInstance = ReturnType<typeof DOMPurify>;
 
 let domPurify: DomPurifyInstance | null | undefined;
@@ -285,12 +290,12 @@ export function sanitizeUntrustedEmailHtml(
 
   const purifier = getDomPurify();
   if (!purifier) {
-    return sanitizeWithoutDom(html, reader);
+    return emptyWhenBlank(sanitizeWithoutDom(html, reader));
   }
 
   activeReaderProfile = reader;
   try {
-    return purifier.sanitize(html, {
+    return emptyWhenBlank(purifier.sanitize(html, {
       ALLOWED_TAGS: reader ? [...ALLOWED_TAGS, "style"] : [...ALLOWED_TAGS],
       ALLOWED_ATTR: [...ALLOWED_ATTRS],
       ALLOW_DATA_ATTR: true,
@@ -299,7 +304,7 @@ export function sanitizeUntrustedEmailHtml(
       FORBID_CONTENTS: [...DROP_WITH_CONTENT_TAGS],
       FORCE_BODY: true,
       RETURN_TRUSTED_TYPE: false,
-    });
+    }));
   } finally {
     activeReaderProfile = false;
   }
