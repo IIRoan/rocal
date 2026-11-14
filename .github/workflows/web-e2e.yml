@@ -1,0 +1,114 @@
+name: Web end-to-end
+
+on:
+  pull_request:
+    branches: [master, main, testing]
+    paths: &paths
+      - "apps/web/**"
+      - "apps/backend/**"
+      - "apps/stalwart/**"
+      - "crates/**"
+      - "xtask/**"
+      - "packages/**"
+      - "scripts/e2e/**"
+      - "e2e/web/**"
+      - "patches/**"
+      - "*.json"
+      - "bun.lock"
+      - "Cargo.*"
+      - ".cargo/**"
+      - "rust-toolchain.toml"
+      - ".bun-version"
+      - ".node-version"
+      - ".github/workflows/web-e2e.yml"
+  push:
+    branches: [master, testing]
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  journeys:
+    name: Web E2E (chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SOLACE_E2E: "1"
+      CI: "1"
+      CARGO_BUILD_JOBS: "3"
+    steps:
+      - name: Prepare isolated test directory
+        shell: bash
+        run: echo "SOLACE_E2E_DIR=$RUNNER_TEMP/solace-e2e" >> "$GITHUB_ENV"
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+      - uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
+        with:
+          node-version-file: .node-version
+      - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Install test prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq podman libssl-dev pkg-config
+          rustup toolchain install
+      - uses: chainguard-actions/Swatinem-rust-cache@b83da835517599f3f42d100dde7195b7edfb9e30 # v2.9.3
+        with:
+          shared-key: web-e2e-${{ runner.os }}
+          cache-on-failure: "true"
+      - name: Build the guarded test harness
+        run: cargo build -p xtask
+      - name: Build the web production bundle against the loopback API
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4001
+          NEXT_PUBLIC_APP_URL: http://localhost:4100
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: bun run build
+      - name: Install Chromium
+        run: bunx playwright install --with-deps --only-shell chromium
+      - name: Start disposable Postgres, Stalwart and avatar storage
+        shell: bash
+        run: python3 scripts/e2e/services.py start
+      - name: Start the real API and create the test accounts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./target/debug/xtask e2e serve > "$SOLACE_E2E_DIR/private/backend.log" 2>&1 &
+          echo "$!" > "$SOLACE_E2E_DIR/private/backend.pid"
+          python3 scripts/e2e/services.py wait-api
+          ./target/debug/xtask e2e seed
+      - name: Run the web journeys
+        run: bun run test:e2e:web
+      - name: Check persisted encryption state
+        run: ./target/debug/xtask e2e verify calendar
+      - name: Copy failure screenshots
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$SOLACE_E2E_DIR/artifacts/web/screenshots"
+          cd "$SOLACE_E2E_DIR/private/playwright" 2>/dev/null || exit 0
+          find . -name '*.png' -exec cp --parents {} "$SOLACE_E2E_DIR/artifacts/web/screenshots/" \;
+      - name: Upload test evidence
+        if: always()
+        uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
+        with:
+          name: web-e2e
+          path: ${{ runner.temp }}/solace-e2e/artifacts/web
+          if-no-files-found: warn
+          overwrite: true
+          retention-days: 7
+      - name: Stop disposable services
+        if: always()
+        shell: bash
+        run: python3 scripts/e2e/services.py stop
