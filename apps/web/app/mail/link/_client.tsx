@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { parseMailtoLink } from "@workspace/calendar-core";
-import { Logo } from "@workspace/ui/components/layout";
 import {
+  assessMailLink,
+  describeMailLink,
+  parseMailtoLink,
+} from "@workspace/calendar-core";
+import { Logo } from "@workspace/ui/components/layout";
+import { Button } from "@workspace/ui/components/ui/button";
+import {
+  canonicalMailLinkUrl,
+  openMailLinkTarget,
   resolveMailLink,
   setPendingMailto,
   type MailLink,
@@ -12,13 +19,38 @@ import {
 
 const EXPIRED_MESSAGE = "This link has expired. Open it again from the message.";
 const INVALID_MAILTO_MESSAGE = "This email link can't be opened.";
+const SHOWN_URL_MAX_LENGTH = 300;
 
-type MailLinkPageState = { status: "resolving" } | { status: "error"; message: string };
+type MailLinkPageState =
+  | { status: "resolving" }
+  | { status: "error"; message: string }
+  | { status: "confirm"; url: string; title: string; lines: string[] };
+
+function resolvedState(link: MailLink | null): MailLinkPageState {
+  if (!link) return { status: "error", message: EXPIRED_MESSAGE };
+  if (/^mailto:/i.test(link.href)) {
+    return { status: "error", message: INVALID_MAILTO_MESSAGE };
+  }
+  const url = canonicalMailLinkUrl(link.href);
+  if (!url) return { status: "error", message: EXPIRED_MESSAGE };
+  return { status: "confirm", url: url.href, ...describeMailLink(assessMailLink(url.href, link.text)) };
+}
 
 export function MailLinkPageContent() {
   const router = useRouter();
   const [state, setState] = useState<MailLinkPageState>({ status: "resolving" });
   const linkIdRef = useRef<string | null>(null);
+
+  // The reader tab's answer arrives from outside React, so acting on it is an event, not render work.
+  const onResolved = useEffectEvent((link: MailLink | null) => {
+    const draft = link ? parseMailtoLink(link.href) : null;
+    if (!draft) {
+      setState(resolvedState(link));
+      return;
+    }
+    setPendingMailto(draft);
+    router.replace("/mail");
+  });
 
   // The fragment holds only an opaque id; it leaves the address bar and history before the reader tab is asked.
   useEffect(() => {
@@ -27,23 +59,23 @@ export function MailLinkPageContent() {
       window.history.replaceState(null, "", window.location.pathname);
     }
     let current = true;
-    const open = (link: MailLink | null) => {
-      if (!current) return;
-      const draft = link ? parseMailtoLink(link.href) : null;
-      if (!link) {
-        setState({ status: "error", message: EXPIRED_MESSAGE });
-      } else if (!draft) {
-        setState({ status: "error", message: INVALID_MAILTO_MESSAGE });
-      } else {
-        setPendingMailto(draft);
-        router.replace("/mail");
-      }
-    };
-    resolveMailLink(linkIdRef.current).then(open, () => open(null));
+    resolveMailLink(linkIdRef.current).then(
+      (link) => {
+        if (current) onResolved(link);
+      },
+      () => {
+        if (current) onResolved(null);
+      },
+    );
     return () => {
       current = false;
     };
-  }, [router]);
+  }, []);
+
+  const cancel = () => {
+    window.close();
+    router.replace("/mail");
+  };
 
   return (
     <main className="flex min-h-[100dvh]">
@@ -54,10 +86,34 @@ export function MailLinkPageContent() {
             <p role="status" className="text-sm text-muted-foreground">
               Opening link…
             </p>
-          ) : (
+          ) : state.status === "error" ? (
             <p role="alert" className="text-sm text-foreground">
               {state.message}
             </p>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight text-balance text-foreground">
+                {state.title}
+              </h1>
+              <div className="mt-3 flex flex-col gap-2 text-sm text-pretty text-foreground">
+                {state.lines.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+              <p className="mt-4 text-xs break-all text-muted-foreground">
+                {state.url.length > SHOWN_URL_MAX_LENGTH
+                  ? `${state.url.slice(0, SHOWN_URL_MAX_LENGTH)}…`
+                  : state.url}
+              </p>
+              <div className="mt-8 flex gap-2">
+                <Button type="button" onClick={() => openMailLinkTarget(state.url)}>
+                  Open link
+                </Button>
+                <Button type="button" variant="outline" onClick={cancel}>
+                  Cancel
+                </Button>
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -127,6 +127,12 @@ export function MailDisplaySettingsContent() {
               value={settings.blockTrackingPixels}
               onValueChange={(value) => updateSettings({ blockTrackingPixels: value })}
             />
+            <SheetSwitchItem
+              label="Confirm links before opening"
+              detail="Shows where a link goes. Suspicious links always ask."
+              value={settings.confirmExternalLinks}
+              onValueChange={(value) => updateSettings({ confirmExternalLinks: value })}
+            />
           </SheetGroup>
         </SheetSection>
 

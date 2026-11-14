@@ -9,10 +9,16 @@ const mockReplace = jest.fn();
 const mockRouter = { replace: mockReplace };
 const mockResolveMailLink = jest.fn<(id: string) => Promise<MailLink | null>>();
 const mockSetPendingMailto = jest.fn();
+const mockOpenMailLinkTarget = jest.fn();
 
 jest.mock("next/navigation", () => ({ useRouter: () => mockRouter }));
 jest.mock("@workspace/ui/components/layout", () => ({ Logo: () => <div>Solace</div> }));
+jest.mock("@workspace/ui/components/ui/button", () => ({
+  Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
+}));
 jest.mock("@/lib/mail/mail-link-handoff", () => ({
+  canonicalMailLinkUrl: (href: string) => new URL(href),
+  openMailLinkTarget: (url: string) => mockOpenMailLinkTarget(url),
   resolveMailLink: (id: string) => mockResolveMailLink(id),
   setPendingMailto: (draft: unknown) => mockSetPendingMailto(draft),
 }));
@@ -70,5 +76,17 @@ describe("MailLinkPage", () => {
 
     expect(container.textContent).toContain("This link has expired. Open it again from the message.");
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it("shows the real host and warnings before opening a web link", async () => {
+    mockResolveMailLink.mockResolvedValue({ href: "https://PAYPAL.com.evil.test/login?x=1", text: "paypal.com" });
+    await renderPage();
+
+    expect(container.querySelector("h1")?.textContent).toBe("Open this link?");
+    expect(container.textContent).toContain("Opens paypal.com.evil.test.");
+    expect(container.textContent).toContain("The link text shows paypal.com, but it opens paypal.com.evil.test.");
+    const open = [...container.querySelectorAll("button")].find((button) => button.textContent === "Open link");
+    act(() => open?.click());
+    expect(mockOpenMailLinkTarget).toHaveBeenCalledWith("https://paypal.com.evil.test/login?x=1");
   });
 });

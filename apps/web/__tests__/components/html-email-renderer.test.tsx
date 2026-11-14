@@ -6,12 +6,13 @@ import { renderToStaticMarkup } from "react-dom/server.node";
 
 import { HtmlEmailRenderer } from "@/components/mail/message-reader/html-email-renderer";
 
-function renderFrame(html: string, blockRemoteImages: boolean) {
+function renderFrame(html: string, blockRemoteImages: boolean, confirmExternalLinks = false) {
   const markup = renderToStaticMarkup(
     <HtmlEmailRenderer
       html={html}
       blockRemoteImages={blockRemoteImages}
       blockTrackingPixels
+      confirmExternalLinks={confirmExternalLinks}
       isDark={false}
     />,
   );
@@ -61,5 +62,24 @@ describe("HtmlEmailRenderer", () => {
     const ids = [...srcDoc.matchAll(/href="http:\/\/localhost\/mail\/link#([0-9a-f-]{36})\.(\d+)"/g)];
     expect(ids.map((match) => match[2])).toEqual(["0", "1"]);
     expect(ids[0]?.[1]).toBe(ids[1]?.[1]);
+  });
+
+  it("hands every web link to the link check while confirmation is on", () => {
+    const srcDoc = renderFrame('<a href="https://example.com/a?utm_source=x&amp;id=1">Example</a>', true, true).getAttribute("srcdoc") ?? "";
+
+    expect(srcDoc).toMatch(/href="http:\/\/localhost\/mail\/link#[0-9a-f-]{36}\.0"/);
+    expect(srcDoc).toContain('title="https://example.com/a?id=1"');
+  });
+
+  it("hands off only warned web links while confirmation is off", () => {
+    const srcDoc = renderFrame(
+      '<a href="https://example.com/">Example</a><a href="https://evil.test/">bank.example</a><a href="https://xn--pple-43d.com/">Apple</a>',
+      true,
+    ).getAttribute("srcdoc") ?? "";
+
+    expect(srcDoc).toContain('href="https://example.com/"');
+    expect(srcDoc).not.toContain('href="https://evil.test/"');
+    expect(srcDoc).not.toContain('href="https://xn--pple-43d.com/"');
+    expect(srcDoc.match(/\/mail\/link#/g)).toHaveLength(2);
   });
 });

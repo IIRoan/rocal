@@ -49,7 +49,7 @@ describe("mail link handoff", () => {
   });
 
   it("rewrites mailto links to an opaque handoff URL and resolves them from the reader tab", async () => {
-    const { links, rewriteLink } = createMailLinkRewriter(TOKEN);
+    const { links, rewriteLink } = createMailLinkRewriter(TOKEN, false);
     expect(rewriteLink({ href: "https://example.org/", text: "site" })).toBeNull();
     const url = rewriteLink({ href: "mailto:a@example.org?subject=Hi", text: "Write" });
     expect(url).toBe(`${window.location.origin}/mail/link#${TOKEN}.0`);

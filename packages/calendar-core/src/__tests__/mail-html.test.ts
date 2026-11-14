@@ -368,3 +368,17 @@ describe("processEmailHtml link rewrite", () => {
     expect(hrefs).toEqual(["https://example.org/?view=1&tab=inbox&lt=2"]);
   });
 });
+
+describe("processEmailHtml tracking parameters", () => {
+  it("strips click trackers from every link and re-escapes the query", () => {
+    const processed = processEmailHtml({
+      html: '<a href="https://shop.example/p?utm_source=mail&amp;id=7&amp;fbclid=x&amp;copy=2">Shop</a><a href="https://example.org/">Plain</a>',
+      isDark: false,
+      blockTrackingPixels: false,
+    });
+
+    expect(processed).toContain('href="https://shop.example/p?id=7&amp;copy=2"');
+    expect(processed).not.toMatch(/utm_source|fbclid/);
+    expect(processed).toContain('href="https://example.org/"');
+  });
+});

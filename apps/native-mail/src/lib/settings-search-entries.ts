@@ -56,6 +56,12 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
   },
   {
     pageId: "mail-display",
+    label: "Confirm links before opening",
+    location: `${DISPLAY} · Privacy`,
+    keywords: "links phishing warning",
+  },
+  {
+    pageId: "mail-display",
     label: "Email appearance",
     location: `${DISPLAY} · Email appearance`,
     keywords: "dark light original mode theme reader",

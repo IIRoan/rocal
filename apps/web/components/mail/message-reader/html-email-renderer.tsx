@@ -16,17 +16,19 @@ export function HtmlEmailRenderer({
   html,
   blockRemoteImages,
   blockTrackingPixels,
+  confirmExternalLinks,
   isDark,
 }: {
   html: string;
   blockRemoteImages: boolean;
   blockTrackingPixels: boolean;
+  confirmExternalLinks: boolean;
   isDark: boolean;
 }) {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [linkToken] = useState(() => crypto.randomUUID());
   const prefersReducedMotion = usePrefersReducedMotion();
-  const { links, rewriteLink } = createMailLinkRewriter(linkToken);
+  const { links, rewriteLink } = createMailLinkRewriter(linkToken, confirmExternalLinks);
   const srcDoc = buildEmailHtmlDocument({
     processedHtml: processEmailHtml({
       html,

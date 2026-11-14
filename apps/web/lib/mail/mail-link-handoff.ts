@@ -1,4 +1,8 @@
-import type { MailtoDraft } from "@workspace/calendar-core";
+import {
+  assessMailLink,
+  shouldConfirmMailLink,
+  type MailtoDraft,
+} from "@workspace/calendar-core";
 import { z } from "@workspace/calendar-core/zod";
 
 export const MAIL_LINK_CHANNEL = "solace:mail-link";
@@ -86,11 +90,32 @@ export function takePendingMailto(): MailtoDraft | null {
   return draft;
 }
 
+/** The browser's WHATWG parser gives the canonical URL (IDN hosts as `xn--`); null when it cannot open the link at all. */
+export function canonicalMailLinkUrl(href: string): URL | null {
+  try {
+    const url = new URL(href);
+    return url.protocol === "https:" || url.protocol === "http:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Replaces the link page, so the destination gets no opener and, with the page's no-referrer policy, no referrer. */
+export function openMailLinkTarget(url: string): void {
+  window.location.replace(url);
+}
+
+function shouldHandOffLink(link: MailLink, confirmExternalLinks: boolean): boolean {
+  if (/^mailto:/i.test(link.href)) return true;
+  const url = canonicalMailLinkUrl(link.href);
+  return url !== null && shouldConfirmMailLink(assessMailLink(url.href, link.text), confirmExternalLinks);
+}
+
 /** Rewrites the links this reader hands off and collects them for `registerMailLinks`; a fresh array per render. */
-export function createMailLinkRewriter(token: string) {
+export function createMailLinkRewriter(token: string, confirmExternalLinks: boolean) {
   const links: Array<MailLink & { id: string }> = [];
   const rewriteLink = (link: MailLink): string | null => {
-    if (!/^mailto:/i.test(link.href)) return null;
+    if (!shouldHandOffLink(link, confirmExternalLinks)) return null;
     const id = `${token}.${links.length}`;
     links.push({ id, ...link });
     return mailLinkHandoffUrl(id);

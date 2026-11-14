@@ -129,6 +129,7 @@ export function MessageReaderBody({
         html={showQuote ? displayHtml : cleanHtml}
         blockRemoteImages={blockRemoteImages}
         blockTrackingPixels={blockTrackingPixels}
+        confirmExternalLinks={displaySettings.confirmExternalLinks}
         isDark={isDark}
       />
       {htmlHasQuote && (

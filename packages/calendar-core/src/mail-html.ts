@@ -1,4 +1,5 @@
 import { decodeHtmlEntities, stripHtmlTags } from "./html-text";
+import { stripTrackingParams } from "./mail-links";
 import {
   decodeCssEscapes,
   sanitizeUntrustedEmailHtml,
@@ -276,7 +277,7 @@ export function processEmailHtml({
     });
   }
 
-  if (rewriteLink) processed = rewriteEmailAnchors(processed, rewriteLink);
+  processed = rewriteEmailAnchors(processed, rewriteLink);
 
   if (isDark && !DARK_SCHEME_PATTERN.test(html)) {
     processed = darkenEmailColors(processed, canvasLightnessOf(canvasColor));
@@ -306,10 +307,13 @@ function linkText(html: string): string {
   return decodeHtmlEntities(stripHtmlTags(html)).replace(/\s+/g, " ").trim().slice(0, LINK_TEXT_MAX_LENGTH);
 }
 
+type EmailLinkRewrite = ProcessEmailHtmlOptions["rewriteLink"];
+
+/** Tracking parameters always go; a rewrite also moves the original href into `title`, since hover would show only the replacement. */
 function rewriteAnchorAttributes(
   attributes: string,
   readText: () => string,
-  rewriteLink: NonNullable<ProcessEmailHtmlOptions["rewriteLink"]>,
+  rewriteLink: EmailLinkRewrite,
 ): string | null {
   const parsed = [...attributes.matchAll(ATTRIBUTE_PATTERN)].map((attribute) => ({
     name: (attribute[1] ?? "").toLowerCase(),
@@ -317,22 +321,23 @@ function rewriteAnchorAttributes(
   }));
   const href = parsed.find((attribute) => attribute.name === "href")?.value;
   if (href === undefined) return null;
-  const replacement = rewriteLink({ href, text: readText() });
-  if (replacement === null) return null;
-  return [
-    ...parsed.filter((attribute) => attribute.name !== "href" && attribute.name !== "title"),
-    { name: "href", value: replacement },
-    { name: "title", value: href.slice(0, LINK_TITLE_MAX_LENGTH) },
-  ]
+  const stripped = stripTrackingParams(href);
+  const replacement = rewriteLink ? rewriteLink({ href: stripped, text: readText() }) : null;
+  if (replacement === null && stripped === href) return null;
+  const rewritten = replacement === null
+    ? parsed.map((attribute) => (attribute.name === "href" ? { name: "href", value: stripped } : attribute))
+    : [
+        ...parsed.filter((attribute) => attribute.name !== "href" && attribute.name !== "title"),
+        { name: "href", value: replacement },
+        { name: "title", value: stripped.slice(0, LINK_TITLE_MAX_LENGTH) },
+      ];
+  return rewritten
     .map((attribute) => ` ${attribute.name}="${escapeAttributeValue(attribute.value)}"`)
     .join("");
 }
 
 /** One scan records every anchor tag and link text runs to the next one, so an unclosed `<a>` cannot make this quadratic. */
-function rewriteEmailAnchors(
-  html: string,
-  rewriteLink: NonNullable<ProcessEmailHtmlOptions["rewriteLink"]>,
-): string {
+function rewriteEmailAnchors(html: string, rewriteLink: EmailLinkRewrite): string {
   const tags = [...html.matchAll(ANCHOR_TAG_PATTERN)];
   let out = "";
   let last = 0;
