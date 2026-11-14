@@ -64,6 +64,8 @@ jobs:
         working-directory: ${{ matrix.dir }}
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version

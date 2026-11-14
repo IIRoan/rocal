@@ -85,18 +85,21 @@ jobs:
         working-directory: ${{ matrix.dir }}
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
           node-version-file: .node-version
       - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
+      # Dependency lifecycle scripts run before any step holds EXPO_TOKEN.
+      - run: bun install --frozen-lockfile
+        working-directory: .
       - uses: chainguard-actions/expo-expo-github-action@f202d68400237adfeabf5142b03e4b5aea4e70f8 # 8.2.1
         with:
           eas-version: ${{ needs.meta.outputs.eas_version }}
           token: ${{ secrets.EXPO_TOKEN }}
-      - run: bun install --frozen-lockfile
-        working-directory: .
       - name: Publish to the build profile's channel
         env:
           PROFILE: ${{ needs.meta.outputs.profile }}
