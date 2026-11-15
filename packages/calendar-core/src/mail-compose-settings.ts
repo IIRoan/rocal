@@ -8,7 +8,22 @@ export type MailComposeSettings = {
   signatureSeparatorEnabled: boolean;
   autoSelectReplyIdentity: boolean;
   stripImageMetadata: boolean;
+  undoSendSeconds: UndoSendSeconds;
 };
+
+export const UNDO_SEND_SECONDS_OPTIONS = [
+  { value: 0, label: "Off" },
+  { value: 5, label: "5 seconds" },
+  { value: 10, label: "10 seconds" },
+  { value: 20, label: "20 seconds" },
+  { value: 30, label: "30 seconds" },
+] as const;
+
+export type UndoSendSeconds = (typeof UNDO_SEND_SECONDS_OPTIONS)[number]["value"];
+
+function normalizeUndoSendSeconds(value: unknown): UndoSendSeconds {
+  return UNDO_SEND_SECONDS_OPTIONS.find((option) => option.value === value)?.value ?? 5;
+}
 
 export const DEFAULT_ATTACHMENT_REMINDER_KEYWORDS = [
   "attached",
@@ -48,6 +63,7 @@ export const DEFAULT_MAIL_COMPOSE_SETTINGS: MailComposeSettings = {
   signatureSeparatorEnabled: true,
   autoSelectReplyIdentity: false,
   stripImageMetadata: true,
+  undoSendSeconds: 5,
 };
 
 function booleanOr(value: unknown, fallback: boolean): boolean {
@@ -89,6 +105,7 @@ export function normalizeMailComposeSettings(input: unknown): MailComposeSetting
       parsed.stripImageMetadata,
       DEFAULT_MAIL_COMPOSE_SETTINGS.stripImageMetadata,
     ),
+    undoSendSeconds: normalizeUndoSendSeconds(parsed.undoSendSeconds),
   };
 }
 

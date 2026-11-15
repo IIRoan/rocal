@@ -11,6 +11,7 @@ import {
 } from "./mail-mailbox-names";
 
 const JMAP_CORE_CAPABILITY = "urn:ietf:params:jmap:core";
+const JMAP_SUBMISSION_CAPABILITY = "urn:ietf:params:jmap:submission";
 
 /** Stalwart Email singleton defaults. */
 export const DEFAULT_MAX_MAILBOX_DEPTH = 10;
@@ -110,9 +111,14 @@ export type MailServerPolicy = {
   maxConcurrentUploads: number;
   maxRequestSizeBytes: number;
   uploadTtlMs: number;
+  maxDelayedSendSeconds: number;
 };
 
 export type MailServerPolicySource = MailServerLimitsSource & {
+  session?: {
+    accounts?: Record<string, unknown>;
+    primaryAccounts?: Record<string, string>;
+  } | null;
   emailSettings?: StalwartEmailPolicySource | null;
   jmapSettings?: StalwartJmapPolicySource | null;
   configPolicy?: Partial<MailServerPolicyConfig> | null;
@@ -212,6 +218,24 @@ function readSessionCoreCapability(
   return core && typeof core === "object" && !Array.isArray(core)
     ? (core as Record<string, unknown>)
     : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** RFC 8621 puts `maxDelayedSend` on the submission account; 0 means no holds. */
+function readMaxDelayedSendSeconds(source: MailServerPolicySource): number {
+  const session = source.session;
+  const accountId = session?.primaryAccounts?.[JMAP_SUBMISSION_CAPABILITY];
+  const account = accountId ? asRecord(session?.accounts?.[accountId]) : null;
+  const capability =
+    asRecord(asRecord(account?.accountCapabilities)?.[JMAP_SUBMISSION_CAPABILITY]) ??
+    asRecord(session?.capabilities?.[JMAP_SUBMISSION_CAPABILITY]);
+  const value = capability?.maxDelayedSend;
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 0;
 }
 
 function resolvePositiveInt(
@@ -320,6 +344,7 @@ export function resolveMailServerPolicy(
       ],
       DEFAULT_JMAP_UPLOAD_TTL_MS,
     ),
+    maxDelayedSendSeconds: readMaxDelayedSendSeconds(source),
   };
 }
 

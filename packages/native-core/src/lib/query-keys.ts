@@ -47,6 +47,7 @@ export const QUERY_KEYS = {
   hiddenMailboxIds: () => ["mail", "hiddenMailboxIds"] as const,
   mailSyncedSettings: () => ["mail", "syncedSettings"] as const,
   mailVacationResponse: () => ["mail", "vacationResponse"] as const,
+  mailScheduledSends: () => ["mail", "scheduledSends"] as const,
   mailSearchMessages: (mailboxId: string | null, revision: number) =>
     ["mail", "messages", mailboxId, "search", revision] as const,
   signupConfig: () => ["account", "signupConfig"] as const,

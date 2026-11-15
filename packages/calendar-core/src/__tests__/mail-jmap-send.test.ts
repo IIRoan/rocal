@@ -17,6 +17,8 @@ import {
   completeMailSendAttempt,
   runMailSendAction,
   JmapHttpStatusError,
+  cancelHeldJmapSubmission,
+  listScheduledJmapSends,
   type JmapRequest,
   type OutgoingJmapMessage,
 } from "../mail-jmap-email-set";
@@ -1064,5 +1066,146 @@ describe("external single-batch nonce receipts", () => {
     const h = harness();
     await expect(sendJmapMessage({ ...message, contentFingerprint }, h.context)).rejects.toThrow("fingerprint");
     expect(h.request).not.toHaveBeenCalled();
+  });
+});
+
+describe("held sends", () => {
+  const token = "b".repeat(32);
+  const keyword = `$solace-scheduled-${token}`;
+  const external = { ...base, sentMailboxId: "sent", sentCopyCiphertext: { blobId: "sealed", size: 9 }, submissionToken: token };
+  const internal = { ...base, to: ["bob@solace.onl"], textBody: "", sentMailboxId: "sent", pgpMimeCiphertext: { blobId: "enc", size: 9 }, submissionToken: token };
+  const mailFrom = (calls: JmapMethodCallLike[]) =>
+    ((calls[1][1].create as Record<string, { envelope: { mailFrom: unknown } }>).s1.envelope.mailFrom);
+
+  it("adds HOLDFOR or HOLDUNTIL beside ENVID", () => {
+    expect(mailFrom(buildSendMessageMethodCalls({ ...external, hold: { forSeconds: 5 } }))).toEqual({
+      email: "alice@solace.onl", parameters: { ENVID: token, HOLDFOR: "5" },
+    });
+    expect(mailFrom(buildSendMessageMethodCalls({ ...external, hold: { until: "2026-11-16T07:00:00Z" } }))).toEqual({
+      email: "alice@solace.onl", parameters: { ENVID: token, HOLDUNTIL: "2026-11-16T07:00:00Z" },
+    });
+  });
+
+  it("keys only the sealed copy of a scheduled send", () => {
+    const scheduled = { until: "2026-11-16T07:00:00Z" };
+    const externalCopies = createdEmails(buildSendMessageMethodCalls({ ...external, hold: scheduled }));
+    expect(externalCopies.sent1.keywords).toEqual({ $seen: true, [keyword]: true });
+    expect(externalCopies.draft1.keywords).toEqual({ $seen: true, $draft: true });
+    expect(createdEmails(buildSendMessageMethodCalls({ ...internal, hold: scheduled })).draft1.keywords).toEqual({
+      $seen: true, $draft: true, [keyword]: true,
+    });
+    const imported = buildSendMessageMethodCalls(
+      { ...internal, pgpMimeCiphertext: undefined, pgpMimeMessage: "x", hold: scheduled },
+      { blobId: "wire", size: 9 },
+    );
+    expect((imported[0][1].emails as Record<string, { keywords: unknown }>).draft1.keywords).toEqual({
+      $seen: true, $draft: true, [keyword]: true,
+    });
+    expect(createdEmails(buildSendMessageMethodCalls({ ...internal, hold: { forSeconds: 5 } })).draft1.keywords).toEqual({
+      $seen: true, $draft: true,
+    });
+  });
+
+  it("throws on malformed holds", () => {
+    expect(() => buildSendMessageMethodCalls({ ...external, hold: { forSeconds: 0 } })).toThrow("Invalid send time.");
+    expect(() => buildSendMessageMethodCalls({ ...external, hold: { forSeconds: 1.5 } })).toThrow("Invalid send time.");
+    expect(() => buildSendMessageMethodCalls({ ...external, hold: { until: "2026-11-16 07:00" } })).toThrow("Invalid send time.");
+    expect(() => buildSendMessageMethodCalls({ ...external, submissionToken: undefined, hold: { until: "2026-11-16T07:00:00Z" } })).toThrow("Invalid send time.");
+  });
+
+  it("refuses an external hold past 24 hours before any request", async () => {
+    const request = jest.fn<JmapRequest>();
+    const until = new Date(Date.now() + 2 * 86_400_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    await expect(sendJmapMessage({ ...external, hold: { until } }, {
+      attempt: createMailSendAttempt(base.fromEmail), mailAccountId: "acc", submissionAccountId: "acc", policy: null, request, onCleanupError: jest.fn(),
+    })).rejects.toThrow("Invalid send time.");
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("keeps the sealed copy as the receipt of a held send", async () => {
+    const request = jest.fn<JmapRequest>(async () => ({ methodResponses: [
+      ["Email/set", { created: { draft1: { id: "plain" }, sent1: { id: "copy", threadId: "t" } } }, "c1"],
+      ["EmailSubmission/set", { created: { s1: { id: "sub" } } }, "c2"],
+    ] }));
+    await expect(sendJmapMessage({ ...external, hold: { forSeconds: 5 } }, {
+      attempt: createMailSendAttempt(base.fromEmail), mailAccountId: "acc", submissionAccountId: "acc", policy: null, request, onCleanupError: jest.fn(),
+    })).resolves.toEqual({ emailId: "copy", threadId: "t", submissionId: "sub" });
+  });
+
+  function cancel(responses: { methodResponses: JmapMethodCallLike[] }[]) {
+    const request = jest.fn<JmapRequest>(async () => {
+      const next = responses.shift();
+      if (!next) throw new Error("unexpected request");
+      return next;
+    });
+    const onMoveError = jest.fn();
+    const result = cancelHeldJmapSubmission({
+      submissionId: "sub", copyEmailId: "copy", draftsMailboxId: "drafts", mailAccountId: "acc", submissionAccountId: "acc", request, onMoveError,
+    });
+    return { result, request, onMoveError };
+  }
+
+  it("cancels, then moves the sealed copy back to Drafts", async () => {
+    const { result, request } = cancel([
+      { methodResponses: [["EmailSubmission/set", { updated: { sub: null } }, "c1"]] },
+      { methodResponses: [["Email/set", { updated: { copy: null } }, "c1"]] },
+    ]);
+    await expect(result).resolves.toBe("canceled");
+    expect(request.mock.calls[0][1]).toEqual([["EmailSubmission/set", { accountId: "acc", update: { sub: { undoStatus: "canceled" } } }, "c1"]]);
+    expect(request.mock.calls[1][1]).toEqual([["Email/set", {
+      accountId: "acc", update: { copy: { mailboxIds: { drafts: true }, keywords: { $draft: true, $seen: true } } },
+    }, "c1"]]);
+  });
+
+  it("reports too late without moving the copy", async () => {
+    const { result, request } = cancel([
+      { methodResponses: [["EmailSubmission/set", { notUpdated: { sub: { type: "cannotUnsend" } } }, "c1"]] },
+    ]);
+    await expect(result).resolves.toBe("sent");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("never moves the copy when the cancel fails", async () => {
+    const { result, request } = cancel([
+      { methodResponses: [["error", { type: "serverFail" }, "c1"]] },
+    ]);
+    await expect(result).rejects.toThrow();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("still reports a confirmed cancel when the move fails", async () => {
+    const { result, onMoveError } = cancel([
+      { methodResponses: [["EmailSubmission/set", { updated: { sub: null } }, "c1"]] },
+      { methodResponses: [["Email/set", { notUpdated: { copy: { type: "notFound" } } }, "c1"]] },
+    ]);
+    await expect(result).resolves.toBe("canceled");
+    expect(onMoveError).toHaveBeenCalled();
+  });
+
+  it("joins scheduled submissions to their keyed copies and drops the rest", async () => {
+    const other = "c".repeat(32);
+    const responses: { methodResponses: JmapMethodCallLike[] }[] = [
+      { methodResponses: [
+        ["EmailSubmission/query", { ids: ["s1", "s2", "s3"] }, "q"],
+        ["EmailSubmission/get", { list: [
+          { id: "s1", sendAt: "2026-11-17T07:00:00Z", undoStatus: "pending", envelope: { mailFrom: { parameters: { ENVID: token } } } },
+          { id: "s2", sendAt: "2026-11-16T07:00:00Z", undoStatus: "pending", envelope: { mailFrom: { parameters: { ENVID: other } } } },
+          { id: "s3", sendAt: "2026-11-15T07:00:00Z", undoStatus: "pending", envelope: { mailFrom: { parameters: null } } },
+        ] }, "g"],
+      ] },
+      { methodResponses: [
+        ["Email/query", { ids: ["copy"] }, "q"],
+        ["Email/get", { list: [
+          { id: "copy", subject: "Plans", to: [{ email: "bob@example.com" }], cc: null, bcc: [{ email: "eve@example.com" }], keywords: { $seen: true, [keyword]: true } },
+        ] }, "g"],
+      ] },
+    ];
+    const request = jest.fn<JmapRequest>(async () => responses.shift() ?? { methodResponses: [] });
+    await expect(listScheduledJmapSends({ mailAccountId: "acc", submissionAccountId: "acc", request })).resolves.toEqual([
+      { submissionId: "s1", emailId: "copy", sendAt: "2026-11-17T07:00:00Z", subject: "Plans", recipients: ["bob@example.com", "eve@example.com"] },
+    ]);
+    expect(request.mock.calls[1][1][0][1]).toMatchObject({
+      filter: { operator: "OR", conditions: [{ hasKeyword: keyword }, { hasKeyword: `$solace-scheduled-${other}` }] },
+    });
   });
 });
