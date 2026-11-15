@@ -29,10 +29,6 @@ import {
   hasComposeUserContent,
   hasPlainTextSignatureBlock,
   replacePlainTextSignatureBlock,
-  resolveEncryptionInternalDomain,
-  shouldEncryptOutgoingMail,
-  validateComposeRecipients,
-  parsedAddressesToEmails,
   type ComposeTextFields,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -226,17 +222,6 @@ function ComposeSession({
     },
   });
 
-  const maxDelayedSendSeconds = runtime?.mailServerPolicy.maxDelayedSendSeconds ?? 0;
-  const recipientValidation = validateComposeRecipients({ to, cc, bcc, subject });
-  const recipientEmails = parsedAddressesToEmails([
-    ...recipientValidation.to,
-    ...recipientValidation.cc,
-    ...recipientValidation.bcc,
-  ]);
-  const hasExternalRecipients =
-    recipientEmails.length > 0 &&
-    !shouldEncryptOutgoingMail(recipientEmails, resolveEncryptionInternalDomain(runtime?.config.defaultDomain));
-
   const { cancel, dismiss } = useComposeLeave({
     runtime,
     mode: params.mode,
@@ -250,35 +235,11 @@ function ComposeSession({
     onClose: closeSendSession,
   });
 
-  const handleInsertSignature = () => {
-    if (!getPlainTextSignature(selectedIdentity)) return;
-    dispatch({
-      type: "editBody",
-      update: (current) =>
-        hasPlainTextSignatureBlock(current, selectedIdentity)
-          ? current
-          : appendPlainTextSignature(
-              current,
-              selectedIdentity,
-              signatureOptions,
-            ),
-    });
-  };
-
-  const handleSelectIdentity = (id: string) => {
-    const nextIdentity = identities.find((entry) => entry.id === id) ?? null;
-    dispatch({
-      type: "editBody",
-      update: (current) =>
-        replacePlainTextSignatureBlock(
-          current,
-          selectedIdentity,
-          nextIdentity,
-          signatureOptions,
-        ) ?? current,
-    });
-    identity.pick(id);
-  };
+  const { handleInsertSignature, handleSelectIdentity } = useComposeSignatureActions(
+    dispatch,
+    identity,
+    signatureOptions,
+  );
 
   const handleAttach = async () => {
     await pickComposeAttachment(
@@ -314,11 +275,7 @@ function ComposeSession({
               void handleAttach();
             }}
             onSend={() => send()}
-            onSchedule={
-              maxDelayedSendSeconds > 0
-                ? () => setSchedule((current) => ({ open: true, key: current.key + 1 }))
-                : undefined
-            }
+            onSchedule={runtime?.mailServerPolicy.maxDelayedSendSeconds ? () => setSchedule((current) => ({ open: true, key: current.key + 1 })) : undefined}
           />
         </BottomSheetHeader>
         <View
@@ -426,12 +383,9 @@ function ComposeSession({
       <ComposeScheduleSheet
         key={schedule.key}
         visible={schedule.open}
-        maxDelayedSendSeconds={maxDelayedSendSeconds}
-        hasExternalRecipients={hasExternalRecipients}
-        onSchedule={(sendAt) => {
-          setSchedule((current) => ({ ...current, open: false }));
-          send(sendAt);
-        }}
+        runtime={runtime}
+        recipients={{ to, cc, bcc }}
+        onSchedule={send}
         onDismiss={() => setSchedule((current) => ({ ...current, open: false }))}
       />
 
@@ -444,6 +398,46 @@ function ComposeSession({
       />
     </>
   );
+}
+
+/** Signature insert and identity switch, keeping the signature block in step with the sender. */
+function useComposeSignatureActions(
+  dispatch: ReturnType<typeof useComposeForm>[1],
+  identity: ReturnType<typeof useComposeIdentity>,
+  signatureOptions: { separator: boolean },
+) {
+  const { identities, selectedIdentity } = identity;
+  const handleInsertSignature = () => {
+    if (!getPlainTextSignature(selectedIdentity)) return;
+    dispatch({
+      type: "editBody",
+      update: (current) =>
+        hasPlainTextSignatureBlock(current, selectedIdentity)
+          ? current
+          : appendPlainTextSignature(
+              current,
+              selectedIdentity,
+              signatureOptions,
+            ),
+    });
+  };
+
+  const handleSelectIdentity = (id: string) => {
+    const nextIdentity = identities.find((entry) => entry.id === id) ?? null;
+    dispatch({
+      type: "editBody",
+      update: (current) =>
+        replacePlainTextSignatureBlock(
+          current,
+          selectedIdentity,
+          nextIdentity,
+          signatureOptions,
+        ) ?? current,
+    });
+    identity.pick(id);
+  };
+
+  return { handleInsertSignature, handleSelectIdentity };
 }
 
 /** Picks one file; the picker's cache copy is plaintext, so it is deleted once read or refused; photos are re-encoded unless `reportStripNotice` is null. */

@@ -51,14 +51,14 @@ export function ComposeSchedulePopover({
   const latest = scheduledSendLatest(now.getTime(), scheduling, hasExternalRecipients);
   const presets = getScheduledSendPresets(now, scheduling.timezone, latest);
 
-  const schedule = (sendAt: string | null) => {
+  const schedule = (sendAt: string | null, now: number) => {
     const resolved = sendAt
       ? resolveMailSendHold({
           sendAt,
           undoSendSeconds: 0,
           policy: scheduling,
           hasExternalRecipients,
-          now: Date.now(),
+          now,
         })
       : { error: "Pick a day and time." };
     if (resolved.error || !sendAt) {
@@ -99,7 +99,7 @@ export function ComposeSchedulePopover({
             key={preset.label}
             type="button"
             disabled={disabled}
-            onClick={() => schedule(preset.sendAt)}
+            onClick={() => schedule(preset.sendAt, Date.now())}
             className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span>{preset.label}</span>
@@ -148,7 +148,7 @@ export function ComposeSchedulePopover({
             className="h-7 text-xs aria-disabled:opacity-50"
             aria-disabled={disabled || undefined}
             onClick={() => {
-              if (!disabled) schedule(parseScheduledSendInput(day, time, scheduling.timezone));
+              if (!disabled) schedule(parseScheduledSendInput(day, time, scheduling.timezone), Date.now());
             }}
           >
             Schedule
