@@ -458,3 +458,73 @@ async fn bulk_deletes_trash_each_event_once_and_purges_delete_for_good() {
         .await
         .expect_error(404, "Not Found", NOT_FOUND));
 }
+
+#[tokio::test]
+async fn racing_deletes_of_one_event_leave_one_trash_entry() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let mut twin = owner.agent.clone();
+    let mut events = Vec::new();
+    // Two requests interleave most of the time, not every time, so several races run.
+    for round in 0..6 {
+        let request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
+        let id = create_event(&mut owner, &request).await.id.0;
+        let single = format!("/api/events/{id}");
+        let (first, second) = if round % 2 == 0 {
+            tokio::join!(owner.agent.delete(&single), twin.delete(&single))
+        } else {
+            let bulk = json!({"action": "delete", "eventIds": [id]});
+            tokio::join!(
+                owner.agent.delete(&single),
+                twin.post("/api/events/bulk", bulk)
+            )
+        };
+        for response in [first, second].map(ok) {
+            assert!(
+                matches!(response.status.as_u16(), 200 | 400),
+                "{}",
+                response.status
+            );
+        }
+        events.push(id);
+    }
+
+    let mut roots: Vec<String> = trash(&mut owner)
+        .await
+        .into_iter()
+        .map(|entry| entry.event_id.0)
+        .collect();
+    roots.sort_unstable();
+    events.sort_unstable();
+    assert_eq!(roots, events, "a raced delete trashes the event once");
+}
+
+#[tokio::test]
+async fn the_trash_lists_its_newest_500_entries() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let event = create_event(
+        &mut owner,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    let newest = delete(&mut owner, &event.id.0).await;
+    sqlx::query(
+        "INSERT INTO event_trash (id, user_id, event_id, calendar_id, rows, trashed_at) \
+         SELECT id || g, user_id, event_id, calendar_id, rows, trashed_at - g * interval '1 minute' \
+         FROM event_trash, generate_series(1, 500) g WHERE id = $1",
+    )
+    .bind(&newest)
+    .execute(&app.db)
+    .await
+    .expect("older entries");
+
+    let listed = trash(&mut owner).await;
+    assert_eq!(listed.len(), 500);
+    assert_eq!(
+        (listed[0].id.0.as_str(), listed[499].id.0.clone()),
+        (newest.as_str(), format!("{newest}499"))
+    );
+}

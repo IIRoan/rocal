@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DbErr, EntityTrait, ExprTrait, FromQueryResult, IdenStatic,
-    Iterable, QueryFilter, QuerySelect, Statement, TransactionTrait, Value as SqlValue,
+    Iterable, QueryFilter, QueryOrder, QuerySelect, Statement, TransactionTrait, Value as SqlValue,
 };
 use serde_json::Value;
 use solace_api_types::SuccessMessage;
@@ -26,6 +26,9 @@ use crate::state::AppState;
 pub const RETENTION_DAYS: i64 = 30;
 
 const NOT_FOUND: &str = "Trashed event not found";
+
+/// The list returns at most this many entries, so a full trash cannot make one response unbounded.
+const LIST_LIMIT: i64 = 500;
 
 /// One entry per root: the root and its children, their exceptions and reminders, and participants as email, role and status only.
 const TRASH_ROOT: &str = r#"
@@ -50,19 +53,33 @@ pub async fn trash_events<C: ConnectionTrait>(
     user_id: &str,
     root_ids: &[String],
 ) -> Result<Vec<String>, DbErr> {
-    let roots: Vec<String> = calendar_event::Entity::find()
+    // A racing delete or update waits here, so a second delete finds the rows gone and trashes nothing.
+    let locked: Vec<(String, Option<String>)> = calendar_event::Entity::find()
         .select_only()
         .column(calendar_event::Column::Id)
+        .column(calendar_event::Column::ParentEventId)
         .filter(calendar_event::Column::UserId.eq(user_id))
-        .filter(calendar_event::Column::Id.is_in(root_ids.to_vec()))
         .filter(
-            calendar_event::Column::ParentEventId
-                .is_null()
-                .or(calendar_event::Column::ParentEventId.is_not_in(root_ids.to_vec())),
+            calendar_event::Column::Id
+                .is_in(root_ids.to_vec())
+                .or(calendar_event::Column::ParentEventId.is_in(root_ids.to_vec())),
         )
+        .order_by_asc(calendar_event::Column::Id)
+        .lock_exclusive()
         .into_tuple()
         .all(db)
         .await?;
+    let selected: HashSet<&str> = root_ids.iter().map(String::as_str).collect();
+    let roots: Vec<String> = locked
+        .into_iter()
+        .filter(|(id, parent)| {
+            selected.contains(id.as_str())
+                && !parent
+                    .as_deref()
+                    .is_some_and(|parent| selected.contains(parent))
+        })
+        .map(|(id, _)| id)
+        .collect();
     let backend = db.get_database_backend();
     let mut trashed = Vec::new();
     for root in &roots {
@@ -114,7 +131,7 @@ struct Entry {
     recurrence: Option<String>,
 }
 
-/// The caller's trash, newest first.
+/// The caller's newest trash entries, newest first.
 pub async fn list(state: &AppState, user: &RouteUser) -> Result<TrashedEventList, AppError> {
     let db = &state.db;
     let entries = Entry::find_by_statement(Statement::from_sql_and_values(
@@ -125,8 +142,9 @@ pub async fn list(state: &AppState, user: &RouteUser) -> Result<TrashedEventList
            CROSS JOIN LATERAL jsonb_populate_record(NULL::calendar_event,
                (SELECT row FROM jsonb_array_elements(t.rows -> 'events') AS row WHERE row ->> 'id' = t.event_id LIMIT 1)) AS e
            WHERE t.user_id = $1
-           ORDER BY t.trashed_at DESC, t.id"#,
-        [user.id.as_str().into()],
+           ORDER BY t.trashed_at DESC, t.id
+           LIMIT $2"#,
+        [user.id.as_str().into(), LIST_LIMIT.into()],
     ))
     .all(db)
     .await?;

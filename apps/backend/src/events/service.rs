@@ -214,7 +214,6 @@ fn checked_reminder(minutes: Option<i32>) -> Result<Option<i32>, AppError> {
     Ok(minutes)
 }
 
-/// `isAttendeeCopyForUser`: the caller is on the event as an attendee.
 /// A mailed invitation's copy held by the caller as an attendee; deleting one declines or removes it instead of trashing it.
 pub fn is_attendee_invitation(
     user_id: &str,
@@ -227,6 +226,7 @@ pub fn is_attendee_invitation(
     non_blank(event.external_id.as_deref()).is_some() && attendee_copy(user_id, participants)
 }
 
+/// `isAttendeeCopyForUser`: the caller is on the event as an attendee.
 fn attendee_copy(
     user_id: &str,
     participants: &[(

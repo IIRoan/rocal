@@ -153,10 +153,10 @@ async fn verify(env: &TestEnv, calendar: bool, mail: bool) -> anyhow::Result<()>
         .bind(EMAIL)
         .fetch_one(&mut db)
         .await?;
-    let readable: i64 = sqlx::query_scalar("SELECT (SELECT count(*) FROM calendar_event WHERE user_id = $1 AND (title ~ '^(Maestro|Playwright)' OR coalesce(description, '') ~ '(Maestro|Playwright)' OR coalesce(location, '') ~ '(Maestro|Playwright)')) + (SELECT count(*) FROM calendar WHERE user_id = $1 AND name ~ '(Maestro|Playwright)') + (SELECT count(*) FROM event_category WHERE user_id = $1 AND name ~ '(Maestro|Playwright)')").bind(&user).fetch_one(&mut db).await?;
+    let readable: i64 = sqlx::query_scalar("SELECT (SELECT count(*) FROM calendar_event WHERE user_id = $1 AND (title ~ '^(Maestro|Playwright)' OR coalesce(description, '') ~ '(Maestro|Playwright)' OR coalesce(location, '') ~ '(Maestro|Playwright)')) + (SELECT count(*) FROM calendar WHERE user_id = $1 AND name ~ '(Maestro|Playwright)') + (SELECT count(*) FROM event_category WHERE user_id = $1 AND name ~ '(Maestro|Playwright)') + (SELECT count(*) FROM event_trash WHERE user_id = $1 AND rows::text ~ '(Maestro|Playwright)')").bind(&user).fetch_one(&mut db).await?;
     ensure!(
         readable == 0,
-        "UI left readable event, calendar or category names in the database"
+        "UI left readable event, calendar or category names in the database or trash"
     );
     if calendar {
         let calendars: i64 = sqlx::query_scalar("SELECT count(*) FROM calendar WHERE user_id = $1 AND encrypted_name IS NOT NULL AND encryption_state = 'encrypted'").bind(&user).fetch_one(&mut db).await?;

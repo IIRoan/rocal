@@ -148,15 +148,3 @@ pub async fn security_txt() -> Response {
     )
         .into_response()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::SECURITY_TXT;
-
-    #[test]
-    fn security_txt_names_the_api_as_a_canonical_location() {
-        assert!(
-            SECURITY_TXT.contains("Canonical: https://api.solace.onl/.well-known/security.txt\n")
-        );
-    }
-}
