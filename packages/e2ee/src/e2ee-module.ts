@@ -1,4 +1,11 @@
 import type { CryptoProvider } from "./crypto-provider";
+import { hkdfSha256 } from "./hkdf";
+import {
+  RECOVERY_SECRET_BYTES,
+  formatRecoveryKey,
+  generateRecoverySecret,
+  parseRecoveryKey,
+} from "./recovery-kit";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -36,6 +43,10 @@ export const PASSWORD_WRAP_ALGORITHM = "AES-GCM-256";
 const AUTH_KEY_PREFIX = "solace-ak1:";
 const AUTH_KEY_SALT_PREFIX = "solace-auth-key-v1:";
 const AUTH_KEY_ITERATIONS = 600000;
+/** Fixed on the client, so a server cannot steer the wrapping key onto the auth key it receives. */
+const RECOVERY_WRAP_INFO = "solace/recovery-wrap/v1";
+const RECOVERY_AUTH_INFO = "solace/recovery-auth/v1";
+const RECOVERY_AUTH_KEY_PREFIX = "rk1:";
 
 // ---------------------------------------------------------------------------
 // Payload types
@@ -66,6 +77,14 @@ export interface PasswordEnvelopePayload {
   wrapAlgorithm: string;
   keyVersion: number;
 }
+
+export interface RecoveryEnvelopePayload {
+  wrappedAccountKey: string;
+  wrappedSearchKey: string;
+  keyVersion: number;
+}
+
+type WrapAadPrefix = "" | "recovery-";
 
 export type PasswordEnvelopeInput = Pick<
   PasswordEnvelopePayload,
@@ -285,6 +304,22 @@ export interface E2eeModule {
   generateDeviceId(): string;
   /** What clients send instead of the password: unlike the envelope's random salt, this one is the email, so the server never sees the password or the envelope key. */
   deriveAuthKey(password: string, email: string): Promise<string>;
+  /** A fresh recovery secret and the formatted key the user saves. */
+  generateRecoveryKey(): Promise<{ secret: Uint8Array; recoveryKey: string }>;
+  /** The secret of a typed recovery key, or null on a typo. */
+  parseRecoveryKey(value: string): Promise<Uint8Array | null>;
+  /** What proves the recovery key to the server; a different HKDF output than the wrapping key, so the server cannot open the envelope. */
+  deriveRecoveryAuthKey(secret: Uint8Array): Promise<string>;
+  createRecoveryEnvelope(
+    accountKey: CryptoKey,
+    blindIndexKey: CryptoKey,
+    secret: Uint8Array,
+    keyVersion?: number,
+  ): Promise<RecoveryEnvelopePayload>;
+  unwrapRecoveryEnvelope(
+    secret: Uint8Array,
+    envelope: RecoveryEnvelopePayload,
+  ): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -438,29 +473,10 @@ export function createE2eeModule(
       kdfParallelism: PASSWORD_ARGON2ID_PARAMS.parallelism,
     };
     const wrappingKey = await derivePasswordWrappingKey(password, kdfParameters);
-    const rawAccountKey = await crypto.subtle.exportKey("raw", accountKey);
-    const rawBlindIndexKey = await crypto.subtle.exportKey(
-      "raw",
-      blindIndexKey,
-    );
-
-    const wrappedAccountKey = await encryptBytes(
-      wrappingKey,
-      rawAccountKey,
-      `account-key:${keyVersion}`,
-    );
-    const wrappedSearchKey = await encryptBytes(
-      wrappingKey,
-      rawBlindIndexKey,
-      `blind-index-key:${keyVersion}`,
-    );
-
     return {
       ...kdfParameters,
-      wrappedAccountKey: JSON.stringify(wrappedAccountKey),
-      wrappedSearchKey: JSON.stringify(wrappedSearchKey),
+      ...(await sealKeys(wrappingKey, accountKey, blindIndexKey, keyVersion, "")),
       wrapAlgorithm: PASSWORD_WRAP_ALGORITHM,
-      keyVersion,
     };
   }
 
@@ -469,15 +485,50 @@ export function createE2eeModule(
     envelope: PasswordEnvelopeInput,
   ): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }> {
     const wrappingKey = await derivePasswordWrappingKey(password, envelope);
+    return openKeys(wrappingKey, envelope, "");
+  }
+
+  /** The account and blind-index keys wrapped under `wrappingKey`; the AAD prefix keeps password and recovery wraps apart. */
+  async function sealKeys(
+    wrappingKey: CryptoKey,
+    accountKey: CryptoKey,
+    blindIndexKey: CryptoKey,
+    keyVersion: number,
+    aadPrefix: WrapAadPrefix,
+  ): Promise<RecoveryEnvelopePayload> {
+    const rawAccountKey = await crypto.subtle.exportKey("raw", accountKey);
+    const rawBlindIndexKey = await crypto.subtle.exportKey("raw", blindIndexKey);
+    const wrappedAccountKey = await encryptBytes(
+      wrappingKey,
+      rawAccountKey,
+      `${aadPrefix}account-key:${keyVersion}`,
+    );
+    const wrappedSearchKey = await encryptBytes(
+      wrappingKey,
+      rawBlindIndexKey,
+      `${aadPrefix}blind-index-key:${keyVersion}`,
+    );
+    return {
+      wrappedAccountKey: JSON.stringify(wrappedAccountKey),
+      wrappedSearchKey: JSON.stringify(wrappedSearchKey),
+      keyVersion,
+    };
+  }
+
+  async function openKeys(
+    wrappingKey: CryptoKey,
+    envelope: RecoveryEnvelopePayload,
+    aadPrefix: WrapAadPrefix,
+  ): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }> {
     const rawAccountKey = await decryptBytes(
       wrappingKey,
       parseEncryptedBinaryPayload(envelope.wrappedAccountKey),
-      `account-key:${envelope.keyVersion}`,
+      `${aadPrefix}account-key:${envelope.keyVersion}`,
     );
     const rawBlindIndexKey = await decryptBytes(
       wrappingKey,
       parseEncryptedBinaryPayload(envelope.wrappedSearchKey),
-      `blind-index-key:${envelope.keyVersion}`,
+      `${aadPrefix}blind-index-key:${envelope.keyVersion}`,
     );
 
     const accountKey = await crypto.subtle.importKey(
@@ -496,6 +547,54 @@ export function createE2eeModule(
     );
 
     return { accountKey, blindIndexKey };
+  }
+
+  async function deriveRecoveryKeyBytes(
+    secret: Uint8Array,
+    info: string,
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    if (secret.length !== RECOVERY_SECRET_BYTES) {
+      throw new Error("Recovery secret has the wrong length.");
+    }
+    return hkdfSha256(crypto, new Uint8Array(secret), info);
+  }
+
+  async function deriveRecoveryWrappingKey(secret: Uint8Array): Promise<CryptoKey> {
+    const raw = await deriveRecoveryKeyBytes(secret, RECOVERY_WRAP_INFO);
+    return crypto.subtle.importKey("raw", raw, AES_GCM_ALGORITHM, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+  }
+
+  async function deriveRecoveryAuthKey(secret: Uint8Array): Promise<string> {
+    const raw = await deriveRecoveryKeyBytes(secret, RECOVERY_AUTH_INFO);
+    return `${RECOVERY_AUTH_KEY_PREFIX}${bytesToBase64Url(raw)}`;
+  }
+
+  async function createRecoveryEnvelope(
+    accountKey: CryptoKey,
+    blindIndexKey: CryptoKey,
+    secret: Uint8Array,
+    keyVersion: number = 1,
+  ): Promise<RecoveryEnvelopePayload> {
+    const wrappingKey = await deriveRecoveryWrappingKey(secret);
+    return sealKeys(wrappingKey, accountKey, blindIndexKey, keyVersion, "recovery-");
+  }
+
+  async function unwrapRecoveryEnvelope(
+    secret: Uint8Array,
+    envelope: RecoveryEnvelopePayload,
+  ): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }> {
+    return openKeys(await deriveRecoveryWrappingKey(secret), envelope, "recovery-");
+  }
+
+  async function generateRecoveryKey(): Promise<{
+    secret: Uint8Array;
+    recoveryKey: string;
+  }> {
+    const secret = generateRecoverySecret(crypto);
+    return { secret, recoveryKey: await formatRecoveryKey(crypto, secret) };
   }
 
   async function unwrapAccountKey(
@@ -647,5 +746,10 @@ export function createE2eeModule(
     generatePasswordSalt,
     generateDeviceId,
     deriveAuthKey,
+    generateRecoveryKey,
+    parseRecoveryKey: (value: string) => parseRecoveryKey(crypto, value),
+    deriveRecoveryAuthKey,
+    createRecoveryEnvelope,
+    unwrapRecoveryEnvelope,
   };
 }

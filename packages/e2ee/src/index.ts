@@ -19,6 +19,7 @@ export type {
   EncryptedBinaryPayload,
   PasswordEnvelopePayload,
   PasswordEnvelopeInput,
+  RecoveryEnvelopePayload,
 } from "./e2ee-module";
 export {
   PASSWORD_ARGON2ID_ALGORITHM,
