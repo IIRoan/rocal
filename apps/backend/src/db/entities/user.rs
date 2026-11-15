@@ -61,6 +61,8 @@ pub enum Relation {
     UserMailTrust,
     #[sea_orm(has_one = "super::user_recent_contacts::Entity")]
     UserRecentContacts,
+    #[sea_orm(has_one = "super::user_recovery_kit::Entity")]
+    UserRecoveryKit,
     #[sea_orm(has_one = "super::user_settings::Entity")]
     UserSettings,
 }
@@ -170,6 +172,12 @@ impl Related<super::user_mail_trust::Entity> for Entity {
 impl Related<super::user_recent_contacts::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::UserRecentContacts.def()
+    }
+}
+
+impl Related<super::user_recovery_kit::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserRecoveryKit.def()
     }
 }
 

@@ -33,6 +33,7 @@ mod notifications;
 mod passkeys;
 mod profiles;
 mod push_devices;
+mod recovery_kit;
 mod recurring;
 mod riftbound;
 mod search_token_retirement;

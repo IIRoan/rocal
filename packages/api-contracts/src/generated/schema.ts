@@ -123,6 +123,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/recovery/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sets the new password and its envelope, ends every session and consumes the kit; the client then signs in as usual. */
+        post: operations["completeAccountRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/recovery/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The account keys wrapped under the recovery key, for the key's holder to open on the device. */
+        post: operations["startAccountRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/calendars": {
         parameters: {
             query?: never;
@@ -271,6 +305,25 @@ export interface paths {
         put: operations["putE2eePassword"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/e2ee/recovery-kit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the caller has a recovery kit. */
+        get: operations["getRecoveryKit"];
+        /** Stores a new recovery kit after checking the current password, replacing any earlier one. */
+        put: operations["putRecoveryKit"];
+        post?: never;
+        /** Removes the caller's recovery kit, so it can no longer reset the password. */
+        delete: operations["deleteRecoveryKit"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2318,6 +2371,44 @@ export interface components {
             encryptionKeyVersion: number;
             updatedAt: components["schemas"]["Timestamp"];
         };
+        /** @description Resets the password with the recovery key: the new auth key and the account keys rewrapped for it. */
+        RecoveryCompleteRequest: {
+            email: string;
+            /** @description The auth key derived from the new password; a raw password is refused. */
+            newPassword: string;
+            passwordEnvelope: components["schemas"]["PasswordEnvelopeRequest"];
+            recoveryAuthKey: string;
+            /** @description Deletes every passkey, for someone who lost theirs. */
+            removePasskeys?: boolean;
+        };
+        /** @description The account keys wrapped under the recovery key, which only the key's holder can open. */
+        RecoveryEnvelope: {
+            /** Format: int32 */
+            keyVersion: number;
+            wrappedAccountKey: string;
+            wrappedSearchKey: string;
+        };
+        /** @description A new recovery kit: the account keys wrapped under the recovery key, and the key that proves it. */
+        RecoveryKitRequest: {
+            /** @description The auth key the client derived from the current password. */
+            currentPassword: string;
+            /** Format: int32 */
+            keyVersion?: number;
+            /** @description `rk1:` and the base64url HKDF output of the recovery key. */
+            recoveryAuthKey: string;
+            wrappedAccountKey: string;
+            wrappedSearchKey: string;
+        };
+        /** @description Whether the caller has a recovery kit; the key itself is never stored or returned. */
+        RecoveryKitStatus: {
+            createdAt?: components["schemas"]["Timestamp"];
+            exists: boolean;
+        };
+        /** @description Proves the recovery key for an email, before the client unwraps the account keys. */
+        RecoveryStartRequest: {
+            email: string;
+            recoveryAuthKey: string;
+        };
         RecurrenceException: {
             createdAt: components["schemas"]["Timestamp"];
             exceptionDate: components["schemas"]["Timestamp"];
@@ -2945,6 +3036,68 @@ export interface operations {
             };
         };
     };
+    completeAccountRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryCompleteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusFlag"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthError"];
+                };
+            };
+        };
+    };
+    startAccountRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryStartRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthError"];
+                };
+            };
+        };
+    };
     listCalendars: {
         parameters: {
             query?: never;
@@ -3237,6 +3390,74 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PasswordEnvelope"];
                 };
+            };
+        };
+    };
+    getRecoveryKit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryKitStatus"];
+                };
+            };
+        };
+    };
+    putRecoveryKit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryKitRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryKitStatus"];
+                };
+            };
+        };
+    };
+    deleteRecoveryKit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessMessage"];
+                };
+            };
+            /** @description The caller has no recovery kit */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

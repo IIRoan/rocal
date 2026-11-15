@@ -870,3 +870,155 @@ pub fn sha256_base64url(value: &str) -> String {
     use sha2::Digest;
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(value.as_bytes()))
 }
+
+/// Once a passkey exists, a password session alone can neither add another nor delete one: that was the lost-passkey bypass.
+#[tokio::test]
+async fn adding_or_deleting_a_passkey_needs_step_up_once_one_exists() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let (mut passkey, created) = register(&app, &mut user, "Laptop").await;
+    let id = created["id"].as_str().expect("id").to_owned();
+    let mut password_only = signed_in_without_passkey(&app, &user).await;
+    for response in [
+        ok(password_only
+            .get("/api/auth/passkey/generate-register-options")
+            .await),
+        ok(password_only
+            .post(
+                "/api/auth/passkey/verify-registration",
+                json!({"response": {}, "name": "Thief"}),
+            )
+            .await),
+        ok(password_only
+            .post("/api/auth/passkey/delete-passkey", json!({"id": id}))
+            .await),
+    ] {
+        auth_error(
+            &response,
+            403,
+            "PASSKEY_STEP_UP_REQUIRED",
+            "Passkey verification required.",
+        );
+    }
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM passkey WHERE \"userId\" = $1",
+            &user.id
+        )
+        .await,
+        1
+    );
+
+    let mut stepped_up = app.anonymous();
+    ok(passkey_sign_in(&mut stepped_up, &mut passkey, &app.origin).await);
+    let options = ok(stepped_up
+        .get("/api/auth/passkey/generate-register-options")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    let mut second = SoftPasskey::new(&rp_id(&app)).expect("passkey");
+    let response = second.register(&options, &app.origin).expect("attestation");
+    ok(stepped_up
+        .post(
+            "/api/auth/passkey/verify-registration",
+            json!({"response": response, "name": "Phone"}),
+        )
+        .await
+        .expect_status(200));
+    ok(stepped_up
+        .post("/api/auth/passkey/delete-passkey", json!({"id": id}))
+        .await
+        .expect_status(200));
+}
+
+/// Native "add passkey": the app's stepped-up session reaches the browser by one-time token, takes its step-up there, and freshening keeps it.
+#[tokio::test]
+async fn the_native_add_passkey_bridge_carries_the_app_step_up() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let (mut passkey, _) = register(&app, &mut user, "Laptop").await;
+    let mut native = app.expo("solace");
+    ok(passkey_sign_in(&mut native, &mut passkey, &app.origin).await);
+    // Takes the sign-in's own bridge marker first, so only the handoff below can grant the browser step-up.
+    ok(native
+        .post("/api/auth/passkey-bridge/complete-step-up", json!({}))
+        .await
+        .expect_status(200));
+    ok(native.get("/api/settings").await.expect_status(200));
+
+    let handoff = ok(native
+        .get("/api/auth/one-time-token/generate")
+        .await
+        .value())["token"]
+        .clone();
+    let mut browser = app.anonymous();
+    ok(browser
+        .post("/api/auth/one-time-token/verify", json!({"token": handoff}))
+        .await
+        .expect_status(200));
+    ok(browser
+        .post("/api/auth/passkey-bridge/complete-step-up", json!({}))
+        .await
+        .expect_status(200));
+    ok(browser
+        .post("/api/auth/passkey-bridge/freshen-session", json!({}))
+        .await
+        .expect_status(200));
+    let payload = step_up_payload(browser.cookie(STEP_UP_COOKIE).expect("step-up cookie"));
+    assert_eq!(payload["s"], json!(session_id(&mut browser).await));
+    let options = ok(browser
+        .get("/api/auth/passkey/generate-register-options")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    let mut second = SoftPasskey::new(&rp_id(&app)).expect("passkey");
+    let response = second.register(&options, &app.origin).expect("attestation");
+    ok(browser
+        .post(
+            "/api/auth/passkey/verify-registration",
+            json!({"response": response, "name": "Phone"}),
+        )
+        .await
+        .expect_status(200));
+
+    // A password-only app session hands over no step-up.
+    let mut password_app = app.expo("solace");
+    ok(password_app
+        .post(
+            "/api/auth/sign-in/email",
+            json!({"email": user.email, "password": user.password}),
+        )
+        .await
+        .expect_status(200));
+    let handoff = ok(password_app
+        .get("/api/auth/one-time-token/generate")
+        .await
+        .value())["token"]
+        .clone();
+    let mut browser = app.anonymous();
+    ok(browser
+        .post("/api/auth/one-time-token/verify", json!({"token": handoff}))
+        .await
+        .expect_status(200));
+    auth_error(
+        &ok(browser
+            .post("/api/auth/passkey-bridge/complete-step-up", json!({}))
+            .await),
+        403,
+        "PASSKEY_STEP_UP_REQUIRED",
+        "Passkey verification required.",
+    );
+    ok(browser
+        .post("/api/auth/passkey-bridge/freshen-session", json!({}))
+        .await
+        .expect_status(200));
+    auth_error(
+        &ok(browser
+            .get("/api/auth/passkey/generate-register-options")
+            .await),
+        403,
+        "PASSKEY_STEP_UP_REQUIRED",
+        "Passkey verification required.",
+    );
+}

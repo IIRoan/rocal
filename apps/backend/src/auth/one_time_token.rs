@@ -12,11 +12,11 @@ use sha2::{Digest, Sha256};
 use solace_api_types::auth::OneTimeToken;
 
 use super::api::{ApiError, URL_SAFE, json, random_string, validate};
-use super::hooks;
 use super::pipeline::AuthBody;
 use super::session::{self, ActiveSession};
 use super::sessions::require_session;
 use super::store;
+use super::{guard, hooks, passkeys};
 use crate::http::zod::{self, Schema};
 use crate::instant;
 use crate::state::AppState;
@@ -47,6 +47,18 @@ pub async fn generate(State(state): State<AppState>, headers: HeaderMap) -> Resp
     let outcome = async {
         let active = require_session(&state, &headers, &mut cookies).await?;
         let token = random_string(32, URL_SAFE);
+        // The receiver can then take this session's step-up through `complete-step-up`, as native passkey setup needs.
+        if guard::step_up_verified(&state, &headers, &active) {
+            let marker = passkeys::bridge_step_up(&active.session.id);
+            store::consume_verification(&state.db, &marker).await?;
+            store::create_verification(
+                &state.db,
+                &marker,
+                active.user.id.clone(),
+                LIFETIME_SECONDS,
+            )
+            .await?;
+        }
         store::create_verification(
             &state.db,
             &identifier(&token),

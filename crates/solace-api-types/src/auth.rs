@@ -137,3 +137,35 @@ pub struct MeResponse {
     #[schema(required = true)]
     pub user: Option<AuthUser>,
 }
+
+/// Proves the recovery key for an email, before the client unwraps the account keys.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RecoveryStartRequest {
+    pub email: String,
+    pub recovery_auth_key: String,
+}
+
+/// The account keys wrapped under the recovery key, which only the key's holder can open.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryEnvelope {
+    pub wrapped_account_key: String,
+    pub wrapped_search_key: String,
+    pub key_version: i32,
+}
+
+/// Resets the password with the recovery key: the new auth key and the account keys rewrapped for it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RecoveryCompleteRequest {
+    pub email: String,
+    pub recovery_auth_key: String,
+    /// The auth key derived from the new password; a raw password is refused.
+    pub new_password: String,
+    pub password_envelope: crate::e2ee::PasswordEnvelopeRequest,
+    /// Deletes every passkey, for someone who lost theirs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub remove_passkeys: Option<bool>,
+}

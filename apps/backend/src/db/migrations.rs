@@ -13,6 +13,7 @@ mod m20261114_190556_sealed_feed_url;
 mod m20261114_190718_event_trash;
 mod m20261115_113752_password_envelope_argon2id;
 mod m20261115_113835_blank_server_device_key_copies;
+mod m20261115_123334_user_recovery_kit;
 
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, TransactionTrait};
 use sea_orm_migration::{MigrationTrait, MigratorTrait};
@@ -40,6 +41,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261114_190718_event_trash::Migration),
             Box::new(m20261115_113752_password_envelope_argon2id::Migration),
             Box::new(m20261115_113835_blank_server_device_key_copies::Migration),
+            Box::new(m20261115_123334_user_recovery_kit::Migration),
         ]
     }
 }

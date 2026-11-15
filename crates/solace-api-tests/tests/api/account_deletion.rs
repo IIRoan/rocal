@@ -306,6 +306,18 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
         )
         .await
         .expect_status(200));
+    ok(user
+        .put(
+            "/api/e2ee/recovery-kit",
+            json!({
+                "currentPassword": user.password,
+                "recoveryAuthKey": format!("rk1:{}", fake_token()),
+                "wrappedAccountKey": fake_envelope(),
+                "wrappedSearchKey": fake_envelope(),
+            }),
+        )
+        .await
+        .expect_status(200));
     let feed_calendar = format!("suitecal{}", hex(8));
     let feed = format!("suitesub{}", hex(8));
     exec(
@@ -519,7 +531,7 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         .expect("one-time token")
         .to_owned();
     let one_time = format!("one-time-token:{}", sha256_base64url(&one_time_token));
-    // Each passkey sign-in leaves a step-up marker for the native bridge's complete-step-up.
+    // Each passkey sign-in, and each token a stepped-up session hands over, leaves a step-up marker for complete-step-up.
     assert_eq!(
         verifications(&app.db, &victim.id, &one_time).await,
         [
@@ -556,6 +568,7 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         "user_encryption_password",
         "user_mail_settings",
         "user_recent_contacts",
+        "user_recovery_kit",
         "user_settings",
         "verification",
     ] {

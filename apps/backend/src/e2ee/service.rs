@@ -103,8 +103,8 @@ fn device_wrapped_keys(
     }
 }
 
-/// The account and search keys wrapped for a password, and their key version.
-fn wrapped_keys(
+/// The account and search keys wrapped for a password or recovery key, and their key version.
+pub(super) fn wrapped_keys(
     account: &str,
     search: &str,
     key_version: Option<i32>,

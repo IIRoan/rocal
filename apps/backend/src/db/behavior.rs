@@ -96,6 +96,8 @@ impl ActiveModelBehavior for entities::mail_policy_monitor::ActiveModel {}
 
 impl ActiveModelBehavior for entities::user_mail_trust::ActiveModel {}
 
+impl ActiveModelBehavior for entities::user_recovery_kit::ActiveModel {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

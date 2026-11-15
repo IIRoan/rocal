@@ -228,3 +228,28 @@ pub struct PasswordEnvelopeRequest {
     #[schema(nullable = false)]
     pub key_version: Option<i32>,
 }
+
+/// Whether the caller has a recovery kit; the key itself is never stored or returned.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryKitStatus {
+    pub exists: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub created_at: Option<Timestamp>,
+}
+
+/// A new recovery kit: the account keys wrapped under the recovery key, and the key that proves it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RecoveryKitRequest {
+    /// The auth key the client derived from the current password.
+    pub current_password: String,
+    /// `rk1:` and the base64url HKDF output of the recovery key.
+    pub recovery_auth_key: String,
+    pub wrapped_account_key: String,
+    pub wrapped_search_key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub key_version: Option<i32>,
+}

@@ -12,6 +12,7 @@ pub mod password;
 mod passwords;
 pub mod pipeline;
 mod rate_limit;
+mod recovery;
 pub mod session;
 mod sessions;
 pub(crate) mod store;
@@ -33,6 +34,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(me))
         .routes(routes!(user))
         .routes(routes!(get_session))
+        .routes(routes!(recovery::start))
+        .routes(routes!(recovery::complete))
         .route("/api/auth/error", get(error_page::error_page))
         .route("/api/auth/sign-up/email", post(email_password::sign_up))
         .route("/api/auth/sign-in/email", post(email_password::sign_in))

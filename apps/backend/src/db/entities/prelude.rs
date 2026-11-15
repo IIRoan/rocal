@@ -27,5 +27,6 @@ pub use super::user_encryption_password::Entity as UserEncryptionPassword;
 pub use super::user_mail_settings::Entity as UserMailSettings;
 pub use super::user_mail_trust::Entity as UserMailTrust;
 pub use super::user_recent_contacts::Entity as UserRecentContacts;
+pub use super::user_recovery_kit::Entity as UserRecoveryKit;
 pub use super::user_settings::Entity as UserSettings;
 pub use super::verification::Entity as Verification;

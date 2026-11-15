@@ -29,5 +29,6 @@ pub mod user_encryption_password;
 pub mod user_mail_settings;
 pub mod user_mail_trust;
 pub mod user_recent_contacts;
+pub mod user_recovery_kit;
 pub mod user_settings;
 pub mod verification;
