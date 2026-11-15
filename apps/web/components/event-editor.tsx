@@ -138,6 +138,7 @@ export function EventEditor({
       eventToEdit.id &&
       initialEventViewMode === "edit" &&
       !eventToEdit.isSynced &&
+      !eventToEdit.contentUnavailable &&
       canEditEvent
     ) {
       setEventViewMode("edit");

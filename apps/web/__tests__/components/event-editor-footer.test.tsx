@@ -218,4 +218,39 @@ describe("EventEditorFooter", () => {
     expect(buttonTexts.some((text) => text.includes("Maybe"))).toBe(false);
     expect(buttonTexts.some((text) => text.includes("Decline"))).toBe(false);
   });
+  it.each([false, true])("offers no edit for an event whose content did not open (desktop: %s)", async (desktop) => {
+    const render = async (contentUnavailable: boolean) => {
+      await act(async () => {
+        root.render(
+          <EventEditorFooter
+            canEditEvent
+            desktop={desktop}
+            eventForm={
+              {
+                eventCalendarId: "calendar-1",
+                eventSaving: false,
+                eventTitle: "Encrypted event",
+                selectedEvent: { id: "event-1", userId: "user-1", contentUnavailable },
+                setEventViewMode: jest.fn(),
+                setShowRecurringDeleteModal: jest.fn(),
+              } as any
+            }
+            handleEventDelete={() => {}}
+            handleEventDownloadIcs={() => {}}
+            handleEventSave={() => {}}
+            invitationResponsePending={null}
+            invitationStatus={null}
+            isViewMode={true}
+            onBack={() => {}}
+            onClose={() => {}}
+            onInvitationResponse={() => {}}
+          />,
+        );
+      });
+      return Array.from(container.querySelectorAll("button")).map((button) => button.textContent ?? "");
+    };
+
+    expect((await render(false)).some((text) => text.includes("Edit"))).toBe(true);
+    expect((await render(true)).some((text) => text.includes("Edit"))).toBe(false);
+  });
 });
