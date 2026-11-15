@@ -2,7 +2,7 @@
 
 import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { createHash, webcrypto } from "node:crypto";
+import { pbkdf2Sync, webcrypto } from "node:crypto";
 import { createE2eeModule, type CryptoProvider } from "@workspace/e2ee";
 import { RECOVERY_KEY_TYPO_MESSAGE } from "@workspace/calendar-client";
 import { RecoverAccountSheet } from "./RecoverAccountSheet";
@@ -10,7 +10,7 @@ import { RecoverAccountSheet } from "./RecoverAccountSheet";
 // Node's WebCrypto matches the provider at runtime; only the DOM-shaped declarations differ.
 const mockCrypto = webcrypto as unknown as CryptoProvider;
 const mockArgon2id = async (password: Uint8Array, salt: Uint8Array) =>
-  new Uint8Array(createHash("sha256").update(password).update(salt).digest());
+  new Uint8Array(pbkdf2Sync(password, salt, 1, 32, "sha256"));
 const mockFetch = jest.fn();
 const mockSignIn = jest.fn();
 const mockAlert = jest.fn();

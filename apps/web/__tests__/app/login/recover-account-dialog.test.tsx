@@ -18,13 +18,13 @@ jest.mock("lucide-react", () => ({ XIcon: () => null }));
 jest.mock("@workspace/ui/lib/toast", () => ({ toast: jest.fn() }));
 
 jest.mock("@/lib/e2ee-crypto", () => {
-  const { createHash } = jest.requireActual<typeof import("node:crypto")>("node:crypto");
+  const { pbkdf2Sync } = jest.requireActual<typeof import("node:crypto")>("node:crypto");
   const { createE2eeModule } = jest.requireActual<typeof import("@workspace/e2ee")>("@workspace/e2ee");
   return {
     // The provider shape matches Node's WebCrypto at runtime; only the DOM declarations differ.
     e2eeModule: createE2eeModule(globalThis.crypto as never, {
       argon2id: async (password: Uint8Array, salt: Uint8Array) =>
-        new Uint8Array(createHash("sha256").update(password).update(salt).digest()),
+        new Uint8Array(pbkdf2Sync(password, salt, 1, 32, "sha256")),
     }),
   };
 });

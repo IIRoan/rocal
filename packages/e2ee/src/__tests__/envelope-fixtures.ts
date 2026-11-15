@@ -1,4 +1,4 @@
-import { createHash, webcrypto } from "node:crypto";
+import { pbkdf2Sync, webcrypto } from "node:crypto";
 import type { CryptoProvider } from "../crypto-provider";
 import {
   bytesToBase64Url,
@@ -13,11 +13,13 @@ export const nodeCrypto = webcrypto as unknown as CryptoProvider;
 /** A fast keyed stand-in for Argon2id, so round-trip tests do not spend 64 MiB per run. */
 export const stubArgon2id: Argon2idDerive = async (password, salt, params) =>
   new Uint8Array(
-    createHash("sha256")
-      .update(password)
-      .update(salt)
-      .update(`${params.memoryKiB}:${params.passes}:${params.parallelism}`)
-      .digest(),
+    pbkdf2Sync(
+      password,
+      Buffer.concat([salt, Buffer.from(`${params.memoryKiB}:${params.passes}:${params.parallelism}`)]),
+      1,
+      32,
+      "sha256",
+    ),
   );
 
 export const testE2eeModule = createE2eeModule(nodeCrypto, { argon2id: stubArgon2id });

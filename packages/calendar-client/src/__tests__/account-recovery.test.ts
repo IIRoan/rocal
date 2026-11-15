@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { createHash, webcrypto } from "node:crypto";
+import { pbkdf2Sync, webcrypto } from "node:crypto";
 import { createE2eeModule, type CryptoProvider } from "@workspace/e2ee";
 import {
   RECOVERY_KEY_TYPO_MESSAGE,
@@ -12,7 +12,7 @@ import { createAuthKeyFetch } from "../auth-key-fetch";
 // Node's WebCrypto matches the provider at runtime; only the DOM-shaped declarations differ.
 const e2ee = createE2eeModule(webcrypto as unknown as CryptoProvider, {
   argon2id: async (password, salt) =>
-    new Uint8Array(createHash("sha256").update(password).update(salt).digest()),
+    new Uint8Array(pbkdf2Sync(password, salt, 1, 32, "sha256")),
 });
 
 const EMAIL = "a@solace.test";
