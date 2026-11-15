@@ -15,6 +15,8 @@ export interface StoredE2eeDeviceRecord {
   updatedAt: string;
   /** Salt of the password envelope known to hold this record's account key; without it sign-out keeps the record. */
   envelopeSalt?: string;
+  /** Set once every event of the account is bound to its row id; unbound event content is refused from then on. */
+  eventContentBound?: boolean;
 }
 
 function openDatabase(): Promise<IDBDatabase | null> {
@@ -110,6 +112,13 @@ export async function rememberStoredDeviceEnvelopeSalt(
   }
 }
 
+export async function markStoredEventContentBound(userId: string): Promise<void> {
+  const record = await getStoredE2eeDevice(userId);
+  if (record && !record.eventContentBound) {
+    await putStoredE2eeDevice({ ...record, eventContentBound: true });
+  }
+}
+
 /** Sign-out keeps a device key no password envelope is known to hold, since it may be the only copy of the account key. */
 export async function listRecoverableE2eeDevices(): Promise<StoredE2eeDeviceRecord[]> {
   const records = await withStore<StoredE2eeDeviceRecord[]>("readonly", (store) =>
@@ -118,10 +127,15 @@ export async function listRecoverableE2eeDevices(): Promise<StoredE2eeDeviceReco
   return (records ?? []).filter((record) => record.envelopeSalt);
 }
 
+/** Sign-out also forgets the bound-content marker of a device key it keeps. */
 export async function deleteRecoverableE2eeDevices(): Promise<void> {
+  const records = await withStore<StoredE2eeDeviceRecord[]>("readonly", (store) =>
+    store.getAll(),
+  );
   await Promise.all(
-    (await listRecoverableE2eeDevices()).map((record) =>
-      deleteStoredE2eeDevice(record.userId),
-    ),
+    (records ?? []).map(({ eventContentBound, ...record }) => {
+      if (record.envelopeSalt) return deleteStoredE2eeDevice(record.userId);
+      return eventContentBound ? putStoredE2eeDevice(record) : undefined;
+    }),
   );
 }

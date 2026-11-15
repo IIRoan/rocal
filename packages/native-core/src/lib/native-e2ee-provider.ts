@@ -2,13 +2,11 @@ import * as SecureStore from "expo-secure-store";
 import {
   encryptEventContentRequest,
   encryptNameRequest,
-  hydrateEncryptedEventWithoutSession,
   hydrateEncryptedName,
+  openEncryptedEvent,
   parseEncryptedJsonPayload,
-  withDecryptedEventContent,
   withoutPlaintextEventContent,
   withoutPlaintextName,
-  type DecryptedEventContent,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
 } from "@workspace/e2ee";
@@ -218,6 +216,7 @@ export async function recoverableStoredDeviceId(): Promise<string | null> {
 
 /** Forgets this device's key pair only when the password envelope is known to hold its account key; otherwise it may be the only copy. */
 export async function clearRecoverableStoredDevice(): Promise<void> {
+  await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.E2EE_EVENT_CONTENT_BOUND);
   if (!(await SecureStore.getItemAsync(SECURE_STORE_KEYS.E2EE_ENVELOPE_SALT))) {
     return;
   }
@@ -340,14 +339,33 @@ export function createNativeE2eeProvider({
     }
   };
 
+  let boundUserId: Promise<string | null> | null = null;
+  const refusesUnboundContent = async (session: E2eeSession): Promise<boolean> => {
+    boundUserId ??= SecureStore.getItemAsync(
+      SECURE_STORE_KEYS.E2EE_EVENT_CONTENT_BOUND,
+    ).catch(() => null);
+    return (await boundUserId) === session.userId;
+  };
+
   const provider: IE2eeProvider = {
     async attachEventEncryptionShadow<
       T extends CreateEventRequest | UpdateEventRequest,
-    >(request: T): Promise<EventWireRequest<T>> {
+    >(request: T, eventId: string): Promise<EventWireRequest<T>> {
       return encryptWith(
         "event",
-        (e2ee, session) => encryptEventContentRequest(e2ee, session, request),
+        (e2ee, session) =>
+          encryptEventContentRequest(e2ee, session, request, eventId),
         () => withoutPlaintextEventContent(request),
+      );
+    },
+
+    async markEventContentBound(): Promise<void> {
+      const session = await waitForSession();
+      if (!session || (await refusesUnboundContent(session))) return;
+      boundUserId = Promise.resolve(session.userId);
+      await SecureStore.setItemAsync(
+        SECURE_STORE_KEYS.E2EE_EVENT_CONTENT_BOUND,
+        session.userId,
       );
     },
 
@@ -398,36 +416,14 @@ export function createNativeE2eeProvider({
     },
 
     async hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent> {
-      if (
-        event.encryptionState !== "encrypted" ||
-        !event.encryptedContent ||
-        typeof event.encryptedContent !== "string"
-      ) {
-        return event;
-      }
-
-      const session = await waitForSession();
-      if (!session) {
-        return hydrateEncryptedEventWithoutSession(event);
-      }
-
-      try {
-        const e2ee = await getModule();
-        if (!e2ee) {
-          return hydrateEncryptedEventWithoutSession(event);
-        }
-
-        const payload = JSON.parse(event.encryptedContent);
-        const decrypted = await e2ee.decryptJsonPayload<DecryptedEventContent>(
-          session.accountKey,
-          payload,
-          "event-content:v1",
-        );
-
-        return withDecryptedEventContent(event, decrypted);
-      } catch {
-        return hydrateEncryptedEventWithoutSession(event);
-      }
+      const session = event.encryptedContent ? await waitForSession() : null;
+      const e2ee = session ? await getModule().catch(() => null) : null;
+      return openEncryptedEvent(
+        e2ee,
+        session,
+        event,
+        session ? await refusesUnboundContent(session) : false,
+      );
     },
 
     async hydrateEncryptedEvents(

@@ -62,6 +62,7 @@ jest.mock("@workspace/e2ee", () => {
     encryptEventContentRequest: actual.encryptEventContentRequest,
     encryptNameRequest: actual.encryptNameRequest,
     hydrateEncryptedName: actual.hydrateEncryptedName,
+    openEncryptedEvent: actual.openEncryptedEvent,
     lockWithoutDeviceKeys: actual.lockWithoutDeviceKeys,
     resolveDeviceEnvelopeSalt: actual.resolveDeviceEnvelopeSalt,
     shouldUpgradePasswordEnvelope: actual.shouldUpgradePasswordEnvelope,
@@ -1057,12 +1058,13 @@ describe("E2eeProvider", () => {
     expect(mockDeleteItemAsync.mock.calls.map(([key]) => key)).toEqual(
       deleted
         ? [
+            "E2EE_EVENT_CONTENT_BOUND",
             "E2EE_DEVICE_ID",
             "E2EE_PRIVATE_KEY",
             "E2EE_DEVICE_KEYS",
             "E2EE_ENVELOPE_SALT",
           ]
-        : [],
+        : ["E2EE_EVENT_CONTENT_BOUND"],
     );
   });
 
@@ -1298,7 +1300,7 @@ describe("E2eeProvider", () => {
       start: "2026-06-01T09:00:00.000Z",
       end: "2026-06-01T10:00:00.000Z",
       calendarId: "calendar-1",
-    });
+    }, "event-1");
     const calendar = await provider.attachCalendarEncryptionShadow({
       name: "Therapy",
       color: "blue",
@@ -1331,6 +1333,37 @@ describe("E2eeProvider", () => {
         updatedAt: new Date(0),
       }),
     ).resolves.toMatchObject({ name: "Therapy" });
+
+    const legacy = {
+      id: "event-1",
+      title: "",
+      encryptedContent: event.encryptedContent,
+      encryptionState: "encrypted" as const,
+      encryptionKeyVersion: 1,
+      start: new Date(0),
+      end: new Date(0),
+      calendarId: "calendar-1",
+      userId: "user-1",
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    };
+    expect(mockE2eeModule.encryptJsonPayload).toHaveBeenCalledWith(
+      accountKey,
+      expect.anything(),
+      "event-content:v2:event-1",
+    );
+    mockE2eeModule.decryptJsonPayload.mockResolvedValue({ title: "Therapy" });
+    await expect(provider.hydrateEncryptedEvent(legacy)).resolves.toMatchObject({
+      title: "Therapy",
+    });
+    await provider.markEventContentBound();
+    expect(mockSetItemAsync).toHaveBeenCalledWith(
+      "E2EE_EVENT_CONTENT_BOUND",
+      "user-1",
+    );
+    await expect(provider.hydrateEncryptedEvent(legacy)).resolves.toMatchObject({
+      contentUnavailable: true,
+    });
   });
 
   it("does not mint new keys when other devices hold them without a password envelope", async () => {

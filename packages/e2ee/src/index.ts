@@ -52,12 +52,14 @@ export {
 
 export {
   decryptEntityName,
+  decryptEventContent,
   ENCRYPTION_NOT_READY_MESSAGE,
   encryptEventContentRequest,
   encryptNameRequest,
   hydrateEncryptedName,
   hydrateEncryptedNameWithoutSession,
   isEncryptedJsonPayload,
+  openEncryptedEvent,
   parseEncryptedJsonPayload,
   shouldEncryptEventContent,
   withoutPlaintextEventContent,

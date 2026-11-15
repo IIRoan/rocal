@@ -123,6 +123,7 @@ describe("CalendarApiService encrypted names", () => {
     expect(JSON.parse(body)).toEqual({
       editScope: "this_only",
       occurrenceDate: "2026-06-01T09:00:00.000Z",
+      newEventId: expect.stringMatching(/^[0-9a-f]{32}$/),
       updates: { encryptedContent: "ciphertext" },
     });
   });
@@ -156,6 +157,7 @@ describe("CalendarApiService encrypted names", () => {
         color: "rose",
         categoryId: "k1",
       }),
+      "e1",
     );
 
     fetchMock.mockClear();

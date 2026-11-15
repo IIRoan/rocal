@@ -10,6 +10,7 @@ type UpgradeApi = Pick<
   | "getEventSearchCorpus"
   | "sealImportedInvitationIfNeeded"
   | "resealEventAttributes"
+  | "markEventContentBound"
   | "sealPendingReminders"
   | "getSubscriptions"
   | "updateSubscription"
@@ -83,9 +84,18 @@ export async function upgradeStoredEncryption(
   if (report.readableInvitations > 0) {
     await sealReadableInvitations(api).catch(() => undefined);
   }
-  await inBatches(report.eventsWithReadableAttributes, (id) =>
-    api.resealEventAttributes(id),
-  );
+  // A re-seal binds the content to its id and moves readable colour and category inside, so each event needs one.
+  const resealed = [
+    ...new Set([
+      ...report.eventsWithReadableAttributes,
+      ...report.eventsWithUnboundContent,
+    ]),
+  ];
+  await inBatches(resealed, (id) => api.resealEventAttributes(id));
+  // Once nothing unbound is left, unbound content is refused here and on the account's other devices.
+  if (report.eventsWithUnboundContent.length === 0) {
+    await api.markEventContentBound().catch(() => undefined);
+  }
   await inBatches(report.eventsWithUnsealedReminders, (id) =>
     api.sealPendingReminders(id),
   );

@@ -10,7 +10,7 @@ describe("CalendarApiService encryption wrappers", () => {
     delete: jest.Mock;
   };
   let mockE2ee: {
-    attachEventEncryptionShadow: jest.Mock<(req: any) => Promise<any>>;
+    attachEventEncryptionShadow: jest.Mock<(req: any, eventId?: string) => Promise<any>>;
     attachCalendarEncryptionShadow: jest.Mock<(req: any) => Promise<any>>;
     attachCategoryEncryptionShadow: jest.Mock<(req: any) => Promise<any>>;
     hydrateEncryptedEvent: jest.Mock<(event: any) => Promise<any>>;
@@ -31,7 +31,7 @@ describe("CalendarApiService encryption wrappers", () => {
       delete: jest.fn(),
     };
     mockE2ee = {
-      attachEventEncryptionShadow: jest.fn((req: any) => Promise.resolve(req)),
+      attachEventEncryptionShadow: jest.fn((req: any, _eventId?: string) => Promise.resolve(req)),
       attachCalendarEncryptionShadow: jest.fn((req: any) =>
         Promise.resolve(req),
       ),
@@ -84,8 +84,10 @@ describe("CalendarApiService encryption wrappers", () => {
 
     await service.createEvent(request as any);
 
-    expect(mockE2ee.attachEventEncryptionShadow).toHaveBeenCalledWith(request);
-    expect(client.post).toHaveBeenCalledWith("/api/events", payload);
+    const id = mockE2ee.attachEventEncryptionShadow.mock.calls[0]?.[1];
+    expect(id).toMatch(/^[0-9a-f]{32}$/);
+    expect(mockE2ee.attachEventEncryptionShadow).toHaveBeenCalledWith(request, id);
+    expect(client.post).toHaveBeenCalledWith("/api/events", { ...payload, id });
   });
 
   it("puts attached event payloads on update", async () => {
@@ -102,7 +104,7 @@ describe("CalendarApiService encryption wrappers", () => {
 
     await service.updateEvent("event-1", request as any);
 
-    expect(mockE2ee.attachEventEncryptionShadow).toHaveBeenCalledWith(request);
+    expect(mockE2ee.attachEventEncryptionShadow).toHaveBeenCalledWith(request, "event-1");
     expect(client.put).toHaveBeenCalledWith("/api/events/event-1", payload);
   });
 

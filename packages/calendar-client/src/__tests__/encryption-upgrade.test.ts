@@ -100,6 +100,7 @@ describe("upgradeStoredEncryption", () => {
   function fakeApi(report: {
     eventsWithReadableAttributes?: string[];
     eventsWithUnsealedReminders?: string[];
+    eventsWithUnboundContent?: string[];
     readableInvitations?: number;
     unsealedSettings?: boolean;
     subscriptionsWithReadableNames?: string[];
@@ -109,6 +110,7 @@ describe("upgradeStoredEncryption", () => {
       getEncryptionUpgrades: jest.fn(async () => ({
         eventsWithReadableAttributes: [],
         eventsWithUnsealedReminders: [],
+        eventsWithUnboundContent: [],
         readableInvitations: 0,
         unsealedSettings: false,
         subscriptionsWithReadableNames: [],
@@ -123,6 +125,7 @@ describe("upgradeStoredEncryption", () => {
         return true;
       }),
       sealPendingReminders: jest.fn(async () => true),
+      markEventContentBound: jest.fn(async () => undefined),
       getSubscriptions: jest.fn(async () => [
         { id: "s1", name: " Therapy practice ", nameRevision: "original-revision", url: " https://example.com/private.ics " },
         { id: "s2", name: "", url: "sealed:s2", encryptedUrl: "sealed-url" },
@@ -141,6 +144,19 @@ describe("upgradeStoredEncryption", () => {
     expect(api.resealEventAttributes).not.toHaveBeenCalled();
     expect(api.sealPendingReminders).not.toHaveBeenCalled();
     expect(api.getSubscriptions).not.toHaveBeenCalled();
+    expect(api.markEventContentBound).toHaveBeenCalledTimes(1);
+  });
+
+  it("binds unbound events once each, and marks the account only when none are left", async () => {
+    const api = fakeApi({
+      eventsWithReadableAttributes: ["a", "b"],
+      eventsWithUnboundContent: ["b", "c"],
+    });
+
+    await upgradeStoredEncryption(api);
+
+    expect(api.resealEventAttributes.mock.calls.map(([id]) => id)).toEqual(["a", "b", "c"]);
+    expect(api.markEventContentBound).not.toHaveBeenCalled();
   });
 
   it("seals readable feed names by renaming each feed to its own name", async () => {

@@ -107,6 +107,8 @@ export interface CalendarEvent {
   blindIndexTokens?: string[] | null;
   encryptionState?: EncryptionState;
   encryptionKeyVersion?: number;
+  /** Client-only: the content did not open on this device, so the event is read-only here. */
+  contentUnavailable?: boolean;
   start: Date;
   end: Date;
   timezone?: string | null;
@@ -420,6 +422,8 @@ export interface UserSettings {
   riftboundImportedIds?: string[];
   /** Absent means on; off disables every single-key shortcut (WCAG 2.1.4). */
   keyboardShortcuts?: boolean;
+  /** Set once every event is bound to its row id; from then on unbound event content is refused. */
+  eventContentBound?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

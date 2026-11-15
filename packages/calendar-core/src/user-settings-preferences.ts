@@ -23,6 +23,7 @@ export const SEALED_USER_SETTINGS_FIELDS = [
   "riftbound",
   "riftboundImportedIds",
   "keyboardShortcuts",
+  "eventContentBound",
 ] as const satisfies ReadonlyArray<keyof UserSettings>;
 
 export type UserSettingsPreferences = Pick<
@@ -64,6 +65,7 @@ const preferenceSchemas = {
   riftbound: riftboundPreferencesSchema,
   riftboundImportedIds: riftboundImportedIdsSchema,
   keyboardShortcuts: z.boolean(),
+  eventContentBound: z.boolean(),
 } satisfies Record<keyof UserSettingsPreferences, z.ZodTypeAny>;
 
 function isSealedField(key: string): key is keyof UserSettingsPreferences {

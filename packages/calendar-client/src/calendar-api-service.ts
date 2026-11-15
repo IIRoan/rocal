@@ -22,6 +22,8 @@ import {
   splitUserSettingsUpdate,
   type UserSettingsPreferences,
   storedEventId,
+  newClientEntityId,
+  EVENT_CONTENT_UNAVAILABLE_MESSAGE,
   SUBSCRIPTION_URL_AAD,
   feedSyncUrl,
   isFeedSyncDue,
@@ -95,10 +97,18 @@ function needsStoredContent(request: UpdateEventRequest): boolean {
   return set > 0 && set < EVENT_CONTENT_FIELDS.length;
 }
 
+/** A stored event that did not open here would seal its placeholder over the real content. */
+function hasAllContent(request: UpdateEventRequest): boolean {
+  return EVENT_CONTENT_FIELDS.every((field) => request[field] !== undefined);
+}
+
 function withStoredContent(
   request: UpdateEventRequest,
   stored: CalendarEvent,
 ): UpdateEventRequest {
+  if (stored.contentUnavailable) {
+    throw new Error(EVENT_CONTENT_UNAVAILABLE_MESSAGE);
+  }
   return {
     ...request,
     title: request.title ?? stored.title,
@@ -231,6 +241,7 @@ export class CalendarApiService {
       description: null,
       location: null,
       encryptionState: "encrypted",
+      contentUnavailable: true,
     });
   }
 
@@ -439,11 +450,19 @@ export class CalendarApiService {
       return undefined;
     }
 
-    const shadow = await this.e2ee.attachEventEncryptionShadow({
-      title: parsed.title,
-      description: parsed.description,
-      location: parsed.location,
-    } as UpdateEventRequest);
+    // An existing copy is sealed only with content bound to its id; a new one takes the id proposed here.
+    const existing = await this.getInvitationByExternalId(parsed.uid, {
+      syncRemote: false,
+    }).catch(() => null);
+    const eventId = existing?.id ?? newClientEntityId();
+    const shadow = await this.e2ee.attachEventEncryptionShadow(
+      {
+        title: parsed.title,
+        description: parsed.description,
+        location: parsed.location,
+      } as UpdateEventRequest,
+      eventId,
+    );
 
     if (!shadow.encryptedContent) {
       return undefined;
@@ -452,6 +471,7 @@ export class CalendarApiService {
     return [
       {
         externalId: parsed.uid,
+        eventId,
         encryptedContent: shadow.encryptedContent,
         ...(shadow.encryptionKeyVersion
           ? { encryptionKeyVersion: shadow.encryptionKeyVersion }
@@ -494,11 +514,14 @@ export class CalendarApiService {
       return null;
     }
 
-    const shadow = await this.e2ee.attachEventEncryptionShadow({
-      title: event.title,
-      description: event.description ?? undefined,
-      location: event.location ?? undefined,
-    } as UpdateEventRequest);
+    const shadow = await this.e2ee.attachEventEncryptionShadow(
+      {
+        title: event.title,
+        description: event.description ?? undefined,
+        location: event.location ?? undefined,
+      } as UpdateEventRequest,
+      event.id,
+    );
 
     if (!shadow.encryptedContent) {
       return null;
@@ -542,24 +565,39 @@ export class CalendarApiService {
     }
   }
 
-  /** Seals an event's readable colour and category into new ciphertext; false when it cannot be opened here. */
+  /** The stored content opened, or null when it does not open on this device. */
+  private async openStoredEvent(stored: CalendarEvent): Promise<CalendarEvent | null> {
+    const opened = await this.e2ee.hydrateEncryptedEvent(stored).catch(() => null);
+    return opened && !opened.contentUnavailable ? opened : null;
+  }
+
+  /** Records that every event is bound to its id, so this and the account's other devices refuse unbound content. */
+  async markEventContentBound(): Promise<void> {
+    await this.e2ee.markEventContentBound();
+    if (!(await this.getUserSettings()).eventContentBound) {
+      await this.updateUserSettings({ eventContentBound: true });
+    }
+  }
+
+  /** Re-seals an event bound to its id, moving a readable colour and category inside; false when it cannot be opened here. */
   async resealEventAttributes(id: string): Promise<boolean> {
     if (!(await this.e2ee.hasActiveSession())) return false;
     const path = `/api/events/${encodeURIComponent(id)}`;
     const stored = (await this.client.get<Schema<"Event">>(path)) as CalendarEvent;
     if (typeof stored.encryptedContent !== "string") return false;
     // An event this device cannot open is left as it is, so its title is never overwritten.
-    const opened = await this.e2ee
-      .hydrateEncryptedEvent(stored)
-      .catch(() => null);
+    const opened = await this.openStoredEvent(stored);
     if (!opened?.title.trim()) return false;
-    const shadow = await this.e2ee.attachEventEncryptionShadow({
-      title: opened.title,
-      description: opened.description ?? "",
-      location: opened.location ?? "",
-      color: opened.color ?? "",
-      categoryId: opened.categoryId ?? "",
-    } as UpdateEventRequest);
+    const shadow = await this.e2ee.attachEventEncryptionShadow(
+      {
+        title: opened.title,
+        description: opened.description ?? "",
+        location: opened.location ?? "",
+        color: opened.color ?? "",
+        categoryId: opened.categoryId ?? "",
+      } as UpdateEventRequest,
+      id,
+    );
     if (!shadow.encryptedContent) return false;
     // The server stores it only over the ciphertext read here, so an edit made meanwhile wins.
     await this.client.post<Schema<"Event">>(`${path}/seal-encryption`, {
@@ -659,12 +697,13 @@ export class CalendarApiService {
     event: CreateEventRequest,
   ): Promise<WithOperationWarnings<CalendarEvent>> {
     try {
+      const id = newClientEntityId();
       const { encryptedContent, ...payload } =
-        await this.e2ee.attachEventEncryptionShadow(event);
+        await this.e2ee.attachEventEncryptionShadow(event, id);
       if (!encryptedContent) throw new Error("Event title is required");
       const response = await this.client.post<Schema<"Event">>(
         "/api/events",
-        { ...payload, encryptedContent } satisfies Schema<"CreateEventRequest">,
+        { ...payload, id, encryptedContent } satisfies Schema<"CreateEventRequest">,
       );
       return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
@@ -681,6 +720,7 @@ export class CalendarApiService {
         needsStoredContent(event)
           ? withStoredContent(event, await this.getEvent(id))
           : event,
+        storedEventId(id),
       );
       const response = await this.client.put<Schema<"Event">>(
         `/api/events/${encodeURIComponent(id)}`,
@@ -907,9 +947,7 @@ export class CalendarApiService {
       for (const event of page.events as CalendarEvent[]) {
         if (event.encryptionState !== "encrypted") continue;
         // Without the column the category read back is the sealed one, and an event that does not open is left as it is.
-        const opened = await this.e2ee
-          .hydrateEncryptedEvent({ ...event, categoryId: null })
-          .catch(() => null);
+        const opened = await this.openStoredEvent({ ...event, categoryId: null });
         if (opened?.categoryId === id) assigned.push(opened);
       }
       offset = page.nextOffset ?? -1;
@@ -1032,7 +1070,12 @@ export class CalendarApiService {
     const opened = encryptedPreferences
       ? await this.e2ee.decryptJson(encryptedPreferences, USER_SETTINGS_PREFERENCES_AAD)
       : null;
-    return { ...(settings as UserSettings), ...readUserSettingsPreferences(opened) };
+    const preferences = readUserSettingsPreferences(opened);
+    // Another device finished binding every event, so this one refuses unbound content too.
+    if (preferences.eventContentBound) {
+      await this.e2ee.markEventContentBound();
+    }
+    return { ...(settings as UserSettings), ...preferences };
   }
 
   /** The whole blob is replaced, so changes merge onto the current preferences; one that cannot be opened is never overwritten. */
@@ -1227,15 +1270,23 @@ export class CalendarApiService {
     request: EditRecurringEventRequest,
   ): Promise<CalendarEvent> {
     try {
+      // A detached occurrence gets its own id and ciphertext bound to it, since series content opens only under the series id.
+      const newEventId =
+        request.editScope === "all" ? undefined : newClientEntityId();
+      const fillContent = newEventId
+        ? !hasAllContent(request.updates)
+        : needsStoredContent(request.updates);
       const updates = await this.e2ee.attachEventEncryptionShadow(
-        needsStoredContent(request.updates)
+        fillContent
           ? withStoredContent(request.updates, await this.getEvent(id))
           : request.updates,
+        newEventId ?? storedEventId(id),
       );
       const response = await this.client.put<Schema<"Event">>(
         `/api/recurring/event/${encodeURIComponent(id)}`,
         {
           ...request,
+          ...(newEventId ? { newEventId } : {}),
           updates,
         } satisfies Schema<"EditRecurringRequest">,
       );
@@ -1279,11 +1330,12 @@ export class CalendarApiService {
       for (const event of parsed.events) {
         checkCurrent();
         const { sourceUid, occurrenceDate, excludedDates, ...content } = event;
-        const payload = await this.e2ee.attachEventEncryptionShadow({ ...content, calendarId: request.calendarId });
+        const id = newClientEntityId();
+        const payload = await this.e2ee.attachEventEncryptionShadow({ ...content, calendarId: request.calendarId }, id);
         const externalId = await this.icsImportId(JSON.stringify([sourceUid, occurrenceDate ?? null]));
         // Zod checked it; apps/web's non-strict build infers its keys as optional.
         encryptedEvents.push(encryptedIcsImportEventSchema.parse({
-          externalId,
+          id, externalId,
           seriesExternalId: occurrenceDate ? await this.icsImportId(JSON.stringify([sourceUid, null])) : undefined,
           occurrenceDate, excludedDates,
           start: content.start, end: content.end, allDay: Boolean(content.allDay), timezone: content.timezone,
@@ -1582,9 +1634,7 @@ export class CalendarApiService {
         `/api/events/${encodeURIComponent(eventId)}`,
       ),
     ]);
-    const opened = await this.e2ee
-      .hydrateEncryptedEvent(stored as CalendarEvent)
-      .catch(() => null);
+    const opened = await this.openStoredEvent(stored as CalendarEvent);
     const pending = [
       ...new Set(
         data.notifications

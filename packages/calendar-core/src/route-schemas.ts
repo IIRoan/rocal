@@ -2,6 +2,7 @@ import type { Schema } from "@workspace/api-contracts";
 import { z } from "./zod";
 import { CALENDAR_COLORS, isValidCalendarColor } from "./color-utils";
 import { isReservedSystemEmail } from "./mail-addresses";
+import { CLIENT_ENTITY_ID_PATTERN } from "./content-encryption";
 
 const PARTICIPANT_EMAIL_REGEX =
   /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
@@ -90,6 +91,7 @@ export const eventParticipantInputSchema = z
 export type EventParticipantInput = z.infer<typeof eventParticipantInputSchema> & Schema<"ParticipantInput">;
 
 export const encryptedIcsImportEventSchema = z.object({
+  id: z.string().regex(CLIENT_ENTITY_ID_PATTERN).optional(),
   externalId: z.string().min(1).max(128),
   seriesExternalId: z.string().min(1).max(128).optional(),
   occurrenceDate: z.iso.datetime().optional(),
