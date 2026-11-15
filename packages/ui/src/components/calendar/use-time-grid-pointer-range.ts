@@ -98,7 +98,6 @@ export function useTimeGridPointerRange({
   const begin = (pointer: ReactPointerEvent<HTMLElement>, seed: GestureSeed) => {
     const column = pointer.currentTarget.closest<HTMLElement>("[data-time-grid-column]");
     if (!column) return;
-    column.setPointerCapture(pointer.pointerId);
     gestureRef.current = { ...seed, column, moved: false, cancelled: false };
     const handleKeyDown = (event: KeyboardEvent) => {
       const gesture = gestureRef.current;
@@ -155,9 +154,17 @@ export function useTimeGridPointerRange({
 
   const handlePointerMove = (pointer: ReactPointerEvent<HTMLElement>) => {
     const gesture = gestureRef.current;
-    if (!gesture || gesture.cancelled) return;
+    if (!gesture) return;
+    // Until the first move takes the capture, a release outside the grid never reaches the column.
+    if (pointer.buttons === 0) {
+      finish();
+      return;
+    }
+    if (gesture.cancelled) return;
     const quarter = quarterAt(gesture.column, pointer.clientY);
     if (quarter === gesture.currentQuarter) return;
+    // Capturing on pointerdown would retarget a plain click from the cell or event to the column.
+    if (!gesture.moved) gesture.column.setPointerCapture(pointer.pointerId);
     gesture.currentQuarter = quarter;
     gesture.moved = true;
     setSelection({

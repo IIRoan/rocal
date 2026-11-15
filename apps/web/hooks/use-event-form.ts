@@ -915,8 +915,7 @@ export function useEventForm({
       }
 
       toast.error(errorMessage);
-    });
-    setEventSaving(false);
+    }).finally(() => setEventSaving(false));
   };
 
   const handleEventDelete: (calendarData: Pick<UseCalendarDataReturn, "deleteEvent">) => Promise<void> = async (calendarData) => {
@@ -937,8 +936,7 @@ export function useEventForm({
     await deleteEvent().catch((error: unknown) => {
       log.error("Failed to delete event:", error);
       toast.error("Failed to delete event");
-    });
-    setEventSaving(false);
+    }).finally(() => setEventSaving(false));
   };
 
   const handleRecurringDelete = async (
@@ -964,8 +962,7 @@ export function useEventForm({
       toast.error(
         getErrorMessage(error, RECURRING_DELETE_FAILURE_MESSAGES[scope]),
       );
-    });
-    setEventSaving(false);
+    }).finally(() => setEventSaving(false));
   };
 
   return {

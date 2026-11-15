@@ -48,4 +48,17 @@ describe("patchCachedEventTiming", () => {
     restoreEventCache(queryClient, context.snapshot);
     expect(queryClient.getQueryData(rangeKey)).toEqual([standup, other]);
   });
+
+  it("leaves the cache and its fetches alone for a content-only edit", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(rangeKey, [standup, other]);
+    const cancel = jest.spyOn(queryClient, "cancelQueries");
+    const setData = jest.spyOn(queryClient, "setQueriesData");
+
+    const context = await patchCachedEventTiming(queryClient, "event-1", { title: "Retro" });
+
+    expect(cancel).not.toHaveBeenCalled();
+    expect(setData).not.toHaveBeenCalled();
+    expect(context).toEqual({ previous: standup, snapshot: undefined });
+  });
 });

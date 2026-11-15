@@ -19,14 +19,17 @@ export function useFeedSync({
   useQuery({
     queryKey: FEED_SYNC_QUERY_KEY,
     queryFn: async () => {
-      const attempted = await api.syncDueSubscriptions();
-      if (attempted > 0) {
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: SUBSCRIPTIONS_QUERY_KEY, exact: true }),
-          queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY }),
-        ]);
-      }
-      return attempted;
+      const result = await api.syncDueSubscriptions();
+      await Promise.all([
+        result.attempted > 0
+          ? queryClient.invalidateQueries({ queryKey: SUBSCRIPTIONS_QUERY_KEY, exact: true })
+          : undefined,
+        // Only changed events justify refetching every loaded range.
+        result.changed > 0
+          ? queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY })
+          : undefined,
+      ]);
+      return result;
     },
     enabled,
     staleTime: FEED_SYNC_INTERVAL_MS,

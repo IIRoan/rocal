@@ -37,6 +37,7 @@ const event: CalendarEvent = {
 const onCreate = jest.fn<(start: Date, end: Date, anchor: { x: number; y: number }) => void>();
 const onCellClick = jest.fn();
 const onEventUpdate = jest.fn<(event: CalendarEvent, verb?: string) => void>();
+const setPointerCapture = jest.fn<(pointerId: number) => void>();
 
 function Grid() {
   const pointer = useTimeGridPointerRange({ timezone: "UTC", onCreate });
@@ -66,7 +67,7 @@ describe("useTimeGridPointerRange", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    HTMLElement.prototype.setPointerCapture = () => {};
+    HTMLElement.prototype.setPointerCapture = setPointerCapture;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -95,12 +96,13 @@ describe("useTimeGridPointerRange", () => {
     return found;
   };
 
-  const pointer = (target: HTMLElement, type: string, quarter: number) =>
+  const pointer = (target: HTMLElement, type: string, quarter: number, buttons = 1) =>
     act(() => {
       target.dispatchEvent(
         new MouseEvent(type, {
           bubbles: true,
           button: 0,
+          buttons,
           clientX: 40,
           clientY: quarter * QUARTER_PX + QUARTER_PX / 2,
         }),
@@ -117,13 +119,23 @@ describe("useTimeGridPointerRange", () => {
     pointer(element("[data-testid='column']"), "pointerup", 36);
     click(element("[data-testid='cell']"));
 
+    expect(setPointerCapture).not.toHaveBeenCalled();
     expect(onCreate).not.toHaveBeenCalled();
     expect(onCellClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a plain click on a resize edge uncaptured", () => {
+    pointer(element("[data-resize-edge='end']"), "pointerdown", 39);
+    pointer(element("[data-testid='column']"), "pointerup", 39);
+
+    expect(setPointerCapture).not.toHaveBeenCalled();
+    expect(onEventUpdate).not.toHaveBeenCalled();
   });
 
   it("creates the swept range and swallows the click that follows", () => {
     pointer(element("[data-testid='cell']"), "pointerdown", 36);
     pointer(element("[data-testid='column']"), "pointermove", 41);
+    expect(setPointerCapture).toHaveBeenCalledTimes(1);
     expect(element("[data-time-grid-selection]").style.height).toBe(
       "calc(var(--week-cells-height) / 4 * 6)",
     );
@@ -137,6 +149,15 @@ describe("useTimeGridPointerRange", () => {
     );
     expect(onCellClick).not.toHaveBeenCalled();
     expect(container.querySelector("[data-time-grid-selection]")).toBeNull();
+  });
+
+  it("drops a press released outside the grid before it moved", () => {
+    pointer(element("[data-testid='cell']"), "pointerdown", 36);
+    pointer(element("[data-testid='column']"), "pointermove", 41, 0);
+    pointer(element("[data-testid='column']"), "pointerup", 44);
+
+    expect(container.querySelector("[data-time-grid-selection]")).toBeNull();
+    expect(onCreate).not.toHaveBeenCalled();
   });
 
   it("cancels on Escape", () => {

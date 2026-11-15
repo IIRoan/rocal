@@ -32,11 +32,7 @@ export function useRestoreTrashedEvent() {
     restored.recurrence
       ? queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY })
       : invalidateEventRanges(queryClient, restored.start, restored.end, timezone);
-  const options = restoreTrashedEventMutationOptions(
-    calendarApiService,
-    queryClient,
-    invalidateRestoredEvent,
-  );
+  const options = restoreTrashedEventMutationOptions(calendarApiService, queryClient);
   return useMutation({
     ...options,
     mutationFn: ({ trashId }: TrashRestoreTarget) => options.mutationFn(trashId),

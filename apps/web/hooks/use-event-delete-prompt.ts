@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { createLogger } from "@workspace/logger";
 import {
-  canCurrentUserEditEvent,
   getErrorMessage,
+  getEventDeleteConfirmCopy,
   isCancelledCalendarEvent,
   type RecurrenceDeleteScope,
 } from "@workspace/calendar-core";
@@ -12,7 +12,6 @@ import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { toast } from "@workspace/ui/lib/toast";
 
 import {
-  getEventDeleteConfirmCopy,
   isRecurringEventDeleteCandidate,
   RECURRING_DELETE_FAILURE_MESSAGES,
   RECURRING_DELETE_SUCCESS_MESSAGES,
@@ -84,12 +83,9 @@ export function useEventDeletePrompt(
     confirmPrompt: {
       open: open && !asksScope,
       onOpenChange,
-      ...getEventDeleteConfirmCopy(
-        eventTitle,
-        target !== null &&
-          !canCurrentUserEditEvent(target) &&
-          isCancelledCalendarEvent(target),
-      ),
+      ...(target
+        ? getEventDeleteConfirmCopy(target)
+        : { title: "", description: "", confirmLabel: "" }),
       onConfirm: confirmDelete,
     },
     scopePrompt: {

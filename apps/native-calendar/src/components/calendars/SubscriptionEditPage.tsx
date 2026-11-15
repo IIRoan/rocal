@@ -81,8 +81,10 @@ function SubscriptionEditForm({
   const syncSubscription = useSyncSubscription();
   const { toggle, pendingCalendarId } = useToggleCalendarVisibility();
 
-  const [name, setName] = useState(subscription.calendar.name);
-  const [color, setColor] = useState<string>(subscription.calendar.color || "indigo");
+  // Untouched fields keep following the saved calendar.
+  const [draft, setDraft] = useState<{ name?: string; color?: string }>({});
+  const name = draft.name ?? subscription.calendar.name;
+  const color = draft.color ?? (subscription.calendar.color || "indigo");
   const [fieldErrors, setFieldErrors] = useState<SubscriptionFieldErrors>({});
 
   const isHoliday = getSubscriptionType(subscription) === "holiday";
@@ -122,7 +124,7 @@ function SubscriptionEditForm({
           <SheetTextField
             value={name}
             onChangeText={(value) => {
-              setName(value);
+              setDraft((previous) => ({ ...previous, name: value }));
               setFieldErrors((previous) => ({ ...previous, name: undefined }));
             }}
             placeholder="Calendar name"
@@ -145,7 +147,7 @@ function SubscriptionEditForm({
             <ColorPicker
               selectedColor={isNamedCalendarColor(color) ? color : undefined}
               onColorSelect={(nextColor) => {
-                setColor(nextColor);
+                setDraft((previous) => ({ ...previous, color: nextColor }));
                 setFieldErrors((previous) => ({ ...previous, color: undefined }));
               }}
             />

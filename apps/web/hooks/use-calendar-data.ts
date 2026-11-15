@@ -136,6 +136,8 @@ export async function patchCachedEventTiming(
   { start, end, allDay }: UpdateEventRequest,
 ) {
   const previous = findEventInCache(queryClient, id);
+  // A content-only edit leaves the cache alone, so no range fetch is cancelled for it.
+  if (!start && !end && allDay === undefined) return { previous, snapshot: undefined };
   const snapshot = await snapshotEventCache(queryClient);
   const patch = toOccurrencePatch({ start, end, allDay });
   mapCachedEvents(queryClient, (events) =>

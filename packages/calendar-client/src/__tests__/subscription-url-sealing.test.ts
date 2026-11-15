@@ -43,7 +43,11 @@ function setup(subscriptions: ReturnType<typeof feed>[]) {
   const client = new HttpClient({ baseURL: "https://api.test", retries: 0 });
   jest.spyOn(client, "get").mockResolvedValue(subscriptions as never);
   const post = jest.spyOn(client, "post").mockImplementation(async (path: string) =>
-    (path === "/api/subscriptions" ? feed("new") : { status: "success" }) as never,
+    (path === "/api/subscriptions"
+      ? feed("new")
+      : path === "/api/subscriptions/broken/sync"
+        ? Promise.reject(new Error("feed down"))
+        : { status: "success", eventsAdded: 2, eventsUpdated: 1, eventsDeleted: 1 }) as never,
   );
   const put = jest.spyOn(client, "put").mockResolvedValue(feed("s1") as never);
   return { post, put, service: new CalendarApiService(client, new UrlSealingProvider()) };
@@ -92,18 +96,25 @@ describe("sealed feed URLs", () => {
       feed("readable", { url: "https://example.com/readable.ics", encryptedUrl: null }),
     ]);
 
-    await expect(service.syncDueSubscriptions(now)).resolves.toBe(1);
+    await expect(service.syncDueSubscriptions(now)).resolves.toEqual({ attempted: 1, changed: 4 });
 
     expect(post.mock.calls).toEqual([
       ["/api/subscriptions/due/sync", { url: "https://example.com/due.ics" }],
     ]);
   });
 
+  it("counts a failed feed as tried without changes and keeps syncing the rest", async () => {
+    const { post, service } = setup([feed("broken"), feed("due")]);
+
+    await expect(service.syncDueSubscriptions(now)).resolves.toEqual({ attempted: 2, changed: 4 });
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+
   it("never syncs a URL that does not open on this device", async () => {
     const { post, service } = setup([feed("other-key", { encryptedUrl: "elsewhere|{}" })]);
 
     const [subscription] = await service.getSubscriptions();
-    await expect(service.syncDueSubscriptions(now)).resolves.toBe(0);
+    await expect(service.syncDueSubscriptions(now)).resolves.toEqual({ attempted: 0, changed: 0 });
 
     expect(subscription?.url).toBe("sealed:other-key");
     expect(post).not.toHaveBeenCalled();

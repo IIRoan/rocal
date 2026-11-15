@@ -15,10 +15,10 @@ jest.mock("@workspace/calendar-core", () => ({
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-async function render(enabled: boolean, attempted: number) {
+async function render(enabled: boolean, attempted: number, changed = 0) {
   const client = new QueryClient();
   const invalidate = jest.spyOn(client, "invalidateQueries");
-  const api = { syncDueSubscriptions: jest.fn(async () => attempted) };
+  const api = { syncDueSubscriptions: jest.fn(async () => ({ attempted, changed })) };
   function Probe() {
     useFeedSync({ api, enabled });
     return null;
@@ -36,13 +36,21 @@ async function render(enabled: boolean, attempted: number) {
   return { api, invalidate };
 }
 
-it("syncs due feeds on open and refreshes feeds and events when it tried any", async () => {
-  const { api, invalidate } = await render(true, 2);
+it("syncs due feeds on open and refreshes feeds and events when events changed", async () => {
+  const { api, invalidate } = await render(true, 2, 3);
 
   expect(api.syncDueSubscriptions).toHaveBeenCalledTimes(1);
   expect(invalidate.mock.calls.map(([filters]) => filters)).toEqual([
     { queryKey: SUBSCRIPTIONS_QUERY_KEY, exact: true },
     { queryKey: EVENTS_QUERY_KEY },
+  ]);
+});
+
+it("refreshes only the feeds when a sync failed or changed no events", async () => {
+  const { invalidate } = await render(true, 2, 0);
+
+  expect(invalidate.mock.calls.map(([filters]) => filters)).toEqual([
+    { queryKey: SUBSCRIPTIONS_QUERY_KEY, exact: true },
   ]);
 });
 

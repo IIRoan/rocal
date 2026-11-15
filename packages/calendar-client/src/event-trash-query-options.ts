@@ -1,7 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import {
   EVENT_TRASH_QUERY_KEY,
-  type CalendarEvent,
   type TrashedCalendarEvent,
 } from "@workspace/calendar-core";
 import type { CalendarApiService } from "./calendar-api-service";
@@ -41,11 +40,10 @@ export function invalidateEventTrash(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: EVENT_TRASH_QUERY_KEY, exact: true });
 }
 
-/** Undo toasts and the trash view share this; `invalidateEvents` refreshes the platform's event ranges for the restored event. */
+/** Undo toasts and the trash view share this; each platform's `onSuccess` reports the restore and refreshes its event ranges. */
 export function restoreTrashedEventMutationOptions(
   api: Pick<TrashApi, "restoreTrashedEvent">,
   queryClient: QueryClient,
-  invalidateEvents: (restored: CalendarEvent) => unknown,
 ) {
   return {
     mutationFn: (trashId: string) => api.restoreTrashedEvent(trashId),
@@ -53,7 +51,6 @@ export function restoreTrashedEventMutationOptions(
       changeCachedTrash(queryClient, (entries) => entries.filter((entry) => entry.id !== trashId)),
     onError: (_error: unknown, _trashId: string, context: EventTrashSnapshot | undefined) =>
       rollbackTrash(queryClient, context),
-    onSuccess: (restored: CalendarEvent) => invalidateEvents(restored),
     onSettled: () => invalidateEventTrash(queryClient),
   };
 }

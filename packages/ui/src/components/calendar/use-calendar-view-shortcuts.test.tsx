@@ -126,6 +126,25 @@ describe("useCalendarShortcuts", () => {
     expect(onViewChange).not.toHaveBeenCalled();
   });
 
+  it.each(["combobox", "listbox"])(
+    "leaves type-ahead to a select's %s, which opens outside the dialog",
+    (role) => {
+      const select = document.createElement("div");
+      select.setAttribute("role", role);
+      select.dataset.state = "closed";
+      const option = document.createElement("div");
+      select.appendChild(option);
+      document.body.appendChild(select);
+
+      for (const key of ["w", "c", "j", "/"]) press(option, key);
+
+      expect(onViewChange).not.toHaveBeenCalled();
+      expect(actions.onCreate).not.toHaveBeenCalled();
+      expect(actions.onNext).not.toHaveBeenCalled();
+      expect(actions.onSearch).not.toHaveBeenCalled();
+    },
+  );
+
   it("works again once a dialog closed with focus still inside it", () => {
     const dialog = document.createElement("div");
     dialog.setAttribute("role", "dialog");

@@ -58,7 +58,7 @@ export type CalendarShortcutActions = {
   onHelp?: () => void;
 };
 
-/** Letters type text in fields, and jump between items in open menus and dialogs; Shift only reaches symbols such as ? on any layout. */
+/** Letters type text in fields, and jump between items in selects, open menus and dialogs; Shift only reaches symbols such as ? on any layout. */
 function isShortcutBlocked(event: KeyboardEvent) {
   if (
     event.defaultPrevented ||
@@ -78,7 +78,7 @@ function isShortcutBlocked(event: KeyboardEvent) {
     target.isContentEditable ||
     // Dialogs stay mounted while closed for their exit motion, and focus can stay behind in one.
     target.closest(
-      "dialog[open], :is([role='dialog'], [role='alertdialog'], [role='menu']):not([data-state='closed'])",
+      "dialog[open], [role='combobox'], [role='listbox'], :is([role='dialog'], [role='alertdialog'], [role='menu']):not([data-state='closed'])",
     ) !== null
   );
 }

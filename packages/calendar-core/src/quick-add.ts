@@ -102,7 +102,7 @@ function upcomingDay(today: Date, month: number, day: number, year?: string): Da
   return validDay(today.getFullYear() + 1, month, day);
 }
 
-/** Without am/pm, 1–7 reads as afternoon (a heuristic); a leading zero means the 24-hour clock. */
+/** Without am/pm the hour reads on the 24-hour clock. */
 function resolveTime(raw: RawTime, meridiem = raw.meridiem): ClockTime | null {
   const hours = Number(raw.hour);
   const minutes = raw.minute ? Number(raw.minute) : 0;
@@ -112,13 +112,17 @@ function resolveTime(raw: RawTime, meridiem = raw.meridiem): ClockTime | null {
     return { hours: (hours % 12) + (meridiem.toLowerCase() === "pm" ? 12 : 0), minutes };
   }
   if (hours > 23) return null;
-  const afternoon = hours >= 1 && hours <= 7 && !raw.hour.startsWith("0");
-  return { hours: afternoon ? hours + 12 : hours, minutes };
+  return { hours, minutes };
 }
 
 const toMinutes = (time: ClockTime) => time.hours * 60 + time.minutes;
 
-function resolveRange(startRaw: RawTime, endRaw: RawTime): [ClockTime, ClockTime] | null {
+/** A bare end hour of 12 or less is whichever of its two 12-hour readings comes first after the start. */
+function resolveRange(
+  startRaw: RawTime,
+  endRaw: RawTime,
+  shiftStart: (clock: ClockTime) => ClockTime,
+): [ClockTime, ClockTime] | null {
   const end = resolveTime(endRaw);
   let start = resolveTime(startRaw);
   if (!start || !end) return null;
@@ -126,9 +130,11 @@ function resolveRange(startRaw: RawTime, endRaw: RawTime): [ClockTime, ClockTime
     const inherited = resolveTime(startRaw, endRaw.meridiem);
     if (inherited && toMinutes(inherited) <= toMinutes(end)) start = inherited;
   }
-  if (!endRaw.meridiem && toMinutes(end) <= toMinutes(start) && end.hours < 12) {
-    const evening = { hours: end.hours + 12, minutes: end.minutes };
-    if (toMinutes(evening) > toMinutes(start)) return [start, evening];
+  start = shiftStart(start);
+  const after = (clock: ClockTime) => (toMinutes(clock) - toMinutes(start) + 1440) % 1440 || 1440;
+  if (!endRaw.meridiem && end.hours <= 12 && toMinutes(end) <= toMinutes(start)) {
+    const sibling = { hours: (end.hours + 12) % 24, minutes: end.minutes };
+    if (after(sibling) < after(end)) return [start, sibling];
   }
   return [start, end];
 }
@@ -172,7 +178,12 @@ function claimClockTime(input: string, spans: Span[]): ClockTime | null {
     claim(input, spans, NAMED_TIME_RE, (match) =>
       (match[1] ?? "").toLowerCase() === "noon" ? NOON : MIDNIGHT,
     ) ??
-    claim(input, spans, BARE_AT_TIME_RE, (match) => resolveMatch(match))
+    claim(input, spans, BARE_AT_TIME_RE, (match) => {
+      const time = resolveMatch(match);
+      // Without am/pm, "at 1" to "at 7" reads as the afternoon (a heuristic); a leading zero keeps the 24-hour clock.
+      const afternoon = time && time.hours >= 1 && time.hours <= 7 && !match[1]?.startsWith("0");
+      return afternoon ? { hours: time.hours + 12, minutes: time.minutes } : time;
+    })
   );
 }
 
@@ -199,6 +210,9 @@ export function parseQuickAdd(input: string, options: QuickAddOptions): QuickAdd
     (match[1] ?? "").toLowerCase(),
   );
   const tonight = relativeDay === "tonight";
+  // Tonight means the evening, so a morning hour moves past noon.
+  const evening = (clock: ClockTime) =>
+    tonight && clock.hours < 12 ? { hours: clock.hours + 12, minutes: clock.minutes } : clock;
   const day = relativeDay
     ? addDays(today, relativeDay === "tomorrow" || relativeDay === "tmrw" ? 1 : 0)
     : claimCalendarDay(input, spans, today);
@@ -211,7 +225,7 @@ export function parseQuickAdd(input: string, options: QuickAddOptions): QuickAdd
     const startRaw = rawTime(match[2], match[3], match[4]);
     const endRaw = rawTime(match[5], match[6], match[7]);
     const qualified = Boolean(match[1] || match[3] || match[4] || match[6] || match[7]);
-    return startRaw && endRaw && qualified ? resolveRange(startRaw, endRaw) : null;
+    return startRaw && endRaw && qualified ? resolveRange(startRaw, endRaw, evening) : null;
   });
   const durationMinutes = claim(input, spans, DURATION_RE, (match) => {
     const hours = (match[2] ?? "").toLowerCase().startsWith("h");
@@ -234,16 +248,12 @@ export function parseQuickAdd(input: string, options: QuickAddOptions): QuickAdd
     return { title, start: relativeStart, end, allDay: false };
   }
 
-  const startTime = time ?? TONIGHT_DEFAULT;
-  // Tonight means the evening, so a morning hour moves past noon.
-  const evening = (clock: ClockTime) =>
-    tonight && clock.hours < 12 ? { hours: clock.hours + 12, minutes: clock.minutes } : clock;
-  const startClock = evening(startTime);
+  const startClock = range ? range[0] : evening(time ?? TONIGHT_DEFAULT);
   const start = wallClockToUtc(calendarDay, startClock.hours, startClock.minutes, timezone);
   if (!range) {
     return { title, start, end: new Date(start.getTime() + duration), allDay: false };
   }
-  const endClock = evening(range[1]);
+  const endClock = range[1];
   const overnight = toMinutes(endClock) <= toMinutes(startClock);
   const endDay = overnight ? addDays(calendarDay, 1) : calendarDay;
   return {

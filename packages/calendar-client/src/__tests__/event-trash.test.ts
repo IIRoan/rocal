@@ -100,19 +100,15 @@ describe("event trash mutation options", () => {
   it("takes a restored entry out of the cached trash at once and puts it back on failure", async () => {
     const client = new QueryClient();
     client.setQueryData(EVENT_TRASH_QUERY_KEY, cached(["t1", "t2"]));
-    const invalidateEvents = jest.fn();
     const options = restoreTrashedEventMutationOptions(
       { restoreTrashedEvent: jest.fn(async () => ({ id: "event-t1" }) as CalendarEvent) },
       client,
-      invalidateEvents,
     );
 
     const context = await options.onMutate("t1");
     expect(ids(client)).toEqual(["t2"]);
     options.onError(new Error("offline"), "t1", context);
     expect(ids(client)).toEqual(["t1", "t2"]);
-    options.onSuccess({ id: "event-t1" } as CalendarEvent);
-    expect(invalidateEvents).toHaveBeenCalledWith({ id: "event-t1" });
   });
 
   it("removes purged entries and empties the cached trash optimistically", async () => {

@@ -18,9 +18,7 @@ export type TrashRestoreTarget = { trashId: string; calendarId: string };
 export function useRestoreTrashedEvent() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const options = restoreTrashedEventMutationOptions(calendarApiService, queryClient, (restored) =>
-    invalidateEventRanges(queryClient, restored),
-  );
+  const options = restoreTrashedEventMutationOptions(calendarApiService, queryClient);
   return useMutation({
     ...options,
     mutationFn: ({ trashId }: TrashRestoreTarget) => options.mutationFn(trashId),

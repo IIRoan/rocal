@@ -1,16 +1,19 @@
 import { useCallback, useState } from "react";
 import { Alert } from "react-native";
-import type {
-  CalendarEvent,
-  RecurrenceDeleteScope,
-  RecurrenceEditScope,
+import {
+  getEventDeleteConfirmCopy,
+  type CalendarEvent,
+  type RecurrenceDeleteScope,
+  type RecurrenceEditScope,
 } from "@workspace/calendar-core";
 import type { RecurringScope } from "../components/event/RecurringScopeModal";
 
-/** Whole events and series go to the trash; one occurrence or the rest of a series is deleted for good. */
-function confirmDelete(scope: RecurrenceDeleteScope | undefined, onConfirm: () => void) {
-  const permanent = scope === "this_only" || scope === "this_and_future";
-  Alert.alert("Delete event?", permanent ? "This action cannot be undone." : "It moves to Trash for 30 days.", [
+function confirmDelete(
+  event: CalendarEvent,
+  scope: RecurrenceDeleteScope | undefined,
+  onConfirm: () => void,
+) {
+  Alert.alert("Delete event?", getEventDeleteConfirmCopy(event, scope).description, [
     { text: "Cancel", style: "cancel" },
     { text: "Delete", style: "destructive", onPress: onConfirm },
   ]);
@@ -40,22 +43,23 @@ export function useRecurringScopeActions({
   }, [isRecurring, onStartEdit]);
 
   const handleDeletePress = useCallback(() => {
+    if (!event) return;
     if (!isRecurring) {
-      confirmDelete(undefined, () => onDelete({}));
+      confirmDelete(event, undefined, () => onDelete({}));
       return;
     }
     setScopeAction("delete");
     setScopeVisible(true);
-  }, [isRecurring, onDelete]);
+  }, [event, isRecurring, onDelete]);
 
   const handleScopeSelect = useCallback(
     (scope: RecurringScope) => {
       if (!scopeVisible) return;
       setScopeVisible(false);
       if (scopeAction === "edit") onStartEdit(scope);
-      else confirmDelete(scope, () => onDelete({ scope }));
+      else if (event) confirmDelete(event, scope, () => onDelete({ scope }));
     },
-    [scopeVisible, scopeAction, onStartEdit, onDelete],
+    [event, scopeVisible, scopeAction, onStartEdit, onDelete],
   );
 
   const closeScopePrompt = useCallback(() => setScopeVisible(false), []);

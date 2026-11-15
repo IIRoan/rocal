@@ -1488,19 +1488,25 @@ export class CalendarApiService {
     }
   }
 
-  /** Syncs the sealed feeds whose interval has passed, one at a time; resolves to how many it tried. */
-  async syncDueSubscriptions(now: number = Date.now()): Promise<number> {
-    if (!(await this.e2ee.hasActiveSession())) return 0;
+  /** Syncs the sealed feeds whose interval has passed, one at a time; resolves to how many it tried and how many events changed. */
+  async syncDueSubscriptions(
+    now: number = Date.now(),
+  ): Promise<{ attempted: number; changed: number }> {
+    if (!(await this.e2ee.hasActiveSession())) return { attempted: 0, changed: 0 };
     const due = (await this.getSubscriptions()).filter((subscription) =>
       isFeedSyncDue(subscription, now),
     );
+    let changed = 0;
     for (const subscription of due) {
       // A failed fetch is recorded on the feed, so one bad feed never stops the rest.
-      await this.syncSubscription(subscription.id, feedSyncUrl(subscription)).catch(
-        () => undefined,
-      );
+      const result = await this.syncSubscription(
+        subscription.id,
+        feedSyncUrl(subscription),
+      ).catch(() => undefined);
+      changed +=
+        (result?.eventsAdded ?? 0) + (result?.eventsUpdated ?? 0) + (result?.eventsDeleted ?? 0);
     }
-    return due.length;
+    return { attempted: due.length, changed };
   }
 
   // ─── Bulk Operations ─────────────────────────────────────────────────────────
