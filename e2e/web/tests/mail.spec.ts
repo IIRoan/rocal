@@ -16,7 +16,7 @@ test("send encrypted mail to self, then receive and decrypt it", async ({ page }
   await compose.getByRole("combobox", { name: "To" }).press("Enter");
   await compose.getByRole("textbox", { name: "Subject" }).fill("Playwright message");
   await compose.getByRole("textbox", { name: "Message body" }).fill("Playwright body text");
-  await compose.getByRole("button", { name: "Send" }).click();
+  await compose.getByRole("button", { name: "Send", exact: true }).click();
   await expect(compose).toBeHidden();
 
   const row = page.getByRole("main").getByRole("button", { name: /Playwright message/ }).first();
