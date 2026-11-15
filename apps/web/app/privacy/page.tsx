@@ -170,10 +170,11 @@ export default function PrivacyPage() {
             Connections to Solace use TLS.
           </p>
           <p className="mt-3">
-            Keep your password safe. Solace does not reset passwords from the
-            sign-in screen; if you forget yours, email support from a different
-            address. Without your password, no one, including Solace, can open
-            your encrypted content.
+            Keep your password safe. If you forget it, your recovery kit resets
+            it: the kit&apos;s key opens your existing keys on your device, so
+            your content stays readable, and Solace stores only a hash of a key
+            derived from it. Without your password or your recovery kit, no
+            one, including Solace, can open your encrypted content.
           </p>
         </div>
 

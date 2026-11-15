@@ -22,6 +22,7 @@ import {
   Tag,
   Star,
   Trophy,
+  LifeBuoy,
 } from "lucide-react";
 import {
   APP_NOTIFICATION_SETTING,
@@ -453,6 +454,16 @@ export const SEARCH_INDEX = [
     description: "Manage passwordless authentication",
     targetView: "security",
     keywords: ["passkey", "security", "authentication", "passwordless"],
+    parent: "security",
+    parentLabel: "Security",
+  },
+  {
+    id: "recovery-kit",
+    label: "Recovery kit",
+    icon: LifeBuoy,
+    description: "Reset a forgotten password without losing data",
+    targetView: "security",
+    keywords: ["recovery", "recovery kit", "forgot password", "reset password", "backup key"],
     parent: "security",
     parentLabel: "Security",
   },

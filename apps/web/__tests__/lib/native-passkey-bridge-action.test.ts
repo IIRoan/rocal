@@ -107,4 +107,29 @@ describe("runNativePasskeyBridgeAction", () => {
       message: "Passkey authentication was cancelled.",
     });
   });
+
+  it("takes the app's step-up in the browser before freshening, and carries on without one", async () => {
+    mockAuthClient.$fetch.mockImplementation(async (path: unknown) =>
+      path === "/passkey-bridge/complete-step-up"
+        ? { data: null, error: { status: 403, message: "Passkey verification required." } }
+        : { data: { ok: true, user: { id: "user-1" } }, error: null },
+    );
+    mockAuthClient.passkey.addPasskey.mockResolvedValue({ data: {}, error: null });
+
+    const result = await runNativePasskeyBridgeAction({
+      mode: "register",
+      callbackURL: "solace://calendar",
+      bridgeToken: "bridge-token",
+      passkeyName: "This device",
+      cancelMessage: "Passkey setup was cancelled.",
+      failureMessage: "Unable to add a passkey.",
+    });
+
+    expect(result.status).toBe("redirect");
+    expect(mockAuthClient.$fetch.mock.calls.map(([path]) => path)).toEqual([
+      "/one-time-token/verify",
+      "/passkey-bridge/complete-step-up",
+      "/passkey-bridge/freshen-session",
+    ]);
+  });
 });

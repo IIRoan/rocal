@@ -81,6 +81,15 @@ export async function runNativePasskeyBridgeAction(
         };
       }
 
+      // The app's passkey step-up comes along, so adding another passkey passes; an account without one has none to take.
+      await authClient
+        .$fetch("/passkey-bridge/complete-step-up", {
+          method: "POST",
+          body: {},
+          throw: false,
+        })
+        .catch(() => undefined);
+
       const freshenRequest = getPasskeyBridgeFreshenRequest("register");
       if (!freshenRequest) {
         return {

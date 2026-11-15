@@ -76,6 +76,7 @@ jest.mock("lucide-react", () => {
     ArrowRight: Icon,
     Check: Icon,
     X: Icon,
+    XIcon: Icon,
     Ticket: Icon,
   };
 });
@@ -381,7 +382,13 @@ describe("LoginForm", () => {
     expect(container.textContent).toContain("@team.solace.onl");
   });
 
-  it("sends a forgotten password to support instead of mailing a reset link", async () => {
+  it("opens the recovery-kit reset for a forgotten password, with support for accounts without a kit", async () => {
+    // Radix's Switch measures itself; jsdom has no ResizeObserver.
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
     await renderForm();
 
     const forgotPasswordButton = Array.from(
@@ -393,8 +400,9 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain(
-      "Email support@solace.onl from a different email address and include your Solace address.",
+    expect(document.body.textContent).toContain("Reset your password");
+    expect(document.body.textContent).toContain(
+      "No recovery kit? Email support@solace.onl from a different email address and include your Solace address.",
     );
     expect(container.textContent).toContain("Welcome back");
     expect(container.querySelector("#password")).not.toBeNull();

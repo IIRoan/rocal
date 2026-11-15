@@ -4,6 +4,7 @@ import type { UserSettings } from "@/lib/types/calendar";
 import { usePrivateSearchIndexControls } from "@/hooks/use-private-search-index-controls";
 import { PasswordSection } from "./password-section";
 import { PrivateSearchIndexToggle } from "./private-search-index-toggle";
+import { RecoveryKitSettings } from "./recovery-kit-settings";
 import {
   EVENT_ENCRYPTION_HINT,
   MAIL_ENCRYPTION_HINT,
@@ -102,6 +103,12 @@ export function SecuritySettings({
             changingPassword={changingPassword}
             handleChangePassword={handleChangePassword}
           />
+        </PaletteSection>
+      ) : null}
+
+      {hasPasswordAccount ? (
+        <PaletteSection label="Recovery">
+          <RecoveryKitSettings />
         </PaletteSection>
       ) : null}
     </PaletteView>

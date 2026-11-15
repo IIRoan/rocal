@@ -23,7 +23,7 @@ export function isWebCryptoAvailable(): boolean {
 const webCrypto: CryptoProvider = globalThis.crypto as unknown as CryptoProvider;
 
 // Create the E2EE module instance with web crypto
-const e2eeModule = createE2eeModule(webCrypto, {
+export const e2eeModule = createE2eeModule(webCrypto, {
   argon2id: async (password, salt, params) =>
     (await import("./mail/vault-kdf")).argon2idBytes(password, salt, params),
 });
