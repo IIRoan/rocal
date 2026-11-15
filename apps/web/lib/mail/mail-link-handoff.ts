@@ -9,7 +9,8 @@ export const MAIL_LINK_CHANNEL = "solace:mail-link";
 export const MAIL_LINK_PATH = "/mail/link";
 export const MAIL_LINK_REGISTRY_LIMIT = 2_000;
 
-export type MailLink = { href: string; text: string };
+/** An `unsubscribe` link is an RFC 8058 one-click target, and its `text` is the receiving address. */
+export type MailLink = { href: string; text: string; kind?: "unsubscribe" };
 
 const MAIL_LINK_ID_PATTERN = /^[0-9a-f-]{36}\.\d{1,5}$/;
 const mailLinkIdSchema = z.string().regex(MAIL_LINK_ID_PATTERN);
@@ -19,6 +20,7 @@ const resolvedResponseSchema = z.strictObject({
   id: mailLinkIdSchema,
   href: z.string().max(16_384),
   text: z.string().max(512),
+  kind: z.literal("unsubscribe").optional(),
 });
 
 const registry = new Map<string, MailLink>();
@@ -30,9 +32,9 @@ export function mailLinkHandoffUrl(id: string): string {
 }
 
 export function registerMailLinks(entries: ReadonlyArray<MailLink & { id: string }>): void {
-  for (const { id, href, text } of entries) {
+  for (const { id, ...link } of entries) {
     registry.delete(id);
-    registry.set(id, { href, text });
+    registry.set(id, link);
   }
   for (const id of registry.keys()) {
     if (registry.size <= MAIL_LINK_REGISTRY_LIMIT) break;
@@ -73,11 +75,25 @@ export function resolveMailLink(id: string, timeoutMs = 5_000): Promise<MailLink
     channel.onmessage = (event: MessageEvent<unknown>) => {
       const response = resolvedResponseSchema.safeParse(event.data);
       if (response.success && response.data.id === id) {
-        finish({ href: response.data.href, text: response.data.text });
+        const { href, text, kind } = response.data;
+        finish(kind ? { href, text, kind } : { href, text });
       }
     };
     channel.postMessage({ type: "resolve", id });
   });
+}
+
+/** The link page posts the one-click form itself, since only its CSP allows an https form action. */
+export function mailUnsubscribeHandoffUrl(url: string, address: string): string {
+  const id = `${crypto.randomUUID()}.0`;
+  registerMailLinks([{ id, href: url, text: address, kind: "unsubscribe" }]);
+  return mailLinkHandoffUrl(id);
+}
+
+/** Only an https target may receive the one-click POST; anything else is refused. */
+export function oneClickUnsubscribeUrl(href: string): string | null {
+  const url = canonicalMailLinkUrl(href);
+  return url?.protocol === "https:" ? url.href : null;
 }
 
 export function setPendingMailto(draft: MailtoDraft): void {

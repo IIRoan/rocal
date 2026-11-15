@@ -32,7 +32,7 @@ export function MessageReaderUnsubscribeLine({
   const identities = props.identities ?? [];
   const replyFrom = resolveMessageReplyFrom(identities, message);
   const first = getMailUnsubscribe(message, {
-    allowOneClick: false,
+    allowOneClick: true,
     allowMailto: replyFrom !== null,
   })?.targets[0];
   if (!onUnsubscribe || !first) return null;

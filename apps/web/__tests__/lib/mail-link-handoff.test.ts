@@ -5,6 +5,8 @@ import {
   MAIL_LINK_REGISTRY_LIMIT,
   clearMailLinkHandoff,
   createMailLinkRewriter,
+  mailUnsubscribeHandoffUrl,
+  oneClickUnsubscribeUrl,
   registerMailLinks,
   resolveMailLink,
   setPendingMailto,
@@ -60,6 +62,37 @@ describe("mail link handoff", () => {
       href: "mailto:a@example.org?subject=Hi",
       text: "Write",
     });
+  });
+
+  it("hands a one-click target over by an opaque id, marked as an unsubscribe", async () => {
+    const url = mailUnsubscribeHandoffUrl("https://news.example/u?t=1", "owner@solace.test");
+    expect(url).toMatch(new RegExp(`^${window.location.origin}/mail/link#[0-9a-f-]{36}\\.0$`));
+    expect(url).not.toContain("news.example");
+    expect(url).not.toContain("owner");
+
+    await expect(resolveMailLink(url.split("#")[1] ?? "")).resolves.toEqual({
+      href: "https://news.example/u?t=1",
+      text: "owner@solace.test",
+      kind: "unsubscribe",
+    });
+  });
+
+  it("accepts only https one-click targets", () => {
+    expect(oneClickUnsubscribeUrl("https://News.example/u?t=1")).toBe("https://news.example/u?t=1");
+    expect(oneClickUnsubscribeUrl("http://news.example/u")).toBeNull();
+    expect(oneClickUnsubscribeUrl("javascript:alert(1)")).toBeNull();
+    expect(oneClickUnsubscribeUrl("mailto:leave@news.example")).toBeNull();
+    expect(oneClickUnsubscribeUrl("not a url")).toBeNull();
+  });
+
+  it("ignores answers with an unknown kind", async () => {
+    jest.useFakeTimers();
+    const intruder = new MockBroadcastChannel("solace:mail-link");
+    const pending = resolveMailLink(`${TOKEN}.4`, 100);
+    intruder.postMessage({ type: "resolved", id: `${TOKEN}.4`, href: "https://x.example/", text: "", kind: "post" });
+    jest.advanceTimersByTime(100);
+    await expect(pending).resolves.toBeNull();
+    intruder.close();
   });
 
   it("answers null for unknown or malformed ids and ignores malformed messages", async () => {

@@ -9,12 +9,13 @@ import {
 } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import type { ActiveMailboxState } from "@/lib/mail/mail-app-helpers";
+import { mailUnsubscribeHandoffUrl } from "@/lib/mail/mail-link-handoff";
 import { sendMailCommand } from "@/lib/mail/send-mail-command";
 import type { JmapEmailMessage } from "@/lib/mail/types";
 
 const log = createLogger("mail-unsubscribe-action");
 
-/** The page's CSP blocks the RFC 8058 one-click POST, so web sends the mailto command or opens the sender's page; never through the API. */
+/** One-click goes to `/mail/link`, whose form posts it from this device, then the mailto command, then the sender's page; never through the API. */
 export function useMailUnsubscribeAction({
   activeMailbox,
   patchMessageKeyword,
@@ -33,11 +34,14 @@ export function useMailUnsubscribeAction({
 }) {
   return async (message: JmapEmailMessage) => {
     if (!activeMailbox) return;
+    const replyFrom = resolveMessageReplyFrom(activeMailbox.identities, message);
     const unsubscribe = getMailUnsubscribe(message, {
-      allowOneClick: false,
-      allowMailto: resolveMessageReplyFrom(activeMailbox.identities, message) !== null,
+      allowOneClick: true,
+      allowMailto: replyFrom !== null,
     });
     if (!unsubscribe) return;
+    const address =
+      activeMailbox.identities.find((identity) => identity.id === replyFrom?.identityId)?.email ?? "";
     const { client, session } = activeMailbox;
     const toastId = toast.loading(MAIL_UNSUBSCRIBE_LABELS.pending);
     patchMessageKeyword(message, MAIL_UNSUBSCRIBED_KEYWORD, true);
@@ -49,6 +53,8 @@ export function useMailUnsubscribeAction({
         try {
           if (target.type === "mailto") {
             await sendMailCommand(activeMailbox, message, `unsubscribe:${message.id}`, target);
+          } else if (target.type === "one-click") {
+            window.open(mailUnsubscribeHandoffUrl(target.url, address), "_blank", "noopener,noreferrer");
           } else {
             window.open(target.url, "_blank", "noopener,noreferrer");
           }

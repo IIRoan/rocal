@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import {
   assessMailLink,
   describeMailLink,
+  describeMailUnsubscribe,
+  MAIL_UNSUBSCRIBE_LABELS,
   parseMailtoLink,
 } from "@workspace/calendar-core";
 import { Logo } from "@workspace/ui/components/layout";
 import { Button } from "@workspace/ui/components/ui/button";
 import {
   canonicalMailLinkUrl,
+  oneClickUnsubscribeUrl,
   openMailLinkTarget,
   resolveMailLink,
   setPendingMailto,
@@ -24,10 +27,17 @@ const SHOWN_URL_MAX_LENGTH = 300;
 type MailLinkPageState =
   | { status: "resolving" }
   | { status: "error"; message: string }
-  | { status: "confirm"; url: string; title: string; lines: string[] };
+  | { status: "confirm"; url: string; title: string; lines: string[] }
+  | { status: "unsubscribe"; url: string; title: string; lines: string[] };
 
 function resolvedState(link: MailLink | null): MailLinkPageState {
   if (!link) return { status: "error", message: EXPIRED_MESSAGE };
+  if (link.kind === "unsubscribe") {
+    const url = oneClickUnsubscribeUrl(link.href);
+    if (!url) return { status: "error", message: EXPIRED_MESSAGE };
+    const description = describeMailUnsubscribe({ type: "one-click", url }, link.text || "your address");
+    return { status: "unsubscribe", url, title: MAIL_UNSUBSCRIBE_LABELS.title, lines: [description] };
+  }
   if (/^mailto:/i.test(link.href)) {
     return { status: "error", message: INVALID_MAILTO_MESSAGE };
   }
@@ -105,14 +115,25 @@ export function MailLinkPageContent() {
                   ? `${state.url.slice(0, SHOWN_URL_MAX_LENGTH)}…`
                   : state.url}
               </p>
-              <div className="mt-8 flex gap-2">
-                <Button type="button" onClick={() => openMailLinkTarget(state.url)}>
-                  Open link
-                </Button>
-                <Button type="button" variant="outline" onClick={cancel}>
-                  Cancel
-                </Button>
-              </div>
+              {state.status === "unsubscribe" ? (
+                // RFC 8058's request is exactly this form post; it replaces the page so the sender's answer shows here.
+                <form method="post" action={state.url} rel="noreferrer" className="mt-8 flex gap-2">
+                  <input type="hidden" name="List-Unsubscribe" value="One-Click" />
+                  <Button type="submit">{MAIL_UNSUBSCRIBE_LABELS.action}</Button>
+                  <Button type="button" variant="outline" onClick={cancel}>
+                    Cancel
+                  </Button>
+                </form>
+              ) : (
+                <div className="mt-8 flex gap-2">
+                  <Button type="button" onClick={() => openMailLinkTarget(state.url)}>
+                    Open link
+                  </Button>
+                  <Button type="button" variant="outline" onClick={cancel}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </div>

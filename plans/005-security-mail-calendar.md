@@ -78,7 +78,7 @@ Each item ends with its own **Decisions** list. These are the ones with the most
 | S1 | Signing key | Generated on the owner's machine; 10-year certificate; development builds stay unsigned |
 | S2 | Required reviewer on the `native-release` environment | No; branch restriction only |
 | M1 | Web link handling | Opaque `/mail/link#<id>` handoff over `BroadcastChannel`; no `registerProtocolHandler` (it puts addresses in a query string) |
-| M4 | One-click unsubscribe | Native only (web CSP `connect-src`), only for DKIM-pass mail, after a confirm |
+| M4 | One-click unsubscribe | Native POSTs itself; web submits a form from `/mail/link` (route-only `form-action https:`, never `connect-src`); only for DKIM-pass mail, after a confirm |
 | M7 | Undo window; holds for external recipients | 5 s; scheduled external sends capped at 24 h, with a notice |
 | M8 | Auto-advance default | Next message |
 | C2 | "Today" key | `N` (`T` is the 3-day view) |
@@ -239,7 +239,6 @@ Run all of the following and record their real output in the PR:
 - **Single-platform exceptions (AGENTS.md §6), each with its reason:**
   - M10 swipes are native only; web has no swipe rows but round-trips the setting.
   - C2 keyboard shortcuts are web only; native already has go-to-date.
-  - M4 one-click unsubscribe is native only, because of the web CSP; web offers the mailto and link variants.
 - **Disclosed plaintext:**
   - M6's auto-reply text is stored readable on the mail server.
   - M7's scheduled sends to external recipients wait readable in Stalwart's queue, capped at 24 h.
@@ -1703,7 +1702,7 @@ Shared ground for M1–M4, verified in code (line numbers as of `ee7fb551`):
 **Docs.** Root AGENTS.md §8: after "Inbound-mail push is enqueued only from the HMAC-signed Stalwart webhook (`POST /api/internal/stalwart/webhook`).", add: "Unsubscribe (`List-Unsubscribe`, RFC 2369/8058; `calendar-core` `mail-unsubscribe.ts`) runs only on the device and only for DKIM-passing mail: native sends the one-click POST itself; web, whose CSP blocks it, falls back to the mailto command through `sendJmapMessage` or the sender's https page; never through the API."
 **Decisions.**
 - Require DKIM pass for every method. **Default: yes.**
-- One-click on web. **Default: no; the PR states the CSP reason** (follow-up issue: never widen `connect-src`).
+- One-click on web. **Done:** `/mail/link` submits a real form POST, which only that route's `form-action https:` allows; `connect-src` is never widened.
 - Subscriptions view. **Default: follow-up issue.**
 
 ### M5. Strip image metadata from outgoing attachments

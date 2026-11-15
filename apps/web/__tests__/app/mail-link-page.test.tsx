@@ -18,6 +18,8 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
 }));
 jest.mock("@/lib/mail/mail-link-handoff", () => ({
   canonicalMailLinkUrl: (href: string) => new URL(href),
+  oneClickUnsubscribeUrl: (href: string) =>
+    jest.requireActual<typeof import("@/lib/mail/mail-link-handoff")>("@/lib/mail/mail-link-handoff").oneClickUnsubscribeUrl(href),
   openMailLinkTarget: (url: string) => mockOpenMailLinkTarget(url),
   resolveMailLink: (id: string) => mockResolveMailLink(id),
   setPendingMailto: (draft: unknown) => mockSetPendingMailto(draft),
@@ -88,5 +90,54 @@ describe("MailLinkPage", () => {
     const open = [...container.querySelectorAll("button")].find((button) => button.textContent === "Open link");
     act(() => open?.click());
     expect(mockOpenMailLinkTarget).toHaveBeenCalledWith("https://paypal.com.evil.test/login?x=1");
+  });
+
+  it("posts the RFC 8058 one-click form to the sender after confirming", async () => {
+    mockResolveMailLink.mockResolvedValue({
+      href: "https://News.example/u?t=1",
+      text: "owner@solace.test",
+      kind: "unsubscribe",
+    });
+    await renderPage();
+
+    expect(window.location.hash).toBe("");
+    expect(container.querySelector("h1")?.textContent).toBe("Unsubscribe?");
+    expect(container.textContent).toContain(
+      "Solace asks news.example to remove owner@solace.test from this list. The sender sees your IP address.",
+    );
+    const form = container.querySelector("form");
+    if (!form) throw new Error("The one-click form did not render");
+    expect(form.getAttribute("method")).toBe("post");
+    expect(form.getAttribute("action")).toBe("https://news.example/u?t=1");
+    expect(form.getAttribute("rel")).toBe("noreferrer");
+    let body: string | null = null;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      body = new URLSearchParams([...new FormData(form)].map(([key, value]) => [key, String(value)])).toString();
+    });
+    const submit = [...container.querySelectorAll("button")].find((button) => button.textContent === "Unsubscribe");
+    act(() => submit?.click());
+    expect(body).toBe("List-Unsubscribe=One-Click");
+    expect(mockOpenMailLinkTarget).not.toHaveBeenCalled();
+  });
+
+  it.each(["http://news.example/u", "javascript:alert(1)", "not a url"])(
+    "refuses a one-click target that is not https (%s)",
+    async (href) => {
+      mockResolveMailLink.mockResolvedValue({ href, text: "owner@solace.test", kind: "unsubscribe" });
+      await renderPage();
+
+      expect(container.querySelector("form")).toBeNull();
+      expect(container.textContent).toContain("This link has expired. Open it again from the message.");
+    },
+  );
+
+  it("does nothing for an unknown id", async () => {
+    mockResolveMailLink.mockResolvedValue(null);
+    await renderPage();
+
+    expect(container.querySelector("form")).toBeNull();
+    expect(mockOpenMailLinkTarget).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

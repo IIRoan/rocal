@@ -29,13 +29,13 @@ const mailbox = {
   mailboxes: [{ id: "drafts", name: "Drafts", role: "drafts" }, { id: "sent", name: "Sent", role: "sent" }],
 } as unknown as ActiveMailboxState; // Only the fields the unsubscribe path reads.
 
-function listMessage(urls: string[]): JmapEmailMessage {
+function listMessage(urls: string[], oneClick = false): JmapEmailMessage {
   return {
     id: "opaque-list-mail",
     to: [{ email: "owner@solace.test" }],
     "header:Authentication-Results:asText:all": ["mx.solace.test; dkim=pass header.d=news.example"],
     "header:List-Unsubscribe:asURLs": urls,
-    "header:List-Unsubscribe-Post:asText": "List-Unsubscribe=One-Click",
+    "header:List-Unsubscribe-Post:asText": oneClick ? "List-Unsubscribe=One-Click" : null,
   };
 }
 
@@ -75,7 +75,19 @@ describe("useMailUnsubscribeAction", () => {
     clearMailSendAttempts();
   });
 
-  it("sends the mailto command from the receiving address and never posts one-click", async () => {
+  it("hands the one-click target to the link page by an opaque id, before mailto", async () => {
+    await act(async () => run(listMessage(["mailto:leave@news.example", "https://news.example/u?t=1"], true)));
+
+    expect(open).toHaveBeenCalledTimes(1);
+    const [url, target, features] = open.mock.calls[0] ?? [];
+    expect(String(url)).toMatch(new RegExp(`^${window.location.origin}/mail/link#[0-9a-f-]{36}\\.0$`));
+    expect(String(url)).not.toContain("news.example");
+    expect([target, features]).toEqual(["_blank", "noopener,noreferrer"]);
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(setMessageKeyword).toHaveBeenCalledWith(mailbox.session, "opaque-list-mail", MAIL_UNSUBSCRIBED_KEYWORD, true);
+  });
+
+  it("sends the mailto command from the receiving address when one-click is not offered", async () => {
     await act(async () => run(listMessage(["mailto:leave@news.example?subject=stop", "https://news.example/u"])));
 
     expect(sendMessage).toHaveBeenCalledTimes(1);

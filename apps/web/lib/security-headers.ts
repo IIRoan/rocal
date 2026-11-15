@@ -29,7 +29,10 @@ function unique(values: Array<string | null>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 }
 
-export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
+export function buildContentSecurityPolicy(
+  env: SecurityHeaderEnv,
+  { allowHttpsFormActions = false }: { allowHttpsFormActions?: boolean } = {},
+): string {
   const isDev = env.NODE_ENV === "development";
   const apiOrigin = toOrigin(env.NEXT_PUBLIC_API_URL);
 
@@ -65,7 +68,8 @@ export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
     ["frame-src", ["'self'"]],
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
-    ["form-action", unique(["'self'", apiOrigin])],
+    // Only /mail/link posts out: the RFC 8058 one-click unsubscribe form to the list sender.
+    ["form-action", unique(["'self'", apiOrigin, allowHttpsFormActions ? "https:" : null])],
     ["frame-ancestors", ["'none'"]],
   ];
 
@@ -111,5 +115,17 @@ function buildBaseHeaders(env: SecurityHeaderEnv): Header[] {
 
 /** Entries for `headers()` in next.config.ts. Later entries override earlier keys. */
 export function buildSecurityHeaderRoutes(env: SecurityHeaderEnv) {
-  return [{ source: "/:path*", headers: buildBaseHeaders(env) }];
+  return [
+    { source: "/:path*", headers: buildBaseHeaders(env) },
+    {
+      source: "/mail/link",
+      headers: [
+        { key: "Referrer-Policy", value: "no-referrer" },
+        {
+          key: "Content-Security-Policy",
+          value: buildContentSecurityPolicy(env, { allowHttpsFormActions: true }),
+        },
+      ],
+    },
+  ];
 }

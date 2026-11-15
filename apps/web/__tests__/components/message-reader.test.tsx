@@ -1893,6 +1893,18 @@ describe("MessageReader — unsubscribe", () => {
     expect(onUnsubscribe).toHaveBeenCalledWith(expect.objectContaining({ id: "msg-1" }));
   });
 
+  it("offers one-click first when the sender supports RFC 8058", () => {
+    render({
+      message: { ...listMessage, "header:List-Unsubscribe-Post:asText": "List-Unsubscribe=One-Click" } as any,
+      identities: [{ id: "bob", email: "bob@example.com" }],
+      onUnsubscribe: jest.fn(),
+    });
+    act(() => findButton("Unsubscribe")!.click());
+    expect(document.body.textContent).toContain(
+      "Solace asks news.example to remove bob@example.com from this list. The sender sees your IP address.",
+    );
+  });
+
   it("offers the sender's page when the message did not reach one of your addresses", () => {
     render({ message: listMessage as any, identities: [], onUnsubscribe: jest.fn() });
     act(() => findButton("Unsubscribe")!.click());
