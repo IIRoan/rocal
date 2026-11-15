@@ -13,3 +13,5 @@ export const authAccountsQueryKey = (userId: string | null) =>
   [...AUTH_ACCOUNTS_QUERY_KEY, userId] as const;
 export const eventNotificationsQueryKey = (eventId: string) =>
   ["eventNotifications", eventId] as const;
+export const recoveryKitQueryKey = (userId: string | null) =>
+  ["recovery-kit", userId] as const;

@@ -14,6 +14,7 @@ const PASSWORD_ROUTES: Record<string, PasswordRoute> = {
   "/sign-in/email": { current: "password" },
   "/sign-up/email": { next: "password" },
   "/change-password": { current: "currentPassword", next: "newPassword" },
+  "/recovery/complete": { next: "newPassword" },
 };
 
 /** After this, a server asking for the raw password is refused, so a compromised API cannot keep collecting them; hashes left by then go through support. */

@@ -39,6 +39,28 @@ beforeEach(() => {
 });
 
 describe("createAuthKeyFetch", () => {
+  it("resets with the key of the new password and its length rules", async () => {
+    await post("/recovery/complete", {
+      email: "a@solace.test",
+      recoveryAuthKey: "rk1:x",
+      newPassword: "new-secret-pw",
+    });
+    const short = await post("/recovery/complete", {
+      email: "a@solace.test",
+      newPassword: "short",
+    });
+
+    expect(sent).toEqual([
+      {
+        email: "a@solace.test",
+        recoveryAuthKey: "rk1:x",
+        newPassword: "key(new-secret-pw|a@solace.test)",
+      },
+    ]);
+    expect(short.status).toBe(400);
+    await expect(short.json()).resolves.toMatchObject({ code: "PASSWORD_TOO_SHORT" });
+  });
+
   it("signs in with the key instead of the password", async () => {
     await post("/sign-in/email", { email: "A@solace.test", password: "secret-pw" });
 

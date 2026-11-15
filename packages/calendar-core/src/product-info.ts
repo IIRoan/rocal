@@ -15,8 +15,16 @@ export const PRODUCT_SOURCE_URL = product.sourceUrl;
 export const PRODUCT_LICENSE_NOTICE =
   "Solace is free software: you can use, study, share and change it under the GNU Affero General Public License, version 3. Its source code is public.";
 
-/** Support handles forgotten passwords until account recovery exists. */
-export const FORGOT_PASSWORD_NOTICE = `Email ${product.supportEmail} from a different email address and include your Solace address. Solace does not reset passwords from the sign-in screen.`;
+/** Without a recovery kit, support is the only way back into an account. */
+export const FORGOT_PASSWORD_NOTICE = `No recovery kit? Email ${product.supportEmail} from a different email address and include your Solace address.`;
+
+/** Shown beside a new recovery key, which the server cannot replace or read back. */
+export const RECOVERY_KIT_NOTICE =
+  "Keep this key somewhere safe. Anyone with it and your email can reset your password.";
+
+/** After a recovery the used kit is gone, so the next sign-in asks for a new one. */
+export const RECOVERY_KIT_USED_NOTICE =
+  "Your recovery kit was used up. Create a new one in Settings, under Security.";
 
 /** A session that cannot open the account key ends; signing in with the password opens it again. */
 export const SIGN_IN_TO_UNLOCK_NOTICE =

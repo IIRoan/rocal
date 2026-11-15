@@ -1,5 +1,5 @@
 import type { Schema } from "@workspace/api-contracts";
-import { HttpClient } from "./http-client";
+import { HttpClient, type ApiResponse } from "./http-client";
 
 export class AccountApiService {
   private signupConfigRequest: Promise<Schema<"SignupConfig">> | null = null;
@@ -31,5 +31,25 @@ export class AccountApiService {
       retries: 0,
       timeout: 2_000,
     });
+  }
+
+  getRecoveryKit(): Promise<ApiResponse<"RecoveryKitStatus">> {
+    return this.client.get<Schema<"RecoveryKitStatus">>("/api/e2ee/recovery-kit", {
+      cache: "no-store",
+    });
+  }
+
+  putRecoveryKit(
+    request: Schema<"RecoveryKitRequest">,
+  ): Promise<ApiResponse<"RecoveryKitStatus">> {
+    return this.client.put<Schema<"RecoveryKitStatus">>(
+      "/api/e2ee/recovery-kit",
+      request,
+      { retries: 0 },
+    );
+  }
+
+  deleteRecoveryKit(): Promise<ApiResponse<"SuccessMessage">> {
+    return this.client.delete<Schema<"SuccessMessage">>("/api/e2ee/recovery-kit");
   }
 }
