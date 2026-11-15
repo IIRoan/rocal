@@ -8,6 +8,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { format } from "date-fns";
 import type { Passkey as AuthPasskey } from "@better-auth/passkey/client";
 import {
   EVENT_ENCRYPTION_HINT,
@@ -15,6 +16,8 @@ import {
   getErrorMessage,
 } from "@workspace/calendar-core";
 import { SettingsPage } from "../SettingsPage";
+import { RecoveryKitPage } from "./RecoveryKitPage";
+import { useRecoveryKit } from "../../../hooks/use-recovery-kit";
 import { useMailSkin, type MailSkin } from "../../mail/mail-ui";
 import {
   SheetGroup,
@@ -46,6 +49,8 @@ export function SecuritySettingsContent() {
   const { registerPasskey, deletePasskey } = useAuth();
   const { toast } = useToast();
   const passkeysQuery = authClient.useListPasskeys();
+  const recoveryKit = useRecoveryKit().statusQuery.data;
+  const [isEditingRecoveryKit, setIsEditingRecoveryKit] = useState(false);
 
   const authCapabilities = useMemo(() => {
     const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
@@ -172,6 +177,30 @@ export function SecuritySettingsContent() {
             />
           </SheetGroup>
         </SheetSection>
+
+        <SheetSection
+          title="Recovery"
+          footer="Resets a forgotten password and keeps your encrypted data. Without one, support is the only way back in."
+        >
+          <SheetGroup>
+            <SheetItem
+              key="recovery-kit"
+              icon="life-buoy"
+              label="Recovery kit"
+              detail={
+                recoveryKit?.exists && recoveryKit.createdAt
+                  ? `Created ${format(new Date(recoveryKit.createdAt), "MMM d, yyyy")}`
+                  : "Not set up"
+              }
+              onPress={() => setIsEditingRecoveryKit(true)}
+              accessibilityState={{ expanded: isEditingRecoveryKit }}
+            />
+          </SheetGroup>
+        </SheetSection>
+
+        {isEditingRecoveryKit ? (
+          <RecoveryKitPage onClose={() => setIsEditingRecoveryKit(false)} />
+        ) : null}
 
         <SheetSection title="Passkeys" footer={passkeyFooter}>
           {isPasskeySupported ? (

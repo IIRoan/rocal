@@ -66,7 +66,7 @@ export interface E2eeContextValue {
   uploadPasswordEnvelope: (envelope: PasswordEnvelopeRequest) => Promise<void>;
   clearSession: () => void;
   runWithAccountKey: <T>(
-    fn: (accountKey: CryptoKey, e2ee: E2eeModule) => Promise<T>,
+    fn: (accountKey: CryptoKey, e2ee: E2eeModule, blindIndexKey: CryptoKey) => Promise<T>,
   ) => Promise<T | null>;
 }
 
@@ -434,7 +434,7 @@ export function E2eeProvider({
 
   const runWithAccountKey = useCallback(
     async <T,>(
-      fn: (accountKey: CryptoKey, e2ee: E2eeModule) => Promise<T>,
+      fn: (accountKey: CryptoKey, e2ee: E2eeModule, blindIndexKey: CryptoKey) => Promise<T>,
     ): Promise<T | null> => {
       if (pendingBootstrapRef.current) {
         await pendingBootstrapRef.current;
@@ -445,7 +445,7 @@ export function E2eeProvider({
         return null;
       }
 
-      return fn(session.accountKey, e2ee);
+      return fn(session.accountKey, e2ee, session.blindIndexKey);
     },
     [getModule],
   );

@@ -26,6 +26,17 @@ describe("settings search entries", () => {
     expect(labels).toContain("Passkeys");
   });
 
+  it("finds the recovery kit from a forgotten-password query", () => {
+    const results = filterAccountSheetSearchEntries(
+      SHARED_SETTINGS_SEARCH_ENTRIES,
+      "forgot password",
+    );
+    expect(results.map((r) => [r.pageId, r.label])).toContainEqual([
+      "security",
+      "Recovery kit",
+    ]);
+  });
+
   it("keeps debugging tools out of store builds", () => {
     expect(
       filterAccountSheetSearchEntries(SHARED_SETTINGS_SEARCH_ENTRIES, "debug"),
