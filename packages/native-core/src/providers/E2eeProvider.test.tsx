@@ -190,6 +190,13 @@ const storedDeviceRecord = {
   updatedAt: new Date(0),
 };
 
+const argon2idKdf = {
+  kdfAlgorithm: "Argon2id",
+  kdfIterations: 3,
+  kdfMemoryKiB: 65536,
+  kdfParallelism: 4,
+};
+
 function createPasswordRecord(
   overrides?: Partial<E2eePasswordRecord>,
 ): E2eePasswordRecord {
@@ -199,6 +206,8 @@ function createPasswordRecord(
     kdfAlgorithm: "PBKDF2-SHA-256",
     kdfSalt: "salt",
     kdfIterations: 600000,
+    kdfMemoryKiB: null,
+    kdfParallelism: null,
     wrappedAccountKey: "wrapped-account",
     wrappedSearchKey: "wrapped-search",
     wrapAlgorithm: "AES-GCM-256",
@@ -338,9 +347,8 @@ describe("E2eeProvider", () => {
     mockE2eeModule.generateAccountKey.mockResolvedValue(accountKey);
     mockE2eeModule.generateBlindIndexKey.mockResolvedValue(blindIndexKey);
     mockE2eeModule.createPasswordEnvelope.mockResolvedValue({
-      kdfAlgorithm: "PBKDF2-SHA-256",
+      ...argon2idKdf,
       kdfSalt: "salt",
-      kdfIterations: 310000,
       wrappedAccountKey: "wrapped-account",
       wrappedSearchKey: "wrapped-search",
       wrapAlgorithm: "AES-GCM-256",
@@ -481,7 +489,7 @@ describe("E2eeProvider", () => {
     mockFetch.mockImplementation(async (url: string, options: RequestInit) => {
       if (url.endsWith("/bootstrap")) {
         return jsonResponse(createBootstrapResponse({
-          passwordEnvelope: envelopeStored ? createPasswordRecord() : null,
+          passwordEnvelope: envelopeStored ? createPasswordRecord(argon2idKdf) : null,
         }));
       }
       if (url.endsWith("/password")) {
@@ -836,9 +844,11 @@ describe("E2eeProvider", () => {
   describe("rewrapping an older envelope with the sign-in password", () => {
     function mockApi(passwordEnvelope: E2eePasswordRecord, devices: E2eeBootstrapResponse["devices"]) {
       mockE2eeModule.createPasswordEnvelope.mockResolvedValue({
-        kdfAlgorithm: "PBKDF2-SHA-256",
+        kdfAlgorithm: "Argon2id",
         kdfSalt: "new-salt",
-        kdfIterations: 600000,
+        kdfIterations: 3,
+        kdfMemoryKiB: 65536,
+        kdfParallelism: 4,
         wrappedAccountKey: "rewrapped-account",
         wrappedSearchKey: "rewrapped-search",
         wrapAlgorithm: "AES-GCM-256",
@@ -876,13 +886,10 @@ describe("E2eeProvider", () => {
     it.each([
       ["after unlocking from it", null],
       ["on a device whose key it is known to hold", "salt"],
-    ])("rewraps a 310k envelope %s", async (_case, deviceSalt) => {
+    ])("rewraps a PBKDF2 envelope to Argon2id %s", async (_case, deviceSalt) => {
       peekPendingAuthPassword.mockReturnValue("secret-password");
       if (deviceSalt) storeUnlockableDevice(deviceSalt);
-      mockApi(
-        createPasswordRecord({ kdfIterations: 310000 }),
-        deviceSalt ? [storedDeviceRecord] : [],
-      );
+      mockApi(createPasswordRecord(), deviceSalt ? [storedDeviceRecord] : []);
 
       const writes = await bootstrapAndReadPasswordWrites();
 
@@ -891,7 +898,9 @@ describe("E2eeProvider", () => {
         blindIndexKey,
         "secret-password",
       );
-      expect(writes).toEqual([expect.objectContaining({ kdfIterations: 600000 })]);
+      expect(writes).toEqual([
+        expect.objectContaining({ kdfAlgorithm: "Argon2id", kdfMemoryKiB: 65536, kdfParallelism: 4 }),
+      ]);
       expect(mockSetItemAsync).toHaveBeenLastCalledWith("E2EE_ENVELOPE_SALT", "new-salt");
     });
 
@@ -908,6 +917,17 @@ describe("E2eeProvider", () => {
 
       await expect(bootstrapAndReadPasswordWrites()).resolves.toEqual([]);
       expect(getActiveE2eeSession()).toMatchObject({ deviceId: "device-1", accountKey });
+    });
+
+    it("leaves an Argon2id envelope", async () => {
+      peekPendingAuthPassword.mockReturnValue("secret-password");
+      storeUnlockableDevice("salt");
+      mockApi(
+        createPasswordRecord(argon2idKdf),
+        [storedDeviceRecord],
+      );
+
+      await expect(bootstrapAndReadPasswordWrites()).resolves.toEqual([]);
     });
 
     it("does not rewrap without a sign-in password", async () => {

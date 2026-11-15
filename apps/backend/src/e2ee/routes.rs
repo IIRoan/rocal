@@ -35,7 +35,9 @@ request_schema!(RegisterDeviceRequest => zod::object([
 request_schema!(PasswordEnvelopeRequest => zod::object([
     ("kdfAlgorithm", zod::string().max(64).optional()),
     ("kdfSalt", zod::string().min(1).max(512)),
-    ("kdfIterations", zod::number().int().min(100_000).max(5_000_000).optional()),
+    ("kdfIterations", zod::number().int().min(1).max(5_000_000).optional()),
+    ("kdfMemoryKiB", zod::number().int().min(65_536).max(131_072).optional()),
+    ("kdfParallelism", zod::number().int().min(1).max(4).optional()),
     ("wrappedAccountKey", zod::string().min(1).max(32768)),
     ("wrappedSearchKey", zod::string().min(1).max(32768)),
     ("wrapAlgorithm", zod::string().max(64).optional()),

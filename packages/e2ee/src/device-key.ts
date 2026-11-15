@@ -1,5 +1,5 @@
 import {
-  DEFAULT_PASSWORD_KDF_ITERATIONS,
+  PASSWORD_ARGON2ID_ALGORITHM,
   type E2eeModule,
   type PasswordEnvelopeInput,
 } from "./e2ee-module";
@@ -35,12 +35,12 @@ export async function resolveDeviceEnvelopeSalt(
 
 /** Whether the sign-in password should rewrap the envelope: it must hold this device's key, or the rewrap would orphan the key it holds. */
 export function shouldUpgradePasswordEnvelope(input: {
-  envelope: Pick<PasswordEnvelopeInput, "kdfSalt" | "kdfIterations"> | null;
+  envelope: Pick<PasswordEnvelopeInput, "kdfSalt" | "kdfAlgorithm"> | null;
   deviceEnvelopeSalt: string | null | undefined;
 }): boolean {
   const { envelope, deviceEnvelopeSalt } = input;
   if (!envelope || deviceEnvelopeSalt !== envelope.kdfSalt) return false;
-  return envelope.kdfIterations < DEFAULT_PASSWORD_KDF_ITERATIONS;
+  return envelope.kdfAlgorithm !== PASSWORD_ARGON2ID_ALGORITHM;
 }
 
 /** Why a signed-in device cannot open the account key; the session then ends instead of asking for a password. */

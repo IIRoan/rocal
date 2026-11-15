@@ -529,6 +529,8 @@ export interface E2eePasswordRecord {
   kdfAlgorithm: string;
   kdfSalt: string;
   kdfIterations: number;
+  kdfMemoryKiB: number | null;
+  kdfParallelism: number | null;
   wrappedAccountKey: string;
   wrappedSearchKey: string;
   wrapAlgorithm: string;
@@ -579,6 +581,8 @@ export interface UpsertE2eePasswordRequest {
   kdfAlgorithm?: string;
   kdfSalt: string;
   kdfIterations?: number;
+  kdfMemoryKiB?: number;
+  kdfParallelism?: number;
   wrappedAccountKey: string;
   wrappedSearchKey: string;
   wrapAlgorithm?: string;

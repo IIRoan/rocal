@@ -72,7 +72,15 @@ pub struct PasswordEnvelope {
     pub user_id: UserId,
     pub kdf_algorithm: String,
     pub kdf_salt: String,
+    /// PBKDF2 iterations, or Argon2id passes.
     pub kdf_iterations: i32,
+    /// Argon2id memory in KiB; null for PBKDF2.
+    #[serde(rename = "kdfMemoryKiB")]
+    #[schema(required = true)]
+    pub kdf_memory_kib: Option<i32>,
+    /// Argon2id lanes; null for PBKDF2.
+    #[schema(required = true)]
+    pub kdf_parallelism: Option<i32>,
     pub wrapped_account_key: String,
     pub wrapped_search_key: String,
     pub wrap_algorithm: String,
@@ -190,6 +198,18 @@ pub struct PasswordEnvelopeRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub kdf_iterations: Option<i32>,
+    /// Required for Argon2id, absent for PBKDF2.
+    #[serde(
+        default,
+        rename = "kdfMemoryKiB",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(nullable = false)]
+    pub kdf_memory_kib: Option<i32>,
+    /// Required for Argon2id, absent for PBKDF2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub kdf_parallelism: Option<i32>,
     pub wrapped_account_key: String,
     pub wrapped_search_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

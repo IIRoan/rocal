@@ -24,8 +24,14 @@ const MAX_BLIND_INDEX_TOKENS = 24;
 const PASSWORD_SALT_BYTES = 16;
 
 export const PASSWORD_KDF_ALGORITHM = "PBKDF2-SHA-256";
+export const PASSWORD_ARGON2ID_ALGORITHM = "Argon2id";
+/** RFC 9106's second recommended option, the same as the mail vault. */
+export const PASSWORD_ARGON2ID_PARAMS = {
+  memoryKiB: 65536,
+  passes: 3,
+  parallelism: 4,
+} as const;
 export const PASSWORD_WRAP_ALGORITHM = "AES-GCM-256";
-export const DEFAULT_PASSWORD_KDF_ITERATIONS = 600000;
 /** Mirrors `apps/backend/src/auth/password.rs`; changing any of these locks every account out. */
 const AUTH_KEY_PREFIX = "solace-ak1:";
 const AUTH_KEY_SALT_PREFIX = "solace-auth-key-v1:";
@@ -53,6 +59,8 @@ export interface PasswordEnvelopePayload {
   kdfAlgorithm: string;
   kdfSalt: string;
   kdfIterations: number;
+  kdfMemoryKiB?: number;
+  kdfParallelism?: number;
   wrappedAccountKey: string;
   wrappedSearchKey: string;
   wrapAlgorithm: string;
@@ -66,6 +74,28 @@ export type PasswordEnvelopeInput = Pick<
   | "wrappedAccountKey"
   | "wrappedSearchKey"
   | "keyVersion"
+> & {
+  kdfAlgorithm?: string;
+  kdfMemoryKiB?: number | null;
+  kdfParallelism?: number | null;
+};
+
+export interface Argon2idParams {
+  memoryKiB: number;
+  passes: number;
+  parallelism: number;
+}
+
+/** Returns the 32-byte Argon2id output for the password bytes. */
+export type Argon2idDerive = (
+  password: Uint8Array,
+  salt: Uint8Array,
+  params: Argon2idParams,
+) => Promise<Uint8Array>;
+
+type EnvelopeKdf = Pick<
+  PasswordEnvelopeInput,
+  "kdfAlgorithm" | "kdfSalt" | "kdfIterations" | "kdfMemoryKiB" | "kdfParallelism"
 >;
 
 // ---------------------------------------------------------------------------
@@ -110,25 +140,46 @@ export function base64UrlToArrayBuffer(value: string): ArrayBuffer {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** The API's accepted range; anything else came from a server we must not trust. */
+/** Mirrors `apps/backend/src/e2ee/service.rs`; anything else came from a server we must not trust. */
 const MIN_PASSWORD_KDF_ITERATIONS = 100_000;
 const MAX_PASSWORD_KDF_ITERATIONS = 5_000_000;
+const ARGON2ID_BOUNDS = {
+  memoryKiB: [65_536, 131_072],
+  passes: [3, 10],
+  parallelism: [1, 4],
+} as const;
 
-/** Envelopes always carry a random 16-byte salt, so a server cannot steer the KDF onto the auth key's email salt. */
-function assertEnvelopeKdfParameters(
-  envelope: Pick<PasswordEnvelopeInput, "kdfSalt" | "kdfIterations">,
-): void {
-  const { kdfIterations } = envelope;
-  if (
-    !Number.isInteger(kdfIterations) ||
-    kdfIterations < MIN_PASSWORD_KDF_ITERATIONS ||
-    kdfIterations > MAX_PASSWORD_KDF_ITERATIONS
-  ) {
-    throw new Error("Password envelope has invalid KDF iterations.");
-  }
+function isIntegerIn(
+  value: number | null | undefined,
+  [min, max]: readonly [number, number],
+): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max;
+}
+
+/** Validated KDF of an envelope: a hostile server can neither pick weak parameters nor exhaust the device's memory. */
+function envelopeKdfParameters(envelope: EnvelopeKdf): Argon2idParams | null {
   if (base64UrlToArrayBuffer(envelope.kdfSalt).byteLength !== PASSWORD_SALT_BYTES) {
     throw new Error("Password envelope has an invalid KDF salt.");
   }
+  const algorithm = envelope.kdfAlgorithm ?? PASSWORD_KDF_ALGORITHM;
+  if (algorithm === PASSWORD_KDF_ALGORITHM) {
+    if (!isIntegerIn(envelope.kdfIterations, [MIN_PASSWORD_KDF_ITERATIONS, MAX_PASSWORD_KDF_ITERATIONS])) {
+      throw new Error("Password envelope has invalid KDF iterations.");
+    }
+    return null;
+  }
+  if (algorithm !== PASSWORD_ARGON2ID_ALGORITHM) {
+    throw new Error("Password envelope has an unsupported KDF.");
+  }
+  const { kdfMemoryKiB: memoryKiB, kdfIterations: passes, kdfParallelism: parallelism } = envelope;
+  if (
+    !isIntegerIn(memoryKiB, ARGON2ID_BOUNDS.memoryKiB) ||
+    !isIntegerIn(passes, ARGON2ID_BOUNDS.passes) ||
+    !isIntegerIn(parallelism, ARGON2ID_BOUNDS.parallelism)
+  ) {
+    throw new Error("Password envelope has invalid KDF parameters.");
+  }
+  return { memoryKiB, passes, parallelism };
 }
 
 /** Wire shape of a wrapped key envelope; `version` defaults to 1 when the sender omits it. */
@@ -220,11 +271,6 @@ export interface E2eeModule {
     blindIndexKey: CryptoKey,
     value: string,
   ): Promise<string[]>;
-  derivePasswordWrappingKey(
-    password: string,
-    salt: string,
-    iterations?: number,
-  ): Promise<CryptoKey>;
   createPasswordEnvelope(
     accountKey: CryptoKey,
     blindIndexKey: CryptoKey,
@@ -245,7 +291,10 @@ export interface E2eeModule {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
+export function createE2eeModule(
+  crypto: CryptoProvider,
+  kdf: { argon2id?: Argon2idDerive } = {},
+): E2eeModule {
   // -- internal encrypt / decrypt helpers -----------------------------------
 
   async function encryptBytes(
@@ -338,12 +387,24 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
 
   async function derivePasswordWrappingKey(
     password: string,
-    salt: string,
-    iterations: number = DEFAULT_PASSWORD_KDF_ITERATIONS,
+    envelope: EnvelopeKdf,
   ): Promise<CryptoKey> {
+    const argon2idParams = envelopeKdfParameters(envelope);
+    const passwordBytes = textEncoder.encode(password.normalize("NFKC"));
+    const salt = base64UrlToArrayBuffer(envelope.kdfSalt);
+    if (argon2idParams) {
+      if (!kdf.argon2id) {
+        throw new Error("Argon2id is not available on this device.");
+      }
+      const raw = await kdf.argon2id(passwordBytes, new Uint8Array(salt), argon2idParams);
+      return crypto.subtle.importKey("raw", new Uint8Array(raw), AES_GCM_ALGORITHM, false, [
+        "encrypt",
+        "decrypt",
+      ]);
+    }
     const passwordKey = await crypto.subtle.importKey(
       "raw",
-      textEncoder.encode(password.normalize("NFKC")),
+      passwordBytes,
       PBKDF2_ALGORITHM,
       false,
       ["deriveKey"],
@@ -352,8 +413,8 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
     return crypto.subtle.deriveKey(
       {
         name: "PBKDF2",
-        salt: base64UrlToArrayBuffer(salt),
-        iterations,
+        salt,
+        iterations: envelope.kdfIterations,
         hash: "SHA-256",
       },
       passwordKey,
@@ -369,13 +430,14 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
     password: string,
     keyVersion: number = 1,
   ): Promise<PasswordEnvelopePayload> {
-    const kdfSalt = generatePasswordSalt();
-    const kdfIterations = DEFAULT_PASSWORD_KDF_ITERATIONS;
-    const wrappingKey = await derivePasswordWrappingKey(
-      password,
-      kdfSalt,
-      kdfIterations,
-    );
+    const kdfParameters = {
+      kdfAlgorithm: PASSWORD_ARGON2ID_ALGORITHM,
+      kdfSalt: generatePasswordSalt(),
+      kdfIterations: PASSWORD_ARGON2ID_PARAMS.passes,
+      kdfMemoryKiB: PASSWORD_ARGON2ID_PARAMS.memoryKiB,
+      kdfParallelism: PASSWORD_ARGON2ID_PARAMS.parallelism,
+    };
+    const wrappingKey = await derivePasswordWrappingKey(password, kdfParameters);
     const rawAccountKey = await crypto.subtle.exportKey("raw", accountKey);
     const rawBlindIndexKey = await crypto.subtle.exportKey(
       "raw",
@@ -394,9 +456,7 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
     );
 
     return {
-      kdfAlgorithm: PASSWORD_KDF_ALGORITHM,
-      kdfSalt,
-      kdfIterations,
+      ...kdfParameters,
       wrappedAccountKey: JSON.stringify(wrappedAccountKey),
       wrappedSearchKey: JSON.stringify(wrappedSearchKey),
       wrapAlgorithm: PASSWORD_WRAP_ALGORITHM,
@@ -408,12 +468,7 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
     password: string,
     envelope: PasswordEnvelopeInput,
   ): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }> {
-    assertEnvelopeKdfParameters(envelope);
-    const wrappingKey = await derivePasswordWrappingKey(
-      password,
-      envelope.kdfSalt,
-      envelope.kdfIterations,
-    );
+    const wrappingKey = await derivePasswordWrappingKey(password, envelope);
     const rawAccountKey = await decryptBytes(
       wrappingKey,
       parseEncryptedBinaryPayload(envelope.wrappedAccountKey),
@@ -587,7 +642,6 @@ export function createE2eeModule(crypto: CryptoProvider): E2eeModule {
     encryptJsonPayload,
     decryptJsonPayload,
     createBlindIndexTokens,
-    derivePasswordWrappingKey,
     createPasswordEnvelope,
     unwrapPasswordEnvelope,
     generatePasswordSalt,

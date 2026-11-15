@@ -172,6 +172,8 @@ const passwordEnvelope = {
   kdfAlgorithm: "PBKDF2-SHA-256",
   kdfSalt: "salt-1",
   kdfIterations: 310000,
+  kdfMemoryKiB: null,
+  kdfParallelism: null,
   wrappedAccountKey: "wrapped-account",
   wrappedSearchKey: "wrapped-search",
   wrapAlgorithm: "AES-GCM-256",
@@ -232,9 +234,11 @@ describe("e2ee bootstrap guards", () => {
     mockPeekPendingAuthPassword.mockReturnValue(null);
     mockGetActiveE2eeSession.mockReturnValue(null);
     mockCreatePasswordEnvelope.mockResolvedValue({
-      kdfAlgorithm: "PBKDF2-SHA-256",
+      kdfAlgorithm: "Argon2id",
       kdfSalt: "salt-1",
-      kdfIterations: 310000,
+      kdfIterations: 3,
+      kdfMemoryKiB: 65536,
+      kdfParallelism: 4,
       wrappedAccountKey: "wrapped-account",
       wrappedSearchKey: "wrapped-search",
       wrapAlgorithm: "AES-GCM-256",
@@ -265,6 +269,8 @@ describe("e2ee bootstrap guards", () => {
       kdfAlgorithm: "PBKDF2-SHA-256",
       kdfSalt: "salt-1",
       kdfIterations: 310000,
+      kdfMemoryKiB: null,
+      kdfParallelism: null,
       wrappedAccountKey: "wrapped-account",
       wrappedSearchKey: "wrapped-search",
       wrapAlgorithm: "AES-GCM-256",
@@ -398,6 +404,8 @@ describe("e2ee bootstrap guards", () => {
         kdfAlgorithm: "PBKDF2-SHA-256",
         kdfSalt: "salt-1",
         kdfIterations: 310000,
+        kdfMemoryKiB: null,
+        kdfParallelism: null,
         wrappedAccountKey: "wrapped-account",
         wrappedSearchKey: "wrapped-search",
         wrapAlgorithm: "AES-GCM-256",
@@ -438,6 +446,8 @@ describe("e2ee bootstrap guards", () => {
         kdfAlgorithm: "PBKDF2-SHA-256",
         kdfSalt: "salt-1",
         kdfIterations: 310000,
+        kdfMemoryKiB: null,
+        kdfParallelism: null,
         wrappedAccountKey: "wrapped-account",
         wrappedSearchKey: "wrapped-search",
         wrapAlgorithm: "AES-GCM-256",
@@ -472,6 +482,8 @@ describe("e2ee bootstrap guards", () => {
         kdfAlgorithm: "PBKDF2-SHA-256",
         kdfSalt: "salt-1",
         kdfIterations: 310000,
+        kdfMemoryKiB: null,
+        kdfParallelism: null,
         wrappedAccountKey: "wrapped-account",
         wrappedSearchKey: "wrapped-search",
         wrapAlgorithm: "AES-GCM-256",
@@ -570,9 +582,11 @@ describe("unlockWithSignInPassword", () => {
       return { ...remoteDevice, deviceId: input.deviceId };
     });
     mockCreatePasswordEnvelope.mockResolvedValue({
-      kdfAlgorithm: "PBKDF2-SHA-256",
+      kdfAlgorithm: "Argon2id",
       kdfSalt: "salt-2",
-      kdfIterations: 310000,
+      kdfIterations: 3,
+      kdfMemoryKiB: 65536,
+      kdfParallelism: 4,
       wrappedAccountKey: "wrapped-account",
       wrappedSearchKey: "wrapped-search",
       wrapAlgorithm: "AES-GCM-256",
@@ -590,9 +604,9 @@ describe("unlockWithSignInPassword", () => {
   });
 
   it.each([
-    ["rewraps a 310k envelope after unlocking from it with the sign-in password", 310000, true],
-    ["keeps an envelope as strong as a new one", 600000, false],
-  ])("%s", async (_case, kdfIterations, rewrapped) => {
+    ["rewraps a PBKDF2 envelope after unlocking from it with the sign-in password", { kdfAlgorithm: "PBKDF2-SHA-256", kdfIterations: 600000 }, true],
+    ["keeps an Argon2id envelope", { kdfAlgorithm: "Argon2id", kdfIterations: 3, kdfMemoryKiB: 65536, kdfParallelism: 4 }, false],
+  ])("%s", async (_case, kdf, rewrapped) => {
     let stored: StoredDevice | null = null;
     mockGetStoredE2eeDevice.mockImplementation(async () => stored);
     mockPutStoredE2eeDevice.mockImplementation(async (record) => {
@@ -605,7 +619,7 @@ describe("unlockWithSignInPassword", () => {
     mockGetActiveE2eeSession.mockImplementation(() => active);
     mockGetBootstrap.mockResolvedValue({
       ...createRemoteBootstrap("other-device"),
-      passwordEnvelope: { ...passwordEnvelope, kdfIterations },
+      passwordEnvelope: { ...passwordEnvelope, ...kdf },
     });
 
     await expect(unlockWithSignInPassword("user-1")).resolves.toBeNull();

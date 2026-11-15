@@ -22,9 +22,13 @@ use crate::state::AppState;
 
 const DEFAULT_PUBLIC_KEY_ALGORITHM: &str = "RSA-OAEP-256";
 const DEFAULT_WRAP_ALGORITHM: &str = "RSA-OAEP-256";
-const DEFAULT_PASSWORD_KDF_ALGORITHM: &str = "PBKDF2-SHA-256";
+const PBKDF2_ALGORITHM: &str = "PBKDF2-SHA-256";
+const ARGON2ID_ALGORITHM: &str = "Argon2id";
 const DEFAULT_PASSWORD_WRAP_ALGORITHM: &str = "AES-GCM-256";
+/// Describes legacy clients that omit `kdfIterations`.
 const DEFAULT_PASSWORD_KDF_ITERATIONS: i32 = 310_000;
+/// Mirrors `unwrapPasswordEnvelope` in `packages/e2ee/src/e2ee-module.ts`, which refuses anything else.
+const ARGON2ID_PASSES: std::ops::RangeInclusive<i32> = 3..=10;
 
 pub async fn bootstrap(state: &AppState, user: &RouteUser) -> Result<E2eeBootstrap, AppError> {
     let (devices, password_envelope, calendars) = tokio::try_join!(
@@ -97,6 +101,58 @@ fn wrapped_keys(
         ));
     }
     Ok((account, search, key_version))
+}
+
+/// The envelope's KDF parameters, checked per algorithm; the request schema already bounds memory and lanes.
+fn kdf_parameters(
+    request: &PasswordEnvelopeRequest,
+) -> Result<(String, i32, Option<i32>, Option<i32>), AppError> {
+    let algorithm = trimmed_or(request.kdf_algorithm.as_deref(), PBKDF2_ALGORITHM);
+    match algorithm.as_str() {
+        PBKDF2_ALGORITHM => {
+            let iterations = request
+                .kdf_iterations
+                .unwrap_or(DEFAULT_PASSWORD_KDF_ITERATIONS);
+            if iterations < 100_000 {
+                return Err(AppError::field(
+                    "KDF iterations must be at least 100000",
+                    "kdfIterations",
+                ));
+            }
+            if request.kdf_memory_kib.is_some() {
+                return Err(AppError::field(
+                    "PBKDF2 takes no memory parameter",
+                    "kdfMemoryKiB",
+                ));
+            }
+            if request.kdf_parallelism.is_some() {
+                return Err(AppError::field(
+                    "PBKDF2 takes no parallelism parameter",
+                    "kdfParallelism",
+                ));
+            }
+            Ok((algorithm, iterations, None, None))
+        }
+        ARGON2ID_ALGORITHM => {
+            let passes = request
+                .kdf_iterations
+                .filter(|passes| ARGON2ID_PASSES.contains(passes))
+                .ok_or_else(|| {
+                    AppError::field("Argon2id passes must be 3 to 10", "kdfIterations")
+                })?;
+            let memory = request
+                .kdf_memory_kib
+                .ok_or_else(|| AppError::field("Argon2id memory is required", "kdfMemoryKiB"))?;
+            let parallelism = request.kdf_parallelism.ok_or_else(|| {
+                AppError::field("Argon2id parallelism is required", "kdfParallelism")
+            })?;
+            Ok((algorithm, passes, Some(memory), Some(parallelism)))
+        }
+        _ => Err(AppError::field(
+            "KDF algorithm must be PBKDF2-SHA-256 or Argon2id",
+            "kdfAlgorithm",
+        )),
+    }
 }
 
 pub async fn register_device(
@@ -179,20 +235,9 @@ pub async fn store_password_keys<C: ConnectionTrait>(
 
 /// An envelope as stored, trimmed and with defaults filled in; a password change writes it in its own transaction.
 pub fn password_keys(request: PasswordEnvelopeRequest) -> Result<PasswordKeys, AppError> {
-    let kdf_algorithm = trimmed_or(
-        request.kdf_algorithm.as_deref(),
-        DEFAULT_PASSWORD_KDF_ALGORITHM,
-    );
+    let (kdf_algorithm, kdf_iterations, kdf_memory_kib, kdf_parallelism) =
+        kdf_parameters(&request)?;
     let kdf_salt = required(&request.kdf_salt, "KDF salt is required", "kdfSalt")?;
-    let kdf_iterations = request
-        .kdf_iterations
-        .unwrap_or(DEFAULT_PASSWORD_KDF_ITERATIONS);
-    if kdf_iterations < 100_000 {
-        return Err(AppError::field(
-            "KDF iterations must be at least 100000",
-            "kdfIterations",
-        ));
-    }
     let (wrapped_account_key, wrapped_search_key, key_version) = wrapped_keys(
         &request.wrapped_account_key,
         &request.wrapped_search_key,
@@ -202,6 +247,8 @@ pub fn password_keys(request: PasswordEnvelopeRequest) -> Result<PasswordKeys, A
         kdf_algorithm,
         kdf_salt,
         kdf_iterations,
+        kdf_memory_kib,
+        kdf_parallelism,
         wrapped_account_key,
         wrapped_search_key,
         wrap_algorithm: trimmed_or(
@@ -251,6 +298,8 @@ fn password_record(envelope: user_encryption_password::Model) -> PasswordEnvelop
         kdf_algorithm: envelope.kdf_algorithm,
         kdf_salt: envelope.kdf_salt,
         kdf_iterations: envelope.kdf_iterations,
+        kdf_memory_kib: envelope.kdf_memory_kib,
+        kdf_parallelism: envelope.kdf_parallelism,
         wrapped_account_key: envelope.wrapped_account_key,
         wrapped_search_key: envelope.wrapped_search_key,
         wrap_algorithm: envelope.wrap_algorithm,
@@ -319,6 +368,8 @@ fn event_record(event: EventRow) -> EncryptionEvent {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
+
     use super::*;
 
     #[test]
@@ -328,6 +379,98 @@ mod tests {
         assert_eq!(blind_index_tokens(Some("not json")), Vec::<String>::new());
         assert_eq!(blind_index_tokens(Some("{\"a\":1}")), Vec::<String>::new());
         assert_eq!(blind_index_tokens(Some("[\"a\",1,null,\"b\"]")), ["a", "b"]);
+    }
+
+    fn envelope_request(
+        algorithm: Option<&str>,
+        iterations: Option<i32>,
+        memory: Option<i32>,
+        parallelism: Option<i32>,
+    ) -> PasswordEnvelopeRequest {
+        PasswordEnvelopeRequest {
+            kdf_algorithm: algorithm.map(Into::into),
+            kdf_salt: "salt".into(),
+            kdf_iterations: iterations,
+            kdf_memory_kib: memory,
+            kdf_parallelism: parallelism,
+            wrapped_account_key: "account".into(),
+            wrapped_search_key: "search".into(),
+            wrap_algorithm: None,
+            key_version: None,
+        }
+    }
+
+    fn field_of(result: Result<PasswordKeys, AppError>) -> String {
+        match result {
+            Err(error) => format!("{error:?}"),
+            Ok(_) => "accepted".into(),
+        }
+    }
+
+    #[test]
+    fn password_keys_check_each_kdf() {
+        let argon = password_keys(envelope_request(
+            Some("Argon2id"),
+            Some(3),
+            Some(65_536),
+            Some(4),
+        ))
+        .expect("Argon2id envelope");
+        assert_eq!(
+            (
+                argon.kdf_iterations,
+                argon.kdf_memory_kib,
+                argon.kdf_parallelism
+            ),
+            (3, Some(65_536), Some(4))
+        );
+        let legacy =
+            password_keys(envelope_request(None, None, None, None)).expect("legacy envelope");
+        assert_eq!(
+            (
+                legacy.kdf_algorithm.as_str(),
+                legacy.kdf_iterations,
+                legacy.kdf_memory_kib
+            ),
+            ("PBKDF2-SHA-256", 310_000, None)
+        );
+        for (request, field) in [
+            (
+                envelope_request(Some("Argon2id"), Some(3), None, Some(4)),
+                "kdfMemoryKiB",
+            ),
+            (
+                envelope_request(Some("Argon2id"), Some(3), Some(65_536), None),
+                "kdfParallelism",
+            ),
+            (
+                envelope_request(Some("Argon2id"), Some(2), Some(65_536), Some(4)),
+                "kdfIterations",
+            ),
+            (
+                envelope_request(Some("Argon2id"), Some(11), Some(65_536), Some(4)),
+                "kdfIterations",
+            ),
+            (
+                envelope_request(None, Some(99_999), None, None),
+                "kdfIterations",
+            ),
+            (
+                envelope_request(None, Some(600_000), Some(65_536), None),
+                "kdfMemoryKiB",
+            ),
+            (
+                envelope_request(None, Some(600_000), None, Some(4)),
+                "kdfParallelism",
+            ),
+            (
+                envelope_request(Some("scrypt"), Some(600_000), None, None),
+                "kdfAlgorithm",
+            ),
+        ] {
+            let error = field_of(password_keys(request));
+            assert!(error.contains(field), "{field}: {error}");
+        }
     }
 
     #[test]

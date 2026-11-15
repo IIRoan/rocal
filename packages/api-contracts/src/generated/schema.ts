@@ -2188,8 +2188,21 @@ export interface components {
             createdAt: components["schemas"]["Timestamp"];
             id: string;
             kdfAlgorithm: string;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description PBKDF2 iterations, or Argon2id passes.
+             */
             kdfIterations: number;
+            /**
+             * Format: int32
+             * @description Argon2id memory in KiB; null for PBKDF2.
+             */
+            kdfMemoryKiB: number | null;
+            /**
+             * Format: int32
+             * @description Argon2id lanes; null for PBKDF2.
+             */
+            kdfParallelism: number | null;
             kdfSalt: string;
             /** Format: int32 */
             keyVersion: number;
@@ -2203,6 +2216,16 @@ export interface components {
             kdfAlgorithm?: string;
             /** Format: int32 */
             kdfIterations?: number;
+            /**
+             * Format: int32
+             * @description Required for Argon2id, absent for PBKDF2.
+             */
+            kdfMemoryKiB?: number;
+            /**
+             * Format: int32
+             * @description Required for Argon2id, absent for PBKDF2.
+             */
+            kdfParallelism?: number;
             kdfSalt: string;
             /** Format: int32 */
             keyVersion?: number;

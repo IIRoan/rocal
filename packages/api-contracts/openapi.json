@@ -6518,6 +6518,8 @@
           "kdfAlgorithm",
           "kdfSalt",
           "kdfIterations",
+          "kdfMemoryKiB",
+          "kdfParallelism",
           "wrappedAccountKey",
           "wrappedSearchKey",
           "wrapAlgorithm",
@@ -6537,7 +6539,24 @@
           },
           "kdfIterations": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "PBKDF2 iterations, or Argon2id passes."
+          },
+          "kdfMemoryKiB": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Argon2id memory in KiB; null for PBKDF2."
+          },
+          "kdfParallelism": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Argon2id lanes; null for PBKDF2."
           },
           "kdfSalt": {
             "type": "string"
@@ -6577,6 +6596,16 @@
           "kdfIterations": {
             "type": "integer",
             "format": "int32"
+          },
+          "kdfMemoryKiB": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Required for Argon2id, absent for PBKDF2."
+          },
+          "kdfParallelism": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Required for Argon2id, absent for PBKDF2."
           },
           "kdfSalt": {
             "type": "string"

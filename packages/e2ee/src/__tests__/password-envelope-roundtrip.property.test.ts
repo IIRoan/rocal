@@ -1,10 +1,8 @@
 import { describe, it, expect } from "@jest/globals";
 import fc from "fast-check";
-import { webcrypto } from "node:crypto";
 
-import type { CryptoProvider } from "../crypto-provider";
-import { bytesToBase64Url, createE2eeModule } from "../e2ee-module";
 import type { E2eeModule } from "../e2ee-module";
+import { pbkdf2Envelope, testE2eeModule } from "./envelope-fixtures";
 
 /**
  * Property 11: Password envelope round-trip
@@ -19,9 +17,7 @@ import type { E2eeModule } from "../e2ee-module";
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
-const nodeCrypto: CryptoProvider = webcrypto as unknown as CryptoProvider;
-
-const e2eeModule: E2eeModule = createE2eeModule(nodeCrypto);
+const e2eeModule: E2eeModule = testE2eeModule;
 
 // ─── Arbitraries ─────────────────────────────────────────────────────────────
 
@@ -99,42 +95,26 @@ describe("Password envelope round-trip - Property Tests", () => {
     }, 60_000);
   });
 
-  it("writes PBKDF2-SHA-256 envelopes at 600000 iterations", async () => {
+  it("writes Argon2id envelopes with the mail vault's parameters", async () => {
     const envelope = await e2eeModule.createPasswordEnvelope(
       await e2eeModule.generateAccountKey(),
       await e2eeModule.generateBlindIndexKey(),
       "pw",
     );
-    expect(envelope).toMatchObject({ kdfAlgorithm: "PBKDF2-SHA-256", kdfIterations: 600000 });
+    expect(envelope).toMatchObject({
+      kdfAlgorithm: "Argon2id",
+      kdfIterations: 3,
+      kdfMemoryKiB: 65536,
+      kdfParallelism: 4,
+    });
   });
 
-  it("still opens an envelope written at the former 310000 iterations", async () => {
+  it.each([310000, 600000])("still opens a PBKDF2 envelope written at %i iterations", async (kdfIterations) => {
     const accountKey = await e2eeModule.generateAccountKey();
     const blindIndexKey = await e2eeModule.generateBlindIndexKey();
-    const kdfSalt = e2eeModule.generatePasswordSalt();
-    const wrappingKey = await e2eeModule.derivePasswordWrappingKey("pw", kdfSalt, 310000);
-    const wrap = async (key: CryptoKey, aad: string) => {
-      const iv = nodeCrypto.getRandomValues(new Uint8Array(12));
-      const ciphertext = await nodeCrypto.subtle.encrypt(
-        { name: "AES-GCM", iv, additionalData: new TextEncoder().encode(aad) },
-        wrappingKey,
-        await nodeCrypto.subtle.exportKey("raw", key),
-      );
-      return JSON.stringify({
-        version: 1,
-        algorithm: "AES-GCM",
-        iv: bytesToBase64Url(iv),
-        ciphertext: bytesToBase64Url(new Uint8Array(ciphertext)),
-      });
-    };
+    const envelope = await pbkdf2Envelope({ password: "pw", accountKey, blindIndexKey, kdfIterations });
 
-    const recovered = await e2eeModule.unwrapPasswordEnvelope("pw", {
-      kdfSalt,
-      kdfIterations: 310000,
-      wrappedAccountKey: await wrap(accountKey, "account-key:1"),
-      wrappedSearchKey: await wrap(blindIndexKey, "blind-index-key:1"),
-      keyVersion: 1,
-    });
+    const recovered = await e2eeModule.unwrapPasswordEnvelope("pw", envelope);
 
     const sealed = await e2eeModule.encryptJsonPayload(accountKey, "legacy");
     await expect(e2eeModule.decryptJsonPayload(recovered.accountKey, sealed)).resolves.toBe("legacy");

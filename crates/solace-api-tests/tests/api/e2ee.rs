@@ -38,6 +38,8 @@ fn envelope() -> PasswordEnvelopeRequest {
         kdf_algorithm: None,
         kdf_salt: blob(16),
         kdf_iterations: None,
+        kdf_memory_kib: None,
+        kdf_parallelism: None,
         wrapped_account_key: blob(60),
         wrapped_search_key: blob(60),
         wrap_algorithm: None,
@@ -560,7 +562,7 @@ async fn the_password_envelope_is_created_then_rotated_in_place() {
     );
 
     let rotated_body = PasswordEnvelopeRequest {
-        kdf_algorithm: Some(" PBKDF2-SHA-512 ".into()),
+        kdf_algorithm: Some(" PBKDF2-SHA-256 ".into()),
         kdf_iterations: Some(600_000),
         wrap_algorithm: Some("AES-GCM-256".into()),
         key_version: Some(2),
@@ -579,7 +581,7 @@ async fn the_password_envelope_is_created_then_rotated_in_place() {
             rotated.kdf_iterations,
             rotated.key_version
         ),
-        ("PBKDF2-SHA-512", 600_000, 2)
+        ("PBKDF2-SHA-256", 600_000, 2)
     );
     assert_eq!(rotated.kdf_salt, rotated_body.kdf_salt);
 
@@ -594,7 +596,7 @@ async fn the_password_envelope_is_created_then_rotated_in_place() {
     assert_eq!(
         row,
         (
-            "PBKDF2-SHA-512".into(),
+            "PBKDF2-SHA-256".into(),
             rotated_body.kdf_salt.clone(),
             600_000,
             rotated_body.wrapped_account_key.clone(),
@@ -618,9 +620,24 @@ async fn password_envelope_fields_are_validated() {
     };
     let cases = [
         (
-            with("kdfIterations", json!(99_999)),
-            "Number must be greater than or equal to 100000",
+            with("kdfIterations", json!(0)),
+            "Number must be greater than or equal to 1",
             "kdfIterations",
+        ),
+        (
+            with("kdfMemoryKiB", json!(1024)),
+            "Number must be greater than or equal to 65536",
+            "kdfMemoryKiB",
+        ),
+        (
+            with("kdfMemoryKiB", json!(131_073)),
+            "Number must be less than or equal to 131072",
+            "kdfMemoryKiB",
+        ),
+        (
+            with("kdfParallelism", json!(5)),
+            "Number must be less than or equal to 4",
+            "kdfParallelism",
         ),
         (
             with("kdfIterations", json!(5_000_001)),
@@ -696,6 +713,64 @@ async fn password_envelope_fields_are_validated() {
             field,
         );
     }
+    let argon = |changes: Value| {
+        let mut body = with("kdfAlgorithm", json!("Argon2id"));
+        body["kdfIterations"] = json!(3);
+        body["kdfMemoryKiB"] = json!(65_536);
+        body["kdfParallelism"] = json!(4);
+        for (key, value) in changes.as_object().expect("changes") {
+            if value.is_null() {
+                body.as_object_mut().expect("body").remove(key);
+            } else {
+                body[key] = value.clone();
+            }
+        }
+        body
+    };
+    for (body, message, field) in [
+        (
+            with("kdfIterations", json!(99_999)),
+            "KDF iterations must be at least 100000",
+            "kdfIterations",
+        ),
+        (
+            with("kdfMemoryKiB", json!(65_536)),
+            "PBKDF2 takes no memory parameter",
+            "kdfMemoryKiB",
+        ),
+        (
+            with("kdfParallelism", json!(4)),
+            "PBKDF2 takes no parallelism parameter",
+            "kdfParallelism",
+        ),
+        (
+            with("kdfAlgorithm", json!("scrypt")),
+            "KDF algorithm must be PBKDF2-SHA-256 or Argon2id",
+            "kdfAlgorithm",
+        ),
+        (
+            argon(json!({"kdfMemoryKiB": null})),
+            "Argon2id memory is required",
+            "kdfMemoryKiB",
+        ),
+        (
+            argon(json!({"kdfParallelism": null})),
+            "Argon2id parallelism is required",
+            "kdfParallelism",
+        ),
+        (
+            argon(json!({"kdfIterations": null})),
+            "Argon2id passes must be 3 to 10",
+            "kdfIterations",
+        ),
+        (
+            argon(json!({"kdfIterations": 11})),
+            "Argon2id passes must be 3 to 10",
+            "kdfIterations",
+        ),
+    ] {
+        expect_field_error(&user.put("/api/e2ee/password", body).await, message, field);
+    }
     assert_eq!(
         count(
             &app.db,
@@ -704,6 +779,79 @@ async fn password_envelope_fields_are_validated() {
         )
         .await,
         0
+    );
+}
+
+#[tokio::test]
+async fn an_argon2id_envelope_keeps_its_parameters_and_a_pbkdf2_rotation_clears_them() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let argon_body = PasswordEnvelopeRequest {
+        kdf_algorithm: Some("Argon2id".into()),
+        kdf_iterations: Some(4),
+        kdf_memory_kib: Some(131_072),
+        kdf_parallelism: Some(2),
+        ..envelope()
+    };
+    let argon: PasswordEnvelope = ok(user
+        .put("/api/e2ee/password", json_body(&argon_body))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(
+        (
+            argon.kdf_algorithm.as_str(),
+            argon.kdf_iterations,
+            argon.kdf_memory_kib,
+            argon.kdf_parallelism
+        ),
+        ("Argon2id", 4, Some(131_072), Some(2))
+    );
+    assert_eq!(
+        bootstrap(&mut user).await.password_envelope,
+        Some(argon.clone())
+    );
+
+    let pbkdf2: PasswordEnvelope = ok(user
+        .put(
+            "/api/e2ee/password",
+            json_body(&PasswordEnvelopeRequest {
+                kdf_iterations: Some(600_000),
+                ..envelope()
+            }),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(pbkdf2.id, argon.id);
+    assert_eq!(
+        (
+            pbkdf2.kdf_algorithm.as_str(),
+            pbkdf2.kdf_memory_kib,
+            pbkdf2.kdf_parallelism
+        ),
+        ("PBKDF2-SHA-256", None, None)
+    );
+    let row: (Option<i32>, Option<i32>) = sqlx::query_as(
+        "SELECT kdf_memory_kib, kdf_parallelism FROM user_encryption_password WHERE user_id = $1",
+    )
+    .bind(&user.id)
+    .fetch_one(&app.db)
+    .await
+    .expect("password envelope");
+    assert_eq!(row, (None, None));
+    let wire = ok(user
+        .get("/api/e2ee/bootstrap")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    assert_eq!(
+        (
+            &wire["passwordEnvelope"]["kdfMemoryKiB"],
+            &wire["passwordEnvelope"]["kdfParallelism"]
+        ),
+        (&Value::Null, &Value::Null),
+        "always written, null for PBKDF2"
     );
 }
 

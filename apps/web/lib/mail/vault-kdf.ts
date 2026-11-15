@@ -1,3 +1,4 @@
+import type { Argon2idParams } from "@workspace/e2ee";
 import { argon2id } from "hash-wasm";
 import type { MailVaultKdfParams } from "./types";
 
@@ -22,21 +23,32 @@ function bytesToBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64");
 }
 
-export async function deriveVaultKeyBytes(
-  passphrase: string,
-  params: MailVaultKdfParams,
+/** The 32-byte Argon2id output; the password envelope and the mail vault share it. */
+export function argon2idBytes(
+  password: Uint8Array | string,
+  salt: Uint8Array,
+  params: Argon2idParams,
 ): Promise<Uint8Array> {
-  const derived = await argon2id({
-    password: passphrase,
-    salt: base64ToBytes(params.saltB64),
-    iterations: params.iterations,
+  return argon2id({
+    password,
+    salt,
+    iterations: params.passes,
     parallelism: params.parallelism,
     memorySize: params.memoryKiB,
     hashLength: 32,
     outputType: "binary",
   });
+}
 
-  return derived;
+export function deriveVaultKeyBytes(
+  passphrase: string,
+  params: MailVaultKdfParams,
+): Promise<Uint8Array> {
+  return argon2idBytes(passphrase, base64ToBytes(params.saltB64), {
+    memoryKiB: params.memoryKiB,
+    passes: params.iterations,
+    parallelism: params.parallelism,
+  });
 }
 
 export async function deriveVaultKeyB64(

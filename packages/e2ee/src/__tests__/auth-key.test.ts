@@ -4,6 +4,7 @@ import { webcrypto } from "node:crypto";
 import vectors from "../../../../apps/backend/tests/fixtures/passwords.json";
 import type { CryptoProvider } from "../crypto-provider";
 import { bytesToBase64Url, createE2eeModule } from "../e2ee-module";
+import { pbkdf2Envelope, testE2eeModule } from "./envelope-fixtures";
 
 const vector = vectors.authKey;
 
@@ -32,11 +33,12 @@ describe("unwrapPasswordEnvelope", () => {
   const password = "same-password";
 
   async function envelope() {
-    return e2eeModule.createPasswordEnvelope(
-      await e2eeModule.generateAccountKey(),
-      await e2eeModule.generateBlindIndexKey(),
+    return pbkdf2Envelope({
       password,
-    );
+      accountKey: await testE2eeModule.generateAccountKey(),
+      blindIndexKey: await testE2eeModule.generateBlindIndexKey(),
+      kdfIterations: 600000,
+    });
   }
 
   it("refuses KDF parameters that would make the wrapping key the auth key the server sees", async () => {
@@ -44,7 +46,7 @@ describe("unwrapPasswordEnvelope", () => {
       new TextEncoder().encode(`solace-auth-key-v1:${email}`),
     );
     await expect(
-      e2eeModule.unwrapPasswordEnvelope(password, {
+      testE2eeModule.unwrapPasswordEnvelope(password, {
         ...(await envelope()),
         kdfSalt: authSalt,
         kdfIterations: 600000,
@@ -56,11 +58,11 @@ describe("unwrapPasswordEnvelope", () => {
     const valid = await envelope();
     for (const kdfIterations of [1, 99_999, 5_000_001, 310000.5]) {
       await expect(
-        e2eeModule.unwrapPasswordEnvelope(password, { ...valid, kdfIterations }),
+        testE2eeModule.unwrapPasswordEnvelope(password, { ...valid, kdfIterations }),
       ).rejects.toThrow("invalid KDF iterations");
     }
     await expect(
-      e2eeModule.unwrapPasswordEnvelope(password, valid),
+      testE2eeModule.unwrapPasswordEnvelope(password, valid),
     ).resolves.toHaveProperty("accountKey");
   });
 });

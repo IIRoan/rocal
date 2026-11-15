@@ -12,6 +12,8 @@ export {
   type UnlockPassword,
 } from "./device-key";
 export type {
+  Argon2idDerive,
+  Argon2idParams,
   E2eeModule,
   EncryptedJsonPayload,
   EncryptedBinaryPayload,
@@ -19,9 +21,10 @@ export type {
   PasswordEnvelopeInput,
 } from "./e2ee-module";
 export {
+  PASSWORD_ARGON2ID_ALGORITHM,
+  PASSWORD_ARGON2ID_PARAMS,
   PASSWORD_KDF_ALGORITHM,
   PASSWORD_WRAP_ALGORITHM,
-  DEFAULT_PASSWORD_KDF_ITERATIONS,
   bytesToBase64Url,
   base64UrlToArrayBuffer,
 } from "./e2ee-module";

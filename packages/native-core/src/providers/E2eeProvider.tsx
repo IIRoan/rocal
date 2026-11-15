@@ -17,7 +17,7 @@ import {
   type PasswordEnvelopeInput,
   type PasswordEnvelopePayload,
 } from "@workspace/e2ee";
-import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
+import { createNativeCryptoProvider, nativeArgon2id } from "../lib/native-crypto-provider";
 import {
   createNativeE2eeProvider,
   fetchE2eeBootstrap,
@@ -111,7 +111,7 @@ export function E2eeProvider({
       return null;
     }
 
-    moduleRef.current = createE2eeModule(crypto);
+    moduleRef.current = createE2eeModule(crypto, { argon2id: nativeArgon2id });
     return moduleRef.current;
   }, []);
 
