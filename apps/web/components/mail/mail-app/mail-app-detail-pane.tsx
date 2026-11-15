@@ -76,6 +76,7 @@ export function MailAppDetailPane({
     accountEmail,
     accountDisplayName,
     composeMailPolicy,
+    composeScheduling,
     composeSessionId,
     handleDismissCompose,
     handleFullComposeSend,
@@ -252,6 +253,7 @@ export function MailAppDetailPane({
           fallbackFromEmail={activeMailbox.email ?? accountEmail}
           onClose={() => handleDismissCompose()}
           onSend={handleFullComposeSend}
+          scheduling={composeScheduling}
           onImageUpload={handleComposeImageUpload}
           activeMailbox={
             activeMailbox

@@ -209,6 +209,41 @@ describe("StalwartJmapClient", () => {
     expect(bodies[1].methodCalls[0][1]).toEqual({ accountId: "vac1", update: { singleton: update } });
   });
 
+  it("cancels a held submission on the submission account and lists scheduled sends", async () => {
+    const reply = (body: unknown) =>
+      new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    const fetcher = jest
+      .fn<(input: string, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValueOnce(reply({ methodResponses: [["EmailSubmission/set", { updated: { sub1: null } }, "c1"]] }))
+      .mockResolvedValueOnce(reply({ methodResponses: [["Email/set", { updated: { copy1: null } }, "c1"]] }))
+      .mockResolvedValueOnce(reply({ methodResponses: [
+        ["EmailSubmission/query", { ids: [] }, "q"],
+        ["EmailSubmission/get", { list: [] }, "g"],
+      ] }));
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+    const session: JmapSession = {
+      apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+      accounts: { acc1: {} },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1", "urn:ietf:params:jmap:submission": "sub-acc" },
+    };
+
+    await expect(client.cancelHeldSubmission(session, { submissionId: "sub1", copyEmailId: "copy1", draftsMailboxId: "drafts" })).resolves.toBe("canceled");
+    await expect(client.listScheduledSends(session)).resolves.toEqual([]);
+
+    const bodies = fetcher.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies[0].using).toContain("urn:ietf:params:jmap:submission");
+    expect(bodies[0].methodCalls[0]).toEqual(["EmailSubmission/set", { accountId: "sub-acc", update: { sub1: { undoStatus: "canceled" } } }, "c1"]);
+    expect(bodies[1].methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      update: { copy1: { mailboxIds: { drafts: true }, keywords: { $draft: true, $seen: true } } },
+    });
+    expect(bodies[2].methodCalls[0]).toEqual(["EmailSubmission/query", { accountId: "sub-acc", filter: { undoStatus: "pending" }, limit: 100 }, "q"]);
+  });
+
   it("supports bearer tokens for proxied JMAP discovery", async () => {
     const fetcher = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>

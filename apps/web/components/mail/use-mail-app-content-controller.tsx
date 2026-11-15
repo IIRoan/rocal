@@ -41,7 +41,8 @@ import {
 import type { JmapEmailMessage } from "@/lib/mail/types";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
-import { isDraftMessage } from "@/lib/mail/draft-utils";
+import { getDraftsMailboxId, isDraftMessage } from "@/lib/mail/draft-utils";
+import { useScheduledMailSends } from "@/hooks/use-scheduled-mail-sends";
 import { canEmptyMailboxRole, getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
 import {
   applyMailListViewFilter,
@@ -72,6 +73,7 @@ export function useMailAppContentController(
     hasAttemptedMailboxOpen,
     activeMailbox,
     composeMailPolicy,
+    composeScheduling,
     listThreadRelatedMessages,
     selectedMessage,
     selectedMessageId,
@@ -153,6 +155,12 @@ export function useMailAppContentController(
 
   const { settings } = useSettings();
   const timeFormat = useUserTimeFormat();
+  const scheduled = useScheduledMailSends(
+    activeMailbox ? { client: activeMailbox.client, session: activeMailbox.session } : null,
+    session?.user?.id ?? null,
+    activeMailbox ? getDraftsMailboxId(activeMailbox.mailboxes) : null,
+  );
+  const scheduledSendAtById = new Map(scheduled.sends.map((send) => [send.emailId, send.sendAt]));
   const [listChrome, dispatchListChrome] = useReducer(
     mailAppListChromeReducer,
     initialMailAppListChromeState,
@@ -577,6 +585,11 @@ export function useMailAppContentController(
     setIsPaletteOpen(true);
   };
 
+  const handleOpenScheduledPalette = () => {
+    patchListChrome({ paletteInitialView: "scheduled" });
+    setIsPaletteOpen(true);
+  };
+
   const handleOpenLabelsPalette = () => {
     patchListChrome({ paletteInitialView: "labels" });
     setIsPaletteOpen(true);
@@ -633,8 +646,8 @@ export function useMailAppContentController(
     setIsFullCompose(true);
   };
 
-  const handleFullComposeSend = async () => {
-    await handleSendMessage();
+  const handleFullComposeSend = async (options?: Parameters<typeof handleSendMessage>[0]) => {
+    await handleSendMessage(options);
     setIsFullCompose(false);
   };
 
@@ -680,6 +693,10 @@ export function useMailAppContentController(
     attachmentPreview,
     activeMailbox,
     composeMailPolicy,
+    composeScheduling,
+    scheduledSendCount: scheduled.sends.length,
+    scheduledSendAtById,
+    handleOpenScheduledPalette,
     listThreadRelatedMessages,
     filteredListMessages,
     labels,

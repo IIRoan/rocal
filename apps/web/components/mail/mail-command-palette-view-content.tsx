@@ -21,6 +21,7 @@ import { MailDisplaySettingsPanel } from "./mail-display-settings-panel";
 import { MailListSettingsPanel } from "./mail-list-settings-panel";
 import { MailSettingsHub } from "./mail-settings-hub";
 import { VacationReplySettingsPanel } from "./vacation-reply-settings-panel";
+import { ScheduledSendsPanel } from "./scheduled-sends-panel";
 import type { MailConnection } from "@/hooks/use-mail-vacation-response";
 import { TrustedSendersPanel } from "./trusted-senders-panel";
 import { MailboxManager } from "./mailbox-manager";
@@ -395,6 +396,18 @@ function MailPreferencesViewContent(props: MailPreferencesViewContentProps) {
         goBack={goBack}
         connection={props.mailConnection}
         userId={props.userId}
+        timezone={props.timezone}
+      />
+    );
+  }
+
+  if (currentView === "scheduled") {
+    return (
+      <ScheduledSendsPanel
+        goBack={goBack}
+        connection={props.mailConnection}
+        userId={props.userId}
+        mailboxes={props.mailboxes}
         timezone={props.timezone}
       />
     );

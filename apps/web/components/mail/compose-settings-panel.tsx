@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { UNDO_SEND_SECONDS_OPTIONS } from "@workspace/calendar-core";
 import { AlignLeft, MapPinOff, Paperclip, X } from "lucide-react";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
 import { useMailComposeSettings } from "@/lib/mail/compose-settings";
@@ -16,6 +17,11 @@ const SIGNATURE_POSITION_OPTIONS = [
   { value: "above_quote", label: "Above quoted text" },
   { value: "below_quote", label: "Below quoted text" },
 ] as const;
+
+const UNDO_SEND_OPTIONS = UNDO_SEND_SECONDS_OPTIONS.map((option) => ({
+  value: String(option.value),
+  label: option.label,
+}));
 
 export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
   const { settings, updateSettings } = useMailComposeSettings();
@@ -54,6 +60,23 @@ export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
           updateSettings({ stripImageMetadata: !settings.stripImageMetadata })
         }
       />
+
+      <PaletteField
+        label="Undo send"
+        htmlFor="mail-undo-send"
+        hint="How long a sent message waits so you can undo it. Mail sends at once when the server can't hold it."
+      >
+        <PaletteSelect
+          id="mail-undo-send"
+          label="Undo send"
+          value={String(settings.undoSendSeconds)}
+          options={UNDO_SEND_OPTIONS}
+          onValueChange={(value) => {
+            const option = UNDO_SEND_SECONDS_OPTIONS.find((entry) => String(entry.value) === value);
+            if (option) updateSettings({ undoSendSeconds: option.value });
+          }}
+        />
+      </PaletteField>
 
       <PaletteField
         label="Signature position"

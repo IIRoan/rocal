@@ -388,6 +388,30 @@ export function useMailComposeController({
     applySeed(buildMailtoSeed(draft, identities, resolvedIdentityId));
   };
 
+  const restoreDraft = (snapshot: ComposeDraft, draftId: string | null) => {
+    resetDraftRefs();
+    draftIdRef.current = draftId;
+    dispatch({ type: "incrementSession" });
+    dispatch({
+      type: "patch",
+      patch: {
+        composeTo: snapshot.to,
+        composeCc: snapshot.cc,
+        composeBcc: snapshot.bcc,
+        composeSubject: snapshot.subject,
+        composeBody: snapshot.body,
+        composeHtmlBody: snapshot.htmlBody,
+        composeAttachments: snapshot.attachments,
+        composeReplyContext: snapshot.replyContext,
+        composeMode: snapshot.composeMode,
+        signatureAlreadyEmbedded: snapshot.signatureAlreadyEmbedded,
+        selectedIdentityId: snapshot.identityId,
+        draftId,
+        isComposeOpen: true,
+      },
+    });
+  };
+
   // A mailto link from another tab's message waits in the handoff slot until this tab's identities load.
   const seedPendingMailto = useEffectEvent(() => {
     const draft = takePendingMailto();
@@ -462,6 +486,7 @@ export function useMailComposeController({
       seedReply,
       seedForward,
       seedNewMessage,
+      restoreDraft,
       seedDraft,
       openDraftEditor,
       markDirty,

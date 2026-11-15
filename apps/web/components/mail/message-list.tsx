@@ -54,6 +54,7 @@ export interface MessageListProps {
   labels?: LabelDef[];
   timeFormat: TimeFormat;
   timezone?: string;
+  scheduledSendAtById?: ReadonlyMap<string, string>;
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
@@ -90,6 +91,7 @@ export function MessageList({
   labels = EMPTY_LABELS,
   timeFormat,
   timezone,
+  scheduledSendAtById,
   onLoadMore,
   hasMore,
   isLoadingMore,
@@ -226,6 +228,7 @@ export function MessageList({
     },
     timeFormat,
     timezone,
+    scheduledSendAtById,
     mailboxActions: {
       onDelete,
       onMove,

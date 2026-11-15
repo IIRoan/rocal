@@ -217,8 +217,13 @@ function buildMessageListRowView({
     threadUi,
     timeFormat,
     timezone,
+    scheduledSendAtById,
     mailboxActions,
   } = presentation;
+  const scheduledAt = scheduledSendAtById?.get(message.id);
+  const dateLabel = scheduledAt
+    ? `Scheduled · ${formatMessageDate(scheduledAt, timeFormat, timezone)}`
+    : formatMessageDate(message.receivedAt, timeFormat, timezone);
   const selectedCount = row.messageIds.filter((id) => selectedIds.has(id)).length;
   const isRead =
     row.messages.filter((entry) => primaryIds.has(entry.id) && !entry.keywords?.["$seen"])
@@ -248,6 +253,7 @@ function buildMessageListRowView({
     timezone,
     mailboxActions,
     selectedCount,
+    dateLabel,
     isChecked: selectedCount === row.messageIds.length,
     isSelected: row.messageIds.includes(selectedMessageId ?? ""),
     isRead,
@@ -259,7 +265,7 @@ function buildMessageListRowView({
     rowLabel: [
       senderLabel,
       message.subject || "(No subject)",
-      formatMessageDate(message.receivedAt, timeFormat, timezone),
+      dateLabel,
       hasAttachments ? "Has attachment" : null,
       isRead ? null : "Unread",
     ]
@@ -286,16 +292,12 @@ function buildMessageListRowView({
 function MessageListRowTrailing({
   hasAttachments,
   messageLabels,
-  receivedAt,
-  timeFormat,
-  timezone,
+  dateLabel,
   hover,
 }: {
   hasAttachments: boolean;
   messageLabels: { id: string; name: string; color?: string }[];
-  receivedAt?: string;
-  timeFormat: TimeFormat;
-  timezone?: string;
+  dateLabel: string;
   hover: ComponentProps<typeof MessageListRowHoverActions>;
 }) {
   return (
@@ -312,7 +314,7 @@ function MessageListRowTrailing({
         mono
         size={TypographySize.SMALL}
       >
-        {formatMessageDate(receivedAt, timeFormat, timezone)}
+        {dateLabel}
       </Typography>
       <MessageListRowHoverActions {...hover} />
     </div>
@@ -335,7 +337,7 @@ function MessageListRowStacked({
 }) {
   const { message, row } = view;
   const showMenu = view.display.narrow;
-  const date = formatMessageDate(message.receivedAt, view.timeFormat, view.timezone);
+  const date = view.dateLabel;
   return (
     <div className="flex h-full items-start">
       <MessageListRowSelectAvatar
@@ -428,9 +430,7 @@ function MessageListRowInline({
       <MessageListRowTrailing
         hasAttachments={view.hasAttachments}
         messageLabels={view.messageLabels}
-        receivedAt={message.receivedAt}
-        timeFormat={view.timeFormat}
-        timezone={view.timezone}
+        dateLabel={view.dateLabel}
         hover={{
           isRead: view.isRead,
           isFlagged: view.isFlagged,

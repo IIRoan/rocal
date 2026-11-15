@@ -90,6 +90,7 @@ export function MailAppListColumn({
     hasMoreMessages,
     isLoadingMore,
     listSettings,
+    scheduledSendAtById,
   } = controller;
 
   const contentRef = useRef<HTMLDivElement>(null);
@@ -293,6 +294,7 @@ export function MailAppListColumn({
               labels={labels}
               timeFormat={timeFormat}
               timezone={timezone}
+              scheduledSendAtById={scheduledSendAtById}
               onLoadMore={
                 searchActive
                   ? undefined

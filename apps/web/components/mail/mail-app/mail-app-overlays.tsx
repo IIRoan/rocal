@@ -49,6 +49,7 @@ export function MailAppOverlays({
     accountEmail,
     handleDismissCompose,
     handleSendMessage,
+    composeScheduling,
     handleComposeImageUpload,
     handleExpandCompose,
     isBusy,
@@ -115,6 +116,7 @@ export function MailAppOverlays({
             : null
         }
         onExpand={handleExpandCompose}
+        scheduling={composeScheduling}
         isBusy={isBusy}
       />
 

@@ -46,6 +46,8 @@ export function MailAppMainLayout({
     handleManualRefresh,
     labels,
     activeLabelId,
+    scheduledSendCount,
+    handleOpenScheduledPalette,
   } = controller;
 
   return (
@@ -74,6 +76,8 @@ export function MailAppMainLayout({
         activeLabelId={activeLabelId}
         onSelectLabel={handleSelectLabel}
         onOpenLabels={handleOpenLabelsPalette}
+        scheduledCount={scheduledSendCount}
+        onOpenScheduled={handleOpenScheduledPalette}
       />
       <SidebarInset className="min-h-0 overflow-hidden border border-[var(--border-secondary)] bg-[var(--bg-l1-solid)] shadow-[var(--shadow-l1)] lg:peer-data-[variant=inset]:rounded-xl">
         {activeMailbox ? (

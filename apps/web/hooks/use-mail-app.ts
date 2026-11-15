@@ -38,6 +38,8 @@ import {
   isCurrentUserMailAddress,
   resolveEncryptionInternalDomain,
   shouldEncryptOutgoingMail,
+  resolveMailSendHold,
+  resolveTimezone,
   isMailAccountEncryptedAtRest,
   resolveMailReadState,
   type JmapAttachmentInput,
@@ -134,6 +136,7 @@ import {
 } from "@/lib/mail/compose-inline-images";
 import type { InlineImageUpload } from "@/components/mail/rich-text-editor";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
+import { announceHeldSend } from "@/lib/mail/held-send-toast";
 import { prepareOutgoingImageFiles } from "@/lib/mail/strip-image-metadata";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "@/lib/mail/mail-pagination";
 import {
@@ -1618,6 +1621,7 @@ export function useMailApp() {
 
   const handleSendMessage = async (options?: {
     skipAttachmentCheck?: boolean;
+    sendAt?: string;
   }) => {
     if (!activeMailbox || composeSendInFlightRef.current) return;
     const bridge = getMailComposeBridge();
@@ -1741,6 +1745,14 @@ export function useMailApp() {
         allRecipients,
         internalDomain,
       );
+      const { hold, error: holdError } = resolveMailSendHold({
+        sendAt: options?.sendAt,
+        undoSendSeconds: composeSettings.undoSendSeconds,
+        policy: mailbox.mailServerPolicy,
+        hasExternalRecipients: !willEncrypt,
+        now: Date.now(),
+      });
+      if (holdError) throw new Error(holdError);
       const preparedAttachments = await prepareOutgoingAttachments(
         composeAttachments,
         {
@@ -1916,10 +1928,38 @@ export function useMailApp() {
         inReplyTo: composeReplyContext?.inReplyTo,
         references: composeReplyContext?.references,
         previousDraftId,
+        hold,
       });
       completeMailSendAttempt(getPrimaryMailAccountId(mailbox.session), `compose:${composeSessionId}`);
+      const sentMessage = encrypted ? "Encrypted message sent." : "Message sent.";
+      const announceSent = () => {
+        if (!hold || !sendResult.emailId) {
+          toast(sentMessage);
+          return;
+        }
+        if ("until" in hold) {
+          void queryClient.invalidateQueries({ queryKey: mailQueryKeys.scheduledSends(session?.user?.id ?? null) });
+        }
+        announceHeldSend({
+          hold,
+          submissionId: sendResult.submissionId,
+          sentMessage,
+          timezone: resolveTimezone(settings?.timezone),
+          timeFormat,
+          cancel: () =>
+            mailbox.client.cancelHeldSubmission(mailbox.session, {
+              submissionId: sendResult.submissionId,
+              copyEmailId: sendResult.emailId,
+              draftsMailboxId,
+            }),
+          onCanceled: () => {
+            getMailComposeBridge()?.restoreDraft(draft, sendResult.emailId);
+            void queryClient.invalidateQueries({ queryKey: mailQueryKeys.scheduledSends(session?.user?.id ?? null) });
+          },
+        });
+      };
       if (!isMailSendScopeOpen(`compose:${composeSessionId}`) || getMailComposeBridge()?.getComposeSessionId() !== composeSessionId) {
-        toast(encrypted ? "Encrypted message sent." : "Message sent.");
+        announceSent();
         return;
       }
       const effectiveThreadId =
@@ -1965,7 +2005,7 @@ export function useMailApp() {
       if (recentEntries.length > 0) {
         recordUsage(recentEntries, "mail");
       }
-      toast(encrypted ? "Encrypted message sent." : "Message sent.");
+      announceSent();
       // Reload only the thread; realtime sync updates the inbox so the sent draft never flashes there.
       if (effectiveThreadId) {
         void loadConversationThread(effectiveThreadId);
@@ -3440,6 +3480,12 @@ export function useMailApp() {
   const composeMailPolicy =
     activeMailbox?.mailServerPolicy ??
     resolveMailServerPolicy({ configPolicy: config?.serverLimits ?? null });
+  const composeScheduling = {
+    maxDelayedSendSeconds: composeMailPolicy.maxDelayedSendSeconds,
+    internalDomain: resolveEncryptionInternalDomain(config?.defaultDomain),
+    timezone: resolveTimezone(settings?.timezone),
+    timeFormat,
+  };
 
   const user = session?.user
     ? {
@@ -3470,6 +3516,7 @@ export function useMailApp() {
     hasAttemptedMailboxOpen,
     activeMailbox,
     composeMailPolicy,
+    composeScheduling,
     listThreadRelatedMessages,
     selectedMessage,
     selectedMessageId,

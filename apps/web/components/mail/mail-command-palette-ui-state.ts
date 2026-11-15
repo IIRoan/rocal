@@ -20,6 +20,7 @@ export type MailPaletteView =
   | "mail-list"
   | "contacts"
   | "auto-reply"
+  | "scheduled"
   | "mail-settings";
 
 export type MailPaletteChromeState = {
