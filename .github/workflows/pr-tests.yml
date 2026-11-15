@@ -129,7 +129,7 @@ jobs:
       - name: Verify PostgreSQL subject search on encrypted drafts
         run: python3 -B apps/stalwart/tests/probe_subject_search.py --assert-fixed
 
-      - name: Verify the JMAP vacation responder
+      - name: Verify the JMAP vacation responder and send holds
         run: python3 -B apps/stalwart/tests/probe_jmap_send_features.py --assert
 
       - name: Verify disposable probe cleanup
