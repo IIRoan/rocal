@@ -51,7 +51,8 @@ describe("useScheduledMailSends", () => {
     const client = {
       listScheduledSends: jest.fn(async () => [send]),
       cancelHeldSubmission: jest.fn(
-        () => new Promise<"canceled" | "sent">((_resolve, reject) => { rejectCancel = reject; }),
+        (_session: unknown, _input: unknown) =>
+          new Promise<"canceled" | "sent">((_resolve, reject) => { rejectCancel = reject; }),
       ),
     };
     const connection = { client, session: {} } as unknown as MailConnection; // test double for the JMAP client
