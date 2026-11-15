@@ -1,6 +1,6 @@
 # Plan 005: Security, mail and calendar improvements in one PR
 
-Status: PARTLY DONE (2026-11-14, PR #200). Implemented: S2 (without the `native-release` environment), S3 Part A, S5 (without the GitHub-advisory Contact line), S6, S9, M1–M6, M8–M10, C1–C6, T1, T2, and R1–R3. Still open, waiting on the owner's decisions: S1, S3 Part B, S4, S7 (with R8), S8, M7 and the S2 environment; their sections below remain the specification.
+Status: DONE except S1 (2026-11-15, PR #200). Owner decisions on 2026-11-15: Solace is pre-release, so the dated gates in S3 Part B, S4 and S7 were dropped (formats switch immediately; existing data is still converted, never lost); S4 also blanks existing server copies for accounts with an envelope; M7 caps scheduled sends at Stalwart's 7-day limit with submissions kept 8 days. S1 (OTA signing) remains open; its section below is the specification.
 
 Planned on 2026-11-14 against commit `ee7fb5511647555967242204ed19eef584f66f21` (branch `ui/reduce-encryption-notices`, which is 10 commits ahead of `master` `95fa8e79`). Priority P1–P3 mixed. Effort XL. Rollout risk is HIGH because of S7, S8, M7 and C6.
 
