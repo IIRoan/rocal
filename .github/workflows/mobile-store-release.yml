@@ -28,6 +28,8 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # ASC_* live in this environment, which GitHub releases only to master and testing.
+    environment: native-release
     timeout-minutes: 10
     steps:
       - name: Require a manual release from the default branch
