@@ -1893,6 +1893,7 @@ async fn all_day_ends_are_exclusive_and_a_single_day_stays_one_day() {
 
 fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEvent {
     EncryptedIcsEvent {
+        id: None,
         external_id: external_id.into(),
         series_external_id: None,
         occurrence_date: None,

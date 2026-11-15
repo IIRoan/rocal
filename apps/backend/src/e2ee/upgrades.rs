@@ -12,6 +12,7 @@ use crate::db::entities::{
     calendar, calendar_event, calendar_subscription, event_notification, user_settings,
 };
 use crate::error::AppError;
+use crate::events::encryption::BOUND_EVENT_CONTENT_VERSION;
 use crate::events::queries::corpus_page;
 use crate::instant;
 use crate::state::AppState;
@@ -20,8 +21,9 @@ use crate::state::AppState;
 const BATCH: u64 = 200;
 
 pub async fn report(state: &AppState, user: &RouteUser) -> Result<EncryptionUpgrades, AppError> {
-    let (attributes, reminders, invitations, settings, feeds, urls) = tokio::try_join!(
+    let (attributes, unbound, reminders, invitations, settings, feeds, urls) = tokio::try_join!(
         events_with_readable_attributes(&state.db, &user.id),
+        events_with_unbound_content(&state.db, &user.id),
         events_with_unsealed_reminders(&state.db, &user.id),
         corpus_page(&state.db, &user.id, None, true, 1, 0),
         user_settings::Entity::find()
@@ -33,6 +35,7 @@ pub async fn report(state: &AppState, user: &RouteUser) -> Result<EncryptionUpgr
     Ok(EncryptionUpgrades {
         events_with_readable_attributes: attributes.into_iter().map(Into::into).collect(),
         events_with_unsealed_reminders: reminders.into_iter().map(Into::into).collect(),
+        events_with_unbound_content: unbound.into_iter().map(Into::into).collect(),
         readable_invitations: i64::try_from(invitations.1).unwrap_or(i64::MAX),
         unsealed_settings: settings.is_some_and(|row| row.encrypted_preferences.is_none()),
         subscriptions_with_readable_names: feeds.into_iter().map(Into::into).collect(),
@@ -99,6 +102,26 @@ async fn events_with_readable_attributes<C: ConnectionTrait>(
                 .add(calendar_event::Column::Color.is_not_null())
                 .add(calendar_event::Column::CategoryId.is_not_null()),
         )
+        .order_by_asc(calendar_event::Column::Id)
+        .limit(BATCH)
+        .into_tuple()
+        .all(db)
+        .await
+}
+
+/// Sealed events whose content an older client sealed without binding it to the row id.
+async fn events_with_unbound_content<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+) -> Result<Vec<String>, sea_orm::DbErr> {
+    calendar_event::Entity::find()
+        .select_only()
+        .column(calendar_event::Column::Id)
+        .filter(calendar_event::Column::UserId.eq(user_id))
+        .filter(calendar_event::Column::SubscriptionId.is_null())
+        .filter(calendar_event::Column::EncryptionState.eq("encrypted"))
+        .filter(calendar_event::Column::EncryptedContent.ne(""))
+        .filter(calendar_event::Column::EncryptionKeyVersion.lt(BOUND_EVENT_CONTENT_VERSION))
         .order_by_asc(calendar_event::Column::Id)
         .limit(BATCH)
         .into_tuple()

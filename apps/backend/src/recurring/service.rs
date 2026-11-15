@@ -17,7 +17,9 @@ use crate::auth::guard::RouteUser;
 use crate::calendars::queries as calendars;
 use crate::db::entities::{calendar, calendar_event, event_participant, user};
 use crate::error::AppError;
-use crate::events::encryption::resolve_invitation_content;
+use crate::events::encryption::{
+    BOUND_EVENT_CONTENT_VERSION, refuse_content_downgrade, resolve_invitation_content,
+};
 use crate::events::recurrence::{generate_instances, validate_rule};
 use crate::events::service::{
     assert_editable, invitation_event, is_attendee_invitation, is_writable, refuse_plaintext,
@@ -284,10 +286,22 @@ fn child_row(
     existing: &calendar_event::Model,
     updates: &RecurringUpdates,
     parent_event_id: &str,
+    child_id: Option<&str>,
     recurrence: Option<String>,
     occurrence: Option<i64>,
 ) -> Result<calendar_event::ActiveModel, AppError> {
+    // Bound series content opens only under the series id, so a child row needs its own ciphertext.
+    if existing.encryption_key_version >= BOUND_EVENT_CONTENT_VERSION
+        && new_ciphertext(updates).is_none()
+    {
+        return Err(AppError::Conflict(
+            "Update the app to edit one occurrence of this event.".into(),
+        ));
+    }
     let mut row = calendar_event::ActiveModel::default();
+    if let Some(id) = child_id {
+        row.id = Set(id.to_owned());
+    }
     apply_content(&mut row, existing, updates)?;
     let duration =
         (instant::unix_millis(existing.end) - instant::unix_millis(existing.start)).max(0);
@@ -376,10 +390,11 @@ pub async fn edit(
         [new_ciphertext(updates).or(existing.row.encrypted_content.as_deref())],
     )?;
     let occurrence = request.occurrence_date.as_deref();
+    let child_id = request.new_event_id.as_ref().map(|id| id.0.as_str());
     match request.edit_scope.as_str() {
         "this_only" => {
             let date = occurrence_date(occurrence, "this_only", "edit")?;
-            let row = child_row(&existing.row, updates, id, None, date)?;
+            let row = child_row(&existing.row, updates, id, child_id, None, date)?;
             let detached = events::insert(&state.db, row).await?;
             queries::insert_exception(
                 &state.db,
@@ -393,16 +408,22 @@ pub async fn edit(
         }
         "this_and_future" => {
             let date = occurrence_date(occurrence, "this_and_future", "edit")?;
-            split(state, &existing.row, date).await?;
             let recurrence = updates
                 .recurrence
                 .clone()
                 .or_else(|| existing.row.recurrence.clone());
-            let row = child_row(&existing.row, updates, id, recurrence, date)?;
+            let row = child_row(&existing.row, updates, id, child_id, recurrence, date)?;
+            split(state, &existing.row, date).await?;
             let future = events::insert(&state.db, row).await?;
             respond(state, user, future, updates, Some(&existing)).await
         }
         _ => {
+            refuse_content_downgrade(
+                existing.row.encryption_key_version,
+                new_ciphertext(updates),
+                updates.encryption_key_version,
+                "Update the app to edit this event.",
+            )?;
             let row = series_update(&existing.row, updates)?;
             let updated = events::update(&state.db, row).await?;
             respond(state, user, updated, updates, None).await

@@ -10,7 +10,10 @@ use solace_api_types::events::{
     ParticipantInput, SealEncryptionRequest, UpdateEventRequest,
 };
 
-use super::encryption::{InvitationContentSource, clear_plaintext, resolve_invitation_content};
+use super::encryption::{
+    BOUND_EVENT_CONTENT_VERSION, InvitationContentSource, clear_plaintext,
+    refuse_content_downgrade, resolve_invitation_content,
+};
 use super::view::{self, Relations};
 use super::{constraints, queries, recurrence};
 use super::{participants, rsvp, trash};
@@ -411,6 +414,9 @@ pub async fn create(
     if let Some(version) = request.encryption_key_version {
         row.encryption_key_version = Set(version);
     }
+    if let Some(id) = &request.id {
+        row.id = Set(id.0.clone());
+    }
     let event = queries::insert(&state.db, row).await?;
     let synced = participants::sync(
         &state.db,
@@ -488,6 +494,12 @@ pub async fn update(
     let existing_participants =
         queries::participants_with_users(&state.db, std::slice::from_ref(&existing.id)).await?;
     assert_editable(&user.id, &existing, &existing_participants)?;
+    refuse_content_downgrade(
+        existing.encryption_key_version,
+        request.encrypted_content.as_deref(),
+        request.encryption_key_version,
+        "Update the app to edit this event.",
+    )?;
     let start = request
         .start
         .as_deref()
@@ -594,9 +606,8 @@ pub async fn update(
     if let Some(content) = &request.encrypted_content {
         row.encrypted_content = Set(Some(content.clone()));
         row.blind_index_tokens = Set(None);
-    }
-    if let Some(version) = request.encryption_key_version {
-        row.encryption_key_version = Set(version);
+        // The version names the AAD of this ciphertext, so it never changes without it.
+        row.encryption_key_version = Set(request.encryption_key_version.unwrap_or(1));
     }
     row.updated_at = Set(instant::now());
     let updated = queries::update_if_unchanged(&state.db, row, &id, seen)
@@ -887,6 +898,13 @@ async fn duplicate(
     relations: &Relations,
     target_calendar_id: Option<&str>,
 ) -> Result<BulkEventResult, AppError> {
+    // Bound content opens only under its own row id, so a copy needs new ciphertext from the client.
+    if events
+        .iter()
+        .any(|event| event.encryption_key_version >= BOUND_EVENT_CONTENT_VERSION)
+    {
+        return Err(AppError::validation("Duplicate this event in the app."));
+    }
     let settings = queries::settings(&state.db, &user.id).await?;
     let mut created = Vec::new();
     for event in events {

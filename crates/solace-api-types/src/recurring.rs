@@ -112,6 +112,10 @@ pub struct EditRecurringRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub occurrence_date: Option<String>,
+    /// The row id a `this_only` or `this_and_future` child takes, which its new content is bound to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub new_event_id: Option<EventId>,
     pub updates: RecurringUpdates,
 }
 

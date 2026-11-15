@@ -68,8 +68,9 @@ async fn reminders(db: &PgPool, event: &str) -> Vec<ReminderRow> {
     .expect("reminders")
 }
 
+/// A re-seal as current clients send it: bound to the row id, over the ciphertext they read.
 fn seal_body(content: &str, expected: &str) -> serde_json::Value {
-    json!({"encryptedContent": content, "expectedEncryptedContent": expected})
+    json!({"encryptedContent": content, "encryptionKeyVersion": 2, "expectedEncryptedContent": expected})
 }
 
 fn reminders_body() -> serde_json::Value {
@@ -110,11 +111,16 @@ async fn the_report_lists_what_an_older_client_left_readable_until_it_is_reseale
         report.events_with_unsealed_reminders,
         vec![event.clone().into()]
     );
+    assert_eq!(
+        report.events_with_unbound_content,
+        vec![event.clone().into()]
+    );
     assert!(report.unsealed_settings);
     assert_eq!(report.readable_invitations, 0);
     let theirs = upgrades(&mut other).await;
     assert!(theirs.events_with_readable_attributes.is_empty());
     assert!(theirs.events_with_unsealed_reminders.is_empty());
+    assert!(theirs.events_with_unbound_content.is_empty());
 
     let (read, _) = stored_content(&app.db, &event).await;
     let resealed = fake_envelope();
@@ -167,6 +173,7 @@ async fn the_report_lists_what_an_older_client_left_readable_until_it_is_reseale
         EncryptionUpgrades {
             events_with_readable_attributes: vec![],
             events_with_unsealed_reminders: vec![],
+            events_with_unbound_content: vec![],
             readable_invitations: 0,
             unsealed_settings: false,
             subscriptions_with_readable_names: vec![],

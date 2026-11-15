@@ -3488,6 +3488,10 @@
           "end": {
             "type": "string"
           },
+          "id": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "A client-proposed row id (32 lowercase hex) that the event content is bound to."
+          },
           "invitationContent": {
             "$ref": "#/components/schemas/InvitationContent",
             "description": "Transient plaintext for invitation mail; never stored."
@@ -3772,6 +3776,10 @@
             "type": "string",
             "description": "`this_only`, `this_and_future` or `all`."
           },
+          "newEventId": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The row id a `this_only` or `this_and_future` child takes, which its new content is bound to."
+          },
           "occurrenceDate": {
             "type": "string",
             "description": "The occurrence instant; required for `this_only` and `this_and_future`."
@@ -3879,6 +3887,10 @@
           },
           "externalId": {
             "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "A client-proposed row id that the event content is bound to."
           },
           "occurrenceDate": {
             "$ref": "#/components/schemas/Timestamp"
@@ -4246,6 +4258,7 @@
         "required": [
           "eventsWithReadableAttributes",
           "eventsWithUnsealedReminders",
+          "eventsWithUnboundContent",
           "readableInvitations",
           "unsealedSettings",
           "subscriptionsWithReadableNames",
@@ -4258,6 +4271,13 @@
               "$ref": "#/components/schemas/EventId"
             },
             "description": "Sealed events whose colour or category still sits in a readable column."
+          },
+          "eventsWithUnboundContent": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventId"
+            },
+            "description": "Sealed events whose content is not yet bound to their row id."
           },
           "eventsWithUnsealedReminders": {
             "type": "array",
@@ -5227,6 +5247,10 @@
           "encryptionKeyVersion": {
             "type": "integer",
             "format": "int32"
+          },
+          "eventId": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The row id the content is bound to: a new copy takes it (32 lowercase hex), an existing copy is sealed only when it is its id."
           },
           "externalId": {
             "type": "string"

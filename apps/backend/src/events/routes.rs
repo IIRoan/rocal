@@ -19,9 +19,10 @@ use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidQuery};
 use crate::http::schemas::{
-    bulk_event_action_schema, calendar_color_schema, event_content_encryption_fields,
-    event_invitation_content_schema, event_participant_input_schema,
-    refine_invitation_content_body, reminder_field_schema, rsvp_status_schema, timezone_schema,
+    bulk_event_action_schema, calendar_color_schema, client_entity_id_schema,
+    event_content_encryption_fields, event_invitation_content_schema,
+    event_participant_input_schema, refine_invitation_content_body, reminder_field_schema,
+    rsvp_status_schema, timezone_schema,
 };
 use crate::http::zod::{self, optional_query_boolean, optional_query_int};
 use crate::request_schema;
@@ -55,6 +56,7 @@ request_schema!(InvitationByExternalIdQuery => zod::object([
 .strict());
 
 request_schema!(CreateEventRequest => zod::object([
+    ("id", client_entity_id_schema().optional()),
     ("start", zod::string()),
     ("end", zod::string()),
     ("allDay", zod::boolean().optional()),

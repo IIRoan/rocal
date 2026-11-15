@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::{CalendarId, SubscriptionId, Timestamp, UserId};
+use crate::common::{CalendarId, EventId, SubscriptionId, Timestamp, UserId};
 use crate::events::ParticipantInput;
 
 /// A feed subscription with its mirrored calendar; only the list carries `_count`.
@@ -192,6 +192,10 @@ pub struct EncryptedIcsImportRequest {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EncryptedIcsEvent {
+    /// A client-proposed row id that the event content is bound to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub id: Option<EventId>,
     pub external_id: String,
     /// Set on an override, together with `occurrenceDate`.
     #[serde(default, skip_serializing_if = "Option::is_none")]

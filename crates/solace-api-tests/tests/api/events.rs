@@ -2153,3 +2153,158 @@ async fn sealing_replaces_plaintext_with_ciphertext() {
     );
     assert_eq!(stored_content(&app.db, &event).await, stored);
 }
+
+/// A create as current clients send it: content bound to an id they propose.
+fn bound_event(calendar: &str) -> solace_api_types::events::CreateEventRequest {
+    let mut request = encrypted_event(calendar, FUTURE_START, FUTURE_END);
+    request.id = Some(hex(16).into());
+    request.encryption_key_version = Some(2);
+    request
+}
+
+#[tokio::test]
+async fn a_client_proposed_id_is_kept_and_must_be_new() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let mut other = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let request = bound_event(&calendar);
+    let id = request.id.clone().expect("id");
+
+    let created = create_event(&mut owner, &request).await;
+    assert_eq!(created.id, id);
+    assert_eq!(
+        stored_content(&app.db, &id.0).await.encryption_key_version,
+        2
+    );
+
+    let taken = owner.post("/api/events", to_json(&request)).await;
+    assert_eq!(taken.status.as_u16(), 409);
+    let theirs = calendar_id(&mut other, "Work").await;
+    let mut foreign = bound_event(&theirs);
+    foreign.id = Some(id.clone());
+    assert_eq!(
+        other
+            .post("/api/events", to_json(&foreign))
+            .await
+            .status
+            .as_u16(),
+        409,
+        "another account's id is never reused"
+    );
+
+    for malformed in [
+        hex(15),
+        format!("{}A", hex(15)),
+        "series_2099-03-02T09:00:00.000Z".into(),
+    ] {
+        let mut body = bound_event(&calendar);
+        body.id = Some(malformed.into());
+        let response = owner.post("/api/events", to_json(&body)).await;
+        assert_eq!(response.status.as_u16(), 400, "{:?}", response.value());
+    }
+}
+
+#[tokio::test]
+async fn bound_content_is_never_overwritten_with_unbound_content() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let event = create_event(&mut owner, &bound_event(&calendar)).await;
+    let path = format!("/api/events/{}", event.id);
+    let before = stored_content(&app.db, &event.id.0).await;
+
+    for version in [json!(1), Value::Null] {
+        let mut body = json!({"encryptedContent": fake_envelope()});
+        if !version.is_null() {
+            body["encryptionKeyVersion"] = version;
+        }
+        let refused = owner.put(&path, body).await;
+        ok(refused.expect_error(409, "Conflict", "Update the app to edit this event."));
+    }
+    assert_eq!(stored_content(&app.db, &event.id.0).await, before);
+
+    ok(owner
+        .put(
+            &path,
+            json!({"encryptionKeyVersion": 1, "start": FUTURE_START}),
+        )
+        .await
+        .expect_status(200));
+    assert_eq!(
+        stored_content(&app.db, &event.id.0)
+            .await
+            .encryption_key_version,
+        2,
+        "the version only changes with the ciphertext it names"
+    );
+
+    let content = fake_envelope();
+    ok(owner
+        .put(
+            &path,
+            json!({"encryptedContent": content, "encryptionKeyVersion": 2}),
+        )
+        .await
+        .expect_status(200));
+    assert_eq!(
+        stored_content(&app.db, &event.id.0).await.encrypted_content,
+        Some(content)
+    );
+}
+
+#[tokio::test]
+async fn unbound_content_can_be_rebound_by_an_update() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let event = create_event(
+        &mut owner,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    ok(owner
+        .put(
+            &format!("/api/events/{}", event.id),
+            json!({"encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
+        )
+        .await
+        .expect_status(200));
+    assert_eq!(
+        stored_content(&app.db, &event.id.0)
+            .await
+            .encryption_key_version,
+        2
+    );
+}
+
+#[tokio::test]
+async fn bulk_duplicate_refuses_bound_content() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let event = create_event(&mut owner, &bound_event(&calendar)).await;
+    let before = count(
+        &app.db,
+        "SELECT count(*) FROM calendar_event WHERE user_id = $1",
+        &owner.id,
+    )
+    .await;
+
+    let response = owner
+        .post(
+            "/api/events/bulk",
+            json!({"action": "duplicate", "eventIds": [event.id]}),
+        )
+        .await;
+    ok(response.expect_error(400, "Validation Error", "Duplicate this event in the app."));
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE user_id = $1",
+            &owner.id,
+        )
+        .await,
+        before
+    );
+}

@@ -23,6 +23,7 @@ pub fn to_json<T: serde::Serialize>(value: &T) -> Value {
 /// An encrypted create body, the only kind owned calendars accept.
 pub fn encrypted_event(calendar_id: &str, start: &str, end: &str) -> CreateEventRequest {
     CreateEventRequest {
+        id: None,
         start: start.into(),
         end: end.into(),
         calendar_id: calendar_id.to_owned().into(),

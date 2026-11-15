@@ -1394,6 +1394,8 @@ export interface components {
             /** Format: int32 */
             encryptionKeyVersion?: number;
             end: string;
+            /** @description A client-proposed row id (32 lowercase hex) that the event content is bound to. */
+            id?: components["schemas"]["EventId"];
             /** @description Transient plaintext for invitation mail; never stored. */
             invitationContent?: components["schemas"]["InvitationContent"];
             participants?: components["schemas"]["ParticipantInput"][];
@@ -1476,6 +1478,8 @@ export interface components {
         EditRecurringRequest: {
             /** @description `this_only`, `this_and_future` or `all`. */
             editScope: string;
+            /** @description The row id a `this_only` or `this_and_future` child takes, which its new content is bound to. */
+            newEventId?: components["schemas"]["EventId"];
             /** @description The occurrence instant; required for `this_only` and `this_and_future`. */
             occurrenceDate?: string;
             updates: components["schemas"]["RecurringUpdates"];
@@ -1503,6 +1507,8 @@ export interface components {
             end: components["schemas"]["Timestamp"];
             excludedDates?: components["schemas"]["Timestamp"][];
             externalId: string;
+            /** @description A client-proposed row id that the event content is bound to. */
+            id?: components["schemas"]["EventId"];
             occurrenceDate?: components["schemas"]["Timestamp"];
             participants?: components["schemas"]["ParticipantInput"][];
             /** @description A recurrence rule object as JSON text. */
@@ -1595,6 +1601,8 @@ export interface components {
         EncryptionUpgrades: {
             /** @description Sealed events whose colour or category still sits in a readable column. */
             eventsWithReadableAttributes: components["schemas"]["EventId"][];
+            /** @description Sealed events whose content is not yet bound to their row id. */
+            eventsWithUnboundContent: components["schemas"]["EventId"][];
             /** @description Events whose pending reminders lack a sealed title or lead. */
             eventsWithUnsealedReminders: components["schemas"]["EventId"][];
             /**
@@ -1838,6 +1846,8 @@ export interface components {
             encryptedContent: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
+            /** @description The row id the content is bound to: a new copy takes it (32 lowercase hex), an existing copy is sealed only when it is its id. */
+            eventId?: components["schemas"]["EventId"];
             externalId: string;
         };
         /** @description What an ICS invitation import did. */

@@ -201,10 +201,24 @@ pub fn event_participant_input_schema() -> Schema {
     .strict()
 }
 
+static CLIENT_ENTITY_ID: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[0-9a-f]{32}$").unwrap_or_else(|error| panic!("client id pattern: {error}"))
+});
+
+/// `CLIENT_ENTITY_ID_PATTERN`: a row id the client proposes, which cannot collide with cuids or occurrence ids.
+pub fn client_entity_id_schema() -> Schema {
+    zod::string().regex(&CLIENT_ENTITY_ID)
+}
+
+pub fn is_client_entity_id(id: &str) -> bool {
+    CLIENT_ENTITY_ID.is_match(id)
+}
+
 /// `encryptedIcsImportEventSchema`: one client-encrypted event of an ICS file, a series override naming its series.
 pub fn encrypted_ics_import_event_schema() -> Schema {
     let external_id = || zod::string().min(1).max(128);
     zod::object([
+        ("id", client_entity_id_schema().optional()),
         ("externalId", external_id()),
         ("seriesExternalId", external_id().optional()),
         ("occurrenceDate", zod::string().datetime().optional()),

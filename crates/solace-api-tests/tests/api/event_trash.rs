@@ -528,3 +528,34 @@ async fn the_trash_lists_its_newest_500_entries() {
         (newest.as_str(), format!("{newest}499"))
     );
 }
+
+#[tokio::test]
+async fn a_restored_bound_event_keeps_the_id_and_ciphertext_it_is_bound_to() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let mut request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
+    request.id = Some(hex(16).into());
+    request.encryption_key_version = Some(2);
+    let event = create_event(&mut owner, &request).await;
+    let before = snapshot(&app.db, "calendar_event", &event.id.0).await;
+
+    let trash_id = delete(&mut owner, &event.id.0).await;
+    let listed = trash(&mut owner).await;
+    assert_eq!(
+        listed
+            .iter()
+            .map(|entry| (&entry.event_id, entry.encryption_key_version))
+            .collect::<Vec<_>>(),
+        vec![(&event.id, 2)],
+        "the trash lists the version a client needs to open the title"
+    );
+    let restored = restore(&mut owner, &trash_id).await;
+
+    assert_eq!(restored.id, event.id);
+    assert_eq!(restored.encryption_key_version, 2);
+    assert_eq!(
+        snapshot(&app.db, "calendar_event", &event.id.0).await,
+        before
+    );
+}

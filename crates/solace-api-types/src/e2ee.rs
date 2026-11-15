@@ -13,6 +13,8 @@ pub struct EncryptionUpgrades {
     pub events_with_readable_attributes: Vec<EventId>,
     /// Events whose pending reminders lack a sealed title or lead.
     pub events_with_unsealed_reminders: Vec<EventId>,
+    /// Sealed events whose content is not yet bound to their row id.
+    pub events_with_unbound_content: Vec<EventId>,
     /// Invitation copies the server still stores readable.
     pub readable_invitations: i64,
     /// Whether the app preferences are still stored readable.

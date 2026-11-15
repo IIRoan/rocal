@@ -96,6 +96,7 @@ fn edit_request(
     EditRecurringRequest {
         edit_scope: scope.into(),
         occurrence_date: occurrence.map(str::to_owned),
+        new_event_id: None,
         updates,
     }
 }
@@ -1925,4 +1926,122 @@ async fn delete_requests_are_validated() {
         .await,
         1
     );
+}
+
+async fn bound_series(user: &mut TestUser, calendar: &str) -> Event {
+    let mut request = encrypted_event(calendar, SERIES_START, SERIES_END);
+    request.recurrence = Some(WEEKLY_FIVE.into());
+    request.id = Some(hex(16).into());
+    request.encryption_key_version = Some(2);
+    create_event(user, &request).await
+}
+
+#[tokio::test]
+async fn a_detached_occurrence_takes_the_client_proposed_id_with_its_own_content() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let series = bound_series(&mut owner, &calendar).await;
+    let child_id = hex(16);
+    let content = fake_envelope();
+    let mut request = edit_request(
+        "this_only",
+        Some("2099-03-16T09:00:00.000Z"),
+        RecurringUpdates {
+            encrypted_content: Some(content.clone()),
+            encryption_key_version: Some(2),
+            ..RecurringUpdates::default()
+        },
+    );
+    request.new_event_id = Some(child_id.clone().into());
+
+    let detached = edit(&mut owner, &series.id.0, &request).await;
+    assert_eq!(detached.id.0, child_id);
+    let stored = stored_content(&app.db, &child_id).await;
+    assert_eq!(
+        (stored.encrypted_content, stored.encryption_key_version),
+        (Some(content), 2)
+    );
+    assert_eq!(
+        exceptions(&app, &series.id.0).await,
+        vec![(
+            "2099-03-16T09:00:00.000Z".to_owned(),
+            "modified".to_owned(),
+            Some(child_id)
+        )]
+    );
+}
+
+#[tokio::test]
+async fn bound_series_content_is_never_copied_onto_a_child_row() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let series = bound_series(&mut owner, &calendar).await;
+    let path = format!("/api/recurring/event/{}", series.id);
+    let moved = RecurringUpdates {
+        start: Some("2099-03-16T14:00:00.000Z".into()),
+        end: Some("2099-03-16T15:00:00.000Z".into()),
+        ..RecurringUpdates::default()
+    };
+
+    for scope in ["this_only", "this_and_future"] {
+        let request = edit_request(scope, Some("2099-03-16T09:00:00.000Z"), moved.clone());
+        let refused = owner.put(&path, to_json(&request)).await;
+        ok(refused.expect_error(
+            409,
+            "Conflict",
+            "Update the app to edit one occurrence of this event.",
+        ));
+    }
+    assert_eq!(
+        stored_rule(&app, &series.id.0).await.as_deref(),
+        Some(WEEKLY_FIVE),
+        "a refused split leaves the series whole"
+    );
+    assert!(exceptions(&app, &series.id.0).await.is_empty());
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE parent_event_id = $1",
+            &series.id.0,
+        )
+        .await,
+        0
+    );
+
+    let downgrade = edit_request(
+        "all",
+        None,
+        RecurringUpdates {
+            encrypted_content: Some(fake_envelope()),
+            ..RecurringUpdates::default()
+        },
+    );
+    ok(owner.put(&path, to_json(&downgrade)).await.expect_error(
+        409,
+        "Conflict",
+        "Update the app to edit this event.",
+    ));
+}
+
+#[tokio::test]
+async fn a_malformed_child_id_is_refused() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let series = bound_series(&mut owner, &calendar).await;
+    let mut request = edit_request(
+        "this_only",
+        Some("2099-03-16T09:00:00.000Z"),
+        RecurringUpdates::default(),
+    );
+    request.new_event_id = Some("not-a-client-id".to_owned().into());
+    let response = owner
+        .put(
+            &format!("/api/recurring/event/{}", series.id),
+            to_json(&request),
+        )
+        .await;
+    assert_eq!(response.status.as_u16(), 400);
 }

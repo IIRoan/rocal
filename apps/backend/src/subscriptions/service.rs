@@ -789,7 +789,7 @@ pub async fn import_ics(
             }
             None => None,
         };
-        let row = calendar_event::ActiveModel {
+        let mut row = calendar_event::ActiveModel {
             user_id: Set(user.id.clone()),
             calendar_id: Set(calendar_id.to_owned()),
             external_id: Set(Some(entry.external_id.clone())),
@@ -811,6 +811,9 @@ pub async fn import_ics(
             parent_event_id: Set(parent.as_ref().map(|parent| parent.id.clone())),
             ..Default::default()
         };
+        if let Some(id) = &entry.id {
+            row.id = Set(id.0.clone());
+        }
         let event = events_queries::insert(&transaction, row).await?;
         let people = entry.participants.as_deref().unwrap_or_default();
         participants::sync(&transaction, &event.id, people, None).await?;

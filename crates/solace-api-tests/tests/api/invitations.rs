@@ -134,6 +134,7 @@ async fn accepting_a_mailed_series_seals_its_moved_occurrences_with_the_series()
     );
     // Clients seal the invitation once, under the series UID.
     request.encryption = Some(vec![InvitationEncryptionEntry {
+        event_id: None,
         external_id: uid.clone(),
         encrypted_content: fake_envelope(),
         blind_index_tokens: None,
@@ -1088,6 +1089,7 @@ async fn declining_keeps_a_hidden_tombstone_that_blocks_restaging() {
     );
     let mut sealed = import_request(ics, Some("accepted"));
     sealed.encryption = Some(vec![InvitationEncryptionEntry {
+        event_id: None,
         external_id: uid.clone(),
         encrypted_content: fake_envelope(),
         blind_index_tokens: None,
@@ -1720,6 +1722,7 @@ async fn imports_with_ciphertext_store_no_plaintext() {
     let ciphertext = fake_envelope();
     let mut request = import_request(ics, Some("accepted"));
     request.encryption = Some(vec![InvitationEncryptionEntry {
+        event_id: None,
         external_id: uid.clone(),
         encrypted_content: ciphertext.clone(),
         blind_index_tokens: Some(vec!["invite-token".into()]),
@@ -1760,5 +1763,91 @@ async fn imports_with_ciphertext_store_no_plaintext() {
             .collect::<Vec<_>>(),
         ["Tentative: Invitation"],
         "a sealed copy replies with a generic title"
+    );
+}
+
+fn bound_entry(uid: &str, event_id: &str) -> InvitationEncryptionEntry {
+    InvitationEncryptionEntry {
+        external_id: uid.into(),
+        event_id: Some(event_id.to_owned().into()),
+        encrypted_content: fake_envelope(),
+        blind_index_tokens: None,
+        encryption_key_version: Some(2),
+    }
+}
+
+#[tokio::test]
+async fn a_new_invitation_copy_takes_the_id_its_content_is_bound_to() {
+    let app = TestApp::spawn().await;
+    let mut attendee = app.user().await;
+    let uid = format!("bound-{}@example.com", hex(6));
+    let id = hex(16);
+    let mut request = import_request(
+        request_ics(&uid, "REQUEST", "organizer@example.com", &attendee.email),
+        None,
+    );
+    request.encryption = Some(vec![bound_entry(&uid, &id)]);
+
+    import(&mut attendee, &request).await;
+    let copy = lookup(&mut attendee, &uid).await.expect("copy");
+    assert_eq!(copy.id.0, id);
+    let stored = stored_content(&app.db, &id).await;
+    assert_eq!(
+        (
+            stored.title.as_str(),
+            stored.encryption_state.as_str(),
+            stored.encryption_key_version
+        ),
+        ("", "encrypted", 2)
+    );
+
+    let other = format!("bound-{}@example.com", hex(6));
+    let mut foreign = import_request(
+        request_ics(&other, "REQUEST", "organizer@example.com", &attendee.email),
+        None,
+    );
+    foreign.encryption = Some(vec![bound_entry(&other, "not-a-client-id")]);
+    import(&mut attendee, &foreign).await;
+    let staged = lookup(&mut attendee, &other).await.expect("staged copy");
+    assert_ne!(staged.id.0, "not-a-client-id");
+    assert_eq!(
+        stored_content(&app.db, &staged.id.0)
+            .await
+            .encrypted_content,
+        None,
+        "content bound to an id the new copy cannot take is not stored"
+    );
+}
+
+#[tokio::test]
+async fn an_existing_copy_is_sealed_only_with_content_bound_to_its_own_id() {
+    let app = TestApp::spawn().await;
+    let mut attendee = app.user().await;
+    let uid = format!("bound-{}@example.com", hex(6));
+    let ics = request_ics(&uid, "REQUEST", "organizer@example.com", &attendee.email);
+    import(&mut attendee, &import_request(ics.clone(), None)).await;
+    let staged = lookup(&mut attendee, &uid).await.expect("staged copy");
+
+    let mut mismatched = import_request(ics.clone(), None);
+    mismatched.encryption = Some(vec![bound_entry(&uid, &hex(16))]);
+    import(&mut attendee, &mismatched).await;
+    let stored = stored_content(&app.db, &staged.id.0).await;
+    assert_eq!(
+        (stored.title.as_str(), stored.encrypted_content),
+        ("Planning", None),
+        "content bound to another id would not open here, so the copy waits for the sweep"
+    );
+
+    let mut matching = import_request(ics, None);
+    matching.encryption = Some(vec![bound_entry(&uid, &staged.id.0)]);
+    import(&mut attendee, &matching).await;
+    let stored = stored_content(&app.db, &staged.id.0).await;
+    assert_eq!(
+        (
+            stored.title.as_str(),
+            stored.encryption_state.as_str(),
+            stored.encryption_key_version
+        ),
+        ("", "encrypted", 2)
     );
 }
