@@ -23,6 +23,9 @@ appId: ${APP_ID}
             VERIFY_ID: compose-recipient-to
       - pressKey: Enter
       - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: Message body
+    timeout: 60000
 # The editor frame can extend behind the keyboard, so its center is not always tappable.
 - tapOn:
     text: Message body
