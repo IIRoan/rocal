@@ -245,8 +245,8 @@ jobs:
 
   publish:
     needs: [meta, ios, android]
-    # Publish whichever platform built; the page script skips missing artifacts.
-    if: always() && needs.meta.result == 'success' && (needs.ios.result == 'success' || needs.android.result == 'success')
+    # Publish every leg that built, even when a leg of either platform failed; a failed leg leaves no artifact.
+    if: ${{ !cancelled() && needs.meta.result == 'success' && (needs.ios.result != 'skipped' || needs.android.result != 'skipped') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -327,6 +327,7 @@ jobs:
             --out-dir "$RUNNER_TEMP/r2-publish"
 
       - name: Build combined install page + QR
+        if: steps.ios-build.outcome == 'success' || steps.android-build.outcome == 'success'
         env:
           S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
@@ -349,6 +350,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Send install QR to Discord
+        if: steps.ios-build.outcome == 'success' || steps.android-build.outcome == 'success'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           EVENT_NAME: ${{ github.event_name }}

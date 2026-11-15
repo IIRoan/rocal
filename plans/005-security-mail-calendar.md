@@ -401,7 +401,7 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
   - `eas build --local` cannot be split without replacing EAS-managed signing (credentials, remote versioning, local build plugin in one run).
 
 **Design.**
-- **Credentials appear only after code-running setup, and only in the step that needs them:**
+- **Credentials appear only after `bun install`, and only in the step that needs them** (this keeps them from that install's lifecycle scripts only; see the residue below):
   - In `expo-update.yml`, move `bun install` above the Expo step.
   - In `mobile-internal-build.yml`, delete the job-level `EXPO_TOKEN` env. The Expo step's `token:` input already authenticates the later `eas build` step.
 - **GitHub environment `native-release`** (operator step in repo settings):
@@ -448,7 +448,7 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
 - Manual: one `workflow_dispatch` of `mobile-internal-build.yml` (preview) and `expo-update.yml` (preview) after merge. Check that the install page and QR still publish, and that the signed update applies on a new internal build.
 
 **Docs.**
-- AGENTS.md §9, after "…EAS Submit uploads that exact `.ipa`.", add: "Release secrets (`EXPO_UPDATES_SIGNING_KEY`, `ASC_*`) live in the `native-release` GitHub environment (master and testing only); jobs install dependencies before any credential step, and R2/Discord credentials stay in the job that runs no project build."
+- AGENTS.md §9, after "…EAS Submit uploads that exact `.ipa`.", add: "Release secrets (`EXPO_UPDATES_SIGNING_KEY`, `ASC_*`) live in the `native-release` GitHub environment (master and testing only); jobs run `bun install` before any credential step, and R2/Discord credentials stay in the job that runs no project build."
 - `.github/SECURITY-SCANNING.md:33`: add one sentence about the environment and the `pinned-workflow-actions` rule.
 
 **Decisions.**

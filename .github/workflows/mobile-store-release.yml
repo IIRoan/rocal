@@ -42,7 +42,7 @@ jobs:
       - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
-      # The release script needs only zod; skipping lifecycle scripts keeps dependency code away from what runs with ASC_* secrets.
+      # The release script needs only zod; skipping lifecycle scripts keeps install-time dependency code away from the ASC_* secrets.
       - run: bun install --frozen-lockfile --ignore-scripts
       - name: Submit for App Review with automatic release after approval
         env:

@@ -93,7 +93,7 @@ jobs:
       - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
-      # Dependency lifecycle scripts run before any step holds EXPO_TOKEN.
+      # Installing first keeps EXPO_TOKEN only from this install's lifecycle scripts; the publish still bundles dependency code beside it.
       - run: bun install --frozen-lockfile
         working-directory: .
       - uses: chainguard-actions/expo-expo-github-action@f202d68400237adfeabf5142b03e4b5aea4e70f8 # 8.2.1
