@@ -65,6 +65,14 @@ describe("planComposeSeed", () => {
     });
   });
 
+  it("reopens an undone send from its form before loading the source", () => {
+    const fields = { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "Hi" };
+    const attachments = [{ id: "a", name: "a.txt", type: "text/plain", size: 1, bytes: new Uint8Array([1]) }];
+    expect(plan({ params: { mode: "reply", messageId: "m", restore: { fields, attachments, draftId: "copy" } }, sourceMessage: null })).toEqual({
+      kind: "fields", fields, draftId: "copy", restoredAttachments: attachments,
+    });
+  });
+
   it("fills every field from a mailto link in a message", () => {
     const mailto = { to: ["a@example.com", "b@example.com"], cc: ["c@example.com"], bcc: [], subject: "Hi", body: "Line one\nLine two" };
     expect(plan({ params: { mailto }, sourceMessage: null })).toEqual({

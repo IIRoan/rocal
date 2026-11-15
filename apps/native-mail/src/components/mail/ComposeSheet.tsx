@@ -29,6 +29,10 @@ import {
   hasComposeUserContent,
   hasPlainTextSignatureBlock,
   replacePlainTextSignatureBlock,
+  resolveEncryptionInternalDomain,
+  shouldEncryptOutgoingMail,
+  validateComposeRecipients,
+  parsedAddressesToEmails,
   type ComposeTextFields,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -68,6 +72,7 @@ import { ComposeHeader } from "./ComposeHeader";
 import { ComposeFormatBar } from "./ComposeFormatBar";
 import { ComposeAttachmentList } from "./ComposeAttachmentList";
 import { ComposeIdentitySheet } from "./ComposeIdentitySheet";
+import { ComposeScheduleSheet } from "./ComposeScheduleSheet";
 import {
   useMailSkin,
   type MailSkin,
@@ -81,6 +86,7 @@ interface ComposeSheetProps {
   presentKey: number;
   onClose: () => void;
   onCloseComplete: () => void;
+  onRestore: (request: ComposeRequest) => void;
 }
 
 /** Compose drawer: new messages, replies, forwards, and drafts. */
@@ -90,6 +96,7 @@ export function ComposeSheet({
   presentKey,
   onClose,
   onCloseComplete,
+  onRestore,
 }: ComposeSheetProps) {
   if (!request) {
     return null;
@@ -102,6 +109,7 @@ export function ComposeSheet({
       presentKey={presentKey}
       onClose={onClose}
       onCloseComplete={onCloseComplete}
+      onRestore={onRestore}
     />
   );
 }
@@ -112,6 +120,7 @@ function ComposeSession({
   presentKey,
   onClose,
   onCloseComplete,
+  onRestore,
 }: Omit<ComposeSheetProps, "request"> & { params: ComposeRequest }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -131,6 +140,7 @@ function ComposeSession({
   const [draftSaveStatus, setDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
   const [bodyFocused, setBodyFocused] = useState(false);
+  const [schedule, setSchedule] = useState({ open: false, key: 0 });
   const subjectInputRef = useRef<TextInputInstance>(null);
   const focusSubject = () => subjectInputRef.current?.focus();
   const bodyEditorRef = useRef<ComposeBodyEditorHandle>(null);
@@ -208,12 +218,24 @@ function ComposeSession({
     signatureOptions,
     settleDraftSave,
     setError,
+    onRestore,
     onSent: () => {
       if (!isMailSendScopeOpen(`compose:${sendSessionId}`)) return;
       closeSendSession();
       setSendSessionId(createMailSendSessionId());
     },
   });
+
+  const maxDelayedSendSeconds = runtime?.mailServerPolicy.maxDelayedSendSeconds ?? 0;
+  const recipientValidation = validateComposeRecipients({ to, cc, bcc, subject });
+  const recipientEmails = parsedAddressesToEmails([
+    ...recipientValidation.to,
+    ...recipientValidation.cc,
+    ...recipientValidation.bcc,
+  ]);
+  const hasExternalRecipients =
+    recipientEmails.length > 0 &&
+    !shouldEncryptOutgoingMail(recipientEmails, resolveEncryptionInternalDomain(runtime?.config.defaultDomain));
 
   const { cancel, dismiss } = useComposeLeave({
     runtime,
@@ -291,7 +313,12 @@ function ComposeSession({
             onAttach={() => {
               void handleAttach();
             }}
-            onSend={send}
+            onSend={() => send()}
+            onSchedule={
+              maxDelayedSendSeconds > 0
+                ? () => setSchedule((current) => ({ open: true, key: current.key + 1 }))
+                : undefined
+            }
           />
         </BottomSheetHeader>
         <View
@@ -395,6 +422,18 @@ function ComposeSession({
           ) : null}
         </View>
       </BottomSheet>
+
+      <ComposeScheduleSheet
+        key={schedule.key}
+        visible={schedule.open}
+        maxDelayedSendSeconds={maxDelayedSendSeconds}
+        hasExternalRecipients={hasExternalRecipients}
+        onSchedule={(sendAt) => {
+          setSchedule((current) => ({ ...current, open: false }));
+          send(sendAt);
+        }}
+        onDismiss={() => setSchedule((current) => ({ ...current, open: false }))}
+      />
 
       <ComposeIdentitySheet
         visible={identity.pickerOpen}

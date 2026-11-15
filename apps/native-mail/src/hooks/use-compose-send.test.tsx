@@ -16,6 +16,7 @@ import type { PendingComposeAttachment } from "../lib/mail/compose-attachments";
 
 const mockSetError = jest.fn();
 const mockOnSent = jest.fn();
+const mockOnRestore = jest.fn();
 const mockUploadBlob = jest.fn(async () => ({ blobId: "plain-blob", size: 3 }));
 
 const mockSendMessage = jest.fn(
@@ -29,9 +30,14 @@ const mockSendMessage = jest.fn(
 jest.mock("react-native", () => ({ Alert: { alert: jest.fn() } }));
 jest.mock("@workspace/native-core/providers/AuthProvider", () => ({}));
 jest.mock("@workspace/native-core/providers/E2eeProvider", () => ({}));
+const mockToast = jest.fn();
+const mockCancelHeldSubmission = jest.fn(async (_session: unknown, _input: unknown): Promise<"canceled" | "sent"> => "canceled");
 jest.mock("@workspace/native-core/providers/ToastProvider", () => ({
-  useToast: () => ({ toast: jest.fn() }),
+  useToast: () => ({ toast: mockToast }),
 }));
+jest.mock("@workspace/native-core/hooks/use-user-timezone", () => ({ useUserTimezone: () => "Europe/Amsterdam" }));
+jest.mock("@workspace/native-core/hooks/use-user-time-format", () => ({ useUserTimeFormat: () => "24h" }));
+jest.mock("./use-mail-list-settings", () => ({ useMailListSettings: () => ({ settings: { undoToastDurationMs: 5000 } }) }));
 jest.mock("@workspace/native-core/hooks/use-recent-contacts", () => ({
   useRecentContacts: () => ({ recordUsage: jest.fn() }),
 }));
@@ -110,9 +116,10 @@ function Composer({
     settleDraftSave: async () => null,
     setError: mockSetError,
     onSent: mockOnSent,
+    onRestore: mockOnRestore,
   });
   return (
-    <button type="button" onClick={compose.send}>
+    <button type="button" onClick={() => compose.send()}>
       Send
     </button>
   );
@@ -163,9 +170,15 @@ describe("native reply send headers", () => {
       doubleClick?: boolean;
       recipient?: string;
       expectSend?: boolean;
+      maxDelayedSendSeconds?: number;
     } = {},
   ) {
-    const runtime = await buildMailRuntime();
+    const base = await buildMailRuntime();
+    const runtime: MailRuntime = {
+      ...base,
+      mailServerPolicy: { ...base.mailServerPolicy, maxDelayedSendSeconds: options.maxDelayedSendSeconds ?? 0 },
+      client: Object.assign(base.client, { cancelHeldSubmission: mockCancelHeldSubmission }),
+    };
     await act(async () =>
       root.render(
         <QueryClientProvider client={queryClient}>
@@ -327,5 +340,43 @@ describe("native reply send headers", () => {
     expect(mockSetError).toHaveBeenCalledWith(
       expect.stringContaining("Could not confirm whether"),
     );
+  });
+
+  it("holds the send for the undo window and restores the form with attachments on undo", async () => {
+    const submitted = await send("reply", { attachments: [attachment], maxDelayedSendSeconds: 600 });
+    expect(submitted?.hold).toEqual({ forSeconds: 5 });
+    const [message, variant, options] = mockToast.mock.calls.at(-1) as [string, string, { duration: number; action: { onPress: () => void } }];
+    expect([message, variant, options.duration]).toEqual(["Sending…", "success", 5000]);
+    await act(async () => {
+      options.action.onPress();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(mockCancelHeldSubmission).toHaveBeenCalledWith(expect.anything(), { submissionId: "submission", copyEmailId: "reply", draftsMailboxId: "drafts" });
+    expect(mockOnRestore).toHaveBeenCalledWith({
+      mode: "reply",
+      messageId: "original",
+      restore: {
+        fields: { to: "peer@solace.test", cc: "", bcc: "", subject: "Re: Plans", body: "My reply" },
+        attachments: [attachment],
+        draftId: "reply",
+      },
+    });
+  });
+
+  it("says when it is too late to undo", async () => {
+    mockCancelHeldSubmission.mockResolvedValueOnce("sent");
+    await send(undefined, { maxDelayedSendSeconds: 600 });
+    const options = mockToast.mock.calls.at(-1)?.[2] as { action: { onPress: () => void } };
+    await act(async () => {
+      options.action.onPress();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(mockToast).toHaveBeenLastCalledWith("Too late to undo. The message was sent.", "info");
+    expect(mockOnRestore).not.toHaveBeenCalled();
+  });
+
+  it("sends at once without a hold when the server can't delay mail", async () => {
+    const submitted = await send(undefined);
+    expect(submitted?.hold).toBeUndefined();
   });
 });

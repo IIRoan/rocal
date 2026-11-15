@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   addAttachmentReminderKeyword,
+  UNDO_SEND_SECONDS_OPTIONS,
   type MailSignaturePosition,
 } from "@workspace/calendar-core";
 import { SettingsPage } from "@workspace/native-core/components/settings/SettingsPage";
@@ -74,6 +75,24 @@ export function ComposeSettingsContent() {
               value={settings.stripImageMetadata}
               onValueChange={(value) => updateSettings({ stripImageMetadata: value })}
             />
+          </SheetGroup>
+        </SheetSection>
+
+        <SheetSection
+          title="Undo send"
+          footer="How long a sent message waits so you can undo it. Mail sends at once when the server can't hold it."
+        >
+          <SheetGroup>
+            {UNDO_SEND_SECONDS_OPTIONS.map((option) => (
+              <SheetItem
+                key={option.value}
+                label={option.label}
+                checked={settings.undoSendSeconds === option.value}
+                onPress={() => updateSettings({ undoSendSeconds: option.value })}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: settings.undoSendSeconds === option.value }}
+              />
+            ))}
           </SheetGroup>
         </SheetSection>
 

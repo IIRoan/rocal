@@ -37,6 +37,12 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
     location: COMPOSING,
     keywords: "image metadata exif gps camera",
   },
+  {
+    pageId: "composing",
+    label: "Undo send",
+    location: `${COMPOSING} · Undo send`,
+    keywords: "cancel unsend delay recall",
+  },
   { pageId: "composing", label: "Signature separator", location: COMPOSING },
   {
     pageId: "composing",

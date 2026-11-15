@@ -182,6 +182,7 @@ function MailThreadList({ controller }: { controller: MailListController }) {
     decryptedPreviews,
     timeFormat,
     timezone,
+    scheduledSendAtById,
     listSettings,
     threadRows,
     listExtraData,
@@ -213,6 +214,7 @@ function MailThreadList({ controller }: { controller: MailListController }) {
         identities={identities}
         timeFormat={timeFormat}
         timezone={timezone}
+        scheduledSendAt={scheduledSendAtById.get(item.latestMessage.id)}
         density={listSettings.density}
         showLabelChips={listSettings.showLabelChipsInList}
         threadExpandable={listSettings.threadExpandInList}

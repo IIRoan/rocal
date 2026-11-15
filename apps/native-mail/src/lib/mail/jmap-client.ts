@@ -53,6 +53,9 @@ import {
   vacationResponseAccountId,
   VACATION_RESPONSE_USING,
   type VacationResponse,
+  cancelHeldJmapSubmission,
+  listScheduledJmapSends,
+  type ScheduledMailSend,
   type VacationResponseUpdate,
 } from "@workspace/calendar-core";
 import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
@@ -1160,6 +1163,31 @@ export class StalwartJmapClient {
           log.warn("Sent mail cleanup failed", sanitizeContext({ error }));
         },
       });
+    });
+  }
+
+  async cancelHeldSubmission(
+    session: JmapSession,
+    input: { submissionId: string; copyEmailId: string; draftsMailboxId: string },
+  ): Promise<"canceled" | "sent"> {
+    const mailAccountId = this.requirePrimaryAccountId(session);
+    return cancelHeldJmapSubmission({
+      ...input,
+      mailAccountId,
+      submissionAccountId: getSubmissionAccountId(session, mailAccountId),
+      request: (using, calls) => this.call(session, using, calls),
+      onMoveError: (error) => {
+        log.warn("Canceled send move to Drafts failed", sanitizeContext({ error }));
+      },
+    });
+  }
+
+  async listScheduledSends(session: JmapSession): Promise<ScheduledMailSend[]> {
+    const mailAccountId = this.requirePrimaryAccountId(session);
+    return listScheduledJmapSends({
+      mailAccountId,
+      submissionAccountId: getSubmissionAccountId(session, mailAccountId),
+      request: (using, calls) => this.call(session, using, calls),
     });
   }
 

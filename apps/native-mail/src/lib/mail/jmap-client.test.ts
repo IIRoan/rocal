@@ -248,6 +248,25 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     });
   }
 
+  it("cancels a held submission, then moves its sealed copy to Drafts, and lists scheduled sends", async () => {
+    const fetcher = jest
+      .fn(async (_url: string, _init?: RequestInit) => jsonOk({ methodResponses: [] }))
+      .mockResolvedValueOnce(jsonOk({ methodResponses: [["EmailSubmission/set", { updated: { sub1: null } }, "c1"]] }))
+      .mockResolvedValueOnce(jsonOk({ methodResponses: [["Email/set", { updated: { copy1: null } }, "c1"]] }))
+      .mockResolvedValueOnce(jsonOk({ methodResponses: [["EmailSubmission/query", { ids: [] }, "q"], ["EmailSubmission/get", { list: [] }, "g"]] }));
+    const client = createClient(fetcher);
+    await expect(client.cancelHeldSubmission(session, { submissionId: "sub1", copyEmailId: "copy1", draftsMailboxId: "drafts" })).resolves.toBe("canceled");
+    await expect(client.listScheduledSends(session)).resolves.toEqual([]);
+    const cancel = parseJmapRequest(fetcher.mock.calls[0][1]);
+    expect(cancel.using).toContain("urn:ietf:params:jmap:submission");
+    expect(cancel.methodCalls[0]).toEqual(["EmailSubmission/set", { accountId: "acc1", update: { sub1: { undoStatus: "canceled" } } }, "c1"]);
+    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      update: { copy1: { mailboxIds: { drafts: true }, keywords: { $draft: true, $seen: true } } },
+    });
+    expect(parseJmapRequest(fetcher.mock.calls[2][1]).methodCalls[0][1]).toEqual({ accountId: "acc1", filter: { undoStatus: "pending" }, limit: 100 });
+  });
+
   it("reads and saves the auto-reply with the vacation capability", async () => {
     const fetcher = jest
       .fn(async (_url: string, _init?: RequestInit) => jsonOk({ methodResponses: [] }))

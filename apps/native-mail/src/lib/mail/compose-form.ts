@@ -34,6 +34,8 @@ export const INITIAL_COMPOSE_FORM: ComposeFormState = {
   attachments: [],
 };
 
+const EMPTY_SEED: ComposeTextFields = { to: "", cc: "", bcc: "", subject: "", body: "" };
+
 function withSeed(
   state: ComposeFormState,
   fields: ComposeTextFields,
@@ -59,9 +61,14 @@ export function composeFormReducer(
       return { ...state, showCcBcc: !state.showCcBcc };
     case "seed": {
       const next = { ...state, draftId: action.plan.draftId ?? state.draftId };
-      return action.plan.kind === "decrypt-draft" || action.plan.kind === "decrypt-source"
-        ? { ...next, decrypting: true }
-        : withSeed(next, action.plan.fields);
+      if (action.plan.kind === "decrypt-draft" || action.plan.kind === "decrypt-source") {
+        return { ...next, decrypting: true };
+      }
+      const seeded = withSeed(next, action.plan.fields);
+      // A restored send counts as edited, so the next autosave replaces its sealed copy.
+      return action.plan.restoredAttachments
+        ? { ...seeded, seed: EMPTY_SEED, attachments: action.plan.restoredAttachments }
+        : seeded;
     }
     case "decrypted": {
       const next = { ...state, decrypting: false };

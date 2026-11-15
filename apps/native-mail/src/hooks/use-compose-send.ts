@@ -15,8 +15,12 @@ import {
   uploadPlaintextMailAttachments,
   shouldWarnAboutMissingAttachment,
   validateComposeRecipients,
+  resolveEncryptionInternalDomain,
+  resolveMailSendHold,
+  shouldEncryptOutgoingMail,
   type MailComposeSettings,
 } from "@workspace/calendar-core";
+import { useHeldSendToast } from "./use-held-send-toast";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import { useRecentContacts } from "@workspace/native-core/hooks/use-recent-contacts";
 import { extractRecentContactEntries } from "@workspace/native-core/lib/record-recent-contacts";
@@ -26,7 +30,7 @@ import { validateComposeInput } from "../lib/mail/mail-helpers";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
 import { resolveOutgoingMessageBody } from "../lib/mail/outgoing-message-crypto";
 import type { JmapEmailMessage, JmapIdentity } from "../lib/mail/types";
-import type { ComposeMode } from "../lib/mail/compose-request";
+import type { ComposeMode, ComposeRequest } from "../lib/mail/compose-request";
 import {
   useSendMessage,
   type resolveComposeContext,
@@ -46,6 +50,8 @@ type ComposeSendInput = {
   settleDraftSave: () => Promise<string | null>;
   setError: (message: string | null) => void;
   onSent: () => void;
+  /** Reopens compose after an undone send. */
+  onRestore: (request: ComposeRequest) => void;
 };
 
 export function useComposeSend({
@@ -62,10 +68,12 @@ export function useComposeSend({
   settleDraftSave,
   setError,
   onSent,
+  onRestore,
 }: ComposeSendInput) {
   const { toast } = useToast();
   const { recordUsage } = useRecentContacts();
   const sendMessage = useSendMessage(runtime);
+  const announceHeldSend = useHeldSendToast(runtime, onRestore);
   const preparingRef = useRef(false);
   const [preparing, setPreparing] = useState(false);
   const { to, cc, bcc, subject, body, attachments } = form;
@@ -75,7 +83,7 @@ export function useComposeSend({
       : null;
 
   const reportSendFailure = (err: unknown) => setError(getErrorMessage(err, "Failed to send message"));
-  const sendNow = async () => {
+  const sendNow = async (sendAt?: string) => {
     if (preparingRef.current) return;
     preparingRef.current = true;
     setPreparing(true);
@@ -103,6 +111,21 @@ export function useComposeSend({
       if (!runtime) {
         throw new Error("Your mailbox is not ready to send messages yet.");
       }
+      const { hold, error: holdError } = resolveMailSendHold({
+        sendAt,
+        undoSendSeconds: settings.undoSendSeconds,
+        policy: runtime.mailServerPolicy,
+        hasExternalRecipients: !shouldEncryptOutgoingMail(
+          allRecipients,
+          resolveEncryptionInternalDomain(runtime.config.defaultDomain),
+        ),
+        now: Date.now(),
+      });
+      if (holdError) throw new Error(holdError);
+      const snapshot = {
+        fields: { to, cc, bcc, subject, body },
+        attachments,
+      };
       const sizeError = getOutgoingAttachmentsTotalSizeError(
         attachments.map((pending) => pending.size),
         runtime.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
@@ -178,8 +201,9 @@ export function useComposeSend({
           sentCopyCiphertext,
           inReplyTo: replyContext?.inReplyTo,
           references: replyContext?.references,
+          hold,
         })
-        .then(() => {
+        .then((receipt) => {
           const recipientValidation = validateComposeRecipients({
             to,
             cc,
@@ -200,7 +224,20 @@ export function useComposeSend({
           if (entries.length > 0) {
             recordUsage(entries, "mail");
           }
-          toast(encrypted ? "Encrypted message sent" : "Message sent");
+          const sentMessage = encrypted ? "Encrypted message sent" : "Message sent";
+          if (hold && receipt.emailId) {
+            announceHeldSend({
+              hold,
+              receipt,
+              reopen: {
+                mode: mode === "draft" ? undefined : mode,
+                messageId: mode === "draft" ? undefined : sourceMessage?.id,
+                restore: { ...snapshot, draftId: receipt.emailId },
+              },
+            });
+          } else {
+            toast(sentMessage);
+          }
           if (isMailSendScopeOpen(sendScope)) onSent();
         });
     };
@@ -212,7 +249,7 @@ export function useComposeSend({
       });
   };
 
-  const handleSend = () => {
+  const handleSend = (sendAt?: string) => {
     setError(null);
     const validation = validateComposeInput({ to, cc, bcc, subject });
     const firstError =
@@ -237,12 +274,12 @@ export function useComposeSend({
         `Your message mentions “${missingAttachmentKeyword}” but no files are attached.`,
         [
           { text: "Go back", style: "cancel" },
-          { text: "Send anyway", onPress: () => void sendNow().catch(reportSendFailure) },
+          { text: "Send anyway", onPress: () => void sendNow(sendAt).catch(reportSendFailure) },
         ],
       );
       return;
     }
-    void sendNow().catch(reportSendFailure);
+    void sendNow(sendAt).catch(reportSendFailure);
   };
 
   const canSend =

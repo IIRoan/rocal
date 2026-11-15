@@ -26,6 +26,7 @@ import { useMailBulkActions } from "./use-mail-bulk-actions";
 import { useMailListSearch } from "./use-mail-list-search";
 import { useMailListSelection } from "./use-mail-list-selection";
 import { useMailListSettings } from "./use-mail-list-settings";
+import { useScheduledMailSends } from "./use-scheduled-mail-sends";
 import { useMailRowHandlers } from "./use-mail-row-handlers";
 import { useMailSwipeMove } from "./use-mail-swipe-move";
 import { useMailUndoToast } from "./use-mail-undo-toast";
@@ -51,6 +52,8 @@ export function useMailListController() {
   const { hiddenIds } = useHiddenMailboxIds();
   const { settings: listSettings } = useMailListSettings();
 
+  const scheduledSends = useScheduledMailSends().sends;
+  const scheduledSendAtById = new Map(scheduledSends.map((send) => [send.emailId, send.sendAt]));
   const account = useMailAccountState();
   const { runtime, provisioned } = account;
   const { selectedMailboxId, setSelectedMailboxId } = useMailSelection();
@@ -201,6 +204,7 @@ export function useMailListController() {
     selectedKey: Array.from(selection.selectedIds).sort().join(","),
     previewKey: Object.keys(list.decryptedPreviews).sort().join(","),
     listSettings,
+    scheduledKey: scheduledSends.map((send) => send.emailId).join(","),
   };
 
   return {
@@ -246,6 +250,7 @@ export function useMailListController() {
     identities: runtime?.identities ?? NO_IDENTITIES,
     timeFormat,
     timezone,
+    scheduledSendAtById,
     listSettings,
     primaryMessageIds: list.primaryMessageIds,
     selectedIds: selection.selectedIds,

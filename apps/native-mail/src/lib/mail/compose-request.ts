@@ -1,4 +1,5 @@
-import type { MailtoDraft } from "@workspace/calendar-core";
+import type { ComposeTextFields, MailtoDraft } from "@workspace/calendar-core";
+import type { PendingComposeAttachment } from "./compose-attachments";
 
 export type ComposeMode = "reply" | "reply-all" | "forward" | "draft";
 
@@ -9,4 +10,6 @@ export interface ComposeRequest {
   to?: string;
   toName?: string;
   mailto?: MailtoDraft;
+  /** Reopens an undone send from its in-memory form; `draftId` is the sealed copy moved back to Drafts. */
+  restore?: { fields: ComposeTextFields; attachments: PendingComposeAttachment[]; draftId: string };
 }

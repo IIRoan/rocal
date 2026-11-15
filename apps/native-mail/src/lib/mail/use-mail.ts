@@ -29,6 +29,7 @@ import {
   SIMPLELOGIN_DONE_KEYWORD,
   type JmapAttachmentInput,
   type JmapPgpMimeCiphertext,
+  type MailSendHold,
   type MailListFilters,
   type MailSearchFieldValues,
   type MailUnsubscribeTarget,
@@ -721,6 +722,7 @@ export interface ComposeMessageInput {
   sentCopyCiphertext: JmapPgpMimeCiphertext | null;
   inReplyTo?: string[];
   references?: string[];
+  hold?: MailSendHold;
 }
 
 /** Identity plus drafts/sent mailboxes for sending, or `null` when the runtime is not ready or has no usable identity. */
@@ -962,6 +964,7 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
         sentCopyCiphertext: input.sentCopyCiphertext,
         inReplyTo: input.inReplyTo,
         references: input.references,
+        hold: input.hold,
       });
     },
     onSuccess: (_data, variables) => {

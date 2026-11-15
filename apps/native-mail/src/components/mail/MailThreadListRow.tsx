@@ -41,6 +41,7 @@ interface MailThreadListRowProps {
   identities: JmapIdentity[];
   timeFormat: TimeFormat;
   timezone?: string;
+  scheduledSendAt?: string;
   density: ListDensity;
   showLabelChips: boolean;
   threadExpandable: boolean;
@@ -62,6 +63,7 @@ function MailThreadListRowComponent({
   identities,
   timeFormat,
   timezone,
+  scheduledSendAt,
   density,
   showLabelChips,
   threadExpandable,
@@ -106,6 +108,7 @@ function MailThreadListRowComponent({
         selected={selected}
         timeFormat={timeFormat}
         timezone={timezone}
+        scheduledSendAt={scheduledSendAt}
         density={density}
         showLabelChips={showLabelChips}
         threadExpandable={threadExpandable}
