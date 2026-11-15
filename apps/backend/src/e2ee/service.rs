@@ -81,18 +81,39 @@ fn required(value: &str, message: &str, field: &str) -> Result<String, AppError>
     Ok(value.to_owned())
 }
 
-/// The account and search keys wrapped for a device or a password, and their key version.
+/// A device's server copy of its wrapped keys: both or neither, and `""` in both when the device keeps them only on itself.
+fn device_wrapped_keys(
+    account: Option<&str>,
+    search: Option<&str>,
+) -> Result<(String, String), AppError> {
+    match (account, search) {
+        (None, None) => Ok((String::new(), String::new())),
+        (account, search) => Ok((
+            required(
+                account.unwrap_or_default(),
+                "Wrapped account key is required",
+                "wrappedAccountKey",
+            )?,
+            required(
+                search.unwrap_or_default(),
+                "Wrapped search key is required",
+                "wrappedSearchKey",
+            )?,
+        )),
+    }
+}
+
+/// The account and search keys wrapped for a password, and their key version.
 fn wrapped_keys(
     account: &str,
     search: &str,
     key_version: Option<i32>,
 ) -> Result<(String, String, i32), AppError> {
-    let account = required(
-        account,
-        "Wrapped account key is required",
-        "wrappedAccountKey",
-    )?;
-    let search = required(search, "Wrapped search key is required", "wrappedSearchKey")?;
+    let (account, search) = device_wrapped_keys(Some(account), Some(search))?;
+    Ok((account, search, self::key_version(key_version)?))
+}
+
+fn key_version(key_version: Option<i32>) -> Result<i32, AppError> {
     let key_version = key_version.unwrap_or(1);
     if key_version < 1 {
         return Err(AppError::field(
@@ -100,7 +121,7 @@ fn wrapped_keys(
             "keyVersion",
         ));
     }
-    Ok((account, search, key_version))
+    Ok(key_version)
 }
 
 /// The envelope's KDF parameters, checked per algorithm; the request schema already bounds memory and lanes.
@@ -162,11 +183,11 @@ pub async fn register_device(
 ) -> Result<EncryptionDevice, AppError> {
     let device_id = required(&request.device_id, "Device ID is required", "deviceId")?;
     let public_key = required(&request.public_key, "Public key is required", "publicKey")?;
-    let (wrapped_account_key, wrapped_search_key, key_version) = wrapped_keys(
-        &request.wrapped_account_key,
-        &request.wrapped_search_key,
-        request.key_version,
+    let (wrapped_account_key, wrapped_search_key) = device_wrapped_keys(
+        request.wrapped_account_key.as_deref(),
+        request.wrapped_search_key.as_deref(),
     )?;
+    let key_version = key_version(request.key_version)?;
     let keys = DeviceKeys {
         // Older clients still send a label such as "iPhone"; nothing shows it, so it is not kept.
         device_label: None,
@@ -469,6 +490,28 @@ mod tests {
             ),
         ] {
             let error = field_of(password_keys(request));
+            assert!(error.contains(field), "{field}: {error}");
+        }
+    }
+
+    #[test]
+    fn device_keys_are_both_or_neither() {
+        assert_eq!(
+            device_wrapped_keys(None, None).expect("no copy"),
+            (String::new(), String::new())
+        );
+        assert_eq!(
+            device_wrapped_keys(Some(" a "), Some("b")).expect("copy"),
+            ("a".to_owned(), "b".to_owned())
+        );
+        for (account, search, field) in [
+            (Some("a"), None, "wrappedSearchKey"),
+            (None, Some("b"), "wrappedAccountKey"),
+        ] {
+            let error = format!(
+                "{:?}",
+                device_wrapped_keys(account, search).expect_err("half a copy")
+            );
             assert!(error.contains(field), "{field}: {error}");
         }
     }

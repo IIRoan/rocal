@@ -26,10 +26,19 @@ fn device(device_id: &str) -> RegisterDeviceRequest {
         device_label: Some("Work laptop".into()),
         public_key: blob(550),
         public_key_algorithm: None,
-        wrapped_account_key: blob(512),
-        wrapped_search_key: blob(512),
+        wrapped_account_key: Some(blob(512)),
+        wrapped_search_key: Some(blob(512)),
         wrap_algorithm: None,
         key_version: None,
+    }
+}
+
+/// A registration as current clients send it: the wrapped keys stay on the device.
+fn keyless_device(device_id: &str) -> RegisterDeviceRequest {
+    RegisterDeviceRequest {
+        wrapped_account_key: None,
+        wrapped_search_key: None,
+        ..device(device_id)
     }
 }
 
@@ -217,8 +226,8 @@ async fn device_key_material_is_stored_byte_for_byte() {
         ),
         (
             &body.public_key,
-            &body.wrapped_account_key,
-            &body.wrapped_search_key
+            body.wrapped_account_key.as_ref().expect("account key"),
+            body.wrapped_search_key.as_ref().expect("search key")
         )
     );
     assert_eq!(stored.key_version, 7);
@@ -228,8 +237,8 @@ async fn device_key_material_is_stored_byte_for_byte() {
             None,
             body.public_key.clone(),
             "RSA-OAEP-256".into(),
-            body.wrapped_account_key.clone(),
-            body.wrapped_search_key.clone(),
+            body.wrapped_account_key.clone().expect("account key"),
+            body.wrapped_search_key.clone().expect("search key"),
             "RSA-OAEP-256".into(),
             7
         )
@@ -261,8 +270,8 @@ async fn device_registration_trims_values_and_applies_defaults() {
             device_label: Some("\u{2028}  ".into()),
             public_key: "\n public-key \r".into(),
             public_key_algorithm: Some("   ".into()),
-            wrapped_account_key: "\t wrapped-account ".into(),
-            wrapped_search_key: " wrapped-search\u{feff}".into(),
+            wrapped_account_key: Some("\t wrapped-account ".into()),
+            wrapped_search_key: Some(" wrapped-search\u{feff}".into()),
             wrap_algorithm: Some(" RSA-OAEP-512 ".into()),
             key_version: None,
         },
@@ -349,6 +358,49 @@ async fn re_registering_a_device_updates_it_in_place() {
         .await,
         1
     );
+}
+
+#[tokio::test]
+async fn a_device_registers_without_a_server_copy_of_its_keys() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let body = keyless_device("phone");
+    let request = json_body(&body);
+    assert!(
+        request.get("wrappedAccountKey").is_none() && request.get("wrappedSearchKey").is_none()
+    );
+
+    let stored = register(&mut user, &body).await;
+    assert_eq!(
+        (
+            stored.wrapped_account_key.as_str(),
+            stored.wrapped_search_key.as_str()
+        ),
+        ("", "")
+    );
+    let row = device_row(&app, &user, "phone").await;
+    assert_eq!((row.3.as_str(), row.4.as_str()), ("", ""));
+    assert_eq!(bootstrap(&mut user).await.devices, [stored]);
+}
+
+#[tokio::test]
+async fn re_registering_without_keys_keeps_no_copy() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let first = register(&mut user, &device("tablet")).await;
+    assert!(!first.wrapped_account_key.is_empty());
+
+    let second = register(&mut user, &keyless_device("tablet")).await;
+    assert_eq!(second.id, first.id);
+    assert_eq!(
+        (
+            second.wrapped_account_key.as_str(),
+            second.wrapped_search_key.as_str()
+        ),
+        ("", "")
+    );
+    let row = device_row(&app, &user, "tablet").await;
+    assert_eq!((row.3.as_str(), row.4.as_str()), ("", ""));
 }
 
 #[tokio::test]
@@ -470,15 +522,7 @@ async fn device_fields_are_validated() {
         .iter()
         .map(|issue| &issue["path"])
         .collect();
-    assert_eq!(
-        paths,
-        [
-            "deviceId",
-            "publicKey",
-            "wrappedAccountKey",
-            "wrappedSearchKey"
-        ]
-    );
+    assert_eq!(paths, ["deviceId", "publicKey"]);
     expect_unknown_field(
         &user
             .put("/api/e2ee/device", with("unexpected", json!(true)))
@@ -504,6 +548,22 @@ async fn device_fields_are_validated() {
             message,
             field,
         );
+    }
+    for (sent, missing, message) in [
+        (
+            "wrappedAccountKey",
+            "wrappedSearchKey",
+            "Wrapped search key is required",
+        ),
+        (
+            "wrappedSearchKey",
+            "wrappedAccountKey",
+            "Wrapped account key is required",
+        ),
+    ] {
+        let mut half = json_body(&keyless_device("half"));
+        half[sent] = json!(blob(512));
+        expect_field_error(&user.put("/api/e2ee/device", half).await, message, missing);
     }
     assert_eq!(
         count(

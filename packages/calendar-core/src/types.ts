@@ -571,8 +571,8 @@ export interface UpsertE2eeDeviceRequest {
   deviceLabel?: string;
   publicKey: string;
   publicKeyAlgorithm?: string;
-  wrappedAccountKey: string;
-  wrappedSearchKey: string;
+  wrappedAccountKey?: string;
+  wrappedSearchKey?: string;
   wrapAlgorithm?: string;
   keyVersion?: number;
 }

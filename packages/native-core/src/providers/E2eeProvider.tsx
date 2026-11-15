@@ -178,18 +178,20 @@ export function E2eeProvider({
         const { existingDevice, privateKeyJwk, envelopeSalt } =
           await readStoredDevice(bootstrapData);
 
-        // A stored key that no longer opens counts as no key, so the envelope decides; its server row goes.
+        // A stored key that no longer opens counts as no key, so the envelope decides; its server row goes once an envelope can stand in.
         const deviceKeys =
           existingDevice && privateKeyJwk
-            ? await unwrapStoredDeviceKeys(e2ee, privateKeyJwk, existingDevice).catch(
+            ? await unwrapStoredDeviceKeys(e2ee, privateKeyJwk, existingDevice.deviceId).catch(
                 (error: unknown) => {
                   log.warn("Stored E2EE device key no longer opens", {
                     userId,
                     errorName: error instanceof Error ? error.name : typeof error,
                   });
-                  void calendarApiService
-                    .deleteE2eeDevice(existingDevice.deviceId)
-                    .catch(() => undefined);
+                  if (bootstrapData.passwordEnvelope) {
+                    void calendarApiService
+                      .deleteE2eeDevice(existingDevice.deviceId)
+                      .catch(() => undefined);
+                  }
                   return null;
                 },
               )

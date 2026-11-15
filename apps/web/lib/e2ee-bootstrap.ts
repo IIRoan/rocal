@@ -136,6 +136,7 @@ async function activateFromRemote(
   return createAttempt(true, bootstrap);
 }
 
+/** The wrapped keys stay in this browser only; the server keeps no copy a key could be swapped into. */
 async function uploadDevice(
   localRecord: StoredE2eeDeviceRecord,
 ): Promise<E2eeDeviceRecord> {
@@ -143,8 +144,6 @@ async function uploadDevice(
     deviceId: localRecord.deviceId,
     publicKey: localRecord.publicKey,
     publicKeyAlgorithm: "RSA-OAEP-256",
-    wrappedAccountKey: localRecord.wrappedAccountKey,
-    wrappedSearchKey: localRecord.wrappedSearchKey,
     wrapAlgorithm: localRecord.wrapAlgorithm,
     keyVersion: localRecord.keyVersion,
   });

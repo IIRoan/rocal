@@ -428,6 +428,12 @@ describe("e2ee bootstrap guards", () => {
     expect(mockUpsertDevice).toHaveBeenCalledWith(
       expect.not.objectContaining({ deviceLabel: expect.anything() }),
     );
+    const registered = mockUpsertDevice.mock.calls[0]?.[0];
+    expect(registered).not.toHaveProperty("wrappedAccountKey");
+    expect(registered).not.toHaveProperty("wrappedSearchKey");
+    expect(mockPutStoredE2eeDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ wrappedAccountKey: "wrapped-key", wrappedSearchKey: "wrapped-key" }),
+    );
     expect(mockClearPendingAuthPassword).toHaveBeenCalled();
   });
 

@@ -56,7 +56,9 @@ pub struct EncryptionDevice {
     pub device_label: Option<String>,
     pub public_key: String,
     pub public_key_algorithm: String,
+    /// Empty when the device keeps its wrapped keys only on itself.
     pub wrapped_account_key: String,
+    /// Empty when the device keeps its wrapped keys only on itself.
     pub wrapped_search_key: String,
     pub wrap_algorithm: String,
     pub key_version: i32,
@@ -178,8 +180,13 @@ pub struct RegisterDeviceRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub public_key_algorithm: Option<String>,
-    pub wrapped_account_key: String,
-    pub wrapped_search_key: String,
+    /// Both or neither; current clients keep their wrapped keys only on the device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub wrapped_account_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub wrapped_search_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub wrap_algorithm: Option<String>,

@@ -175,12 +175,8 @@ export async function registerDeviceForSession({
         "Content-Type": "application/json",
         ...getAuthHeaders(),
       },
-      body: JSON.stringify({
-        deviceId,
-        publicKey,
-        wrappedAccountKey,
-        wrappedSearchKey,
-      }),
+      // The wrapped keys stay on this device; the server keeps no copy a key could be swapped into.
+      body: JSON.stringify({ deviceId, publicKey }),
     });
 
     if (!deviceResponse.ok) {
@@ -192,12 +188,13 @@ export async function registerDeviceForSession({
 
   // The old device's salt must never vouch for the new key, even if the app dies between writes.
   await rememberDeviceEnvelopeSalt(null);
+  // The only wrapped copy is written before the key pair it belongs to, so a kill between writes never strands a key.
+  await rememberOwnDeviceKeys({ deviceId, wrappedAccountKey, wrappedSearchKey });
   await SecureStore.setItemAsync(SECURE_STORE_KEYS.E2EE_DEVICE_ID, deviceId);
   await writeChunkedSecureValue(
     SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
     exportedPrivateKeyJson,
   );
-  await rememberOwnDeviceKeys({ deviceId, wrappedAccountKey, wrappedSearchKey });
   if (envelopeSalt) {
     await rememberDeviceEnvelopeSalt(envelopeSalt);
   }
@@ -258,12 +255,16 @@ async function readOwnDeviceKeys(deviceId: string): Promise<OwnDeviceKeys | null
   }
 }
 
-/** Opens this device's own wrapped keys; installs from before that copy existed trust the server's once and keep it. */
+/** Opens this device's own wrapped keys, never the server's: anyone can wrap a key to this device's public key. */
 export async function unwrapStoredDeviceKeys(
   e2ee: E2eeModule,
   privateKeyJwk: string,
-  device: OwnDeviceKeys,
+  deviceId: string,
 ): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }> {
+  const own = await readOwnDeviceKeys(deviceId);
+  if (!own) {
+    throw new Error("This device keeps no wrapped keys of its own.");
+  }
   const crypto = createNativeCryptoProvider();
   if (!crypto) {
     throw new Error("Native crypto is unavailable for E2EE unwrap.");
@@ -277,28 +278,8 @@ export async function unwrapStoredDeviceKeys(
     ["unwrapKey"],
   );
 
-  const own = await readOwnDeviceKeys(device.deviceId);
-  const wrapped = own ?? device;
-  const accountKey = await e2ee.unwrapAccountKey(
-    wrapped.wrappedAccountKey,
-    privateKey,
-  );
-  const blindIndexKey = await e2ee.unwrapBlindIndexKey(
-    wrapped.wrappedSearchKey,
-    privateKey,
-  );
-  if (!own) {
-    // A failed write only means the next start trusts the server's copy again, never a lost key.
-    await rememberOwnDeviceKeys({
-      deviceId: device.deviceId,
-      wrappedAccountKey: device.wrappedAccountKey,
-      wrappedSearchKey: device.wrappedSearchKey,
-    }).catch((error: unknown) => {
-      log.warn("Failed to keep this device's wrapped keys", {
-        errorName: error instanceof Error ? error.name : typeof error,
-      });
-    });
-  }
+  const accountKey = await e2ee.unwrapAccountKey(own.wrappedAccountKey, privateKey);
+  const blindIndexKey = await e2ee.unwrapBlindIndexKey(own.wrappedSearchKey, privateKey);
   return { accountKey, blindIndexKey };
 }
 

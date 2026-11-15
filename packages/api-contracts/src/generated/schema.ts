@@ -1562,7 +1562,9 @@ export interface components {
             updatedAt: components["schemas"]["Timestamp"];
             userId: components["schemas"]["UserId"];
             wrapAlgorithm: string;
+            /** @description Empty when the device keeps its wrapped keys only on itself. */
             wrappedAccountKey: string;
+            /** @description Empty when the device keeps its wrapped keys only on itself. */
             wrappedSearchKey: string;
         };
         EncryptionEvent: {
@@ -2397,8 +2399,9 @@ export interface components {
             publicKey: string;
             publicKeyAlgorithm?: string;
             wrapAlgorithm?: string;
-            wrappedAccountKey: string;
-            wrappedSearchKey: string;
+            /** @description Both or neither; current clients keep their wrapped keys only on the device. */
+            wrappedAccountKey?: string;
+            wrappedSearchKey?: string;
         };
         RegisterPushDeviceRequest: {
             bundleId: string;

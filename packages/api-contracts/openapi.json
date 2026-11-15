@@ -4104,10 +4104,12 @@
             "type": "string"
           },
           "wrappedAccountKey": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty when the device keeps its wrapped keys only on itself."
           },
           "wrappedSearchKey": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty when the device keeps its wrapped keys only on itself."
           }
         }
       },
@@ -7156,9 +7158,7 @@
         "type": "object",
         "required": [
           "deviceId",
-          "publicKey",
-          "wrappedAccountKey",
-          "wrappedSearchKey"
+          "publicKey"
         ],
         "properties": {
           "deviceId": {
@@ -7181,7 +7181,8 @@
             "type": "string"
           },
           "wrappedAccountKey": {
-            "type": "string"
+            "type": "string",
+            "description": "Both or neither; current clients keep their wrapped keys only on the device."
           },
           "wrappedSearchKey": {
             "type": "string"

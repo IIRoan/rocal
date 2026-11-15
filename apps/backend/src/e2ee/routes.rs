@@ -26,8 +26,8 @@ request_schema!(RegisterDeviceRequest => zod::object([
     ("deviceLabel", zod::string().max(120).optional()),
     ("publicKey", zod::string().min(1).max(32768)),
     ("publicKeyAlgorithm", zod::string().max(64).optional()),
-    ("wrappedAccountKey", zod::string().min(1).max(32768)),
-    ("wrappedSearchKey", zod::string().min(1).max(32768)),
+    ("wrappedAccountKey", zod::string().min(1).max(32768).optional()),
+    ("wrappedSearchKey", zod::string().min(1).max(32768).optional()),
     ("wrapAlgorithm", zod::string().max(64).optional()),
     ("keyVersion", zod::number().int().min(1).max(1000).optional()),
 ]).strict());
