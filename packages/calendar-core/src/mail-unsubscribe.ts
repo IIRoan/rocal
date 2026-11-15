@@ -83,11 +83,19 @@ export function getMailUnsubscribe(
   return targets.length > 0 ? { targets, host: https ? publicHttpsHost(https) : null } : null;
 }
 
+/** The sender's unsubscribe page, offered when the unsubscribe itself failed. */
+export function getMailUnsubscribePage(message: MailUnsubscribeFields & MailSimpleLoginFields): string | null {
+  const page = getMailUnsubscribe(message, { allowOneClick: false, allowMailto: false })?.targets[0];
+  return page?.type === "https" ? page.url : null;
+}
+
 export const MAIL_UNSUBSCRIBE_LABELS = {
   title: "Unsubscribe?",
   action: "Unsubscribe",
   pending: "Unsubscribing…",
   done: "Unsubscribed",
+  failed: "Couldn't unsubscribe. Try again.",
+  openPage: "Open page",
 } as const;
 
 /** Confirm copy for the first target; a look-alike host carries the same warning as a link in mail. */

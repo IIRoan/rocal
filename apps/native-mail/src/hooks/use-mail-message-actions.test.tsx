@@ -19,6 +19,7 @@ jest.mock("react-native", () => ({ Alert: { alert: jest.fn() } }));
 jest.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack, replace: mockReplace }),
 }));
+jest.mock("expo-web-browser", () => ({ openBrowserAsync: jest.fn() }));
 jest.mock("../providers/MailSelectionProvider", () => ({
   useMailSelection: () => ({
     readerOrder: mockReaderOrder,

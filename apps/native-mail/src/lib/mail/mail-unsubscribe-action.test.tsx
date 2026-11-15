@@ -24,7 +24,7 @@ type Run = ReturnType<typeof useMailUnsubscribeAction>["mutateAsync"];
 
 const sendMessage = jest.fn(async () => undefined);
 const setMessageKeyword = jest.fn(async () => undefined);
-const fetchMock = jest.fn<Promise<{ ok: boolean }>, [string, RequestInit]>();
+const fetchMock = jest.fn<Promise<{ ok: boolean; status?: number; type?: string }>, [string, RequestInit]>();
 
 // Only the runtime fields the unsubscribe path reads.
 const runtime = {
@@ -90,9 +90,13 @@ describe("useMailUnsubscribeAction", () => {
     ];
 
   it("posts the RFC 8058 one-click body from the device without credentials", async () => {
-    fetchMock.mockResolvedValue({ ok: true });
-    await act(async () => run(message));
+    fetchMock.mockResolvedValue({ ok: true, status: 200 });
+    let outcome: string | null = null;
+    await act(async () => {
+      outcome = await run(message);
+    });
 
+    expect(outcome).toBe("unsubscribed");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://news.example/u?t=1",
       expect.objectContaining({
@@ -100,10 +104,20 @@ describe("useMailUnsubscribeAction", () => {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: "List-Unsubscribe=One-Click",
         credentials: "omit",
+        redirect: "manual",
       }),
     );
     expect(sendMessage).not.toHaveBeenCalled();
     expect(setMessageKeyword).toHaveBeenCalledWith(runtime.session, "opaque-list-mail", MAIL_UNSUBSCRIBED_KEYWORD, true);
+    expect(cachedKeyword()).toBe(true);
+  });
+
+  it("accepts a redirect answer without following it to an unchecked host", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 307, type: "default" });
+    await act(async () => run(message));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sendMessage).not.toHaveBeenCalled();
     expect(cachedKeyword()).toBe(true);
   });
 
@@ -119,15 +133,29 @@ describe("useMailUnsubscribeAction", () => {
     expect(cachedKeyword()).toBe(true);
   });
 
-  it("rolls the keyword back when every method fails", async () => {
+  it("surfaces a failed mailto send instead of opening the sender's page, and marks nothing", async () => {
     fetchMock.mockRejectedValue(new Error("offline"));
     sendMessage.mockRejectedValueOnce(new Error("refused"));
-    jest.mocked(WebBrowser.openBrowserAsync).mockRejectedValueOnce(new Error("no browser"));
 
     await act(async () => {
-      await expect(run(message)).rejects.toThrow("no browser");
+      await expect(run(message)).rejects.toThrow("refused");
     });
+    expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
     expect(cachedKeyword()).toBeUndefined();
     expect(setMessageKeyword).not.toHaveBeenCalled();
+  });
+
+  it("only opens the sender's page when that is the one way, and leaves the message unmarked", async () => {
+    const pageOnly = { ...message, "header:List-Unsubscribe:asURLs": ["https://news.example/u?t=1"], "header:List-Unsubscribe-Post:asText": null };
+    let outcome: string | null = null;
+    await act(async () => {
+      outcome = await run(pageOnly);
+    });
+
+    expect(outcome).toBe("opened");
+    expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith("https://news.example/u?t=1");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(setMessageKeyword).not.toHaveBeenCalled();
+    expect(cachedKeyword()).toBeUndefined();
   });
 });

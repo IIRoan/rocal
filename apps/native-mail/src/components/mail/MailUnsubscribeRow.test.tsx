@@ -6,7 +6,7 @@ import { Alert } from "react-native";
 import type { JmapEmailMessage } from "../../lib/mail/types";
 import { MailUnsubscribeRow } from "./MailUnsubscribeRow";
 
-type PressableProps = { onPress: () => void; disabled: boolean; children: ReactNode };
+type PressableProps = { onPress: () => void; disabled: boolean; style: { minHeight?: number }; children: ReactNode };
 
 let mockPressable: PressableProps | null = null;
 
@@ -24,6 +24,7 @@ jest.mock("@workspace/native-core/providers/ThemeProvider", () => ({
   useTheme: () => ({ theme: { spacing: { "1": 4 } } }),
 }));
 jest.mock("@workspace/native-core/components/mail/mail-ui", () => ({
+  MAIL_LAYOUT: { hitSize: 44 },
   useMailSkin: () => ({ meta: {}, textTertiary: "" }),
 }));
 
@@ -81,6 +82,11 @@ describe("MailUnsubscribeRow", () => {
     expect(onUnsubscribe).not.toHaveBeenCalled();
     buttons?.find((button) => button.text === "Unsubscribe")?.onPress?.();
     expect(onUnsubscribe).toHaveBeenCalledWith(message);
+  });
+
+  it("keeps a 44pt tap target on the one-line row", () => {
+    renderRow(message);
+    expect(mockPressable?.style.minHeight).toBeGreaterThanOrEqual(44);
   });
 
   it("shows pending and done states without another action", () => {

@@ -24,11 +24,14 @@ const isUntrustedSource = (node: ts.Expression) => {
 /** TanStack Query methods that resolve even when the underlying fetch fails. */
 const NON_REJECTING_METHODS = new Set(["invalidateQueries", "prefetchQuery", "prefetchInfiniteQuery", "refetchQueries", "cancelQueries", "resetQueries"]);
 
-/** True for a top-level `await x.catch(...)` or `return x.catch(...)`, the compiler-friendly form of try/catch. */
+const isMethodCall = (node: ts.Expression | undefined, method: string): node is ts.CallExpression & { expression: ts.PropertyAccessExpression } =>
+  !!node && ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === method;
+
+/** True for a top-level `await x.catch(...)` or `return x.catch(...)`, optionally followed by `.finally(...)`, the compiler-friendly form of try/catch. */
 function awaitsCaughtPromise(statement: ts.Statement) {
   const expression = ts.isExpressionStatement(statement) || ts.isReturnStatement(statement) ? statement.expression : undefined;
   const call = expression && unwrap(expression);
-  return !!call && ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === "catch";
+  return isMethodCall(isMethodCall(call, "finally") ? call.expression.expression : call, "catch");
 }
 
 /** True when the same-file declaration of `name` catches at its top level, so its promise does not reject. */
@@ -129,7 +132,7 @@ export const typescriptRules: Rule[] = [
       }),
     examples: {
       path: "apps/web/hooks/use-sync.ts",
-      bad: ["void syncInbox();", "void SecureStore.deleteItemAsync(key);", "const save = async () => { await put(); };\nvoid save();"],
+      bad: ["void syncInbox();", "void SecureStore.deleteItemAsync(key);", "const save = async () => { await put(); };\nvoid save();", "const save = async () => { await put().finally(() => setBusy(false)); };\nvoid save();"],
       good: [
         "void syncInbox().catch(reportError);",
         "await syncInbox();",
@@ -137,6 +140,7 @@ export const typescriptRules: Rule[] = [
         "void queryClient.invalidateQueries({ queryKey });",
         "const save = useCallback(async () => { try { await put(); } catch { toast.error('Failed'); } }, []);\nvoid save();",
         "const save = async () => { await put().catch(() => toast.error('Failed')); };\nvoid save();",
+        "const save = async () => { await put().catch(() => toast.error('Failed')).finally(() => setBusy(false)); };\nvoid save();",
       ],
     },
   },

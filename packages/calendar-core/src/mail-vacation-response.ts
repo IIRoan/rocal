@@ -1,6 +1,12 @@
+import { addDays } from "date-fns";
 import type { JmapMethodCallLike } from "./mail-server-policy";
 import { toJmapUtcDate } from "./mail-search-filter";
-import { formatCalendarDayKey, resolveTimezone, utcToPickerDate } from "./timezone";
+import {
+  formatCalendarDayKey,
+  parseCalendarDayKey,
+  resolveTimezone,
+  utcToPickerDate,
+} from "./timezone";
 import { z } from "./zod";
 
 export const VACATION_RESPONSE_CAPABILITY = "urn:ietf:params:jmap:vacationresponse";
@@ -76,17 +82,24 @@ export function vacationResponseToForm(
   };
 }
 
+/** A real YYYY-MM-DD day only: a date-time or a day that rolls over (2026-02-30) is null. */
+function parseVacationDay(dayKey: string): Date | null {
+  const day = parseCalendarDayKey(dayKey);
+  return day && formatCalendarDayKey(day) === dayKey ? day : null;
+}
+
 function nextDayKey(dayKey: string): string {
-  const [year, month, day] = dayKey.split("-").map(Number);
-  return formatCalendarDayKey(new Date(year ?? 0, (month ?? 1) - 1, (day ?? 1) + 1));
+  const day = parseVacationDay(dayKey);
+  if (!day) throw new Error("Use dates like 2026-11-14.");
+  return formatCalendarDayKey(addDays(day, 1));
 }
 
 /** The first problem with the form, for an inline message under that field. */
 export function validateVacationForm(form: MailVacationForm): MailVacationFormError | null {
-  if (form.fromDay && !toJmapUtcDate(form.fromDay)) {
+  if (form.fromDay && !parseVacationDay(form.fromDay)) {
     return { field: "fromDay", message: "Use dates like 2026-11-14." };
   }
-  if (form.toDay && !toJmapUtcDate(form.toDay)) {
+  if (form.toDay && !parseVacationDay(form.toDay)) {
     return { field: "toDay", message: "Use dates like 2026-11-14." };
   }
   if (form.fromDay && form.toDay && form.toDay < form.fromDay) {

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import React, { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { clearMailSendAttempts, MAIL_UNSUBSCRIBED_KEYWORD, type MailKeywordEdit } from "@workspace/calendar-core";
+import { toast } from "@workspace/ui/lib/toast";
 import { useMailUnsubscribeAction } from "@/hooks/use-mail-unsubscribe-action";
 import type { ActiveMailboxState } from "@/lib/mail/mail-app-helpers";
 import type { JmapEmailMessage } from "@/lib/mail/types";
@@ -75,7 +76,7 @@ describe("useMailUnsubscribeAction", () => {
     clearMailSendAttempts();
   });
 
-  it("hands the one-click target to the link page by an opaque id, before mailto", async () => {
+  it("hands the one-click target to the link page by an opaque id, before mailto, and marks nothing", async () => {
     await act(async () => run(listMessage(["mailto:leave@news.example", "https://news.example/u?t=1"], true)));
 
     expect(open).toHaveBeenCalledTimes(1);
@@ -84,10 +85,21 @@ describe("useMailUnsubscribeAction", () => {
     expect(String(url)).not.toContain("news.example");
     expect([target, features]).toEqual(["_blank", "noopener,noreferrer"]);
     expect(sendMessage).not.toHaveBeenCalled();
-    expect(setMessageKeyword).toHaveBeenCalledWith(mailbox.session, "opaque-list-mail", MAIL_UNSUBSCRIBED_KEYWORD, true);
+    expect(patchMessageKeyword).not.toHaveBeenCalled();
+    expect(setMessageKeyword).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it("sends the mailto command from the receiving address when one-click is not offered", async () => {
+  it("opens the sender's page without saying or marking it unsubscribed", async () => {
+    await act(async () => run({ ...listMessage(["https://news.example/u"]), to: [{ email: "someone@else.test" }] }));
+
+    expect(open).toHaveBeenCalledWith("https://news.example/u", "_blank", "noopener,noreferrer");
+    expect(patchMessageKeyword).not.toHaveBeenCalled();
+    expect(setMessageKeyword).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("sends the mailto command from the receiving address, then marks it done", async () => {
     await act(async () => run(listMessage(["mailto:leave@news.example?subject=stop", "https://news.example/u"])));
 
     expect(sendMessage).toHaveBeenCalledTimes(1);
@@ -98,27 +110,24 @@ describe("useMailUnsubscribeAction", () => {
       fromEmail: "owner@solace.test",
     });
     expect(open).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith("Unsubscribed", expect.anything());
+    expect(patchMessageKeyword).toHaveBeenCalledWith(expect.objectContaining({ id: "opaque-list-mail" }), MAIL_UNSUBSCRIBED_KEYWORD, true);
     expect(tracked).toEqual([[{ messageId: "opaque-list-mail", keyword: MAIL_UNSUBSCRIBED_KEYWORD, enabled: true }]]);
     expect(setMessageKeyword).toHaveBeenCalledWith(mailbox.session, "opaque-list-mail", MAIL_UNSUBSCRIBED_KEYWORD, true);
   });
 
-  it("falls back to the sender's page when the mailto send fails", async () => {
+  it("shows a failed mailto send and offers the sender's page instead of opening it", async () => {
     sendMessage.mockRejectedValue(new Error("Submission refused"));
     await act(async () => run(listMessage(["mailto:leave@news.example", "https://news.example/u"])));
 
-    expect(open).toHaveBeenCalledWith("https://news.example/u", "_blank", "noopener,noreferrer");
-    expect(patchMessageKeyword).toHaveBeenCalledTimes(1);
-    expect(setMessageKeyword).toHaveBeenCalledTimes(1);
-  });
-
-  it("rolls the keyword back when no method works", async () => {
-    sendMessage.mockRejectedValue(new Error("Submission refused"));
-    await act(async () => run(listMessage(["mailto:leave@news.example"])));
-
-    expect(patchMessageKeyword.mock.calls).toEqual([
-      [expect.objectContaining({ id: "opaque-list-mail" }), MAIL_UNSUBSCRIBED_KEYWORD, true],
-      [expect.objectContaining({ id: "opaque-list-mail" }), MAIL_UNSUBSCRIBED_KEYWORD, false],
-    ]);
+    expect(open).not.toHaveBeenCalled();
+    expect(patchMessageKeyword).not.toHaveBeenCalled();
     expect(setMessageKeyword).not.toHaveBeenCalled();
+    const [text, options] = jest.mocked(toast.error).mock.calls[0] ?? [];
+    expect(text).toBe("Submission refused");
+    const action = (options as { action?: { label: string; onClick: () => void } } | undefined)?.action;
+    expect(action?.label).toBe("Open page");
+    action?.onClick();
+    expect(open).toHaveBeenCalledWith("https://news.example/u", "_blank", "noopener,noreferrer");
   });
 });

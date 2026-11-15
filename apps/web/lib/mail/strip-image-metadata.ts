@@ -3,6 +3,7 @@ import {
   IMAGE_REENCODE_JPEG_QUALITY,
   imageFileNameForType,
   imageMetadataStripFailedNotice,
+  mayStripImageMetadata,
   planImageMetadataStrip,
   type ReencodedImageType,
 } from "@workspace/calendar-core";
@@ -50,6 +51,7 @@ function encodedType(blob: Blob, fallback: ReencodedImageType): ReencodedImageTy
 
 /** Re-encodes a still photo in memory so its location and camera metadata stay on this device; decoding applies its rotation first. */
 export async function stripImageMetadata(file: File): Promise<ImageMetadataStripResult> {
+  if (!mayStripImageMetadata(file.type)) return { file, outcome: "unchanged" };
   const bytes = await file.arrayBuffer().then(
     (buffer) => new Uint8Array(buffer),
     () => null,

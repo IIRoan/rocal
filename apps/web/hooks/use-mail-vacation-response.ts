@@ -1,11 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supportsVacationResponse } from "@workspace/calendar-core";
 import {
-  supportsVacationResponse,
-  type VacationResponse,
-  type VacationResponseUpdate,
-} from "@workspace/calendar-core";
+  saveVacationResponseMutationOptions,
+  vacationResponseQueryOptions,
+} from "@workspace/calendar-client/mail-vacation-response-query-options";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 import type { JmapSession } from "@/lib/mail/types";
@@ -22,30 +22,10 @@ export function useMailVacationResponse(
   const queryKey = mailQueryKeys.vacationResponse(userId);
 
   const query = useQuery({
-    queryKey,
-    queryFn: () => {
-      if (!connection) throw new Error("Mail is not ready yet.");
-      return connection.client.getVacationResponse(connection.session);
-    },
+    ...vacationResponseQueryOptions(queryKey, connection),
     enabled: supported && Boolean(userId),
   });
-
-  const mutation = useMutation({
-    mutationFn: (update: VacationResponseUpdate) => {
-      if (!connection) throw new Error("Mail is not ready yet.");
-      return connection.client.setVacationResponse(connection.session, update);
-    },
-    onMutate: async (update) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<VacationResponse | null>(queryKey);
-      const optimistic: VacationResponse = { id: "singleton", ...update };
-      queryClient.setQueryData<VacationResponse | null>(queryKey, optimistic);
-      return { previous };
-    },
-    onError: (_error, _update, context) =>
-      queryClient.setQueryData<VacationResponse | null>(queryKey, context?.previous ?? null),
-    onSettled: () => queryClient.invalidateQueries({ queryKey }),
-  });
+  const mutation = useMutation(saveVacationResponseMutationOptions(queryKey, connection, queryClient));
 
   return {
     loading: !connection || (supported && query.isPending),

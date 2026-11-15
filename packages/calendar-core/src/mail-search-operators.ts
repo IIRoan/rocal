@@ -20,7 +20,7 @@ export type MailSearchContext = {
 };
 
 export type ParsedMailSearch = {
-  /** Plain words, searched as text. */
+  /** Plain words, searched as text; quoted where needed so they read back as words. */
   text: string;
   filters: MailSearchFilters;
   /** Operators that could not be used, kept as typed so the user can fix them; never searched. */
@@ -123,7 +123,7 @@ export function parseMailSearchQuery(input: string, context: MailSearchContext):
     conditions.push(operator.negated ? { ...condition, negated: true } : condition);
   }
   return {
-    text: parsed.terms.join(" "),
+    text: parsed.terms.map(formatSearchOperatorValue).join(" "),
     filters: mergeMailSearchFilters({ conditions: [] }, { conditions }),
     unresolved: unresolved.join(" "),
     issues,

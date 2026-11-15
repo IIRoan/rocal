@@ -3,12 +3,15 @@
 import React, { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   VACATION_REPLY_SERVER_NOTICE,
   VACATION_REPLY_UNAVAILABLE,
+  VACATION_RESPONSE_CAPABILITY,
   type VacationResponse,
   type VacationResponseUpdate,
 } from "@workspace/calendar-core";
+import type { MailConnection } from "@/hooks/use-mail-vacation-response";
 
 const mockSave = jest.fn(async (_update: VacationResponseUpdate) => undefined);
 const mockVacation = {
@@ -21,9 +24,16 @@ const mockVacation = {
   saving: false,
 };
 
-jest.mock("@/hooks/use-mail-vacation-response", () => ({
-  useMailVacationResponse: () => mockVacation,
-}));
+let mockRealHook = false;
+jest.mock("@/hooks/use-mail-vacation-response", () => {
+  const actual = jest.requireActual<typeof import("@/hooks/use-mail-vacation-response")>(
+    "@/hooks/use-mail-vacation-response",
+  );
+  return {
+    useMailVacationResponse: (...args: Parameters<typeof actual.useMailVacationResponse>) =>
+      mockRealHook ? actual.useMailVacationResponse(...args) : mockVacation,
+  };
+});
 jest.mock("lucide-react", () => new Proxy({}, { get: () => () => null }));
 jest.mock("sonner", () => ({
   toast: Object.assign(jest.fn(), { success: jest.fn(), error: jest.fn() }),
@@ -52,6 +62,15 @@ function button(text: string) {
   return found;
 }
 
+/** TanStack Query notifies observers on a timer, so let a few macrotasks pass. */
+async function flush() {
+  await act(async () => {
+    for (let i = 0; i < 10; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  });
+}
+
 function setValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
   const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   act(() => {
@@ -63,6 +82,7 @@ function setValue(element: HTMLInputElement | HTMLTextAreaElement, value: string
 describe("VacationReplySettingsPanel", () => {
   beforeEach(() => {
     mockSave.mockClear();
+    mockRealHook = false;
     mockVacation.supported = true;
     mockVacation.response = null;
     container = document.createElement("div");
@@ -99,6 +119,37 @@ describe("VacationReplySettingsPanel", () => {
     expect(mockSave).not.toHaveBeenCalled();
     expect(container.querySelector('[role="alert"]')?.textContent).toBe("Write the reply before turning it on.");
     expect(container.querySelector("textarea")?.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("keeps what was typed when the server refuses the save", async () => {
+    mockRealHook = true;
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const connection = {
+      client: {
+        getVacationResponse: async () => null,
+        setVacationResponse: async () => {
+          throw new Error("Field could not be set.");
+        },
+      },
+      session: { capabilities: { [VACATION_RESPONSE_CAPABILITY]: {} } },
+    } as unknown as MailConnection; // Only the fields the auto-reply reads.
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <VacationReplySettingsPanel goBack={() => {}} connection={connection} userId="u1" timezone="Europe/Amsterdam" />
+        </QueryClientProvider>,
+      );
+    });
+    await flush();
+    act(() => container.querySelector<HTMLButtonElement>('button[role="switch"]')?.click());
+    const textarea = container.querySelector("textarea");
+    if (!textarea) throw new Error("No message field");
+    setValue(textarea, "Back on Monday.");
+    act(() => button("Save").click());
+    await flush();
+
+    expect(container.querySelector("textarea")?.value).toBe("Back on Monday.");
+    expect(container.querySelector('button[role="switch"]')?.getAttribute("aria-checked")).toBe("true");
   });
 
   it("explains when the mail server has no auto-reply", () => {

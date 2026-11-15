@@ -25,10 +25,9 @@ import {
   SheetScroll,
   SheetSection,
 } from "@workspace/native-core/components/sheet/SheetSections";
-import { useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
+import { MAIL_LAYOUT, useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 
-const LINE_HIT_SLOP = { top: 8, bottom: 8 };
 const SHEET_SNAP_POINTS = [0.5];
 
 export function MailTrackerRow({ trackers }: { trackers: EmailTrackerSummary }) {
@@ -44,7 +43,6 @@ export function MailTrackerRow({ trackers }: { trackers: EmailTrackerSummary }) 
     <>
       <Pressable
         onPress={() => setOpen(true)}
-        hitSlop={LINE_HIT_SLOP}
         style={styles.line}
         accessibilityRole="button"
         accessibilityLabel={`${notice.label}. Show details`}
@@ -92,6 +90,7 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       alignItems: "center" as const,
       gap: theme.spacing["1"],
       minWidth: 0,
+      minHeight: MAIL_LAYOUT.hitSize,
     },
     modalRoot: {
       flex: 1,

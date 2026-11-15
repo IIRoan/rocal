@@ -676,8 +676,7 @@ export function useMailApp() {
     await fetchThread().catch((error: unknown) => {
       log.warn("Failed to load thread messages", error);
       setRelatedConversationMessages([]);
-    });
-    setIsConversationLoading(false);
+    }).finally(() => setIsConversationLoading(false));
   };
 
   const clearConversationThread = () => {
@@ -1367,8 +1366,7 @@ export function useMailApp() {
     };
     await fetchNextPage().catch((error: unknown) => {
       log.error("Failed to load more messages", error);
-    });
-    setIsLoadingMore(false);
+    }).finally(() => setIsLoadingMore(false));
   };
 
   const handleSignIn = async (passwordOverride?: string) => {
@@ -1522,8 +1520,7 @@ export function useMailApp() {
       toast.error(
         error instanceof Error ? error.message : "Could not open the mailbox.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
   const autoOpenMailbox = useEffectEvent(() => handleSignIn());
@@ -1992,9 +1989,10 @@ export function useMailApp() {
         isReply: Boolean(composeReplyContext),
       });
       toast.error(getErrorMessage(error, "Could not send the message."));
+    }).finally(() => {
+      composeSendInFlightRef.current = false;
+      setIsBusy(false);
     });
-    composeSendInFlightRef.current = false;
-    setIsBusy(false);
   };
 
   const handleDeleteMessage = async (
@@ -2706,8 +2704,7 @@ export function useMailApp() {
       toast.error(
         error instanceof Error ? error.message : "Could not empty the folder.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
   const handleReorderMailboxes = async (reordered: JmapMailbox[]) => {
@@ -2853,8 +2850,7 @@ export function useMailApp() {
           ? error.message
           : "Could not delete the mailbox.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
   const handleBulkDelete = async (
@@ -2892,8 +2888,7 @@ export function useMailApp() {
           ? error.message
           : "Could not delete the messages.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
   const handleBulkMove = async (
@@ -2927,8 +2922,7 @@ export function useMailApp() {
       toast.error(
         error instanceof Error ? error.message : "Could not move the messages.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
   const handleBulkMarkAsUnread = async (messageIds: string[]) => {
@@ -3222,8 +3216,7 @@ export function useMailApp() {
     await refresh().catch((error: unknown) => {
       log.error("Manual refresh failed", error);
       toast.error(getErrorMessage(error, "Could not refresh mail."));
-    });
-    setIsRefreshing(false);
+    }).finally(() => setIsRefreshing(false));
   };
 
   const realtimeAccountId = activeMailbox

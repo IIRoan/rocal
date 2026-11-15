@@ -4,7 +4,7 @@ import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MailTrackerRow } from "./MailTrackerRow";
 
-type PressableProps = { onPress: () => void; accessibilityLabel: string; children: ReactNode };
+type PressableProps = { onPress: () => void; accessibilityLabel: string; style: { minHeight?: number }; children: ReactNode };
 
 let mockPressable: PressableProps | null = null;
 
@@ -23,6 +23,7 @@ jest.mock("@workspace/native-core/providers/ThemeProvider", () => ({
   useTheme: () => ({ theme: { spacing: { "1": 4 } } }),
 }));
 jest.mock("@workspace/native-core/components/mail/mail-ui", () => ({
+  MAIL_LAYOUT: { hitSize: 44 },
   useMailSkin: () => ({ meta: {}, textTertiary: "" }),
 }));
 jest.mock("@workspace/native-core/components/BottomSheet", () => ({
@@ -64,6 +65,7 @@ describe("MailTrackerRow", () => {
     act(() => root.render(<MailTrackerRow trackers={{ count: 3, hosts: ["a.example", "b.example"] }} />));
     expect(container.textContent).toBe("Blocked 3 trackers");
     expect(mockPressable?.accessibilityLabel).toBe("Blocked 3 trackers. Show details");
+    expect(mockPressable?.style.minHeight).toBeGreaterThanOrEqual(44);
 
     act(() => mockPressable?.onPress());
     const hosts = [...container.querySelectorAll("li")].map((item) => item.textContent);

@@ -114,9 +114,10 @@ export function toJmapUtcDate(
   return instant.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-/** Quotes a typed operator value that holds spaces, so the chip label parses back to the same operator. */
+/** Quotes a value the parser would split or read as an operator or negation; it drops quotes, so they go here too. */
 export function formatSearchOperatorValue(value: string): string {
-  return /\s/.test(value) ? `"${value.replace(/"/g, "")}"` : value;
+  const bare = value.replace(/"/g, "");
+  return /[\s:]|^-/.test(bare) ? `"${bare}"` : bare;
 }
 
 const SIZE_SUFFIXES: [number, string][] = [

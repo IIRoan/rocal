@@ -53,6 +53,18 @@ describe("vacation response form", () => {
     expect(validateVacationForm(form())).toBeNull();
   });
 
+  it("refuses date-times as days, so the reply always gets an end", () => {
+    expect(validateVacationForm(form({ toDay: "2026-11-20T18:00" }))).toMatchObject({ field: "toDay" });
+    expect(validateVacationForm(form({ fromDay: "2026-10-23T08:00" }))).toMatchObject({ field: "fromDay" });
+    expect(validateVacationForm(form({ toDay: "2026-13-01" }))).toMatchObject({ field: "toDay" });
+    expect(() => vacationFormToUpdate(form({ toDay: "2026-11-20T18:00" }), TZ)).toThrow("Use dates like 2026-11-14.");
+  });
+
+  it("ends the reply after the last day across month and year ends", () => {
+    expect(vacationFormToUpdate(form({ fromDay: "", toDay: "2026-12-31" }), TZ).toDate).toBe("2026-12-31T23:00:00Z");
+    expect(vacationFormToUpdate(form({ fromDay: "", toDay: "2028-02-28" }), TZ).toDate).toBe("2028-02-28T23:00:00Z");
+  });
+
   it("starts empty when the account has no reply yet", () => {
     expect(vacationResponseToForm(null, TZ)).toEqual({ enabled: false, fromDay: "", toDay: "", subject: "", text: "" });
   });

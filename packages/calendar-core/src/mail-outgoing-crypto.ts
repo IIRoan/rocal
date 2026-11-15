@@ -5,7 +5,11 @@ import {
   resolveEncryptionInternalDomain,
   shouldEncryptOutgoingMail,
 } from "./mail-addresses";
-import type { JmapPgpMimeCiphertext } from "./mail-jmap-email-set";
+import {
+  runMailSendAction,
+  type JmapPgpMimeCiphertext,
+  type ScopedOutgoingJmapMessage,
+} from "./mail-jmap-email-set";
 import {
   buildOutgoingMimeMessage,
   type OutgoingMimeAttachment,
@@ -145,6 +149,54 @@ export async function sealMailForSelf(
   const uploaded = await sealer.upload(armoredMessage);
   assertCurrent(sealer.isCurrent);
   return uploaded;
+}
+
+export type MailCommand = { to: string; subject: string; body: string };
+
+export type MailCommandSender = Pick<
+  ScopedOutgoingJmapMessage,
+  "identityId" | "fromEmail" | "fromName" | "draftsMailboxId" | "sentMailboxId"
+>;
+
+/** A platform's JMAP client, session and sealer, as a list or alias command needs them. */
+export type MailCommandTransport<Session> = {
+  client: {
+    ensureEncryptOnAppendDisabled: (session: Session) => Promise<void>;
+    sendMessage: (session: Session, input: ScopedOutgoingJmapMessage) => Promise<unknown>;
+  };
+  session: Session;
+  accountId: string | null;
+  createSealer: () => MailSealer | Promise<MailSealer>;
+};
+
+/** Sends a list or alias command as plaintext with a self-sealed Sent copy, from `sender`. */
+export async function sendJmapMailCommand<Session>(
+  transport: MailCommandTransport<Session>,
+  sender: MailCommandSender,
+  actionId: string,
+  command: MailCommand,
+): Promise<void> {
+  const { client, session, accountId } = transport;
+  if (!accountId) throw new Error("Your mailbox is not connected.");
+  await runMailSendAction(accountId, actionId, async (sendScope, isActionCurrent) => {
+    await client.ensureEncryptOnAppendDisabled(session);
+    const sealer = await transport.createSealer();
+    const sentCopyCiphertext = await sealMailForSelf({ text: command.body }, sealer);
+    if (!isActionCurrent()) throw new Error("This mail action was closed before sending.");
+    await client.sendMessage(session, {
+      isCurrent: sealer.isCurrent,
+      sendScope,
+      draftsMailboxId: sender.draftsMailboxId,
+      sentMailboxId: sender.sentMailboxId,
+      fromEmail: sender.fromEmail,
+      fromName: sender.fromName,
+      to: [command.to],
+      subject: command.subject,
+      textBody: command.body,
+      identityId: sender.identityId,
+      sentCopyCiphertext,
+    });
+  });
 }
 
 export async function sealOutgoingMessageBody(input: {

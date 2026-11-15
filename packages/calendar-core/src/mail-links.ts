@@ -53,8 +53,15 @@ export type MailLinkAssessment = {
   warnings: MailLinkWarning[];
 };
 
+/** Any script counts, so a look-alike such as "pаypal.com" is read as a host and never equals the ASCII one. */
 const TEXT_HOST_PATTERN =
-  /^<?(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,63})(?::\d+)?(?:[/?#]\S*)?>?$/i;
+  /^<?(?:https?:\/\/)?((?:[\p{L}\p{N}\p{M}-]+\.)+\p{L}[\p{L}\p{M}]{1,62})\.?(?::\d+)?(?:[/?#]\S*)?>?$/iu;
+
+/** Format characters (zero-width, soft hyphen, bidi controls) are invisible, so they must not hide a host. */
+function readTextHost(text: string): string | null {
+  const visible = text.replace(/\p{Cf}/gu, "").normalize("NFKC").trim();
+  return TEXT_HOST_PATTERN.exec(visible)?.[1]?.toLowerCase() ?? null;
+}
 
 function withoutWww(host: string): string {
   return host.startsWith("www.") ? host.slice(4) : host;
@@ -70,7 +77,7 @@ function isSameSite(first: string, second: string): boolean {
 /** Every IDN host warns: telling look-alikes from real scripts needs Unicode data Hermes lacks. */
 export function assessMailLink(canonicalUrl: string, text: string): MailLinkAssessment {
   const host = getLinkHost(canonicalUrl) ?? "";
-  const textHost = TEXT_HOST_PATTERN.exec(text.trim())?.[1]?.toLowerCase() ?? null;
+  const textHost = readTextHost(text);
   const warnings: MailLinkWarning[] = [];
   // eslint-disable-next-line no-control-regex
   if (/[^\x00-\x7f]/.test(host) || /(?:^|\.)xn--/.test(host)) warnings.push("international-host");

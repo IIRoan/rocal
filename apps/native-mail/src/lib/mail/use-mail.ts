@@ -843,59 +843,65 @@ export function useSimpleLoginAliasAction(runtime: MailRuntime | undefined) {
   });
 }
 
-async function runUnsubscribeTarget(
+type UnsubscribeAction = Exclude<MailUnsubscribeTarget, { type: "https" }>;
+
+/** Tries the one-click POST, then the mailto command; each failure falls through to the next, and the last is thrown. */
+async function runUnsubscribeActions(
   runtime: MailRuntime,
   context: ReturnType<typeof resolveReceivingContext>,
   message: JmapEmailMessage,
-  target: MailUnsubscribeTarget,
+  [target, ...rest]: UnsubscribeAction[],
 ): Promise<void> {
-  if (target.type === "one-click") {
-    await postOneClickUnsubscribe(target.url);
-  } else if (target.type === "https") {
-    await WebBrowser.openBrowserAsync(target.url);
-  } else if (context) {
-    await sendMailCommand(runtime, context, `unsubscribe:${message.id}`, target);
-  } else {
-    throw new Error("Could not find the address this message was sent to.");
+  if (!target) throw new Error("This message can't be unsubscribed here.");
+  try {
+    if (target.type === "one-click") {
+      await postOneClickUnsubscribe(target.url);
+    } else if (context) {
+      await sendMailCommand(runtime, context, `unsubscribe:${message.id}`, target);
+    } else {
+      throw new Error("Could not find the address this message was sent to.");
+    }
+  } catch (error) {
+    if (rest.length === 0) throw error;
+    await runUnsubscribeActions(runtime, context, message, rest);
   }
 }
 
-/** Unsubscribes on the device by the first method that works: one-click POST, the mailto command, then the sender's page. */
+/** Unsubscribes on the device by one-click POST, else the mailto command; the sender's page is only opened, so it is never marked done. */
 export function useMailUnsubscribeAction(runtime: MailRuntime | undefined) {
   const queryClient = useQueryClient();
-  const setUnsubscribed = (messageId: string, done: boolean) =>
-    setMessageKeywordInCaches(queryClient, messageId, MAIL_UNSUBSCRIBED_KEYWORD, done);
 
   return useMutation({
-    mutationFn: async (message: JmapEmailMessage) => {
+    mutationFn: async (message: JmapEmailMessage): Promise<"unsubscribed" | "opened"> => {
       if (!runtime) throw new Error("Your mailbox is not connected.");
       const context = resolveReceivingContext(runtime, message);
       const unsubscribe = getMailUnsubscribe(message, { allowOneClick: true, allowMailto: context !== null });
       if (!unsubscribe) throw new Error("This message can't be unsubscribed here.");
-      let failure: unknown = null;
-      for (const target of unsubscribe.targets) {
-        try {
-          await runUnsubscribeTarget(runtime, context, message, target);
-          await runtime.client
-            .setMessageKeyword(runtime.session, message.id, MAIL_UNSUBSCRIBED_KEYWORD, true)
-            .catch(() => undefined);
-          return;
-        } catch (error) {
-          failure = error;
-        }
+      const [first] = unsubscribe.targets;
+      if (first?.type === "https") {
+        await WebBrowser.openBrowserAsync(first.url);
+        return "opened";
       }
-      throw failure;
+      const actions = unsubscribe.targets.filter(
+        (target): target is UnsubscribeAction => target.type !== "https",
+      );
+      await runUnsubscribeActions(runtime, context, message, actions);
+      await runtime.client
+        .setMessageKeyword(runtime.session, message.id, MAIL_UNSUBSCRIBED_KEYWORD, true)
+        .catch(() => undefined);
+      return "unsubscribed";
     },
-    onMutate: async (message) => {
-      const resume = await cancelMailMessageReads(queryClient, [
+    onMutate: () =>
+      cancelMailMessageReads(queryClient, [
         QUERY_KEYS.mailMessagesAll(),
         QUERY_KEYS.mailThreadsAll(),
         QUERY_KEYS.mailMessageDetailsAll(),
-      ]);
-      setUnsubscribed(message.id, true);
-      return resume;
+      ]),
+    onSuccess: (outcome, message) => {
+      if (outcome === "unsubscribed") {
+        setMessageKeywordInCaches(queryClient, message.id, MAIL_UNSUBSCRIBED_KEYWORD, true);
+      }
     },
-    onError: (_error, message) => setUnsubscribed(message.id, false),
     onSettled: (_data, _error, _variables, resume) => {
       resume?.().catch(() => undefined);
     },

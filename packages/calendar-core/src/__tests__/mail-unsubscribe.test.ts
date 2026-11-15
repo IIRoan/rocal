@@ -3,6 +3,7 @@ import { SIMPLELOGIN_DONE_KEYWORD } from "../mail-simplelogin";
 import {
   describeMailUnsubscribe,
   getMailUnsubscribe,
+  getMailUnsubscribePage,
   MAIL_UNSUBSCRIBED_KEYWORD,
   type MailUnsubscribeFields,
 } from "../mail-unsubscribe";
@@ -42,6 +43,12 @@ describe("getMailUnsubscribe", () => {
     expect(types(listMessage({ "header:List-Unsubscribe-Post:asText": "List-Unsubscribe=Maybe" }))).toEqual(["mailto", "https"]);
     expect(types(listMessage(), { allowOneClick: false, allowMailto: true })).toEqual(["mailto", "https"]);
     expect(types(listMessage(), { allowOneClick: false, allowMailto: false })).toEqual(["https"]);
+  });
+
+  it("finds the sender's page to offer after a failed unsubscribe", () => {
+    expect(getMailUnsubscribePage(listMessage())).toBe("https://news.example/u/abc?t=1");
+    expect(getMailUnsubscribePage(listMessage({ "header:List-Unsubscribe:asURLs": ["mailto:leave@news.example"] }))).toBeNull();
+    expect(getMailUnsubscribePage(listMessage({ "header:Authentication-Results:asText:all": ["mx; dkim=fail"] }))).toBeNull();
   });
 
   it("requires DKIM pass and leaves SimpleLogin forwards to their own line", () => {

@@ -61,6 +61,25 @@ describe("assessMailLink", () => {
     expect(assessMailLink("https://example.com/", "<https://mail.example.com/x?y=1>").warnings).toEqual([]);
     expect(assessMailLink("https://example.com/", "Read the full story").textHost).toBeNull();
   });
+
+  it("reads look-alike, hidden and dotted hosts in the text, so they always ask", () => {
+    for (const text of [
+      "pаypal.com",
+      "pay​pal.com",
+      "paypal.com.",
+      "https://paypal.com./login",
+      "ｐａｙｐａｌ．ｃｏｍ",
+      "‮moc.lapyap",
+    ]) {
+      const assessment = assessMailLink("https://evil.example/", text);
+      expect(assessment.warnings).toEqual(["text-mismatch"]);
+      expect(shouldConfirmMailLink(assessment, false)).toBe(true);
+    }
+    expect(assessMailLink("https://paypal.com/", "pay­pal.com.﻿").warnings).toEqual([]);
+    for (const text of ["Click here", "e.g.", "v1.2", "詳細はこちら", "Lees meer…"]) {
+      expect(assessMailLink("https://example.com/", text).textHost).toBeNull();
+    }
+  });
 });
 
 describe("describeMailLink", () => {

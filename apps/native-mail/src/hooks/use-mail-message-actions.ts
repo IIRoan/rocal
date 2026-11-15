@@ -2,8 +2,10 @@ import { captureSessionDataScope } from "@workspace/native-core/lib/session-data
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import {
   getErrorMessage,
+  getMailUnsubscribePage,
   resolveAttachmentPreviewKind,
   resolveMailAutoAdvanceTarget,
   resolveMarkAsReadDelayMs,
@@ -370,9 +372,20 @@ export function useMailMessageActions({
 
   const handleUnsubscribe = (target: JmapEmailMessage) => {
     unsubscribeAction.mutate(target, {
-      onSuccess: () => toast(MAIL_UNSUBSCRIBE_LABELS.done, "success"),
-      onError: (error) =>
-        toast(getErrorMessage(error, "Couldn't unsubscribe. Try again."), "error"),
+      onSuccess: (outcome) => {
+        if (outcome === "unsubscribed") toast(MAIL_UNSUBSCRIBE_LABELS.done, "success");
+      },
+      onError: (error) => {
+        const page = getMailUnsubscribePage(target);
+        const openPage = (url: string) => () => {
+          WebBrowser.openBrowserAsync(url).catch(() => undefined);
+        };
+        toast(
+          getErrorMessage(error, MAIL_UNSUBSCRIBE_LABELS.failed),
+          "error",
+          page ? { action: { label: MAIL_UNSUBSCRIBE_LABELS.openPage, onPress: openPage(page) } } : undefined,
+        );
+      },
     });
   };
 

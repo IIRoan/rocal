@@ -462,7 +462,6 @@ export function useMailComposeController({
       seedReply,
       seedForward,
       seedNewMessage,
-      seedMailto,
       seedDraft,
       openDraftEditor,
       markDirty,

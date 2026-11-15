@@ -15,11 +15,9 @@ import {
   resolveMessageReplyFrom,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
+import { MAIL_LAYOUT, useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import type { JmapEmailMessage, JmapIdentity } from "../../lib/mail/types";
-
-const LINE_HIT_SLOP = { top: 8, bottom: 8 };
 
 export function MailUnsubscribeRow({
   message,
@@ -61,7 +59,6 @@ export function MailUnsubscribeRow({
     <Pressable
       onPress={confirm}
       disabled={pending || done}
-      hitSlop={LINE_HIT_SLOP}
       style={styles.line}
       accessibilityRole="button"
       accessibilityState={{ disabled: pending || done }}
@@ -82,6 +79,7 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       alignItems: "center" as const,
       gap: theme.spacing["1"],
       minWidth: 0,
+      minHeight: MAIL_LAYOUT.hitSize,
     },
   } satisfies Record<string, ViewStyle>;
 

@@ -30,6 +30,7 @@
     "./use-feed-sync": "./src/use-feed-sync.ts",
     "./use-category-delete-pending": "./src/use-category-delete-pending.ts",
     "./use-mail-trust-review": "./src/use-mail-trust-review.ts",
-    "./mail-query-coordination": "./src/mail-query-coordination.ts"
+    "./mail-query-coordination": "./src/mail-query-coordination.ts",
+    "./mail-vacation-response-query-options": "./src/mail-vacation-response-query-options.ts"
   }
 }

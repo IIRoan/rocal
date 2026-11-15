@@ -2,6 +2,7 @@ import { toast } from "@workspace/ui/lib/toast";
 import {
   getErrorMessage,
   getMailUnsubscribe,
+  getMailUnsubscribePage,
   MAIL_UNSUBSCRIBE_LABELS,
   MAIL_UNSUBSCRIBED_KEYWORD,
   resolveMessageReplyFrom,
@@ -15,7 +16,21 @@ import type { JmapEmailMessage } from "@/lib/mail/types";
 
 const log = createLogger("mail-unsubscribe-action");
 
-/** One-click goes to `/mail/link`, whose form posts it from this device, then the mailto command, then the sender's page; never through the API. */
+function openPage(url: string) {
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+/** A failed send is shown, never silently swapped for the sender's page; the page is offered instead. */
+function showUnsubscribeFailure(message: JmapEmailMessage, toastId: string | number, error: unknown) {
+  log.error("Failed to unsubscribe", error);
+  const page = getMailUnsubscribePage(message);
+  toast.error(getErrorMessage(error, MAIL_UNSUBSCRIBE_LABELS.failed), {
+    id: toastId,
+    action: page ? { label: MAIL_UNSUBSCRIBE_LABELS.openPage, onClick: () => openPage(page) } : undefined,
+  });
+}
+
+/** One-click opens `/mail/link`, whose form the user submits from this device, and mailto is sent here; never through the API. */
 export function useMailUnsubscribeAction({
   activeMailbox,
   patchMessageKeyword,
@@ -35,52 +50,31 @@ export function useMailUnsubscribeAction({
   return async (message: JmapEmailMessage) => {
     if (!activeMailbox) return;
     const replyFrom = resolveMessageReplyFrom(activeMailbox.identities, message);
-    const unsubscribe = getMailUnsubscribe(message, {
+    const target = getMailUnsubscribe(message, {
       allowOneClick: true,
       allowMailto: replyFrom !== null,
-    });
-    if (!unsubscribe) return;
-    const address =
-      activeMailbox.identities.find((identity) => identity.id === replyFrom?.identityId)?.email ?? "";
+    })?.targets[0];
+    if (!target) return;
+    // Opened inside the click so no popup blocker stops it; neither page reports back, so nothing is marked done.
+    if (target.type !== "mailto") {
+      const address =
+        activeMailbox.identities.find((identity) => identity.id === replyFrom?.identityId)?.email ?? "";
+      openPage(target.type === "one-click" ? mailUnsubscribeHandoffUrl(target.url, address) : target.url);
+      return;
+    }
     const { client, session } = activeMailbox;
     const toastId = toast.loading(MAIL_UNSUBSCRIBE_LABELS.pending);
-    patchMessageKeyword(message, MAIL_UNSUBSCRIBED_KEYWORD, true);
-    let done = false;
-    // The mark shows from now but is written only after the unsubscribe, so the whole span counts as one write in flight.
-    const unsubscribeThenMark = async () => {
-      let failure: unknown = null;
-      for (const target of unsubscribe.targets) {
-        try {
-          if (target.type === "mailto") {
-            await sendMailCommand(activeMailbox, message, `unsubscribe:${message.id}`, target);
-          } else if (target.type === "one-click") {
-            window.open(mailUnsubscribeHandoffUrl(target.url, address), "_blank", "noopener,noreferrer");
-          } else {
-            window.open(target.url, "_blank", "noopener,noreferrer");
-          }
-          done = true;
-          break;
-        } catch (error) {
-          failure = error;
-        }
-      }
-      if (!done) throw failure;
-      toast.success(MAIL_UNSUBSCRIBE_LABELS.done, { id: toastId });
-      await client.setMessageKeyword(session, message.id, MAIL_UNSUBSCRIBED_KEYWORD, true);
-    };
     try {
-      await trackKeywordWrite(
-        [{ messageId: message.id, keyword: MAIL_UNSUBSCRIBED_KEYWORD, enabled: true }],
-        unsubscribeThenMark,
-      );
+      await sendMailCommand(activeMailbox, message, `unsubscribe:${message.id}`, target);
     } catch (error) {
-      if (done) {
-        log.error("Failed to mark unsubscribe done", error);
-        return;
-      }
-      log.error("Failed to unsubscribe", error);
-      patchMessageKeyword(message, MAIL_UNSUBSCRIBED_KEYWORD, false);
-      toast.error(getErrorMessage(error, "Couldn't unsubscribe. Try again."), { id: toastId });
+      showUnsubscribeFailure(message, toastId, error);
+      return;
     }
+    toast.success(MAIL_UNSUBSCRIBE_LABELS.done, { id: toastId });
+    patchMessageKeyword(message, MAIL_UNSUBSCRIBED_KEYWORD, true);
+    await trackKeywordWrite(
+      [{ messageId: message.id, keyword: MAIL_UNSUBSCRIBED_KEYWORD, enabled: true }],
+      () => client.setMessageKeyword(session, message.id, MAIL_UNSUBSCRIBED_KEYWORD, true),
+    ).catch((error: unknown) => log.error("Failed to mark unsubscribe done", error));
   };
 }

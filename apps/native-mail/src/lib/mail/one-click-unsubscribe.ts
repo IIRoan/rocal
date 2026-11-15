@@ -11,10 +11,12 @@ export async function postOneClickUnsubscribe(url: string): Promise<void> {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: "List-Unsubscribe=One-Click",
       credentials: "omit",
-      redirect: "follow",
+      redirect: "manual",
       signal: controller.signal,
     });
-    if (!response.ok) throw new Error("The sender didn't accept the unsubscribe request.");
+    // A redirect target never passed the public-host check, so it is not followed; the POST already reached the checked host.
+    const redirected = response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400);
+    if (!response.ok && !redirected) throw new Error("The sender didn't accept the unsubscribe request.");
   } finally {
     clearTimeout(timer);
   }

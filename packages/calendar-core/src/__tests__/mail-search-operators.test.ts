@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import fc from "fast-check";
 import { buildJmapFilter, conditionToChip, resolveMailSearchScope } from "../mail-search-filter";
 import {
   formatMailSearchQuery,
@@ -73,9 +74,37 @@ describe("parseMailSearchQuery", () => {
 
   it("leaves unknown keys as plain words", () => {
     expect(parseMailSearchQuery("filename:report.pdf note:x", context)).toMatchObject({
-      text: "filename:report.pdf note:x",
+      text: '"filename:report.pdf" "note:x"',
       filters: { conditions: [] },
     });
+  });
+});
+
+const queryArb = fc
+  .array(
+    fc.constantFrom("from", "in", "is", "label", "larger", "read", "inbox", "work", "Trips 2026", "5K", ":", '"', "-", " ", "\t", "a", "é"),
+    { maxLength: 40 },
+  )
+  .map((parts) => parts.join(""));
+
+describe("quoted words and values", () => {
+  it("keeps a quoted operator-like word a word after Enter", () => {
+    const lifted = liftMailSearchOperators('"in:progress" report -"from:bob" "-draft" from:ann', { conditions: [] }, context);
+    expect(lifted.text).toBe('"in:progress" report "-draft"');
+    expect(lifted.filters.conditions).toEqual([{ text: "from:bob", negated: true }, { from: "ann" }]);
+    expect(parseMailSearchQuery(lifted.text, context)).toMatchObject({ unresolved: "", issues: [] });
+    expect(conditionToChip({ text: "from:bob", negated: true })[0]?.label).toBe('-"from:bob"');
+  });
+
+  it("parses its own lifted and formatted output to the same search", () => {
+    fc.assert(
+      fc.property(queryArb, (input) => {
+        const parsed = parseMailSearchQuery(input, context);
+        const lifted = liftMailSearchOperators(input, { conditions: [] }, context);
+        const reparsed = parseMailSearchQuery(formatMailSearchQuery(lifted.text, lifted.filters.conditions), context);
+        expect(reparsed).toEqual({ ...parsed, filters: lifted.filters });
+      }),
+    );
   });
 });
 

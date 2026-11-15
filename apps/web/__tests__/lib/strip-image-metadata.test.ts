@@ -90,6 +90,14 @@ describe("stripImageMetadata", () => {
     expect(createImageBitmap).not.toHaveBeenCalled();
   });
 
+  it("never reads a file whose type cannot be re-encoded", async () => {
+    const original = new File([JPEG], "report.pdf", { type: "application/pdf" });
+    const arrayBuffer = jest.fn(async () => JPEG.slice().buffer);
+    Object.defineProperty(original, "arrayBuffer", { value: arrayBuffer });
+    expect(await stripImageMetadata(original)).toEqual({ file: original, outcome: "unchanged" });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+  });
+
   it("follows the compose setting and warns about files it could not clean", async () => {
     const original = file(JPEG, "photo.jpg", "image/jpeg");
     writeMailComposeSettings({ ...DEFAULT_MAIL_COMPOSE_SETTINGS, stripImageMetadata: false }, { sync: false });
