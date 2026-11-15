@@ -21,7 +21,6 @@ import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
 import {
   createNativeE2eeProvider,
   fetchE2eeBootstrap,
-  putPasswordEnvelope,
   readStoredDevice,
   registerDeviceForSession,
   rememberDeviceEnvelopeSalt,
@@ -119,26 +118,27 @@ export function E2eeProvider({
   const storePasswordEnvelopeForActiveSession = useCallback(
     async ({
       e2ee,
-      userId,
-      apiBaseUrl,
+      session,
       password,
+      isStale,
     }: {
       e2ee: E2eeModule;
-      userId: string;
-      apiBaseUrl: string;
+      session: E2eeSession;
       password: string;
+      isStale: () => boolean;
     }) => {
-      const session = sessionRef.current;
-
-      if (!session) {
-        throw new Error("E2EE session is not ready on this device.");
-      }
-
-      await putPasswordEnvelope({ e2ee, session, apiBaseUrl, password });
+      const envelope = await e2ee.createPasswordEnvelope(
+        session.accountKey,
+        session.blindIndexKey,
+        password,
+      );
+      // An account switch during the slow wrap must not send this envelope with the next account's cookie.
+      if (isStale()) return;
+      await uploadPasswordEnvelopeToApi(session.apiBaseUrl, envelope);
 
       clearPendingAuthPassword();
       log.info("Stored native E2EE password envelope for active session", {
-        userId,
+        userId: session.userId,
       });
     },
     [clearPendingAuthPassword],
@@ -202,14 +202,15 @@ export function E2eeProvider({
             return null;
           }
 
-          sessionRef.current = {
+          const session: E2eeSession = {
             accountKey,
             blindIndexKey,
             deviceId: existingDevice.deviceId,
             userId,
             apiBaseUrl,
           };
-          setActiveE2eeSession(sessionRef.current);
+          sessionRef.current = session;
+          setActiveE2eeSession(session);
           const pendingPassword = peekPendingAuthPassword();
           // Keys minted while another key's envelope existed must survive sign-out, so a changed envelope is checked again.
           const deviceEnvelopeSalt = await resolveDeviceEnvelopeSalt(e2ee, {
@@ -229,27 +230,33 @@ export function E2eeProvider({
               });
               return null;
             });
+          if (isStale()) {
+            return null;
+          }
           await upgradePasswordEnvelope({
             envelope: bootstrapData.passwordEnvelope,
             deviceEnvelopeSalt,
             password: pendingPassword,
             userId,
             store: (password) =>
-              storePasswordEnvelopeForActiveSession({ e2ee, userId, apiBaseUrl, password }),
+              storePasswordEnvelopeForActiveSession({ e2ee, session, password, isStale }),
           });
           // An account whose first envelope write failed gets another try whenever the sign-in password is at hand.
           if (!bootstrapData.passwordEnvelope && pendingPassword) {
             await storePasswordEnvelopeForActiveSession({
               e2ee,
-              userId,
-              apiBaseUrl,
+              session,
               password: pendingPassword,
+              isStale,
             }).catch((error: unknown) => {
               log.warn("Failed to store the missing E2EE password envelope", {
                 userId,
                 error,
               });
             });
+          }
+          if (isStale()) {
+            return null;
           }
           clearPendingAuthPassword();
           log.info("Restored native E2EE session from existing device", {
@@ -305,8 +312,16 @@ export function E2eeProvider({
             password: pendingPassword,
             userId,
             store: (password) =>
-              storePasswordEnvelopeForActiveSession({ e2ee, userId, apiBaseUrl, password }),
+              storePasswordEnvelopeForActiveSession({
+                e2ee,
+                session: nextSession,
+                password,
+                isStale,
+              }),
           });
+          if (isStale()) {
+            return null;
+          }
           clearPendingAuthPassword();
           log.info("Unlocked native E2EE with pending auth password", {
             userId,
@@ -326,6 +341,9 @@ export function E2eeProvider({
             )
           : null;
         if (firstEnvelope) {
+          if (isStale()) {
+            return null;
+          }
           await uploadPasswordEnvelopeToApi(apiBaseUrl, firstEnvelope);
         }
         const nextSession = await registerDeviceForSession({

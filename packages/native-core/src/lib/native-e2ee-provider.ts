@@ -302,27 +302,6 @@ export async function unwrapStoredDeviceKeys(
   return { accountKey, blindIndexKey };
 }
 
-export async function putPasswordEnvelope({
-  e2ee,
-  session,
-  apiBaseUrl,
-  password,
-}: {
-  e2ee: E2eeModule;
-  session: E2eeSession;
-  apiBaseUrl: string;
-  password: string;
-}): Promise<void> {
-  await uploadPasswordEnvelope(
-    apiBaseUrl,
-    await e2ee.createPasswordEnvelope(
-      session.accountKey,
-      session.blindIndexKey,
-      password,
-    ),
-  );
-}
-
 /** Stores an envelope already wrapped with the password, and remembers its salt as this device's. */
 export async function uploadPasswordEnvelope(
   apiBaseUrl: string,

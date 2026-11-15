@@ -917,6 +917,51 @@ describe("E2eeProvider", () => {
       await expect(bootstrapAndReadPasswordWrites()).resolves.toEqual([]);
       expect(mockE2eeModule.createPasswordEnvelope).not.toHaveBeenCalled();
     });
+
+    it.each([
+      ["the envelope check", null],
+      ["the rewrap", "salt"],
+    ])("stores nothing when another account signs in during %s", async (_step, deviceSalt) => {
+      const otherAccountKey = { type: "other-account-key" } as unknown as CryptoKey;
+      peekPendingAuthPassword.mockReturnValueOnce("secret-password").mockReturnValue(null);
+      storeUnlockableDevice(deviceSalt);
+      mockE2eeModule.unwrapAccountKey
+        .mockResolvedValueOnce(accountKey)
+        .mockResolvedValueOnce(otherAccountKey);
+      mockApi(createPasswordRecord({ kdfIterations: 310000 }), [storedDeviceRecord]);
+      const held = deviceSalt
+        ? mockE2eeModule.createPasswordEnvelope
+        : mockE2eeModule.unwrapPasswordEnvelope;
+      const value = deviceSalt
+        ? { kdfSalt: "new-salt", kdfIterations: 600000 }
+        : { accountKey, blindIndexKey };
+      let release: () => void = () => undefined;
+      held.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(value); }));
+      mockE2eeModule.encryptJsonPayload.mockResolvedValue({ ciphertext: "probe" });
+      mockE2eeModule.decryptJsonPayload.mockResolvedValue(true);
+      await renderProvider();
+
+      let first: Promise<unknown> = Promise.resolve();
+      await act(async () => {
+        first = getE2ee().bootstrap("user-1", "https://api.solace.test");
+      });
+      expect(held).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await getE2ee().bootstrap("user-2", "https://api.solace.test");
+      });
+      await act(async () => {
+        release();
+        await first;
+      });
+
+      expect(mockFetch.mock.calls.filter(([url]) => String(url).endsWith("/api/e2ee/password"))).toEqual([]);
+      expect(mockE2eeModule.createPasswordEnvelope).not.toHaveBeenCalledWith(
+        otherAccountKey,
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(getActiveE2eeSession()).toMatchObject({ userId: "user-2", accountKey: otherAccountKey });
+    });
   });
 
   it("forgets the envelope check of a restored device key once the envelope changed", async () => {
