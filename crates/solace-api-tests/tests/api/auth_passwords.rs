@@ -116,7 +116,7 @@ async fn change_password_replaces_the_hash_and_mails_a_confirmation() {
     let text = text_body(&message);
     assert!(text.contains(&format!("Hi {},", user.name)), "{text}");
     assert!(
-        text.contains("the password for your Solace account was changed."),
+        text.contains("The password for your Solace account was changed."),
         "{text}"
     );
     assert!(
