@@ -427,6 +427,17 @@ describe("known trackers", () => {
     });
   });
 
+  it("leaves no known tracker in CSS however the style blocks and attributes interleave", () => {
+    const html =
+      '<style>.a{background:url(https://mailtrack.io/trace/mail/a)}</style><p style="background:url(https://mailtrack.io/trace/mail/b)">' +
+      '<style>.b{background:url(https://mailtrack.io/trace/mail/c)}</style>x</p>';
+    const processed = processEmailHtml({ html, isDark: false, blockTrackingPixels: true, blockRemoteImages: false });
+
+    expect(processed).not.toContain("mailtrack");
+    expect(processEmailHtml({ html: processed, isDark: false, blockTrackingPixels: true, blockRemoteImages: false })).toBe(processed);
+    expect(analyzeEmailHtml({ html, isDark: false, blockTrackingPixels: true }).trackers.count).toBe(3);
+  });
+
   it("counts nothing when tracker blocking is off", () => {
     const result = analyzeEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: false });
     expect(result.trackers).toEqual({ count: 0, hosts: [] });

@@ -299,27 +299,12 @@ function processEmailHtmlInternal(
   }
 
   if (blockTrackingPixels) {
-    processed = processed
-      .replace(STYLE_BLOCK_PATTERN, (block, css: string) => block.replace(css, () => stripCssTrackers(css, onBlockedTracker)))
-      .replace(TAG_PATTERN, (tag, name: string, attributes: string) => {
-        let changed = false;
-        const kept = [...attributes.matchAll(ATTRIBUTE_PATTERN)].flatMap((attribute) => {
-          const attributeName = (attribute[1] ?? "").toLowerCase();
-          const value = decodeHtmlEntities(attribute[2] ?? attribute[3] ?? attribute[4] ?? "");
-          const knownHost =
-            attributeName === "background" && BACKGROUND_ATTRIBUTE_TAGS.has(name.toLowerCase()) ? matchKnownTracker(value) : null;
-          if (knownHost) {
-            onBlockedTracker?.(knownHost);
-            changed = true;
-            return [];
-          }
-          const css = attributeName === "style" ? stripCssTrackers(value, onBlockedTracker) : value;
-          if (css === value) return [` ${attribute[0]}`];
-          changed = true;
-          return [` style="${escapeAttributeValue(css)}"`];
-        });
-        return changed ? `<${name}${kept.join("")}>` : tag;
-      });
+    // Repeat until stable, so no rewrite can leave a tracker that another pass would still find.
+    let previous: string;
+    do {
+      previous = processed;
+      processed = stripMarkupCssTrackers(processed, onBlockedTracker);
+    } while (processed !== previous);
   }
 
   processed = rewriteEmailAnchors(processed, rewriteLink);
@@ -524,6 +509,30 @@ const ATTRIBUTE_PATTERN = /([^\s"'>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'
 const BACKGROUND_ATTRIBUTE_TAGS = new Set([
   "table", "thead", "tbody", "tfoot", "tr", "td", "th",
 ]);
+
+function stripMarkupCssTrackers(html: string, onBlockedTracker?: (host: string) => void): string {
+  return html
+    .replace(STYLE_BLOCK_PATTERN, (block, css: string) => block.replace(css, () => stripCssTrackers(css, onBlockedTracker)))
+    .replace(TAG_PATTERN, (tag, name: string, attributes: string) => {
+      let changed = false;
+      const kept = [...attributes.matchAll(ATTRIBUTE_PATTERN)].flatMap((attribute) => {
+        const attributeName = (attribute[1] ?? "").toLowerCase();
+        const value = decodeHtmlEntities(attribute[2] ?? attribute[3] ?? attribute[4] ?? "");
+        const knownHost =
+          attributeName === "background" && BACKGROUND_ATTRIBUTE_TAGS.has(name.toLowerCase()) ? matchKnownTracker(value) : null;
+        if (knownHost) {
+          onBlockedTracker?.(knownHost);
+          changed = true;
+          return [];
+        }
+        const css = attributeName === "style" ? stripCssTrackers(value, onBlockedTracker) : value;
+        if (css === value) return [` ${attribute[0]}`];
+        changed = true;
+        return [` style="${escapeAttributeValue(css)}"`];
+      });
+      return changed ? `<${name}${kept.join("")}>` : tag;
+    });
+}
 
 function sanitizedHtmlHasRemoteContent(html: string): boolean {
   for (const block of html.matchAll(STYLE_BLOCK_PATTERN)) {
