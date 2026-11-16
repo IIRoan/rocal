@@ -1144,7 +1144,7 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
    - Session-route methods go on `AccountApiService` (`packages/calendar-client/src/account-api-service.ts`): `getRecoveryKit`, `putRecoveryKit`, `deleteRecoveryKit`.
 8. **UI.**
    - **Web.**
-     - The login "Forgot password?" opens new `apps/web/app/login/recover-account-dialog.tsx`: `@workspace/ui` Dialog with email, recovery key, new password, confirm, and a "Remove passkeys (I lost them)" switch that defaults on. On success it runs the existing sign-in submit path. A "No recovery kit?" line shows `FORGOT_PASSWORD_NOTICE`.
+     - The login "Forgot password?" opens new `apps/web/app/login/recover-account-dialog.tsx`: `@workspace/ui` Dialog with email, recovery key, new password, confirm, and a "Remove passkeys (I lost them)" switch that default off. On success it runs the existing sign-in submit path. A "No recovery kit?" line shows `FORGOT_PASSWORD_NOTICE`.
      - The command palette security view (`apps/web/components/command-palette/security-settings.tsx`) gets a "Recovery kit" row. It asks for the password, shows the key once with Copy, "Download .txt" (Blob, saved only by the user) and Print (a print-only section plus `window.print()`), and requires an "I saved it" confirmation.
    - **Native** (drawers):
      - `SignInScreen` "Forgot password?" opens new `packages/native-core/src/components/auth/RecoverAccountSheet.tsx` (`BottomSheet`, `SheetSections`), then `signIn` with the new password.
@@ -1256,7 +1256,7 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
 - Secret format. **Default: base32 groups with a checksum, no dependency** (words via `@scure/bip39`, MIT, is the alternative).
 - Kit is single-use and the app prompts for a new one after recovery. **Default: yes.**
 - Tighten passkey step-up for every account now; accounts with no kit and no passkey left go to support. **Default: yes.**
-- "Remove passkeys" switch defaults on. **Default: yes.**
+- "Remove passkeys" switch defaults off. **Default: off** (changed in review: off, so a forgotten password alone never drops passkeys).
 - Creating a kit needs the current password plus step-up. **Default: yes.**
 - Rotate the account key on recovery? **Default: no** (it would re-encrypt everything; follow-up if wanted).
 - Delete E2EE device rows on recovery? **Default: no** (sessions are revoked; the device-key deletion rule handles the rest).
@@ -1442,7 +1442,7 @@ Shared ground for M1–M4, verified in code (line numbers as of `ee7fb551`):
     - Constants `MAIL_LINK_CHANNEL`, `MAIL_LINK_PATH = "/mail/link"`.
     - `mailLinkHandoffUrl(id)`, `registerMailLinks(entries)`, `clearMailLinkHandoff()`.
     - `startMailLinkResponder(): () => void`, `resolveMailLink(id, timeoutMs = 5000): Promise<{href,text} | null>`.
-    - `setPendingMailto(draft)` / `takePendingMailto()`.
+    - Superseded in review: the page returns to Mail with a full page load (`openMailDocument`) and passes the draft as `/mail#<opaque id>`.
   - `lib/auth-local-state.ts`: call `clearMailLinkHandoff()` in `clearSolaceClientAuthArtifacts` (`:41-57`), `clearOrphanedClientAuthArtifacts` and `signOutAndClearLocalState`.
   - `components/mail/mail-app.tsx:54`: `useEffect(() => startMailLinkResponder(), [])`. A BroadcastChannel subscription is an external system, so an effect is right here.
   - `components/mail/message-reader/html-email-renderer.tsx`: take a `confirmExternalLinks` prop (M2), create the token, pass `rewriteLink`, register the collected pairs in an effect. The local array is filled during render; per §5, a fresh local array is not React state.
