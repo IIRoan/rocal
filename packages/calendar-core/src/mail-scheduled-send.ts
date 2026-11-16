@@ -27,6 +27,7 @@ export type ScheduledMailSend = {
 
 /** Sealed copies always report an attachment (the ciphertext part), so the notice cannot be conditional. */
 export const SCHEDULED_SEND_CANCELED_NOTICE = "Moved to Drafts. Attachments aren't kept when you edit it.";
+export const CANCELED_SEND_IN_SENT_NOTICE = "Send canceled, but the message is still in Sent.";
 
 export type ScheduledSendPreset = { label: string; sendAt: string };
 

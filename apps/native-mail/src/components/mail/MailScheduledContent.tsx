@@ -14,6 +14,7 @@ import {
   SheetScroll,
   SheetSection,
 } from "@workspace/native-core/components/sheet/SheetSections";
+import { useCopyInSentToast } from "../../hooks/use-held-send-toast";
 import { useScheduledMailSends } from "../../hooks/use-scheduled-mail-sends";
 
 /** Scheduled sends with a cancel that moves each back to Drafts. */
@@ -22,10 +23,17 @@ export function MailScheduledContent() {
   const { toast } = useToast();
   const timezone = useUserTimezone();
   const timeFormat = useUserTimeFormat();
+  const announceCopyInSent = useCopyInSentToast();
 
   const cancel = (send: ScheduledMailSend) => {
     scheduled.cancel(send).then(
-      (result) => toast(result === "canceled" ? SCHEDULED_SEND_CANCELED_NOTICE : "Too late to cancel. The message was sent.", "info"),
+      (result) => {
+        if (result === "canceledInSent") {
+          announceCopyInSent(() => scheduled.moveToDrafts(send));
+          return;
+        }
+        toast(result === "canceled" ? SCHEDULED_SEND_CANCELED_NOTICE : "Too late to cancel. The message was sent.", "info");
+      },
       (error: unknown) => toast(getErrorMessage(error, "Couldn't cancel the scheduled send."), "error"),
     );
   };

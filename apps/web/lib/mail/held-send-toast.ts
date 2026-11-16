@@ -1,5 +1,7 @@
 import {
+  CANCELED_SEND_IN_SENT_NOTICE,
   formatScheduledSendTime,
+  type HeldSubmissionCancelResult,
   type MailSendHold,
   type TimeFormat,
 } from "@workspace/calendar-core";
@@ -14,7 +16,8 @@ export function announceHeldSend(input: {
   sentMessage: string;
   timezone: string;
   timeFormat: TimeFormat;
-  cancel: () => Promise<"canceled" | "sent">;
+  cancel: () => Promise<HeldSubmissionCancelResult>;
+  moveToDrafts: () => Promise<void>;
   onCanceled: () => void;
 }): void {
   const id = `held-send-${input.submissionId}`;
@@ -26,6 +29,9 @@ export function announceHeldSend(input: {
     const result = await input.cancel().catch(() => null);
     if (result === "canceled") {
       toast(isUndoWindow ? "Sending canceled." : "Moved to Drafts.", { id, duration: 4000 });
+      input.onCanceled();
+    } else if (result === "canceledInSent") {
+      announceCopyInSent(id, input.moveToDrafts);
       input.onCanceled();
     } else if (result === "sent") {
       toast(TOO_LATE, { id, duration: 4000 });
@@ -47,4 +53,16 @@ export function announceHeldSend(input: {
     return;
   }
   toast(`Scheduled for ${formatScheduledSendTime(input.hold.until, input.timezone, input.timeFormat)}.`, { id, action });
+}
+
+/** The send is canceled but its copy stayed in Sent; Retry moves it to Drafts again. */
+export function announceCopyInSent(id: string, moveToDrafts: () => Promise<void>): void {
+  const retry = () => {
+    toast.loading("Moving to Drafts…", { id, action: undefined });
+    moveToDrafts().then(
+      () => toast("Moved to Drafts.", { id, duration: 4000 }),
+      () => announceCopyInSent(id, moveToDrafts),
+    );
+  };
+  toast.error(CANCELED_SEND_IN_SENT_NOTICE, { id, action: { label: "Retry", onClick: retry } });
 }

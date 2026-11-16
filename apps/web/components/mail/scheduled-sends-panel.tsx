@@ -12,6 +12,7 @@ import type { MailConnection } from "@/hooks/use-mail-vacation-response";
 import { useScheduledMailSends } from "@/hooks/use-scheduled-mail-sends";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { getDraftsMailboxId } from "@/lib/mail/draft-utils";
+import { announceCopyInSent } from "@/lib/mail/held-send-toast";
 import type { JmapMailbox } from "@/lib/mail/types";
 import {
   PaletteButton,
@@ -39,6 +40,10 @@ export function ScheduledSendsPanel({
   const cancel = (send: ScheduledMailSend) => {
     scheduled.cancel(send).then(
       (result) => {
+        if (result === "canceledInSent") {
+          announceCopyInSent(`scheduled-send-${send.submissionId}`, () => scheduled.moveToDrafts(send));
+          return;
+        }
         toast(result === "canceled" ? SCHEDULED_SEND_CANCELED_NOTICE : "Too late to cancel. The message was sent.");
       },
       (error: unknown) => toast.error(getErrorMessage(error, "Couldn't cancel the scheduled send.")),

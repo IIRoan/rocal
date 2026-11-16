@@ -1173,12 +1173,12 @@ describe("held sends", () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
-  it("still reports a confirmed cancel when the move fails", async () => {
+  it("reports a confirmed cancel whose copy is still in Sent when the move fails", async () => {
     const { result, onMoveError } = cancel([
       { methodResponses: [["EmailSubmission/set", { updated: { sub: null } }, "c1"]] },
       { methodResponses: [["Email/set", { notUpdated: { copy: { type: "notFound" } } }, "c1"]] },
     ]);
-    await expect(result).resolves.toBe("canceled");
+    await expect(result).resolves.toBe("canceledInSent");
     expect(onMoveError).toHaveBeenCalled();
   });
 

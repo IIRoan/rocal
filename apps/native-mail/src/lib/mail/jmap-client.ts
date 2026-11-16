@@ -54,7 +54,9 @@ import {
   VACATION_RESPONSE_USING,
   type VacationResponse,
   cancelHeldJmapSubmission,
+  type HeldSubmissionCancelResult,
   listScheduledJmapSends,
+  moveCanceledJmapCopyToDrafts,
   type ScheduledMailSend,
   type VacationResponseUpdate,
 } from "@workspace/calendar-core";
@@ -1169,7 +1171,7 @@ export class StalwartJmapClient {
   async cancelHeldSubmission(
     session: JmapSession,
     input: { submissionId: string; copyEmailId: string; draftsMailboxId: string },
-  ): Promise<"canceled" | "sent"> {
+  ): Promise<HeldSubmissionCancelResult> {
     const mailAccountId = this.requirePrimaryAccountId(session);
     return cancelHeldJmapSubmission({
       ...input,
@@ -1179,6 +1181,14 @@ export class StalwartJmapClient {
       onMoveError: (error) => {
         log.warn("Canceled send move to Drafts failed", sanitizeContext({ error }));
       },
+    });
+  }
+
+  async moveCanceledSendToDrafts(session: JmapSession, input: { copyEmailId: string; draftsMailboxId: string }): Promise<void> {
+    return moveCanceledJmapCopyToDrafts({
+      ...input,
+      mailAccountId: this.requirePrimaryAccountId(session),
+      request: (using, calls) => this.call(session, using, calls),
     });
   }
 

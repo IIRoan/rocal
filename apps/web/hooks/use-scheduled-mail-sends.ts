@@ -47,11 +47,20 @@ export function useScheduledMailSends(
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   });
 
+  const moveToDrafts = useMutation({
+    mutationFn: (send: ScheduledMailSend) => {
+      if (!connection || !draftsMailboxId) throw new Error("Mail is not ready yet.");
+      return connection.client.moveCanceledSendToDrafts(connection.session, { copyEmailId: send.emailId, draftsMailboxId });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
   return {
     sends: query.data ?? NO_SENDS,
     loading: Boolean(connection) && query.isPending,
     loadError: query.error,
     cancel: cancel.mutateAsync,
+    moveToDrafts: moveToDrafts.mutateAsync,
     cancelingId: cancel.isPending ? (cancel.variables?.submissionId ?? null) : null,
   };
 }

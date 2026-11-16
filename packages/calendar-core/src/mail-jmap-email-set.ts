@@ -998,6 +998,26 @@ const cancelResultSchema = z.object({
   notUpdated: z.record(z.string(), z.object({ type: z.string() })).nullish(),
 });
 
+/** "canceledInSent": the server canceled the send but the sealed copy could not be moved out of Sent. */
+export type HeldSubmissionCancelResult = "canceled" | "canceledInSent" | "sent";
+
+export async function moveCanceledJmapCopyToDrafts(input: {
+  mailAccountId: string;
+  request: JmapRequest;
+  copyEmailId: string;
+  draftsMailboxId: string;
+}): Promise<void> {
+  const moved = await input.request(MAIL_CAPABILITIES, [
+    ["Email/set", {
+      accountId: input.mailAccountId,
+      update: { [input.copyEmailId]: { mailboxIds: { [input.draftsMailboxId]: true }, keywords: { $draft: true, $seen: true } } },
+    }, "c1"],
+  ]);
+  assertSuccessfulJmapResponses(moved, "Move to Drafts");
+  const update = z.object({ updated: z.record(z.string(), z.unknown()).nullish() }).safeParse(resultOf(moved, "Email/set"));
+  if (!update.success || !update.data.updated || !(input.copyEmailId in update.data.updated)) throw new Error("Could not move the message to Drafts.");
+}
+
 /** Moves the sealed copy back to Drafts only after the server confirmed the cancel. */
 export async function cancelHeldJmapSubmission(
   input: HeldSubmissionContext & {
@@ -1006,7 +1026,7 @@ export async function cancelHeldJmapSubmission(
     draftsMailboxId: string;
     onMoveError: (error: unknown) => void;
   },
-): Promise<"canceled" | "sent"> {
+): Promise<HeldSubmissionCancelResult> {
   const canceled = await input.request(SUBMISSION_CAPABILITIES, [
     ["EmailSubmission/set", { accountId: input.submissionAccountId, update: { [input.submissionId]: { undoStatus: "canceled" } } }, "c1"],
   ]);
@@ -1014,17 +1034,13 @@ export async function cancelHeldJmapSubmission(
   if (!result.success) throw findJmapResponseError(canceled, "Cancel send") ?? new Error("Could not cancel the send.");
   if (result.data.notUpdated?.[input.submissionId]?.type === "cannotUnsend") return "sent";
   if (!result.data.updated || !(input.submissionId in result.data.updated)) throw new Error("Could not cancel the send.");
-  await input.request(MAIL_CAPABILITIES, [
-    ["Email/set", {
-      accountId: input.mailAccountId,
-      update: { [input.copyEmailId]: { mailboxIds: { [input.draftsMailboxId]: true }, keywords: { $draft: true, $seen: true } } },
-    }, "c1"],
-  ]).then((moved) => {
-    assertSuccessfulJmapResponses(moved, "Move to Drafts");
-    const update = z.object({ updated: z.record(z.string(), z.unknown()).nullish() }).safeParse(resultOf(moved, "Email/set"));
-    if (!update.success || !update.data.updated || !(input.copyEmailId in update.data.updated)) throw new Error("Could not move the message to Drafts.");
-  }).catch(input.onMoveError);
-  return "canceled";
+  return moveCanceledJmapCopyToDrafts(input).then(
+    () => "canceled" as const,
+    (error: unknown) => {
+      input.onMoveError(error);
+      return "canceledInSent" as const;
+    },
+  );
 }
 
 const pendingSubmissionsSchema = z.object({

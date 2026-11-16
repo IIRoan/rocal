@@ -47,11 +47,21 @@ export function useScheduledMailSends() {
     },
   });
 
+  const moveToDrafts = useMutation({
+    mutationFn: (send: ScheduledMailSend) => {
+      const draftsMailboxId = runtime?.mailboxes.find((mailbox) => mailbox.role === "drafts")?.id;
+      if (!runtime || !draftsMailboxId) throw new Error("Mail is not ready yet.");
+      return runtime.client.moveCanceledSendToDrafts(runtime.session, { copyEmailId: send.emailId, draftsMailboxId });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mailMessagesAll() }).catch(() => undefined),
+  });
+
   return {
     sends: query.data ?? NO_SENDS,
     loading: Boolean(runtime) && query.isPending && query.fetchStatus !== "idle",
     loadError: query.error,
     cancel: cancel.mutateAsync,
+    moveToDrafts: moveToDrafts.mutateAsync,
     cancelingId: cancel.isPending ? (cancel.variables?.submissionId ?? null) : null,
   };
 }

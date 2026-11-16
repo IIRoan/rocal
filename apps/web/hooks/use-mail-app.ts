@@ -1952,6 +1952,8 @@ export function useMailApp() {
               copyEmailId: sendResult.emailId,
               draftsMailboxId,
             }),
+          moveToDrafts: () =>
+            mailbox.client.moveCanceledSendToDrafts(mailbox.session, { copyEmailId: sendResult.emailId, draftsMailboxId }),
           onCanceled: () => {
             getMailComposeBridge()?.restoreDraft(draft, sendResult.emailId);
             void queryClient.invalidateQueries({ queryKey: mailQueryKeys.scheduledSends(session?.user?.id ?? null) });

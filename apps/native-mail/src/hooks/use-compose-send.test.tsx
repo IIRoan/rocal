@@ -3,7 +3,13 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { clearMailSendAttempts, discardMailSendAttempt, DEFAULT_MAIL_COMPOSE_SETTINGS } from "@workspace/calendar-core";
+import {
+  CANCELED_SEND_IN_SENT_NOTICE,
+  clearMailSendAttempts,
+  discardMailSendAttempt,
+  DEFAULT_MAIL_COMPOSE_SETTINGS,
+  type HeldSubmissionCancelResult,
+} from "@workspace/calendar-core";
 import { buildMailRuntime } from "../lib/mail/mail-runtime";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
 import { INITIAL_COMPOSE_FORM } from "../lib/mail/compose-form";
@@ -31,7 +37,8 @@ jest.mock("react-native", () => ({ Alert: { alert: jest.fn() } }));
 jest.mock("@workspace/native-core/providers/AuthProvider", () => ({}));
 jest.mock("@workspace/native-core/providers/E2eeProvider", () => ({}));
 const mockToast = jest.fn();
-const mockCancelHeldSubmission = jest.fn(async (_session: unknown, _input: unknown): Promise<"canceled" | "sent"> => "canceled");
+const mockCancelHeldSubmission = jest.fn(async (_session: unknown, _input: unknown): Promise<HeldSubmissionCancelResult> => "canceled");
+const mockMoveCanceledSendToDrafts = jest.fn(async (_session: unknown, _input: unknown) => undefined);
 jest.mock("@workspace/native-core/providers/ToastProvider", () => ({
   useToast: () => ({ toast: mockToast }),
 }));
@@ -177,7 +184,10 @@ describe("native reply send headers", () => {
     const runtime: MailRuntime = {
       ...base,
       mailServerPolicy: { ...base.mailServerPolicy, maxDelayedSendSeconds: options.maxDelayedSendSeconds ?? 0 },
-      client: Object.assign(base.client, { cancelHeldSubmission: mockCancelHeldSubmission }),
+      client: Object.assign(base.client, {
+        cancelHeldSubmission: mockCancelHeldSubmission,
+        moveCanceledSendToDrafts: mockMoveCanceledSendToDrafts,
+      }),
     };
     await act(async () =>
       root.render(
@@ -373,6 +383,25 @@ describe("native reply send headers", () => {
     });
     expect(mockToast).toHaveBeenLastCalledWith("Too late to undo. The message was sent.", "info");
     expect(mockOnRestore).not.toHaveBeenCalled();
+  });
+
+  it("says the copy is still in Sent and retries the move when the cancel could not move it", async () => {
+    mockCancelHeldSubmission.mockResolvedValueOnce("canceledInSent");
+    await send(undefined, { maxDelayedSendSeconds: 600 });
+    const options = mockToast.mock.calls.at(-1)?.[2] as { action: { onPress: () => void } };
+    await act(async () => {
+      options.action.onPress();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const [message, variant, notice] = mockToast.mock.calls.at(-1) as [string, string, { action: { label: string; onPress: () => void } }];
+    expect([message, variant, notice.action.label]).toEqual([CANCELED_SEND_IN_SENT_NOTICE, "error", "Retry"]);
+    expect(mockOnRestore).toHaveBeenCalled();
+    await act(async () => {
+      notice.action.onPress();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(mockMoveCanceledSendToDrafts).toHaveBeenCalledWith(expect.anything(), { copyEmailId: "reply", draftsMailboxId: "drafts" });
+    expect(mockToast).toHaveBeenLastCalledWith("Moved to Drafts.", "success");
   });
 
   it("sends at once without a hold when the server can't delay mail", async () => {
