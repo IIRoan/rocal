@@ -254,32 +254,37 @@ async function readOwnDeviceKeys(deviceId: string): Promise<OwnDeviceKeys | null
   }
 }
 
-/** Opens this device's own wrapped keys, never the server's: anyone can wrap a key to this device's public key. */
+/** Opens this device's own wrapped keys, never the server's; null when it keeps none or they no longer open, while read failures throw. */
 export async function unwrapStoredDeviceKeys(
   e2ee: E2eeModule,
   privateKeyJwk: string,
   deviceId: string,
-): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }> {
+): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey } | null> {
   const own = await readOwnDeviceKeys(deviceId);
-  if (!own) {
-    throw new Error("This device keeps no wrapped keys of its own.");
-  }
+  if (!own) return null;
   const crypto = createNativeCryptoProvider();
   if (!crypto) {
     throw new Error("Native crypto is unavailable for E2EE unwrap.");
   }
 
-  const privateKey = await crypto.subtle.importKey(
-    "jwk",
-    JSON.parse(privateKeyJwk),
-    { name: "RSA-OAEP", hash: "SHA-256" },
-    false,
-    ["unwrapKey"],
-  );
-
-  const accountKey = await e2ee.unwrapAccountKey(own.wrappedAccountKey, privateKey);
-  const blindIndexKey = await e2ee.unwrapBlindIndexKey(own.wrappedSearchKey, privateKey);
-  return { accountKey, blindIndexKey };
+  const open = async () => {
+    const privateKey = await crypto.subtle.importKey(
+      "jwk",
+      JSON.parse(privateKeyJwk),
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["unwrapKey"],
+    );
+    const accountKey = await e2ee.unwrapAccountKey(own.wrappedAccountKey, privateKey);
+    const blindIndexKey = await e2ee.unwrapBlindIndexKey(own.wrappedSearchKey, privateKey);
+    return { accountKey, blindIndexKey };
+  };
+  return open().catch((error: unknown) => {
+    log.warn("Stored E2EE device key no longer opens", {
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
+    return null;
+  });
 }
 
 /** Stores an envelope already wrapped with the password, and remembers its salt as this device's. */

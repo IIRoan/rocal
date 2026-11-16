@@ -1047,6 +1047,52 @@ describe("E2eeProvider", () => {
     expect(mockDeleteE2eeDevice).toHaveBeenCalledWith("device-1");
   });
 
+  it("keeps the server row of a stored key that no longer opens when the envelope is not known to hold it", async () => {
+    storeDevice("older-salt");
+    mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
+    mockE2eeModule.unwrapAccountKey.mockRejectedValue(new Error("OperationError"));
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(
+          createBootstrapResponse({ devices: [storedDeviceRecord], passwordEnvelope: createPasswordRecord() }),
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+
+    expect(mockDeleteE2eeDevice).not.toHaveBeenCalled();
+  });
+
+  it("keeps the device and its server row when its stored keys cannot be read", async () => {
+    storeDevice("salt");
+    const stored = mockGetItemAsync.getMockImplementation();
+    mockGetItemAsync.mockImplementation(async (key: string) => {
+      if (key === "E2EE_DEVICE_KEYS") throw new Error("Keychain unavailable");
+      return (await stored?.(key)) ?? null;
+    });
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(
+          createBootstrapResponse({ devices: [storedDeviceRecord], passwordEnvelope: createPasswordRecord() }),
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await expect(getE2ee().bootstrap("user-1", "https://api.solace.test")).rejects.toThrow("Keychain unavailable");
+    });
+
+    expect(mockDeleteE2eeDevice).not.toHaveBeenCalled();
+    expect(mockSetItemAsync).not.toHaveBeenCalledWith("E2EE_DEVICE_ID", expect.anything());
+  });
+
   it.each([
     ["deletes the device key the envelope is known to hold", "salt", true],
     ["keeps a device key no envelope is known to hold", null, false],
