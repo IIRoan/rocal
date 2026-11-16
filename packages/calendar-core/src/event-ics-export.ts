@@ -19,6 +19,17 @@ export interface EventIcsExport {
 
 export class EventIcsExportError extends Error {}
 
+/** A calendar export leaves out events this device can't open, and says how many. */
+export interface CalendarIcsExport extends EventIcsExport {
+  skipped: number;
+}
+
+export function calendarIcsExportSkippedNotice(skipped: number): string {
+  return skipped === 1
+    ? "1 event couldn't be opened on this device, so it was left out of the export."
+    : `${skipped} events couldn't be opened on this device, so they were left out of the export.`;
+}
+
 /** Same rules as the backend export, so web and native downloads get the same file name. */
 export function toSafeIcsFilename(baseName: string): string {
   const normalized = (baseName.trim() || "calendar")
@@ -113,15 +124,10 @@ export function buildEventIcsExport(
 
 /** Builds a whole calendar's .ics on-device from the decrypted corpus: series with their exceptions, overrides under the series UID, and every other row on its own. */
 export function buildCalendarIcsExport(
-  events: CalendarEvent[],
+  corpus: CalendarEvent[],
   options: { calendarName: string; timezone?: string | null },
-): EventIcsExport {
-  if (events.some(isStillEncrypted)) {
-    throw new EventIcsExportError(
-      "Some events are still encrypted on this device, so the calendar can't be exported yet.",
-    );
-  }
-
+): CalendarIcsExport {
+  const events = corpus.filter((event) => !isStillEncrypted(event));
   const exportedIds = new Set(events.map((event) => event.id));
   const overrides = new Map<string, { uid: string; recurrenceId: Date }>();
   const exceptionDates = new Map<string, Date[]>();
@@ -157,5 +163,6 @@ export function buildCalendarIcsExport(
       events: icsEvents,
     }),
     filename: toSafeIcsFilename(options.calendarName),
+    skipped: corpus.length - events.length,
   };
 }

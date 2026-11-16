@@ -1,7 +1,7 @@
 import type { Calendar } from "@workspace/calendar-core";
 import {
   buildCalendarIcsExport,
-  type EventIcsExport,
+  type CalendarIcsExport,
 } from "@workspace/calendar-core/event-ics-export";
 import type { CalendarApiService } from "./calendar-api-service";
 import { loadEventSearchCorpus } from "./event-search-corpus";
@@ -10,7 +10,7 @@ import { loadEventSearchCorpus } from "./event-search-corpus";
 export async function loadCalendarIcsExport(
   api: Pick<CalendarApiService, "getEventSearchCorpus">,
   options: { calendars: Array<Pick<Calendar, "id" | "name">>; timezone?: string | null },
-): Promise<EventIcsExport> {
+): Promise<CalendarIcsExport> {
   const [only, ...others] = options.calendars;
   const calendarIds = new Set(options.calendars.map((calendar) => calendar.id));
   const events = await loadEventSearchCorpus(api, { includeExceptions: true });

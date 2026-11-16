@@ -1,7 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { loadCalendarIcsExport } from "@workspace/calendar-client";
 import { getErrorMessage, type Calendar } from "@workspace/calendar-core";
-import { EventIcsExportError } from "@workspace/calendar-core/event-ics-export";
+import {
+  calendarIcsExportSkippedNotice,
+  EventIcsExportError,
+} from "@workspace/calendar-core/event-ics-export";
 import { useUserTimezone } from "@workspace/native-core/hooks/use-user-timezone";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -12,8 +15,14 @@ export function useCalendarIcsExport() {
   const { toast } = useToast();
   const timezone = useUserTimezone();
   return useMutation({
-    mutationFn: async (calendars: Calendar[]) =>
-      shareIcsFile(await loadCalendarIcsExport(calendarApiService, { calendars, timezone })),
+    mutationFn: async (calendars: Calendar[]) => {
+      const file = await loadCalendarIcsExport(calendarApiService, { calendars, timezone });
+      await shareIcsFile(file);
+      return file.skipped;
+    },
+    onSuccess: (skipped) => {
+      if (skipped > 0) toast(calendarIcsExportSkippedNotice(skipped), "info");
+    },
     onError: (error) =>
       toast(
         error instanceof EventIcsExportError

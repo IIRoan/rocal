@@ -1,5 +1,6 @@
 import {
   buildCalendarIcsExport,
+  calendarIcsExportSkippedNotice,
   buildEventIcsExport,
   EventIcsExportError,
   toSafeIcsFilename,
@@ -170,12 +171,16 @@ describe("buildCalendarIcsExport", () => {
     expect(block("Dentist")).toContain("DTSTART:20250616T070000Z");
   });
 
-  it("refuses the whole export while any event is still locked", () => {
-    expect(() =>
-      buildCalendarIcsExport(
-        [series, makeEvent({ id: "locked", title: "Encrypted event", encryptionState: "encrypted" })],
-        { calendarName: "Work" },
-      ),
-    ).toThrow("Some events are still encrypted on this device");
+  it("leaves out events this device can't open and counts them", () => {
+    const { icsContent, skipped } = buildCalendarIcsExport(
+      [series, makeEvent({ id: "locked", title: "Encrypted event", encryptionState: "encrypted" })],
+      { calendarName: "Work" },
+    );
+    expect(skipped).toBe(1);
+    expect(icsContent).toContain("SUMMARY:Weekly sync");
+    expect(icsContent).not.toContain("Encrypted event");
+    expect(calendarIcsExportSkippedNotice(skipped)).toBe(
+      "1 event couldn't be opened on this device, so it was left out of the export.",
+    );
   });
 });
