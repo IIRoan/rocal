@@ -3,8 +3,8 @@
 use std::collections::{HashMap, HashSet};
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, ExprTrait, FromQueryResult, IdenStatic,
-    Iterable, QueryFilter, QueryOrder, QuerySelect, Statement, TransactionTrait, Value as SqlValue,
+    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, FromQueryResult, IdenStatic, Iterable,
+    QueryFilter, QueryOrder, QuerySelect, Statement, TransactionTrait, Value as SqlValue,
 };
 use serde_json::Value;
 use solace_api_types::SuccessMessage;
@@ -30,21 +30,18 @@ const NOT_FOUND: &str = "Trashed event not found";
 /// The list returns at most this many entries, so a full trash cannot make one response unbounded.
 const LIST_LIMIT: i64 = 500;
 
-/// One entry per root: the root and its children, their exceptions and reminders, and participants as email, role and status only. `$2` is `[{eventId, trashId}]`.
+/// One entry per root: the root and its children, their exceptions and reminders, and participants as email, role and status only. `$2` is `[{eventId, trashId, ids}]`, `ids` the locked family.
 const TRASH_ROOTS: &str = r#"
 INSERT INTO event_trash (id, user_id, event_id, calendar_id, rows)
 SELECT r."trashId", e.user_id, e.id, e.calendar_id, jsonb_build_object(
-    'events', coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM calendar_event x WHERE x.id = ANY(family.ids)), '[]'::jsonb),
-    'exceptions', coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM recurrence_exception x WHERE x.parent_event_id = ANY(family.ids) OR x.modified_event_id = ANY(family.ids)), '[]'::jsonb),
-    'reminders', coalesce((SELECT jsonb_agg(to_jsonb(n)) FROM event_notification n WHERE n.event_id = ANY(family.ids)), '[]'::jsonb),
+    'events', coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM calendar_event x WHERE x.id = ANY(r."ids")), '[]'::jsonb),
+    'exceptions', coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM recurrence_exception x WHERE x.parent_event_id = ANY(r."ids") OR x.modified_event_id = ANY(r."ids")), '[]'::jsonb),
+    'reminders', coalesce((SELECT jsonb_agg(to_jsonb(n)) FROM event_notification n WHERE n.event_id = ANY(r."ids")), '[]'::jsonb),
     'participants', coalesce((SELECT jsonb_agg(jsonb_build_object('eventId', p.event_id, 'email', coalesce(nullif(p.email, ''), u.email), 'role', p.role, 'status', p.status))
-        FROM event_participant p LEFT JOIN "user" u ON u.id = p.user_id WHERE p.event_id = ANY(family.ids)), '[]'::jsonb)
+        FROM event_participant p LEFT JOIN "user" u ON u.id = p.user_id WHERE p.event_id = ANY(r."ids")), '[]'::jsonb)
 )
-FROM jsonb_to_recordset($2::jsonb) AS r("eventId" text, "trashId" text)
+FROM jsonb_to_recordset($2::jsonb) AS r("eventId" text, "trashId" text, "ids" text[])
 JOIN calendar_event e ON e.id = r."eventId" AND e.user_id = $1
-CROSS JOIN LATERAL (
-    SELECT array_agg(c.id) AS ids FROM calendar_event c WHERE c.user_id = $1 AND (c.id = e.id OR c.parent_event_id = e.id)
-) AS family
 RETURNING id"#;
 
 /// Moves the owner's events, each with its children, into the trash and deletes them; a selected child of a selected series goes with its series. Returns the new entries' ids.
@@ -54,35 +51,51 @@ pub async fn trash_events<C: ConnectionTrait>(
     root_ids: &[String],
 ) -> Result<Vec<String>, DbErr> {
     // A racing delete or update waits here, so a second delete finds the rows gone and trashes nothing.
-    let locked: Vec<(String, Option<String>)> = calendar_event::Entity::find()
+    let selected: Vec<(String, Option<String>)> = calendar_event::Entity::find()
         .select_only()
         .column(calendar_event::Column::Id)
         .column(calendar_event::Column::ParentEventId)
         .filter(calendar_event::Column::UserId.eq(user_id))
-        .filter(
-            calendar_event::Column::Id
-                .is_in(root_ids.to_vec())
-                .or(calendar_event::Column::ParentEventId.is_in(root_ids.to_vec())),
-        )
+        .filter(calendar_event::Column::Id.is_in(root_ids.to_vec()))
         .order_by_asc(calendar_event::Column::Id)
         .lock_exclusive()
         .into_tuple()
         .all(db)
         .await?;
-    let selected: HashSet<&str> = root_ids.iter().map(String::as_str).collect();
-    let roots: Vec<String> = locked
+    let chosen: HashSet<&str> = root_ids.iter().map(String::as_str).collect();
+    let roots: Vec<String> = selected
         .into_iter()
-        .filter(|(id, parent)| {
-            selected.contains(id.as_str())
-                && !parent
-                    .as_deref()
-                    .is_some_and(|parent| selected.contains(parent))
+        .filter(|(_, parent)| {
+            !parent
+                .as_deref()
+                .is_some_and(|parent| chosen.contains(parent))
         })
         .map(|(id, _)| id)
         .collect();
-    let entries: Vec<Value> = roots
+    // A new child locks its series first (`recurring::service::edit`), so with the roots held this family is complete.
+    let children: Vec<(String, Option<String>)> = calendar_event::Entity::find()
+        .select_only()
+        .column(calendar_event::Column::Id)
+        .column(calendar_event::Column::ParentEventId)
+        .filter(calendar_event::Column::UserId.eq(user_id))
+        .filter(calendar_event::Column::ParentEventId.is_in(roots.clone()))
+        .order_by_asc(calendar_event::Column::Id)
+        .lock_exclusive()
+        .into_tuple()
+        .all(db)
+        .await?;
+    let mut families: HashMap<&str, Vec<String>> = roots
         .iter()
-        .map(|root| serde_json::json!({"eventId": root, "trashId": cuid()}))
+        .map(|root| (root.as_str(), vec![root.clone()]))
+        .collect();
+    for (child, parent) in children {
+        if let Some(family) = parent.and_then(|parent| families.get_mut(parent.as_str())) {
+            family.push(child);
+        }
+    }
+    let entries: Vec<Value> = families
+        .iter()
+        .map(|(root, ids)| serde_json::json!({"eventId": root, "trashId": cuid(), "ids": ids}))
         .collect();
     let trashed = db
         .query_all_raw(Statement::from_sql_and_values(
@@ -94,18 +107,8 @@ pub async fn trash_events<C: ConnectionTrait>(
         .iter()
         .map(|row| row.try_get::<String>("", "id"))
         .collect::<Result<Vec<_>, _>>()?;
-    let ids: Vec<String> = calendar_event::Entity::find()
-        .select_only()
-        .column(calendar_event::Column::Id)
-        .filter(calendar_event::Column::UserId.eq(user_id))
-        .filter(
-            calendar_event::Column::Id
-                .is_in(roots.clone())
-                .or(calendar_event::Column::ParentEventId.is_in(roots)),
-        )
-        .into_tuple()
-        .all(db)
-        .await?;
+    // Exactly the rows saved above are deleted.
+    let ids: Vec<String> = families.into_values().flatten().collect();
     queries::delete_reminders(db, ids.clone()).await?;
     queries::delete_notification_logs(db, Some(user_id), ids.clone()).await?;
     queries::delete(db, user_id, ids).await?;

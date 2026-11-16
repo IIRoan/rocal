@@ -683,8 +683,8 @@ async fn editing_one_occurrence_detaches_it_with_the_series_ciphertext() {
             &series.id.0
         )
         .await,
-        3,
-        "a second detach of one occurrence fails on the unique exception after inserting its row"
+        2,
+        "a second detach of one occurrence fails on the unique exception and keeps no row"
     );
 }
 

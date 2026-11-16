@@ -1,6 +1,7 @@
 //! `/api/events/trash`: deletes move events into the owner's trash, restores bring them back under the same ids and ciphertext, purges delete for good.
 
 use serde_json::{Value, json};
+use solace_api_tests::seed::fake_envelope;
 use solace_api_types::SuccessMessage;
 use solace_api_types::events::{
     BulkEventResult, Event, EventDeleted, ParticipantInput, TrashedEvent, TrashedEventList,
@@ -308,6 +309,82 @@ async fn a_detached_occurrence_restored_alone_relinks_to_its_series() {
     );
     restore(&mut owner, &trash_id).await;
     assert_eq!(exceptions(&app.db, &series.id.0).await, linked);
+}
+
+#[tokio::test]
+async fn an_occurrence_edited_while_its_series_is_trashed_waits_and_is_never_left_behind() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    let calendar = calendar_id(&mut owner, "Work").await;
+    let mut request = encrypted_event(
+        &calendar,
+        "2099-03-02T09:00:00.000Z",
+        "2099-03-02T10:00:00.000Z",
+    );
+    request.recurrence = Some(r#"{"frequency":"weekly","interval":1,"count":4}"#.into());
+    let series = create_event(&mut owner, &request).await.id.0;
+    // This transaction stands in for a trash that has saved the family it locked.
+    let mut trashing = app.db.begin().await.expect("transaction");
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *trashing)
+        .await
+        .expect("backend pid");
+    sqlx::query("SELECT id FROM calendar_event WHERE id = $1 FOR UPDATE")
+        .bind(&series)
+        .execute(&mut *trashing)
+        .await
+        .expect("series lock");
+    let mut twin = owner.agent.clone();
+    let path = format!("/api/recurring/event/{series}");
+    let edit = tokio::spawn(async move {
+        twin.put(
+            &path,
+            json!({
+                "editScope": "this_only",
+                "occurrenceDate": "2099-03-16T09:00:00.000Z",
+                "newEventId": hex(16),
+                "updates": {
+                    "start": "2099-03-16T14:00:00.000Z",
+                    "end": "2099-03-16T15:00:00.000Z",
+                    "encryptedContent": fake_envelope(),
+                    "encryptionKeyVersion": 2,
+                },
+            }),
+        )
+        .await
+    });
+    let blocked = "SELECT count(*) FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))";
+    for attempt in 0.. {
+        let waiting: i64 = sqlx::query_scalar(blocked)
+            .bind(pid)
+            .fetch_one(&app.db)
+            .await
+            .expect("blocked queries");
+        if waiting > 0 || edit.is_finished() {
+            break;
+        }
+        assert!(attempt < 1200, "the edit never reached the series");
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+    sqlx::query("DELETE FROM calendar_event WHERE id = $1")
+        .bind(&series)
+        .execute(&mut *trashing)
+        .await
+        .expect("delete the saved family");
+    trashing.commit().await.expect("commit");
+
+    let response = ok(edit.await.expect("edit task"));
+    assert_eq!(response.status.as_u16(), 400, "the series is gone");
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE parent_event_id = $1",
+            &series,
+        )
+        .await,
+        0,
+        "no occurrence outlives its trashed series"
+    );
 }
 
 #[tokio::test]

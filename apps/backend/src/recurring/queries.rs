@@ -1,6 +1,8 @@
 //! Series rows and their recurrence exceptions, scoped to the owner.
 
-use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
+};
 
 use crate::db::entities::{calendar_event, recurrence_exception};
 
@@ -16,6 +18,21 @@ pub async fn series<C: ConnectionTrait>(
         .filter(calendar_event::Column::Recurrence.is_not_null())
         .one(db)
         .await
+}
+
+/// Locks the owner's series row for the transaction, so a trash of it waits for a new child or finds it; false when it is gone.
+pub async fn lock_series<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+    id: &str,
+) -> Result<bool, sea_orm::DbErr> {
+    calendar_event::Entity::find()
+        .filter(calendar_event::Column::Id.eq(id))
+        .filter(calendar_event::Column::UserId.eq(user_id))
+        .lock_exclusive()
+        .one(db)
+        .await
+        .map(|row| row.is_some())
 }
 
 pub async fn exception<C: ConnectionTrait>(

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use sea_orm::{Set, TransactionTrait};
+use sea_orm::{ConnectionTrait, DatabaseTransaction, Set, TransactionTrait};
 use solace_api_types::events::{Event, ParticipantInput};
 use solace_api_types::recurring::{
     DeleteRecurringQuery, EditRecurringRequest, PreviewInstance, PreviewRecurrenceRequest,
@@ -395,15 +395,17 @@ pub async fn edit(
         "this_only" => {
             let date = occurrence_date(occurrence, "this_only", "edit")?;
             let row = child_row(&existing.row, updates, id, child_id, None, date)?;
-            let detached = events::insert(&state.db, row).await?;
+            let transaction = lock_parent(state, &user.id, id).await?;
+            let detached = events::insert(&transaction, row).await?;
             queries::insert_exception(
-                &state.db,
+                &transaction,
                 id,
                 column(date)?,
                 "modified",
                 Some(detached.id.clone()),
             )
             .await?;
+            transaction.commit().await?;
             respond(state, user, detached, updates, Some(&existing)).await
         }
         "this_and_future" => {
@@ -413,8 +415,10 @@ pub async fn edit(
                 .clone()
                 .or_else(|| existing.row.recurrence.clone());
             let row = child_row(&existing.row, updates, id, child_id, recurrence, date)?;
-            split(state, &existing.row, date).await?;
-            let future = events::insert(&state.db, row).await?;
+            let transaction = lock_parent(state, &user.id, id).await?;
+            split(&transaction, &existing.row, date).await?;
+            let future = events::insert(&transaction, row).await?;
+            transaction.commit().await?;
             respond(state, user, future, updates, Some(&existing)).await
         }
         _ => {
@@ -431,16 +435,29 @@ pub async fn edit(
     }
 }
 
-/// Ends the stored rule the day before the split, when it is readable.
-async fn split(
+/// A transaction holding the series row, so trashing the series cannot miss or drop the child created in it.
+async fn lock_parent(
     state: &AppState,
+    user_id: &str,
+    id: &str,
+) -> Result<DatabaseTransaction, AppError> {
+    let transaction = state.db.begin().await?;
+    if !queries::lock_series(&transaction, user_id, id).await? {
+        return Err(AppError::validation(NOT_FOUND));
+    }
+    Ok(transaction)
+}
+
+/// Ends the stored rule the day before the split, when it is readable.
+async fn split<C: ConnectionTrait>(
+    db: &C,
     series: &calendar_event::Model,
     date: Option<i64>,
 ) -> Result<(), AppError> {
     if let Some(rule) = rules::split_rule(series.recurrence.as_deref(), date) {
         let mut row: calendar_event::ActiveModel = series.clone().into();
         row.recurrence = Set(Some(rule));
-        events::update(&state.db, row).await?;
+        events::update(db, row).await?;
     }
     Ok(())
 }
@@ -517,7 +534,7 @@ pub async fn delete(
         }
         "this_and_future" => {
             let date = occurrence_date(occurrence, "this_and_future", "delete")?;
-            split(state, &existing.row, date).await?;
+            split(&state.db, &existing.row, date).await?;
             ("Future occurrences deleted successfully", "delete_future")
         }
         _ => {
