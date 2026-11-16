@@ -30,21 +30,21 @@ const NOT_FOUND: &str = "Trashed event not found";
 /// The list returns at most this many entries, so a full trash cannot make one response unbounded.
 const LIST_LIMIT: i64 = 500;
 
-/// One entry per root: the root and its children, their exceptions and reminders, and participants as email, role and status only.
-const TRASH_ROOT: &str = r#"
-WITH ids AS (
-    SELECT id FROM calendar_event WHERE user_id = $1 AND (id = $2 OR parent_event_id = $2)
-), payload AS (
-    SELECT jsonb_build_object(
-        'events', coalesce((SELECT jsonb_agg(to_jsonb(e)) FROM calendar_event e WHERE e.user_id = $1 AND e.id IN (SELECT id FROM ids)), '[]'::jsonb),
-        'exceptions', coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM recurrence_exception x WHERE x.parent_event_id IN (SELECT id FROM ids) OR x.modified_event_id IN (SELECT id FROM ids)), '[]'::jsonb),
-        'reminders', coalesce((SELECT jsonb_agg(to_jsonb(n)) FROM event_notification n WHERE n.event_id IN (SELECT id FROM ids)), '[]'::jsonb),
-        'participants', coalesce((SELECT jsonb_agg(jsonb_build_object('eventId', p.event_id, 'email', coalesce(nullif(p.email, ''), u.email), 'role', p.role, 'status', p.status))
-            FROM event_participant p LEFT JOIN "user" u ON u.id = p.user_id WHERE p.event_id IN (SELECT id FROM ids)), '[]'::jsonb)
-    ) AS rows
-)
+/// One entry per root: the root and its children, their exceptions and reminders, and participants as email, role and status only. `$2` is `[{eventId, trashId}]`.
+const TRASH_ROOTS: &str = r#"
 INSERT INTO event_trash (id, user_id, event_id, calendar_id, rows)
-SELECT $3, e.user_id, e.id, e.calendar_id, payload.rows FROM calendar_event e, payload WHERE e.id = $2 AND e.user_id = $1
+SELECT r."trashId", e.user_id, e.id, e.calendar_id, jsonb_build_object(
+    'events', coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM calendar_event x WHERE x.id = ANY(family.ids)), '[]'::jsonb),
+    'exceptions', coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM recurrence_exception x WHERE x.parent_event_id = ANY(family.ids) OR x.modified_event_id = ANY(family.ids)), '[]'::jsonb),
+    'reminders', coalesce((SELECT jsonb_agg(to_jsonb(n)) FROM event_notification n WHERE n.event_id = ANY(family.ids)), '[]'::jsonb),
+    'participants', coalesce((SELECT jsonb_agg(jsonb_build_object('eventId', p.event_id, 'email', coalesce(nullif(p.email, ''), u.email), 'role', p.role, 'status', p.status))
+        FROM event_participant p LEFT JOIN "user" u ON u.id = p.user_id WHERE p.event_id = ANY(family.ids)), '[]'::jsonb)
+)
+FROM jsonb_to_recordset($2::jsonb) AS r("eventId" text, "trashId" text)
+JOIN calendar_event e ON e.id = r."eventId" AND e.user_id = $1
+CROSS JOIN LATERAL (
+    SELECT array_agg(c.id) AS ids FROM calendar_event c WHERE c.user_id = $1 AND (c.id = e.id OR c.parent_event_id = e.id)
+) AS family
 RETURNING id"#;
 
 /// Moves the owner's events, each with its children, into the trash and deletes them; a selected child of a selected series goes with its series. Returns the new entries' ids.
@@ -80,21 +80,20 @@ pub async fn trash_events<C: ConnectionTrait>(
         })
         .map(|(id, _)| id)
         .collect();
-    let backend = db.get_database_backend();
-    let mut trashed = Vec::new();
-    for root in &roots {
-        let id = cuid();
-        let inserted = db
-            .query_one_raw(Statement::from_sql_and_values(
-                backend,
-                TRASH_ROOT,
-                [user_id.into(), root.as_str().into(), id.as_str().into()],
-            ))
-            .await?;
-        if inserted.is_some() {
-            trashed.push(id);
-        }
-    }
+    let entries: Vec<Value> = roots
+        .iter()
+        .map(|root| serde_json::json!({"eventId": root, "trashId": cuid()}))
+        .collect();
+    let trashed = db
+        .query_all_raw(Statement::from_sql_and_values(
+            db.get_database_backend(),
+            TRASH_ROOTS,
+            [user_id.into(), Value::Array(entries).into()],
+        ))
+        .await?
+        .iter()
+        .map(|row| row.try_get::<String>("", "id"))
+        .collect::<Result<Vec<_>, _>>()?;
     let ids: Vec<String> = calendar_event::Entity::find()
         .select_only()
         .column(calendar_event::Column::Id)
@@ -185,7 +184,7 @@ struct Locked {
     rows: Value,
 }
 
-/// The original calendar while it is the owner's and writable, else the default one, else the first writable one.
+/// The original calendar while it is the owner's and writable, the hidden Invitations one included, as the list reports it; else the default one, else the first writable one.
 async fn restore_target<C: ConnectionTrait>(
     db: &C,
     user_id: &str,
@@ -195,7 +194,9 @@ async fn restore_target<C: ConnectionTrait>(
         .await?
         .into_iter()
         .filter(super::service::is_writable)
-        .filter(|calendar| {
+        .collect();
+    let visible = || {
+        owned.iter().filter(|calendar| {
             !is_mail_invitation_staging_calendar(
                 &calendar.kind,
                 calendar.is_sync_only,
@@ -203,12 +204,12 @@ async fn restore_target<C: ConnectionTrait>(
                 &calendar.name,
             )
         })
-        .collect();
+    };
     owned
         .iter()
         .find(|calendar| calendar.id == original)
-        .or_else(|| owned.iter().find(|calendar| calendar.is_default))
-        .or_else(|| owned.first())
+        .or_else(|| visible().find(|calendar| calendar.is_default))
+        .or_else(|| visible().next())
         .cloned()
         .ok_or_else(|| AppError::Conflict("No calendar to restore into".into()))
 }

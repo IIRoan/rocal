@@ -9,7 +9,8 @@ use solace_api_types::recurring::RecurringDeleted;
 use sqlx::PgPool;
 
 use crate::event_fixtures::{
-    FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event, list_events, row_snapshot,
+    FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event, insert_plaintext_event,
+    insert_staging_calendar, list_events, row_snapshot,
 };
 use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, hex, ok};
 
@@ -350,6 +351,24 @@ async fn a_restore_without_its_calendar_lands_in_the_default_one_and_drops_a_del
 }
 
 #[tokio::test]
+async fn a_staged_invitation_copy_comes_back_to_the_hidden_calendar_it_left() {
+    let app = TestApp::spawn().await;
+    let mut owner = app.user().await;
+    calendar_id(&mut owner, "Personal").await;
+    let staging = insert_staging_calendar(&app, &owner.id).await;
+    let staged =
+        insert_plaintext_event(&app, &owner.id, &staging, "Plain", FUTURE_START, FUTURE_END).await;
+    let trash_id = delete(&mut owner, &staged).await;
+    assert!(!trash(&mut owner).await[0].calendar_missing);
+
+    let restored = restore(&mut owner, &trash_id).await;
+    assert_eq!(
+        restored.calendar_id.0, staging,
+        "it never surfaces in a visible calendar"
+    );
+}
+
+#[tokio::test]
 async fn the_trash_is_private_to_its_owner() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
@@ -436,6 +455,23 @@ async fn bulk_deletes_trash_each_event_once_and_purges_delete_for_good() {
     let mut expected = [single.id.0.as_str(), series.id.0.as_str()];
     expected.sort_unstable();
     assert_eq!(roots, expected, "the occurrence goes with its series");
+    let mut stored: Vec<(String, Vec<String>, i64)> = sqlx::query_as(
+        "SELECT event_id, (SELECT array_agg(e ->> 'id' ORDER BY e ->> 'id') FROM jsonb_array_elements(rows -> 'events') e), \
+         jsonb_array_length(rows -> 'exceptions')::int8 FROM event_trash WHERE user_id = $1 ORDER BY event_id",
+    )
+    .bind(&owner.id)
+    .fetch_all(&app.db)
+    .await
+    .expect("entries");
+    stored.sort_unstable();
+    let mut family = vec![series.id.0.clone(), detached.id.0.clone()];
+    family.sort_unstable();
+    let mut expected = vec![
+        (single.id.0.clone(), vec![single.id.0.clone()], 0),
+        (series.id.0.clone(), family, 1),
+    ];
+    expected.sort_unstable();
+    assert_eq!(stored, expected, "each entry holds only its own rows");
 
     let purged: SuccessMessage = ok(owner
         .delete(&format!("/api/events/trash/{}", listed[0].id))
