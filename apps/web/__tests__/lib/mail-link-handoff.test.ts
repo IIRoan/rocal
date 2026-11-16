@@ -9,9 +9,8 @@ import {
   oneClickUnsubscribeUrl,
   registerMailLinks,
   resolveMailLink,
-  setPendingMailto,
   startMailLinkResponder,
-  takePendingMailto,
+  takeMailLinkFragment,
 } from "@/lib/mail/mail-link-handoff";
 
 type Listener = ((event: { data: unknown }) => void) | null;
@@ -107,15 +106,13 @@ describe("mail link handoff", () => {
     intruder.close();
   });
 
-  it("forgets every link and the pending draft when cleared", async () => {
+  it("forgets every link when cleared", async () => {
     jest.useFakeTimers();
     registerMailLinks([{ id: `${TOKEN}.0`, href: "mailto:a@example.org", text: "" }]);
-    setPendingMailto({ to: ["a@example.org"], cc: [], bcc: [], subject: "", body: "" });
     clearMailLinkHandoff();
     const pending = resolveMailLink(`${TOKEN}.0`, 50);
     jest.advanceTimersByTime(50);
     await expect(pending).resolves.toBeNull();
-    expect(takePendingMailto()).toBeNull();
   });
 
   it("evicts the oldest links beyond the cap", async () => {
@@ -135,10 +132,10 @@ describe("mail link handoff", () => {
     });
   });
 
-  it("hands the pending mailto draft out once", () => {
-    const draft = { to: ["a@example.org"], cc: [], bcc: [], subject: "Hi", body: "" };
-    setPendingMailto(draft);
-    expect(takePendingMailto()).toEqual(draft);
-    expect(takePendingMailto()).toBeNull();
+  it("takes the link id from the fragment and drops it from history", () => {
+    window.history.replaceState(null, "", `/mail#${TOKEN}.2`);
+    expect(takeMailLinkFragment()).toBe(`${TOKEN}.2`);
+    expect(window.location.href).toBe(`${window.location.origin}/mail`);
+    expect(takeMailLinkFragment()).toBe("");
   });
 });

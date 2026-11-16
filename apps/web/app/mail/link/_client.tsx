@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   assessMailLink,
   describeMailLink,
@@ -14,9 +13,10 @@ import { Button } from "@workspace/ui/components/ui/button";
 import {
   canonicalMailLinkUrl,
   oneClickUnsubscribeUrl,
+  openMailDocument,
   openMailLinkTarget,
   resolveMailLink,
-  setPendingMailto,
+  takeMailLinkFragment,
   type MailLink,
 } from "@/lib/mail/mail-link-handoff";
 
@@ -47,34 +47,29 @@ function resolvedState(link: MailLink | null): MailLinkPageState {
 }
 
 export function MailLinkPageContent() {
-  const router = useRouter();
   const [state, setState] = useState<MailLinkPageState>({ status: "resolving" });
   const linkIdRef = useRef<string | null>(null);
 
   // The reader tab's answer arrives from outside React, so acting on it is an event, not render work.
-  const onResolved = useEffectEvent((link: MailLink | null) => {
-    const draft = link ? parseMailtoLink(link.href) : null;
-    if (!draft) {
-      setState(resolvedState(link));
+  const onResolved = useEffectEvent((id: string, link: MailLink | null) => {
+    if (link && parseMailtoLink(link.href)) {
+      openMailDocument(id);
       return;
     }
-    setPendingMailto(draft);
-    router.replace("/mail");
+    setState(resolvedState(link));
   });
 
   // The fragment holds only an opaque id; it leaves the address bar and history before the reader tab is asked.
   useEffect(() => {
-    if (linkIdRef.current === null) {
-      linkIdRef.current = window.location.hash.slice(1);
-      window.history.replaceState(null, "", window.location.pathname);
-    }
+    if (linkIdRef.current === null) linkIdRef.current = takeMailLinkFragment();
+    const id = linkIdRef.current;
     let current = true;
-    resolveMailLink(linkIdRef.current).then(
+    resolveMailLink(id).then(
       (link) => {
-        if (current) onResolved(link);
+        if (current) onResolved(id, link);
       },
       () => {
-        if (current) onResolved(null);
+        if (current) onResolved(id, null);
       },
     );
     return () => {
@@ -84,7 +79,7 @@ export function MailLinkPageContent() {
 
   const cancel = () => {
     window.close();
-    router.replace("/mail");
+    openMailDocument();
   };
 
   return (

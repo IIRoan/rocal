@@ -1,8 +1,4 @@
-import {
-  assessMailLink,
-  shouldConfirmMailLink,
-  type MailtoDraft,
-} from "@workspace/calendar-core";
+import { assessMailLink, shouldConfirmMailLink } from "@workspace/calendar-core";
 import { z } from "@workspace/calendar-core/zod";
 
 export const MAIL_LINK_CHANNEL = "solace:mail-link";
@@ -24,7 +20,6 @@ const resolvedResponseSchema = z.strictObject({
 });
 
 const registry = new Map<string, MailLink>();
-let pendingMailto: MailtoDraft | null = null;
 
 /** Only an opaque random id ever reaches a URL; the reader tab answers for it over a same-origin channel. */
 export function mailLinkHandoffUrl(id: string): string {
@@ -44,7 +39,18 @@ export function registerMailLinks(entries: ReadonlyArray<MailLink & { id: string
 
 export function clearMailLinkHandoff(): void {
   registry.clear();
-  pendingMailto = null;
+}
+
+/** Reads the opaque link id from the fragment and drops it from the address bar and history. */
+export function takeMailLinkFragment(): string {
+  const id = window.location.hash.slice(1);
+  if (id) window.history.replaceState(null, "", window.location.pathname);
+  return id;
+}
+
+/** A full document load, so Mail gets its own CSP rather than keeping the link page's `form-action https:`. */
+export function openMailDocument(mailtoLinkId?: string): void {
+  window.location.replace(mailtoLinkId ? `/mail#${mailtoLinkId}` : "/mail");
 }
 
 /** Answers link pages opened from this tab's messages; returns the channel's teardown. */
@@ -94,16 +100,6 @@ export function mailUnsubscribeHandoffUrl(url: string, address: string): string 
 export function oneClickUnsubscribeUrl(href: string): string | null {
   const url = canonicalMailLinkUrl(href);
   return url?.protocol === "https:" ? url.href : null;
-}
-
-export function setPendingMailto(draft: MailtoDraft): void {
-  pendingMailto = draft;
-}
-
-export function takePendingMailto(): MailtoDraft | null {
-  const draft = pendingMailto;
-  pendingMailto = null;
-  return draft;
 }
 
 /** The browser's WHATWG parser gives the canonical URL (IDN hosts as `xn--`); null when it cannot open the link at all. */

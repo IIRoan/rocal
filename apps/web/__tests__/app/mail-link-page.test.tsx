@@ -5,13 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import { createRoot, type Root } from "react-dom/client";
 import type { MailLink } from "@/lib/mail/mail-link-handoff";
 
-const mockReplace = jest.fn();
-const mockRouter = { replace: mockReplace };
 const mockResolveMailLink = jest.fn<(id: string) => Promise<MailLink | null>>();
-const mockSetPendingMailto = jest.fn();
+const mockOpenMailDocument = jest.fn();
 const mockOpenMailLinkTarget = jest.fn();
 
-jest.mock("next/navigation", () => ({ useRouter: () => mockRouter }));
 jest.mock("@workspace/ui/components/layout", () => ({ Logo: () => <div>Solace</div> }));
 jest.mock("@workspace/ui/components/ui/button", () => ({
   Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
@@ -20,9 +17,11 @@ jest.mock("@/lib/mail/mail-link-handoff", () => ({
   canonicalMailLinkUrl: (href: string) => new URL(href),
   oneClickUnsubscribeUrl: (href: string) =>
     jest.requireActual<typeof import("@/lib/mail/mail-link-handoff")>("@/lib/mail/mail-link-handoff").oneClickUnsubscribeUrl(href),
+  openMailDocument: (id?: string) => mockOpenMailDocument(id),
   openMailLinkTarget: (url: string) => mockOpenMailLinkTarget(url),
   resolveMailLink: (id: string) => mockResolveMailLink(id),
-  setPendingMailto: (draft: unknown) => mockSetPendingMailto(draft),
+  takeMailLinkFragment: () =>
+    jest.requireActual<typeof import("@/lib/mail/mail-link-handoff")>("@/lib/mail/mail-link-handoff").takeMailLinkFragment(),
 }));
 
 import MailLinkPage from "../../app/mail/link/page";
@@ -55,21 +54,26 @@ describe("MailLinkPage", () => {
     });
   }
 
-  it("drops the fragment and opens compose in Mail for a mailto link", async () => {
+  it("drops the fragment and loads Mail as a new document to compose a mailto link", async () => {
     mockResolveMailLink.mockResolvedValue({ href: "mailto:a@example.org?subject=Hi", text: "Write" });
     await renderPage();
 
     expect(mockResolveMailLink).toHaveBeenCalledWith(LINK_ID);
     expect(window.location.hash).toBe("");
     expect(window.location.pathname).toBe("/mail/link");
-    expect(mockSetPendingMailto).toHaveBeenCalledWith({
-      to: ["a@example.org"],
-      cc: [],
-      bcc: [],
-      subject: "Hi",
-      body: "",
-    });
-    expect(mockReplace).toHaveBeenCalledWith("/mail");
+    expect(mockOpenMailDocument).toHaveBeenCalledWith(LINK_ID);
+  });
+
+  it("leaves for Mail with a full document load on cancel", async () => {
+    mockResolveMailLink.mockResolvedValue({ href: "https://example.org/", text: "Example" });
+    await renderPage();
+    const close = jest.spyOn(window, "close").mockImplementation(() => {});
+
+    const cancel = [...container.querySelectorAll("button")].find((button) => button.textContent === "Cancel");
+    act(() => cancel?.click());
+    expect(close).toHaveBeenCalled();
+    expect(mockOpenMailDocument).toHaveBeenCalledWith(undefined);
+    close.mockRestore();
   });
 
   it("says the link expired when the reader tab does not answer", async () => {
@@ -77,7 +81,7 @@ describe("MailLinkPage", () => {
     await renderPage();
 
     expect(container.textContent).toContain("This link has expired. Open it again from the message.");
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockOpenMailDocument).not.toHaveBeenCalled();
   });
 
   it("shows the real host and warnings before opening a web link", async () => {
@@ -138,6 +142,6 @@ describe("MailLinkPage", () => {
 
     expect(container.querySelector("form")).toBeNull();
     expect(mockOpenMailLinkTarget).not.toHaveBeenCalled();
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockOpenMailDocument).not.toHaveBeenCalled();
   });
 });

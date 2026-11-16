@@ -15,6 +15,7 @@ import {
   createMailSendScopeLifetime,
   discardMailSendAttempt,
   hasComposeUserContent,
+  parseMailtoLink,
   type ComposeTextFields,
   type MailServerLimits,
   type MailtoDraft,
@@ -23,7 +24,7 @@ import {
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
 import { resetComposeInlineImages } from "@/lib/mail/compose-inline-images";
-import { takePendingMailto } from "@/lib/mail/mail-link-handoff";
+import { resolveMailLink, takeMailLinkFragment, type MailLink } from "@/lib/mail/mail-link-handoff";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
 import {
   cancelComposeDraftSave,
@@ -412,14 +413,30 @@ export function useMailComposeController({
     });
   };
 
-  // A mailto link from another tab's message waits in the handoff slot until this tab's identities load.
-  const seedPendingMailto = useEffectEvent(() => {
-    const draft = takePendingMailto();
+  // A mailto link from another tab's message arrives as an opaque fragment id, resolved once this tab's identities load.
+  const mailtoLinkIdRef = useRef<string | null>(null);
+  const seedMailtoLink = useEffectEvent((link: MailLink | null) => {
+    mailtoLinkIdRef.current = "";
+    const draft = link ? parseMailtoLink(link.href) : null;
     if (draft) seedMailto(draft);
   });
   const hasIdentities = identities.length > 0;
   useEffect(() => {
-    if (hasIdentities) seedPendingMailto();
+    if (mailtoLinkIdRef.current === null) mailtoLinkIdRef.current = takeMailLinkFragment();
+    const id = mailtoLinkIdRef.current;
+    if (!hasIdentities || !id) return;
+    let current = true;
+    resolveMailLink(id).then(
+      (link) => {
+        if (current) seedMailtoLink(link);
+      },
+      () => {
+        if (current) seedMailtoLink(null);
+      },
+    );
+    return () => {
+      current = false;
+    };
   }, [hasIdentities]);
 
   const seedDraft = (
