@@ -93,10 +93,16 @@ fn account_security(
             ("SUPPORT_EMAIL", &escape_html(SUPPORT_EMAIL)),
         ],
     );
+    let mut letters = message.chars();
+    // The HTML continues "Hi {name}, " with the message; on its own line it opens a sentence.
+    let sentence: String = letters
+        .next()
+        .map(|first| first.to_uppercase().chain(letters).collect())
+        .unwrap_or_default();
     let text = [
         format!("Hi {name},"),
         String::new(),
-        message.to_owned(),
+        sentence,
         detail.to_owned(),
         format!("If this wasn't you, email {SUPPORT_EMAIL} from another address right away."),
     ]
@@ -414,7 +420,12 @@ mod tests {
                 .text
                 .contains("email support@solace.onl from another address")
         );
-        assert!(changed.html.contains("Hi &lt;Roan&gt;"));
+        assert!(changed.html.contains("Hi &lt;Roan&gt;, the password"));
+        assert!(
+            changed
+                .text
+                .contains("Hi <Roan>,\n\nThe password for your Solace account")
+        );
         assert!(!changed.html.contains("{{"), "every placeholder is filled");
     }
 
