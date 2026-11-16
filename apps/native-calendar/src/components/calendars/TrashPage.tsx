@@ -11,6 +11,7 @@ import {
   SheetCenteredState,
   SheetGroup,
   SheetItem,
+  SheetMessage,
   SheetScroll,
   SheetSection,
 } from "@workspace/native-core/components/sheet/SheetSections";
@@ -26,15 +27,33 @@ export function TrashPage() {
   }
   if (trash.isError) {
     return (
-      <SheetCenteredState
-        tone="destructive"
-        message={getErrorMessage(trash.error, "Failed to load deleted events")}
-      />
+      <SheetScroll>
+        <SheetSection>
+          <SheetMessage tone="destructive" text={getErrorMessage(trash.error, "Failed to load deleted events")} />
+          <SheetGroup>
+            <SheetItem
+              label="Try again"
+              icon="refresh-cw"
+              pending={trash.isFetching}
+              disabled={trash.isFetching}
+              onPress={() => {
+                trash.refetch().catch(() => undefined);
+              }}
+            />
+          </SheetGroup>
+        </SheetSection>
+      </SheetScroll>
     );
   }
   if (trash.data.length === 0) {
     return <SheetCenteredState message={EVENT_TRASH_EMPTY_MESSAGE} />;
   }
+
+  const confirmDelete = (entry: TrashedCalendarEvent) =>
+    Alert.alert(`Delete “${entry.title}” forever?`, "The event is deleted for good. This action cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete forever", style: "destructive", onPress: () => deleteForever.mutate(entry.id) },
+    ]);
 
   const openEntry = (entry: TrashedCalendarEvent) =>
     Alert.alert(entry.title, formatTrashEntryDetail(entry, timezone), [
@@ -42,7 +61,7 @@ export function TrashPage() {
         text: "Restore",
         onPress: () => restore.mutate({ trashId: entry.id, calendarId: entry.calendarId }),
       },
-      { text: "Delete forever", style: "destructive", onPress: () => deleteForever.mutate(entry.id) },
+      { text: "Delete forever", style: "destructive", onPress: () => confirmDelete(entry) },
       { text: "Cancel", style: "cancel" },
     ]);
 

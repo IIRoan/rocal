@@ -34,6 +34,7 @@ jest.mock("@workspace/native-core/components/sheet/SheetSections", () => {
     SheetSection: Slot,
     SheetGroup: Slot,
     SheetCenteredState: ({ message }: { message: string }) => <p>{message}</p>,
+    SheetMessage: ({ text }: { text: string }) => <p>{text}</p>,
     SheetItem: ({ label, detail, onPress }: { label: string; detail?: string; onPress?: () => void }) => (
       <button onClick={onPress}>
         {label}
@@ -138,6 +139,9 @@ describe("TrashPage", () => {
 
     await settle(() => button("Dentist").click());
     await choose("Delete forever");
+    expect(mockApi.deleteTrashedEvent).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenLastCalledWith("Delete “Dentist” forever?", expect.any(String), expect.any(Array));
+    await choose("Delete forever");
     expect(mockApi.deleteTrashedEvent).toHaveBeenCalledWith("trash-1");
 
     mockApi.listTrashedEvents.mockResolvedValue([{ ...entry, id: "trash-2" }]);
@@ -148,7 +152,7 @@ describe("TrashPage", () => {
     expect(mockApi.emptyEventTrash).toHaveBeenCalled();
   });
 
-  it("says the trash is empty, and shows a load failure", async () => {
+  it("says the trash is empty, and shows a load failure with a retry", async () => {
     mockApi.listTrashedEvents.mockResolvedValue([]);
     await renderPage();
     expect(container.textContent).toContain("Trash is empty. Deleted events stay here for 30 days.");
@@ -156,5 +160,9 @@ describe("TrashPage", () => {
     mockApi.listTrashedEvents.mockRejectedValue(new Error("Failed to load deleted events"));
     await settle(() => queryClient.resetQueries());
     expect(container.textContent).toContain("Failed to load deleted events");
+
+    mockApi.listTrashedEvents.mockResolvedValue([entry]);
+    await settle(() => button("Try again").click());
+    expect(button("Dentist")).toBeTruthy();
   });
 });
