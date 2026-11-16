@@ -95,23 +95,14 @@ export async function deleteStoredE2eeDevice(userId: string): Promise<void> {
   await withStore("readwrite", (store) => store.delete(userId));
 }
 
-/** Reads and rewrites one record in a single transaction, so concurrent updates never write back a stale copy. */
-async function updateStoredE2eeDevice(
-  userId: string,
-  update: (record: StoredE2eeDeviceRecord) => StoredE2eeDeviceRecord | null,
-): Promise<void> {
+/** Runs reads and the writes they decide in one readwrite transaction, so concurrent updates never write back a stale copy. */
+async function readWriteStore(run: (store: IDBObjectStore) => void): Promise<void> {
   const database = await openDatabase();
   if (!database) return;
 
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    const read = store.get(userId);
-    read.onsuccess = () => {
-      const record: StoredE2eeDeviceRecord | undefined = read.result;
-      const next = record ? update(record) : null;
-      if (next) store.put(next);
-    };
+    run(transaction.objectStore(STORE_NAME));
     transaction.oncomplete = () => {
       database.close();
       resolve();
@@ -121,6 +112,20 @@ async function updateStoredE2eeDevice(
     };
     transaction.onabort = () => {
       reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
+    };
+  });
+}
+
+async function updateStoredE2eeDevice(
+  userId: string,
+  update: (record: StoredE2eeDeviceRecord) => StoredE2eeDeviceRecord | null,
+): Promise<void> {
+  await readWriteStore((store) => {
+    const read = store.get(userId);
+    read.onsuccess = () => {
+      const record: StoredE2eeDeviceRecord | undefined = read.result;
+      const next = record ? update(record) : null;
+      if (next) store.put(next);
     };
   });
 }
@@ -153,13 +158,14 @@ export async function listRecoverableE2eeDevices(): Promise<StoredE2eeDeviceReco
 
 /** Sign-out also forgets the bound-content marker of a device key it keeps. */
 export async function deleteRecoverableE2eeDevices(): Promise<void> {
-  const records = await withStore<StoredE2eeDeviceRecord[]>("readonly", (store) =>
-    store.getAll(),
-  );
-  await Promise.all(
-    (records ?? []).map(({ eventContentBound, ...record }) => {
-      if (record.envelopeSalt) return deleteStoredE2eeDevice(record.userId);
-      return eventContentBound ? putStoredE2eeDevice(record) : undefined;
-    }),
-  );
+  await readWriteStore((store) => {
+    const read = store.getAll();
+    read.onsuccess = () => {
+      const records: StoredE2eeDeviceRecord[] = read.result;
+      for (const { eventContentBound, ...record } of records) {
+        if (record.envelopeSalt) store.delete(record.userId);
+        else if (eventContentBound) store.put(record);
+      }
+    };
+  });
 }

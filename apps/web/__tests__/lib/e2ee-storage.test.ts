@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it } from "@jest/globals";
 import {
+  deleteRecoverableE2eeDevices,
   markStoredEventContentBound,
   rememberStoredDeviceEnvelopeSalt,
 } from "@/lib/e2ee-storage";
@@ -47,7 +48,9 @@ function transaction(_store: string, mode: IDBTransactionMode) {
   };
   const store = {
     get: (key: string) => run(() => structuredClone(disk.get(key))),
+    getAll: () => run(() => [...disk.values()].map((value) => structuredClone(value))),
     put: (value: Record<string, unknown>) => run(() => disk.set(String(value.userId), structuredClone(value))),
+    delete: (key: string) => run(() => disk.delete(key)),
   };
   return tx;
 }
@@ -87,4 +90,15 @@ it("keeps both concurrent updates of the device record", async () => {
     envelopeSalt: "salt",
     eventContentBound: true,
   });
+});
+
+it("never writes back a stale record when sign-out cleanup overlaps an envelope update", async () => {
+  disk.set("user-1", { userId: "user-1", deviceId: "device-1", eventContentBound: true });
+
+  await Promise.all([
+    deleteRecoverableE2eeDevices(),
+    rememberStoredDeviceEnvelopeSalt("user-1", "device-1", "salt"),
+  ]);
+
+  expect(disk.get("user-1")).toEqual({ userId: "user-1", deviceId: "device-1", envelopeSalt: "salt" });
 });
