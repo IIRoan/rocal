@@ -13,7 +13,7 @@ appId: ${APP_ID}
       text: Move
       enabled: true
     timeout: 30000
-- tapOn: Go back
+- runFlow: ../common/go-back.yaml
 - extendedWaitUntil:
     visible: Compose message
     timeout: 30000
@@ -68,7 +68,7 @@ appId: ${APP_ID}
 - tapOn: ".*Maestro round trip.*"
 - assertVisible: ".*Maestro body survives encrypted draft storage.*"
 - takeScreenshot: ${SCREENSHOT_DIR}/restored-from-trash
-- tapOn: Go back
+- runFlow: ../common/go-back.yaml
 - tapOn: Settings
 - runFlow:
     file: ../common/select-settings-page.yaml

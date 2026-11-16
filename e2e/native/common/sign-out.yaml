@@ -4,12 +4,7 @@ appId: ${APP_ID}
     visible:
       id: workspace-ready
     timeout: 90000
-- runFlow:
-    when:
-      visible: Go back
-    commands:
-      - tapOn: Go back
-      - waitForAnimationToEnd
+- runFlow: go-back.yaml
 - extendedWaitUntil:
     visible: ${HOME_LABEL}
     timeout: 30000
