@@ -1,8 +1,17 @@
 /** @jest-environment jsdom */
 
-import React from "react";
-import { describe, expect, it } from "@jest/globals";
+import React, { act } from "react";
+import { describe, expect, it, jest } from "@jest/globals";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server.node";
+import type { MailLink } from "@/lib/mail/mail-link-handoff";
+
+const mockRegisterMailLinks = jest.fn<(links: ReadonlyArray<MailLink & { id: string }>) => void>();
+
+jest.mock("@/lib/mail/mail-link-handoff", () => ({
+  ...jest.requireActual<typeof import("@/lib/mail/mail-link-handoff")>("@/lib/mail/mail-link-handoff"),
+  registerMailLinks: (links: ReadonlyArray<MailLink & { id: string }>) => mockRegisterMailLinks(links),
+}));
 
 import { HtmlEmailRenderer } from "@/components/mail/message-reader/html-email-renderer";
 
@@ -81,5 +90,28 @@ describe("HtmlEmailRenderer", () => {
     expect(srcDoc).not.toContain('href="https://evil.test/"');
     expect(srcDoc).not.toContain('href="https://xn--pple-43d.com/"');
     expect(srcDoc.match(/\/mail\/link#/g)).toHaveLength(2);
+  });
+
+  it("registers each link set once, under ids no other set reuses", () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    const render = (html: string, isDark = false) =>
+      act(() =>
+        root.render(
+          <HtmlEmailRenderer html={html} blockRemoteImages blockTrackingPixels confirmExternalLinks={false} isDark={isDark} />,
+        ),
+      );
+
+    render('<a href="mailto:a@example.org">A</a>');
+    render('<a href="mailto:a@example.org">A</a>', true);
+    render('<a href="mailto:b@example.org">B</a>');
+    act(() => root.unmount());
+
+    const registered = mockRegisterMailLinks.mock.calls.map(([links]) => links.map(({ id, href }) => ({ id, href })));
+    expect(registered).toHaveLength(2);
+    expect(registered[0]?.[0]?.href).toBe("mailto:a@example.org");
+    expect(registered[1]?.[0]?.href).toBe("mailto:b@example.org");
+    expect(registered[1]?.[0]?.id).not.toBe(registered[0]?.[0]?.id);
   });
 });

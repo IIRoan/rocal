@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import {
   buildEmailHtmlDocument,
   processEmailHtml,
@@ -26,9 +26,13 @@ export function HtmlEmailRenderer({
   isDark: boolean;
 }) {
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [linkToken] = useState(() => crypto.randomUUID());
+  const [linkScope, setLinkScope] = useState(() => ({ html, confirmExternalLinks, token: crypto.randomUUID() }));
+  // A new link set gets new ids, so a link page still resolving an old id never receives a different link.
+  if (linkScope.html !== html || linkScope.confirmExternalLinks !== confirmExternalLinks) {
+    setLinkScope({ html, confirmExternalLinks, token: crypto.randomUUID() });
+  }
   const prefersReducedMotion = usePrefersReducedMotion();
-  const { links, rewriteLink } = createMailLinkRewriter(linkToken, confirmExternalLinks);
+  const { links, rewriteLink } = createMailLinkRewriter(linkScope.token, confirmExternalLinks);
   const srcDoc = buildEmailHtmlDocument({
     processedHtml: processEmailHtml({
       html,
@@ -41,7 +45,8 @@ export function HtmlEmailRenderer({
     isDark,
   });
 
-  useEffect(() => registerMailLinks(links), [links]);
+  const registerLinks = useEffectEvent(() => registerMailLinks(links));
+  useEffect(() => registerLinks(), [linkScope.token]);
 
   // The frame paints nothing until its document loads, so it stays hidden over a matching surface and fades in once.
   return (
