@@ -13,19 +13,20 @@ type UpgradeApi = Pick<
   | "markEventContentBound"
   | "sealPendingReminders"
   | "getSubscriptions"
+  | "getUnboundSubscriptionUrls"
   | "updateSubscription"
 >;
 
 /** Small batches keep a large backlog from flooding the API; a failed id waits for the next start. */
-async function inBatches(
-  ids: string[],
-  run: (id: string) => Promise<boolean>,
+async function inBatches<T>(
+  items: T[],
+  run: (item: T) => Promise<boolean>,
 ): Promise<void> {
-  for (let index = 0; index < ids.length; index += BATCH_SIZE) {
+  for (let index = 0; index < items.length; index += BATCH_SIZE) {
     await Promise.all(
-      ids
+      items
         .slice(index, index + BATCH_SIZE)
-        .map((id) => run(id).catch(() => false)),
+        .map((item) => run(item).catch(() => false)),
     );
   }
 }
@@ -73,6 +74,18 @@ async function sealSubscriptionUrls(
   });
 }
 
+/** Re-seals feed URLs sealed before they were bound to their feed; true when none is left. */
+async function bindSubscriptionUrls(api: UpgradeApi): Promise<boolean> {
+  const unbound = await api.getUnboundSubscriptionUrls();
+  let left = unbound.length;
+  await inBatches(unbound, async ({ id, url }) => {
+    await api.updateSubscription(id, { url });
+    left -= 1;
+    return true;
+  });
+  return left === 0;
+}
+
 /** Re-seals what the server reports this account still stores in an older form; true when the settings were sealed. */
 export async function upgradeStoredEncryption(
   api: UpgradeApi,
@@ -92,10 +105,12 @@ export async function upgradeStoredEncryption(
     ]),
   ];
   await inBatches(resealed, (id) => api.resealEventAttributes(id));
-  // Once nothing unbound is left, trash included, unbound content is refused here and on the account's other devices.
+  const urlsBound = await bindSubscriptionUrls(api).catch(() => false);
+  // Once nothing unbound is left, trash and feed URLs included, unbound content is refused here and on the account's other devices.
   if (
     report.eventsWithUnboundContent.length === 0 &&
-    report.trashWithUnboundContent === 0
+    report.trashWithUnboundContent === 0 &&
+    urlsBound
   ) {
     await api.markEventContentBound().catch(() => undefined);
   }

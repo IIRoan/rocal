@@ -81,6 +81,8 @@ pub struct SyncLogCount {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateSubscriptionRequest {
+    /// A client-proposed id (32 lowercase hex) that the sealed URL is bound to.
+    pub id: SubscriptionId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub name: Option<String>,

@@ -142,24 +142,22 @@ pub fn sealed_url_placeholder(id: &str) -> String {
     format!("sealed:{id}")
 }
 
-/// A sealed URL is stored instead of the readable one, which then never reaches the row.
+/// The feed of `calendar`, under its owner and name; a sealed URL is stored instead of the readable one, which then never reaches the row.
 pub async fn insert_feed<C: ConnectionTrait>(
     db: &C,
-    user_id: &str,
-    name: &str,
+    id: &str,
+    calendar: &calendar::Model,
     url: &str,
     encrypted_url: Option<&str>,
-    calendar_id: &str,
     sync_interval_minutes: i32,
 ) -> Result<calendar_subscription::Model, sea_orm::DbErr> {
-    let id = cuid();
     calendar_subscription::ActiveModel {
-        url: Set(encrypted_url.map_or_else(|| url.to_owned(), |_| sealed_url_placeholder(&id))),
+        url: Set(encrypted_url.map_or_else(|| url.to_owned(), |_| sealed_url_placeholder(id))),
         encrypted_url: Set(encrypted_url.map(str::to_owned)),
-        id: Set(id),
-        name: Set(name.to_owned()),
-        user_id: Set(user_id.to_owned()),
-        calendar_id: Set(calendar_id.to_owned()),
+        id: Set(id.to_owned()),
+        name: Set(calendar.name.clone()),
+        user_id: Set(calendar.user_id.clone()),
+        calendar_id: Set(calendar.id.clone()),
         last_sync_status: Set("pending".into()),
         sync_interval_minutes: Set(sync_interval_minutes),
         ..Default::default()

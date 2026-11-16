@@ -78,7 +78,7 @@ export class WebE2eeProvider implements E2eeProvider {
     return (await getE2eeSession()) !== null;
   }
 
-  private refusesUnboundContent(userId: string): Promise<boolean> {
+  private refusesUnboundContentFor(userId: string): Promise<boolean> {
     let bound = this.boundUsers.get(userId);
     if (!bound) {
       bound = getStoredE2eeDevice(userId).then(
@@ -92,9 +92,14 @@ export class WebE2eeProvider implements E2eeProvider {
 
   async markEventContentBound(): Promise<void> {
     const session = await getE2eeSession();
-    if (!session || (await this.refusesUnboundContent(session.userId))) return;
+    if (!session || (await this.refusesUnboundContentFor(session.userId))) return;
     this.boundUsers.set(session.userId, Promise.resolve(true));
     await markStoredEventContentBound(session.userId);
+  }
+
+  async refusesUnboundContent(): Promise<boolean> {
+    const session = await getE2eeSession();
+    return session ? this.refusesUnboundContentFor(session.userId) : false;
   }
 
   async hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent> {
@@ -103,7 +108,7 @@ export class WebE2eeProvider implements E2eeProvider {
       session ? contentDecrypter : null,
       session,
       event,
-      session ? await this.refusesUnboundContent(session.userId) : false,
+      session ? await this.refusesUnboundContentFor(session.userId) : false,
     );
   }
 

@@ -282,11 +282,10 @@ pub async fn create(
     };
     let feed = queries::insert_feed(
         &state.db,
-        &user.id,
-        &calendar.name,
+        &request.id.0,
+        &calendar,
         &request.url,
         request.encrypted_url.as_deref(),
-        &calendar.id,
         interval,
     )
     .await?;
@@ -969,11 +968,10 @@ pub(crate) mod tests {
             let url = format!("{}{path}?feed={}", self.origin, crate::db::cuid());
             let feed = queries::insert_feed(
                 db,
-                &self.user.id,
-                "Feed",
+                &crate::db::cuid(),
+                &calendar,
                 &url,
                 None,
-                &calendar.id,
                 interval_minutes,
             )
             .await
@@ -1051,6 +1049,7 @@ pub(crate) mod tests {
 
         let fixture = fixture().await;
         let request = CreateSubscriptionRequest {
+            id: "0123456789abcdef0123456789abcdef".to_owned().into(),
             name: Some("Work".into()),
             encrypted_name: None,
             encryption_key_version: None,
@@ -1077,6 +1076,7 @@ pub(crate) mod tests {
     async fn a_sealed_name_is_stored_only_as_ciphertext_on_the_mirrored_calendar() {
         let fixture = fixture().await;
         let request = CreateSubscriptionRequest {
+            id: "0123456789abcdef0123456789abcdef".to_owned().into(),
             name: None,
             encrypted_name: Some("sealed-name".into()),
             encryption_key_version: Some(2),
@@ -1087,6 +1087,7 @@ pub(crate) mod tests {
         let created = create(&fixture.state, &fixture.user, request)
             .await
             .unwrap();
+        assert_eq!(created.id.0, "0123456789abcdef0123456789abcdef");
         assert_eq!(created.name, "");
         assert_eq!(
             (
@@ -1210,6 +1211,7 @@ pub(crate) mod tests {
     async fn a_sealed_create_stores_only_the_ciphertext_and_syncs_through_the_request_url() {
         let fixture = fixture().await;
         let request = CreateSubscriptionRequest {
+            id: "0123456789abcdef0123456789abcdef".to_owned().into(),
             name: None,
             encrypted_name: Some("sealed-name".into()),
             encryption_key_version: Some(1),

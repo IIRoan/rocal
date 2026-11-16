@@ -98,6 +98,7 @@ describe("sealPendingReminders", () => {
 
 describe("upgradeStoredEncryption", () => {
   function fakeApi(report: {
+    unboundSubscriptionUrls?: Array<{ id: string; url: string }>;
     eventsWithReadableAttributes?: string[];
     eventsWithUnsealedReminders?: string[];
     eventsWithUnboundContent?: string[];
@@ -119,6 +120,7 @@ describe("upgradeStoredEncryption", () => {
         subscriptionsWithReadableUrls: [],
         ...report,
       })),
+      getUnboundSubscriptionUrls: jest.fn(async () => report.unboundSubscriptionUrls ?? []),
       ensureSealedUserSettings: jest.fn(async () => true),
       getEventSearchCorpus: jest.fn(async () => ({ events: [], total: 0, nextOffset: null })),
       sealImportedInvitationIfNeeded: jest.fn(async (e: CalendarEvent) => e),
@@ -166,6 +168,27 @@ describe("upgradeStoredEncryption", () => {
 
     await upgradeStoredEncryption(api);
 
+    expect(api.markEventContentBound).not.toHaveBeenCalled();
+  });
+
+  it("binds feed URLs sealed before binding, and marks the account only once all are bound", async () => {
+    const api = fakeApi({
+      unboundSubscriptionUrls: [
+        { id: "s2", url: "https://example.com/s2.ics" },
+        { id: "s3", url: "https://example.com/s3.ics" },
+      ],
+    });
+    api.updateSubscription.mockImplementation(async (id) => {
+      if (id === "s3") throw new Error("offline");
+      return {} as never;
+    });
+
+    await upgradeStoredEncryption(api);
+
+    expect(api.updateSubscription.mock.calls).toEqual([
+      ["s2", { url: "https://example.com/s2.ics" }],
+      ["s3", { url: "https://example.com/s3.ics" }],
+    ]);
     expect(api.markEventContentBound).not.toHaveBeenCalled();
   });
 

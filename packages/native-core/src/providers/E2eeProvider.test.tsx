@@ -1402,6 +1402,7 @@ describe("E2eeProvider", () => {
     await expect(provider.hydrateEncryptedEvent(legacy)).resolves.toMatchObject({
       title: "Therapy",
     });
+    await expect(provider.refusesUnboundContent()).resolves.toBe(false);
     await provider.markEventContentBound();
     expect(mockSetItemAsync).toHaveBeenCalledWith(
       "E2EE_EVENT_CONTENT_BOUND",
@@ -1410,6 +1411,7 @@ describe("E2eeProvider", () => {
     await expect(provider.hydrateEncryptedEvent(legacy)).resolves.toMatchObject({
       contentUnavailable: true,
     });
+    await expect(provider.refusesUnboundContent()).resolves.toBe(true);
   });
 
   it("does not mint new keys when other devices hold them without a password envelope", async () => {

@@ -191,7 +191,7 @@ describe("CalendarApiService encrypted names", () => {
       .filter(([, init]) => init?.body)
       .map(([, init]) => JSON.parse(String(init?.body)));
     expect(bodies.slice(0, 2)).toEqual([
-      { url: "https://feeds.test/new.ics", color: "blue", encryptedName: "sealed:Therapy practice", encryptionKeyVersion: 1, encryptedUrl: `sealed:${JSON.stringify({ url: "https://feeds.test/new.ics" })}` },
+      { id: expect.stringMatching(/^[0-9a-f]{32}$/), url: "https://feeds.test/new.ics", color: "blue", encryptedName: "sealed:Therapy practice", encryptionKeyVersion: 1, encryptedUrl: `sealed:${JSON.stringify({ url: "https://feeds.test/new.ics" })}` },
       { isActive: false, expectedNameRevision: "original-revision", encryptedName: "sealed:Clinic", encryptionKeyVersion: 1 },
     ]);
     for (const subscription of [created, listed]) {

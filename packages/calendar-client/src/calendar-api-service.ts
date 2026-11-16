@@ -24,7 +24,8 @@ import {
   storedEventId,
   newClientEntityId,
   EVENT_CONTENT_UNAVAILABLE_MESSAGE,
-  SUBSCRIPTION_URL_AAD,
+  subscriptionUrlAad,
+  UNBOUND_SUBSCRIPTION_URL_AAD,
   feedSyncUrl,
   isFeedSyncDue,
 } from "@workspace/calendar-core";
@@ -117,6 +118,15 @@ function withStoredContent(
     color: request.color ?? stored.color ?? undefined,
     categoryId: request.categoryId ?? stored.categoryId ?? undefined,
   };
+}
+
+function openedFeedUrl(opened: unknown): string | null {
+  return typeof opened === "object" &&
+    opened !== null &&
+    "url" in opened &&
+    typeof opened.url === "string"
+    ? opened.url
+    : null;
 }
 
 // `as` casts from API types only narrow free-text fields (kind, encryptionState, role, status) to calendar-core's literal unions.
@@ -1418,10 +1428,11 @@ export class CalendarApiService {
   private async hydrateSubscription<
     T extends Omit<CalendarSubscription, "_count">,
   >(subscription: T): Promise<T> {
-    const [calendar, url] = await Promise.all([
+    const [calendar, sealed] = await Promise.all([
       this.hydrateCalendar(subscription.calendar as Calendar),
-      this.openSubscriptionUrl(subscription),
+      this.openSealedUrl(subscription),
     ]);
+    const url = sealed?.url ?? subscription.url;
     return {
       ...subscription,
       name: calendar.name,
@@ -1430,24 +1441,41 @@ export class CalendarApiService {
     };
   }
 
-  private async openSubscriptionUrl(
-    subscription: Pick<CalendarSubscription, "url" | "encryptedUrl">,
-  ): Promise<string> {
-    if (!subscription.encryptedUrl) return subscription.url;
-    const opened = await this.e2ee
-      .decryptJson(subscription.encryptedUrl, SUBSCRIPTION_URL_AAD)
-      .catch(() => null);
-    return typeof opened === "object" &&
-      opened !== null &&
-      "url" in opened &&
-      typeof opened.url === "string"
-      ? opened.url
-      : subscription.url;
+  /** The sealed URL and whether it is bound to its feed; one sealed before binding opens only until this device refuses unbound content. */
+  private async openSealedUrl(
+    subscription: Pick<CalendarSubscription, "id" | "encryptedUrl">,
+  ): Promise<{ url: string; bound: boolean } | null> {
+    const { encryptedUrl } = subscription;
+    if (!encryptedUrl) return null;
+    const open = async (aad: string) =>
+      openedFeedUrl(await this.e2ee.decryptJson(encryptedUrl, aad).catch(() => null));
+    const bound = await open(subscriptionUrlAad(subscription.id));
+    if (bound) return { url: bound, bound: true };
+    if (await this.e2ee.refusesUnboundContent()) return null;
+    const unbound = await open(UNBOUND_SUBSCRIPTION_URL_AAD);
+    return unbound ? { url: unbound, bound: false } : null;
   }
 
   /** Throws instead of sending a feed URL readable when no session is active. */
-  private sealSubscriptionUrl(url: string): Promise<string> {
-    return this.e2ee.encryptJson({ url }, SUBSCRIPTION_URL_AAD);
+  private sealSubscriptionUrl(url: string, subscriptionId: string): Promise<string> {
+    return this.e2ee.encryptJson({ url }, subscriptionUrlAad(subscriptionId));
+  }
+
+  /** Feeds whose URL was sealed before it was bound to the feed, with the URL opened here; none once this device refuses unbound content. */
+  async getUnboundSubscriptionUrls(): Promise<Array<{ id: string; url: string }>> {
+    if (await this.e2ee.refusesUnboundContent()) return [];
+    const subscriptions = await this.client.get<Schema<"CalendarSubscription">[]>(
+      "/api/subscriptions",
+    );
+    const opened = await Promise.all(
+      subscriptions.map(async (subscription) => ({
+        id: subscription.id,
+        sealed: await this.openSealedUrl(subscription),
+      })),
+    );
+    return opened.flatMap(({ id, sealed }) =>
+      sealed && !sealed.bound ? [{ id, url: sealed.url }] : [],
+    );
   }
 
   /** Seals a feed name as a calendar name; throws instead of sending it readable when no session is active. */
@@ -1479,9 +1507,10 @@ export class CalendarApiService {
   ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
       const { name, ...rest } = request;
+      const id = newClientEntityId();
       const sealed = {
         ...(await this.sealSubscriptionName(name)),
-        encryptedUrl: await this.sealSubscriptionUrl(request.url),
+        encryptedUrl: await this.sealSubscriptionUrl(request.url, id),
       };
       const url = request.url.trim();
       if ((await this.getSubscriptions()).some((subscription) => subscription.url.trim() === url)) {
@@ -1489,7 +1518,7 @@ export class CalendarApiService {
       }
       const created = (await this.client.post<Schema<"CalendarSubscription">>(
         "/api/subscriptions",
-        { ...rest, ...sealed } satisfies Schema<"CreateSubscriptionRequest">,
+        { ...rest, id, ...sealed } satisfies Schema<"CreateSubscriptionRequest">,
       )) as Omit<CalendarSubscription, "_count">;
       return await this.hydrateSubscription(created);
     } catch (error) {
@@ -1508,7 +1537,7 @@ export class CalendarApiService {
         {
           ...rest,
           ...(name === undefined ? {} : await this.sealSubscriptionName(name)),
-          ...(url === undefined ? {} : { encryptedUrl: await this.sealSubscriptionUrl(url) }),
+          ...(url === undefined ? {} : { encryptedUrl: await this.sealSubscriptionUrl(url, id) }),
         } satisfies Schema<"UpdateSubscriptionRequest">,
       )) as Omit<CalendarSubscription, "_count">;
       return await this.hydrateSubscription(updated);

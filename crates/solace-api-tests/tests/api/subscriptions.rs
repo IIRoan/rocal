@@ -143,6 +143,7 @@ async fn create(user: &mut TestUser, url: &str) -> solace_api_tests::client::Api
     user.post(
         "/api/subscriptions",
         json_body(&CreateSubscriptionRequest {
+            id: hex(16).into(),
             name: None,
             encrypted_name: Some(fake_envelope()),
             encryption_key_version: Some(1),
@@ -325,37 +326,42 @@ async fn create_validates_the_body() {
     let url = "https://example.com/feed.ics";
     let cases = [
         (
-            json!({"name": "X", "url": "not a url"}),
+            json!({"id": "feed-1", "name": "X", "url": url}),
+            "Invalid",
+            "id",
+        ),
+        (
+            json!({"id": hex(16), "name": "X", "url": "not a url"}),
             "Invalid url",
             "url",
         ),
         (
-            json!({"name": "X", "url": "http://[fe80::1%25eth0]/"}),
+            json!({"id": hex(16), "name": "X", "url": "http://[fe80::1%25eth0]/"}),
             "Invalid url",
             "url",
         ),
         (
-            json!({"name": 7, "url": url}),
+            json!({"id": hex(16), "name": 7, "url": url}),
             "Expected string, received number",
             "name",
         ),
         (
-            json!({"name": "X", "url": url, "color": "navy"}),
+            json!({"id": hex(16), "name": "X", "url": url, "color": "navy"}),
             COLOR_MESSAGE,
             "color",
         ),
         (
-            json!({"name": "X", "url": url, "color": "#12345"}),
+            json!({"id": hex(16), "name": "X", "url": url, "color": "#12345"}),
             COLOR_MESSAGE,
             "color",
         ),
         (
-            json!({"encryptedName": 7, "url": url}),
+            json!({"id": hex(16), "encryptedName": 7, "url": url}),
             "Expected string, received number",
             "encryptedName",
         ),
         (
-            json!({"encryptedName": fake_envelope(), "encryptionKeyVersion": 0, "url": url}),
+            json!({"id": hex(16), "encryptedName": fake_envelope(), "encryptionKeyVersion": 0, "url": url}),
             "Number must be greater than or equal to 1",
             "encryptionKeyVersion",
         ),
@@ -374,13 +380,13 @@ async fn create_validates_the_body() {
         .expect_error(400, "Validation Error", "Required"));
     assert_eq!(
         missing["details"]["issues"],
-        json!([{"path": "url", "message": "Required"}])
+        json!([{"path": "id", "message": "Required"}, {"path": "url", "message": "Required"}])
     );
     expect_unknown_field(
         &user
             .post(
                 "/api/subscriptions",
-                json!({"name": "X", "url": url, "userId": user.id}),
+                json!({"id": hex(16), "name": "X", "url": url, "userId": user.id}),
             )
             .await,
         "userId",
@@ -395,18 +401,22 @@ async fn create_requires_exactly_one_non_blank_name_before_fetching() {
     let url = "http://127.0.0.1/feed.ics";
     for (body, message, field) in [
         (
-            json!({"name": "   ", "url": url}),
+            json!({"id": hex(16), "name": "   ", "url": url}),
             "Calendar name is required",
             "name",
         ),
-        (json!({"url": url}), "Calendar name is required", "name"),
         (
-            json!({"encryptedName": "   ", "url": url}),
+            json!({"id": hex(16), "url": url}),
+            "Calendar name is required",
+            "name",
+        ),
+        (
+            json!({"id": hex(16), "encryptedName": "   ", "url": url}),
             "Encrypted calendar name cannot be empty",
             "encryptedName",
         ),
         (
-            json!({"name": "Therapy practice", "encryptedName": fake_envelope(), "url": url}),
+            json!({"id": hex(16), "name": "Therapy practice", "encryptedName": fake_envelope(), "url": url}),
             "Send the calendar name either encrypted or readable, not both",
             "name",
         ),
@@ -1519,6 +1529,7 @@ async fn a_sealed_create_with_a_private_url_is_refused_and_stores_nothing() {
         .post(
             "/api/subscriptions",
             json!({
+                "id": hex(16),
                 "encryptedName": fake_envelope(),
                 "url": "http://169.254.169.254/latest/meta-data",
                 "encryptedUrl": fake_envelope(),
@@ -1530,7 +1541,7 @@ async fn a_sealed_create_with_a_private_url_is_refused_and_stores_nothing() {
         &user
             .post(
                 "/api/subscriptions",
-                json!({"encryptedName": fake_envelope(), "url": "https://example.com/feed.ics", "encryptedUrl": "x".repeat(4097)}),
+                json!({"id": hex(16), "encryptedName": fake_envelope(), "url": "https://example.com/feed.ics", "encryptedUrl": "x".repeat(4097)}),
             )
             .await,
         "String must contain at most 4096 character(s)",

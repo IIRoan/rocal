@@ -3686,6 +3686,7 @@
         "type": "object",
         "description": "Current clients send `encryptedName`; a readable `name` is only accepted from shipped binaries.",
         "required": [
+          "id",
           "url"
         ],
         "properties": {
@@ -3702,6 +3703,10 @@
           "encryptionKeyVersion": {
             "type": "integer",
             "format": "int32"
+          },
+          "id": {
+            "$ref": "#/components/schemas/SubscriptionId",
+            "description": "A client-proposed id (32 lowercase hex) that the sealed URL is bound to."
           },
           "name": {
             "type": "string"

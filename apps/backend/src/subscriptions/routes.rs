@@ -14,12 +14,15 @@ use super::service;
 use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidQuery};
-use crate::http::schemas::{calendar_color_schema, encrypted_ics_import_body_schema};
+use crate::http::schemas::{
+    calendar_color_schema, client_entity_id_schema, encrypted_ics_import_body_schema,
+};
 use crate::http::zod;
 use crate::request_schema;
 use crate::state::AppState;
 
 request_schema!(CreateSubscriptionRequest => zod::object([
+    ("id", client_entity_id_schema()),
     ("name", zod::string().optional()),
     ("encryptedName", zod::string().optional()),
     ("encryptionKeyVersion", key_version_schema()),

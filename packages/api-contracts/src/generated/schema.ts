@@ -1472,6 +1472,8 @@ export interface components {
             encryptedUrl?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
+            /** @description A client-proposed id (32 lowercase hex) that the sealed URL is bound to. */
+            id: components["schemas"]["SubscriptionId"];
             name?: string;
             /** @description Probed and synced once, then stored only as `encryptedUrl` when that is sent. */
             url: string;

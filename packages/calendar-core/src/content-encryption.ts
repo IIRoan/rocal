@@ -34,8 +34,13 @@ export function encryptedNameAad(
   return `${kind}-name:v${keyVersion}`;
 }
 
-/** A feed URL is sealed with the account key; the server keeps only `sealed:<id>` in its readable column. */
-export const SUBSCRIPTION_URL_AAD = "subscription-url:v1";
+/** A feed URL sealed before it was bound to its feed; it opens only until the account is marked bound. */
+export const UNBOUND_SUBSCRIPTION_URL_AAD = "subscription-url:v1";
+
+/** Binding a sealed feed URL to its subscription id stops the server from moving it onto another feed; the server keeps only `sealed:<id>`. */
+export function subscriptionUrlAad(subscriptionId: string): string {
+  return `subscription-url:v2:${subscriptionId}`;
+}
 
 /** `encryptionKeyVersion` of event content bound to its stored row id; version 1 is the unbound legacy format. */
 export const BOUND_EVENT_CONTENT_VERSION = 2;

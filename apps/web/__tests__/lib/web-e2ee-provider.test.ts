@@ -90,6 +90,7 @@ describe("WebE2eeProvider event content", () => {
       title: "Encrypted event",
       contentUnavailable: true,
     });
+    await expect(provider.refusesUnboundContent()).resolves.toBe(true);
   });
 
   it("refuses unbound content once the stored marker is set", async () => {
@@ -99,5 +100,6 @@ describe("WebE2eeProvider event content", () => {
       new WebE2eeProvider().hydrateEncryptedEvent(event("e1", 1)),
     ).resolves.toMatchObject({ contentUnavailable: true });
     expect(mockDecrypt).not.toHaveBeenCalled();
+    await expect(new WebE2eeProvider().refusesUnboundContent()).resolves.toBe(true);
   });
 });

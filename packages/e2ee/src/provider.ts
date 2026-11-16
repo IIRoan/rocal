@@ -49,8 +49,11 @@ export interface E2eeProvider {
   /** Resolves once any pending bootstrap settles. */
   hasActiveSession(): Promise<boolean>;
 
-  /** Refuses unbound event content on this device from now on, also after a restart, until sign-out. */
+  /** Refuses unbound event content and feed URLs on this device from now on, also after a restart, until sign-out. */
   markEventContentBound(): Promise<void>;
+
+  /** True once this device refuses unbound content for the signed-in account. */
+  refusesUnboundContent(): Promise<boolean>;
 
   /** Decrypt a single encrypted event for display, or a read-only placeholder when it does not open here. */
   hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent>;
@@ -114,6 +117,10 @@ export class NoopE2eeProvider implements E2eeProvider {
   }
 
   async markEventContentBound(): Promise<void> {}
+
+  async refusesUnboundContent(): Promise<boolean> {
+    return false;
+  }
 
   async hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent> {
     return event;

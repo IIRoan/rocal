@@ -374,6 +374,11 @@ export function createNativeE2eeProvider({
       );
     },
 
+    async refusesUnboundContent(): Promise<boolean> {
+      const session = await waitForSession();
+      return session ? refusesUnboundContent(session) : false;
+    },
+
     async attachCalendarEncryptionShadow<
       T extends CreateCalendarRequest | UpdateCalendarRequest,
     >(request: T): Promise<NameWireRequest<T>> {
