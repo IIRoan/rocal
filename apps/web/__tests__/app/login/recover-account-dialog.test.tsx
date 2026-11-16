@@ -101,9 +101,9 @@ async function settled() {
   }
 }
 
-it("prefills the email, removes lost passkeys by default and names the support route", () => {
+it("prefills the email, keeps passkeys by default and names the support route", () => {
   expect(inputs()[0]?.value).toBe("a@solace.test");
-  expect(document.querySelector("[role='switch']")?.getAttribute("aria-checked")).toBe("true");
+  expect(document.querySelector("[role='switch']")?.getAttribute("aria-checked")).toBe("false");
   expect(document.body.textContent).toContain(FORGOT_PASSWORD_NOTICE);
 });
 
@@ -139,7 +139,7 @@ it("resets with the kit, then signs in with the new password", async () => {
     "/recovery/start",
     "/recovery/complete",
   ]);
-  expect(fetchMock.mock.calls[1]?.[1].body).toMatchObject({ removePasskeys: true });
+  expect(fetchMock.mock.calls[1]?.[1].body).toMatchObject({ removePasskeys: false });
   expect(toast).toHaveBeenCalledWith(RECOVERY_KIT_USED_NOTICE);
   expect(onRecovered).toHaveBeenCalledWith("a@solace.test", "new-secret-pw");
 });

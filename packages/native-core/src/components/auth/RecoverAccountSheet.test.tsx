@@ -142,11 +142,11 @@ afterEach(() => {
   container.remove();
 });
 
-it("prefills the email and removes passkeys unless turned off", () => {
+it("prefills the email and keeps passkeys unless turned on", () => {
   render();
 
   expect(field("Email address").value).toBe("ada@solace.test");
-  expect(field("Remove passkeys (I lost them)").checked).toBe(true);
+  expect(field("Remove passkeys (I lost them)").checked).toBe(false);
 });
 
 it("refuses a mistyped key before anything reaches the network", async () => {
@@ -189,7 +189,7 @@ it("resets the password with the kit, then signs in with the new one", async () 
       body: expect.objectContaining({
         email: "ada@solace.test",
         newPassword: "new-secret-pw",
-        removePasskeys: true,
+        removePasskeys: false,
       }),
     }),
   );

@@ -90,7 +90,7 @@ function RecoverAccountForm({
     recoveryKey: "",
     newPassword: "",
     confirmPassword: "",
-    removePasskeys: true,
+    removePasskeys: false,
     error: null,
     pending: false,
   });

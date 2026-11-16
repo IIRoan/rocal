@@ -48,7 +48,7 @@ const EMPTY_FORM: RecoverForm = {
   recoveryKey: null,
   newPassword: null,
   confirmPassword: null,
-  removePasskeys: true,
+  removePasskeys: false,
   error: null,
   isPending: false,
 };
