@@ -1110,7 +1110,7 @@ async fn a_kept_feed_calendar_and_its_events_can_be_sealed_until_no_plaintext_is
         ok(user
             .post(
                 &format!("/api/events/{event}/seal-encryption"),
-                json!({"encryptedContent": fake_envelope(), "blindIndexTokens": [fake_token()]}),
+                json!({"encryptedContent": fake_envelope(), "blindIndexTokens": [fake_token()], "encryptionKeyVersion": 2}),
             )
             .await
             .expect_status(200));
@@ -1893,7 +1893,7 @@ async fn all_day_ends_are_exclusive_and_a_single_day_stays_one_day() {
 
 fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEvent {
     EncryptedIcsEvent {
-        id: None,
+        id: crate::helpers::hex(16).into(),
         external_id: external_id.into(),
         series_external_id: None,
         occurrence_date: None,
@@ -1905,7 +1905,7 @@ fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEve
         recurrence: None,
         encrypted_content: fake_envelope(),
         blind_index_tokens: None,
-        encryption_key_version: None,
+        encryption_key_version: Some(2),
         participants: None,
     }
 }
@@ -2079,7 +2079,7 @@ async fn encrypted_import_stores_ciphertext_as_sent_and_links_overrides() {
                 None,
                 "encrypted".into(),
                 Some(moved_content),
-                1,
+                2,
                 None,
                 None,
                 Some(series_id.clone()),

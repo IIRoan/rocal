@@ -88,15 +88,21 @@ async fn edit(user: &mut TestUser, series: &str, request: &EditRecurringRequest)
         .and_then(|r| r.dto()))
 }
 
+/// An edit as current clients send it: new content is bound, and a child row gets its own id and content.
 fn edit_request(
     scope: &str,
     occurrence: Option<&str>,
-    updates: RecurringUpdates,
+    mut updates: RecurringUpdates,
 ) -> EditRecurringRequest {
+    let child = scope != "all";
+    if child || updates.encrypted_content.is_some() {
+        updates.encrypted_content.get_or_insert_with(fake_envelope);
+        updates.encryption_key_version.get_or_insert(2);
+    }
     EditRecurringRequest {
         edit_scope: scope.into(),
         occurrence_date: occurrence.map(str::to_owned),
-        new_event_id: None,
+        new_event_id: child.then(|| hex(16).into()),
         updates,
     }
 }
@@ -581,25 +587,21 @@ async fn common_patterns_are_fixed() {
 }
 
 #[tokio::test]
-async fn editing_one_occurrence_detaches_it_with_the_series_ciphertext() {
+async fn editing_one_occurrence_detaches_it_with_its_own_ciphertext() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let calendar = calendar_id(&mut owner, "Work").await;
     let series = weekly_series(&mut owner, &calendar).await;
 
-    let detached = edit(
-        &mut owner,
-        &series.id.0,
-        &edit_request(
-            "this_only",
-            Some("2099-03-16T09:00:00.000Z"),
-            RecurringUpdates {
-                color: Some("rose".into()),
-                ..RecurringUpdates::default()
-            },
-        ),
-    )
-    .await;
+    let request = edit_request(
+        "this_only",
+        Some("2099-03-16T09:00:00.000Z"),
+        RecurringUpdates {
+            color: Some("rose".into()),
+            ..RecurringUpdates::default()
+        },
+    );
+    let detached = edit(&mut owner, &series.id.0, &request).await;
     assert_ne!(detached.id, series.id);
     assert_eq!(detached.parent_event_id.as_ref(), Some(&series.id));
     assert_eq!(
@@ -615,10 +617,13 @@ async fn editing_one_occurrence_detaches_it_with_the_series_ciphertext() {
     );
     assert_eq!(detached.external_id, None);
     assert_eq!(detached.calendar.id.0, calendar);
+    assert_eq!(Some(&detached.id), request.new_event_id.as_ref());
     assert_eq!(
-        stored_content(&app.db, &detached.id.0).await,
-        stored_content(&app.db, &series.id.0).await,
-        "the occurrence keeps the series ciphertext"
+        stored_content(&app.db, &detached.id.0)
+            .await
+            .encrypted_content,
+        request.updates.encrypted_content,
+        "the occurrence takes the ciphertext bound to its own id"
     );
     let people = detached.participants.clone().expect("participants");
     assert_eq!(
@@ -703,7 +708,7 @@ async fn content_edits_need_ciphertext_and_store_no_plaintext() {
         ("this_and_future", json!({"title": "Plain"})),
         (
             "all",
-            json!({"location": "Room", "encryptedContent": fake_envelope()}),
+            json!({"location": "Room", "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
         ),
         ("all", json!({"description": ""})),
     ] {
@@ -829,7 +834,7 @@ async fn content_edits_need_ciphertext_and_store_no_plaintext() {
             encrypted_content: Some(occurrence_ciphertext),
             blind_index_tokens: None,
             encryption_state: "encrypted".into(),
-            encryption_key_version: 1,
+            encryption_key_version: 2,
         }
     );
     assert_eq!(
@@ -873,9 +878,14 @@ async fn this_and_future_splits_the_series() {
         ("2099-03-16T13:00:00.000Z", "2099-03-16T14:30:00.000Z"),
         "the duration follows the new start"
     );
-    assert_eq!(
-        stored_content(&app.db, &future.id.0).await,
-        stored_content(&app.db, &series.id.0).await
+    assert_ne!(
+        stored_content(&app.db, &future.id.0)
+            .await
+            .encrypted_content,
+        stored_content(&app.db, &series.id.0)
+            .await
+            .encrypted_content,
+        "the future half takes ciphertext bound to its own id"
     );
     assert_eq!(exceptions(&app, &series.id.0).await, []);
 
@@ -1397,7 +1407,7 @@ async fn edit_requests_are_validated() {
     ok(owner
         .put(
             &path,
-            json!({"editScope": "this_only", "occurrenceDate": "nonsense", "updates": {}}),
+            json!({"editScope": "this_only", "occurrenceDate": "nonsense", "newEventId": hex(16), "updates": {"encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}}),
         )
         .await
         .expect_error(
@@ -1931,8 +1941,6 @@ async fn delete_requests_are_validated() {
 async fn bound_series(user: &mut TestUser, calendar: &str) -> Event {
     let mut request = encrypted_event(calendar, SERIES_START, SERIES_END);
     request.recurrence = Some(WEEKLY_FIVE.into());
-    request.id = Some(hex(16).into());
-    request.encryption_key_version = Some(2);
     create_event(user, &request).await
 }
 
@@ -1973,7 +1981,7 @@ async fn a_detached_occurrence_takes_the_client_proposed_id_with_its_own_content
 }
 
 #[tokio::test]
-async fn bound_series_content_is_never_copied_onto_a_child_row() {
+async fn a_child_row_needs_its_own_id_and_content_bound_to_it() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let calendar = calendar_id(&mut owner, "Work").await;
@@ -1986,12 +1994,25 @@ async fn bound_series_content_is_never_copied_onto_a_child_row() {
     };
 
     for scope in ["this_only", "this_and_future"] {
-        let request = edit_request(scope, Some("2099-03-16T09:00:00.000Z"), moved.clone());
-        let refused = owner.put(&path, to_json(&request)).await;
-        ok(refused.expect_error(
+        let mut without_content =
+            edit_request(scope, Some("2099-03-16T09:00:00.000Z"), moved.clone());
+        without_content.updates.encrypted_content = None;
+        let mut without_id = edit_request(scope, Some("2099-03-16T09:00:00.000Z"), moved.clone());
+        without_id.new_event_id = None;
+        for request in [without_content, without_id] {
+            let refused = owner.put(&path, to_json(&request)).await;
+            ok(refused.expect_error(
+                409,
+                "Conflict",
+                "Update the app to edit one occurrence of this event.",
+            ));
+        }
+        let mut unbound = edit_request(scope, Some("2099-03-16T09:00:00.000Z"), moved.clone());
+        unbound.updates.encryption_key_version = Some(1);
+        ok(owner.put(&path, to_json(&unbound)).await.expect_error(
             409,
             "Conflict",
-            "Update the app to edit one occurrence of this event.",
+            "Update the app to save this event.",
         ));
     }
     assert_eq!(
@@ -2015,13 +2036,14 @@ async fn bound_series_content_is_never_copied_onto_a_child_row() {
         None,
         RecurringUpdates {
             encrypted_content: Some(fake_envelope()),
+            encryption_key_version: Some(1),
             ..RecurringUpdates::default()
         },
     );
     ok(owner.put(&path, to_json(&downgrade)).await.expect_error(
         409,
         "Conflict",
-        "Update the app to edit this event.",
+        "Update the app to save this event.",
     ));
 }
 

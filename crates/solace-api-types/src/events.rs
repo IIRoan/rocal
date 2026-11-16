@@ -394,9 +394,7 @@ pub struct InvitationByExternalIdQuery {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateEventRequest {
     /// A client-proposed row id (32 lowercase hex) that the event content is bound to.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub id: Option<EventId>,
+    pub id: EventId,
     pub start: String,
     pub end: String,
     pub calendar_id: CalendarId,
@@ -584,9 +582,7 @@ pub struct ImportInvitationRequest {
 pub struct InvitationEncryptionEntry {
     pub external_id: String,
     /// The row id the content is bound to: a new copy takes it (32 lowercase hex), an existing copy is sealed only when it is its id.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub event_id: Option<EventId>,
+    pub event_id: EventId,
     pub encrypted_content: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]

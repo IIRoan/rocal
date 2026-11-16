@@ -154,7 +154,7 @@ async fn owned_calendar(user: &mut TestUser) -> String {
 
 fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEvent {
     EncryptedIcsEvent {
-        id: None,
+        id: crate::helpers::hex(16).into(),
         external_id: external_id.into(),
         series_external_id: None,
         occurrence_date: None,
@@ -166,7 +166,7 @@ fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEve
         recurrence: None,
         encrypted_content: fake_envelope(),
         blind_index_tokens: Some(vec![fake_token()]),
-        encryption_key_version: None,
+        encryption_key_version: Some(2),
         participants: None,
     }
 }
@@ -295,14 +295,14 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
     ok(user
         .put(
             "/api/recent-contacts",
-            json!({"encryptedContent": fake_envelope()}),
+            json!({"encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
         )
         .await
         .expect_status(200));
     ok(user
         .put(
             "/api/mail-settings",
-            json!({"encryptedContent": fake_envelope()}),
+            json!({"encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
         )
         .await
         .expect_status(200));

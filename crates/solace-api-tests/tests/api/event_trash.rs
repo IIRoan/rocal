@@ -221,7 +221,8 @@ async fn a_series_comes_back_with_its_exceptions_and_detached_occurrence() {
             json!({
                 "editScope": "this_only",
                 "occurrenceDate": "2099-03-16T09:00:00.000Z",
-                "updates": {"start": "2099-03-16T14:00:00.000Z", "end": "2099-03-16T15:00:00.000Z"},
+                "newEventId": hex(16),
+                "updates": {"start": "2099-03-16T14:00:00.000Z", "end": "2099-03-16T15:00:00.000Z", "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2},
             }),
         )
         .await
@@ -293,7 +294,8 @@ async fn a_detached_occurrence_restored_alone_relinks_to_its_series() {
             json!({
                 "editScope": "this_only",
                 "occurrenceDate": "2099-03-16T09:00:00.000Z",
-                "updates": {"start": "2099-03-16T14:00:00.000Z", "end": "2099-03-16T15:00:00.000Z"},
+                "newEventId": hex(16),
+                "updates": {"start": "2099-03-16T14:00:00.000Z", "end": "2099-03-16T15:00:00.000Z", "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2},
             }),
         )
         .await
@@ -507,7 +509,8 @@ async fn bulk_deletes_trash_each_event_once_and_purges_delete_for_good() {
             json!({
                 "editScope": "this_only",
                 "occurrenceDate": "2099-03-16T09:00:00.000Z",
-                "updates": {"start": "2099-03-16T14:00:00.000Z", "end": "2099-03-16T15:00:00.000Z"},
+                "newEventId": hex(16),
+                "updates": {"start": "2099-03-16T14:00:00.000Z", "end": "2099-03-16T15:00:00.000Z", "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2},
             }),
         )
         .await
@@ -647,9 +650,7 @@ async fn a_restored_bound_event_keeps_the_id_and_ciphertext_it_is_bound_to() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let calendar = calendar_id(&mut owner, "Work").await;
-    let mut request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
-    request.id = Some(hex(16).into());
-    request.encryption_key_version = Some(2);
+    let request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
     let event = create_event(&mut owner, &request).await;
     let before = snapshot(&app.db, "calendar_event", &event.id.0).await;
 

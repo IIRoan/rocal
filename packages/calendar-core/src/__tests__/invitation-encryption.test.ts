@@ -55,12 +55,14 @@ describe("invitation encryption helpers", () => {
     const map = indexInvitationImportEncryption([
       {
         externalId: "invite@example.com",
+        eventId: "0123456789abcdef0123456789abcdef",
         encryptedContent: "ciphertext",
       },
     ]);
 
     expect(map.get("invite@example.com")).toEqual({
       externalId: "invite@example.com",
+      eventId: "0123456789abcdef0123456789abcdef",
       encryptedContent: "ciphertext",
     });
   });

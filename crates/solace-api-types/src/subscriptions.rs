@@ -193,9 +193,7 @@ pub struct EncryptedIcsImportRequest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EncryptedIcsEvent {
     /// A client-proposed row id that the event content is bound to.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(nullable = false)]
-    pub id: Option<EventId>,
+    pub id: EventId,
     pub external_id: String,
     /// Set on an override, together with `occurrenceDate`.
     #[serde(default, skip_serializing_if = "Option::is_none")]

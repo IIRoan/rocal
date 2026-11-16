@@ -56,7 +56,7 @@ request_schema!(InvitationByExternalIdQuery => zod::object([
 .strict());
 
 request_schema!(CreateEventRequest => zod::object([
-    ("id", client_entity_id_schema().optional()),
+    ("id", client_entity_id_schema()),
     ("start", zod::string()),
     ("end", zod::string()),
     ("allDay", zod::boolean().optional()),

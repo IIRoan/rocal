@@ -3597,6 +3597,7 @@
       "CreateEventRequest": {
         "type": "object",
         "required": [
+          "id",
           "start",
           "end",
           "calendarId",
@@ -3999,6 +4000,7 @@
       "EncryptedIcsEvent": {
         "type": "object",
         "required": [
+          "id",
           "externalId",
           "start",
           "end",
@@ -5385,6 +5387,7 @@
         "type": "object",
         "required": [
           "externalId",
+          "eventId",
           "encryptedContent"
         ],
         "properties": {

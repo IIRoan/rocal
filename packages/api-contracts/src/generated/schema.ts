@@ -1448,7 +1448,7 @@ export interface components {
             encryptionKeyVersion?: number;
             end: string;
             /** @description A client-proposed row id (32 lowercase hex) that the event content is bound to. */
-            id?: components["schemas"]["EventId"];
+            id: components["schemas"]["EventId"];
             /** @description Transient plaintext for invitation mail; never stored. */
             invitationContent?: components["schemas"]["InvitationContent"];
             participants?: components["schemas"]["ParticipantInput"][];
@@ -1561,7 +1561,7 @@ export interface components {
             excludedDates?: components["schemas"]["Timestamp"][];
             externalId: string;
             /** @description A client-proposed row id that the event content is bound to. */
-            id?: components["schemas"]["EventId"];
+            id: components["schemas"]["EventId"];
             occurrenceDate?: components["schemas"]["Timestamp"];
             participants?: components["schemas"]["ParticipantInput"][];
             /** @description A recurrence rule object as JSON text. */
@@ -1905,7 +1905,7 @@ export interface components {
             /** Format: int32 */
             encryptionKeyVersion?: number;
             /** @description The row id the content is bound to: a new copy takes it (32 lowercase hex), an existing copy is sealed only when it is its id. */
-            eventId?: components["schemas"]["EventId"];
+            eventId: components["schemas"]["EventId"];
             externalId: string;
         };
         /** @description What an ICS invitation import did. */

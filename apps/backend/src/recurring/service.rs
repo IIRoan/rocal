@@ -18,7 +18,7 @@ use crate::calendars::queries as calendars;
 use crate::db::entities::{calendar, calendar_event, event_participant, user};
 use crate::error::AppError;
 use crate::events::encryption::{
-    BOUND_EVENT_CONTENT_VERSION, refuse_content_downgrade, resolve_invitation_content,
+    BOUND_EVENT_CONTENT_VERSION, require_bound_content, resolve_invitation_content,
 };
 use crate::events::recurrence::{generate_instances, validate_rule};
 use crate::events::service::{
@@ -255,30 +255,15 @@ fn clear_sealed_attributes(row: &mut calendar_event::ActiveModel, updates: &Recu
     }
 }
 
-/// New ciphertext replaces the content; otherwise the series' own content (and ciphertext) is carried over.
-fn apply_content(
-    row: &mut calendar_event::ActiveModel,
-    existing: &calendar_event::Model,
-    updates: &RecurringUpdates,
-) -> Result<(), AppError> {
-    if let Some(ciphertext) = new_ciphertext(updates) {
-        row.title = Set(String::new());
-        row.description = Set(None);
-        row.location = Set(None);
-        row.encrypted_content = Set(Some(ciphertext.to_owned()));
-        row.blind_index_tokens = Set(None);
-        row.encryption_state = Set("encrypted".into());
-        row.encryption_key_version = Set(updates.encryption_key_version.unwrap_or(1));
-        return Ok(());
-    }
-    row.title = Set(existing.title.clone());
-    row.description = Set(existing.description.clone());
-    row.location = Set(existing.location.clone());
-    row.encrypted_content = Set(existing.encrypted_content.clone());
+/// New ciphertext, bound to the row it is written to, replaces the readable content.
+fn apply_content(row: &mut calendar_event::ActiveModel, ciphertext: &str, version: Option<i32>) {
+    row.title = Set(String::new());
+    row.description = Set(None);
+    row.location = Set(None);
+    row.encrypted_content = Set(Some(ciphertext.to_owned()));
     row.blind_index_tokens = Set(None);
-    row.encryption_state = Set(existing.encryption_state.clone());
-    row.encryption_key_version = Set(existing.encryption_key_version);
-    Ok(())
+    row.encryption_state = Set("encrypted".into());
+    row.encryption_key_version = Set(version.unwrap_or(BOUND_EVENT_CONTENT_VERSION));
 }
 
 /// `buildRecurringEventCreateData`: a child of the series at `occurrence`, keeping the series' duration unless the edit sets an end.
@@ -290,19 +275,17 @@ fn child_row(
     recurrence: Option<String>,
     occurrence: Option<i64>,
 ) -> Result<calendar_event::ActiveModel, AppError> {
-    // Bound series content opens only under the series id, so a child row needs its own ciphertext.
-    if existing.encryption_key_version >= BOUND_EVENT_CONTENT_VERSION
-        && new_ciphertext(updates).is_none()
-    {
+    // Series content opens only under the series id, so a child row needs its own id and ciphertext bound to it.
+    let (Some(child_id), Some(ciphertext)) = (child_id, new_ciphertext(updates)) else {
         return Err(AppError::Conflict(
             "Update the app to edit one occurrence of this event.".into(),
         ));
-    }
-    let mut row = calendar_event::ActiveModel::default();
-    if let Some(id) = child_id {
-        row.id = Set(id.to_owned());
-    }
-    apply_content(&mut row, existing, updates)?;
+    };
+    let mut row = calendar_event::ActiveModel {
+        id: Set(child_id.to_owned()),
+        ..Default::default()
+    };
+    apply_content(&mut row, ciphertext, updates.encryption_key_version);
     let duration =
         (instant::unix_millis(existing.end) - instant::unix_millis(existing.start)).max(0);
     let start = js_date(updates.start.as_deref()).unwrap_or(occurrence);
@@ -361,8 +344,8 @@ fn series_update(
     if let Some(category_id) = &updates.category_id {
         row.category_id = Set(clearable_category(category_id));
     }
-    if new_ciphertext(updates).is_some() {
-        apply_content(&mut row, existing, updates)?;
+    if let Some(ciphertext) = new_ciphertext(updates) {
+        apply_content(&mut row, ciphertext, updates.encryption_key_version);
     }
     clear_sealed_attributes(&mut row, updates);
     if let Some(start) = js_date(updates.start.as_deref()) {
@@ -384,6 +367,7 @@ pub async fn edit(
     let existing = series(state, &user.id, id).await?;
     assert_editable(&user.id, &existing.row, &existing.participants)?;
     let updates = &request.updates;
+    require_bound_content(new_ciphertext(updates), updates.encryption_key_version)?;
     let calendar = assert_targets_owned(state, &user.id, &existing.row, updates).await?;
     refuse_plaintext(
         &calendar,
@@ -422,12 +406,6 @@ pub async fn edit(
             respond(state, user, future, updates, Some(&existing)).await
         }
         _ => {
-            refuse_content_downgrade(
-                existing.row.encryption_key_version,
-                new_ciphertext(updates),
-                updates.encryption_key_version,
-                "Update the app to edit this event.",
-            )?;
             let row = series_update(&existing.row, updates)?;
             let updated = events::update(&state.db, row).await?;
             respond(state, user, updated, updates, None).await

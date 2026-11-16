@@ -15,7 +15,7 @@ use crate::helpers::{TestApp, TestUser, count, expect_unauthorized, expect_unkno
 
 fn entry(external_id: &str) -> EncryptedIcsEvent {
     EncryptedIcsEvent {
-        id: None,
+        id: crate::helpers::hex(16).into(),
         external_id: external_id.into(),
         series_external_id: None,
         occurrence_date: None,
@@ -27,7 +27,7 @@ fn entry(external_id: &str) -> EncryptedIcsEvent {
         recurrence: None,
         encrypted_content: fake_envelope(),
         blind_index_tokens: Some(vec!["keyed-token".into()]),
-        encryption_key_version: None,
+        encryption_key_version: Some(2),
         participants: None,
     }
 }
@@ -428,8 +428,7 @@ async fn an_entry_keeps_the_id_its_content_is_bound_to() {
     let calendar = calendar_id(&mut owner, "Work").await;
     let id = crate::helpers::hex(16);
     let mut bound = entry("bound-one");
-    bound.id = Some(id.clone().into());
-    bound.encryption_key_version = Some(2);
+    bound.id = id.clone().into();
 
     assert_eq!(
         import(&mut owner, body(&calendar, vec![bound])).await,
@@ -439,7 +438,7 @@ async fn an_entry_keeps_the_id_its_content_is_bound_to() {
     assert_eq!(stored_content(&app.db, &id).await.encryption_key_version, 2);
 
     let mut malformed = entry("bound-two");
-    malformed.id = Some("ABC".to_owned().into());
+    malformed.id = "ABC".to_owned().into();
     let response = owner
         .post(
             "/api/subscriptions/import-ics",

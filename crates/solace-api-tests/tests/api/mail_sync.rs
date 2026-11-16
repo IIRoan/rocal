@@ -470,7 +470,7 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
     let import = json!({
         "icsContent": invitation_ics("REQUEST", &uid, "Decrypted invite", 0, &email),
         "status": "accepted",
-        "encryption": [{"externalId": uid, "encryptedContent": ciphertext}],
+        "encryption": [{"externalId": uid, "eventId": hex(16), "encryptedContent": ciphertext, "encryptionKeyVersion": 2}],
     });
     let summary: MailCalendarImportSummary = ok(user
         .post("/api/events/invitations/import-ics", import)
@@ -515,7 +515,7 @@ async fn accepted_invitation_imports_land_on_the_default_writable_calendar() {
                 "icsContent": invitation_ics("REQUEST", &chosen_uid, "Chosen calendar", 0, &email),
                 "status": "accepted",
                 "calendarId": side_id,
-                "encryption": [{"externalId": chosen_uid, "encryptedContent": fake_envelope()}],
+                "encryption": [{"externalId": chosen_uid, "eventId": hex(16), "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}],
             }),
         )
         .await
@@ -552,7 +552,7 @@ async fn accepted_imports_without_a_sealed_copy_store_nothing() {
         json!({
             "icsContent": two_events,
             "status": "tentative",
-            "encryption": [{"externalId": uid, "encryptedContent": fake_envelope()}],
+            "encryption": [{"externalId": uid, "eventId": hex(16), "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}],
         }),
     ] {
         let summary: MailCalendarImportSummary = ok(user
@@ -593,7 +593,7 @@ async fn client_encrypted_invitation_imports_store_only_ciphertext() {
     let body = json!({
         "icsContent": invitation_ics("REQUEST", &uid, "Secret planning", 0, &email),
         "status": "tentative",
-        "encryption": [{"externalId": uid, "encryptedContent": ciphertext, "blindIndexTokens": [token], "encryptionKeyVersion": 1}],
+        "encryption": [{"externalId": uid, "eventId": hex(16), "encryptedContent": ciphertext, "blindIndexTokens": [token], "encryptionKeyVersion": 2}],
     });
 
     let without_calendars: MailCalendarImportSummary = ok(user

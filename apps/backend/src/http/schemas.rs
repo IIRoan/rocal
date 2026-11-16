@@ -218,7 +218,7 @@ pub fn is_client_entity_id(id: &str) -> bool {
 pub fn encrypted_ics_import_event_schema() -> Schema {
     let external_id = || zod::string().min(1).max(128);
     zod::object([
-        ("id", client_entity_id_schema().optional()),
+        ("id", client_entity_id_schema()),
         ("externalId", external_id()),
         ("seriesExternalId", external_id().optional()),
         ("occurrenceDate", zod::string().datetime().optional()),

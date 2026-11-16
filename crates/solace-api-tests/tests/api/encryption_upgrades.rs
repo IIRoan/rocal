@@ -7,7 +7,9 @@ use solace_api_types::events::EventDeleted;
 use solace_api_types::notifications::{NotificationSetting, SealedReminders};
 use sqlx::PgPool;
 
-use crate::event_fixtures::{FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event};
+use crate::event_fixtures::{
+    FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event, unbind,
+};
 use crate::helpers::{TestApp, TestUser, expect_unauthorized, hex, ok};
 use crate::notifications::{lead_ciphertext, title_ciphertext};
 
@@ -19,12 +21,14 @@ async fn upgrades(user: &mut TestUser) -> EncryptionUpgrades {
         .and_then(|r| r.dto()))
 }
 
-/// A sealed event an older client saved with its colour in the readable column.
-async fn legacy_event(user: &mut TestUser) -> String {
+/// A sealed event an older client saved unbound, with its colour in the readable column.
+async fn legacy_event(app: &TestApp, user: &mut TestUser) -> String {
     let calendar = calendar_id(user, "Work").await;
     let mut request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
     request.color = Some("#3b82f6".into());
-    create_event(user, &request).await.id.0
+    let id = create_event(user, &request).await.id.0;
+    unbind(&app.db, &id).await;
+    id
 }
 
 /// Reminders as an older client set them: no sealed title, no sealed leads.
@@ -99,7 +103,7 @@ async fn the_report_lists_what_an_older_client_left_readable_until_it_is_reseale
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let mut other = app.user().await;
-    let event = legacy_event(&mut user).await;
+    let event = legacy_event(&app, &mut user).await;
     legacy_reminders(&mut user, &event).await;
     ok(user.get("/api/settings").await.expect_status(200));
 
@@ -195,9 +199,8 @@ async fn unbound_content_in_the_trash_is_counted_until_a_restore_lists_it_for_bi
     )
     .await
     .id;
-    let mut bound = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
-    bound.id = Some(hex(16).into());
-    bound.encryption_key_version = Some(2);
+    unbind(&app.db, &legacy.0).await;
+    let bound = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
     let bound = create_event(&mut user, &bound).await.id;
     let mut trash_ids = Vec::new();
     for event in [&legacy, &bound] {
@@ -246,6 +249,7 @@ async fn a_trash_between_the_live_and_trashed_reads_never_reports_the_account_bo
     .await
     .id
     .0;
+    unbind(&app.db, &legacy).await;
     let (db, event) = (&app.db, &legacy);
     // Holding the events table parks the report's live reads while this "trash" moves the event.
     let trash = async move {
@@ -302,7 +306,7 @@ async fn a_reseal_over_a_ciphertext_that_changed_since_it_was_read_is_refused() 
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let mut other = app.user().await;
-    let event = legacy_event(&mut user).await;
+    let event = legacy_event(&app, &mut user).await;
     let stored = stored_content(&app.db, &event).await;
 
     let stale = user
@@ -334,7 +338,7 @@ async fn sealing_reminders_leaves_sent_ones_and_other_users_alone() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
     let mut other = app.user().await;
-    let event = legacy_event(&mut user).await;
+    let event = legacy_event(&app, &mut user).await;
     legacy_reminders(&mut user, &event).await;
     sqlx::query(
         "UPDATE event_notification SET is_sent = true WHERE event_id = $1 AND minutes_before = 60",

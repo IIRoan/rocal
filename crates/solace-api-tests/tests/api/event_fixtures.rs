@@ -23,7 +23,7 @@ pub fn to_json<T: serde::Serialize>(value: &T) -> Value {
 /// An encrypted create body, the only kind owned calendars accept.
 pub fn encrypted_event(calendar_id: &str, start: &str, end: &str) -> CreateEventRequest {
     CreateEventRequest {
-        id: None,
+        id: hex(16).into(),
         start: start.into(),
         end: end.into(),
         calendar_id: calendar_id.to_owned().into(),
@@ -35,16 +35,30 @@ pub fn encrypted_event(calendar_id: &str, start: &str, end: &str) -> CreateEvent
         recurrence: None,
         encrypted_content: fake_envelope(),
         blind_index_tokens: Some(vec![fake_token(), fake_token()]),
-        encryption_key_version: Some(1),
+        encryption_key_version: Some(2),
         participants: None,
         invitation_content: None,
         attributes_encrypted: None,
     }
 }
 
+/// Rewrites a stored event into the unbound form older clients sealed it in.
+pub async fn unbind(db: &PgPool, id: &str) {
+    sqlx::query("UPDATE calendar_event SET encryption_key_version = 1 WHERE id = $1")
+        .bind(id)
+        .execute(db)
+        .await
+        .expect("unbind event");
+}
+
+/// Creates the event under a fresh id, as clients propose one per create.
 pub async fn create_event(user: &mut TestUser, request: &CreateEventRequest) -> Event {
+    let request = CreateEventRequest {
+        id: hex(16).into(),
+        ..request.clone()
+    };
     ok(user
-        .post("/api/events", to_json(request))
+        .post("/api/events", to_json(&request))
         .await
         .expect_status(200)
         .and_then(|r| r.dto()))

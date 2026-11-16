@@ -11,8 +11,8 @@ use solace_api_types::events::{
 };
 
 use super::encryption::{
-    BOUND_EVENT_CONTENT_VERSION, InvitationContentSource, clear_plaintext,
-    refuse_content_downgrade, resolve_invitation_content,
+    BOUND_EVENT_CONTENT_VERSION, InvitationContentSource, clear_plaintext, require_bound_content,
+    resolve_invitation_content,
 };
 use super::view::{self, Relations};
 use super::{constraints, queries, recurrence};
@@ -391,6 +391,10 @@ pub async fn create(
             "encryptedContent",
         ));
     }
+    require_bound_content(
+        Some(&request.encrypted_content),
+        request.encryption_key_version,
+    )?;
     let uid = format!("{}@solace-calendar.local", uuid::Uuid::new_v4());
     let mut row = calendar_event::ActiveModel {
         start: Set(start),
@@ -411,12 +415,10 @@ pub async fn create(
         ..Default::default()
     };
     clear_plaintext(&mut row);
-    if let Some(version) = request.encryption_key_version {
-        row.encryption_key_version = Set(version);
-    }
-    if let Some(id) = &request.id {
-        row.id = Set(id.0.clone());
-    }
+    row.encryption_key_version = Set(request
+        .encryption_key_version
+        .unwrap_or(BOUND_EVENT_CONTENT_VERSION));
+    row.id = Set(request.id.0.clone());
     let event = queries::insert(&state.db, row).await?;
     let synced = participants::sync(
         &state.db,
@@ -494,11 +496,9 @@ pub async fn update(
     let existing_participants =
         queries::participants_with_users(&state.db, std::slice::from_ref(&existing.id)).await?;
     assert_editable(&user.id, &existing, &existing_participants)?;
-    refuse_content_downgrade(
-        existing.encryption_key_version,
+    require_bound_content(
         request.encrypted_content.as_deref(),
         request.encryption_key_version,
-        "Update the app to edit this event.",
     )?;
     let start = request
         .start
@@ -607,7 +607,9 @@ pub async fn update(
         row.encrypted_content = Set(Some(content.clone()));
         row.blind_index_tokens = Set(None);
         // The version names the AAD of this ciphertext, so it never changes without it.
-        row.encryption_key_version = Set(request.encryption_key_version.unwrap_or(1));
+        row.encryption_key_version = Set(request
+            .encryption_key_version
+            .unwrap_or(BOUND_EVENT_CONTENT_VERSION));
     }
     row.updated_at = Set(instant::now());
     let updated = queries::update_if_unchanged(&state.db, row, &id, seen)
@@ -898,10 +900,10 @@ async fn duplicate(
     relations: &Relations,
     target_calendar_id: Option<&str>,
 ) -> Result<BulkEventResult, AppError> {
-    // Bound content opens only under its own row id, so a copy needs new ciphertext from the client.
+    // Sealed content opens only under its own row id, or is unbound content that is never written again, so a copy needs new ciphertext from the client.
     if events
         .iter()
-        .any(|event| event.encryption_key_version >= BOUND_EVENT_CONTENT_VERSION)
+        .any(|event| non_blank(event.encrypted_content.as_deref()).is_some())
     {
         return Err(AppError::validation("Duplicate this event in the app."));
     }
@@ -995,6 +997,10 @@ pub async fn seal(
             "encryptedContent",
         ));
     }
+    require_bound_content(
+        Some(&request.encrypted_content),
+        request.encryption_key_version,
+    )?;
     let existing = queries::find(&state.db, &user.id, id)
         .await?
         .ok_or_else(not_found)?;
@@ -1013,7 +1019,9 @@ pub async fn seal(
     clear_plaintext(&mut row);
     row.encrypted_content = Set(Some(request.encrypted_content));
     row.blind_index_tokens = Set(None);
-    row.encryption_key_version = Set(request.encryption_key_version.unwrap_or(1));
+    row.encryption_key_version = Set(request
+        .encryption_key_version
+        .unwrap_or(BOUND_EVENT_CONTENT_VERSION));
     let updated = queries::update(&state.db, row).await?;
     view::one(&state.db, &updated).await
 }
@@ -1026,17 +1034,17 @@ async fn reseal(
     expected: &str,
     request: SealEncryptionRequest,
 ) -> Result<Event, AppError> {
-    let mut row = calendar_event::ActiveModel {
+    let row = calendar_event::ActiveModel {
         encrypted_content: Set(Some(request.encrypted_content)),
         color: Set(None),
         category_id: Set(None),
         blind_index_tokens: Set(None),
+        encryption_key_version: Set(request
+            .encryption_key_version
+            .unwrap_or(BOUND_EVENT_CONTENT_VERSION)),
         updated_at: Set(instant::now()),
         ..Default::default()
     };
-    if let Some(version) = request.encryption_key_version {
-        row.encryption_key_version = Set(version);
-    }
     let updated = queries::reseal_if_unchanged(&state.db, &user.id, id, expected, row)
         .await?
         .ok_or_else(|| {

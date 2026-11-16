@@ -26,6 +26,7 @@ use crate::db::entities::{
 };
 use crate::entity_metadata::{EncryptedName, NameInput, resolve_name_persistence};
 use crate::error::AppError;
+use crate::events::encryption::{BOUND_EVENT_CONTENT_VERSION, require_bound_content};
 use crate::events::participants;
 use crate::events::queries as events_queries;
 use crate::http::zod::{js_length, js_trim};
@@ -753,6 +754,9 @@ pub async fn import_ics(
     user: &RouteUser,
     request: EncryptedIcsImportRequest,
 ) -> Result<ImportIcsResponse, AppError> {
+    for entry in &request.encrypted_events {
+        require_bound_content(Some(&entry.encrypted_content), entry.encryption_key_version)?;
+    }
     let calendar_id = request.calendar_id.0.as_str();
     let mut entries: Vec<_> = request.encrypted_events.iter().collect();
     entries.sort_by_key(|entry| entry.series_external_id.is_some());
@@ -798,7 +802,9 @@ pub async fn import_ics(
             location: Set(None),
             encrypted_content: Set(Some(entry.encrypted_content.clone())),
             encryption_state: Set("encrypted".into()),
-            encryption_key_version: Set(entry.encryption_key_version.unwrap_or(1)),
+            encryption_key_version: Set(entry
+                .encryption_key_version
+                .unwrap_or(BOUND_EVENT_CONTENT_VERSION)),
             start: Set(stored_instant(&entry.start)?),
             end: Set(stored_instant(&entry.end)?),
             all_day: Set(entry.all_day),
@@ -811,9 +817,7 @@ pub async fn import_ics(
             parent_event_id: Set(parent.as_ref().map(|parent| parent.id.clone())),
             ..Default::default()
         };
-        if let Some(id) = &entry.id {
-            row.id = Set(id.0.clone());
-        }
+        row.id = Set(entry.id.0.clone());
         let event = events_queries::insert(&transaction, row).await?;
         let people = entry.participants.as_deref().unwrap_or_default();
         participants::sync(&transaction, &event.id, people, None).await?;

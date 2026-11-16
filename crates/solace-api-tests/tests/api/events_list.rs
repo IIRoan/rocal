@@ -1,6 +1,7 @@
 //! `GET /api/events` range listing with recurrence expansion, `/api/events/search` and `/api/events/search-corpus`.
 
 use serde_json::{Value, json};
+use solace_api_tests::seed::fake_envelope;
 use solace_api_types::events::{Event, EventSearchCorpus, EventSearchResults, RecurrenceException};
 use solace_api_types::recurring::RecurringDeleted;
 
@@ -466,7 +467,8 @@ async fn listed_series_apply_their_occurrence_exceptions() {
             json!({
                 "editScope": "this_only",
                 "occurrenceDate": "2099-03-16T09:00:00.000Z",
-                "updates": {"start": "2099-03-16T14:00:00.000Z", "end": "2099-03-16T15:00:00.000Z"},
+                "newEventId": hex(16),
+                "updates": {"start": "2099-03-16T14:00:00.000Z", "end": "2099-03-16T15:00:00.000Z", "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2},
             }),
         )
         .await
@@ -612,7 +614,8 @@ async fn a_split_series_lists_both_halves_and_the_detached_row_once() {
             json!({
                 "editScope": "this_and_future",
                 "occurrenceDate": "2099-03-16T09:00:00.000Z",
-                "updates": {"start": "2099-03-16T11:00:00.000Z"},
+                "newEventId": hex(16),
+                "updates": {"start": "2099-03-16T11:00:00.000Z", "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2},
             }),
         )
         .await
@@ -624,7 +627,8 @@ async fn a_split_series_lists_both_halves_and_the_detached_row_once() {
             json!({
                 "editScope": "this_only",
                 "occurrenceDate": "2099-03-23T11:00:00.000Z",
-                "updates": {"start": "2099-03-24T11:00:00.000Z", "end": "2099-03-24T12:00:00.000Z"},
+                "newEventId": hex(16),
+                "updates": {"start": "2099-03-24T11:00:00.000Z", "end": "2099-03-24T12:00:00.000Z", "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2},
             }),
         )
         .await

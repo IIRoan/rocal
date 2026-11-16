@@ -11,7 +11,7 @@ use solace_api_types::events::{
 use crate::event_fixtures::{
     FUTURE_END, FUTURE_START, StoredContent, calendar_id, create_event, encrypted_event,
     insert_calendar, insert_plaintext_event, insert_staging_calendar, iso_from_now, row_snapshot,
-    stored_content, to_json,
+    stored_content, to_json, unbind,
 };
 use crate::helpers::{
     TestApp, TestUser, count, expect_unauthorized, expect_unknown_field, hex, ok,
@@ -343,7 +343,7 @@ async fn sealed_colour_and_category_keep_no_plaintext_copy() {
     let resealed: Event = ok(owner
         .put(
             &path,
-            json!({"attributesEncrypted": true, "encryptedContent": fake_envelope(), "color": "blue"}),
+            json!({"attributesEncrypted": true, "encryptedContent": fake_envelope(), "color": "blue", "encryptionKeyVersion": 2}),
         )
         .await
         .expect_status(200)
@@ -422,7 +422,8 @@ async fn plaintext_content_beside_ciphertext_is_rejected() {
         body[key] = json!(value);
         expect_unknown_field(&owner.post("/api/events", body).await, key);
 
-        let update = json!({key: value, "encryptedContent": fake_envelope()});
+        let update =
+            json!({key: value, "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2});
         expect_unknown_field(
             &owner
                 .put(&format!("/api/events/{}", existing.id), update)
@@ -461,7 +462,7 @@ async fn invitation_content_needs_ciphertext_and_participants() {
     assert_eq!(issue_paths(&error), ["invitationContent"]);
 
     let body = json!({
-        "start": FUTURE_START, "end": FUTURE_END, "calendarId": calendar,
+        "id": hex(16), "start": FUTURE_START, "end": FUTURE_END, "calendarId": calendar,
         "participants": [{"email": "guest@example.com"}],
         "invitationContent": {"title": "Planning"},
     });
@@ -796,7 +797,7 @@ async fn field_shapes_are_validated_with_the_zod_message() {
     let error = ok(owner
         .post(
             "/api/events",
-            json!({"end": FUTURE_END, "calendarId": calendar, "encryptedContent": fake_envelope()}),
+            json!({"id": hex(16), "end": FUTURE_END, "calendarId": calendar, "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
         )
         .await
         .expect_error(400, "Validation Error", "Required"));
@@ -816,7 +817,7 @@ async fn field_shapes_are_validated_with_the_zod_message() {
         ),
     ];
     for (fields, message, path) in cases {
-        let mut body = json!({"start": FUTURE_START, "end": FUTURE_END, "calendarId": calendar});
+        let mut body = json!({"id": hex(16), "start": FUTURE_START, "end": FUTURE_END, "calendarId": calendar});
         for (key, value) in fields.as_object().expect("object") {
             body[key] = value.clone();
         }
@@ -922,7 +923,7 @@ async fn service_rules_reject_inconsistent_events() {
     let error = ok(owner
         .post(
             "/api/events",
-            json!({"start": FUTURE_START, "end": FUTURE_END, "calendarId": calendar, "title": "Plain"}),
+            json!({"id": hex(16), "start": FUTURE_START, "end": FUTURE_END, "calendarId": calendar, "title": "Plain"}),
         )
         .await
         .expect_error(400, "Validation Error", "Required"));
@@ -1128,14 +1129,14 @@ async fn other_users_cannot_read_change_or_delete_an_event() {
         other
             .put(
                 &path,
-                json!({"encryptedContent": fake_envelope(), "calendarId": other_calendar}),
+                json!({"encryptedContent": fake_envelope(), "calendarId": other_calendar, "encryptionKeyVersion": 2}),
             )
             .await,
         other.delete(&path).await,
         other
             .post(
                 &format!("{path}/seal-encryption"),
-                json!({"encryptedContent": fake_envelope()}),
+                json!({"encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
             )
             .await,
         other
@@ -1699,7 +1700,7 @@ async fn synced_events_are_read_only() {
     ok(owner
         .post(
             &format!("/api/events/{event}/seal-encryption"),
-            json!({"encryptedContent": fake_envelope()}),
+            json!({"encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
         )
         .await
         .expect_error(
@@ -1920,88 +1921,6 @@ async fn bulk_duplicate_refuses_another_users_calendar() {
 }
 
 #[tokio::test]
-async fn bulk_duplicate_copies_ciphertext_attendees_and_reminders() {
-    let app = TestApp::spawn().await;
-    let mut owner = app.user().await;
-    let calendar = calendar_id(&mut owner, "Work").await;
-    let family = calendar_id(&mut owner, "Family").await;
-    let mut request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
-    request.reminder = Some(Some(20));
-    request.recurrence = Some(r#"{"frequency":"daily","interval":1,"count":2}"#.into());
-    request.participants = Some(vec![solace_api_types::events::ParticipantInput {
-        email: "guest@example.com".into(),
-        display_name: Some("Guest".into()),
-        role: None,
-        status: Some("accepted".into()),
-    }]);
-    let source = create_event(&mut owner, &request).await;
-
-    let result: BulkEventResult = ok(owner
-        .post(
-            "/api/events/bulk",
-            json!({"action": "duplicate", "eventIds": [source.id], "targetCalendarId": family}),
-        )
-        .await
-        .expect_status(200)
-        .and_then(|r| r.dto()));
-    assert_eq!(
-        (
-            result.success,
-            result.message.as_str(),
-            result.events_processed,
-            result.action.as_str()
-        ),
-        (true, "Successfully duplicated 1 events", 1, "duplicate")
-    );
-    let created = result.created_events.expect("created events");
-    let copy = created
-        .iter()
-        .find(|event| event.encryption_state == "encrypted")
-        .expect("encrypted copy");
-    assert_ne!(copy.id, source.id);
-    assert_eq!(copy.title, "", "encrypted titles are not suffixed");
-    assert_eq!(copy.encrypted_content, source.encrypted_content);
-    assert_eq!(copy.blind_index_tokens, source.blind_index_tokens);
-    assert_eq!(copy.calendar_id.0, family);
-    assert_eq!((copy.reminder, &copy.recurrence), (Some(20), &None));
-    assert_eq!(copy.external_id, None);
-    let mut people: Vec<(String, String, String)> = copy
-        .participants
-        .clone()
-        .expect("participants")
-        .into_iter()
-        .map(|p| (p.email, p.role, p.status))
-        .collect();
-    people.sort();
-    let mut expected = vec![
-        (
-            "guest@example.com".to_owned(),
-            "attendee".to_owned(),
-            "accepted".to_owned(),
-        ),
-        (
-            owner.email.clone(),
-            "organizer".to_owned(),
-            "accepted".to_owned(),
-        ),
-    ];
-    expected.sort();
-    assert_eq!(people, expected);
-    let reminders: Vec<(i32, Option<String>)> = sqlx::query_as(
-        "SELECT minutes_before, encrypted_display_title FROM event_notification WHERE event_id = $1",
-    )
-    .bind(&copy.id.0)
-    .fetch_all(&app.db)
-    .await
-    .expect("reminders");
-    assert_eq!(
-        reminders,
-        [(20, None)],
-        "the copy starts with a generic reminder"
-    );
-}
-
-#[tokio::test]
 async fn bulk_delete_removes_events_and_their_reminders() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
@@ -2117,7 +2036,7 @@ async fn sealing_replaces_plaintext_with_ciphertext() {
             to_json(&SealEncryptionRequest {
                 encrypted_content: ciphertext.clone(),
                 blind_index_tokens: Some(vec!["seal-token".into()]),
-                encryption_key_version: None,
+                encryption_key_version: Some(2),
                 expected_encrypted_content: None,
             }),
         )
@@ -2135,7 +2054,7 @@ async fn sealing_replaces_plaintext_with_ciphertext() {
         encrypted_content: Some(ciphertext),
         blind_index_tokens: None,
         encryption_state: "encrypted".into(),
-        encryption_key_version: 1,
+        encryption_key_version: 2,
     };
     assert_eq!(stored_content(&app.db, &event).await, stored);
 
@@ -2154,24 +2073,20 @@ async fn sealing_replaces_plaintext_with_ciphertext() {
     assert_eq!(stored_content(&app.db, &event).await, stored);
 }
 
-/// A create as current clients send it: content bound to an id they propose.
-fn bound_event(calendar: &str) -> solace_api_types::events::CreateEventRequest {
-    let mut request = encrypted_event(calendar, FUTURE_START, FUTURE_END);
-    request.id = Some(hex(16).into());
-    request.encryption_key_version = Some(2);
-    request
-}
-
 #[tokio::test]
 async fn a_client_proposed_id_is_kept_and_must_be_new() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let mut other = app.user().await;
     let calendar = calendar_id(&mut owner, "Work").await;
-    let request = bound_event(&calendar);
-    let id = request.id.clone().expect("id");
+    let request = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
+    let id = request.id.clone();
 
-    let created = create_event(&mut owner, &request).await;
+    let created: Event = ok(owner
+        .post("/api/events", to_json(&request))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
     assert_eq!(created.id, id);
     assert_eq!(
         stored_content(&app.db, &id.0).await.encryption_key_version,
@@ -2181,8 +2096,8 @@ async fn a_client_proposed_id_is_kept_and_must_be_new() {
     let taken = owner.post("/api/events", to_json(&request)).await;
     assert_eq!(taken.status.as_u16(), 409);
     let theirs = calendar_id(&mut other, "Work").await;
-    let mut foreign = bound_event(&theirs);
-    foreign.id = Some(id.clone());
+    let mut foreign = encrypted_event(&theirs, FUTURE_START, FUTURE_END);
+    foreign.id = id.clone();
     assert_eq!(
         other
             .post("/api/events", to_json(&foreign))
@@ -2198,31 +2113,81 @@ async fn a_client_proposed_id_is_kept_and_must_be_new() {
         format!("{}A", hex(15)),
         "series_2099-03-02T09:00:00.000Z".into(),
     ] {
-        let mut body = bound_event(&calendar);
-        body.id = Some(malformed.into());
+        let mut body = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
+        body.id = malformed.into();
         let response = owner.post("/api/events", to_json(&body)).await;
         assert_eq!(response.status.as_u16(), 400, "{:?}", response.value());
     }
 }
 
 #[tokio::test]
-async fn bound_content_is_never_overwritten_with_unbound_content() {
+async fn event_content_is_only_ever_written_bound_to_its_row_id() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let calendar = calendar_id(&mut owner, "Work").await;
-    let event = create_event(&mut owner, &bound_event(&calendar)).await;
+    let event = create_event(
+        &mut owner,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    let legacy = create_event(
+        &mut owner,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    unbind(&app.db, &legacy.id.0).await;
     let path = format!("/api/events/{}", event.id);
     let before = stored_content(&app.db, &event.id.0).await;
+    let unbound = "Update the app to save this event.";
 
+    let mut create = to_json(&encrypted_event(&calendar, FUTURE_START, FUTURE_END));
+    if let Some(body) = create.as_object_mut() {
+        body.remove("id");
+    }
+    let missing = ok(owner
+        .post("/api/events", create.clone())
+        .await
+        .expect_error(400, "Validation Error", "Required"));
+    assert_eq!(issue_paths(&missing), ["id"]);
     for version in [json!(1), Value::Null] {
+        let mut create = to_json(&encrypted_event(&calendar, FUTURE_START, FUTURE_END));
+        if let Some(body) = create.as_object_mut() {
+            body.remove("encryptionKeyVersion");
+        }
+        if !version.is_null() {
+            create["encryptionKeyVersion"] = version.clone();
+        }
+        ok(owner
+            .post("/api/events", create)
+            .await
+            .expect_error(409, "Conflict", unbound));
         let mut body = json!({"encryptedContent": fake_envelope()});
         if !version.is_null() {
             body["encryptionKeyVersion"] = version;
         }
-        let refused = owner.put(&path, body).await;
-        ok(refused.expect_error(409, "Conflict", "Update the app to edit this event."));
+        for target in [&event.id.0, &legacy.id.0] {
+            let path = format!("/api/events/{target}");
+            ok(owner
+                .put(&path, body.clone())
+                .await
+                .expect_error(409, "Conflict", unbound));
+            ok(owner
+                .post(&format!("{path}/seal-encryption"), body.clone())
+                .await
+                .expect_error(409, "Conflict", unbound));
+        }
     }
     assert_eq!(stored_content(&app.db, &event.id.0).await, before);
+    assert_eq!(
+        count(
+            &app.db,
+            "SELECT count(*) FROM calendar_event WHERE user_id = $1",
+            &owner.id
+        )
+        .await,
+        2,
+        "no unbound event was created"
+    );
 
     ok(owner
         .put(
@@ -2263,6 +2228,7 @@ async fn unbound_content_can_be_rebound_by_an_update() {
         &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
     )
     .await;
+    unbind(&app.db, &event.id.0).await;
     ok(owner
         .put(
             &format!("/api/events/{}", event.id),
@@ -2279,11 +2245,21 @@ async fn unbound_content_can_be_rebound_by_an_update() {
 }
 
 #[tokio::test]
-async fn bulk_duplicate_refuses_bound_content() {
+async fn bulk_duplicate_refuses_sealed_content_bound_or_not() {
     let app = TestApp::spawn().await;
     let mut owner = app.user().await;
     let calendar = calendar_id(&mut owner, "Work").await;
-    let event = create_event(&mut owner, &bound_event(&calendar)).await;
+    let bound = create_event(
+        &mut owner,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    let unbound = create_event(
+        &mut owner,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await;
+    unbind(&app.db, &unbound.id.0).await;
     let before = count(
         &app.db,
         "SELECT count(*) FROM calendar_event WHERE user_id = $1",
@@ -2291,13 +2267,15 @@ async fn bulk_duplicate_refuses_bound_content() {
     )
     .await;
 
-    let response = owner
-        .post(
-            "/api/events/bulk",
-            json!({"action": "duplicate", "eventIds": [event.id]}),
-        )
-        .await;
-    ok(response.expect_error(400, "Validation Error", "Duplicate this event in the app."));
+    for event in [&bound, &unbound] {
+        let response = owner
+            .post(
+                "/api/events/bulk",
+                json!({"action": "duplicate", "eventIds": [event.id]}),
+            )
+            .await;
+        ok(response.expect_error(400, "Validation Error", "Duplicate this event in the app."));
+    }
     assert_eq!(
         count(
             &app.db,

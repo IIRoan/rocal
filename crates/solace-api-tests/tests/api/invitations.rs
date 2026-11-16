@@ -122,7 +122,7 @@ fn series_request(uid: &str, organizer: &str, attendee: &str, master: bool) -> S
 }
 
 #[tokio::test]
-async fn accepting_a_mailed_series_seals_its_moved_occurrences_with_the_series() {
+async fn invitation_content_sealed_without_its_row_id_is_refused_and_stores_nothing() {
     let app = TestApp::spawn().await;
     let mut attendee = app.user().await;
     calendar_id(&mut attendee, "Work").await;
@@ -132,27 +132,27 @@ async fn accepting_a_mailed_series_seals_its_moved_occurrences_with_the_series()
         series_request(&uid, "organizer@example.com", &email, true),
         Some("accepted"),
     );
-    // Clients seal the invitation once, under the series UID.
-    request.encryption = Some(vec![InvitationEncryptionEntry {
-        event_id: None,
-        external_id: uid.clone(),
-        encrypted_content: fake_envelope(),
-        blind_index_tokens: None,
-        encryption_key_version: None,
-    }]);
-
-    let result = import(&mut attendee, &request).await;
-    assert_eq!(result.errors, Vec::<String>::new());
-    assert!(result.events_created >= 2, "{result:?}");
+    for version in [None, Some(1)] {
+        request.encryption = Some(vec![InvitationEncryptionEntry {
+            event_id: hex(16).into(),
+            external_id: uid.clone(),
+            encrypted_content: fake_envelope(),
+            blind_index_tokens: None,
+            encryption_key_version: version,
+        }]);
+        ok(attendee
+            .post("/api/events/invitations/import-ics", to_json(&request))
+            .await
+            .expect_error(409, "Conflict", "Update the app to save this event."));
+    }
     assert_eq!(
         count(
             &app.db,
-            "SELECT count(*) FROM calendar_event WHERE external_id LIKE $1 || '%' AND (title <> '' OR encrypted_content IS NULL)",
+            "SELECT count(*) FROM calendar_event WHERE external_id LIKE $1 || '%'",
             &uid
         )
         .await,
-        0,
-        "the series and its moved occurrence are stored only as ciphertext"
+        0
     );
 }
 
@@ -552,6 +552,7 @@ async fn updating_participants_invites_only_new_people_and_removes_the_rest() {
 
     let update = UpdateEventRequest {
         encrypted_content: Some(fake_envelope()),
+        encryption_key_version: Some(2),
         participants: Some(vec![participant(&kept), participant(&added)]),
         invitation_content: Some(invitation("Planning v2")),
         ..UpdateEventRequest::default()
@@ -1089,11 +1090,11 @@ async fn declining_keeps_a_hidden_tombstone_that_blocks_restaging() {
     );
     let mut sealed = import_request(ics, Some("accepted"));
     sealed.encryption = Some(vec![InvitationEncryptionEntry {
-        event_id: None,
+        event_id: hex(16).into(),
         external_id: uid.clone(),
         encrypted_content: fake_envelope(),
         blind_index_tokens: None,
-        encryption_key_version: None,
+        encryption_key_version: Some(2),
     }]);
     assert_eq!(
         import(&mut attendee, &sealed).await,
@@ -1158,7 +1159,7 @@ async fn the_corpus_lists_the_invitation_copies_still_readable_for_sealing() {
     ok(attendee
         .post(
             &format!("/api/events/{}/seal-encryption", copy.id),
-            json!({"encryptedContent": fake_envelope()}),
+            json!({"encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
         )
         .await
         .expect_status(200));
@@ -1291,7 +1292,7 @@ async fn cancelled_copies_can_be_edited_and_removed() {
     let edited: Event = ok(attendee
         .put(
             &format!("/api/events/{}", copy.id),
-            json!({"color": "red", "encryptedContent": fake_envelope()}),
+            json!({"color": "red", "encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
         )
         .await
         .expect_status(200)
@@ -1650,12 +1651,12 @@ async fn invitation_imports_are_validated() {
             "calendarId",
         ),
         (
-            json!({"icsContent": "x", "encryption": [{"externalId": "", "encryptedContent": "x"}]}),
+            json!({"icsContent": "x", "encryption": [{"eventId": "e1", "externalId": "", "encryptedContent": "x"}]}),
             "String must contain at least 1 character(s)",
             "encryption.0.externalId",
         ),
         (
-            json!({"icsContent": "x", "encryption": [{"externalId": "u", "encryptedContent": "x", "blindIndexTokens": [""]}]}),
+            json!({"icsContent": "x", "encryption": [{"eventId": "e1", "externalId": "u", "encryptedContent": "x", "blindIndexTokens": [""]}]}),
             "String must contain at least 1 character(s)",
             "encryption.0.blindIndexTokens.0",
         ),
@@ -1676,7 +1677,7 @@ async fn invitation_imports_are_validated() {
         &attendee
             .post(
                 "/api/events/invitations/import-ics",
-                json!({"icsContent": "x", "encryption": [{"externalId": "u", "encryptedContent": "x", "title": "Plain"}]}),
+                json!({"icsContent": "x", "encryption": [{"eventId": "e1", "externalId": "u", "encryptedContent": "x", "title": "Plain"}]}),
             )
             .await,
         "title",
@@ -1722,7 +1723,7 @@ async fn imports_with_ciphertext_store_no_plaintext() {
     let ciphertext = fake_envelope();
     let mut request = import_request(ics, Some("accepted"));
     request.encryption = Some(vec![InvitationEncryptionEntry {
-        event_id: None,
+        event_id: staged.id.clone(),
         external_id: uid.clone(),
         encrypted_content: ciphertext.clone(),
         blind_index_tokens: Some(vec!["invite-token".into()]),
@@ -1769,7 +1770,7 @@ async fn imports_with_ciphertext_store_no_plaintext() {
 fn bound_entry(uid: &str, event_id: &str) -> InvitationEncryptionEntry {
     InvitationEncryptionEntry {
         external_id: uid.into(),
-        event_id: Some(event_id.to_owned().into()),
+        event_id: event_id.to_owned().into(),
         encrypted_content: fake_envelope(),
         blind_index_tokens: None,
         encryption_key_version: Some(2),

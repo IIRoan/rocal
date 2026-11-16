@@ -3,7 +3,7 @@ import type { CalendarEvent } from "./types";
 export type InvitationImportEncryptionPayload = {
   externalId: string;
   /** The row id the content is bound to. */
-  eventId?: string;
+  eventId: string;
   encryptedContent: string;
   encryptionKeyVersion?: number;
 };

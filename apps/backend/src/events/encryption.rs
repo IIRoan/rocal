@@ -18,15 +18,16 @@ pub fn clear_plaintext(row: &mut calendar_event::ActiveModel) {
 /// `encryptionKeyVersion` of content bound to its row id (`event-content:v2:<id>`); 1 is the unbound format.
 pub const BOUND_EVENT_CONTENT_VERSION: i32 = 2;
 
-/// An older client must not overwrite bound content with unbound ciphertext, which would also unbind it.
-pub fn refuse_content_downgrade(
-    stored_version: i32,
+/// New event content must be bound to its row id; unbound content stays only where it was, until its re-seal.
+pub fn require_bound_content(
     new_ciphertext: Option<&str>,
     new_version: Option<i32>,
-    message: &str,
 ) -> Result<(), AppError> {
-    if non_blank(new_ciphertext).is_some() && new_version.unwrap_or(1) < stored_version {
-        return Err(AppError::Conflict(message.into()));
+    if non_blank(new_ciphertext).is_some() && new_version.unwrap_or(1) < BOUND_EVENT_CONTENT_VERSION
+    {
+        return Err(AppError::Conflict(
+            "Update the app to save this event.".into(),
+        ));
     }
     Ok(())
 }
@@ -55,16 +56,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bound_content_is_never_downgraded() {
-        let refuse = |stored, content, version| {
-            refuse_content_downgrade(stored, content, version, "Update the app.").is_err()
-        };
-        assert!(refuse(2, Some("c"), None));
-        assert!(refuse(2, Some("c"), Some(1)));
-        assert!(!refuse(2, Some("c"), Some(2)));
-        assert!(!refuse(2, None, Some(1)));
-        assert!(!refuse(2, Some(" "), Some(1)));
-        assert!(!refuse(1, Some("c"), None));
+    fn only_bound_content_is_written() {
+        let refuse = |content, version| require_bound_content(content, version).is_err();
+        assert!(refuse(Some("c"), None));
+        assert!(refuse(Some("c"), Some(1)));
+        assert!(!refuse(Some("c"), Some(2)));
+        assert!(!refuse(None, Some(1)));
+        assert!(!refuse(Some(" "), Some(1)));
     }
 
     #[test]

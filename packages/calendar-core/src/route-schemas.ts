@@ -91,7 +91,7 @@ export const eventParticipantInputSchema = z
 export type EventParticipantInput = z.infer<typeof eventParticipantInputSchema> & Schema<"ParticipantInput">;
 
 export const encryptedIcsImportEventSchema = z.object({
-  id: z.string().regex(CLIENT_ENTITY_ID_PATTERN).optional(),
+  id: z.string().regex(CLIENT_ENTITY_ID_PATTERN),
   externalId: z.string().min(1).max(128),
   seriesExternalId: z.string().min(1).max(128).optional(),
   occurrenceDate: z.iso.datetime().optional(),
