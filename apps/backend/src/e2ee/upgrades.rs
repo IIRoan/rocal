@@ -3,7 +3,7 @@
 use sea_orm::sea_query::Condition;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, JoinType, QueryFilter, QueryOrder, QuerySelect,
-    RelationTrait,
+    RelationTrait, Statement,
 };
 use solace_api_types::e2ee::EncryptionUpgrades;
 
@@ -21,9 +21,10 @@ use crate::state::AppState;
 const BATCH: u64 = 200;
 
 pub async fn report(state: &AppState, user: &RouteUser) -> Result<EncryptionUpgrades, AppError> {
-    let (attributes, unbound, reminders, invitations, settings, feeds, urls) = tokio::try_join!(
+    let (attributes, unbound, trashed, reminders, invitations, settings, feeds, urls) = tokio::try_join!(
         events_with_readable_attributes(&state.db, &user.id),
         events_with_unbound_content(&state.db, &user.id),
+        trash_with_unbound_content(&state.db, &user.id),
         events_with_unsealed_reminders(&state.db, &user.id),
         corpus_page(&state.db, &user.id, None, true, 1, 0),
         user_settings::Entity::find()
@@ -36,6 +37,7 @@ pub async fn report(state: &AppState, user: &RouteUser) -> Result<EncryptionUpgr
         events_with_readable_attributes: attributes.into_iter().map(Into::into).collect(),
         events_with_unsealed_reminders: reminders.into_iter().map(Into::into).collect(),
         events_with_unbound_content: unbound.into_iter().map(Into::into).collect(),
+        trash_with_unbound_content: trashed,
         readable_invitations: i64::try_from(invitations.1).unwrap_or(i64::MAX),
         unsealed_settings: settings.is_some_and(|row| row.encrypted_preferences.is_none()),
         subscriptions_with_readable_names: feeds.into_iter().map(Into::into).collect(),
@@ -127,6 +129,25 @@ async fn events_with_unbound_content<C: ConnectionTrait>(
         .into_tuple()
         .all(db)
         .await
+}
+
+/// Trash entries holding unbound content, which a restore brings back as it was, so the account is not marked bound while any remain.
+async fn trash_with_unbound_content<C: ConnectionTrait>(
+    db: &C,
+    user_id: &str,
+) -> Result<i64, sea_orm::DbErr> {
+    let row = db
+        .query_one_raw(Statement::from_sql_and_values(
+            db.get_database_backend(),
+            r#"SELECT count(*) AS n FROM event_trash t WHERE t.user_id = $1 AND EXISTS (
+                   SELECT 1 FROM jsonb_array_elements(t.rows -> 'events') e
+                   WHERE e ->> 'subscription_id' IS NULL AND e ->> 'encryption_state' = 'encrypted'
+                     AND coalesce(e ->> 'encrypted_content', '') <> ''
+                     AND (e ->> 'encryption_key_version')::int < $2)"#,
+            [user_id.into(), BOUND_EVENT_CONTENT_VERSION.into()],
+        ))
+        .await?;
+    row.map_or(Ok(0), |row| row.try_get("", "n"))
 }
 
 /// Events whose upcoming reminders still lack a sealed title or lead, so their push would show neither.

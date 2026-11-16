@@ -1667,6 +1667,11 @@ export interface components {
             subscriptionsWithReadableNames: components["schemas"]["SubscriptionId"][];
             /** @description Feeds whose URL is still stored readable. */
             subscriptionsWithReadableUrls: components["schemas"]["SubscriptionId"][];
+            /**
+             * Format: int64
+             * @description Trash entries whose events are not yet bound; a restore lists them above, and none may remain before the account is marked bound.
+             */
+            trashWithUnboundContent: number;
             /** @description Whether the app preferences are still stored readable. */
             unsealedSettings: boolean;
         };

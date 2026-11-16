@@ -92,8 +92,11 @@ export async function upgradeStoredEncryption(
     ]),
   ];
   await inBatches(resealed, (id) => api.resealEventAttributes(id));
-  // Once nothing unbound is left, unbound content is refused here and on the account's other devices.
-  if (report.eventsWithUnboundContent.length === 0) {
+  // Once nothing unbound is left, trash included, unbound content is refused here and on the account's other devices.
+  if (
+    report.eventsWithUnboundContent.length === 0 &&
+    report.trashWithUnboundContent === 0
+  ) {
     await api.markEventContentBound().catch(() => undefined);
   }
   await inBatches(report.eventsWithUnsealedReminders, (id) =>

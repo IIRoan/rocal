@@ -15,6 +15,8 @@ pub struct EncryptionUpgrades {
     pub events_with_unsealed_reminders: Vec<EventId>,
     /// Sealed events whose content is not yet bound to their row id.
     pub events_with_unbound_content: Vec<EventId>,
+    /// Trash entries whose events are not yet bound; a restore lists them above, and none may remain before the account is marked bound.
+    pub trash_with_unbound_content: i64,
     /// Invitation copies the server still stores readable.
     pub readable_invitations: i64,
     /// Whether the app preferences are still stored readable.

@@ -4406,6 +4406,7 @@
           "eventsWithReadableAttributes",
           "eventsWithUnsealedReminders",
           "eventsWithUnboundContent",
+          "trashWithUnboundContent",
           "readableInvitations",
           "unsealedSettings",
           "subscriptionsWithReadableNames",
@@ -4451,6 +4452,11 @@
               "$ref": "#/components/schemas/SubscriptionId"
             },
             "description": "Feeds whose URL is still stored readable."
+          },
+          "trashWithUnboundContent": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Trash entries whose events are not yet bound; a restore lists them above, and none may remain before the account is marked bound."
           },
           "unsealedSettings": {
             "type": "boolean",

@@ -101,6 +101,7 @@ describe("upgradeStoredEncryption", () => {
     eventsWithReadableAttributes?: string[];
     eventsWithUnsealedReminders?: string[];
     eventsWithUnboundContent?: string[];
+    trashWithUnboundContent?: number;
     readableInvitations?: number;
     unsealedSettings?: boolean;
     subscriptionsWithReadableNames?: string[];
@@ -111,6 +112,7 @@ describe("upgradeStoredEncryption", () => {
         eventsWithReadableAttributes: [],
         eventsWithUnsealedReminders: [],
         eventsWithUnboundContent: [],
+        trashWithUnboundContent: 0,
         readableInvitations: 0,
         unsealedSettings: false,
         subscriptionsWithReadableNames: [],
@@ -156,6 +158,14 @@ describe("upgradeStoredEncryption", () => {
     await upgradeStoredEncryption(api);
 
     expect(api.resealEventAttributes.mock.calls.map(([id]) => id)).toEqual(["a", "b", "c"]);
+    expect(api.markEventContentBound).not.toHaveBeenCalled();
+  });
+
+  it("keeps the account unmarked while the trash still holds unbound events a restore would bring back", async () => {
+    const api = fakeApi({ trashWithUnboundContent: 1 });
+
+    await upgradeStoredEncryption(api);
+
     expect(api.markEventContentBound).not.toHaveBeenCalled();
   });
 

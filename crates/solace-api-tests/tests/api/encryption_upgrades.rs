@@ -3,11 +3,12 @@
 use serde_json::json;
 use solace_api_tests::seed::fake_envelope;
 use solace_api_types::e2ee::EncryptionUpgrades;
+use solace_api_types::events::EventDeleted;
 use solace_api_types::notifications::{NotificationSetting, SealedReminders};
 use sqlx::PgPool;
 
 use crate::event_fixtures::{FUTURE_END, FUTURE_START, calendar_id, create_event, encrypted_event};
-use crate::helpers::{TestApp, TestUser, expect_unauthorized, ok};
+use crate::helpers::{TestApp, TestUser, expect_unauthorized, hex, ok};
 use crate::notifications::{lead_ciphertext, title_ciphertext};
 
 async fn upgrades(user: &mut TestUser) -> EncryptionUpgrades {
@@ -174,12 +175,63 @@ async fn the_report_lists_what_an_older_client_left_readable_until_it_is_reseale
             events_with_readable_attributes: vec![],
             events_with_unsealed_reminders: vec![],
             events_with_unbound_content: vec![],
+            trash_with_unbound_content: 0,
             readable_invitations: 0,
             unsealed_settings: false,
             subscriptions_with_readable_names: vec![],
             subscriptions_with_readable_urls: vec![],
         }
     );
+}
+
+#[tokio::test]
+async fn unbound_content_in_the_trash_is_counted_until_a_restore_lists_it_for_binding() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar = calendar_id(&mut user, "Work").await;
+    let legacy = create_event(
+        &mut user,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await
+    .id;
+    let mut bound = encrypted_event(&calendar, FUTURE_START, FUTURE_END);
+    bound.id = Some(hex(16).into());
+    bound.encryption_key_version = Some(2);
+    let bound = create_event(&mut user, &bound).await.id;
+    let mut trash_ids = Vec::new();
+    for event in [&legacy, &bound] {
+        let deleted: EventDeleted = ok(user
+            .delete(&format!("/api/events/{event}"))
+            .await
+            .expect_status(200)
+            .and_then(|r| r.dto()));
+        trash_ids.push(deleted.trash_id.expect("trash id"));
+    }
+
+    let report = upgrades(&mut user).await;
+    assert!(report.events_with_unbound_content.is_empty());
+    assert_eq!(
+        report.trash_with_unbound_content, 1,
+        "only the legacy entry keeps the account from being marked bound"
+    );
+    assert_eq!(
+        upgrades(&mut app.user().await)
+            .await
+            .trash_with_unbound_content,
+        0
+    );
+
+    ok(user
+        .post(
+            &format!("/api/events/trash/{}/restore", trash_ids[0]),
+            json!({}),
+        )
+        .await
+        .expect_status(200));
+    let report = upgrades(&mut user).await;
+    assert_eq!(report.events_with_unbound_content, vec![legacy]);
+    assert_eq!(report.trash_with_unbound_content, 0);
 }
 
 #[tokio::test]
