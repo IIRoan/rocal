@@ -121,10 +121,10 @@ async function waitFor(done: () => boolean) {
   }
 }
 
-function render(onDismiss = jest.fn()) {
+function render(onDismiss = jest.fn(), lostPasskey = false) {
   act(() => {
     root.render(
-      <RecoverAccountSheet visible initialEmail="ada@solace.test" onDismiss={onDismiss} />,
+      <RecoverAccountSheet visible initialEmail="ada@solace.test" lostPasskey={lostPasskey} onDismiss={onDismiss} />,
     );
   });
   return onDismiss;
@@ -147,6 +147,12 @@ it("prefills the email and keeps passkeys unless turned on", () => {
 
   expect(field("Email address").value).toBe("ada@solace.test");
   expect(field("Remove passkeys (I lost them)").checked).toBe(false);
+});
+
+it("removes passkeys by default when opened from the lost-passkey link", () => {
+  render(jest.fn(), true);
+
+  expect(field("Remove passkeys (I lost them)").checked).toBe(true);
 });
 
 it("refuses a mistyped key before anything reaches the network", async () => {

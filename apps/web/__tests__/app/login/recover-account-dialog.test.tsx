@@ -107,6 +107,22 @@ it("prefills the email, keeps passkeys by default and names the support route", 
   expect(document.body.textContent).toContain(FORGOT_PASSWORD_NOTICE);
 });
 
+it("removes passkeys by default when opened from the lost-passkey link", async () => {
+  await act(async () =>
+    root.render(
+      <RecoverAccountDialog
+        key="lost-passkey"
+        open
+        onOpenChange={jest.fn()}
+        initialEmail="a@solace.test"
+        lostPasskey
+        onRecovered={onRecovered}
+      />,
+    ),
+  );
+  expect(document.querySelector("[role='switch']")?.getAttribute("aria-checked")).toBe("true");
+});
+
 it("refuses a mistyped recovery key before anything is sent", async () => {
   const { recoveryKey } = await e2eeModule.generateRecoveryKey();
   const typo = `${recoveryKey.charAt(0) === "A" ? "B" : "A"}${recoveryKey.slice(1)}`;

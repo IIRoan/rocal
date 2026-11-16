@@ -58,7 +58,7 @@ export function SignInScreen() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<SignInErrors>(NO_ERRORS);
   const [pending, setPending] = useState<"sign-in" | "passkey" | null>(null);
-  const [isRecovering, setIsRecovering] = useState(false);
+  const [recovery, setRecovery] = useState({ visible: false, lostPasskey: false });
   const hasStartedPasskeyPromptRef = useRef(false);
   const signInInFlightRef = useRef(false);
 
@@ -207,7 +207,7 @@ export function SignInScreen() {
               <View style={styles.inlineLabelRow}>
                 <Text style={styles.label}>Password</Text>
                 <Pressable
-                  onPress={() => setIsRecovering(true)}
+                  onPress={() => setRecovery({ visible: true, lostPasskey: false })}
                   accessibilityRole="button"
                   accessibilityLabel="Forgot password"
                   hitSlop={12}
@@ -287,7 +287,7 @@ export function SignInScreen() {
             {requiresPasskeyStepUp ? (
               <Pressable
                 style={styles.recoveryLink}
-                onPress={() => setIsRecovering(true)}
+                onPress={() => setRecovery({ visible: true, lostPasskey: true })}
                 accessibilityRole="button"
                 accessibilityLabel="Lost your passkey? Use your recovery kit"
               >
@@ -310,9 +310,10 @@ export function SignInScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
       <RecoverAccountSheet
-        visible={isRecovering}
+        visible={recovery.visible}
         initialEmail={email.trim()}
-        onDismiss={() => setIsRecovering(false)}
+        lostPasskey={recovery.lostPasskey}
+        onDismiss={() => setRecovery((current) => ({ ...current, visible: false }))}
       />
     </SafeAreaView>
   );

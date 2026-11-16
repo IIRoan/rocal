@@ -283,7 +283,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
   const titleRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const [recoverOpen, setRecoverOpen] = useState(false);
+  const [recoverEntry, setRecoverEntry] = useState<"password" | "passkey" | null>(null);
   const hasAutoPromptedStepUpRef = useRef(false);
   const isLeavingRef = useRef(false);
 
@@ -918,7 +918,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
 
   /** A recovered account signs in through the normal submit, so the new password opens the keys as any sign-in does. */
   function signInAfterRecovery(recoveredEmail: string, newPassword: string) {
-    setRecoverOpen(false);
+    setRecoverEntry(null);
     dispatchChrome({ type: "clear-messages" });
     dispatchFields({ type: "set-email", email: recoveredEmail });
     dispatchFields({ type: "set-password", password: newPassword });
@@ -1197,7 +1197,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                     {!isSignUp ? (
                       <button
                         type="button"
-                        onClick={() => setRecoverOpen(true)}
+                        onClick={() => setRecoverEntry("password")}
                         className="text-xs font-medium text-accent transition-colors hover:text-accent/80"
                       >
                         Forgot password?
@@ -1321,7 +1321,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                 {requiresPasskeyStepUp ? (
                   <button
                     type="button"
-                    onClick={() => setRecoverOpen(true)}
+                    onClick={() => setRecoverEntry("passkey")}
                     className="mt-3 w-full cursor-pointer rounded-md py-2 text-center text-xs font-medium text-accent transition-colors hover:text-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     Lost your passkey? Use your recovery kit
@@ -1373,8 +1373,11 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
       </main>
 
       <RecoverAccountDialog
-        open={recoverOpen}
-        onOpenChange={setRecoverOpen}
+        open={recoverEntry !== null}
+        onOpenChange={(open) => {
+          if (!open) setRecoverEntry(null);
+        }}
+        lostPasskey={recoverEntry === "passkey"}
         initialEmail={email}
         onRecovered={signInAfterRecovery}
       />

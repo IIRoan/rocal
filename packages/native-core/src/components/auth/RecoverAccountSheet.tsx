@@ -31,7 +31,7 @@ import {
 type Field = "email" | "recoveryKey" | "newPassword" | "confirmPassword";
 
 type RecoverForm = Record<Field, string | null> & {
-  removePasskeys: boolean;
+  removePasskeys: boolean | null;
   error: string | null;
   isPending: boolean;
 };
@@ -48,7 +48,7 @@ const EMPTY_FORM: RecoverForm = {
   recoveryKey: null,
   newPassword: null,
   confirmPassword: null,
-  removePasskeys: false,
+  removePasskeys: null,
   error: null,
   isPending: false,
 };
@@ -86,14 +86,16 @@ function getRecoverFormError(input: {
   return null;
 }
 
-/** Resets a forgotten password with the recovery kit; the account key is reopened on this device, so no data is lost. */
+/** Resets a forgotten password with the recovery kit; the lost-passkey entry also removes passkeys by default. */
 export function RecoverAccountSheet({
   visible,
   initialEmail,
+  lostPasskey = false,
   onDismiss,
 }: {
   visible: boolean;
   initialEmail: string;
+  lostPasskey?: boolean;
   onDismiss: () => void;
 }) {
   const { theme } = useTheme();
@@ -101,6 +103,7 @@ export function RecoverAccountSheet({
   const { signIn } = useAuth();
   const [form, dispatch] = useReducer(recoverReducer, EMPTY_FORM);
   const email = form.email ?? initialEmail;
+  const removePasskeys = form.removePasskeys ?? lostPasskey;
   const values = {
     email,
     recoveryKey: form.recoveryKey ?? "",
@@ -115,7 +118,7 @@ export function RecoverAccountSheet({
       email: values.email.trim(),
       recoveryKey: values.recoveryKey,
       newPassword: values.newPassword,
-      removePasskeys: form.removePasskeys,
+      removePasskeys,
     });
     await signIn(values.email.trim(), values.newPassword).catch(() => {
       throw new Error("Your password was reset. Sign in with your new password.");
@@ -209,7 +212,7 @@ export function RecoverAccountSheet({
             <SheetSwitchItem
               icon="key"
               label="Remove passkeys (I lost them)"
-              value={form.removePasskeys}
+              value={removePasskeys}
               onValueChange={(value) => dispatch({ type: "remove-passkeys", value })}
             />
           </SheetGroup>

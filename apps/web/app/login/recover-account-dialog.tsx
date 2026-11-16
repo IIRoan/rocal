@@ -77,10 +77,12 @@ const FIELDS: { field: Field; label: string; type: string; autoComplete: string 
 
 function RecoverAccountForm({
   initialEmail,
+  lostPasskey,
   onCancel,
   onRecovered,
 }: {
   initialEmail: string;
+  lostPasskey: boolean;
   onCancel: () => void;
   onRecovered: (email: string, password: string) => void;
 }) {
@@ -90,7 +92,7 @@ function RecoverAccountForm({
     recoveryKey: "",
     newPassword: "",
     confirmPassword: "",
-    removePasskeys: false,
+    removePasskeys: lostPasskey,
     error: null,
     pending: false,
   });
@@ -174,16 +176,18 @@ function RecoverAccountForm({
   );
 }
 
-/** "Forgot password?": resets the password with the recovery kit, keeping every encrypted item readable. */
+/** Resets the password with the recovery kit, keeping every encrypted item readable; the lost-passkey entry also removes passkeys by default. */
 export function RecoverAccountDialog({
   open,
   onOpenChange,
   initialEmail,
+  lostPasskey = false,
   onRecovered,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialEmail: string;
+  lostPasskey?: boolean;
   onRecovered: (email: string, password: string) => void;
 }) {
   return (
@@ -199,6 +203,7 @@ export function RecoverAccountDialog({
         {open ? (
           <RecoverAccountForm
             initialEmail={initialEmail}
+            lostPasskey={lostPasskey}
             onCancel={() => onOpenChange(false)}
             onRecovered={onRecovered}
           />
