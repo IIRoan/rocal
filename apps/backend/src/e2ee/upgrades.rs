@@ -2,8 +2,8 @@
 
 use sea_orm::sea_query::Condition;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, JoinType, QueryFilter, QueryOrder, QuerySelect,
-    RelationTrait, Statement,
+    AccessMode, ColumnTrait, ConnectionTrait, EntityTrait, IsolationLevel, JoinType, QueryFilter,
+    QueryOrder, QuerySelect, RelationTrait, Statement, TransactionTrait,
 };
 use solace_api_types::e2ee::EncryptionUpgrades;
 
@@ -21,18 +21,27 @@ use crate::state::AppState;
 const BATCH: u64 = 200;
 
 pub async fn report(state: &AppState, user: &RouteUser) -> Result<EncryptionUpgrades, AppError> {
-    let (attributes, unbound, trashed, reminders, invitations, settings, feeds, urls) = tokio::try_join!(
-        events_with_readable_attributes(&state.db, &user.id),
-        events_with_unbound_content(&state.db, &user.id),
-        trash_with_unbound_content(&state.db, &user.id),
-        events_with_unsealed_reminders(&state.db, &user.id),
-        corpus_page(&state.db, &user.id, None, true, 1, 0),
-        user_settings::Entity::find()
-            .filter(user_settings::Column::UserId.eq(&user.id))
-            .one(&state.db),
-        subscriptions_with_readable_names(&state.db, &user.id),
-        subscriptions_with_readable_urls(&state.db, &user.id),
-    )?;
+    // One snapshot, so a trash or restore between the live and trashed reads never makes both look empty.
+    let snapshot = state
+        .db
+        .begin_with_config(
+            Some(IsolationLevel::RepeatableRead),
+            Some(AccessMode::ReadOnly),
+        )
+        .await?;
+    let db = &snapshot;
+    let attributes = events_with_readable_attributes(db, &user.id).await?;
+    let unbound = events_with_unbound_content(db, &user.id).await?;
+    let trashed = trash_with_unbound_content(db, &user.id).await?;
+    let reminders = events_with_unsealed_reminders(db, &user.id).await?;
+    let invitations = corpus_page(db, &user.id, None, true, 1, 0).await?;
+    let settings = user_settings::Entity::find()
+        .filter(user_settings::Column::UserId.eq(&user.id))
+        .one(db)
+        .await?;
+    let feeds = subscriptions_with_readable_names(db, &user.id).await?;
+    let urls = subscriptions_with_readable_urls(db, &user.id).await?;
+    snapshot.commit().await?;
     Ok(EncryptionUpgrades {
         events_with_readable_attributes: attributes.into_iter().map(Into::into).collect(),
         events_with_unsealed_reminders: reminders.into_iter().map(Into::into).collect(),

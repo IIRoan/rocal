@@ -235,6 +235,69 @@ async fn unbound_content_in_the_trash_is_counted_until_a_restore_lists_it_for_bi
 }
 
 #[tokio::test]
+async fn a_trash_between_the_live_and_trashed_reads_never_reports_the_account_bound() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let calendar = calendar_id(&mut user, "Work").await;
+    let legacy = create_event(
+        &mut user,
+        &encrypted_event(&calendar, FUTURE_START, FUTURE_END),
+    )
+    .await
+    .id
+    .0;
+    let (db, event) = (&app.db, &legacy);
+    // Holding the events table parks the report's live reads while this "trash" moves the event.
+    let trash = async move {
+        let mut lock = db.begin().await.expect("transaction");
+        let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+            .fetch_one(&mut *lock)
+            .await
+            .expect("backend pid");
+        sqlx::query("LOCK TABLE calendar_event IN ACCESS EXCLUSIVE MODE")
+            .execute(&mut *lock)
+            .await
+            .expect("table lock");
+        let blocked = "SELECT count(*) FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))";
+        for attempt in 0.. {
+            let waiting: i64 = sqlx::query_scalar(blocked)
+                .bind(pid)
+                .fetch_one(db)
+                .await
+                .expect("blocked queries");
+            if waiting > 0 {
+                break;
+            }
+            assert!(attempt < 1200, "the report never reached the events table");
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+        // Reads that do not wait on the lock finish first.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        sqlx::query(
+            "INSERT INTO event_trash (id, user_id, event_id, calendar_id, rows) \
+             SELECT $2, e.user_id, e.id, e.calendar_id, jsonb_build_object('events', jsonb_build_array(to_jsonb(e))) \
+             FROM calendar_event e WHERE e.id = $1",
+        )
+        .bind(event)
+        .bind(hex(12))
+        .execute(&mut *lock)
+        .await
+        .expect("trash copy");
+        sqlx::query("DELETE FROM calendar_event WHERE id = $1")
+            .bind(event)
+            .execute(&mut *lock)
+            .await
+            .expect("delete event");
+        lock.commit().await.expect("commit");
+    };
+    let (report, ()) = tokio::join!(upgrades(&mut user), trash);
+    assert!(
+        !report.events_with_unbound_content.is_empty() || report.trash_with_unbound_content > 0,
+        "unbound content was reported nowhere: {report:?}"
+    );
+}
+
+#[tokio::test]
 async fn a_reseal_over_a_ciphertext_that_changed_since_it_was_read_is_refused() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
