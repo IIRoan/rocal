@@ -411,6 +411,22 @@ describe("known trackers", () => {
     });
   });
 
+  it("removes and counts known trackers in inline styles and style blocks, escaped or in image-set()", () => {
+    const html =
+      '<style>.a{background:url(https://mail\\74 rack.io/trace/mail/b.png)}.b{background:\\75rl("https://mailtrack.io/trace/mail/c")}' +
+      '.c{background-image:image-set("https://mailtrack.io/trace/mail/d" 1x)}.d{background:url(https://cdn.example/bg.png)}</style>' +
+      '<div style="background-image:url(&quot;https://mailtrack.io/trace/mail/test&quot;);color:red">x</div>';
+    const processed = processEmailHtml({ html, isDark: false, blockTrackingPixels: true, blockRemoteImages: false });
+
+    expect(processed).not.toMatch(/mailtrack|\\74|\\75/);
+    expect(processed).toContain("url(https://cdn.example/bg.png)");
+    expect(processed).toContain('style="background-image:none;color:red"');
+    expect(analyzeEmailHtml({ html, isDark: false, blockTrackingPixels: true }).trackers).toEqual({
+      count: 4,
+      hosts: ["mailtrack.io"],
+    });
+  });
+
   it("counts nothing when tracker blocking is off", () => {
     const result = analyzeEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: false });
     expect(result.trackers).toEqual({ count: 0, hosts: [] });

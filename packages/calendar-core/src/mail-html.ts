@@ -299,16 +299,27 @@ function processEmailHtmlInternal(
   }
 
   if (blockTrackingPixels) {
-    processed = processed.replace(TAG_PATTERN, (tag, name: string, attributes: string) => {
-      if (!BACKGROUND_ATTRIBUTE_TAGS.has(name.toLowerCase())) return tag;
-      const knownHost = matchKnownTracker(attributeValueOf(attributes, "background"));
-      if (!knownHost) return tag;
-      onBlockedTracker?.(knownHost);
-      const kept = [...attributes.matchAll(ATTRIBUTE_PATTERN)]
-        .filter((attribute) => (attribute[1] ?? "").toLowerCase() !== "background")
-        .map((attribute) => ` ${attribute[0]}`);
-      return `<${name}${kept.join("")}>`;
-    });
+    processed = processed
+      .replace(STYLE_BLOCK_PATTERN, (block, css: string) => block.replace(css, () => stripCssTrackers(css, onBlockedTracker)))
+      .replace(TAG_PATTERN, (tag, name: string, attributes: string) => {
+        let changed = false;
+        const kept = [...attributes.matchAll(ATTRIBUTE_PATTERN)].flatMap((attribute) => {
+          const attributeName = (attribute[1] ?? "").toLowerCase();
+          const value = decodeHtmlEntities(attribute[2] ?? attribute[3] ?? attribute[4] ?? "");
+          const knownHost =
+            attributeName === "background" && BACKGROUND_ATTRIBUTE_TAGS.has(name.toLowerCase()) ? matchKnownTracker(value) : null;
+          if (knownHost) {
+            onBlockedTracker?.(knownHost);
+            changed = true;
+            return [];
+          }
+          const css = attributeName === "style" ? stripCssTrackers(value, onBlockedTracker) : value;
+          if (css === value) return [` ${attribute[0]}`];
+          changed = true;
+          return [` style="${escapeAttributeValue(css)}"`];
+        });
+        return changed ? `<${name}${kept.join("")}>` : tag;
+      });
   }
 
   processed = rewriteEmailAnchors(processed, rewriteLink);
@@ -471,11 +482,11 @@ function cssHasRemoteUrl(css: string): boolean {
   const normalized = decodeCssEscapes(css)
     .replace(/@import[^;]*;?/gi, "")
     .replace(/@font-face\s*\{[^}]*(?:\}|$)/gi, "");
-  for (const match of normalized.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*(?:\)|$)/gi)) {
+  for (const match of normalized.matchAll(CSS_URL_PATTERN)) {
     if (isRemoteUrl(match[1] ?? match[2] ?? match[3] ?? "")) return true;
   }
-  for (const imageSet of normalized.matchAll(/image-set\(([^)]*)(?:\)|$)/gi)) {
-    for (const match of (imageSet[1] ?? "").matchAll(/"([^"]*)"|'([^']*)'/g)) {
+  for (const imageSet of normalized.matchAll(CSS_IMAGE_SET_PATTERN)) {
+    for (const match of (imageSet[1] ?? "").matchAll(CSS_STRING_PATTERN)) {
       if (isRemoteUrl(match[1] ?? match[2] ?? "")) return true;
     }
   }
@@ -483,6 +494,28 @@ function cssHasRemoteUrl(css: string): boolean {
 }
 
 const STYLE_BLOCK_PATTERN = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
+const CSS_URL_PATTERN = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*(?:\)|$)/gi;
+const CSS_IMAGE_SET_PATTERN = /image-set\(([^)]*)(?:\)|$)/gi;
+const CSS_STRING_PATTERN = /"([^"]*)"|'([^']*)'/g;
+
+/** Known trackers in `url()`/`image-set()` become `none`, read with escapes decoded as the browser fetches them; untouched CSS is returned as is. */
+function stripCssTrackers(css: string, onBlockedTracker?: (host: string) => void): string {
+  let found = false;
+  const strip = (token: string, url: string): string => {
+    const host = matchKnownTracker(url);
+    if (!host) return token;
+    found = true;
+    onBlockedTracker?.(host);
+    return "none";
+  };
+  const stripped = decodeCssEscapes(css)
+    .replace(CSS_URL_PATTERN, (token, double?: string, single?: string, bare?: string) => strip(token, double ?? single ?? bare ?? ""))
+    .replace(CSS_IMAGE_SET_PATTERN, (imageSet) =>
+      imageSet.replace(CSS_STRING_PATTERN, (token, double?: string, single?: string) => strip(token, double ?? single ?? "")),
+    );
+  // Decoding can turn `\3c ` back into `<`, which must not reach markup as a tag.
+  return found ? stripped.replace(/</g, "\\3c ") : css;
+}
 const IMG_TAG_PATTERN =
   /<img\b((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/gi;
 const TAG_PATTERN =

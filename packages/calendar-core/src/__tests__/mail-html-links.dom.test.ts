@@ -19,6 +19,20 @@ describe("processEmailHtml links and trackers (DOMPurify)", () => {
     expect(anchor?.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
+  it("removes known trackers from inline styles and style blocks", () => {
+    const processed = processEmailHtml({
+      html:
+        '<style>.a{background:url(https://mail\\74 rack.io/trace/mail/b.png)}</style>' +
+        '<div title="a>b" style="background-image:url(&quot;https://mailtrack.io/trace/mail/test&quot;)">x</div>',
+      isDark: false,
+      blockTrackingPixels: true,
+      blockRemoteImages: false,
+    });
+
+    expect(processed).not.toMatch(/mailtrack|\\74/);
+    expect(processed).toContain('style="background-image:none"');
+  });
+
   it("removes a known tracker whose earlier attribute holds a raw `>`", () => {
     const processed = processEmailHtml({
       html: '<img alt="a>b" data-src="https://cdn.example/ok.png" src="https://us5.list-manage.com/track/open.php?u=1"><img src="https://cdn.example/banner.png">',
