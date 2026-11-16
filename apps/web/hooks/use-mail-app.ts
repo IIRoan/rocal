@@ -1938,7 +1938,7 @@ export function useMailApp() {
           return;
         }
         if ("until" in hold) {
-          void queryClient.invalidateQueries({ queryKey: mailQueryKeys.scheduledSends(session?.user?.id ?? null) });
+          queryClient.invalidateQueries({ queryKey: mailQueryKeys.scheduledSends(session?.user?.id ?? null) }).catch(() => undefined);
         }
         announceHeldSend({
           hold,
@@ -1956,7 +1956,7 @@ export function useMailApp() {
             mailbox.client.moveCanceledSendToDrafts(mailbox.session, { copyEmailId: sendResult.emailId, draftsMailboxId }),
           onCanceled: () => {
             getMailComposeBridge()?.restoreDraft(draft, sendResult.emailId);
-            void queryClient.invalidateQueries({ queryKey: mailQueryKeys.scheduledSends(session?.user?.id ?? null) });
+            queryClient.invalidateQueries({ queryKey: mailQueryKeys.scheduledSends(session?.user?.id ?? null) }).catch(() => undefined);
           },
         });
       };

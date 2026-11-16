@@ -71,4 +71,23 @@ describe("useScheduledMailSends", () => {
     });
     expect(queryClient.getQueryData(mailQueryKeys.scheduledSends("user-1"))).toEqual([send]);
   });
+
+  it("lists scheduled sends only when the server can hold mail", async () => {
+    const listScheduledSends = jest.fn(async () => [send]);
+    const connection = (maxDelayedSend: number) =>
+      ({
+        client: { listScheduledSends },
+        session: { capabilities: { "urn:ietf:params:jmap:submission": { maxDelayedSend } } },
+      }) as unknown as MailConnection; // test double for the JMAP client
+
+    const withoutHolds = renderHook(connection(0), new QueryClient());
+    await act(async () => undefined);
+    expect(listScheduledSends).not.toHaveBeenCalled();
+    expect(withoutHolds.current?.loading).toBe(false);
+    act(() => root?.unmount());
+
+    renderHook(connection(600), new QueryClient());
+    await act(async () => undefined);
+    expect(listScheduledSends).toHaveBeenCalledTimes(1);
+  });
 });

@@ -24,7 +24,7 @@ export function useFeedSync({
         result.attempted > 0
           ? queryClient.invalidateQueries({ queryKey: SUBSCRIPTIONS_QUERY_KEY, exact: true })
           : undefined,
-        // Only changed events justify refetching every loaded range.
+        // Accepted §4 exception: event range keys carry no calendar id, so changed feed events refetch every loaded range.
         result.changed > 0
           ? queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY })
           : undefined,

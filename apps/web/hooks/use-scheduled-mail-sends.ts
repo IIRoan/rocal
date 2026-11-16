@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ScheduledMailSend } from "@workspace/calendar-core";
+import { resolveMailServerPolicy, type ScheduledMailSend } from "@workspace/calendar-core";
 import type { MailConnection } from "@/hooks/use-mail-vacation-response";
 import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
 
@@ -15,6 +15,9 @@ export function useScheduledMailSends(
 ) {
   const queryClient = useQueryClient();
   const queryKey = mailQueryKeys.scheduledSends(userId);
+  const canHoldSends = connection
+    ? resolveMailServerPolicy({ session: connection.session }).maxDelayedSendSeconds > 0
+    : false;
 
   const query = useQuery({
     queryKey,
@@ -22,7 +25,7 @@ export function useScheduledMailSends(
       if (!connection) throw new Error("Mail is not ready yet.");
       return connection.client.listScheduledSends(connection.session);
     },
-    enabled: Boolean(connection && userId),
+    enabled: Boolean(connection && userId) && canHoldSends,
     staleTime: 60_000,
   });
 
@@ -57,7 +60,7 @@ export function useScheduledMailSends(
 
   return {
     sends: query.data ?? NO_SENDS,
-    loading: Boolean(connection) && query.isPending,
+    loading: Boolean(connection) && query.isPending && query.fetchStatus !== "idle",
     loadError: query.error,
     cancel: cancel.mutateAsync,
     moveToDrafts: moveToDrafts.mutateAsync,
