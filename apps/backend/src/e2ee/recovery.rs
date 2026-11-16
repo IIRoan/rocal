@@ -191,16 +191,15 @@ async fn verified<C: ConnectionTrait>(
 ) -> Result<Option<(user::Model, user_recovery_kit::Model)>, sea_orm::DbErr> {
     let presented = auth_key_hash(recovery_auth_key);
     let user = store::find_user_by_email(db, &email.trim().to_lowercase()).await?;
-    let kit = match &user {
-        Some(user) if lock => {
-            user_recovery_kit::Entity::find_by_id(&user.id)
-                .lock_exclusive()
-                .one(db)
-                .await?
-        }
-        Some(user) => self::kit(db, &user.id).await?,
-        None => None,
-    };
+    // An unknown email still runs the kit lookup, so the response time says nothing about who has an account.
+    let lookup = user_recovery_kit::Entity::find_by_id(user.as_ref().map_or("", |user| &user.id));
+    let kit = if lock {
+        lookup.lock_exclusive()
+    } else {
+        lookup
+    }
+    .one(db)
+    .await?;
     let valid = is_auth_key(recovery_auth_key) && kit_matches(kit.as_ref(), &presented);
     Ok(user.zip(kit).filter(|_| valid))
 }

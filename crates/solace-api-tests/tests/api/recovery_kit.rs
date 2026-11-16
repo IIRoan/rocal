@@ -273,6 +273,29 @@ async fn start_answers_one_way_for_an_unknown_email_no_kit_and_a_wrong_key() {
 }
 
 #[tokio::test]
+async fn start_reads_the_kit_table_even_for_an_unknown_email() {
+    let app = TestApp::spawn().await;
+    let mut agent = app.anonymous();
+    let mut lock = app.db.begin().await.expect("transaction");
+    sqlx::query("LOCK TABLE user_recovery_kit IN ACCESS EXCLUSIVE MODE")
+        .execute(&mut *lock)
+        .await
+        .expect("lock");
+    let email = format!("nobody-{}@example.com", hex(6));
+    let key = recovery_auth_key();
+    let mut pending = Box::pin(start(&mut agent, &email, &key));
+
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(500), &mut pending)
+            .await
+            .is_err(),
+        "an unknown email waits on the same kit lookup as a known one"
+    );
+    lock.rollback().await.expect("unlock");
+    auth_error(&pending.await, 401, INVALID_KIT.0, INVALID_KIT.1);
+}
+
+#[tokio::test]
 async fn completing_a_recovery_resets_the_password_ends_sessions_and_consumes_the_kit() {
     let app = TestApp::spawn().await;
     let mut user = app.user().await;
