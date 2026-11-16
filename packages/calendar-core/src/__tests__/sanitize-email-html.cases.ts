@@ -123,6 +123,9 @@ export const READER_PARITY = [
   { html: " <a ", output: "" },
 ];
 
+/** The reader frame would resolve these against the app's origin and open them past the link check. */
+export const READER_DROPPED_HREFS = ["//evil.example/x", "/\\evil.example", "\\\\evil.example", " //evil.example", "evil.example/x", ""];
+
 export const READER_KEEPS = {
   html:
     '<style>.card{color:#111;background:url(cid:logo@x)}</style>' +

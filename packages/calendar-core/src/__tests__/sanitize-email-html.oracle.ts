@@ -24,6 +24,13 @@ function isUnsafeUrl(tag: string, name: string, raw: string): boolean {
   return !(tag === "img" && name === "src" && (scheme === "blob" || SAFE_IMAGE_DATA.test(value)));
 }
 
+/** The reader frame resolves anything else against the app's origin, so `//host` would open past the link check. */
+function isReaderHref(raw: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  const value = decodeHtmlEntities(raw).replace(/[\x00-\x20\x7f-\x9f\s]+/g, "").toLowerCase();
+  return /^(?:(?:https?|mailto|tel):|#)/.test(value);
+}
+
 function isUnsafeCss(css: string): boolean {
   const normalized = decodeCssEscapes(css).replace(/\s+/g, "").toLowerCase();
   return /expression\(|-moz-binding|javascript:/.test(normalized);
@@ -40,6 +47,7 @@ export function unsafeElementReasons(
   for (const [name, value] of attributes) {
     if (/^on/.test(name) || ["srcset", "formaction", "xlink:href"].includes(name)) reasons.push(`attribute ${name}`);
     if (URL_ATTRIBUTES.has(name) && isUnsafeUrl(tag, name, value)) reasons.push(`${name}=${value}`);
+    if (profile === "reader" && name === "href" && !isReaderHref(value)) reasons.push(`relative href=${value}`);
     if (name === "style" && isUnsafeCss(decodeHtmlEntities(value))) reasons.push(`style=${value}`);
   }
   return reasons;

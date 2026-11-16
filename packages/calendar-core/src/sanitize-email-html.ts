@@ -41,9 +41,11 @@ const ALLOWED_TAG_SET = new Set<string>(ALLOWED_TAGS);
 const ALLOWED_ATTR_SET = new Set<string>(ALLOWED_ATTRS);
 
 /** Browsers ignore whitespace/control chars inside schemes (`java\tscript:`), so strip them first. */
-export function isSafeEmailUrl(tag: string, attr: string, rawValue: string): boolean {
+export function isSafeEmailUrl(tag: string, attr: string, rawValue: string, reader = false): boolean {
   // eslint-disable-next-line no-control-regex
   const value = rawValue.replace(/[\x00- \x7f-\x9f\s]+/g, "").toLowerCase();
+  // The reader frame resolves a scheme-less href (`//host`, `/\host`) against the app's origin, past the link check.
+  if (reader && attr === "href") return /^(?:(?:https?|mailto|tel):|#)/.test(value);
   if (!value) return true;
 
   const schemeMatch = value.match(/^([^/?#]*?):/);
@@ -156,7 +158,7 @@ function serializeAttributes(tag: string, attrs: Array<[string, string]>, reader
   for (const [name, rawValue] of attrs) {
     if (seen.has(name) || !isAllowedAttributeName(name)) continue;
     const decoded = decodeHtmlEntities(rawValue);
-    if (URL_ATTRS.has(name) && !isSafeEmailUrl(tag, name, decoded)) continue;
+    if (URL_ATTRS.has(name) && !isSafeEmailUrl(tag, name, decoded, reader)) continue;
     if (name === "style" && isDangerousCss(decoded)) continue;
     seen.add(name);
     out += ` ${name}="${escapeAttributeValue(rawValue)}"`;
@@ -255,7 +257,7 @@ function getDomPurify(): DomPurifyInstance | null {
 
   instance.addHook("uponSanitizeAttribute", (node, data) => {
     const tag = node.nodeName.toLowerCase();
-    if (URL_ATTRS.has(data.attrName) && !isSafeEmailUrl(tag, data.attrName, data.attrValue)) {
+    if (URL_ATTRS.has(data.attrName) && !isSafeEmailUrl(tag, data.attrName, data.attrValue, activeReaderProfile)) {
       data.keepAttr = false;
     }
     if (data.attrName === "style" && isDangerousCss(data.attrValue)) {
