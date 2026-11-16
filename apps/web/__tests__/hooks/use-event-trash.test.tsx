@@ -105,4 +105,23 @@ describe("useRestoreTrashedEvent", () => {
     expect(cachedIds()).toEqual(["t1", "t2"]);
     expect(toast.error).toHaveBeenCalledWith("offline", expect.anything());
   });
+
+  it("refreshes only the loaded months a restored series reaches", async () => {
+    const months = ["2026-01", "2026-03", "2026-05"];
+    for (const month of months) queryClient.setQueryData(["events", month, "Europe/Amsterdam"], []);
+    queryClient.setQueryData(["events", "detail", "event-1"], null);
+    jest.mocked(calendarApiService.restoreTrashedEvent).mockResolvedValue({
+      id: "event-1",
+      calendarId: "personal",
+      start: new Date("2026-03-10T09:00:00.000Z"),
+      end: new Date("2026-03-10T10:00:00.000Z"),
+      recurrence: "FREQ=WEEKLY",
+    } as CalendarEvent);
+
+    await act(async () => restore.mutate({ trashId: "t1", calendarId: "personal" }));
+
+    const invalidated = (key: readonly unknown[]) => queryClient.getQueryState(key)?.isInvalidated;
+    expect(months.map((month) => invalidated(["events", month, "Europe/Amsterdam"]))).toEqual([false, true, true]);
+    expect(invalidated(["events", "detail", "event-1"])).toBe(true);
+  });
 });

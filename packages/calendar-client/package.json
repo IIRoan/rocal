@@ -28,6 +28,7 @@
     "./event-trash-query-options": "./src/event-trash-query-options.ts",
     "./use-riftbound": "./src/use-riftbound.ts",
     "./use-feed-sync": "./src/use-feed-sync.ts",
+    "./use-event-trash": "./src/use-event-trash.ts",
     "./use-category-delete-pending": "./src/use-category-delete-pending.ts",
     "./use-mail-trust-review": "./src/use-mail-trust-review.ts",
     "./mail-query-coordination": "./src/mail-query-coordination.ts",

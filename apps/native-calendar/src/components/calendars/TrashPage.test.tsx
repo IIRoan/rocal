@@ -128,7 +128,7 @@ describe("TrashPage", () => {
     await choose("Restore");
 
     expect(mockApi.restoreTrashedEvent).toHaveBeenCalledWith("trash-1");
-    expect(mockToast).toHaveBeenCalledWith("Restored to Personal");
+    expect(mockToast).toHaveBeenCalledWith("Restored to Personal", "success");
   });
 
   it("deletes one event forever and empties the trash after a confirm", async () => {

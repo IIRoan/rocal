@@ -71,7 +71,7 @@ describe("useDeleteEventMutation", () => {
 
     await act(async () => options?.action?.onPress());
     expect(mockApi.restoreTrashedEvent).toHaveBeenCalledWith("trash-1");
-    expect(mockToast).toHaveBeenLastCalledWith("Event restored");
+    expect(mockToast).toHaveBeenLastCalledWith("Event restored", "success");
   });
 
   it("only confirms a delete that left nothing to restore", async () => {
