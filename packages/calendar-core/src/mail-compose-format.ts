@@ -103,6 +103,8 @@ export function composeTextToHtml(text: string): string {
 
   const blocks = normalized.split(/\n{2,}/);
   const htmlBlocks = blocks.map((block) => {
+    // A reply's leading blank lines need a line box, or the caret cannot land above the quote.
+    if (!block) return "<p><br></p>";
     const lines = block.split("\n");
     const isList = lines.every((line) => line.length === 0 || line.startsWith("- "));
     if (isList && lines.some((line) => line.startsWith("- "))) {
@@ -177,6 +179,8 @@ function wrapStyledHtml(html: string): string {
   return current;
 }
 
+const LEADING_EMPTY_BLOCK = /^\s*<(p|div)\b[^>]*>(?:\s|<br\b[^>]*>)*<\/\1>/i;
+
 /** Convert editor/draft HTML back into compose markdown-lite (strong/em/u, lists, execCommand spans). */
 export function htmlToComposeText(html: string): string {
   if (!html.trim()) return "";
@@ -200,7 +204,8 @@ export function htmlToComposeText(html: string): string {
   value = value.replace(/<\/(ul|ol)>/gi, "\n");
   value = stripHtmlTags(value, "");
   value = decodeHtmlEntities(value);
-  return value.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  const text = value.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return text && LEADING_EMPTY_BLOCK.test(html) ? `\n\n${text}` : text;
 }
 
 /** Prefer markdown-lite text, otherwise recover formatting from HTML drafts. */

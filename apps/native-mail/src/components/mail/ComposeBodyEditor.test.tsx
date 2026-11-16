@@ -202,3 +202,26 @@ it("rebuilds the page with the current text when its chrome changes", () => {
   expect(mockPages[1]).toContain("Write a reply");
   expect(mockPages[1]).toContain("Hello there");
 });
+
+it("opens a reply with an editable blank line above the quote", () => {
+  const onChangeText = jest.fn();
+  render("\n\nOn Nov 16, Maestro wrote:\n> Hello", "Message", onChangeText);
+  editorReady();
+
+  const firstBlock = container.querySelector('[role="textbox"]')?.firstElementChild;
+  expect(firstBlock?.outerHTML).toBe("<p><br></p>");
+
+  act(() => {
+    mockWebView?.onMessage({
+      nativeEvent: {
+        data: JSON.stringify({
+          type: "change",
+          html: '<p>Thanks</p><p class="quote">On Nov 16, Maestro wrote:<br>&gt; Hello</p>',
+        }),
+      },
+    });
+  });
+  expect(onChangeText).toHaveBeenLastCalledWith(
+    "Thanks\n\nOn Nov 16, Maestro wrote:\n> Hello",
+  );
+});
