@@ -1,7 +1,8 @@
 import type { CalendarSubscription } from "./types";
 
 /** Calendar apps sync sealed feeds themselves, because the server keeps no URL it could fetch. */
-export const FEED_SYNC_QUERY_KEY = ["subscriptions", "feed-sync"] as const;
+/** Its own root, so a subscriptions refresh never re-runs the sync. */
+export const FEED_SYNC_QUERY_KEY = ["feed-sync"] as const;
 
 export const FEED_SYNC_INTERVAL_MS = 15 * 60_000;
 

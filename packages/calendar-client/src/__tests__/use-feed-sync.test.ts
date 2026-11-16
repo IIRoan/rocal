@@ -15,7 +15,12 @@ jest.mock("@workspace/calendar-core", () => ({
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-async function render(enabled: boolean, attempted: number, changed = 0) {
+async function render(
+  enabled: boolean,
+  attempted: number,
+  changed = 0,
+  whileMounted?: (client: QueryClient) => Promise<unknown>,
+) {
   const client = new QueryClient();
   const invalidate = jest.spyOn(client, "invalidateQueries");
   const api = { syncDueSubscriptions: jest.fn(async () => ({ attempted, changed })) };
@@ -32,6 +37,11 @@ async function render(enabled: boolean, attempted: number, changed = 0) {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
+  if (whileMounted) {
+    await act(async () => {
+      await whileMounted(client);
+    });
+  }
   act(() => root.unmount());
   return { api, invalidate };
 }
@@ -57,4 +67,12 @@ it("refreshes only the feeds when a sync failed or changed no events", async () 
 it("refreshes nothing when no feed was due, and never runs while disabled", async () => {
   expect((await render(true, 0)).invalidate).not.toHaveBeenCalled();
   expect((await render(false, 1)).api.syncDueSubscriptions).not.toHaveBeenCalled();
+});
+
+it("does not sync again when the subscription list is refreshed", async () => {
+  const { api } = await render(true, 0, 0, (client) =>
+    client.invalidateQueries({ queryKey: SUBSCRIPTIONS_QUERY_KEY }),
+  );
+
+  expect(api.syncDueSubscriptions).toHaveBeenCalledTimes(1);
 });
