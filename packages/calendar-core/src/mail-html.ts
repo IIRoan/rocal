@@ -299,12 +299,7 @@ function processEmailHtmlInternal(
   }
 
   if (blockTrackingPixels) {
-    // Repeat until stable, so no rewrite can leave a tracker that another pass would still find.
-    let previous: string;
-    do {
-      previous = processed;
-      processed = stripMarkupCssTrackers(processed, onBlockedTracker);
-    } while (processed !== previous);
+    processed = stripMarkupCssTrackers(processed, onBlockedTracker);
   }
 
   processed = rewriteEmailAnchors(processed, rewriteLink);
@@ -510,9 +505,27 @@ const BACKGROUND_ATTRIBUTE_TAGS = new Set([
   "table", "thead", "tbody", "tfoot", "tr", "td", "th",
 ]);
 
+/** Repeats until stable, so no rewrite can leave a tracker that another pass would still find. */
 function stripMarkupCssTrackers(html: string, onBlockedTracker?: (host: string) => void): string {
-  return html
-    .replace(STYLE_BLOCK_PATTERN, (block, css: string) => block.replace(css, () => stripCssTrackers(css, onBlockedTracker)))
+  let previous: string;
+  let current = html;
+  do {
+    previous = current;
+    current = stripMarkupCssTrackersOnce(previous, onBlockedTracker);
+  } while (current !== previous);
+  return current;
+}
+
+function stripMarkupCssTrackersOnce(html: string, onBlockedTracker?: (host: string) => void): string {
+  let previous: string;
+  let current = html;
+  do {
+    previous = current;
+    current = previous.replace(STYLE_BLOCK_PATTERN, (block, css: string) =>
+      block.replace(css, () => stripCssTrackers(css, onBlockedTracker)),
+    );
+  } while (current !== previous);
+  return current
     .replace(TAG_PATTERN, (tag, name: string, attributes: string) => {
       let changed = false;
       const kept = [...attributes.matchAll(ATTRIBUTE_PATTERN)].flatMap((attribute) => {
