@@ -31,6 +31,8 @@ const EXTENSIONS: Record<ReencodedImageType, string> = {
 };
 
 const HEIC_BRANDS = new Set(["heic", "heix", "mif1", "msf1"]);
+/** Types that say nothing about the content (HEIC on Chrome and Firefox off Apple platforms), so the bytes decide. */
+const UNTYPED = new Set(["", "application/octet-stream"]);
 
 function ascii(bytes: Uint8Array, start: number, length: number): string {
   let text = "";
@@ -80,7 +82,7 @@ export function imageFileNameForType(name: string, type: ReencodedImageType): st
 /** True for the declared types a re-encode can apply to, so other files need not be read at all. */
 export function mayStripImageMetadata(type: string | null | undefined): boolean {
   const declared = (type ?? "").toLowerCase();
-  return Object.values(DECLARED_TYPES).some((types) => types.includes(declared));
+  return UNTYPED.has(declared) || Object.values(DECLARED_TYPES).some((types) => types.includes(declared));
 }
 
 /** Decides whether an outgoing image is re-encoded to drop its metadata; GIFs, animations and unrecognized files stay as they are. */
@@ -91,7 +93,7 @@ export function planImageMetadataStrip(file: {
 }): ImageMetadataStripPlan {
   const format = sniffImageFormat(file.bytes);
   const declared = (file.type ?? "").toLowerCase();
-  if (!format || !DECLARED_TYPES[format].includes(declared)) return { action: "keep" };
+  if (!format || !(UNTYPED.has(declared) || DECLARED_TYPES[format].includes(declared))) return { action: "keep" };
   if (format === "png" && isAnimatedPng(file.bytes)) return { action: "keep" };
   if (format === "webp" && isAnimatedWebp(file.bytes)) return { action: "keep" };
   const outputType = OUTPUT_TYPES[format];

@@ -15,6 +15,7 @@ import { writeMailComposeSettings } from "@/lib/mail/compose-settings";
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe1, 0x45, 0x78, 0x69, 0x66]);
 const WEBP = new Uint8Array([...new TextEncoder().encode("RIFF\0\0\0\0WEBPVP8 ")]);
 const GIF = new Uint8Array([...new TextEncoder().encode("GIF89a")]);
+const HEIC = new Uint8Array([0, 0, 0, 24, ...new TextEncoder().encode("ftypheic")]);
 
 const close = jest.fn();
 const drawImage = jest.fn();
@@ -82,6 +83,12 @@ describe("stripImageMetadata", () => {
     const original = file(JPEG, "photo.jpg", "image/jpeg");
     const result = await stripImageMetadata(original);
     expect(result).toEqual({ file: original, outcome: "failed" });
+  });
+
+  it("reports an untyped HEIC the browser cannot decode, so the notice shows", async () => {
+    createImageBitmap.mockRejectedValueOnce(new Error("HEIC unsupported"));
+    const original = file(HEIC, "IMG_1.HEIC", "");
+    expect(await stripImageMetadata(original)).toEqual({ file: original, outcome: "failed" });
   });
 
   it("leaves GIFs untouched", async () => {

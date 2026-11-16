@@ -43,12 +43,24 @@ describe("planImageMetadataStrip", () => {
     expect(planImageMetadataStrip({ name: "a.heic", type: "image/heic", bytes: heic("avif") })).toEqual({ action: "keep" });
   });
 
+  it("lets the bytes decide when the type is missing or generic", () => {
+    expect(planImageMetadataStrip({ name: "IMG_1.HEIC", type: "", bytes: heic("heic") })).toEqual({
+      action: "reencode",
+      outputType: "image/jpeg",
+      outputName: "IMG_1.jpg",
+    });
+    expect(planImageMetadataStrip({ name: "a.jpg", type: undefined, bytes: JPEG })).toMatchObject({ outputType: "image/jpeg" });
+    expect(planImageMetadataStrip({ name: "a", type: "application/octet-stream", bytes: PNG })).toMatchObject({
+      outputType: "image/png",
+    });
+  });
+
   it("keeps GIFs, animations, mismatched types and unknown files", () => {
     expect(planImageMetadataStrip({ name: "a.gif", type: "image/gif", bytes: GIF })).toEqual({ action: "keep" });
     expect(planImageMetadataStrip({ name: "a.png", type: "image/png", bytes: APNG })).toEqual({ action: "keep" });
     expect(planImageMetadataStrip({ name: "a.webp", type: "image/webp", bytes: webp(0x12) })).toEqual({ action: "keep" });
     expect(planImageMetadataStrip({ name: "a.png", type: "image/png", bytes: JPEG })).toEqual({ action: "keep" });
-    expect(planImageMetadataStrip({ name: "a.jpg", type: undefined, bytes: JPEG })).toEqual({ action: "keep" });
+    expect(planImageMetadataStrip({ name: "a.bin", type: "", bytes: GIF })).toEqual({ action: "keep" });
     expect(planImageMetadataStrip({ name: "a.pdf", type: "application/pdf", bytes: bytes(ascii("%PDF")) })).toEqual({ action: "keep" });
   });
 });
