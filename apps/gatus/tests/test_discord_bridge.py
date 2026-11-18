@@ -115,12 +115,13 @@ class StatusPageTests(unittest.TestCase):
                 self.assertEqual(json.loads(body), {"error": "unknown endpoint"})
                 self.assertEqual(proxied, [])
 
-    def test_public_status_list_excludes_internal_checks(self):
+    def test_public_status_list_excludes_internal_and_retired_checks(self):
         path = "/api/v1/endpoints/statuses?page=1&pageSize=1"
         healthy = {"key": "vps_vps-health", "results": [{"success": True}]}
         response = mock.Mock(status=200, headers=Message())
         response.read.return_value = json.dumps([
             {"key": "application_api-mail-policy"}, healthy, {"key": "application_api-mail-key-expiry"},
+            {"key": bridge.RETIRED_JMAP_KEY},
         ]).encode()
         upstream = mock.Mock()
         upstream.getresponse.return_value = response

@@ -60,7 +60,16 @@ The page skips refreshes while the tab is hidden:
 
 Display names and descriptions live in `SERVICES` at the top of the page script, keyed by
 the Gatus key (`group_name`, lowercased). Endpoint names and groups in the config are storage
-keys: renaming one drops its 90-day history, so rename in `SERVICES` instead.
+keys. For display-only changes, rename the label in `SERVICES`. To retire a monitor,
+list its old key in `storage.preserve-endpoint-keys` before deploying the new config.
+
+The historical `application_api-mail-jmap` series measured the full HTTP round trip.
+When available, read it at `/timeline/application_api-mail-jmap` with the usual range
+parameters. The overview shows the active `application_api-mail-jmap-private` monitor
+and its private upstream timings. The retention setting preserves rows already on
+the volume. On an instance that has already pruned them, recovery requires a copy of
+the original data. Keep `storage.preserve-endpoint-keys` in any full `GATUS_CONFIG_YAML`
+override.
 
 ## Railway variables
 
@@ -99,9 +108,9 @@ stays at 2m because each check is a Vercel invocation. About 8,800 checks a day 
 | Stalwart Metrics | `stalwart-metrics`: `mail.solace.onl/metrics/prometheus` | 2m | Exporter is reachable, expected gauges are present, and no monitored error counters are exported |
 | VPS | `vps-health`, `vps-secondary-health` (SSH) | 1m each | Each VPS independently checks its kubelet, HAProxy, outbound relay services, and SMTP STARTTLS certificate lifetime |
 
-Install `vps-health.py` as the root-owned `/usr/local/bin/solace-vps-health` on both mail VPSs.
-The monitoring SSH key is restricted to that command. Pin both host keys in
-`VPS_MONITOR_SSH_KNOWN_HOSTS` and set `VPS_MONITOR_SSH_SECONDARY_HOST` to enable the secondary check.
+Follow the [VPS monitoring setup](../stalwart/vps/README.md#provision-the-monitoring-account).
+Pin both host keys in `VPS_MONITOR_SSH_KNOWN_HOSTS` and set
+`VPS_MONITOR_SSH_SECONDARY_HOST` to enable the secondary check.
 
 The policy and key-expiry monitors remain available to internal alerting. The public status page omits their rows and history.
 
@@ -126,6 +135,5 @@ Without `prometheus_*` the metrics monitor fails auth; without `DISCORD_WEBHOOK_
 ## Optional
 
 - **Status page auth:** `GATUS_ADMIN_USERNAME` / `GATUS_ADMIN_PASSWORD`
-- **VPS SSH monitor:** install `apps/gatus/vps-health.py` at `/usr/local/bin/solace-vps-health` as root-owned mode 755. Run `sudo bash apps/stalwart/vps/setup-gatus-monitor.sh --check /path/to/monitor.pub` and repeat with `--apply` to provision the restricted account.
 - `ssh-known-hosts.patch` adds `GATUS_SSH_KNOWN_HOSTS` to the pinned Gatus source; the entrypoint requires a host-key pin for VPS monitoring and writes credential files with mode 600. The image build tests matching, changed, unknown and missing host keys, plus deadlines for stalled handshakes and commands.
 - SSH probes refuse connections when host pins are absent, including custom configurations. VPS service states use a fixed allowlist; raw command errors never enter monitor JSON.

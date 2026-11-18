@@ -1,0 +1,28 @@
+diff --git a/main.go b/main.go
+index 13788fd..b9c5904 100644
+--- a/main.go
++++ b/main.go
+@@ -127,6 +127,9 @@ func initializeStorage(cfg *config.Config) {
+ 			keys = append(keys, ep.Key())
+ 		}
+ 	}
++	if cfg.Storage != nil {
++		keys = append(keys, cfg.Storage.PreserveEndpointKeys...)
++	}
+ 	logr.Infof("[main.initializeStorage] Total endpoint keys to preserve: %d", len(keys))
+ 	numberOfEndpointStatusesDeleted := store.Get().DeleteAllEndpointStatusesNotInKeys(keys)
+ 	if numberOfEndpointStatusesDeleted > 0 {
+diff --git a/storage/config.go b/storage/config.go
+index a707d5e..9d93e55 100644
+--- a/storage/config.go
++++ b/storage/config.go
+@@ -36,6 +36,9 @@ type Config struct {
+ 
+ 	// MaximumNumberOfEvents is the number of events each endpoint should be able to provide
+ 	MaximumNumberOfEvents int `yaml:"maximum-number-of-events,omitempty"`
++
++	// PreserveEndpointKeys identifies retired endpoints whose stored history should survive startup cleanup.
++	PreserveEndpointKeys []string `yaml:"preserve-endpoint-keys,omitempty"`
+ }
+ 
+ // ValidateAndSetDefaults validates the configuration and sets the default values (if applicable)

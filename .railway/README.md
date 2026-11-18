@@ -2,7 +2,7 @@
 
 The `status` partial in `.railway/railway.ts` manages Railway Monitoring and its SQLite history volume. Monitoring builds `apps/gatus` from `IIRoan/rocal` on `master` when a push changes `apps/gatus/**`.
 
-Solace API, Stalwart and notifications run on Zeabur. Railway holds the former production resources for recovery. Keep the Railway configuration scoped to the `status` partial so a normal apply leaves those resources alone.
+Solace API, Stalwart and notifications run on [Zeabur](../apps/stalwart/README.md). Railway holds the former production resources for recovery. Keep the Railway configuration scoped to the `status` partial so a normal apply leaves those resources alone.
 
 ## Commands
 

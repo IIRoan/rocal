@@ -115,7 +115,7 @@ append_vps_ssh_endpoints() {
 		printf '%s\n' "$VPS_MONITOR_SSH_PRIVATE_KEY" > /data/vps_monitor_key
 	fi
 	chmod 600 /data/vps_monitor_key
-	VPS_MONITOR_SSH_COMMAND="${VPS_MONITOR_SSH_COMMAND:-/usr/local/bin/gatus-monitor.sh}"
+	VPS_MONITOR_SSH_COMMAND="${VPS_MONITOR_SSH_COMMAND:-/usr/local/bin/solace-vps-health}"
 	append_vps_ssh_endpoint vps-health "${VPS_MONITOR_SSH_HOST:-mx.solace.onl}" "${VPS_MONITOR_SSH_PORT:-22}"
 	if [ -n "${VPS_MONITOR_SSH_SECONDARY_HOST:-}" ]; then
 		append_vps_ssh_endpoint vps-secondary-health "$VPS_MONITOR_SSH_SECONDARY_HOST" "${VPS_MONITOR_SSH_SECONDARY_PORT:-22}"

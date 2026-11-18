@@ -3,6 +3,8 @@ storage:
   path: /data/gatus.db
   # A day of individual checks at the fastest (30s) interval, so the status page can zoom into any recent hour.
   maximum-number-of-results: 2880
+  preserve-endpoint-keys:
+    - application_api-mail-jmap
 
 web:
   address: 0.0.0.0
@@ -18,7 +20,7 @@ alerting:
       success-threshold: 2
       description: "Service monitor failed"
 
-# Endpoint names are storage keys: renaming one drops its 90-day history. Display names live in status.html.
+# Endpoint names are storage keys. Use status.html for display names and preserve-endpoint-keys for retired series.
 .discord-alerts: &discord-alerts
   alerts:
     - type: discord
@@ -90,7 +92,7 @@ endpoints:
       - "[STATUS] == 200"
       - "[BODY].status == ok"
 
-  # Public JMAP through Railway HTTPS.
+  # Public JMAP through Cloudflare and the Zeabur mail gateway.
   - name: jmap-session
     <<: *discord-alerts
     group: Mail

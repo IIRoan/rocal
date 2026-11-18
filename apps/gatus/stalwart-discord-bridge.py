@@ -38,6 +38,7 @@ GATUS_DB = "/data/gatus.db"
 TIMELINE_PATH = "/timeline/"
 STATUS_API_PATH = "/api/v1/endpoints/"
 INTERNAL_STATUS_KEYS = {"application_api-mail-policy", "application_api-mail-key-expiry"}
+RETIRED_JMAP_KEY = "application_api-mail-jmap"
 PRIVATE_JMAP_KEY = "application_api-mail-jmap-private"
 HOUR = 3600
 DAY = 24 * HOUR
@@ -196,7 +197,8 @@ def _proxy(handler: BaseHTTPRequestHandler) -> None:
             public_statuses = path == STATUS_API_PATH + "statuses"
             if public_statuses and resp.status == 200 and handler.command == "GET":
                 statuses = json.loads(payload)
-                payload = json.dumps([row for row in statuses if row["key"] not in INTERNAL_STATUS_KEYS],
+                hidden_keys = INTERNAL_STATUS_KEYS | {RETIRED_JMAP_KEY}
+                payload = json.dumps([row for row in statuses if row["key"] not in hidden_keys],
                                      separators=(",", ":")).encode()
             handler.send_response(resp.status)
             for key, value in resp.headers.items():
@@ -322,7 +324,7 @@ class Handler(BaseHTTPRequestHandler):
                 if key in INTERNAL_STATUS_KEYS:
                     self._send_json(404, {"error": "unknown endpoint"})
                     return
-                if path.startswith("/endpoints/") and key == "application_api-mail-jmap":
+                if path.startswith("/endpoints/") and key == RETIRED_JMAP_KEY:
                     self.send_response(302)
                     self.send_header("Location", "/endpoints/application_api-mail-jmap-private")
                     self.send_header("Content-Length", "0")

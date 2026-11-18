@@ -74,6 +74,7 @@ class EntrypointSecurityTests(unittest.TestCase):
             self.assertEqual(config.count("  - name: vps-health\n"), 1)
             self.assertEqual(config.count("  - name: vps-secondary-health\n"), 1)
             self.assertIn("url: ssh://mx2.test:22", config)
+            self.assertIn('/usr/local/bin/solace-vps-health', config)
             self.assertIn("[BODY].smtpStarttls == true", config)
 
 

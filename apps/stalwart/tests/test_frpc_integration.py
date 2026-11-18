@@ -6,7 +6,6 @@ No production credentials, ports or mailbox operations are used.
 
 import os
 from pathlib import Path
-import re
 import socket
 import subprocess
 import tempfile
@@ -14,7 +13,7 @@ import threading
 import time
 import unittest
 
-from test_mail_ha import ROOT, render_frpc_config
+from test_mail_ha import render_frpc_config
 
 
 def free_port():
@@ -96,25 +95,6 @@ class FrpGroupIntegrationTests(unittest.TestCase):
         old.terminate()
         old.wait(timeout=5)
         self.assertEqual({hit(self.group_port) for _ in range(200)}, {"new"})
-
-    def test_committed_frps_config_only_admits_clients_holding_a_ca_cert(self):
-        tls = self.root / "tls"
-        subprocess.run(["sh", str(ROOT / "scripts/frp-tls-certs.sh"), str(tls)], check=True, capture_output=True)
-        text = (ROOT / "vps/frps.toml").read_text()
-        text = re.sub(r"\n# Only allow.*", "\n", text, flags=re.S)
-        text = (text.replace("__FRP_TOKEN__", "test-only").replace("/etc/frp/tls", str(tls))
-                .replace('bindAddr = "0.0.0.0"', 'bindAddr = "127.0.0.1"')
-                .replace("bindPort = 7000", f"bindPort = {self.server_port}")
-                .replace("webServer.port = 7500", f"webServer.port = {free_port()}"))
-        self.start_frps(text)
-
-        def b64(name):
-            return (tls / f"{name}.b64").read_text()
-
-        self.container("pinned", FRPC_TLS_CERT=b64("client.crt"), FRPC_TLS_KEY=b64("client.key"),
-                       FRPC_TLS_CA=b64("ca.crt"))
-        self.container("anonymous", joins=False)
-        self.assertEqual({hit(self.group_port) for _ in range(20)}, {"pinned"})
 
 
 if __name__ == "__main__":

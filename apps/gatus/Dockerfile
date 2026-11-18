@@ -26,6 +26,10 @@ COPY server-timing.patch /tmp/server-timing.patch
 RUN git apply /tmp/server-timing.patch
 COPY server-timing_test.go config/endpoint/solace_server_timing_test.go
 RUN go test ./config/endpoint -run '^TestSolaceServerTiming' -count=1
+COPY retained-endpoint-history.patch /tmp/retained-endpoint-history.patch
+RUN git apply /tmp/retained-endpoint-history.patch
+COPY retained-endpoint-history_test.go solace_history_test.go
+RUN go test . -run '^TestSolaceRetainsRetiredEndpointHistory' -count=1
 COPY assets/solace-logo.png web/static/solace-logo.png
 COPY assets/favicon.ico web/static/favicon.ico
 COPY assets/favicon-32x32.png web/static/favicon-32x32.png
