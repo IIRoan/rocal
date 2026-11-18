@@ -275,13 +275,12 @@ footer a:hover { color: var(--fg); }
   const SERVICES = {
     "application_website": ["Website", "solace.onl"],
     "application_api-health": ["API", "api.solace.onl"],
-    "application_api-mail-jmap": ["API to mail server", "Private network link"],
-    "application_api-mail-policy": ["Mailbox policy check", "User metadata scan and encryption policy"],
-    "application_api-mail-key-expiry": ["Mailbox key expiry check", "User keys expire within 14 days"],
+    "application_api-mail-jmap-private": ["API to mail server", "Private JMAP request measured by the API"],
     "mail_jmap-session": ["Mail access", "JMAP at mail.solace.onl"],
     "mail_mta-sts": ["Mail server certificate", "MTA-STS at mta-sts.solace.onl"],
     "stalwart-metrics_stalwart-metrics": ["Storage and delivery", "Mail server error counters"],
-    "vps_vps-health": ["Mail relay", "SMTP relay and tunnels"],
+    "vps_vps-health": ["mx.solace.onl", ""],
+    "vps_vps-secondary-health": ["mx2.solace.onl", ""],
   };
   const GROUPS = { "Stalwart Metrics": "Mail server", VPS: "Mail relay" };
   const DAYS = 90;
@@ -360,7 +359,9 @@ footer a:hover { color: var(--fg); }
     return last ? (last.success ? "up" : "down") : "unknown";
   };
   const percent = (uptime) => (uptime >= 1 ? "100%" : `${(Math.floor(uptime * 10000) / 100).toFixed(2)}%`);
-  const ms = (value) => (value >= 1000 ? `${(value / 1000).toFixed(1)} s` : `${Math.round(value)} ms`);
+  const ms = (value) => value >= 1000
+    ? `${(value / 1000).toFixed(1)} s`
+    : `${value < 10 ? Number(value.toFixed(1)) : Math.round(value)} ms`;
 
   function duration(span) {
     const minutes = Math.max(1, Math.round(span / 60e3));
@@ -876,7 +877,7 @@ footer a:hover { color: var(--fg); }
     const checks = zoom.hour ? zoom.hour.checks || [] : [];
     const points = checks.map((c) => ({
       t: c.at,
-      v: Math.max(1, c.ms),
+      v: c.ms,
       failed: !c.ok,
       reach: 15 * 60e3,
       tip: `${esc(clockSeconds.format(c.at))}<span>${c.ok ? "Passed" : "Failed"} in ${ms(c.ms)}</span>${c.status ? `<span>HTTP ${c.status}</span>` : ""}`,

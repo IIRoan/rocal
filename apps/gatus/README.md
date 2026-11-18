@@ -93,13 +93,20 @@ stays at 2m because each check is a Vercel invocation. About 8,800 checks a day 
 |-------|----------|----------|----------------|
 | Application | `website`: `solace.onl` (`HEAD`) | 2m | Web frontend reachable, TLS valid |
 | Application | `api-health`: `api.solace.onl/api/health` | 1m | API process up (primary signal) |
-| Application | `api-mail-jmap`: `api.solace.onl/api/health/mail-jmap` | 1m | API reaches Stalwart over the private network |
-| Mail | `jmap-session`: `mail.solace.onl/jmap/session` | 30s | Public JMAP through Railway HTTPS |
-| Mail | `mta-sts`: `mta-sts.solace.onl/.well-known/mta-sts.txt` | 10m | VPS `:443` passthrough to Stalwart serves the MTA-STS policy, and Stalwart's ACME certificate (the one SMTP STARTTLS presents) has > 14 days left. Not `starttls://`: Go's SMTP client sends `EHLO localhost`, which Stalwart rejects |
-| Stalwart Metrics | `stalwart-metrics`: `mail.solace.onl/metrics/prometheus` | 2m | Exporter alive, metric families registered, store I/O present, no error counters exported |
-| VPS | `vps-health` (SSH, optional) | 1m | HAProxy, frps, STCP relay, Postfix, tunnel group members, local JMAP |
+| Application | `api-mail-jmap-private`: `api.solace.onl/api/health/mail-jmap` | 1m | API reaches Stalwart and reports the private request duration in `Server-Timing` |
+| Mail | `jmap-session`: `mail.solace.onl/jmap/session` | 30s | Public JMAP through the Cloudflare tunnel |
+| Mail | `mta-sts`: `mta-sts.solace.onl/.well-known/mta-sts.txt` | 10m | Public MTA-STS policy lists both MX hosts and the HTTPS certificate has more than 14 days left |
+| Stalwart Metrics | `stalwart-metrics`: `mail.solace.onl/metrics/prometheus` | 2m | Exporter is reachable, expected gauges are present, and no monitored error counters are exported |
+| VPS | `vps-health`, `vps-secondary-health` (SSH) | 1m each | Each VPS independently checks its kubelet, HAProxy, outbound relay services, and SMTP STARTTLS certificate lifetime |
 
-The Prometheus check is a single scrape; counter **values** and thresholds are handled by
+Install `vps-health.py` as the root-owned `/usr/local/bin/solace-vps-health` on both mail VPSs.
+The monitoring SSH key is restricted to that command. Pin both host keys in
+`VPS_MONITOR_SSH_KNOWN_HOSTS` and set `VPS_MONITOR_SSH_SECONDARY_HOST` to enable the secondary check.
+
+The policy and key-expiry monitors remain available to internal alerting. The public status page omits their rows and history.
+
+The Prometheus check accepts idle replicas whose activity counters and histograms have yet to appear.
+Counter values and thresholds are handled by
 **Stalwart Enterprise Alerts** (email). Discord alert condition details are capped at 1024
 characters; the API retains the full results. Grafana
 ([dashboard #23498](https://grafana.com/grafana/dashboards/23498-service-stalwart/)) remains
@@ -119,6 +126,6 @@ Without `prometheus_*` the metrics monitor fails auth; without `DISCORD_WEBHOOK_
 ## Optional
 
 - **Status page auth:** `GATUS_ADMIN_USERNAME` / `GATUS_ADMIN_PASSWORD`
-- **VPS SSH monitor:** install `apps/stalwart/vps/gatus-monitor.sh` as root-owned mode 755, then run `sudo bash apps/stalwart/vps/setup-gatus-monitor.sh --check /path/to/monitor.pub` and `--apply` after review. Set the three `VPS_MONITOR_SSH_*` variables above; the account has no sudo, forwarding or arbitrary command access.
+- **VPS SSH monitor:** install `apps/gatus/vps-health.py` at `/usr/local/bin/solace-vps-health` as root-owned mode 755. Run `sudo bash apps/stalwart/vps/setup-gatus-monitor.sh --check /path/to/monitor.pub` and repeat with `--apply` to provision the restricted account.
 - `ssh-known-hosts.patch` adds `GATUS_SSH_KNOWN_HOSTS` to the pinned Gatus source; the entrypoint requires a host-key pin for VPS monitoring and writes credential files with mode 600. The image build tests matching, changed, unknown and missing host keys, plus deadlines for stalled handshakes and commands.
 - SSH probes refuse connections when host pins are absent, including custom configurations. VPS service states use a fixed allowlist; raw command errors never enter monitor JSON.

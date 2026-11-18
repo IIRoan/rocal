@@ -108,6 +108,7 @@ export default defineRailway(() => {
       PORT: "8080",
       TZ: "Europe/Amsterdam",
       VPS_MONITOR_SSH_HOST: "mx.solace.onl",
+      VPS_MONITOR_SSH_SECONDARY_HOST: "mx2.solace.onl",
       VPS_MONITOR_SSH_USERNAME: preserve(),
       VPS_MONITOR_SSH_PRIVATE_KEY_B64: preserve(),
       VPS_MONITOR_SSH_KNOWN_HOSTS: preserve(),

@@ -52,11 +52,12 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
-  # API -> Stalwart over the private network; one unauthenticated request.
-  - name: api-mail-jmap
+  # The API times its private JMAP request. Its own history key keeps those times comparable.
+  - name: api-mail-jmap-private
     <<: *discord-alerts
     group: Application
     url: https://api.solace.onl/api/health/mail-jmap
+    response-time-metric: stalwart-jmap
     interval: 1m
     client:
       timeout: 15s
@@ -102,7 +103,7 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
-  # Stalwart's ACME certificate (the one SMTP STARTTLS presents) via the VPS :443 passthrough; starttls:// fails, Go sends EHLO localhost.
+  # Public MTA-STS through Cloudflare. Each VPS check verifies the SMTP certificate separately.
   - name: mta-sts
     <<: *discord-alerts
     group: Mail
@@ -113,9 +114,10 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[BODY] == pat(*mx: mx.solace.onl*)"
+      - "[BODY] == pat(*mx: mx2.solace.onl*)"
       - "[CERTIFICATE_EXPIRATION] > 336h"
 
-  # One scrape of Stalwart's exporter; Stalwart Enterprise Alerts handle counter values and thresholds.
+  # One scrape may land on either node. Counters and histograms can be absent until that node handles traffic.
   - name: stalwart-metrics
     <<: *discord-alerts
     group: Stalwart Metrics
@@ -131,15 +133,11 @@ endpoints:
       - "[STATUS] == 200"
       - "[BODY] == pat(*stalwart_server_memory_bytes*)"
       - "[BODY] == pat(*stalwart_smtp_active_connections*)"
-      - "[BODY] == pat(*stalwart_smtp_request_time_seconds_count*)"
       - "[BODY] == pat(*stalwart_delivery_active_connections*)"
       - "[BODY] == pat(*stalwart_imap_active_connections*)"
       - "[BODY] == pat(*stalwart_http_active_connections*)"
-      - "[BODY] == pat(*stalwart_http_request_time_seconds_count*)"
       - "[BODY] == pat(*stalwart_users*)"
       - "[BODY] == pat(*stalwart_domains*)"
-      - "[BODY] == pat(*stalwart_store_blob_read_total*)"
-      - "[BODY] == pat(*stalwart_store_data_write_total*)"
       # Error counters are exported only once they are non-zero.
       - "[BODY] != pat(*store_unexpected_error*)"
       - "[BODY] != pat(*store_s3_error*)"

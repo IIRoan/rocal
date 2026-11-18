@@ -65,6 +65,37 @@ config_path.write_text(config.replace(marker, token))
 PY
 }
 
+append_vps_ssh_endpoint() {
+	if grep -Fxq "  - name: $1" /data/config.yaml; then
+		return 0
+	fi
+	{
+		printf '\n  - name: %s\n' "$1"
+		echo "    group: VPS"
+		printf '    url: ssh://%s:%s\n' "$2" "$3"
+		echo "    interval: 1m"
+		echo "    ui:"
+		echo "      hide-url: true"
+		echo "    client:"
+		echo "      timeout: 20s"
+		echo "    alerts:"
+		echo "      - type: discord"
+		echo "    ssh:"
+		printf '      username: "%s"\n' "$VPS_MONITOR_SSH_USERNAME"
+		echo "      private-key: |"
+		sed 's/^/        /' /data/vps_monitor_key
+		echo "    body: |"
+		printf '      {"command": "%s"}\n' "$VPS_MONITOR_SSH_COMMAND"
+		echo "    conditions:"
+		echo '      - "[CONNECTED] == true"'
+		echo '      - "[STATUS] == 0"'
+		echo '      - "[BODY].status == healthy"'
+		echo '      - "[BODY].k3sReady == true"'
+		echo '      - "[BODY].smtpStarttls == true"'
+		echo '      - "[BODY].tlsExpiresInSeconds > 1209600"'
+	} >> /data/config.yaml
+}
+
 append_vps_ssh_endpoints() {
 	if [ -z "${VPS_MONITOR_SSH_USERNAME:-}" ]; then
 		return 0
@@ -84,42 +115,11 @@ append_vps_ssh_endpoints() {
 		printf '%s\n' "$VPS_MONITOR_SSH_PRIVATE_KEY" > /data/vps_monitor_key
 	fi
 	chmod 600 /data/vps_monitor_key
-	if grep -q 'name: vps-health' /data/config.yaml 2>/dev/null; then
-		return 0
-	fi
-
-	VPS_MONITOR_SSH_HOST="${VPS_MONITOR_SSH_HOST:-mx.solace.onl}"
-	VPS_MONITOR_SSH_PORT="${VPS_MONITOR_SSH_PORT:-22}"
 	VPS_MONITOR_SSH_COMMAND="${VPS_MONITOR_SSH_COMMAND:-/usr/local/bin/gatus-monitor.sh}"
-
-	{
-		echo ""
-		echo "  - name: vps-health"
-		echo "    group: VPS"
-		echo "    url: ssh://${VPS_MONITOR_SSH_HOST}:${VPS_MONITOR_SSH_PORT}"
-		echo "    interval: 1m"
-		echo "    ui:"
-		echo "      hide-url: true"
-		echo "    client:"
-		echo "      timeout: 25s"
-		echo "    alerts:"
-		echo "      - type: discord"
-		echo "    ssh:"
-		echo "      username: \"${VPS_MONITOR_SSH_USERNAME}\""
-		echo "      private-key: |"
-		sed 's/^/        /' /data/vps_monitor_key
-		echo "    body: |"
-		echo "      {"
-		echo "        \"command\": \"${VPS_MONITOR_SSH_COMMAND}\""
-		echo "      }"
-		echo "    conditions:"
-		echo "      - \"[CONNECTED] == true\""
-		echo "      - \"[STATUS] == 0\""
-		echo "      - \"[BODY].status == healthy\""
-		echo "      - \"[BODY].groupMembers.http > 0\""
-		echo "      - \"[BODY].groupMembers.smtp > 0\""
-		echo "      - \"[BODY].http == true\""
-	} >> /data/config.yaml
+	append_vps_ssh_endpoint vps-health "${VPS_MONITOR_SSH_HOST:-mx.solace.onl}" "${VPS_MONITOR_SSH_PORT:-22}"
+	if [ -n "${VPS_MONITOR_SSH_SECONDARY_HOST:-}" ]; then
+		append_vps_ssh_endpoint vps-secondary-health "$VPS_MONITOR_SSH_SECONDARY_HOST" "${VPS_MONITOR_SSH_SECONDARY_PORT:-22}"
+	fi
 }
 
 write_base_config

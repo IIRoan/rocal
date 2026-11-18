@@ -22,6 +22,10 @@ COPY uptime-hourly-retention.patch /tmp/uptime-hourly-retention.patch
 RUN git apply /tmp/uptime-hourly-retention.patch
 COPY uptime-hourly-retention_test.go storage/store/sql/solace_uptime_test.go
 RUN go test ./storage/store/sql -run '^TestSolace' -count=1
+COPY server-timing.patch /tmp/server-timing.patch
+RUN git apply /tmp/server-timing.patch
+COPY server-timing_test.go config/endpoint/solace_server_timing_test.go
+RUN go test ./config/endpoint -run '^TestSolaceServerTiming' -count=1
 COPY assets/solace-logo.png web/static/solace-logo.png
 COPY assets/favicon.ico web/static/favicon.ico
 COPY assets/favicon-32x32.png web/static/favicon-32x32.png

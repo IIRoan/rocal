@@ -1,0 +1,79 @@
+diff --git a/config/endpoint/endpoint.go b/config/endpoint/endpoint.go
+index 0e8c77b..249b448 100644
+--- a/config/endpoint/endpoint.go
++++ b/config/endpoint/endpoint.go
+@@ -91,6 +91,9 @@ type Endpoint struct {
+ 	// URL to send the request to
+ 	URL string `yaml:"url"`
+ 
++	// ResponseTimeMetric records a named Server-Timing metric for an HTTP endpoint.
++	ResponseTimeMetric string `yaml:"response-time-metric,omitempty"`
++
+ 	// Method of the request made to the url of the endpoint
+ 	Method string `yaml:"method,omitempty"`
+ 
+@@ -241,6 +244,9 @@ func (e *Endpoint) ValidateAndSetDefaults() error {
+ 			return fmt.Errorf("%v: %w", ErrInvalidConditionFormat, err)
+ 		}
+ 	}
++	if e.ResponseTimeMetric != "" && e.Type() != TypeHTTP {
++		return errors.New("response-time-metric requires an HTTP endpoint")
++	}
+ 	if e.DNSConfig != nil {
+ 		return e.DNSConfig.ValidateAndSetDefault()
+ 	}
+@@ -545,7 +551,9 @@ func (e *Endpoint) call(result *Result) {
+ 		}
+ 	} else {
+ 		response, err = client.GetHTTPClient(e.ClientConfig).Do(request)
+-		result.Duration = time.Since(startTime)
++		if e.ResponseTimeMetric == "" {
++			result.Duration = time.Since(startTime)
++		}
+ 		if err != nil {
+ 			result.AddError(err.Error())
+ 			return
+@@ -557,6 +565,14 @@ func (e *Endpoint) call(result *Result) {
+ 		}
+ 		result.HTTPStatus = response.StatusCode
+ 		result.Connected = response.StatusCode > 0
++		if e.ResponseTimeMetric != "" {
++			var ok bool
++			result.Duration, ok = serverTimingDuration(response.Header.Values("Server-Timing"), e.ResponseTimeMetric)
++			if !ok {
++				result.Success = false
++				result.AddError("Server-Timing metric missing or invalid: " + e.ResponseTimeMetric)
++			}
++		}
+ 		// Only read the Body if there's a condition that uses the BodyPlaceholder
+ 		if e.needsToReadBody() {
+ 			result.Body, err = io.ReadAll(response.Body)
+@@ -567,6 +583,28 @@ func (e *Endpoint) call(result *Result) {
+ 	}
+ }
+ 
++func serverTimingDuration(headers []string, metric string) (time.Duration, bool) {
++	for _, header := range headers {
++		for _, item := range strings.Split(header, ",") {
++			name, params, _ := strings.Cut(item, ";")
++			if strings.TrimSpace(name) != metric {
++				continue
++			}
++			for _, param := range strings.Split(params, ";") {
++				key, value, _ := strings.Cut(param, "=")
++				if strings.TrimSpace(key) != "dur" {
++					continue
++				}
++				ms, err := strconv.ParseFloat(strings.Trim(strings.TrimSpace(value), `"`), 64)
++				if err == nil && ms >= 0 && ms < float64(1<<63)/float64(time.Millisecond) {
++					return time.Duration(ms * float64(time.Millisecond)), true
++				}
++			}
++		}
++	}
++	return 0, false
++}
++
+ func (e *Endpoint) buildHTTPRequest() *http.Request {
+ 	var bodyBuffer *bytes.Buffer
+ 	if e.GraphQL {

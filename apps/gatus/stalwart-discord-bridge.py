@@ -36,6 +36,9 @@ STATUS_PAGE_HEADERS = {
 }
 GATUS_DB = "/data/gatus.db"
 TIMELINE_PATH = "/timeline/"
+STATUS_API_PATH = "/api/v1/endpoints/"
+INTERNAL_STATUS_KEYS = {"application_api-mail-policy", "application_api-mail-key-expiry"}
+PRIVATE_JMAP_KEY = "application_api-mail-jmap-private"
 HOUR = 3600
 DAY = 24 * HOUR
 TIMELINE_MAX_WINDOW = 92 * DAY
@@ -92,7 +95,19 @@ def timeline(key: str, start: int, end: int, step: int = HOUR, zone: tzinfo | No
             " WHERE endpoint_id = ? AND hour_unix_timestamp >= ? AND hour_unix_timestamp < ? ORDER BY hour_unix_timestamp",
             (found[0], start - 2 * DAY, end + 2 * DAY),
         ).fetchall()
-        sums: dict[int, list[int]] = {}
+        retained_timings: dict[int, tuple[int, int]] = {}
+        if key == PRIVATE_JMAP_KEY:
+            # Gatus stores aggregate timings in whole milliseconds. Use raw timings for fully retained hours.
+            for stamp, duration in db.execute(
+                "SELECT timestamp, duration FROM endpoint_results WHERE endpoint_id = ?", (found[0],)
+            ):
+                sample = _check_time_ms(stamp)
+                if sample is None:
+                    continue
+                hour = sample // (HOUR * 1000) * HOUR
+                count, total_ns = retained_timings.get(hour, (0, 0))
+                retained_timings[hour] = (count + 1, total_ns + duration)
+        sums: dict[int, list[int | float]] = {}
         for i, (at, total, ok, total_ms) in enumerate(rows):
             # Rows Gatus merged into days before hourly retention sit a day apart; hourly rows an hour apart.
             span = DAY if i + 1 < len(rows) and rows[i + 1][0] - at >= 23 * HOUR else HOUR
@@ -107,10 +122,13 @@ def timeline(key: str, start: int, end: int, step: int = HOUR, zone: tzinfo | No
             bucket = sums.setdefault(begin, [size, 0, 0, 0])
             bucket[1] += total
             bucket[2] += ok
-            bucket[3] += total_ms
+            count, total_ns = retained_timings.get(at, (0, 0))
+            bucket[3] += total_ns / 1_000_000 if span == HOUR and count > 0 and count == total else total_ms
+        precision = 3 if key == PRIVATE_JMAP_KEY else None
         data: dict[str, Any] = {
             "buckets": [
-                {"at": at, "span": size, "total": total, "ok": ok, "ms": round(total_ms / total) if total else 0}
+                {"at": at, "span": size, "total": total, "ok": ok,
+                 "ms": round(total_ms / total, precision) if total else 0}
                 for at, (size, total, ok, total_ms) in sorted(sums.items())
             ]
         }
@@ -129,7 +147,7 @@ def timeline(key: str, start: int, end: int, step: int = HOUR, zone: tzinfo | No
                     checks[result_id] = {
                         "at": at,
                         "ok": bool(ok),
-                        "ms": duration // 1_000_000,
+                        "ms": duration / 1_000_000,
                         "status": status,
                         "errors": [error for error in errors.split(GATUS_LIST_SEPARATOR) if error],
                         "conditions": [],
@@ -174,9 +192,15 @@ def _proxy(handler: BaseHTTPRequestHandler) -> None:
             connection.request(handler.command, handler.path, body=body or None, headers=headers)
             resp = connection.getresponse()
             payload = resp.read()
+            path = urllib.parse.unquote(handler.path.split("?", 1)[0]).lower().rstrip("/")
+            public_statuses = path == STATUS_API_PATH + "statuses"
+            if public_statuses and resp.status == 200 and handler.command == "GET":
+                statuses = json.loads(payload)
+                payload = json.dumps([row for row in statuses if row["key"] not in INTERNAL_STATUS_KEYS],
+                                     separators=(",", ":")).encode()
             handler.send_response(resp.status)
             for key, value in resp.headers.items():
-                if key.lower() in _SKIP_RESPONSE_HEADERS:
+                if key.lower() in _SKIP_RESPONSE_HEADERS or (public_statuses and key.lower() == "etag"):
                     continue
                 handler.send_header(key, value)
             handler.send_header("Content-Length", str(len(payload)))
@@ -291,6 +315,20 @@ class Handler(BaseHTTPRequestHandler):
         if path.rstrip("/") == HOOK_PATH.rstrip("/") and self.command == "POST":
             self._handle_stalwart()
             return
+        public_path = urllib.parse.unquote(path).lower()
+        for prefix in ("/endpoints/", STATUS_API_PATH, TIMELINE_PATH):
+            if public_path.startswith(prefix):
+                key = public_path[len(prefix):].split("/", 1)[0]
+                if key in INTERNAL_STATUS_KEYS:
+                    self._send_json(404, {"error": "unknown endpoint"})
+                    return
+                if path.startswith("/endpoints/") and key == "application_api-mail-jmap":
+                    self.send_response(302)
+                    self.send_header("Location", "/endpoints/application_api-mail-jmap-private")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                break
         if self.command in ("GET", "HEAD") and _is_status_page(path):
             self._send_status_page()
             return
@@ -306,7 +344,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != "HEAD":
+            self.wfile.write(body)
 
     def _handle_timeline(self, key: str) -> None:
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)

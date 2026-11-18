@@ -2,6 +2,7 @@ import contextlib
 from datetime import datetime, timezone
 import importlib.util
 import io
+import json
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -106,6 +107,31 @@ class StatusPageTests(unittest.TestCase):
             _, _, proxied = dispatch("GET", path)
             self.assertEqual(len(proxied), 1)
 
+    def test_internal_checks_cannot_be_loaded_directly(self):
+        for key in ("application_api-mail-policy", "application_api-mail-key-expiry"):
+            for path in (f"/endpoints/{key}", f"/api/v1/endpoints/{key}/statuses", f"/timeline/{key}?from=1&to=2"):
+                sent, body, proxied = dispatch("GET", path)
+                self.assertEqual(sent["status"], 404)
+                self.assertEqual(json.loads(body), {"error": "unknown endpoint"})
+                self.assertEqual(proxied, [])
+
+    def test_public_status_list_excludes_internal_checks(self):
+        path = "/api/v1/endpoints/statuses?page=1&pageSize=1"
+        healthy = {"key": "vps_vps-health", "results": [{"success": True}]}
+        response = mock.Mock(status=200, headers=Message())
+        response.read.return_value = json.dumps([
+            {"key": "application_api-mail-policy"}, healthy, {"key": "application_api-mail-key-expiry"},
+        ]).encode()
+        upstream = mock.Mock()
+        upstream.getresponse.return_value = response
+        handler = SimpleNamespace(headers=Message(), rfile=io.BytesIO(), wfile=io.BytesIO(), path=path,
+                                  command="GET", send_response=mock.Mock(), send_header=mock.Mock(),
+                                  end_headers=lambda: None)
+        with mock.patch.object(bridge, "HTTPConnection", return_value=upstream):
+            bridge._proxy(handler)
+        self.assertEqual(json.loads(handler.wfile.getvalue()), [healthy])
+        handler.send_response.assert_called_once_with(200)
+
 
 class TimelineTests(unittest.TestCase):
     DAY_START = 1_793_660_400  # 2026-11-03 00:00 Amsterdam, a merged daily row
@@ -160,6 +186,16 @@ class TimelineTests(unittest.TestCase):
             "errors": ["timeout", "retry failed"], "conditions": [["[STATUS] (0) == 200", False], ["[RESPONSE_TIME] < 5000", True]],
         }])
         self.assertEqual(data["checksSince"], (self.HOURLY_START + 90) * 1000 + 123)
+
+    def test_private_jmap_uses_retained_sub_millisecond_samples_in_hourly_buckets(self):
+        with sqlite3.connect(bridge.GATUS_DB) as db:
+            db.execute("INSERT INTO endpoints VALUES (2, ?)", (bridge.PRIVATE_JMAP_KEY,))
+            db.execute("INSERT INTO endpoint_uptimes VALUES (2, ?, 2, 2, 0)", (self.HOURLY_START,))
+            for result_id, duration in ((3, 250000), (4, 750000)):
+                stamp = datetime.fromtimestamp(self.HOURLY_START + result_id, timezone.utc).strftime("%Y-%m-%d %H:%M:%S +0000 UTC")
+                db.execute("INSERT INTO endpoint_results VALUES (?, 2, 1, ?, 200, '', ?)", (result_id, duration, stamp))
+        data = bridge.timeline(bridge.PRIVATE_JMAP_KEY, self.HOURLY_START, self.HOURLY_START + 3 * 3600)
+        self.assertEqual(data["buckets"][0]["ms"], 0.5)
 
     def test_unknown_endpoints_and_bad_ranges_are_refused(self):
         self.assertIsNone(bridge.timeline("nope", self.HOURLY_START, self.HOURLY_START + 3600))
