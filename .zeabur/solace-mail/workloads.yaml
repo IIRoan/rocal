@@ -35,7 +35,7 @@ spec:
           envFrom:
             - secretRef:
                 name: mail-cf-tunnel
-          image: cloudflare/cloudflared@sha256:b94b96edf2c9c4360f8879c8580cfaa99077f19c849ec595ca2f711b27d4f344
+          image: docker.io/cloudflare/cloudflared@sha256:b94b96edf2c9c4360f8879c8580cfaa99077f19c849ec595ca2f711b27d4f344
           imagePullPolicy: IfNotPresent
           name: cloudflared
           readinessProbe:
@@ -59,6 +59,7 @@ spec:
             capabilities:
               drop:
                 - ALL
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
@@ -129,7 +130,7 @@ spec:
           envFrom:
             - secretRef:
                 name: mail-cf-tunnel
-          image: cloudflare/cloudflared@sha256:b94b96edf2c9c4360f8879c8580cfaa99077f19c849ec595ca2f711b27d4f344
+          image: docker.io/cloudflare/cloudflared@sha256:b94b96edf2c9c4360f8879c8580cfaa99077f19c849ec595ca2f711b27d4f344
           imagePullPolicy: IfNotPresent
           name: cloudflared
           readinessProbe:
@@ -153,6 +154,7 @@ spec:
             capabilities:
               drop:
                 - ALL
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
@@ -253,7 +255,7 @@ spec:
           env:
             - name: SOLACE_MAIL_UPSTREAM
               value: mail-live.solace-mail.svc.cluster.local:8081
-          image: haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          image: docker.io/library/haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
           imagePullPolicy: IfNotPresent
           name: mail-gate
           resources:
@@ -347,7 +349,7 @@ spec:
           env:
             - name: SOLACE_MAIL_UPSTREAM
               value: mail-live.solace-mail.svc.cluster.local:8081
-          image: haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          image: docker.io/library/haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
           imagePullPolicy: IfNotPresent
           lifecycle:
             preStop:
@@ -670,6 +672,7 @@ spec:
             capabilities:
               drop:
                 - ALL
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
@@ -680,6 +683,8 @@ spec:
               readOnly: true
             - mountPath: /var/lib/stalwart
               name: runtime
+            - mountPath: /tmp
+              name: tmp
         - command:
             - haproxy
             - -db
@@ -697,7 +702,7 @@ spec:
           envFrom:
             - secretRef:
                 name: mail-live-auth
-          image: haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          image: docker.io/library/haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
           imagePullPolicy: IfNotPresent
           name: gateway
           readinessProbe:
@@ -719,6 +724,7 @@ spec:
             capabilities:
               drop:
                 - ALL
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
@@ -728,6 +734,8 @@ spec:
             - mountPath: /opt/mail
               name: config
               readOnly: true
+            - mountPath: /tmp
+              name: gateway-tmp
       dnsPolicy: ClusterFirst
       nodeSelector:
         kubernetes.io/hostname: webdock-mail
@@ -767,6 +775,10 @@ spec:
           name: config
         - emptyDir: {}
           name: runtime
+        - name: tmp
+          emptyDir: {}
+        - name: gateway-tmp
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -856,6 +868,7 @@ spec:
             capabilities:
               drop:
                 - ALL
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
@@ -866,6 +879,8 @@ spec:
               readOnly: true
             - mountPath: /var/lib/stalwart
               name: runtime
+            - mountPath: /tmp
+              name: tmp
         - command:
             - haproxy
             - -db
@@ -883,7 +898,7 @@ spec:
           envFrom:
             - secretRef:
                 name: mail-live-auth
-          image: haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          image: docker.io/library/haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
           imagePullPolicy: IfNotPresent
           name: gateway
           readinessProbe:
@@ -905,6 +920,7 @@ spec:
             capabilities:
               drop:
                 - ALL
+            readOnlyRootFilesystem: true
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
@@ -914,6 +930,8 @@ spec:
             - mountPath: /opt/mail
               name: config
               readOnly: true
+            - mountPath: /tmp
+              name: gateway-tmp
       dnsPolicy: ClusterFirst
       nodeSelector:
         kubernetes.io/hostname: webdock-1
@@ -953,6 +971,10 @@ spec:
           name: config
         - emptyDir: {}
           name: runtime
+        - name: tmp
+          emptyDir: {}
+        - name: gateway-tmp
+          emptyDir: {}
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -981,7 +1003,7 @@ spec:
               command:
                 - /bin/sh
                 - -ec
-              image: docker.io/library/busybox:1.37.0
+              image: docker.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
               imagePullPolicy: IfNotPresent
               name: retention
               resources:
@@ -996,6 +1018,7 @@ spec:
                 capabilities:
                   drop:
                     - ALL
+                readOnlyRootFilesystem: true
               terminationMessagePath: /dev/termination-log
               terminationMessagePolicy: File
               volumeMounts:
@@ -1060,7 +1083,7 @@ spec:
               command:
                 - /bin/sh
                 - -ec
-              image: docker.io/library/busybox:1.37.0
+              image: docker.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
               imagePullPolicy: IfNotPresent
               name: retention
               resources:
@@ -1075,6 +1098,7 @@ spec:
                 capabilities:
                   drop:
                     - ALL
+                readOnlyRootFilesystem: true
               terminationMessagePath: /dev/termination-log
               terminationMessagePolicy: File
               volumeMounts:

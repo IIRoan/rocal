@@ -4,10 +4,10 @@ This Kustomize root declares the active Solace project on Zeabur OSS. `solace-ma
 
 | Path | What it manages |
 | --- | --- |
-| [project.yaml](project.yaml) | The namespaces, Solace's ingress class, and its three encrypted Longhorn storage classes |
-| [solace-mail/](solace-mail/) | API and notifications, Stalwart and its gateways, Cloudflare tunnel workloads, private and public Service ports, routes, network policies, issuer and certificate, mail PostgreSQL, Redis Sentinel, and mail object storage |
-| [solace-api/](solace-api/) | Application PostgreSQL primary and standby, their trust and initialization config, Services, and network policies |
-| [bootstrap/](bootstrap/) | Initial Flux setup, scoped deploy permissions, and the ingress controller's RBAC |
+| [project.yaml](project.yaml) | The namespaces and three encrypted Longhorn storage classes |
+| [solace-mail/](solace-mail/) | API and notifications, Stalwart and its gateways, Cloudflare tunnel workloads, issuer and certificate, mail PostgreSQL, Redis Sentinel, and mail object storage |
+| [solace-api/](solace-api/) | Application PostgreSQL primary and standby, their trust and initialization config |
+| [bootstrap/](bootstrap/) | Initial Flux setup, scoped deploy permissions, networking, and the ingress controller's RBAC |
 
 The live workloads drive the image digests, selectors, placement, probes, and storage settings in these manifests. Keep image changes here for the workloads this directory manages. Zeabur reads these objects and displays their live state.
 
@@ -26,7 +26,7 @@ Preserve the original volume bindings on the live cluster. Use apply without pru
 
 ## Deploy from Git
 
-Flux reads `.zeabur/` on the protected `master` branch and applies it with the `solace-reconciler` service account. It polls Git every minute and checks for drift every five minutes. Use Git as the writer for managed fields. Changes to a Deployment's pod template trigger its rollout. Flux leaves existing objects in place when a manifest is removed.
+Flux reads `.zeabur/` on the protected `master` branch and applies it with the `solace-reconciler` service account. It polls Git every minute and checks for drift every five minutes. An administrator applies the [networking manifests](bootstrap/networking/) separately, so the reconciler cannot change Services, Ingresses, or NetworkPolicies. Use Git as the writer for managed fields. Changes to a Deployment's pod template trigger its rollout. Flux leaves existing objects in place when a manifest is removed.
 
 Review the server-side diff against the production context before merging a config change.
 
@@ -44,3 +44,11 @@ kubectl -n solace-mail get deployments
 ```
 
 The [bootstrap procedure](bootstrap/README.md) covers first adoption and recovery. Review storage and routing changes against the [production runbook](../apps/stalwart/README.md). Verify both mail endpoints, the public API and JMAP, and STARTTLS on both MXs after a rollout.
+
+## Workload hardening
+
+Containers use read-only root filesystems. PostgreSQL and the Stalwart gateways have writable socket directories, and PostgreSQL, Redis, Stalwart, and SeaweedFS have writable scratch space. Existing data volumes retain their service UID and GID. Changing the identity of a stateful process requires a tested data ownership migration.
+
+The image references use digest pins and the registries approved in [the Trivy Kubernetes configuration](../.github/trivy-data/registries.yaml). A runtime image change requires compatibility checks for the entrypoint, its data and its probes.
+
+The application mail gateways still use a compatibility host alias for the private JMAP route. The ingress controller reads TLS Secrets in its namespace. The Flux account can update workload and ConfigMap objects within the Solace namespaces. These capabilities are visible in the scanner report. The sensitive-ConfigMap check also matches the microphone permissions header, the public security contact header, and the Lua lookup of a gate key from the environment. The gateway configuration stores Secret references and public settings in Git.

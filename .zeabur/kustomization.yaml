@@ -4,8 +4,6 @@ resources:
   - project.yaml
   - solace-mail/config.yaml
   - solace-mail/data.yaml
-  - solace-mail/routing.yaml
   - solace-mail/workloads.yaml
   - solace-api/config.yaml
   - solace-api/data.yaml
-  - solace-api/routing.yaml
