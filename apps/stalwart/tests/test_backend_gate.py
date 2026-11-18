@@ -1,12 +1,12 @@
 """Optional loopback test of backend-gate.cfg with a real HAProxy; set HAPROXY_TEST_BINARY to run it."""
 
 import hashlib
+import ipaddress
 import json
 import os
 import socket
 import struct
 import subprocess
-import tempfile
 import threading
 import time
 import unittest
