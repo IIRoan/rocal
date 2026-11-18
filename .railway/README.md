@@ -1,8 +1,8 @@
 # Railway configuration
 
-The Solace project is defined in `.railway/railway.ts`. That file is the source of truth for services, databases, volumes, buckets, domains, and variables. Mail (`apps/stalwart`) and Monitoring (`apps/gatus`) live in this repo; do not point those services at a second GitHub repository.
+The `status` partial in `.railway/railway.ts` manages Railway Monitoring and its SQLite history volume. Monitoring builds `apps/gatus` from `IIRoan/rocal` on `master` when a push changes `apps/gatus/**`.
 
-Do not add per-service `railway.toml` or `railway.json`. Config as Code is deprecated.
+Solace API, Stalwart and notifications run on Zeabur. Railway holds the former production resources for recovery. Keep the Railway configuration scoped to the `status` partial so a normal apply leaves those resources alone.
 
 ## Commands
 

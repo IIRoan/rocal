@@ -1,4 +1,6 @@
-# Stalwart on Railway (Solace mail)
+# Stalwart on Railway recovery reference
+
+Solace production runs two Stalwart replicas on Zeabur, one per Webdock host. Public SMTP reaches the pods through the MX hosts' HAProxy listeners. The Railway deployment instructions below describe the former topology and its recovery configuration.
 
 The image installs a checksummed Stalwart 1.1.0 binary with a narrow PostgreSQL subject-search patch. The [versioned release](https://github.com/IIRoan/rocal/releases/tag/stalwart-v1.1.0-solace.1) includes its corresponding source and build recipe. See [the regression and deployment notes](tests/SUBJECT-SEARCH.md) for the literal matching behavior, disposable test, binary update procedure and required application reindex after rollout.
 
