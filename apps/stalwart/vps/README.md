@@ -1,4 +1,6 @@
-# VPS services
+# Railway-era mail VPS recovery reference
+
+Production SMTP now enters on `mx.solace.onl` and `mx2.solace.onl` and is routed by HAProxy to Zeabur. The configuration below documents the former single-VPS frp path. The `Sync mail VPS` workflow is retired. Its settings and commands are kept here for recovery reference.
 
 Public VPS at `193.180.211.139` (`mail.solace.onl`) for Stalwart on Railway.
 Architecture diagrams: [README.md](../README.md).
