@@ -1,0 +1,1113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mail-cloudflared-a
+  namespace: solace-mail
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: mail-cf-tunnel
+      instance: mail-cloudflared-a
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: mail-cf-tunnel
+        instance: mail-cloudflared-a
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - args:
+            - tunnel
+            - --no-autoupdate
+            - --metrics
+            - 0.0.0.0:2000
+            - --protocol
+            - http2
+            - run
+          envFrom:
+            - secretRef:
+                name: mail-cf-tunnel
+          image: cloudflare/cloudflared@sha256:b94b96edf2c9c4360f8879c8580cfaa99077f19c849ec595ca2f711b27d4f344
+          imagePullPolicy: IfNotPresent
+          name: cloudflared
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: 2000
+              scheme: HTTP
+            periodSeconds: 4
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 350m
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/solace-origin-ca
+              name: solace-origin-ca
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-mail
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: solace-origin-ca
+          name: solace-origin-ca
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mail-cloudflared-b
+  namespace: solace-mail
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: mail-cf-tunnel
+      instance: mail-cloudflared-b
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: mail-cf-tunnel
+        instance: mail-cloudflared-b
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - args:
+            - tunnel
+            - --no-autoupdate
+            - --metrics
+            - 0.0.0.0:2000
+            - --protocol
+            - http2
+            - run
+          envFrom:
+            - secretRef:
+                name: mail-cf-tunnel
+          image: cloudflare/cloudflared@sha256:b94b96edf2c9c4360f8879c8580cfaa99077f19c849ec595ca2f711b27d4f344
+          imagePullPolicy: IfNotPresent
+          name: cloudflared
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: 2000
+              scheme: HTTP
+            periodSeconds: 4
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 350m
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/solace-origin-ca
+              name: solace-origin-ca
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-1
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: solace-origin-ca
+          name: solace-origin-ca
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: notifications
+    app.kubernetes.io/part-of: solace
+  name: notifications
+  namespace: solace-mail
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notifications
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notifications
+        app.kubernetes.io/part-of: solace
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - envFrom:
+            - secretRef:
+                name: notifications-runtime
+          image: zot.zot.svc:5000/solace-api/notifications@sha256:ac23dcc1b86161328b69ccd26ebd0d11a5d208193e135730555c4358479944e3
+          imagePullPolicy: IfNotPresent
+          name: worker
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: 4002
+              scheme: HTTP
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 350m
+              memory: 384Mi
+            requests:
+              cpu: 25m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/app-pg-ca
+              name: app-pg-ca
+              readOnly: true
+        - command:
+            - haproxy
+            - -db
+            - -f
+            - /etc/mail-gate/haproxy.cfg
+          env:
+            - name: SOLACE_MAIL_UPSTREAM
+              value: mail-live.solace-mail.svc.cluster.local:8081
+          image: haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          imagePullPolicy: IfNotPresent
+          name: mail-gate
+          resources:
+            limits:
+              cpu: 125m
+              memory: 64Mi
+            requests:
+              cpu: 20m
+              memory: 24Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/mail-gate
+              name: mail-gate
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      hostAliases:
+        - hostnames:
+            - stalwart-gate.railway.internal
+          ip: 127.0.0.1
+      nodeSelector:
+        kubernetes.io/hostname: webdock-mail
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: notifications-edge-upstream
+          name: mail-gate
+        - configMap:
+            defaultMode: 420
+            name: app-pg-ca
+          name: app-pg-ca
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: solace-api
+    app.kubernetes.io/part-of: solace
+  name: solace-api
+  namespace: solace-mail
+spec:
+  minReadySeconds: 8
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: solace-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: solace-api
+        app.kubernetes.io/part-of: solace
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - command:
+            - haproxy
+            - -db
+            - -f
+            - /etc/solace-api/haproxy.cfg
+          env:
+            - name: SOLACE_MAIL_UPSTREAM
+              value: mail-live.solace-mail.svc.cluster.local:8081
+          image: haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 8
+          name: edge
+          ports:
+            - containerPort: 8080
+              name: edge
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              httpHeaders:
+                - name: Host
+                  value: api.solace.onl
+              path: /api/health
+              port: edge
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: 200m
+              memory: 96Mi
+            requests:
+              cpu: 20m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/solace-api
+              name: edge
+              readOnly: true
+        - env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  key: DATABASE_URL
+                  name: app-postgres-url
+            - name: STALWART_BASE_URL
+              value: http://stalwart-gate.railway.internal:8081
+            - name: CALENDAR_SYNC
+              value: 'true'
+            - name: DATABASE_POOL_SIZE
+              value: '10'
+          envFrom:
+            - secretRef:
+                name: api-runtime
+          image: zot.zot.svc:5000/solace-api/api@sha256:96c0ec8970441cfd0b2adabcf05a1eaebf2b75c4b0aff160098c80793d457679
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 8
+          name: api
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /api/health
+              port: 4001
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 8
+            successThreshold: 1
+            timeoutSeconds: 2
+          resources:
+            limits:
+              cpu: 750m
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/app-pg-ca
+              name: app-pg-ca
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      hostAliases:
+        - hostnames:
+            - stalwart-gate.railway.internal
+          ip: 127.0.0.1
+      nodeSelector:
+        kubernetes.io/hostname: webdock-1
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 40
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: app-pg-ca
+          name: app-pg-ca
+        - configMap:
+            defaultMode: 420
+            name: api-edge-upstream
+          name: edge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: solace-tunnel-ingress
+  name: solace-tunnel-ingress
+  namespace: solace-mail
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: solace-tunnel-ingress
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: solace-tunnel-ingress
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - webdock-1
+                      - webdock-mail
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: solace-tunnel-ingress
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - args:
+            - --entryPoints.tunnel.address=:8443/tcp
+            - --entryPoints.tunnel.http.tls=true
+            - --entryPoints.traefik.address=:8080/tcp
+            - --ping=true
+            - --api.dashboard=false
+            - --providers.kubernetesingress=true
+            - --providers.kubernetesingress.namespaces=solace-mail
+            - --providers.kubernetesingress.ingressclass=solace-tunnel
+            - --providers.kubernetesingress.disableClusterScopeResources=true
+            - --providers.kubernetesingress.ingressendpoint.hostname=ingress.solace.onl
+            - --log.level=WARN
+          image: docker.io/traefik:v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2
+          imagePullPolicy: IfNotPresent
+          name: traefik
+          ports:
+            - containerPort: 8443
+              name: tunnel
+              protocol: TCP
+            - containerPort: 8080
+              name: health
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ping
+              port: health
+              scheme: HTTP
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 300m
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 48Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccount: solace-tunnel-ingress
+      serviceAccountName: solace-tunnel-ingress
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: stalwart-a
+    app.kubernetes.io/part-of: solace-mail
+  name: stalwart-a
+  namespace: solace-mail
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: stalwart-production
+      instance: stalwart-a
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        cni.projectcalico.org/ipAddrs: '["10.42.162.249"]'
+      labels:
+        app: stalwart-production
+        app.kubernetes.io/name: stalwart-a
+        app.kubernetes.io/part-of: solace-mail
+        instance: stalwart-a
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - args:
+            - --config
+            - /opt/mail/config.json
+          command:
+            - /usr/local/bin/stalwart
+          env:
+            - name: HOME
+              value: /tmp
+            - name: TOKIO_WORKER_THREADS
+              value: '2'
+            - name: STALWART_PUBLIC_URL
+              value: https://mail.solace.onl
+            - name: STALWART_HOSTNAME
+              value: mail-a.solace.internal
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: STALWART_PG_PASSWORD
+                  name: mail-pg-auth
+            - name: BUCKET_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: BUCKET_ACCESS_KEY_ID
+                  name: mail-object-auth
+            - name: BUCKET_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: BUCKET_SECRET_ACCESS_KEY
+                  name: mail-object-auth
+            - name: STALWART_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: STALWART_WEBHOOK_SECRET
+                  name: mail-live-auth
+          image: zot.zot.svc:5000/solace-mail/stalwart@sha256:46adef95786d6780258685ae326a3da3dfe1b13607a9950972f839554fd86cb1
+          imagePullPolicy: IfNotPresent
+          name: stalwart
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz/ready
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: '1'
+              memory: 768Mi
+            requests:
+              cpu: 50m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/log/stalwart
+              name: logs
+            - mountPath: /opt/mail
+              name: config
+              readOnly: true
+            - mountPath: /var/lib/stalwart
+              name: runtime
+        - command:
+            - haproxy
+            - -db
+            - -f
+            - /opt/mail/haproxy.cfg
+          env:
+            - name: STALWART_GATE_PORT
+              value: '8081'
+            - name: STALWART_PUBLIC_PORT
+              value: '8082'
+            - name: STALWART_HTTP_PORT
+              value: '8080'
+            - name: STALWART_GATE_LUA_PATH
+              value: /opt/mail/admin-gate.lua
+          envFrom:
+            - secretRef:
+                name: mail-live-auth
+          image: haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          imagePullPolicy: IfNotPresent
+          name: gateway
+          readinessProbe:
+            failureThreshold: 3
+            periodSeconds: 3
+            successThreshold: 1
+            tcpSocket:
+              port: 8082
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 400m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 48Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/relay-secondary
+              name: standby-relay
+              readOnly: true
+            - mountPath: /opt/mail
+              name: config
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-mail
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+        sysctls:
+          - name: net.ipv4.ip_unprivileged_port_start
+            value: '0'
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - name: logs
+          persistentVolumeClaim:
+            claimName: stalwart-a-logs
+        - name: standby-relay
+          secret:
+            defaultMode: 288
+            secretName: mail-standby-relay-tls
+        - configMap:
+            defaultMode: 420
+            name: mail-live-config
+          name: config
+        - emptyDir: {}
+          name: runtime
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: stalwart-b
+    app.kubernetes.io/part-of: solace-mail
+  name: stalwart-b
+  namespace: solace-mail
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: stalwart-production
+      instance: stalwart-b
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        cni.projectcalico.org/ipAddrs: '["10.42.133.121"]'
+      labels:
+        app: stalwart-production
+        app.kubernetes.io/name: stalwart-b
+        app.kubernetes.io/part-of: solace-mail
+        instance: stalwart-b
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - args:
+            - --config
+            - /opt/mail/config.json
+          command:
+            - /usr/local/bin/stalwart
+          env:
+            - name: HOME
+              value: /tmp
+            - name: TOKIO_WORKER_THREADS
+              value: '2'
+            - name: STALWART_PUBLIC_URL
+              value: https://mail.solace.onl
+            - name: STALWART_HOSTNAME
+              value: mail-b.solace.internal
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: STALWART_PG_PASSWORD
+                  name: mail-pg-auth
+            - name: BUCKET_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: BUCKET_ACCESS_KEY_ID
+                  name: mail-object-auth
+            - name: BUCKET_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: BUCKET_SECRET_ACCESS_KEY
+                  name: mail-object-auth
+            - name: STALWART_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: STALWART_WEBHOOK_SECRET
+                  name: mail-live-auth
+          image: zot.zot.svc:5000/solace-mail/stalwart@sha256:46adef95786d6780258685ae326a3da3dfe1b13607a9950972f839554fd86cb1
+          imagePullPolicy: IfNotPresent
+          name: stalwart
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz/ready
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: '1'
+              memory: 768Mi
+            requests:
+              cpu: 50m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/log/stalwart
+              name: logs
+            - mountPath: /opt/mail
+              name: config
+              readOnly: true
+            - mountPath: /var/lib/stalwart
+              name: runtime
+        - command:
+            - haproxy
+            - -db
+            - -f
+            - /opt/mail/haproxy.cfg
+          env:
+            - name: STALWART_GATE_PORT
+              value: '8081'
+            - name: STALWART_PUBLIC_PORT
+              value: '8082'
+            - name: STALWART_HTTP_PORT
+              value: '8080'
+            - name: STALWART_GATE_LUA_PATH
+              value: /opt/mail/admin-gate.lua
+          envFrom:
+            - secretRef:
+                name: mail-live-auth
+          image: haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          imagePullPolicy: IfNotPresent
+          name: gateway
+          readinessProbe:
+            failureThreshold: 3
+            periodSeconds: 3
+            successThreshold: 1
+            tcpSocket:
+              port: 8082
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 400m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 48Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/relay-secondary
+              name: standby-relay
+              readOnly: true
+            - mountPath: /opt/mail
+              name: config
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-1
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+        sysctls:
+          - name: net.ipv4.ip_unprivileged_port_start
+            value: '0'
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - name: logs
+          persistentVolumeClaim:
+            claimName: stalwart-b-logs
+        - name: standby-relay
+          secret:
+            defaultMode: 288
+            secretName: mail-standby-relay-tls
+        - configMap:
+            defaultMode: 420
+            name: mail-live-config
+          name: config
+        - emptyDir: {}
+          name: runtime
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace-mail
+  name: stalwart-a-log-retention
+  namespace: solace-mail
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    metadata: {}
+    spec:
+      activeDeadlineSeconds: 120
+      backoffLimit: 1
+      template:
+        metadata: {}
+        spec:
+          automountServiceAccountToken: false
+          containers:
+            - args:
+                - |-
+                  test -w /var/log/stalwart
+                  find /var/log/stalwart -maxdepth 1 -type f -name 'stalwart.log.[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' -mtime +13 -exec unlink {} \;
+              command:
+                - /bin/sh
+                - -ec
+              image: docker.io/library/busybox:1.37.0
+              imagePullPolicy: IfNotPresent
+              name: retention
+              resources:
+                limits:
+                  cpu: 100m
+                  memory: 32Mi
+                requests:
+                  cpu: 5m
+                  memory: 8Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              volumeMounts:
+                - mountPath: /var/log/stalwart
+                  name: logs
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/hostname: webdock-mail
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext:
+            fsGroup: 10001
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          terminationGracePeriodSeconds: 30
+          tolerations:
+            - effect: NoSchedule
+              key: roan.dev/apps-only
+              operator: Equal
+              value: 'true'
+            - effect: NoSchedule
+              key: roan.dev/mail-only
+              operator: Equal
+              value: 'true'
+          volumes:
+            - name: logs
+              persistentVolumeClaim:
+                claimName: stalwart-a-logs
+  schedule: 37 2 * * *
+  startingDeadlineSeconds: 1800
+  successfulJobsHistoryLimit: 1
+  suspend: false
+  timeZone: Etc/UTC
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace-mail
+  name: stalwart-b-log-retention
+  namespace: solace-mail
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    metadata: {}
+    spec:
+      activeDeadlineSeconds: 120
+      backoffLimit: 1
+      template:
+        metadata: {}
+        spec:
+          automountServiceAccountToken: false
+          containers:
+            - args:
+                - |-
+                  test -w /var/log/stalwart
+                  find /var/log/stalwart -maxdepth 1 -type f -name 'stalwart.log.[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' -mtime +13 -exec unlink {} \;
+              command:
+                - /bin/sh
+                - -ec
+              image: docker.io/library/busybox:1.37.0
+              imagePullPolicy: IfNotPresent
+              name: retention
+              resources:
+                limits:
+                  cpu: 100m
+                  memory: 32Mi
+                requests:
+                  cpu: 5m
+                  memory: 8Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              volumeMounts:
+                - mountPath: /var/log/stalwart
+                  name: logs
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/hostname: webdock-1
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext:
+            fsGroup: 10001
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          terminationGracePeriodSeconds: 30
+          tolerations:
+            - effect: NoSchedule
+              key: roan.dev/apps-only
+              operator: Equal
+              value: 'true'
+            - effect: NoSchedule
+              key: roan.dev/mail-only
+              operator: Equal
+              value: 'true'
+          volumes:
+            - name: logs
+              persistentVolumeClaim:
+                claimName: stalwart-b-logs
+  schedule: 37 2 * * *
+  startingDeadlineSeconds: 1800
+  successfulJobsHistoryLimit: 1
+  suspend: false
+  timeZone: Etc/UTC

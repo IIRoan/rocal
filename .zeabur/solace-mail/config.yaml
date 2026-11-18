@@ -1,0 +1,396 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: solace-tunnel-ingress
+  namespace: solace-mail
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-edge-upstream
+  namespace: solace-mail
+data:
+  haproxy.cfg: |
+    global
+        maxconn 512
+        nbthread 1
+
+    defaults
+        mode http
+        timeout connect 5s
+        timeout http-request 15s
+        timeout client 5m
+        timeout server 5m
+        timeout tunnel 1h
+
+    resolvers cluster
+        parse-resolv-conf
+        hold valid 10s
+
+    frontend api_tunnel
+        bind *:8080
+        http-request return status 421 unless { hdr(host) -i api.solace.onl }
+        http-request del-header x-real-ip
+        http-request del-header x-forwarded-for
+        http-request del-header forwarded
+        http-request del-header x-forwarded-host
+        http-request del-header x-forwarded-proto
+        http-request set-header X-Forwarded-Proto https
+        http-request set-header X-Real-IP %[req.hdr(CF-Connecting-IP)] if { req.hdr_ip(CF-Connecting-IP) -m found }
+        http-response set-header X-Solace-Origin zeabur
+        default_backend api_process
+
+    backend api_process
+        retries 0
+        server api 127.0.0.1:4001
+
+    # The deployed API allows the exact Railway-private host for its keyed JMAP gate.
+    # That name is pinned to loopback for this pod. Mail remains on the private cluster network.
+    listen mail_gate
+        bind 127.0.0.1:8081
+        retries 0
+        server stalwart "${SOLACE_MAIL_UPSTREAM}" resolvers cluster init-addr libc,none
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-pg-ca
+  namespace: solace-mail
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIBmTCCAT+gAwIBAgIUNoIbzFGUxtFsm/58GOdg86r/0zcwCgYIKoZIzj0EAwIw
+    KTEnMCUGA1UEAwweU29sYWNlIGFwcGxpY2F0aW9uIGRhdGFiYXNlIENBMB4XDTI2
+    MTExODEyNTkyMFoXDTI4MTExNzEyNTkyMFowKTEnMCUGA1UEAwweU29sYWNlIGFw
+    cGxpY2F0aW9uIGRhdGFiYXNlIENBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE
+    yCu0oRcnhapafvXAdFE14qV68OO/L3Pc/DIJSqkcpM8MZfbNxbyYE1ai07eX0qq1
+    eZN539PUaOgKJLGGztHAQKNFMEMwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8B
+    Af8EBAMCAQYwHQYDVR0OBBYEFFhEDrWAd9B/28tkcEDHzTw4kr/sMAoGCCqGSM49
+    BAMCA0gAMEUCIQCVjK2PgyU7SxrqNUIttXxAc9SLoISWsFfn1jjtZhQvYAIgJjp3
+    LBZG7Mf20Ax8T2pSPxnzuZ6QX6VC2UN254OUaFs=
+    -----END CERTIFICATE-----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mail-live-config
+  namespace: solace-mail
+data:
+  admin-gate.lua: |
+    local auth_url = os.getenv("SOLACE_ADMIN_AUTH_URL") or ""
+    local gate_key = os.getenv("STALWART_ADMIN_GATE_KEY") or ""
+    local login_url = os.getenv("SOLACE_ADMIN_LOGIN_URL") or ""
+    local session_name = os.getenv("SOLACE_ADMIN_SESSION_COOKIE") or "__Secure-better-auth.session_token"
+    local step_up_name = os.getenv("SOLACE_ADMIN_STEP_UP_COOKIE") or "solace-passkey-step-up"
+    local session_prefix = session_name:match("^(.+%.)[^.]+$") or session_name
+    local remember_name = session_prefix .. "dont_remember"
+
+    local function application_cookie(name)
+        return name == session_name or name == step_up_name or name == "solace_enc_pw"
+            or name:sub(1, #session_prefix) == session_prefix
+    end
+
+    local function cookies(txn)
+        local result = {}
+        local headers = txn.http:req_get_headers()["cookie"] or {}
+        for index = 0, #headers do
+            for part in (headers[index] or ""):gmatch("[^;]+") do
+                local name, value = part:match("^%s*([^=%s]+)%s*=%s*(.-)%s*$")
+                if name then
+                    result[#result + 1] = {name, value}
+                end
+            end
+        end
+        return result
+    end
+
+    local function valid_auth_url()
+        local host = auth_url:match("^http://([^/:]+):%d+/api/internal/stalwart/admin%-access$")
+        return host and (host == "127.0.0.1" or host:match("^[%w.-]+%.railway%.internal$"))
+    end
+
+    local function valid_login_url()
+        local scheme, host, port = login_url:match("^(https?)://([%w.-]+):?(%d*)/login$")
+        return scheme == "https" or (scheme == "http" and port ~= "" and (host == "127.0.0.1" or host == "localhost"))
+    end
+
+    core.register_action("solace_admin_authorize", {"http-req"}, function(txn)
+        txn:set_var("txn.solace_admin_status", "denied")
+        if not valid_auth_url() or #gate_key < 32 or not valid_login_url() then return end
+        txn:set_var("txn.solace_admin_login_url", login_url .. "?next=%2Fadmin")
+        local selected, seen = {}, {}
+        for _, cookie in ipairs(cookies(txn)) do
+            if cookie[1] == session_name or cookie[1] == step_up_name or cookie[1] == remember_name then
+                if seen[cookie[1]] then return end
+                seen[cookie[1]] = true
+                selected[#selected + 1] = cookie[1] .. "=" .. cookie[2]
+            end
+        end
+        if not seen[session_name] then
+            txn:set_var("txn.solace_admin_status", "login")
+            return
+        end
+        local ok, response = pcall(function()
+            return core.httpclient():get({
+                url = auth_url,
+                headers = {
+                    cookie = {table.concat(selected, "; ")},
+                    ["x-solace-admin-gate"] = {gate_key},
+                    ["x-real-ip"] = {txn.f:req_hdr("x-real-ip")},
+                },
+                timeout = 1000,
+            })
+        end)
+        if not ok or not response then return end
+        local auth_cookies = (response.headers or {})["set-cookie"] or {}
+        txn:set_priv({auth_cookies = auth_cookies})
+        txn:set_var("txn.solace_auth_cookies", next(auth_cookies) ~= nil)
+        local status = ({[204] = "allowed", [401] = "login", [403] = "step_up"})[response.status]
+        txn:set_var("txn.solace_admin_status", status or "denied")
+    end)
+
+    core.register_action("solace_strip_cookies", {"http-req"}, function(txn)
+        local retained = {}
+        for _, cookie in ipairs(cookies(txn)) do
+            if not application_cookie(cookie[1]) then
+                retained[#retained + 1] = cookie[1] .. "=" .. cookie[2]
+            end
+        end
+        txn.http:req_del_header("cookie")
+        if #retained > 0 then txn.http:req_add_header("cookie", table.concat(retained, "; ")) end
+    end)
+
+    core.register_action("solace_admin_response", {"http-after-res"}, function(txn)
+        local headers = txn.http:res_get_headers()["set-cookie"] or {}
+        txn.http:res_del_header("set-cookie")
+        for index = 0, #headers do
+            local value = headers[index]
+            local name = value and value:match("^%s*([^=%s]+)%s*=")
+            if name and not application_cookie(name) then txn.http:res_add_header("set-cookie", value) end
+        end
+        local data = txn:get_priv()
+        if data then
+            for index = 0, #data.auth_cookies do
+                local value = data.auth_cookies[index]
+                if value then txn.http:res_add_header("set-cookie", value) end
+            end
+        end
+    end)
+  config.json: '{"@type": "PostgreSql", "host": "mail-pg", "port": 5432, "database": "stalwart_v1", "authUsername": "stalwart",
+    "authSecret": {"@type": "EnvironmentVariable", "variableName": "PGPASSWORD"}, "useTls": false, "allowInvalidCerts": false,
+    "poolMaxConnections": 8}'
+  haproxy.cfg: |
+    # Railway entries for public JMAP and the private API; never log paths, blob ids or attachment names.
+    global
+        maxconn 1024
+        stats socket /tmp/solace-haproxy.sock mode 600 level admin
+        # Railway exposes host CPUs beyond this container's eight-vCPU quota.
+        thread-hard-limit 8
+        nbthread 2
+        tune.lua.bool-sample-conversion pre-3.1-bug
+        lua-load-per-thread "${STALWART_GATE_LUA_PATH}"
+        tune.lua.session-timeout 1s
+        httpclient.resolvers.prefer ipv4
+        httpclient.retries 0
+        httpclient.timeout.connect 500ms
+
+    resolvers default
+        parse-resolv-conf
+        hold valid 10s
+
+    defaults
+        mode http
+        timeout connect 5s
+        timeout http-request 10s
+        timeout client 5m
+        timeout server 5m
+
+    frontend ft_backend_gate
+        bind ":::${STALWART_GATE_PORT}" v4v6
+        # Digests are compared so timing reveals nothing about the key; an unset digest matches nothing.
+        acl gate_key req.fhdr(x-solace-gate),sha2(256),hex -m str -i "${STALWART_GATE_KEY_SHA256}"
+        acl api_jmap path /jmap /.well-known/jmap
+        acl api_jmap path_beg /jmap/
+        acl api_auth path /api/auth /auth/token
+        http-request return status 404 if !gate_key
+        http-request return status 404 if !api_jmap !api_auth
+        http-request return status 404 if api_auth !METH_POST
+        http-request del-header x-solace-gate
+        # Railway's edge sets X-Real-IP and only key holders reach this line, so Stalwart rate-limits the API's egress IP as it does via the VPS.
+        http-request set-src req.hdr(x-real-ip) if { req.hdr(x-real-ip) -m found }
+        # PROXY v2 needs one address family; an IPv4 dst keeps an IPv4 client from arriving as ::ffff:-mapped.
+        http-request set-dst ipv4(127.0.0.1)
+        # Stalwart's discovery redirect always names mail.solace.onl, which the API proxy rejects as cross-origin.
+        http-request set-path /jmap/session if { path /.well-known/jmap }
+        default_backend bk_stalwart
+
+    frontend ft_public_jmap
+        http-request return status 503 if { env(STALWART_HELD_MODE) -m str true }
+        bind ":::${STALWART_PUBLIC_PORT}" v4v6
+        http-request del-header x-real-ip
+        http-request set-header X-Real-IP %[req.hdr(CF-Connecting-IP)] if { req.hdr_ip(CF-Connecting-IP) -m found }
+        # Only the Railway edge supplies this header; the authorizer's limiter and Stalwart's login protections key on it.
+        acl real_ip_present req.hdr_ip(x-real-ip) -m found
+        http-request return status 200 content-type "text/plain; charset=utf-8" lf-string "Contact: mailto:postmaster@solace.onl\nExpires: 2027-08-26T00:00:00.000Z\nPreferred-Languages: en\nCanonical: https://mail.solace.onl/.well-known/security.txt\n" if { path /.well-known/security.txt }
+        acl unsafe_path path,url_dec -m reg (^|/)[.]{1,2}(/|$)
+        acl public_path path /jmap /metrics/prometheus
+        acl public_path path /mail/config-v1.1.xml /autodiscover/autodiscover.xml /autodiscover/autodiscover.json
+        acl public_path path_beg /autodiscover/autodiscover.json/
+        acl public_path path_beg /jmap/ /.well-known/ /api/discover
+        http-request return status 404 if unsafe_path
+        http-request set-var(txn.solace_is_public) bool(true) if public_path
+        acl discovery_v1 urlp(Protocol) -i AutodiscoverV1
+        acl discovery_v1 urlp(protocol) -i AutodiscoverV1
+        http-request return status 200 content-type application/json string '{"Protocol":"AutodiscoverV1","Url":"https://autodiscover.solace.onl/autodiscover/autodiscover.xml"}' if METH_GET { hdr(host) -i autodiscover.solace.onl } { path_reg -i ^/autodiscover/autodiscover[.]json(/v1[.]0/[^/]+)?$ } discovery_v1
+        http-request return status 404 if !public_path !real_ip_present
+        http-request lua.solace_admin_authorize if !public_path
+        acl session_admin var(txn.solace_admin_status) -m str allowed
+        acl admin_login var(txn.solace_admin_status) -m str login
+        acl admin_step_up var(txn.solace_admin_status) -m str step_up
+        acl admin_entry path / /admin /admin/
+        http-request redirect location %[var(txn.solace_admin_login_url)] code 302 if !public_path admin_entry METH_GET admin_login
+        http-request redirect location %[var(txn.solace_admin_login_url)]&stepUp=1 code 302 if !public_path admin_entry METH_GET admin_step_up
+        http-request return status 404 if !public_path !session_admin
+        http-request lua.solace_strip_cookies if { req.hdr(cookie) -m found }
+        http-request del-header x-solace-gate
+        http-request del-header x-solace-admin-gate
+        # Railway overwrites X-Real-IP; Stalwart consumes the address through PROXY v2, never a client-supplied forwarding header.
+        http-request set-src req.hdr_ip(x-real-ip) if { req.hdr(x-real-ip) -m found }
+        http-request set-dst ipv4(127.0.0.1)
+        http-after-response set-header Strict-Transport-Security "max-age=15552000"
+        http-after-response lua.solace_admin_response if { res.hdr(set-cookie) -m found } || { var(txn.solace_auth_cookies) -m bool }
+        http-after-response set-header Cache-Control "no-store" unless { var(txn.solace_is_public) -m bool }
+        http-after-response set-header X-Content-Type-Options "nosniff"
+        http-after-response set-header X-Frame-Options "DENY"
+        http-after-response set-header Referrer-Policy "strict-origin-when-cross-origin"
+        http-after-response set-header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+        http-after-response set-header Cross-Origin-Opener-Policy "same-origin"
+        http-after-response set-header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; upgrade-insecure-requests" if { res.hdr(content-type) -m sub text/html }
+        default_backend bk_stalwart
+
+    backend bk_stalwart
+        # One upstream connection per request so each PROXY header carries that request's source.
+        option http-server-close
+        # Stalwart trusts PROXY v2 from loopback (proxyTrustedNetworks 127.0.0.0/8), so plain loopback HTTP is rejected.
+        server stalwart "127.0.0.1:${STALWART_HTTP_PORT}" send-proxy-v2
+
+    listen ft_edge_smtp
+        mode tcp
+        bind *:22525 accept-proxy
+        server smtp 127.0.0.1:25 send-proxy-v2
+
+    listen ft_edge_https
+        mode tcp
+        bind *:18443 accept-proxy
+        server https 127.0.0.1:8443 send-proxy-v2
+
+    listen ft_edge_admin
+        mode tcp
+        bind *:18080 accept-proxy
+        server admin 127.0.0.1:8080 send-proxy-v2
+
+    frontend ft_account_authorizer
+        bind 127.0.0.1:8083
+        http-request return status 404 unless { method GET } { path /api/internal/stalwart/admin-access }
+        http-request set-header Host api.solace.onl
+        # The loopback gate supplies the validated browser IP. The API edge normalizes it to X-Real-IP.
+        http-request del-header CF-Connecting-IP
+        http-request set-header CF-Connecting-IP %[req.hdr(X-Real-IP)] if { req.hdr_ip(X-Real-IP) -m found }
+        default_backend bk_account_authorizer
+
+    backend bk_account_authorizer
+        retries 0
+        server api solace-api.solace-mail.svc.cluster.local:8080 resolvers default init-addr libc,none
+
+    listen ft_outbound_smtp
+        mode tcp
+        bind 127.0.0.1:2524
+        option smtpchk EHLO mx.solace.onl
+        timeout connect 4s
+        retries 0
+        default-server inter 4s fall 2 rise 1
+        server primary 10.200.31.6:12525 ssl check sni str(mail-relay-a.solace.internal) verify required verifyhost mail-relay-a.solace.internal ca-file /etc/relay-secondary/ca.crt crt /etc/relay-secondary/client.pem
+        server secondary 10.200.31.2:12525 ssl check sni str(mail-relay-b.solace.internal) verify required verifyhost mail-relay-b.solace.internal ca-file /etc/relay-secondary/ca.crt crt /etc/relay-secondary/client.pem backup
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notifications-edge-upstream
+  namespace: solace-mail
+data:
+  haproxy.cfg: |
+    global
+        nbthread 1
+        maxconn 128
+    defaults
+        mode http
+        timeout connect 5s
+        timeout client 90s
+        timeout server 90s
+    resolvers cluster
+        parse-resolv-conf
+        hold valid 10s
+    listen mail_gate
+        bind 127.0.0.1:8081
+        retries 0
+        server stalwart "${SOLACE_MAIL_UPSTREAM}" resolvers cluster init-addr libc,none
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: solace-origin-ca
+  namespace: solace-mail
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIEHzCCAoegAwIBAgIUf+bAAlmXiCeW0mIG6CcHT7UHuN4wDQYJKoZIhvcNAQEL
+    BQAwJjEkMCIGA1UEAwwbU29sYWNlIENsb3VkZmxhcmUgT3JpZ2luIENBMB4XDTI2
+    MTExODEzMzEzM1oXDTMzMTExNjEzMzEzM1owJjEkMCIGA1UEAwwbU29sYWNlIENs
+    b3VkZmxhcmUgT3JpZ2luIENBMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKC
+    AYEAtXWLzVPiGffx4iw0R48HQTI1CSjIWWqaS6y7rK9Wmh+jE0ccKVi+MGMahWIZ
+    BnZwmtJewVNmqxK0FpKLEdUi6IzaD9BaMHL2DcLluHt3h7ksUF43C4dLKtzt5dOM
+    TFnzKPoAyIznS7WoTyhDV/VUjGc5ZQI1+7Wj+xuA0cLWNKeEymQ5UktYgfgY1LXm
+    mTTxq7sKzvFp/pHojlXlYfDhUFW1Zic3Y0+k5J4KUPmB4xvB7ACHWk36kXu5+wku
+    X/XsahFxyVNUG4LcHRoYUWMTej/nV5qc7rnEmBzVlABpA7FEph2R1TRCB8x0Z/F4
+    yxAXhFa/ci9iLITaJN1gpGZh5YKqi2IR9jCa7YmsLjDfQHUnMqj+pXXCxocoXWVb
+    Qiv4FnAieUFm3eNixwosnUuzTY8BZfsJ3qLOiTN8DiyTacvWnBiMrJn1nkGaL8mH
+    pkrqcBnTOClzeRFSBpaxFaXhCCDd/U3RJkMsiKGL/oHQbDIrKRhvX18sNSk1Lo7U
+    MvkfAgMBAAGjRTBDMBIGA1UdEwEB/wQIMAYBAf8CAQAwDgYDVR0PAQH/BAQDAgEG
+    MB0GA1UdDgQWBBQt5wIK3Yqm85fo+1R13MNksZJtJDANBgkqhkiG9w0BAQsFAAOC
+    AYEAVIG9SIy5C8lLbMjXXLf1FS/MQycQWwEz7uVER019zgAddcvG35Rwd6eiG7Fb
+    C0Rh++6NS+wSmwETHLf7eG6FIWsKrLfyA9pYU8ZurbbfV0RFmXHADT7f7z7C6n0Q
+    +rVjUaltThAqLHM2d0gYfPBbJNy8sV8BWE4LMWXHDhjs7FR6podTRbjzbBJf8UmB
+    Tc2oJ1gFJ0O+ngHUVqyjL5Htq/AHYpSkRgxiDw/Z8E3pcWEhq9RmkzWrRXxQoH65
+    KGP7kwXxd9SC0jBXAI10ITxlHJN4YUI+GNch+GjVcT5z801waSRlWHuH8A1RpiDV
+    i6/WNaZ8PUx9alQrgbTXiKbgSFBuMxB0AbdSWU7kV6CG6itaXEsLPiY07drPS7fE
+    H13O7blrTwLOyx6nFV3O+UasxIYG+BFsJ1JXRMTc7XXJysyHs+kqw3lI5sYeTvSd
+    VWrm1f5KKn2DpP0uX18MVHFX7LlEGp0MKMEi6Me0ire9lBxrX4zqsmpTyTNlKEQW
+    Lpyp
+    -----END CERTIFICATE-----
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: solace-origin
+  namespace: solace-mail
+spec:
+  dnsNames:
+    - api.solace.onl
+    - mail.solace.onl
+  duration: 2160h
+  issuerRef:
+    kind: Issuer
+    name: solace-origin-ca
+  privateKey:
+    rotationPolicy: Always
+  renewBefore: 720h
+  secretName: solace-origin-tls
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: solace-origin-ca
+  namespace: solace-mail
+spec:
+  ca:
+    secretName: solace-origin-ca

@@ -1,0 +1,937 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mail-live
+  namespace: solace-mail
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: private-jmap
+      port: 8081
+      protocol: TCP
+      targetPort: 8081
+    - name: public-jmap
+      port: 8082
+      protocol: TCP
+      targetPort: 8082
+    - name: smtp
+      port: 2525
+      protocol: TCP
+      targetPort: 22525
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: 18443
+    - name: legacy-admin
+      port: 18080
+      protocol: TCP
+      targetPort: 18080
+  selector:
+    app: stalwart-production
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mail-redis
+  namespace: solace-mail
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: redis
+      port: 6379
+      protocol: TCP
+      targetPort: 6379
+  selector:
+    app: mail-redis
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mail-redis-replica
+  namespace: solace-mail
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: redis
+      port: 6379
+      protocol: TCP
+      targetPort: 6379
+  selector:
+    app: mail-redis-replica
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-redis-sentinel-a
+  namespace: solace-mail
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: sentinel
+      port: 26379
+      protocol: TCP
+      targetPort: 26379
+  selector:
+    instance: mail-redis-sentinel-a
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-redis-sentinel-b
+  namespace: solace-mail
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: sentinel
+      port: 26379
+      protocol: TCP
+      targetPort: 26379
+  selector:
+    instance: mail-redis-sentinel-b
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-redis-sentinel-witness
+  namespace: solace-mail
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: sentinel
+      port: 26379
+      protocol: TCP
+      targetPort: 26379
+  selector:
+    instance: mail-redis-sentinel-witness
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mail-s3
+  namespace: solace-mail
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: s3
+      port: 8333
+      protocol: TCP
+      targetPort: 8333
+  selector:
+    app: mail-s3
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: solace-api
+  name: solace-api
+  namespace: solace-mail
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: edge
+  selector:
+    app.kubernetes.io/name: solace-api
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: solace-tunnel-ingress
+  name: solace-tunnel-ingress
+  namespace: solace-mail
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: tunnel
+  selector:
+    app.kubernetes.io/name: solace-tunnel-ingress
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: solace-tunnel
+    traefik.ingress.kubernetes.io/router.entrypoints: tunnel
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: api-solace-onl
+  namespace: solace-mail
+spec:
+  rules:
+    - host: api.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: solace-api
+                port:
+                  number: 8080
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - api.solace.onl
+      secretName: solace-origin-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: solace-tunnel
+    traefik.ingress.kubernetes.io/router.entrypoints: tunnel
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-discovery
+  namespace: solace-mail
+spec:
+  rules:
+    - host: autodiscover.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-live
+                port:
+                  number: 8082
+            path: /autodiscover/autodiscover.xml
+            pathType: Exact
+          - backend:
+              service:
+                name: mail-live
+                port:
+                  number: 8082
+            path: /autodiscover/autodiscover.json
+            pathType: Prefix
+    - host: autoconfig.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-live
+                port:
+                  number: 8082
+            path: /mail/config-v1.1.xml
+            pathType: Exact
+          - backend:
+              service:
+                name: mail-live
+                port:
+                  number: 8082
+            path: /.well-known/autoconfig/mail/config-v1.1.xml
+            pathType: Exact
+          - backend:
+              service:
+                name: mail-live
+                port:
+                  number: 8082
+            path: /.well-known/mail-v1.xml
+            pathType: Exact
+    - host: ua-auto-config.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-live
+                port:
+                  number: 8082
+            path: /.well-known/user-agent-configuration.json
+            pathType: Exact
+          - backend:
+              service:
+                name: mail-live
+                port:
+                  number: 8082
+            path: /.well-known/mail-v1.xml
+            pathType: Exact
+    - host: mta-sts.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-live
+                port:
+                  number: 8082
+            path: /.well-known/mta-sts.txt
+            pathType: Exact
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: solace-tunnel
+    traefik.ingress.kubernetes.io/router.entrypoints: tunnel
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-solace-onl
+  namespace: solace-mail
+spec:
+  rules:
+    - host: mail.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-live
+                port:
+                  number: 8082
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - mail.solace.onl
+      secretName: solace-origin-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cloudflared-to-solace-ingress
+  namespace: solace-mail
+spec:
+  egress:
+    - ports:
+        - port: 8443
+          protocol: TCP
+      to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-tunnel-ingress
+    - ports:
+        - port: 8080
+          protocol: TCP
+      to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-api
+  podSelector:
+    matchLabels:
+      app: mail-cf-tunnel
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: isolate-solace-mail
+  namespace: solace-mail
+spec:
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: NotIn
+                values:
+                  - solace-api
+                  - notifications
+                  - solace-tunnel-ingress
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: NotIn
+                values:
+                  - solace-api
+                  - notifications
+                  - solace-tunnel-ingress
+    - from:
+        - ipBlock:
+            cidr: 192.168.2.106/32
+        - ipBlock:
+            cidr: 10.42.214.192/32
+        - ipBlock:
+            cidr: 100.83.138.110/32
+      ports:
+        - port: 8333
+          protocol: TCP
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: NotIn
+        values:
+          - solace-api
+          - notifications
+          - solace-tunnel-ingress
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-database-operator
+  namespace: solace-mail
+spec:
+  egress:
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+    - ports:
+        - port: 6443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 192.168.2.106/32
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+      ports:
+        - port: 8000
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: mail-database
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mail-live-edges
+  namespace: solace-mail
+spec:
+  egress:
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+    - ports:
+        - port: 12525
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 10.200.31.2/32
+    - ports:
+        - port: 12525
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 10.200.31.6/32
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.200.31.6/32
+        - ipBlock:
+            cidr: 10.200.31.2/32
+        - ipBlock:
+            cidr: 192.168.2.106/32
+        - ipBlock:
+            cidr: 10.42.214.192/32
+        - ipBlock:
+            cidr: 10.42.162.192/32
+        - ipBlock:
+            cidr: 10.42.133.64/32
+      ports:
+        - port: 8081
+          protocol: TCP
+        - port: 8082
+          protocol: TCP
+        - port: 22525
+          protocol: TCP
+        - port: 18443
+          protocol: TCP
+        - port: 18080
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app: stalwart-production
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mail-tunnel-egress
+  namespace: solace-mail
+spec:
+  egress:
+    - ports:
+        - port: 7844
+          protocol: TCP
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+  podSelector:
+    matchLabels:
+      app: mail-cf-tunnel
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-admin-authorizer-from-stalwart
+  namespace: solace-mail
+spec:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: stalwart-production
+      ports:
+        - port: 8080
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: solace-api
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-api-mail-gate
+  namespace: solace-mail
+spec:
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-api
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-api
+      ports:
+        - port: 8081
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app: stalwart-production
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-api-object-storage
+  namespace: solace-mail
+spec:
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-api
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-api
+      ports:
+        - port: 8333
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app: mail-s3
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-api-origin
+  namespace: solace-mail
+spec:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-tunnel-ingress
+        - podSelector:
+            matchLabels:
+              app: mail-cf-tunnel
+      ports:
+        - port: 8080
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: solace-api
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-api-runtime-egress
+  namespace: solace-mail
+spec:
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+    - ports:
+        - port: 5432
+          protocol: TCP
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-api
+          podSelector:
+            matchLabels:
+              app: app-postgres
+    - ports:
+        - port: 8081
+          protocol: TCP
+      to:
+        - podSelector:
+            matchLabels:
+              app: stalwart-production
+    - ports:
+        - port: 8333
+          protocol: TCP
+      to:
+        - podSelector:
+            matchLabels:
+              app: mail-s3
+    - ports:
+        - port: 80
+          protocol: TCP
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: solace-api
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-apps-to-mail
+  namespace: solace-mail
+spec:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-api
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: notifications
+      ports:
+        - port: 8081
+          protocol: TCP
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-tunnel-ingress
+      ports:
+        - port: 8082
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app: stalwart-production
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-apps-to-objects
+  namespace: solace-mail
+spec:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-api
+      ports:
+        - port: 8333
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app: mail-s3
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-notifications-egress
+  namespace: solace-mail
+spec:
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+    - ports:
+        - port: 5432
+          protocol: TCP
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-api
+          podSelector:
+            matchLabels:
+              app: app-postgres
+    - ports:
+        - port: 8081
+          protocol: TCP
+      to:
+        - podSelector:
+            matchLabels:
+              app: stalwart-production
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: notifications
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-notifications-ingress
+  namespace: solace-mail
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: notifications
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-notifications-mail-gate
+  namespace: solace-mail
+spec:
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-api
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: notifications
+      ports:
+        - port: 8081
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app: stalwart-production
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-tunnel-ingress
+  namespace: solace-mail
+spec:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: mail-cf-tunnel
+      ports:
+        - port: 8443
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: solace-tunnel-ingress
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-tunnel-ingress-egress
+  namespace: solace-mail
+spec:
+  egress:
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+    - ports:
+        - port: 6443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 192.168.2.106/32
+    - ports:
+        - port: 8080
+          protocol: TCP
+      to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-api
+    - ports:
+        - port: 8082
+          protocol: TCP
+      to:
+        - podSelector:
+            matchLabels:
+              app: stalwart-production
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: solace-tunnel-ingress
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stalwart-to-solace-admin-authorizer
+  namespace: solace-mail
+spec:
+  egress:
+    - ports:
+        - port: 8080
+          protocol: TCP
+      to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-api
+  podSelector:
+    matchLabels:
+      app: stalwart-production
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  annotations:
+    solace.onl/purpose: Default deny. Service-specific policies define allowed traffic.
+  name: zeabur-project
+  namespace: solace-mail
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

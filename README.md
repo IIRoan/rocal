@@ -10,6 +10,7 @@ A calendar and mail monorepo: web frontend, native Calendar and Mail apps, API b
 - **apps/native-mail** - Expo app "Solace Mail". See [apps/native-mail/README.md](apps/native-mail/README.md).
 - **apps/notifications** - Rust worker for scheduled reminder email and APNs notifications
 - **apps/stalwart** - Stalwart mail server image, JMAP config plan and production deployment runbook. See [apps/stalwart/README.md](apps/stalwart/README.md).
+- **.zeabur** - [Solace project configuration](.zeabur/README.md) for Zeabur OSS
 - **apps/gatus** - Status page (`status.solace.onl`). See [apps/gatus/README.md](apps/gatus/README.md).
 - **packages/ui** - Shared UI component library
 - **packages/native-core** - Code shared by both native apps (auth, E2EE, settings, push, sheets, theme)
