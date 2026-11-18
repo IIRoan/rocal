@@ -1,5 +1,6 @@
 import contextlib
 from datetime import datetime, timezone
+from contextlib import closing
 import importlib.util
 import io
 import json
@@ -189,7 +190,7 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(data["checksSince"], (self.HOURLY_START + 90) * 1000 + 123)
 
     def test_private_jmap_uses_retained_sub_millisecond_samples_in_hourly_buckets(self):
-        with sqlite3.connect(bridge.GATUS_DB) as db:
+        with closing(sqlite3.connect(bridge.GATUS_DB)) as db, db:
             db.execute("INSERT INTO endpoints VALUES (2, ?)", (bridge.PRIVATE_JMAP_KEY,))
             db.execute("INSERT INTO endpoint_uptimes VALUES (2, ?, 2, 2, 0)", (self.HOURLY_START,))
             for result_id, duration in ((3, 250000), (4, 750000)):
@@ -197,6 +198,18 @@ class TimelineTests(unittest.TestCase):
                 db.execute("INSERT INTO endpoint_results VALUES (?, 2, 1, ?, 200, '', ?)", (result_id, duration, stamp))
         data = bridge.timeline(bridge.PRIVATE_JMAP_KEY, self.HOURLY_START, self.HOURLY_START + 3 * 3600)
         self.assertEqual(data["buckets"][0]["ms"], 0.5)
+
+    def test_durable_private_jmap_timings_exclude_missing_samples(self):
+        with closing(sqlite3.connect(bridge.GATUS_DB)) as db, db:
+            db.execute("CREATE TABLE solace_server_timings (endpoint_id, hour_unix_timestamp, samples, total_ns)")
+            db.execute("INSERT INTO endpoints VALUES (2, ?)", (bridge.PRIVATE_JMAP_KEY,))
+            db.execute("INSERT INTO endpoint_uptimes VALUES (2, ?, 4, 3, 0)", (self.HOURLY_START,))
+            db.execute("INSERT INTO solace_server_timings VALUES (2, ?, 3, 1000000)", (self.HOURLY_START,))
+            db.execute("INSERT INTO endpoint_uptimes VALUES (2, ?, 2, 0, 0)", (self.HOURLY_START + 3600,))
+        data = bridge.timeline(bridge.PRIVATE_JMAP_KEY, self.HOURLY_START, self.HOURLY_START + 3 * 3600)
+        retained, unavailable = data["buckets"]
+        self.assertEqual((retained["total"], retained["samples"], retained["ms"]), (4, 3, 0.333))
+        self.assertEqual((unavailable["total"], unavailable["samples"], unavailable["ms"]), (2, 0, None))
 
     def test_unknown_endpoints_and_bad_ranges_are_refused(self):
         self.assertIsNone(bridge.timeline("nope", self.HOURLY_START, self.HOURLY_START + 3600))

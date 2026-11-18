@@ -4,10 +4,9 @@ This Kustomize root declares the active Solace project on Zeabur OSS. `solace-ma
 
 | Path | What it manages |
 | --- | --- |
-| [project.yaml](project.yaml) | The namespaces and three encrypted Longhorn storage classes |
 | [solace-mail/](solace-mail/) | API and notifications, Stalwart and its gateways, Cloudflare tunnel workloads, issuer and certificate, mail PostgreSQL, Redis Sentinel, and mail object storage |
 | [solace-api/](solace-api/) | Application PostgreSQL primary and standby, their trust and initialization config |
-| [bootstrap/](bootstrap/) | Initial Flux setup, scoped deploy permissions, networking, and the ingress controller's RBAC |
+| [bootstrap/](bootstrap/) | Namespaces with restricted Pod Security, encrypted StorageClasses, Flux setup, scoped deploy permissions, networking, and ingress RBAC |
 
 The live workloads drive the image digests, selectors, placement, probes, and storage settings in these manifests. Keep image changes here for the workloads this directory manages. Zeabur reads these objects and displays their live state.
 
@@ -22,11 +21,15 @@ The cluster provides K3s, Traefik, cert-manager, CloudNativePG and Longhorn. Kee
 
 The CA ConfigMaps contain public trust certificates. cert-manager issues `solace-origin-tls` from the externally provisioned CA key. CloudNativePG manages its instance Services, accounts and volumes. Kubernetes provisions the StatefulSet claims from their templates. The long-lived mail object claim is declared explicitly. Restore the database and object data, with their encryption keys, before routing production traffic to a replacement installation.
 
+The admin networking manifests reserve the five Service IPs advertised by this Redis and Sentinel installation. Create those Services before other workloads allocate addresses on a replacement cluster. The production manifests expect the K3s Service CIDR to contain those addresses. A different CIDR requires updating the Service and Sentinel addresses together and migrating the saved Sentinel state to the verified leader. The `mail-pg` alias follows the CloudNativePG primary.
+
+On each application PostgreSQL worker, load the `solace-rehearsal-postgres` AppArmor profile from platform provisioning and verify it permits the mounted data directory, scratch directory and socket directory. The standby's replication network must match the restricted TLS replication rule in [app-pg-init](solace-api/config.yaml). When rebuilding on another subnet, set the rule to the new standby subnet before initialization. When restoring an existing PGDATA, update its stored rule before starting the standby.
+
 Preserve the original volume bindings on the live cluster. Use apply without pruning so dormant recovery resources and controller-managed objects remain available.
 
 ## Deploy from Git
 
-Flux reads `.zeabur/` on the protected `master` branch and applies it with the `solace-reconciler` service account. It polls Git every minute and checks for drift every five minutes. An administrator applies the [networking manifests](bootstrap/networking/) separately, so the reconciler cannot change Services, Ingresses, or NetworkPolicies. Use Git as the writer for managed fields. Changes to a Deployment's pod template trigger its rollout. Flux leaves existing objects in place when a manifest is removed.
+Flux reads `.zeabur/` on the protected `master` branch and applies it with the `solace-reconciler` service account. It polls Git every minute and checks for drift every five minutes. An administrator owns [project prerequisites](bootstrap/project.yaml) and [networking manifests](bootstrap/networking/), including namespace admission policy. Use Git as the writer for managed fields. Stalwart A reconciles after the shared workloads, and Stalwart B waits for A's healthy deployment on the same Git revision. Gateway configuration is mounted from immutable ConfigMaps whose content hashes change the pod templates. Flux leaves existing objects in place when a manifest is removed.
 
 Review the server-side diff against the production context before merging a config change.
 
@@ -34,6 +37,8 @@ Review the server-side diff against the production context before merging a conf
 kubectl config current-context
 kubectl kustomize .zeabur
 kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur
+kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur/solace-mail/stalwart-a
+kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur/solace-mail/stalwart-b
 ```
 
 After a merge, check the applied revision and workload health.

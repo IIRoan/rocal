@@ -19,8 +19,6 @@ func TestSolaceRetainsRetiredEndpointHistory(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(`
 storage:
   type: sqlite
-  preserve-endpoint-keys:
-    - application_api-mail-jmap
 endpoints:
   - name: api-mail-jmap-private
     group: Application
@@ -49,6 +47,9 @@ endpoints:
 	}
 	store.Get().Close()
 
+	initializeStorage(cfg)
+	store.Get().Close()
+	cfg.Endpoints = []*endpoint.Endpoint{previous}
 	initializeStorage(cfg)
 	defer store.Get().Close()
 

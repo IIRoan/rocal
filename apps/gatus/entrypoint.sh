@@ -65,37 +65,6 @@ config_path.write_text(config.replace(marker, token))
 PY
 }
 
-append_vps_ssh_endpoint() {
-	if grep -Fxq "  - name: $1" /data/config.yaml; then
-		return 0
-	fi
-	{
-		printf '\n  - name: %s\n' "$1"
-		echo "    group: VPS"
-		printf '    url: ssh://%s:%s\n' "$2" "$3"
-		echo "    interval: 1m"
-		echo "    ui:"
-		echo "      hide-url: true"
-		echo "    client:"
-		echo "      timeout: 20s"
-		echo "    alerts:"
-		echo "      - type: discord"
-		echo "    ssh:"
-		printf '      username: "%s"\n' "$VPS_MONITOR_SSH_USERNAME"
-		echo "      private-key: |"
-		sed 's/^/        /' /data/vps_monitor_key
-		echo "    body: |"
-		printf '      {"command": "%s"}\n' "$VPS_MONITOR_SSH_COMMAND"
-		echo "    conditions:"
-		echo '      - "[CONNECTED] == true"'
-		echo '      - "[STATUS] == 0"'
-		echo '      - "[BODY].status == healthy"'
-		echo '      - "[BODY].k3sReady == true"'
-		echo '      - "[BODY].smtpStarttls == true"'
-		echo '      - "[BODY].tlsExpiresInSeconds > 1209600"'
-	} >> /data/config.yaml
-}
-
 append_vps_ssh_endpoints() {
 	if [ -z "${VPS_MONITOR_SSH_USERNAME:-}" ]; then
 		return 0
@@ -115,11 +84,7 @@ append_vps_ssh_endpoints() {
 		printf '%s\n' "$VPS_MONITOR_SSH_PRIVATE_KEY" > /data/vps_monitor_key
 	fi
 	chmod 600 /data/vps_monitor_key
-	VPS_MONITOR_SSH_COMMAND="${VPS_MONITOR_SSH_COMMAND:-/usr/local/bin/solace-vps-health}"
-	append_vps_ssh_endpoint vps-health "${VPS_MONITOR_SSH_HOST:-mx.solace.onl}" "${VPS_MONITOR_SSH_PORT:-22}"
-	if [ -n "${VPS_MONITOR_SSH_SECONDARY_HOST:-}" ]; then
-		append_vps_ssh_endpoint vps-secondary-health "$VPS_MONITOR_SSH_SECONDARY_HOST" "${VPS_MONITOR_SSH_SECONDARY_PORT:-22}"
-	fi
+	python3 /usr/local/lib/solace/configure-vps-monitor.py /data/config.yaml /data/vps_monitor_key
 }
 
 write_base_config
@@ -137,18 +102,24 @@ fi
 
 append_vps_ssh_endpoints
 
-# Bind public PORT immediately so healthchecks are not connection-refused during Gatus boot.
 export GATUS_CONFIG_PATH="${GATUS_CONFIG_PATH:-/data/config.yaml}"
 export GATUS_INTERNAL_PORT
-export PORT="${GATUS_INTERNAL_PORT}"
 
-/usr/local/bin/gatus &
+PORT="$GATUS_INTERNAL_PORT" /usr/local/bin/gatus &
 GATUS_PID=$!
+PORT="$PUBLIC_PORT" python3 /usr/local/lib/solace/stalwart-discord-bridge.py &
+BRIDGE_PID=$!
 
-if ! kill -0 "$GATUS_PID" 2>/dev/null; then
-	echo "Gatus failed to start" >&2
-	exit 1
-fi
+stop_children() {
+	kill -TERM "$GATUS_PID" "$BRIDGE_PID" 2>/dev/null || true
+	wait "$GATUS_PID" "$BRIDGE_PID" 2>/dev/null || true
+}
 
-export PORT="${PUBLIC_PORT}"
-exec python3 /usr/local/lib/solace/stalwart-discord-bridge.py
+trap 'stop_children; exit 0' TERM INT
+while kill -0 "$GATUS_PID" 2>/dev/null && kill -0 "$BRIDGE_PID" 2>/dev/null; do
+	sleep 1
+done
+
+echo "The Gatus process or its proxy exited." >&2
+stop_children
+exit 1

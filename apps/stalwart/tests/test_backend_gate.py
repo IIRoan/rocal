@@ -13,8 +13,12 @@ import unittest
 import urllib.error
 import urllib.request
 
+from pathlib import Path
+
 from test_mail_ha import ROOT
 
+GATE_FIXTURE = os.environ.get("SOLACE_GATE_CONFIG_DIR")
+PUBLIC_IP_HEADER = "CF-Connecting-IP" if GATE_FIXTURE else "X-Real-IP"
 KEY = "k" * 64
 PROXY_V2_SIGNATURE = b"\r\n\r\n\x00\r\nQUIT\n"
 
@@ -84,13 +88,16 @@ class BackendGateTests(unittest.TestCase):
         cls.upstream = ProxyV2Upstream()
         cls.gate_port = free_port()
         cls.public_port = free_port()
+        gate_dir = Path(GATE_FIXTURE) if GATE_FIXTURE else ROOT
+        config = gate_dir / ("haproxy.cfg" if GATE_FIXTURE else "backend-gate.cfg")
         env = {**os.environ, "SOLACE_ADMIN_AUTH_URL": "", "STALWART_GATE_PORT": str(cls.gate_port),
-               "STALWART_GATE_LUA_PATH": str(ROOT / "admin-gate.lua"),
+               "STALWART_GATE_LUA_PATH": str(gate_dir / "admin-gate.lua"),
                "STALWART_PUBLIC_PORT": str(cls.public_port),
                "STALWART_HTTP_PORT": str(cls.upstream.port),
                "STALWART_GATE_KEY_SHA256": hashlib.sha256(KEY.encode()).hexdigest()}
         cls.gate = subprocess.Popen([os.environ["HAPROXY_TEST_BINARY"], "-db", "-f",
-                                     str(ROOT / "backend-gate.cfg")], env=env)
+                                     str(config)], env=env)
+        cls.addClassCleanup(cls.stop_gate)
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             with socket.socket() as sock:
@@ -100,7 +107,7 @@ class BackendGateTests(unittest.TestCase):
         raise RuntimeError("gate did not start")
 
     @classmethod
-    def tearDownClass(cls):
+    def stop_gate(cls):
         cls.gate.terminate()
         cls.gate.wait(timeout=5)
 
@@ -115,7 +122,8 @@ class BackendGateTests(unittest.TestCase):
             with urllib.request.urlopen(req, timeout=5) as resp:
                 return resp.status
         except urllib.error.HTTPError as error:
-            return error.code
+            with error:
+                return error.code
 
     def test_rejects_missing_or_wrong_key(self):
         self.assertEqual(self.request("/jmap/session", key=None), 404)
@@ -156,7 +164,7 @@ class BackendGateTests(unittest.TestCase):
 
     def test_public_gateway_forwards_auth_and_client_ip_without_gate_key(self):
         before = len(self.upstream.requests)
-        headers = {"X-Real-IP": "203.0.113.9", "Authorization": "Bearer mailbox-test-token"}
+        headers = {PUBLIC_IP_HEADER: "203.0.113.9", "Authorization": "Bearer mailbox-test-token"}
         self.assertEqual(self.request("/jmap/", method="POST", headers=headers, public=True), 200)
         forwarded = self.upstream.requests[before]
         self.assertEqual(forwarded["source"], "203.0.113.9")
@@ -166,7 +174,7 @@ class BackendGateTests(unittest.TestCase):
 
     def test_public_gateway_preserves_ipv6_client_addresses(self):
         before = len(self.upstream.requests)
-        self.assertEqual(self.request("/jmap/session", headers={"X-Real-IP": "2001:db8::9"}, public=True), 200)
+        self.assertEqual(self.request("/jmap/session", headers={PUBLIC_IP_HEADER: "2001:db8::9"}, public=True), 200)
         self.assertEqual(self.upstream.requests[before]["source"], "2001:db8::9")
 
     def test_unconfigured_session_gate_denies_direct_stalwart_login(self):
@@ -176,6 +184,24 @@ class BackendGateTests(unittest.TestCase):
                 before = len(self.upstream.requests)
                 self.assertEqual(self.request(path, headers=headers, key=None, public=True), 404, path)
                 self.assertEqual(len(self.upstream.requests), before, path)
+
+    @unittest.skipUnless(GATE_FIXTURE, "requires the deployed Zeabur gateway configuration")
+    def test_smtp_forwards_one_proxy_header_with_the_sender_address(self):
+        with socket.create_server(("127.0.0.1", 25)) as listener:
+            listener.settimeout(5)
+            with socket.create_connection(("127.0.0.1", 22525), timeout=5) as edge:
+                source = ipaddress.IPv4Address("192.0.2.123").packed
+                dest = ipaddress.IPv4Address("192.0.2.25").packed
+                edge.sendall(PROXY_V2_SIGNATURE + struct.pack("!BBH", 0x21, 0x11, 12)
+                             + source + dest + struct.pack("!HH", 49000, 25) + b"EHLO test.example\r\n")
+                conn, _ = listener.accept()
+                with conn:
+                    conn.settimeout(5)
+                    header = read_exact(conn, 16)
+                    self.assertEqual(header[:14], PROXY_V2_SIGNATURE + b"\x21\x11")
+                    addresses = read_exact(conn, struct.unpack("!H", header[14:])[0])
+                    self.assertEqual(addresses[:4], source)
+                    self.assertEqual(read_exact(conn, 19), b"EHLO test.example\r\n")
 
 
 class RestrictedHttpsListenerPlanTests(unittest.TestCase):

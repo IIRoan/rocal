@@ -21,9 +21,11 @@ RUN go test ./alerting/provider/discord -count=1
 COPY uptime-hourly-retention.patch /tmp/uptime-hourly-retention.patch
 RUN git apply /tmp/uptime-hourly-retention.patch
 COPY uptime-hourly-retention_test.go storage/store/sql/solace_uptime_test.go
-RUN go test ./storage/store/sql -run '^TestSolace' -count=1
 COPY server-timing.patch /tmp/server-timing.patch
 RUN git apply /tmp/server-timing.patch
+COPY server-timing-storage.patch /tmp/server-timing-storage.patch
+RUN git apply /tmp/server-timing-storage.patch
+RUN go test ./storage/store/sql -run '^TestSolace' -count=1
 COPY server-timing_test.go config/endpoint/solace_server_timing_test.go
 RUN go test ./config/endpoint -run '^TestSolaceServerTiming' -count=1
 COPY retained-endpoint-history.patch /tmp/retained-endpoint-history.patch
@@ -38,14 +40,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -mod=readonly -ldflags="-s -w" -o /gatus .
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:d13acb327aa77acf2752acea8c08456511a5b8142455cc2fe0f966b960bf64c6
 
 RUN apk upgrade --no-cache \
-    && apk add --no-cache ca-certificates apache2-utils tzdata wget python3 su-exec \
+    && apk add --no-cache ca-certificates apache2-utils tzdata wget python3 py3-pyyaml su-exec \
     && addgroup -S -g 10001 gatus && adduser -S -D -H -u 10001 -G gatus gatus \
     && mkdir -p /etc/gatus /data \
     && rm -rf /var/cache/apk/*
 
 COPY --from=gatus-builder /gatus /usr/local/bin/gatus
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY stalwart-discord-bridge.py status.html /usr/local/lib/solace/
+COPY configure-vps-monitor.py stalwart-discord-bridge.py status.html /usr/local/lib/solace/
 COPY config.default.yaml /etc/gatus/config.default.yaml
 
 RUN chmod 755 /usr/local/bin/entrypoint.sh /usr/local/bin/gatus \

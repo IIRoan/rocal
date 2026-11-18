@@ -3,8 +3,6 @@ storage:
   path: /data/gatus.db
   # A day of individual checks at the fastest (30s) interval, so the status page can zoom into any recent hour.
   maximum-number-of-results: 2880
-  preserve-endpoint-keys:
-    - application_api-mail-jmap
 
 web:
   address: 0.0.0.0

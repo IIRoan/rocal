@@ -37,9 +37,26 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  name: mail-pg
+  namespace: solace-mail
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+  selector:
+    cnpg.io/cluster: mail-database
+    cnpg.io/instanceRole: primary
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
   name: mail-redis
   namespace: solace-mail
 spec:
+  clusterIP: 10.43.163.106
   internalTrafficPolicy: Cluster
   ipFamilies:
     - IPv4
@@ -60,6 +77,7 @@ metadata:
   name: mail-redis-replica
   namespace: solace-mail
 spec:
+  clusterIP: 10.43.42.212
   internalTrafficPolicy: Cluster
   ipFamilies:
     - IPv4
@@ -82,6 +100,7 @@ metadata:
   name: mail-redis-sentinel-a
   namespace: solace-mail
 spec:
+  clusterIP: 10.43.11.29
   internalTrafficPolicy: Cluster
   ipFamilies:
     - IPv4
@@ -104,6 +123,7 @@ metadata:
   name: mail-redis-sentinel-b
   namespace: solace-mail
 spec:
+  clusterIP: 10.43.45.232
   internalTrafficPolicy: Cluster
   ipFamilies:
     - IPv4
@@ -126,6 +146,7 @@ metadata:
   name: mail-redis-sentinel-witness
   namespace: solace-mail
 spec:
+  clusterIP: 10.43.35.161
   internalTrafficPolicy: Cluster
   ipFamilies:
     - IPv4

@@ -66,10 +66,16 @@ list its old key in `storage.preserve-endpoint-keys` before deploying the new co
 The historical `application_api-mail-jmap` series measured the full HTTP round trip.
 When available, read it at `/timeline/application_api-mail-jmap` with the usual range
 parameters. The overview shows the active `application_api-mail-jmap-private` monitor
-and its private upstream timings. The retention setting preserves rows already on
-the volume. On an instance that has already pruned them, recovery requires a copy of
-the original data. Keep `storage.preserve-endpoint-keys` in any full `GATUS_CONFIG_YAML`
-override.
+and its private upstream timings. Both JMAP history keys are protected across
+configuration changes in the current image, including full overrides. Use an image
+that preserves both keys for rollback. Before deploying an older incompatible image,
+take a consistent SQLite backup of the mounted database and restore it when returning
+to the current image. A copy from before pruning is required to recover already deleted
+history. For other retired monitors, keep the key in `storage.preserve-endpoint-keys`.
+
+The private JMAP chart stores measured nanoseconds and a separate sample count
+alongside uptime. Failed probes without a server timing still count as checks. Older
+buckets with expired raw samples may have uptime and no latency value.
 
 ## Railway variables
 
@@ -122,6 +128,8 @@ characters; the API retains the full results. Grafana
 useful for rate graphs.
 
 ## Local test
+
+The Python tests use PyYAML to validate generated configuration.
 
 ```bash
 cd apps/gatus

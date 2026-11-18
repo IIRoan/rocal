@@ -1,11 +1,12 @@
 diff --git a/main.go b/main.go
-index 13788fd..b9c5904 100644
+index 13788fd..72fa52e 100644
 --- a/main.go
 +++ b/main.go
-@@ -127,6 +127,9 @@ func initializeStorage(cfg *config.Config) {
+@@ -127,6 +127,10 @@ func initializeStorage(cfg *config.Config) {
  			keys = append(keys, ep.Key())
  		}
  	}
++	keys = append(keys, "application_api-mail-jmap", "application_api-mail-jmap-private")
 +	if cfg.Storage != nil {
 +		keys = append(keys, cfg.Storage.PreserveEndpointKeys...)
 +	}

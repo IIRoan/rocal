@@ -22,7 +22,7 @@ func TestSolaceServerTimingRecordsUpstreamDuration(t *testing.T) {
 		t.Fatalf("expected full request duration by default, got %+v", result)
 	}
 	endpoint.ResponseTimeMetric = "stalwart-jmap"
-	if result := endpoint.EvaluateHealth(); !result.Success || result.Duration != 1250*time.Microsecond {
+	if result := endpoint.EvaluateHealth(); !result.Success || result.Duration != 1250*time.Microsecond || !result.ServerTimingMeasured {
 		t.Fatalf("expected 1.250ms private duration, got %+v", result)
 	}
 }
@@ -39,9 +39,39 @@ func TestSolaceServerTimingRejectsMissingOrInvalidDuration(t *testing.T) {
 			if err := endpoint.ValidateAndSetDefaults(); err != nil {
 				t.Fatal(err)
 			}
-			if result := endpoint.EvaluateHealth(); result.Success || result.Duration != 0 || len(result.Errors) == 0 {
+			if result := endpoint.EvaluateHealth(); result.Success || result.Duration >= 0 || result.ServerTimingMeasured || len(result.Errors) == 0 {
 				t.Fatalf("expected a failed check with no private timing, got %+v", result)
 			}
 		})
+	}
+}
+
+func TestSolaceServerTimingKeepsARealZero(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Server-Timing", "stalwart-jmap;dur=0")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	probe := &Endpoint{Name: "upstream", URL: server.URL, ResponseTimeMetric: "stalwart-jmap", Conditions: []Condition{"[STATUS] == 200"}}
+	if err := probe.ValidateAndSetDefaults(); err != nil {
+		t.Fatal(err)
+	}
+	if result := probe.EvaluateHealth(); !result.Success || !result.ServerTimingMeasured || result.Duration != 0 {
+		t.Fatalf("expected a measured zero, got %+v", result)
+	}
+}
+
+func TestSolaceServerTimingMarksTransportFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	server.Close()
+	probe := &Endpoint{
+		Name: "upstream", URL: server.URL, ResponseTimeMetric: "stalwart-jmap",
+		Conditions: []Condition{"[RESPONSE_TIME] < 10000"},
+	}
+	if err := probe.ValidateAndSetDefaults(); err != nil {
+		t.Fatal(err)
+	}
+	if result := probe.EvaluateHealth(); result.Success || result.ServerTimingMeasured || result.Duration >= 0 {
+		t.Fatalf("expected a failed probe without a measurement, got %+v", result)
 	}
 }

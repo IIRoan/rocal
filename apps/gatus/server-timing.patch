@@ -1,5 +1,5 @@
 diff --git a/config/endpoint/endpoint.go b/config/endpoint/endpoint.go
-index 0e8c77b..249b448 100644
+index 0e8c77b..e947deb 100644
 --- a/config/endpoint/endpoint.go
 +++ b/config/endpoint/endpoint.go
 @@ -91,6 +91,9 @@ type Endpoint struct {
@@ -22,7 +22,17 @@ index 0e8c77b..249b448 100644
  	if e.DNSConfig != nil {
  		return e.DNSConfig.ValidateAndSetDefault()
  	}
-@@ -545,7 +551,9 @@ func (e *Endpoint) call(result *Result) {
+@@ -325,6 +331,9 @@ func (e *Endpoint) EvaluateHealthWithContext(context *gontext.Gontext) *Result {
+ 			result.AddError(err.Error())
+ 		}
+ 	}
++	if processedEndpoint.ResponseTimeMetric != "" {
++		result.Duration = -1
++	}
+ 	// Call the endpoint (if there's no errors)
+ 	if len(result.Errors) == 0 {
+ 		processedEndpoint.call(result)
+@@ -545,8 +554,11 @@ func (e *Endpoint) call(result *Result) {
  		}
  	} else {
  		response, err = client.GetHTTPClient(e.ClientConfig).Do(request)
@@ -31,16 +41,19 @@ index 0e8c77b..249b448 100644
 +			result.Duration = time.Since(startTime)
 +		}
  		if err != nil {
++			result.Success = false
  			result.AddError(err.Error())
  			return
-@@ -557,6 +565,14 @@ func (e *Endpoint) call(result *Result) {
+ 		}
+@@ -557,6 +569,15 @@ func (e *Endpoint) call(result *Result) {
  		}
  		result.HTTPStatus = response.StatusCode
  		result.Connected = response.StatusCode > 0
 +		if e.ResponseTimeMetric != "" {
-+			var ok bool
-+			result.Duration, ok = serverTimingDuration(response.Header.Values("Server-Timing"), e.ResponseTimeMetric)
-+			if !ok {
++			if duration, ok := serverTimingDuration(response.Header.Values("Server-Timing"), e.ResponseTimeMetric); ok {
++				result.Duration = duration
++				result.ServerTimingMeasured = true
++			} else {
 +				result.Success = false
 +				result.AddError("Server-Timing metric missing or invalid: " + e.ResponseTimeMetric)
 +			}
@@ -48,7 +61,7 @@ index 0e8c77b..249b448 100644
  		// Only read the Body if there's a condition that uses the BodyPlaceholder
  		if e.needsToReadBody() {
  			result.Body, err = io.ReadAll(response.Body)
-@@ -567,6 +583,28 @@ func (e *Endpoint) call(result *Result) {
+@@ -567,6 +588,28 @@ func (e *Endpoint) call(result *Result) {
  	}
  }
  
@@ -77,3 +90,16 @@ index 0e8c77b..249b448 100644
  func (e *Endpoint) buildHTTPRequest() *http.Request {
  	var bodyBuffer *bytes.Buffer
  	if e.GraphQL {
+diff --git a/config/endpoint/result.go b/config/endpoint/result.go
+index ca3fbdf..5a98db1 100644
+--- a/config/endpoint/result.go
++++ b/config/endpoint/result.go
+@@ -27,6 +27,8 @@ type Result struct {
+ 	// Duration time that the request took
+ 	Duration time.Duration `json:"duration"`
+ 
++	ServerTimingMeasured bool `json:"-"`
++
+ 	// Errors encountered during the evaluation of the Endpoint's health
+ 	Errors []string `json:"errors,omitempty"`
+ 
