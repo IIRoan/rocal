@@ -1,0 +1,29 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    providers:
+      kubernetesIngress:
+        publishedService:
+          enabled: false
+        ingressEndpoint:
+          hostname: zeabur.roan.dev
+      kubernetesGateway:
+        statusAddress:
+          hostname: ingress.roan.dev
+    ports:
+      web:
+        asDefault: true
+      websecure:
+        asDefault: true
+      appsecure:
+        port: 8444
+        expose:
+          default: false
+        exposedPort: 8444
+        protocol: TCP
+        proxyProtocol:
+          trustedIPs: [10.42.0.0/16]

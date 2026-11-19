@@ -1,0 +1,103 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zeabur-apps
+  namespace: traefik
+spec:
+  dnsNames: ['*.roan.dev']
+  issuerRef:
+    kind: ClusterIssuer
+    name: zeabur-roan-public
+  secretName: zeabur-apps-tls
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: webdock-apps
+  namespace: traefik
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: https
+      hostname: '*.roan.dev'
+      protocol: HTTPS
+      port: 8444
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: zeabur-apps-tls
+      allowedRoutes:
+        kinds:
+          - kind: HTTPRoute
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              zeabur.com/project: 'true'
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: NotIn
+                values: [solace-mail]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zeabur-app-gateway
+  namespace: traefik
+spec:
+  selector:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-traefik
+  ports:
+    - name: https
+      port: 8444
+      targetPort: appsecure
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zeabur-app-gateway
+  namespace: traefik
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+      app.kubernetes.io/instance: traefik-traefik
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - {port: 8000, protocol: TCP}
+        - {port: 8080, protocol: TCP}
+        - {port: 8443, protocol: TCP}
+        - {port: 9100, protocol: TCP}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - {port: 8444, protocol: TCP}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-traefik-to-zeabur-app-gateway
+  namespace: solace-mail
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: solace-public-ingress
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+              app.kubernetes.io/instance: traefik-traefik
+      ports:
+        - {port: 8444, protocol: TCP}

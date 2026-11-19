@@ -9,7 +9,7 @@ spec:
       name: zeabur-roan-acme-account
     solvers:
       - selector:
-          dnsNames: [builds.roan.dev, demo.roan.dev, errors.roan.dev, objects.roan.dev, roan.dev, www.roan.dev]
+          dnsNames: ['*.roan.dev', builds.roan.dev, demo.roan.dev, errors.roan.dev, objects.roan.dev, roan.dev, www.roan.dev]
         dns01:
           cloudflare:
             apiTokenSecretRef:
