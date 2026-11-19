@@ -1,11 +1,11 @@
 # Solace on Zeabur
 
-This Kustomize root declares the active Solace project on Zeabur OSS. `solace-mail` is the labeled Zeabur project. `solace-api` holds its application PostgreSQL primary and standby. The shared Zeabur installation and the Kubernetes platform have their own lifecycle. The [Railway Monitoring configuration](../.railway/README.md) covers Gatus.
+This Kustomize root declares the active Solace project on Zeabur OSS. `solace-mail` is the labeled Zeabur project. `solace-api` holds its application PostgreSQL instance. The shared Zeabur installation and the Kubernetes platform have their own lifecycle. The [Railway Monitoring configuration](../.railway/README.md) covers Gatus.
 
 | Path | What it manages |
 | --- | --- |
 | [solace-mail/](solace-mail/) | API and notifications, Stalwart and its gateways, public Traefik, issuers and certificates, mail PostgreSQL, Redis Sentinel, and mail object storage |
-| [solace-api/](solace-api/) | Application PostgreSQL primary and standby, their trust and initialization config |
+| [solace-api/](solace-api/) | Application PostgreSQL and its trust and initialization config |
 | [bootstrap/](bootstrap/) | Namespaces with restricted Pod Security, encrypted StorageClasses, Flux setup, scoped deploy permissions, networking, and ingress RBAC |
 
 The live workloads drive the image digests, selectors, placement, probes, and storage settings in these manifests. Keep image changes here for the workloads this directory manages. Zeabur reads these objects and displays their live state.
@@ -23,7 +23,7 @@ The CA ConfigMaps contain public trust certificates. cert-manager issues `solace
 
 The admin networking manifests reserve the five Service IPs advertised by this Redis and Sentinel installation. Create those Services before other workloads allocate addresses on a replacement cluster. The production manifests expect the K3s Service CIDR to contain those addresses. A different CIDR requires updating the Service and Sentinel addresses together and migrating the saved Sentinel state to the verified leader. The `mail-pg` alias follows the CloudNativePG primary.
 
-On each application PostgreSQL worker, load the `solace-rehearsal-postgres` AppArmor profile from platform provisioning and verify it permits the mounted data directory, scratch directory and socket directory. The standby's replication network must match the restricted TLS replication rule in [app-pg-init](solace-api/config.yaml). When rebuilding on another subnet, set the rule to the new standby subnet before initialization. When restoring an existing PGDATA, update its stored rule before starting the standby.
+On the application PostgreSQL worker, load the `solace-rehearsal-postgres` AppArmor profile from platform provisioning and verify it permits the mounted data directory, scratch directory and socket directory. When restoring existing PGDATA, check that `synchronous_standby_names` is empty so application commits can complete on the single instance.
 
 Preserve the original volume bindings on the live cluster. Use apply without pruning so dormant recovery resources and controller-managed objects remain available.
 
