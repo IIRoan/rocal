@@ -151,9 +151,10 @@ def check_public_ingress(network, workloads):
         "secretName": certificate["spec"]["secretName"],
     }]
     assert certificate["spec"]["dnsNames"] == [rule["host"] for rule in private_host_routes]
-    for name, pool, port in (("solace-public", "solace-edge", 443), ("solace-smtp", "solace-smtp", 25)):
+    for name, port in (("solace-public", 443), ("solace-smtp", 25)):
         service = find_resource(network, "Service", namespace, name)
-        assert service["metadata"]["labels"]["svccontroller.k3s.cattle.io/lbpool"] == pool
+        assert service["spec"]["loadBalancerClass"] == "solace.onl/vps-ingress"
+        assert service["spec"]["allocateLoadBalancerNodePorts"] is False
         assert service["spec"]["externalTrafficPolicy"] == "Local"
         assert [item["port"] for item in service["spec"]["ports"]] == [port]
     ingress = find_resource(workloads, "Deployment", namespace, "solace-public-ingress")

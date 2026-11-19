@@ -69,12 +69,15 @@ The public Traefik deployment has one replica per worker and serves the public L
 
 Provision `solace-acme-dns` in `solace-mail` with the `api-token` key and DNS write and zone read access restricted to `solace.onl`. Flux reconciles the issuer and certificate. cert-manager renews the public certificate in `solace-public-tls`, which both Traefik replicas read. The DNS challenge works before changing the public HTTPS records. Alert on both the Certificate's readiness and the expiry served from each worker.
 
-A cluster administrator applies the networking manifests. The new LoadBalancer Services have separate K3s node pools. Leave the worker labels absent when applying setup resources so the ServiceLB pods stay off the public ports until the maintenance window. Validate the port owners, firewall, application health, and real client IP through an isolated pilot before enabling a pool. Keep the shared Zeabur Traefik on its existing nodes.
+A cluster administrator applies the networking manifests. The public Services use a dedicated LoadBalancer class so K3s does not create its source-NATing ServiceLB pods. Keep the Services' public addresses unset during setup. The bootstrap helper binds the selected MX host addresses as Kubernetes load balancer VIPs. kube-proxy routes the original connection directly to a local ready Traefik pod, preserving the client IP. This requires the public IP to be assigned directly to the worker's interface.
 
-| Listener | Service | Node label |
-| --- | --- | --- |
-| HTTPS 443 | `solace-public` | `lbpool.svccontroller.k3s.cattle.io/solace-edge=true` |
-| SMTP 25 | `solace-smtp` | `lbpool.svccontroller.k3s.cattle.io/solace-smtp=true` |
+Allow the new forwarded paths in each worker's existing firewall before binding its VIP. Match the original public IPv4 destination and TCP port 443 or 25 and the corresponding post-DNAT target port 9443 or 2525. Validate the change with a source-restricted temporary rule before persisting it. Keep the shared Zeabur Traefik on its existing nodes.
+
+```sh
+python3 -B .zeabur/bootstrap/public-edge.py https mx mx2
+python3 -B .zeabur/bootstrap/public-edge.py smtp mx2
+python3 -B .zeabur/bootstrap/public-edge.py smtp mx mx2
+```
 
 1. Bring up HTTPS on both workers. Keep the existing tunnel and DNS records until the direct HTTPS probe passes on each worker. Review the active Cloudflare security rules and confirm the new path preserves client-IP rate limits, operator authorization and compatible request size and streaming timeouts.
 2. Verify authenticated web and native sign-in, read and send with a synthetic attachment, incoming mail, and JMAP event reconnect while one public ingress path is unavailable. Reissue a staging certificate and check that both replicas serve it without a restart.
@@ -88,4 +91,4 @@ Run the protocol probes from outside the cluster. For a test listener, set `--ht
 python3 -B scripts/probe-solace-edge.py --public-dns
 ```
 
-If HTTPS fails after the DNS switch, restore the previous DNS records while both connectors still serve. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either rollback.
+If HTTPS fails after the DNS switch, restore the previous DNS records while both connectors still serve. Use the bind helper with no MX argument to clear a Service's VIPs if it must stop intercepting traffic. If SMTP fails, omit the affected worker from the SMTP Service's VIPs with the bootstrap helper and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either rollback.

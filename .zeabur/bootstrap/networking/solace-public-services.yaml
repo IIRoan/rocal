@@ -3,20 +3,10 @@ kind: Service
 metadata:
   name: solace-public
   namespace: solace-mail
-  labels:
-    svccontroller.k3s.cattle.io/lbpool: solace-edge
-  annotations:
-    svccontroller.k3s.cattle.io/tolerations: |
-      - key: roan.dev/apps-only
-        operator: Equal
-        value: "true"
-        effect: NoSchedule
-      - key: roan.dev/mail-only
-        operator: Equal
-        value: "true"
-        effect: NoSchedule
 spec:
   type: LoadBalancer
+  loadBalancerClass: solace.onl/vps-ingress
+  allocateLoadBalancerNodePorts: false
   externalTrafficPolicy: Local
   selector:
     app.kubernetes.io/name: solace-public-ingress
@@ -31,20 +21,10 @@ kind: Service
 metadata:
   name: solace-smtp
   namespace: solace-mail
-  labels:
-    svccontroller.k3s.cattle.io/lbpool: solace-smtp
-  annotations:
-    svccontroller.k3s.cattle.io/tolerations: |
-      - key: roan.dev/apps-only
-        operator: Equal
-        value: "true"
-        effect: NoSchedule
-      - key: roan.dev/mail-only
-        operator: Equal
-        value: "true"
-        effect: NoSchedule
 spec:
   type: LoadBalancer
+  loadBalancerClass: solace.onl/vps-ingress
+  allocateLoadBalancerNodePorts: false
   externalTrafficPolicy: Local
   selector:
     app.kubernetes.io/name: solace-public-ingress
