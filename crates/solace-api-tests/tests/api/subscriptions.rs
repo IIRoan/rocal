@@ -263,7 +263,8 @@ async fn create_refuses_private_and_loopback_literals_before_connecting() {
         "http://foo.localhost/",
         "http://printer.local/",
         "http://metadata.google.internal/",
-        "http://solace-api.railway.internal/",
+        "http://solace-api.solace-mail.svc.cluster.local/",
+        "http://stalwart-gate.solace.internal/",
         "https://127.0.0.1:58080/jmap/session",
         "http://localhost:4131/api/health",
         "webcal://169.254.169.254/feed.ics",
@@ -282,7 +283,7 @@ async fn create_refuses_private_and_loopback_literals_before_connecting() {
     );
 }
 
-/// A plain DNS name the backend's host resolves to loopback, so only the connect-time check catches it; Railway's containers know `ip6-localhost` instead.
+/// A plain DNS name the backend's host resolves to loopback, so only the connect-time check catches it; some containers know only `ip6-localhost`.
 fn loopback_feed() -> String {
     let host =
         std::env::var("TEST_LOOPBACK_DNS_NAME").unwrap_or_else(|_| "localhost.localdomain".into());

@@ -1,6 +1,6 @@
 # Solace mail in production
 
-Solace runs the API, notifications worker and two Stalwart replicas on Zeabur OSS on K3s. Vercel serves the web app. Railway runs [Gatus Monitoring](../gatus/README.md) and holds recovery copies. The current cluster and host layout is documented here and in the [mail VPS runbook](vps/README.md).
+Solace runs the API, notifications worker and two Stalwart replicas on Zeabur OSS on K3s. Vercel serves the web app. The current cluster and host layout is documented here and in the [mail VPS runbook](vps/README.md).
 
 ## Workloads and data
 
@@ -30,7 +30,7 @@ The DATA stage runs the [SimpleLogin Sieve script](stalwart/sieve/solace-simplel
 - The [Solace Zeabur configuration](../../.zeabur/README.md) versions the existing Kubernetes resources and Secret references. Review its server-side diff before applying changes to workload placement, image digests, selectors, health probes or PVCs. Keep platform Helm values, host configuration, and backup data in their operational stores.
 - Flux rolls A while B serves, then promotes B after A has stayed Ready for 60 seconds. During rollout, check that the serving peer stays ready and its pod UID stays fixed. Verify public JMAP, the API's private JMAP probe and certificate-validated STARTTLS on both MXs while each old pod is gone and again once both replicas are available.
 
-The [Stalwart release and build recipe](https://github.com/IIRoan/rocal/releases/tag/stalwart-v1.1.0-solace.1) include the literal PostgreSQL subject-search patch. See the [regression and reindex instructions](tests/SUBJECT-SEARCH.md) before replacing the binary. [The 1.0 migration runbook](UPGRADE-1.0.md) records the legacy Railway recovery procedure. The [former Railway/VPS sources](https://github.com/IIRoan/rocal/tree/467b75c1f4b43da93e199c9d4fec6841a036ff61/apps/stalwart) remain in Git history.
+The [Stalwart release and build recipe](https://github.com/IIRoan/rocal/releases/tag/stalwart-v1.1.0-solace.1) include the literal PostgreSQL subject-search patch. See the [regression and reindex instructions](tests/SUBJECT-SEARCH.md) before replacing the binary. The [former VPS relay sources](https://github.com/IIRoan/rocal/tree/467b75c1f4b43da93e199c9d4fec6841a036ff61/apps/stalwart) and the [last tree with the Railway deployment, the 1.0 migration runbook and Gatus](https://github.com/IIRoan/rocal/tree/cbd4abc2bee07da8226641fe59acf090e88dac3e) remain in Git history.
 
 ## Mailbox provisioning and operator access
 

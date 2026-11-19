@@ -590,7 +590,7 @@ async fn the_mail_health_route_uses_the_private_gate_without_the_public_edge() {
 
     let upstream = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = upstream.local_addr().unwrap();
-    let base = format!("http://stalwart.railway.internal:{}", address.port());
+    let base = format!("http://stalwart-gate.solace.internal:{}", address.port());
     let gate_key = "solace-test-private-gate";
     let upstream_task = tokio::spawn(async move {
         let (mut stream, _) = upstream.accept().await.unwrap();
@@ -624,7 +624,7 @@ async fn the_mail_health_route_uses_the_private_gate_without_the_public_edge() {
     state.http_no_redirect = reqwest::Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
-        .resolve("stalwart.railway.internal", address)
+        .resolve("stalwart-gate.solace.internal", address)
         .build()
         .unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

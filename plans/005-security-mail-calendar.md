@@ -11,7 +11,7 @@ Read this whole plan and root `AGENTS.md` before implementing. Then:
 1. Branch from `master` after `ui/reduce-encryption-notices` merges, or rebase onto it.
 2. Run `git diff --stat ee7fb551..HEAD` and reconcile every `path:line` reference that moved.
 3. Keep changes unstaged until the owner asks for commits.
-4. Start no deploys, OTA publishes, store builds, Zeabur or Railway changes because of this document. The operator steps below are for the owner.
+4. Start no deploys, OTA publishes, store builds or Zeabur changes because of this document. The operator steps below are for the owner.
 
 ## Outcome and boundaries
 
@@ -230,7 +230,7 @@ Run all of the following and record their real output in the PR:
 2. Schedule store builds of both apps early enough for the S3/S7 gate rules.
 3. Fetch `/.well-known/security.txt` from `solace.onl`, `api.solace.onl` and `mail.solace.onl`.
 4. Confirm that Flux rolled the new gateway ConfigMap (`.zeabur/solace-mail/gateway/base/haproxy.cfg`) to both Stalwart replicas.
-5. Apply M7's two Stalwart objects, `MtaExtensions` (`30-mta.ndjson`) and `DataRetention` (`00-stores.ndjson`), with `apps/stalwart/scripts/stalwart-plan.sh` and `STALWART_PLAN_DIR` set to a directory holding only those two lines. `00-stores.ndjson` still names the Railway Redis, and the live cluster selects its own stores. Until then, a send scheduled more than 3 days out can no longer be canceled.
+5. Apply M7's two Stalwart objects, `MtaExtensions` (`30-mta.ndjson`) and `DataRetention` (`00-stores.ndjson`), with `apps/stalwart/scripts/stalwart-plan.sh` and `STALWART_PLAN_DIR` set to a directory holding only those two lines, so nothing else in the live configuration changes. Until then, a send scheduled more than 3 days out can no longer be canceled.
 6. Check DKIM on a vacation auto-reply (M6).
 
 **Before each gate date:** confirm its preconditions, or move the constant later.
@@ -658,7 +658,7 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
 - **Keep the columns NOT NULL and use the empty string; no migration.** A nullable migration would let a row hold NULL while the previous deployment (deploy overlap, or a rollback) still decodes the column as `String` through its generated entity. Its bootstrap would then fail for every device of that user. AGENTS §3 allows only changes the previous deployment ignores.
 - **Response:** `EncryptionDevice.wrapped_account_key/search_key` stay `String`, always written, `""` for devices without a server copy. Doc comment: `/// Empty when the device keeps its wrapped keys only on itself.` No contract break for shipped readers.
 - **Clients stop sending after a date:** `export const SERVER_DEVICE_KEY_COPY_ENDS = Date.UTC(2027, 0, 11);` in `packages/e2ee/src/device-key.ts`. Both senders spread `...(Date.now() < SERVER_DEVICE_KEY_COPY_ENDS ? { wrappedAccountKey, wrappedSearchKey } : {})`.
-  - A date rather than immediately: in one merge, Vercel can serve the new web before Railway finishes the API. An API rollback to before this PR answers 400 to keyless registrations, so new browsers and devices could not unlock.
+  - A date rather than immediately: in one merge, Vercel can serve the new web before the new API image runs. An API rollback to before this PR answers 400 to keyless registrations, so new browsers and devices could not unlock.
   - It must be at least 14 days after merge (move it if merging later).
 - **Native write order:** in `registerDeviceForSession`, call `rememberOwnDeviceKeys` *before* writing `E2EE_DEVICE_ID`/`E2EE_PRIVATE_KEY`, with a one-line comment. A kill between those writes then never leaves a key pair whose only wrapped copy was the (now empty) server one. `readOwnDeviceKeys` already matches by `deviceId`, so a stale entry is harmless.
 - **Follow-up, not this PR:** blank the existing server copies (`UPDATE user_encryption_device SET wrapped_account_key = '', wrapped_search_key = ''`) and then delete the one-time trust branch in `unwrapStoredDeviceKeys`, once **all** of these hold:
@@ -718,7 +718,7 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
 - Contact constants in `packages/calendar-core/src/product-info.json`: `supportEmail: "support@solace.onl"`, `issuesUrl`, `sourceUrl: "https://github.com/IIRoan/rocal"`. There is no security-specific address, and none should be invented.
 - How the web serves `.well-known` today: `apps/web/app/.well-known/apple-app-site-association/route.ts`, a route handler. `apps/web/public/` has no `.well-known/`. Production web origin: `apps/web/.env.production` `NEXT_PUBLIC_APP_URL=https://solace.onl`.
 - Backend: non-OpenAPI routes are added in `apps/backend/src/lib.rs:89-92` (`.route("/api", get(health::root_redirect))`), handlers in `apps/backend/src/health.rs`.
-- The API and notifications Docker images copy only `apps/backend`, `apps/notifications`, `crates`, `xtask` and one JSON from packages (`apps/backend/Dockerfile:8-15`, `apps/notifications/Dockerfile:8-13`; notifications compiles the API crate). Railway watch patterns are in `.railway/railway.ts:184-192,245-253`. A file `include_str!`'d from `apps/backend/` needs no Docker or watch change.
+- The API and notifications Docker images copy only `apps/backend`, `apps/notifications`, `crates`, `xtask` and one JSON from packages (`apps/backend/Dockerfile:8-15`, `apps/notifications/Dockerfile:8-13`; notifications compiles the API crate). A file `include_str!`'d from `apps/backend/` needs no Docker change.
 
 **Design.**
 - **One RFC 9116 body, identical on all three hosts.** RFC 9116 allows several `Canonical` lines, so one file lists every location:
@@ -753,7 +753,7 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
     - SPF/DMARC on non-mail domains;
     - self-XSS;
     - reports that only repeat the documented known gaps and accepted trade-offs in AGENTS.md §2 (plaintext `EventParticipant` email and name, and the listed "Known gaps");
-    - third-party services (Cloudflare, Webdock, Vercel, Railway, Expo, Apple);
+    - third-party services (Cloudflare, Webdock, Vercel, Expo, Apple);
   - **Response targets** (D2): acknowledge within 5 business days, assessment within 14 days, fix critical issues within 30 days. Coordinated disclosure after a fix or 90 days. Credit on request. No bounty.
   - **Safe harbour:** good-faith research under this policy is authorized and will not be pursued legally, provided you:
     - use only accounts you own or have permission to test;

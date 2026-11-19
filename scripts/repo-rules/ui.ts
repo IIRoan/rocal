@@ -5,10 +5,10 @@ import { type FileContext, type Rule, appSourceUnder, find, hasSpreadAttributes,
 const WEB_UI = appSourceUnder(["apps/web/", "packages/ui/src/"], /\.tsx$/);
 const NATIVE_UI = appSourceUnder(["apps/native-calendar/", "apps/native-mail/", "packages/native-core/src/"], /\.tsx$/);
 const ALL_UI_CODE = appSourceUnder(["apps/web/", "packages/ui/src/", "apps/native-calendar/", "apps/native-mail/", "packages/native-core/src/"]);
-const WEB_STYLES = sourceUnder(["apps/web/", "packages/ui/src/", "apps/gatus/"], /\.css$/);
+const WEB_STYLES = sourceUnder(["apps/web/", "packages/ui/src/"], /\.css$/);
 
 /** Files that define the palette itself: design tokens, theme providers, and the user-pickable event/label colors. */
-const COLOR_SOURCES = /^(packages\/design-tokens\/|packages\/ui\/src\/styles\/|apps\/web\/app\/globals\.css$|apps\/gatus\/)|(^|\/)(theme|colors?|palette|tokens?)[^/]*\.(ts|tsx|css)$|(^|\/)app\.config\.ts$/;
+const COLOR_SOURCES = /^(packages\/design-tokens\/|packages\/ui\/src\/styles\/|apps\/web\/app\/globals\.css$)|(^|\/)(theme|colors?|palette|tokens?)[^/]*\.(ts|tsx|css)$|(^|\/)app\.config\.ts$/;
 
 /** HTML email templates and their previews must inline literal colors because mail clients ignore CSS variables. */
 const EMAIL_TEMPLATES = /^(packages\/ui\/src\/components\/email\/|apps\/web\/app\/debug\/mails\/)/;

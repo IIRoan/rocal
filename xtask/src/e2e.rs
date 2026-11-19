@@ -211,7 +211,7 @@ mod tests {
         for url in [
             "https://api.solace.onl",
             "http://localhost.evil.test:4001",
-            "https://service.railway.internal",
+            "http://stalwart-gate.solace.internal:8081",
             "http://api.solace.test",
             "invalid",
         ] {

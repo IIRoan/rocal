@@ -26,7 +26,7 @@ Please include:
 - SPF or DMARC on domains that send no mail.
 - Self-XSS.
 - Reports that only repeat the known gaps and accepted trade-offs documented in `AGENTS.md` §2, such as the plaintext `EventParticipant` email and name and the listed "Known gaps".
-- Third-party services (Cloudflare, Webdock, Vercel, Railway, Expo, Apple).
+- Third-party services (Cloudflare, Webdock, Vercel, Expo, Apple).
 
 ## What to expect
 

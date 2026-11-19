@@ -17,7 +17,7 @@ import urllib.request
 
 from pathlib import Path
 
-from test_mail_ha import ROOT
+ROOT = Path(__file__).resolve().parents[1]
 
 GATE_FIXTURE = os.environ.get("SOLACE_GATE_CONFIG_DIR")
 PUBLIC_IP_HEADER = "CF-Connecting-IP" if GATE_FIXTURE else "X-Real-IP"

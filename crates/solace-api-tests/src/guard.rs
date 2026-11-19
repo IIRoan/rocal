@@ -6,7 +6,7 @@ use url::Url;
 pub const TEST_SECRET_PREFIX: &str = "solace-test-";
 /// Prefix of every test database name.
 pub const TEST_NAME_PREFIX: &str = "solace_test";
-/// Prefix of every test bucket name (Railway appends a random suffix).
+/// Prefix of every test bucket name.
 pub const TEST_BUCKET_PREFIX: &str = "solace-test-";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -27,7 +27,7 @@ pub enum GuardError {
     NotTestMailDomain(&'static str),
 }
 
-/// Loopback, the container host and RFC 2606 `.test` names; Railway hosts are production's since the test environment was retired.
+/// Loopback, the container host and RFC 2606 `.test` names; cluster and `.internal` names are production's.
 fn is_test_host(host: &str) -> bool {
     let host = host.trim_end_matches('.').to_ascii_lowercase();
     matches!(
@@ -36,7 +36,7 @@ fn is_test_host(host: &str) -> bool {
     ) || host.ends_with(".test")
 }
 
-/// An HTTP(S) URL of a test service: never a production API, web, mail or Railway production domain.
+/// An HTTP(S) URL of a test service: never a production API, web, mail or cluster host.
 pub fn check_service_url(name: &'static str, value: &str) -> Result<(), GuardError> {
     let url = Url::parse(value).map_err(|_| GuardError::InvalidUrl(name))?;
     if !matches!(url.scheme(), "http" | "https") {
@@ -118,10 +118,9 @@ mod tests {
             "https://api.solace.onl",
             "https://solace.onl",
             "https://mail.solace.onl",
-            "https://stalwart-mail-production.up.railway.app",
-            "http://solace-api.railway.internal:8080",
-            "https://solace-api-rust-test.up.railway.app",
-            "https://storage.railway.app",
+            "http://solace-api.solace-mail.svc.cluster.local:8080",
+            "http://stalwart-gate.solace.internal:8081",
+            "http://mail-s3.solace-mail.svc.cluster.local:8333",
             "https://example.com",
             "ftp://127.0.0.1",
             "not a url",
@@ -142,14 +141,14 @@ mod tests {
         assert_eq!(
             check_database_url(
                 "DB",
-                "postgresql://postgres:solace-test-x@ab.proxy.rlwy.net:123/solace_test_template"
+                "postgresql://postgres:solace-test-x@app-postgres.solace-api.svc.cluster.local:5432/solace_test_template"
             ),
             Err(GuardError::NotTestHost("DB"))
         );
         assert_eq!(
             check_database_url(
                 "DB",
-                "postgresql://solace_test:solace-test-pg@127.0.0.1:55432/railway"
+                "postgresql://solace_test:solace-test-pg@127.0.0.1:55432/postgres"
             ),
             Err(GuardError::NotTestDatabase("DB"))
         );
