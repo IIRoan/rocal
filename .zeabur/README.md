@@ -118,3 +118,16 @@ python3 -B scripts/probe-solace-edge.py --public-dns --mx-https
 ```
 
 If one worker fails HTTPS checks, remove its address from the DNS alias until it can serve the API and mail routes again. Remove the corresponding ServiceLB pool label from a worker to withdraw its listener. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either change.
+
+### Riftbound web route
+
+`rift.solace.onl` uses the shared Webdock Traefik deployment and routes to `riftbound/expo-web:8080`. The DNS-only CNAME points to `edge.solace.onl`. The namespaced issuer renews `expo-public-tls` with Let's Encrypt DNS-01. Provision `rift-public-acme-dns` in `riftbound` with the `api-token` key through the cluster's credential process before applying the [routing and issuer manifests](bootstrap/riftbound-public.yaml). With the Riftbound namespace and role in place, enable its namespace on the shared Traefik deployment through Flux.
+
+```sh
+kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/riftbound-public.yaml
+kubectl -n riftbound wait certificate/expo-public --for=condition=Ready --timeout=10m
+kubectl -n solace-gitops patch kustomization solace --field-manager=rocal-solace-bootstrap \
+  --type=merge --patch-file .zeabur/bootstrap/riftbound-traefik-patch.json
+```
+
+Check the web route in the Zeabur API and probe both public addresses with the hostname and TLS verification. The separate `riftapi.solace.onl` backend uses the Riftbound tunnel.

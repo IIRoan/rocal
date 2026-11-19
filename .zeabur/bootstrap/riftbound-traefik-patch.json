@@ -1,0 +1,14 @@
+{
+  "spec": {
+    "patches": [
+      {
+        "target": {
+          "kind": "Deployment",
+          "name": "solace-public-ingress",
+          "namespace": "solace-mail"
+        },
+        "patch": "[{\"op\": \"test\", \"path\": \"/spec/template/spec/containers/0/args/8\", \"value\": \"--providers.kubernetesingress.namespaces=solace-mail\"}, {\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/0/args/8\", \"value\": \"--providers.kubernetesingress.namespaces=solace-mail,riftbound\"}]"
+      }
+    ]
+  }
+}
