@@ -127,30 +127,38 @@ def check(flux, gateway_dir):
 def check_public_ingress(network, workloads):
     namespace = "solace-mail"
     public = find_resource(network, "Ingress", namespace, "solace-public")
-    private_host_routes = [
-        rule for doc in network
-        if doc["kind"] == "Ingress" and doc["metadata"]["name"] != "solace-public"
-        for rule in doc["spec"]["rules"]
-    ]
-    expected_public_rules = []
-    direct_services = {"solace-api": "solace-api-direct", "mail-live": "mail-public-direct"}
-    for rule in private_host_routes:
-        paths = [
-            {
-                **path,
-                "backend": {"service": {"name": direct_services[path["backend"]["service"]["name"]],
-                                         "port": {"number": 8085}}},
-            }
-            for path in rule["http"]["paths"]
-        ]
-        expected_public_rules.append({"host": rule["host"], "http": {"paths": paths}})
-    assert public["spec"]["rules"] == expected_public_rules
+    expected_paths = {
+        "api.solace.onl": [("/", "Prefix")],
+        "autodiscover.solace.onl": [
+            ("/autodiscover/autodiscover.xml", "Exact"),
+            ("/autodiscover/autodiscover.json", "Prefix"),
+        ],
+        "autoconfig.solace.onl": [
+            ("/mail/config-v1.1.xml", "Exact"),
+            ("/.well-known/autoconfig/mail/config-v1.1.xml", "Exact"),
+            ("/.well-known/mail-v1.xml", "Exact"),
+        ],
+        "ua-auto-config.solace.onl": [
+            ("/.well-known/user-agent-configuration.json", "Exact"),
+            ("/.well-known/mail-v1.xml", "Exact"),
+        ],
+        "mta-sts.solace.onl": [("/.well-known/mta-sts.txt", "Exact")],
+        "mail.solace.onl": [("/", "Prefix")],
+    }
+    rules = public["spec"]["rules"]
+    assert len(rules) == len(expected_paths)
+    assert {rule["host"]: [(p["path"], p["pathType"]) for p in rule["http"]["paths"]]
+            for rule in rules} == expected_paths
+    for rule in rules:
+        service = "solace-api-direct" if rule["host"] == "api.solace.onl" else "mail-public-direct"
+        for path in rule["http"]["paths"]:
+            assert path["backend"] == {"service": {"name": service, "port": {"number": 8085}}}
     certificate = find_resource(workloads, "Certificate", namespace, "solace-public")
     assert public["spec"]["tls"] == [{
         "hosts": certificate["spec"]["dnsNames"],
         "secretName": certificate["spec"]["secretName"],
     }]
-    assert certificate["spec"]["dnsNames"] == [rule["host"] for rule in private_host_routes]
+    assert certificate["spec"]["dnsNames"] == [rule["host"] for rule in rules]
     for name, port, pool in (("solace-public", 443, "solace-https"), ("solace-smtp", 25, "solace-smtp")):
         service = find_resource(network, "Service", namespace, name)
         assert service["spec"]["type"] == "LoadBalancer"
@@ -161,6 +169,7 @@ def check_public_ingress(network, workloads):
         assert [item["port"] for item in service["spec"]["ports"]] == [port]
     ingress = find_resource(workloads, "Deployment", namespace, "solace-public-ingress")
     template = ingress["spec"]["template"]["spec"]
+    find_resource(workloads, "ServiceAccount", namespace, template["serviceAccountName"])
     routes_name = next(vol["configMap"]["name"] for vol in template["volumes"] if vol["name"] == "ingress-routes")
     routes = yaml.safe_load(find_resource(workloads, "ConfigMap", namespace, routes_name)["data"]["routes.yaml"])
     assert routes["tcp"]["services"]["mail-inbound"]["loadBalancer"]["proxyProtocol"]["version"] == 2

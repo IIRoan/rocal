@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   annotations:
-    zeabur.com/description: "Production across both Webdock VPSs\nHTTPS \u2192 Cloudflare Tunnel \u2192 private ingress \u2192\
+    zeabur.com/description: "Production across both Webdock VPSs\nHTTPS \u2192 Traefik on both Webdock VPSs \u2192\
       \ Solace API and Stalwart\nSMTP \u2192 Webdock MX gateways \u2192 Stalwart\nSolace API and notifications \u2192 Stalwart\
       \ and application PostgreSQL\nStalwart \u2192 mail PostgreSQL, Redis and SeaweedFS\nMail PostgreSQL has a synchronous standby.\nApplication PostgreSQL uses one instance.\
       \ Redis has a replica. SeaweedFS has one writer on replicated storage."

@@ -12,14 +12,14 @@ The live workloads drive the image digests, selectors, placement, probes, and st
 
 ## Dependencies and recovery
 
-The cluster provides K3s, Traefik, cert-manager, CloudNativePG and Longhorn. Keep the two Webdock worker names used by placement rules. Restore access to the pinned images, Cloudflare DNS, and the [host SMTP listeners and relays](../apps/stalwart/vps/README.md). Keep the previous tunnel credentials available for HTTPS rollback.
+The cluster provides K3s, Traefik, cert-manager, CloudNativePG and Longhorn. Keep the two Webdock worker names used by placement rules. Restore access to the pinned images, Cloudflare DNS, and the [host SMTP listeners and relays](../apps/stalwart/vps/README.md).
 
 | Namespace | Secrets supplied through the deployment or recovery process |
 | --- | --- |
-| `solace-mail` | `api-runtime`, `notifications-runtime`, `app-postgres-url`, `solace-acme-dns`, `mail-cf-tunnel` (rollback), `mail-database-app`, `mail-live-auth`, `mail-object-auth`, `mail-pg-auth`, `mail-pg-crypto`, `mail-redis-sentinel-auth`, `mail-s3-crypto`, `mail-standby-relay-tls`, `solace-origin-ca` (rollback) |
+| `solace-mail` | `api-runtime`, `notifications-runtime`, `app-postgres-url`, `solace-acme-dns`, `mail-database-app`, `mail-live-auth`, `mail-object-auth`, `mail-pg-auth`, `mail-pg-crypto`, `mail-redis-sentinel-auth`, `mail-s3-crypto`, `mail-standby-relay-tls` |
 | `solace-api` | `app-pg-auth`, `app-pg-crypto`, `app-pg-tls` |
 
-The CA ConfigMaps contain public trust certificates. cert-manager issues `solace-origin-tls` from the externally provisioned CA key. CloudNativePG manages its instance Services, accounts and volumes. Kubernetes provisions the StatefulSet claims from their templates. The long-lived mail object claim is declared explicitly. Restore the database and object data, with their encryption keys, before routing production traffic to a replacement installation.
+The CA ConfigMaps contain public trust certificates. CloudNativePG manages its instance Services, accounts and volumes. Kubernetes provisions the StatefulSet claims from their templates. The long-lived mail object claim is declared explicitly. Restore the database and object data, with their encryption keys, before routing production traffic to a replacement installation.
 
 The admin networking manifests reserve the five Service IPs advertised by this Redis and Sentinel installation. Create those Services before other workloads allocate addresses on a replacement cluster. The production manifests expect the K3s Service CIDR to contain those addresses. A different CIDR requires updating the Service and Sentinel addresses together and migrating the saved Sentinel state to the verified leader. The `mail-pg` alias follows the CloudNativePG primary.
 
@@ -65,7 +65,7 @@ The application mail gateways still use a compatibility host alias for the priva
 
 ## Direct public ingress
 
-The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. HTTPS on `mx.solace.onl` passes encrypted traffic through to the existing Stalwart listener with PROXY v2. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy. The tunnel connectors and their dedicated Traefik deployment are scaled to zero for rollback.
+The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. HTTPS on `mx.solace.onl` passes encrypted traffic through to the existing Stalwart listener with PROXY v2. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.
 
 Provision `solace-acme-dns` in `solace-mail` with the `api-token` key and DNS write and zone read access restricted to `solace.onl`. Flux reconciles the issuer and certificate. cert-manager renews the public certificate in `solace-public-tls`, which both Traefik replicas read. The DNS challenge works before changing the public HTTPS records. Alert on both the Certificate's readiness and the expiry served from each worker.
 
@@ -82,11 +82,10 @@ kubectl label node webdock-1 lbpool.svccontroller.k3s.cattle.io/solace-smtp=true
 kubectl label node webdock-mail lbpool.svccontroller.k3s.cattle.io/solace-smtp=true
 ```
 
-1. Bring up HTTPS on both workers. Keep the existing tunnel and DNS records until the direct HTTPS probe passes on each worker. Review the active Cloudflare security rules and confirm the new path preserves client-IP rate limits, operator authorization and compatible request size and streaming timeouts.
+1. Bring up HTTPS on both workers. Keep the existing DNS records until the direct HTTPS probe passes on each worker. Verify client-IP rate limits, operator authorization, request sizes and streaming timeouts.
 2. Verify authenticated web and native sign-in, read and send with a synthetic attachment, incoming mail, and JMAP event reconnect while one public ingress path is unavailable. Reissue a staging certificate and check that both replicas serve it without a restart.
 3. Save the previous HTTPS records. Point the six HTTPS names at the DNS-only `edge.solace.onl` alias, which has one A record per worker. Keep the MX records as they are. Verify the exact enforced MTA-STS policy through both origins and normal DNS. DNS advertises both addresses. If a worker fails, an operator can temporarily remove its address from the alias.
-4. After the previous HTTPS DNS TTL has elapsed and direct traffic checks pass, scale the old connectors and their dedicated ingress to zero in Git. Retain the previous DNS, listener configuration and connector references for recovery.
-5. Move SMTP separately, one worker at a time. Migrate only the public HAProxy listener after verifying the owning process and preserving any private relay listeners in the same service. The TCP route carries the original client IP in PROXY v2 and Stalwart handles STARTTLS. Confirm the Kubernetes Service prefers a ready local gateway and uses its peer during drain. Send and receive through both MXs using a controlled external mailbox. Verify queued canary mail delivers after recovery and update the host health check.
+4. Move SMTP separately, one worker at a time. Migrate only the public HAProxy listener after verifying the owning process and preserving any private relay listeners in the same service. The TCP route carries the original client IP in PROXY v2 and Stalwart handles STARTTLS. Confirm the Kubernetes Service prefers a ready local gateway and uses its peer during drain. Send and receive through both MXs using a controlled external mailbox. Verify queued canary mail delivers after recovery and update the host health check.
 
 Run the protocol probes from outside the cluster. For a test listener, set `--https-port` and `--smtp-port` to the temporary public ports. `--skip-smtp` runs only the HTTPS checks before moving SMTP.
 
@@ -94,4 +93,4 @@ Run the protocol probes from outside the cluster. For a test listener, set `--ht
 python3 -B scripts/probe-solace-edge.py --public-dns --mx-https
 ```
 
-If HTTPS fails, restore the previous DNS records after confirming the old connectors and dedicated ingress are ready. If they are idle, restore their previous replica counts in Git and wait for Flux. Remove the corresponding ServiceLB pool label from a worker to withdraw its listener. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either rollback.
+If one worker fails HTTPS checks, remove its address from the DNS alias until it can serve the API and mail routes again. Remove the corresponding ServiceLB pool label from a worker to withdraw its listener. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either change.
