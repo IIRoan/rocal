@@ -1,0 +1,13 @@
+tcp:
+  routers:
+    smtp:
+      entryPoints: [smtp]
+      rule: HostSNI(`*`)
+      service: mail-inbound
+  services:
+    mail-inbound:
+      loadBalancer:
+        proxyProtocol:
+          version: 2
+        servers:
+          - address: mail-inbound.solace-mail.svc.cluster.local:2525

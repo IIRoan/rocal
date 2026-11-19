@@ -1,0 +1,107 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: solace-public
+  namespace: solace-mail
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public
+spec:
+  rules:
+    - host: api.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: solace-api-direct
+                port:
+                  number: 8085
+            path: /
+            pathType: Prefix
+    - host: autodiscover.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-public-direct
+                port:
+                  number: 8085
+            path: /autodiscover/autodiscover.xml
+            pathType: Exact
+          - backend:
+              service:
+                name: mail-public-direct
+                port:
+                  number: 8085
+            path: /autodiscover/autodiscover.json
+            pathType: Prefix
+    - host: autoconfig.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-public-direct
+                port:
+                  number: 8085
+            path: /mail/config-v1.1.xml
+            pathType: Exact
+          - backend:
+              service:
+                name: mail-public-direct
+                port:
+                  number: 8085
+            path: /.well-known/autoconfig/mail/config-v1.1.xml
+            pathType: Exact
+          - backend:
+              service:
+                name: mail-public-direct
+                port:
+                  number: 8085
+            path: /.well-known/mail-v1.xml
+            pathType: Exact
+    - host: ua-auto-config.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-public-direct
+                port:
+                  number: 8085
+            path: /.well-known/user-agent-configuration.json
+            pathType: Exact
+          - backend:
+              service:
+                name: mail-public-direct
+                port:
+                  number: 8085
+            path: /.well-known/mail-v1.xml
+            pathType: Exact
+    - host: mta-sts.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-public-direct
+                port:
+                  number: 8085
+            path: /.well-known/mta-sts.txt
+            pathType: Exact
+    - host: mail.solace.onl
+      http:
+        paths:
+          - backend:
+              service:
+                name: mail-public-direct
+                port:
+                  number: 8085
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - api.solace.onl
+        - autodiscover.solace.onl
+        - autoconfig.solace.onl
+        - ua-auto-config.solace.onl
+        - mta-sts.solace.onl
+        - mail.solace.onl
+      secretName: solace-public-tls

@@ -62,3 +62,30 @@ Containers use read-only root filesystems. PostgreSQL and the Stalwart gateways 
 The image references use digest pins and the registries approved in [the Trivy Kubernetes configuration](../.github/trivy-data/registries.yaml). A runtime image change requires compatibility checks for the entrypoint, its data and its probes.
 
 The application mail gateways still use a compatibility host alias for the private JMAP route. The ingress controller reads TLS Secrets in its namespace. The Flux account can update workload and ConfigMap objects within the Solace namespaces. These capabilities are visible in the scanner report. The sensitive-ConfigMap check also matches the microphone permissions header, the public security contact header, and the Lua lookup of a gate key from the environment. The gateway configuration stores Secret references and public settings in Git.
+
+## Direct public ingress
+
+The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. Cloudflared keeps using the original Traefik deployment and origin CA. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.
+
+Provision `solace-acme-dns` in `solace-mail` with the `api-token` key and DNS write and zone read access restricted to `solace.onl`. Flux reconciles the issuer and certificate. cert-manager renews the public certificate in `solace-public-tls`, which both Traefik replicas read. The DNS challenge works before changing the public HTTPS records. Alert on both the Certificate's readiness and the expiry served from each worker.
+
+A cluster administrator applies the networking manifests. The new LoadBalancer Services have separate K3s node pools. Leave the worker labels absent when applying setup resources so the ServiceLB pods stay off the public ports until the maintenance window. Validate the port owners, firewall, application health, and real client IP through an isolated pilot before enabling a pool. Keep the shared Zeabur Traefik on its existing nodes.
+
+| Listener | Service | Node label |
+| --- | --- | --- |
+| HTTPS 443 | `solace-public` | `lbpool.svccontroller.k3s.cattle.io/solace-edge=true` |
+| SMTP 25 | `solace-smtp` | `lbpool.svccontroller.k3s.cattle.io/solace-smtp=true` |
+
+1. Bring up HTTPS on both workers. Keep the existing tunnel and DNS records until the direct HTTPS probe passes on each worker. Review the active Cloudflare security rules and confirm the new path preserves client-IP rate limits, operator authorization and compatible request size and streaming timeouts.
+2. Verify authenticated web and native sign-in, read and send with a synthetic attachment, incoming mail, and JMAP event reconnect while one public ingress path is unavailable. Reissue a staging certificate and check that both replicas serve it without a restart.
+3. Set up health-checked DNS for the direct endpoints and save the previous records. Switch the HTTPS names to the direct path without changing the MX records. Verify the exact enforced MTA-STS policy through both origins and normal DNS.
+4. Move SMTP separately, one worker at a time. Migrate only the public HAProxy listener after verifying the owning process and preserving any private relay listeners in the same service. The TCP route carries the original client IP in PROXY v2 and Stalwart handles STARTTLS. Confirm the Kubernetes Service prefers a ready local gateway and uses its peer during drain. Send and receive through both MXs using a controlled external mailbox. Verify queued canary mail delivers after recovery.
+5. Update the host health check to match the migrated service. After the observation window, scale the old connectors to zero in Git. Retain the previous DNS, listener configuration and connector references for recovery.
+
+Run the protocol probes from outside the cluster. For a test listener, set `--https-port` and `--smtp-port` to the temporary public ports. `--skip-smtp` runs only the HTTPS checks before moving SMTP.
+
+```sh
+python3 -B scripts/probe-solace-edge.py --public-dns
+```
+
+If HTTPS fails after the DNS switch, restore the previous DNS records while both connectors still serve. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either rollback.
