@@ -7,6 +7,8 @@ metadata:
       \ and application PostgreSQL\nStalwart \u2192 mail PostgreSQL, Redis and SeaweedFS\nMail PostgreSQL has a synchronous standby.\nApplication PostgreSQL uses one instance.\
       \ Redis has a replica. SeaweedFS has one writer on replicated storage."
     zeabur.com/display-name: Solace
+    builder.zeabur.com/build-cpu: "8"
+    builder.zeabur.com/build-memory: 16Gi
   labels:
     pod-security.kubernetes.io/enforce: restricted
     zeabur.com/project: 'true'
