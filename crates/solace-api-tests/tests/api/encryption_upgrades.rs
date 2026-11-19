@@ -251,6 +251,7 @@ async fn a_trash_between_the_live_and_trashed_reads_never_reports_the_account_bo
     .0;
     unbind(&app.db, &legacy).await;
     let (db, event) = (&app.db, &legacy);
+    let (locked, report_may_start) = tokio::sync::oneshot::channel();
     // Holding the events table parks the report's live reads while this "trash" moves the event.
     let trash = async move {
         let mut lock = db.begin().await.expect("transaction");
@@ -262,6 +263,7 @@ async fn a_trash_between_the_live_and_trashed_reads_never_reports_the_account_bo
             .execute(&mut *lock)
             .await
             .expect("table lock");
+        locked.send(()).expect("report waiting");
         let blocked = "SELECT count(*) FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))";
         for attempt in 0.. {
             let waiting: i64 = sqlx::query_scalar(blocked)
@@ -294,7 +296,12 @@ async fn a_trash_between_the_live_and_trashed_reads_never_reports_the_account_bo
             .expect("delete event");
         lock.commit().await.expect("commit");
     };
-    let (report, ()) = tokio::join!(upgrades(&mut user), trash);
+    // Started only once the lock is held, or the report can finish before the lock and never wait.
+    let report = async {
+        report_may_start.await.expect("table locked");
+        upgrades(&mut user).await
+    };
+    let (report, ()) = tokio::join!(report, trash);
     assert!(
         !report.events_with_unbound_content.is_empty() || report.trash_with_unbound_content > 0,
         "unbound content was reported nowhere: {report:?}"
