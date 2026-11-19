@@ -105,6 +105,8 @@ spec:
       ports:
         - port: 22525
           protocol: TCP
+        - port: 18443
+          protocol: TCP
         - port: 8085
           protocol: TCP
 ---
@@ -125,6 +127,8 @@ spec:
               app.kubernetes.io/name: solace-public-ingress
       ports:
         - port: 22525
+          protocol: TCP
+        - port: 18443
           protocol: TCP
         - port: 8085
           protocol: TCP

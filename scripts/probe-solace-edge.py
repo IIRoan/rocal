@@ -39,15 +39,15 @@ class DirectSMTP(smtplib.SMTP):
         return super()._get_socket(self.target, port, timeout)
 
 
-def check_https(target, port):
-    for host, path, expected in HTTPS_ROUTES:
+def check_https(target, port, routes=HTTPS_ROUTES):
+    for host, path, expected in routes:
         connection = DirectHTTPS(host, target or host, port)
         try:
             connection.request("GET", path, headers={"Host": host})
             response = connection.getresponse()
             if response.status != expected:
                 raise RuntimeError(f"{host}{path} expected HTTP {expected}, got {response.status}")
-            if host == "mta-sts.solace.onl":
+            if path == "/.well-known/mta-sts.txt":
                 policy = response.read(8192).decode("ascii").splitlines()
                 mx_hosts = {line.partition(":")[2].strip() for line in policy if line.startswith("mx:")}
                 if "mode: enforce" not in policy or mx_hosts != set(MX_HOSTS):
@@ -73,6 +73,7 @@ def main():
     parser.add_argument("--smtp-port", default=25, type=int)
     parser.add_argument("--skip-smtp", action="store_true")
     parser.add_argument("--public-dns", action="store_true")
+    parser.add_argument("--mx-https", action="store_true", help="also verify legacy HTTPS on the primary MX")
     parser.add_argument("--primary", default=MX_HOSTS[0])
     parser.add_argument("--secondary", default=MX_HOSTS[1])
     args = parser.parse_args()
@@ -81,6 +82,11 @@ def main():
         check_https(target, args.https_port)
         if not args.skip_smtp:
             check_smtp(host, target, args.smtp_port)
+    if args.mx_https:
+        check_https(args.primary, args.https_port, (
+            (MX_HOSTS[0], "/jmap/session", 200),
+            (MX_HOSTS[0], "/.well-known/mta-sts.txt", 200),
+        ))
     if args.public_dns:
         check_https(None, 443)
 

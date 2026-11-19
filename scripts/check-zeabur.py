@@ -162,6 +162,16 @@ def check_public_ingress(network, workloads):
     routes_name = next(vol["configMap"]["name"] for vol in template["volumes"] if vol["name"] == "ingress-routes")
     routes = yaml.safe_load(find_resource(workloads, "ConfigMap", namespace, routes_name)["data"]["routes.yaml"])
     assert routes["tcp"]["services"]["mail-inbound"]["loadBalancer"]["proxyProtocol"]["version"] == 2
+    assert routes["tcp"]["routers"]["mx-https"] == {
+        "entryPoints": ["public"],
+        "rule": "HostSNI(`mx.solace.onl`)",
+        "service": "mx-https",
+        "tls": {"passthrough": True},
+    }
+    assert routes["tcp"]["services"]["mx-https"]["loadBalancer"] == {
+        "proxyProtocol": {"version": 2},
+        "servers": [{"address": "mail-live.solace-mail.svc.cluster.local:8443"}],
+    }
 
 
 def check_gateway(deployment, configs, volume):
