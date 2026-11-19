@@ -1,0 +1,39 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: solace-public-acme
+  namespace: solace-mail
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: solace-public-acme-account
+    solvers:
+      - selector:
+          dnsZones:
+            - solace.onl
+        dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: solace-acme-dns
+              key: api-token
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: solace-public
+  namespace: solace-mail
+spec:
+  secretName: solace-public-tls
+  issuerRef:
+    name: solace-public-acme
+    kind: Issuer
+  privateKey:
+    rotationPolicy: Always
+  dnsNames:
+    - api.solace.onl
+    - autodiscover.solace.onl
+    - autoconfig.solace.onl
+    - ua-auto-config.solace.onl
+    - mta-sts.solace.onl
+    - mail.solace.onl

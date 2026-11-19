@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: solace-public-ingress
+  name: solace-public-ingress
+  namespace: solace-mail
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: solace-public-ingress
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: solace-public-ingress
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - webdock-1
+                      - webdock-mail
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: solace-public-ingress
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - args:
+            - --entryPoints.public.address=:9443/tcp
+            - --entryPoints.public.http.tls=true
+            - --entryPoints.smtp.address=:2525/tcp
+            - --entryPoints.traefik.address=:8080/tcp
+            - --providers.file.filename=/etc/solace-ingress/routes.yaml
+            - --ping=true
+            - --api.dashboard=false
+            - --providers.kubernetesingress=true
+            - --providers.kubernetesingress.namespaces=solace-mail
+            - --providers.kubernetesingress.ingressclass=solace-public
+            - --providers.kubernetesingress.disableClusterScopeResources=true
+            - --log.level=WARN
+          image: docker.io/traefik:v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2
+          imagePullPolicy: IfNotPresent
+          name: traefik
+          ports:
+            - containerPort: 9443
+              name: public-https
+              protocol: TCP
+            - containerPort: 2525
+              name: smtp
+              protocol: TCP
+            - containerPort: 8080
+              name: health
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ping
+              port: health
+              scheme: HTTP
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 300m
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 48Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - name: ingress-routes
+              mountPath: /etc/solace-ingress
+              readOnly: true
+      volumes:
+        - name: ingress-routes
+          configMap:
+            name: solace-ingress-routes
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccount: solace-tunnel-ingress
+      serviceAccountName: solace-tunnel-ingress
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
