@@ -3,6 +3,8 @@ kind: Kustomization
 namespace: solace-mail
 generatorOptions:
   immutable: true
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled
 configMapGenerator:
   - name: mail-live-config
     files: [admin-gate.lua, config.json, haproxy.cfg]

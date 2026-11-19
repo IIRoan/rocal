@@ -6,3 +6,4 @@ resources:
   - solace-mail.yaml
   - solace-public.yaml
   - solace-public-services.yaml
+  - solace-releases.yaml

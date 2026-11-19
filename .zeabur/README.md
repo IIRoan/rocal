@@ -7,11 +7,11 @@ This Kustomize root declares the active Solace project on Zeabur OSS. `solace-ma
 | [solace-mail/](solace-mail/) | API, its PostgreSQL database and notifications, Stalwart and its gateways, public Traefik, issuers and certificates, mail PostgreSQL, Redis Sentinel, and mail object storage |
 | [bootstrap/](bootstrap/) | Namespaces with restricted Pod Security, encrypted StorageClasses, Flux setup, scoped deploy permissions, networking, and ingress RBAC |
 
-The live workloads drive the image digests, selectors, placement, probes, and storage settings in these manifests. Keep image changes here for the workloads this directory manages. Zeabur reads these objects and displays their live state.
+These manifests declare workload placement, probes, storage and fallback image digests. Zeabur displays the resulting Kubernetes workloads and Builder runs.
 
 ## Dependencies and recovery
 
-The cluster provides K3s, Traefik, cert-manager, CloudNativePG and Longhorn. Keep the two Webdock worker names used by placement rules. Restore access to the pinned images, Cloudflare DNS, and the [host SMTP listeners and relays](../apps/stalwart/vps/README.md).
+The cluster provides K3s, Traefik, cert-manager, CloudNativePG, Longhorn, Zeabur Builder and the private Zot registry. Keep the two Webdock worker names used by placement rules. Restore access to the pinned images, Cloudflare DNS, and the [host SMTP listeners and relays](../apps/stalwart/vps/README.md).
 
 | Namespace | Secrets supplied through the deployment or recovery process |
 | --- | --- |
@@ -33,14 +33,32 @@ Each Stalwart Deployment keeps a single replica and a stable pod address for the
 
 On shutdown, the gateway closes the health listener checked by both MXs and pauses for 18 seconds while they switch to the healthy peer. Kubernetes removes the terminating pod from the JMAP Service while the application and SMTP listener are still running. Sessions that exceed the shutdown grace period reconnect through the remaining replica.
 
-Review the server-side diff against the production context before merging a config change.
+### Automatic image releases
+
+A push to protected `master` runs [Solace production images](../.github/workflows/solace-production.yml). The [release planner](../scripts/solace-release-request.py) compares the last requested revision with the new commit and records affected components on the generated `solace-release-requests` branch.
+
+| Change | Images requested |
+| --- | --- |
+| API entry point or Dockerfile | API |
+| Shared backend Rust code, API types or workspace dependency inputs | API and notifications |
+| Notifications worker or Dockerfile | Notifications |
+| Stalwart runtime Dockerfile, install scripts or packaged configuration | Stalwart |
+| Kubernetes config, docs, web or native code only | None |
+
+The workflow tags each requested source commit. The release CronJob passes that exact Git ref to Zeabur Builder and records successful image digests from Zot. Flux applies the selected digest. Stalwart A must be available on the new digest for its full readiness window before B is updated. Third-party containers use the image pins in their Git manifests and change when their pod templates change.
+
+Check the workflow for the selected services and Zeabur for their Build runs. A failed build leaves the current image in place. A healthy B lets the next Stalwart fix replace a failed rollout on A. If B fails after promotion, keep A serving and follow the [recovery procedure](bootstrap/README.md#recover-an-image-rollout).
+
+Review a server-side diff from the selected revision with the production image inputs resolved by Flux. Do this from a cluster context with read access to the live substitution ConfigMap and write permission for the dry run.
 
 ```sh
 kubectl config current-context
-kubectl kustomize .zeabur
-kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur
-kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur/solace-mail/stalwart-a
-kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur/solace-mail/stalwart-b
+flux build kustomization solace --namespace=solace-gitops --path .zeabur \
+  | kubectl diff --server-side --field-manager=kustomize-controller -f -
+flux build kustomization solace-stalwart-a --namespace=solace-gitops --path .zeabur/solace-mail/stalwart-a \
+  | kubectl diff --server-side --field-manager=kustomize-controller -f -
+flux build kustomization solace-stalwart-b --namespace=solace-gitops --path .zeabur/solace-mail/stalwart-b \
+  | kubectl diff --server-side --field-manager=kustomize-controller -f -
 ```
 
 After a merge, check the applied revision and workload health.

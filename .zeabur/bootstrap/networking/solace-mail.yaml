@@ -219,6 +219,9 @@ spec:
                   - solace-api
                   - notifications
                   - app-postgres
+                  - solace-release-controller
+              - key: builder.zeabur.com/buildrun
+                operator: DoesNotExist
     - ports:
         - port: 53
           protocol: UDP
@@ -241,6 +244,9 @@ spec:
                   - solace-api
                   - notifications
                   - app-postgres
+                  - solace-release-controller
+              - key: builder.zeabur.com/buildrun
+                operator: DoesNotExist
     - from:
         - ipBlock:
             cidr: 192.168.2.106/32
@@ -259,6 +265,9 @@ spec:
           - solace-api
           - notifications
           - app-postgres
+          - solace-release-controller
+      - key: builder.zeabur.com/buildrun
+        operator: DoesNotExist
   policyTypes:
     - Ingress
     - Egress

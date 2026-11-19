@@ -26,7 +26,7 @@ spec:
         - envFrom:
             - secretRef:
                 name: notifications-runtime
-          image: zot.zot.svc:5000/solace-api/notifications@sha256:ac23dcc1b86161328b69ccd26ebd0d11a5d208193e135730555c4358479944e3
+          image: ${SOLACE_NOTIFICATIONS_IMAGE:=zot.zot.svc:5000/solace-api/notifications@sha256:ac23dcc1b86161328b69ccd26ebd0d11a5d208193e135730555c4358479944e3}
           imagePullPolicy: IfNotPresent
           name: worker
           readinessProbe:
@@ -217,7 +217,7 @@ spec:
           envFrom:
             - secretRef:
                 name: api-runtime
-          image: zot.zot.svc:5000/solace-api/api@sha256:96c0ec8970441cfd0b2adabcf05a1eaebf2b75c4b0aff160098c80793d457679
+          image: ${SOLACE_API_IMAGE:=zot.zot.svc:5000/solace-api/api@sha256:96c0ec8970441cfd0b2adabcf05a1eaebf2b75c4b0aff160098c80793d457679}
           imagePullPolicy: IfNotPresent
           lifecycle:
             preStop:
