@@ -53,6 +53,23 @@ def check(flux, gateway_dir):
         verbs = {verb for rule in rules if resource in rule["resources"] for verb in rule["verbs"]}
         assert verbs == {"get", "list", "watch"}, resource
     assert grants.isdisjoint({"namespaces", "storageclasses", "services", "ingresses", "networkpolicies", "secrets"})
+    assert "validatingadmissionpolicies" not in grants
+    assert "validatingadmissionpolicybindings" not in grants
+    policy, *bindings = read(ROOT / "bootstrap/stalwart-rollout.yaml")
+    policy_name = policy["metadata"]["name"]
+    assert policy["spec"]["failurePolicy"] == "Fail"
+    assert policy["spec"]["paramKind"] == {"apiVersion": "apps/v1", "kind": "Deployment"}
+    peers = {}
+    for binding in bindings:
+        spec = binding["spec"]
+        assert spec["policyName"] == policy_name and spec["validationActions"] == ["Deny"]
+        param = spec["paramRef"]
+        assert param["namespace"] == "solace-mail" and param["parameterNotFoundAction"] == "Deny"
+        (rule,) = spec["matchResources"]["resourceRules"]
+        assert rule["operations"] == ["UPDATE"] and rule["resources"] == ["deployments"]
+        (replica,) = rule["resourceNames"]
+        peers[replica] = param["name"]
+    assert peers == {"stalwart-a": "stalwart-b", "stalwart-b": "stalwart-a"}
 
     seen = {identity(doc) for doc in network + prerequisites}
     fixtures = []
@@ -77,9 +94,14 @@ def check(flux, gateway_dir):
             assert deployments.keys() == {replica}
             assert spec["healthChecks"] == [{"apiVersion": "apps/v1", "kind": "Deployment",
                                               "name": replica, "namespace": "solace-mail"}]
-            fixtures.append(check_gateway(deployments[replica], configs, "config"))
-            gateway = next(container for container in deployments[replica]["spec"]["template"]["spec"]["containers"]
+            deployment = deployments[replica]
+            fixtures.append(check_gateway(deployment, configs, "config"))
+            assert deployment["spec"]["minReadySeconds"] >= 60, replica
+            assert deployment["spec"]["strategy"] == {"type": "Recreate"}, replica
+            gateway = next(container for container in deployment["spec"]["template"]["spec"]["containers"]
                            if container["name"] == "gateway")
+            assert gateway["readinessProbe"]["httpGet"] == {"path": "/readyz", "port": 8084, "scheme": "HTTP"}
+            assert gateway["readinessProbe"]["failureThreshold"] == 1
             images.append(gateway["image"])
         else:
             assert {"stalwart-a", "stalwart-b"}.isdisjoint(deployments)
