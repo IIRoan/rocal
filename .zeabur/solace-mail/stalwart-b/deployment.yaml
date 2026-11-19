@@ -1,6 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    solace.onl/mx-hostname: mx2.solace.onl
   labels:
     app.kubernetes.io/name: stalwart-b
     app.kubernetes.io/part-of: solace-mail
