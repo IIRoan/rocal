@@ -913,7 +913,7 @@
     },
     {
      "name": "@next/env",
-     "version": "16.4.3",
+     "version": "16.4.5",
      "copyright": []
     },
     {
@@ -3283,7 +3283,7 @@
     },
     {
      "name": "next",
-     "version": "16.4.3",
+     "version": "16.4.5",
      "copyright": [
       "Copyright (c) 2025 Vercel, Inc."
      ]
@@ -5554,7 +5554,7 @@
    "packages": [
     {
      "name": "node-forge",
-     "version": "1.4.0",
+     "version": "1.4.3",
      "copyright": [
       "Copyright (c) 2010, Digital Bazaar, Inc.",
       "Copyright (C) 1989, 1991 Free Software Foundation, Inc.",

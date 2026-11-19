@@ -1,0 +1,1 @@
+{"@type": "PostgreSql", "host": "mail-pg", "port": 5432, "database": "stalwart_v1", "authUsername": "stalwart", "authSecret": {"@type": "EnvironmentVariable", "variableName": "PGPASSWORD"}, "useTls": false, "allowInvalidCerts": false, "poolMaxConnections": 8}

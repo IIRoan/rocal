@@ -1,0 +1,946 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mail-redis
+  namespace: solace-mail
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: mail-redis
+  serviceName: mail-redis
+  template:
+    metadata:
+      labels:
+        app: mail-redis
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - command:
+            - sh
+            - -ec
+            - |
+              primary() {
+                  REDISCLI_AUTH="$SENTINEL_PASSWORD" timeout 2 redis-cli --raw -h "$1" -p 26379 SENTINEL get-master-addr-by-name solace 2>/dev/null | head -n 1
+              }
+              while :; do
+                  a=$(primary 10.43.11.29)
+                  b=$(primary 10.43.45.232)
+                  c=$(primary 10.43.35.161)
+                  leader=""
+                  if [ -n "$a" ] && { [ "$a" = "$b" ] || [ "$a" = "$c" ]; }; then
+                      leader=$a
+                  elif [ -n "$b" ] && [ "$b" = "$c" ]; then
+                      leader=$b
+                  fi
+                  case "$leader" in 10.43.163.106|10.43.42.212) break;; esac
+                  sleep 2
+              done
+              set -- redis-server --protected-mode yes --requirepass "$REDIS_PASSWORD" --masterauth "$REDIS_PASSWORD" --save "" --appendonly no --maxmemory 64mb --maxmemory-policy noeviction --replica-announce-ip 10.43.163.106 --replica-read-only yes
+              if [ "$leader" != "10.43.163.106" ]; then
+                  set -- "$@" --replicaof "$leader" 6379
+              fi
+              exec "$@"
+          env:
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: SENTINEL_PASSWORD
+                  name: mail-redis-sentinel-auth
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: REDIS_PASSWORD
+                  name: mail-object-auth
+          image: docker.io/library/redis@sha256:896f241f438ab6a210cfb24f573b84bea721a4cbe67f1b4fd07eb638b3b02a7b
+          imagePullPolicy: IfNotPresent
+          name: mail-redis
+          readinessProbe:
+            failureThreshold: 3
+            periodSeconds: 2
+            successThreshold: 1
+            tcpSocket:
+              port: 6379
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 300m
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsGroup: 10001
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /data
+              name: redis-runtime
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-mail
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 10001
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - name: redis-runtime
+          emptyDir: {}
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mail-redis-replica
+  namespace: solace-mail
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: mail-redis-replica
+  serviceName: mail-redis-replica
+  template:
+    metadata:
+      labels:
+        app: mail-redis-replica
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - command:
+            - sh
+            - -ec
+            - |
+              primary() {
+                  REDISCLI_AUTH="$SENTINEL_PASSWORD" timeout 2 redis-cli --raw -h "$1" -p 26379 SENTINEL get-master-addr-by-name solace 2>/dev/null | head -n 1
+              }
+              while :; do
+                  a=$(primary 10.43.11.29)
+                  b=$(primary 10.43.45.232)
+                  c=$(primary 10.43.35.161)
+                  leader=""
+                  if [ -n "$a" ] && { [ "$a" = "$b" ] || [ "$a" = "$c" ]; }; then
+                      leader=$a
+                  elif [ -n "$b" ] && [ "$b" = "$c" ]; then
+                      leader=$b
+                  fi
+                  case "$leader" in 10.43.42.212|10.43.163.106) break;; esac
+                  sleep 2
+              done
+              set -- redis-server --protected-mode yes --requirepass "$REDIS_PASSWORD" --masterauth "$REDIS_PASSWORD" --save "" --appendonly no --maxmemory 64mb --maxmemory-policy noeviction --replica-announce-ip 10.43.42.212 --replica-read-only yes
+              if [ "$leader" != "10.43.42.212" ]; then
+                  set -- "$@" --replicaof "$leader" 6379
+              fi
+              exec "$@"
+          env:
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: SENTINEL_PASSWORD
+                  name: mail-redis-sentinel-auth
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: REDIS_PASSWORD
+                  name: mail-object-auth
+          image: docker.io/library/redis@sha256:896f241f438ab6a210cfb24f573b84bea721a4cbe67f1b4fd07eb638b3b02a7b
+          imagePullPolicy: IfNotPresent
+          name: mail-redis-replica
+          readinessProbe:
+            failureThreshold: 3
+            periodSeconds: 2
+            successThreshold: 1
+            tcpSocket:
+              port: 6379
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 300m
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsGroup: 10001
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /data
+              name: redis-runtime
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-1
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 10001
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - name: redis-runtime
+          emptyDir: {}
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-redis-sentinel-a
+  namespace: solace-mail
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      instance: mail-redis-sentinel-a
+  serviceName: mail-redis-sentinel-a
+  template:
+    metadata:
+      labels:
+        app: mail-redis-sentinel
+        app.kubernetes.io/part-of: solace
+        instance: mail-redis-sentinel-a
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - command:
+            - sh
+            - -ec
+            - |
+              umask 077
+              if [ ! -s /data/sentinel.conf ] || grep -Eq "^sentinel monitor solace [[:alpha:]]" /data/sentinel.conf; then
+                  cat > /data/sentinel.conf.new <<EOF
+              bind 0.0.0.0
+              port 26379
+              protected-mode yes
+              dir /data
+              requirepass "$SENTINEL_PASSWORD"
+              sentinel announce-ip 10.43.11.29
+              sentinel monitor solace 10.43.163.106 6379 2
+              sentinel auth-pass solace "$REDIS_PASSWORD"
+              sentinel sentinel-pass "$SENTINEL_PASSWORD"
+              sentinel down-after-milliseconds solace 9000
+              sentinel failover-timeout solace 30000
+              sentinel parallel-syncs solace 1
+              EOF
+                  mv /data/sentinel.conf.new /data/sentinel.conf
+              fi
+              exec redis-sentinel /data/sentinel.conf
+          env:
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: SENTINEL_PASSWORD
+                  name: mail-redis-sentinel-auth
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: REDIS_PASSWORD
+                  name: mail-object-auth
+          image: docker.io/library/redis@sha256:896f241f438ab6a210cfb24f573b84bea721a4cbe67f1b4fd07eb638b3b02a7b
+          imagePullPolicy: IfNotPresent
+          name: sentinel
+          ports:
+            - containerPort: 26379
+              name: sentinel
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -ec
+                - REDISCLI_AUTH="$SENTINEL_PASSWORD" redis-cli --raw -p 26379 ping | grep -qx PONG
+            failureThreshold: 3
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 2
+          resources:
+            limits:
+              cpu: 150m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 16Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /data
+              name: state
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-mail
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 999
+        runAsGroup: 999
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: state
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 32Mi
+        storageClassName: local-path
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-redis-sentinel-b
+  namespace: solace-mail
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      instance: mail-redis-sentinel-b
+  serviceName: mail-redis-sentinel-b
+  template:
+    metadata:
+      labels:
+        app: mail-redis-sentinel
+        app.kubernetes.io/part-of: solace
+        instance: mail-redis-sentinel-b
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - command:
+            - sh
+            - -ec
+            - |
+              umask 077
+              if [ ! -s /data/sentinel.conf ] || grep -Eq "^sentinel monitor solace [[:alpha:]]" /data/sentinel.conf; then
+                  cat > /data/sentinel.conf.new <<EOF
+              bind 0.0.0.0
+              port 26379
+              protected-mode yes
+              dir /data
+              requirepass "$SENTINEL_PASSWORD"
+              sentinel announce-ip 10.43.45.232
+              sentinel monitor solace 10.43.163.106 6379 2
+              sentinel auth-pass solace "$REDIS_PASSWORD"
+              sentinel sentinel-pass "$SENTINEL_PASSWORD"
+              sentinel down-after-milliseconds solace 9000
+              sentinel failover-timeout solace 30000
+              sentinel parallel-syncs solace 1
+              EOF
+                  mv /data/sentinel.conf.new /data/sentinel.conf
+              fi
+              exec redis-sentinel /data/sentinel.conf
+          env:
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: SENTINEL_PASSWORD
+                  name: mail-redis-sentinel-auth
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: REDIS_PASSWORD
+                  name: mail-object-auth
+          image: docker.io/library/redis@sha256:896f241f438ab6a210cfb24f573b84bea721a4cbe67f1b4fd07eb638b3b02a7b
+          imagePullPolicy: IfNotPresent
+          name: sentinel
+          ports:
+            - containerPort: 26379
+              name: sentinel
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -ec
+                - REDISCLI_AUTH="$SENTINEL_PASSWORD" redis-cli --raw -p 26379 ping | grep -qx PONG
+            failureThreshold: 3
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 2
+          resources:
+            limits:
+              cpu: 150m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 16Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /data
+              name: state
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-1
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 999
+        runAsGroup: 999
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: state
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 32Mi
+        storageClassName: local-path
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-redis-sentinel-witness
+  namespace: solace-mail
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      instance: mail-redis-sentinel-witness
+  serviceName: mail-redis-sentinel-witness
+  template:
+    metadata:
+      labels:
+        app: mail-redis-sentinel
+        app.kubernetes.io/part-of: solace
+        instance: mail-redis-sentinel-witness
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - command:
+            - sh
+            - -ec
+            - |
+              umask 077
+              if [ ! -s /data/sentinel.conf ] || grep -Eq "^sentinel monitor solace [[:alpha:]]" /data/sentinel.conf; then
+                  cat > /data/sentinel.conf.new <<EOF
+              bind 0.0.0.0
+              port 26379
+              protected-mode yes
+              dir /data
+              requirepass "$SENTINEL_PASSWORD"
+              sentinel announce-ip 10.43.35.161
+              sentinel monitor solace 10.43.163.106 6379 2
+              sentinel auth-pass solace "$REDIS_PASSWORD"
+              sentinel sentinel-pass "$SENTINEL_PASSWORD"
+              sentinel down-after-milliseconds solace 9000
+              sentinel failover-timeout solace 30000
+              sentinel parallel-syncs solace 1
+              EOF
+                  mv /data/sentinel.conf.new /data/sentinel.conf
+              fi
+              exec redis-sentinel /data/sentinel.conf
+          env:
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: SENTINEL_PASSWORD
+                  name: mail-redis-sentinel-auth
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: REDIS_PASSWORD
+                  name: mail-object-auth
+          image: docker.io/library/redis@sha256:896f241f438ab6a210cfb24f573b84bea721a4cbe67f1b4fd07eb638b3b02a7b
+          imagePullPolicy: IfNotPresent
+          name: sentinel
+          ports:
+            - containerPort: 26379
+              name: sentinel
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -ec
+                - REDISCLI_AUTH="$SENTINEL_PASSWORD" redis-cli --raw -p 26379 ping | grep -qx PONG
+            failureThreshold: 3
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 2
+          resources:
+            limits:
+              cpu: 150m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 16Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /data
+              name: state
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: roan-server
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 999
+        runAsGroup: 999
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: state
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 32Mi
+        storageClassName: local-path
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mail-s3
+  namespace: solace-mail
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: mail-s3
+  serviceName: mail-s3
+  template:
+    metadata:
+      labels:
+        app: mail-s3
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - webdock-mail
+              weight: 60
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - webdock-mail
+                      - webdock-1
+      automountServiceAccountToken: false
+      containers:
+        - args:
+            - server
+            - -dir=/data
+            - -ip=127.0.0.1
+            - -ip.bind=127.0.0.1
+            - -s3
+            - -s3.ip.bind=0.0.0.0
+            - -s3.port=8333
+            - -s3.port.lance=0
+            - -s3.config=/etc/s3/s3.json
+            - -s3.autoCreateBucket=false
+            - -master.volumeSizeLimitMB=128
+            - -volume.max=24
+          command:
+            - /usr/bin/weed
+          image: docker.io/chrislusf/seaweedfs@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8
+          imagePullPolicy: IfNotPresent
+          name: seaweed
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -ec
+                - curl -fsS --max-time 2 http://127.0.0.1:9333/cluster/status | grep -Fq '"IsLeader":true' && curl -fsS --max-time
+                  2 http://127.0.0.1:9333/dir/status | grep -Fq '"DataNodes":[{'
+            failureThreshold: 3
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources:
+            limits:
+              cpu: 750m
+              memory: 512Mi
+            requests:
+              cpu: 75m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsGroup: 1000
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /data
+              name: data
+            - mountPath: /etc/s3
+              name: config
+              readOnly: true
+            - mountPath: /tmp
+              name: tmp
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mail-objects
+        - name: config
+          secret:
+            defaultMode: 420
+            items:
+              - key: s3.json
+                path: s3.json
+            secretName: mail-object-auth
+        - name: tmp
+          emptyDir: {}
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mail-objects
+  namespace: solace-mail
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi
+  storageClassName: solace-s3-encrypted
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace-mail
+  name: stalwart-a-logs
+  namespace: solace-mail
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace-mail
+  name: stalwart-b-logs
+  namespace: solace-mail
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path
+  volumeMode: Filesystem
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  labels:
+    app.kubernetes.io/part-of: solace
+  name: mail-database
+  namespace: solace-mail
+spec:
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - preference:
+            matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - webdock-1
+          weight: 60
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - webdock-1
+                  - webdock-mail
+    podAntiAffinityType: required
+    tolerations:
+      - effect: NoSchedule
+        key: roan.dev/apps-only
+        operator: Equal
+        value: 'true'
+      - effect: NoSchedule
+        key: roan.dev/mail-only
+        operator: Equal
+        value: 'true'
+    topologyKey: kubernetes.io/hostname
+  bootstrap:
+    initdb:
+      dataChecksums: true
+      database: stalwart_v1
+      encoding: UTF8
+      localeCType: C
+      localeCollate: C
+      owner: stalwart
+      secret:
+        name: mail-database-app
+  enablePDB: true
+  enableSuperuserAccess: false
+  failoverDelay: 10
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-standard-trixie@sha256:37fdeea29a4d3ed14570f719488ba55bd21e8975eaea864be5ce74d25a9a13de
+  inheritedMetadata: {}
+  instances: 2
+  logLevel: info
+  maxSyncReplicas: 0
+  minSyncReplicas: 0
+  monitoring:
+    customQueriesConfigMap:
+      - key: queries
+        name: cnpg-default-monitoring
+    disableDefaultQueries: false
+    enablePodMonitor: false
+  postgresGID: 26
+  postgresUID: 26
+  postgresql:
+    parameters:
+      archive_mode: 'on'
+      archive_timeout: 5min
+      dynamic_shared_memory_type: posix
+      full_page_writes: 'on'
+      log_destination: csvlog
+      log_directory: /controller/log
+      log_filename: postgres
+      log_rotation_age: '0'
+      log_rotation_size: '0'
+      log_truncate_on_rotation: 'false'
+      logging_collector: 'on'
+      max_connections: '32'
+      max_parallel_workers: '8'
+      max_replication_slots: '32'
+      max_slot_wal_keep_size: 1GB
+      max_worker_processes: '12'
+      shared_buffers: 48MB
+      shared_memory_type: mmap
+      shared_preload_libraries: ''
+      ssl_max_protocol_version: TLSv1.3
+      ssl_min_protocol_version: TLSv1.3
+      wal_keep_size: 128MB
+      wal_level: logical
+      wal_log_hints: 'on'
+      wal_receiver_timeout: 5s
+      wal_sender_timeout: 5s
+      work_mem: 4MB
+    syncReplicaElectionConstraint:
+      enabled: false
+    synchronous:
+      dataDurability: preferred
+      failoverQuorum: true
+      method: any
+      number: 1
+  primaryUpdateMethod: restart
+  primaryUpdateStrategy: unsupervised
+  probes:
+    liveness:
+      isolationCheck:
+        connectionTimeout: 1000
+        enabled: true
+        requestTimeout: 1000
+  replicationSlots:
+    highAvailability:
+      enabled: true
+      slotPrefix: _cnpg_
+    synchronizeReplicas:
+      enabled: true
+    updateInterval: 30
+  resources:
+    limits:
+      cpu: 750m
+      memory: 512Mi
+    requests:
+      cpu: 75m
+      memory: 128Mi
+  smartShutdownTimeout: 15
+  startDelay: 3600
+  stopDelay: 1800
+  storage:
+    resizeInUseVolumes: true
+    size: 4Gi
+    storageClass: solace-pg-encrypted
+  switchoverDelay: 45

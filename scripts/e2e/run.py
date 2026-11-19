@@ -497,10 +497,13 @@ def run_journey(platform, app, flow, results, backend_expected=True):
     passed, reason, exit_code = False, blocked, None
     # Without the API the journey would only report a sign-in or loading assertion that says nothing about the app.
     if not blocked:
+        timeout = 600
+        if platform == "ios":
+            timeout = 1500 if app == "calendar" and name == "01-authentication" else 1200
         # A failed journey runs once: a replay would start from app and server state it already changed, such as a completed sign-in.
         try:
             with (root / f"private/{app}-{name}.log").open("wb") as log:
-                exit_code = run_maestro(command, environment, log, 1200 if platform == "ios" else 600)
+                exit_code = run_maestro(command, environment, log, timeout)
             passed = exit_code == 0
             if not passed:
                 reason = failure_kind(root / f"private/{app}-{name}.log", root / f"private/{app}-{name}.xml")

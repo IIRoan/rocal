@@ -6,6 +6,8 @@ import subprocess
 import tempfile
 import unittest
 
+import yaml
+
 
 ENTRYPOINT = Path(__file__).resolve().parents[1] / "entrypoint.sh"
 
@@ -37,14 +39,16 @@ class EntrypointSecurityTests(unittest.TestCase):
             self.assertIn(f"su-exec:gatus {script}", log.read_text())
             self.assertFalse((root / "data/config.yaml").exists())
 
-    def prepare(self, directory, config, pin="mail.test ssh-ed25519 test-pin"):
+    def prepare(self, directory, config, pin="mail.test ssh-ed25519 test-pin", secondary=None):
         data = Path(directory, "data")
         source = ENTRYPOINT.read_text().split("\nwrite_base_config\n", 1)[0]
         script = Path(directory, "entrypoint-functions.sh")
-        script.write_text(source.replace("/data", str(data)) + '\nwrite_base_config\nappend_vps_ssh_endpoints\nprintf "%s" "$GATUS_SSH_KNOWN_HOSTS"\n')
+        script.write_text(source.replace("/data", str(data)).replace("/usr/local/lib/solace", str(ENTRYPOINT.parent)) + '\nwrite_base_config\nappend_vps_ssh_endpoints\nprintf "%s" "$GATUS_SSH_KNOWN_HOSTS"\n')
         env = {"PATH": os.environ["PATH"], "PORT": "8080", "GATUS_CONFIG_YAML": config, "VPS_MONITOR_SSH_USERNAME": "monitor", "VPS_MONITOR_SSH_PRIVATE_KEY": "test-private-key"}
         if pin is not None:
             env["VPS_MONITOR_SSH_KNOWN_HOSTS"] = pin
+        if secondary is not None:
+            env["VPS_MONITOR_SSH_SECONDARY_HOST"] = secondary
         return data, subprocess.run(["sh", str(script)], env=env, capture_output=True, text=True, timeout=5)
 
     def test_existing_custom_endpoint_still_prepares_private_host_pins(self):
@@ -63,6 +67,20 @@ class EntrypointSecurityTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse((data / "vps_monitor_key").exists())
             self.assertNotIn("test-private-key", result.stdout + result.stderr)
+
+    def test_secondary_is_independent_of_existing_primary_override(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data, result = self.prepare(directory, "endpoints:\n  - name: vps-health\nweb:\n  port: 8081\n", secondary="mx2.test")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            config = (data / "config.yaml").read_text()
+            parsed = yaml.safe_load(config)
+            self.assertEqual(parsed["web"], {"port": 8081})
+            primary, secondary = parsed["endpoints"]
+            self.assertEqual(primary, {"name": "vps-health"})
+            self.assertEqual(secondary["name"], "vps-secondary-health")
+            self.assertEqual(secondary["url"], "ssh://mx2.test:22")
+            self.assertIn("/usr/local/bin/solace-vps-health", secondary["body"])
+            self.assertIn("[BODY].smtpStarttls == true", secondary["conditions"])
 
 
 if __name__ == "__main__":

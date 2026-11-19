@@ -806,6 +806,38 @@ class HarnessTests(unittest.TestCase):
                     for sentinel in (password, email, device, "progress-path-sentinel", "22087", "Create new event", "onl.solace"):
                         self.assertNotIn(sentinel.encode(), exported)
 
+    def test_only_ios_calendar_authentication_allows_extra_time_for_sign_in_and_driver_exit(self):
+        cases = (("ios", "calendar", "01-authentication", 1260, 1500, True),
+                 ("ios", "calendar", "01-authentication", 1501, 1500, False),
+                 ("ios", "calendar", "02-calendar-management", 1, 1200, True),
+                 ("ios", "mail", "01-unlock-and-draft", 1, 1200, True),
+                 ("ios", "mail", "01-authentication", 1, 1200, True),
+                 ("android", "calendar", "01-authentication", 1, 600, True))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                private = directory() / "private"
+                (private / "device.json").write_text(json.dumps({"id": "synthetic-device"}))
+                (private / "fixture.json").write_text(json.dumps({"email": "journey@solace.test", "password": "synthetic"}))
+                (private / "maestro-path").write_text("synthetic-maestro")
+                for platform, app, name, duration, expected, passed in cases:
+                    with self.subTest(platform=platform, app=app, name=name):
+                        def maestro(command, environment, log, timeout):
+                            if duration > timeout:
+                                raise journeys.subprocess.TimeoutExpired(command, timeout)
+                            return 0
+                        with patch.object(journeys, "run_maestro", side_effect=maestro) as execute, \
+                                patch.object(connectivity, "prepare", return_value=({**ANDROID_READY, "reverseRestored": False}, None)), \
+                                patch.object(journeys, "capture_failure_screenshot"), patch.object(journeys, "capture_failure_hierarchy"), \
+                                redirect_stdout(io.StringIO()):
+                            results = []
+                            self.assertEqual(journeys.run_journey(platform, app, Path(f"{name}.yaml"), results), passed)
+                        self.assertEqual(results[0]["passed"], passed)
+                        if not passed:
+                            self.assertEqual(results[0]["reason"], "journey-timeout")
+                        execute.assert_called_once()
+                        self.assertEqual(execute.call_args.args[-1], expected)
+
     def test_only_ios_journeys_get_a_unique_maestro_state_and_passing_journeys_export_no_progress(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "solace-e2e"

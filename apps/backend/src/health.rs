@@ -1,5 +1,7 @@
 //! Health and root routes: liveness, mail server reachability, the connectivity test, the root redirect and security.txt.
 
+use std::time::Instant;
+
 use axum::Json;
 use axum::extract::{RawQuery, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
@@ -43,13 +45,15 @@ pub async fn health() -> Json<HealthStatus> {
 )]
 #[tracing::instrument(skip_all)]
 pub async fn mail_jmap(State(state): State<AppState>) -> Response {
-    match reachability::probe(
+    let started = Instant::now();
+    let upstream = reachability::probe(
         &state.http_no_redirect,
         &state.config.stalwart_base_url,
         &state.stalwart_gate,
     )
-    .await
-    {
+    .await;
+    let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+    let mut response = match upstream {
         Ok(()) => Json(HealthStatus {
             status: "ok".into(),
         })
@@ -62,7 +66,14 @@ pub async fn mail_jmap(State(state): State<AppState>) -> Response {
             }),
         )
             .into_response(),
+    };
+    if let Ok(timing) = HeaderValue::from_str(&format!("stalwart-jmap;dur={elapsed_ms:.3}")) {
+        response.headers_mut().insert("server-timing", timing);
     }
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
 }
 
 /// Fresh complete metadata cycles without encryption-policy drift; never gates mail delivery.

@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: stalwart
+      spec:
+        minReadySeconds: 60
+        template:
+          spec:
+            terminationGracePeriodSeconds: 50
+            containers:
+              - name: stalwart
+                lifecycle:
+                  preStop:
+                    sleep:
+                      seconds: 18
+              - name: gateway
+                lifecycle:
+                  preStop:
+                    exec:
+                      command:
+                        - /bin/sh
+                        - -c
+                        - |
+                          printf 'shutdown frontend ft_rollout_ready; shutdown frontend ft_edge_admin\n' |
+                            socat -T 2 - UNIX-CONNECT:/tmp/solace-haproxy.sock
+                          sleep 18
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8084
+                    scheme: HTTP
+                  failureThreshold: 1
+                  periodSeconds: 3
+                  timeoutSeconds: 1
+    target:
+      kind: Deployment

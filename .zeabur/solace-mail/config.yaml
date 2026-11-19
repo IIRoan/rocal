@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: solace-tunnel-ingress
+  namespace: solace-mail
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-pg-ca
+  namespace: solace-mail
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIBmTCCAT+gAwIBAgIUNoIbzFGUxtFsm/58GOdg86r/0zcwCgYIKoZIzj0EAwIw
+    KTEnMCUGA1UEAwweU29sYWNlIGFwcGxpY2F0aW9uIGRhdGFiYXNlIENBMB4XDTI2
+    MTExODEyNTkyMFoXDTI4MTExNzEyNTkyMFowKTEnMCUGA1UEAwweU29sYWNlIGFw
+    cGxpY2F0aW9uIGRhdGFiYXNlIENBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE
+    yCu0oRcnhapafvXAdFE14qV68OO/L3Pc/DIJSqkcpM8MZfbNxbyYE1ai07eX0qq1
+    eZN539PUaOgKJLGGztHAQKNFMEMwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8B
+    Af8EBAMCAQYwHQYDVR0OBBYEFFhEDrWAd9B/28tkcEDHzTw4kr/sMAoGCCqGSM49
+    BAMCA0gAMEUCIQCVjK2PgyU7SxrqNUIttXxAc9SLoISWsFfn1jjtZhQvYAIgJjp3
+    LBZG7Mf20Ax8T2pSPxnzuZ6QX6VC2UN254OUaFs=
+    -----END CERTIFICATE-----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: solace-origin-ca
+  namespace: solace-mail
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIEHzCCAoegAwIBAgIUf+bAAlmXiCeW0mIG6CcHT7UHuN4wDQYJKoZIhvcNAQEL
+    BQAwJjEkMCIGA1UEAwwbU29sYWNlIENsb3VkZmxhcmUgT3JpZ2luIENBMB4XDTI2
+    MTExODEzMzEzM1oXDTMzMTExNjEzMzEzM1owJjEkMCIGA1UEAwwbU29sYWNlIENs
+    b3VkZmxhcmUgT3JpZ2luIENBMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKC
+    AYEAtXWLzVPiGffx4iw0R48HQTI1CSjIWWqaS6y7rK9Wmh+jE0ccKVi+MGMahWIZ
+    BnZwmtJewVNmqxK0FpKLEdUi6IzaD9BaMHL2DcLluHt3h7ksUF43C4dLKtzt5dOM
+    TFnzKPoAyIznS7WoTyhDV/VUjGc5ZQI1+7Wj+xuA0cLWNKeEymQ5UktYgfgY1LXm
+    mTTxq7sKzvFp/pHojlXlYfDhUFW1Zic3Y0+k5J4KUPmB4xvB7ACHWk36kXu5+wku
+    X/XsahFxyVNUG4LcHRoYUWMTej/nV5qc7rnEmBzVlABpA7FEph2R1TRCB8x0Z/F4
+    yxAXhFa/ci9iLITaJN1gpGZh5YKqi2IR9jCa7YmsLjDfQHUnMqj+pXXCxocoXWVb
+    Qiv4FnAieUFm3eNixwosnUuzTY8BZfsJ3qLOiTN8DiyTacvWnBiMrJn1nkGaL8mH
+    pkrqcBnTOClzeRFSBpaxFaXhCCDd/U3RJkMsiKGL/oHQbDIrKRhvX18sNSk1Lo7U
+    MvkfAgMBAAGjRTBDMBIGA1UdEwEB/wQIMAYBAf8CAQAwDgYDVR0PAQH/BAQDAgEG
+    MB0GA1UdDgQWBBQt5wIK3Yqm85fo+1R13MNksZJtJDANBgkqhkiG9w0BAQsFAAOC
+    AYEAVIG9SIy5C8lLbMjXXLf1FS/MQycQWwEz7uVER019zgAddcvG35Rwd6eiG7Fb
+    C0Rh++6NS+wSmwETHLf7eG6FIWsKrLfyA9pYU8ZurbbfV0RFmXHADT7f7z7C6n0Q
+    +rVjUaltThAqLHM2d0gYfPBbJNy8sV8BWE4LMWXHDhjs7FR6podTRbjzbBJf8UmB
+    Tc2oJ1gFJ0O+ngHUVqyjL5Htq/AHYpSkRgxiDw/Z8E3pcWEhq9RmkzWrRXxQoH65
+    KGP7kwXxd9SC0jBXAI10ITxlHJN4YUI+GNch+GjVcT5z801waSRlWHuH8A1RpiDV
+    i6/WNaZ8PUx9alQrgbTXiKbgSFBuMxB0AbdSWU7kV6CG6itaXEsLPiY07drPS7fE
+    H13O7blrTwLOyx6nFV3O+UasxIYG+BFsJ1JXRMTc7XXJysyHs+kqw3lI5sYeTvSd
+    VWrm1f5KKn2DpP0uX18MVHFX7LlEGp0MKMEi6Me0ire9lBxrX4zqsmpTyTNlKEQW
+    Lpyp
+    -----END CERTIFICATE-----
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: solace-origin
+  namespace: solace-mail
+spec:
+  dnsNames:
+    - api.solace.onl
+    - mail.solace.onl
+  duration: 2160h
+  issuerRef:
+    kind: Issuer
+    name: solace-origin-ca
+  privateKey:
+    rotationPolicy: Always
+  renewBefore: 720h
+  secretName: solace-origin-tls
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: solace-origin-ca
+  namespace: solace-mail
+spec:
+  ca:
+    secretName: solace-origin-ca

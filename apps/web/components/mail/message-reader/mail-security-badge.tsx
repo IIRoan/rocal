@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { reviewCurrentMailSenderKey } from "@/lib/mail/mail-trust-lifecycle";
-import { ShieldCheck, ShieldAlert, Lock } from "lucide-react";
+import { Info, ShieldAlert } from "lucide-react";
 import {
   getMailSecurityNotice,
   MAIL_READABLE_METADATA,
@@ -12,24 +12,16 @@ import {
 import { DropdownPanel } from "@workspace/ui/solace";
 import { Button } from "@workspace/ui/components/ui/button";
 import { cn } from "@workspace/ui/lib/utils";
+
 export function MailSecurityBadge(
   props: MailSecurityNoticeInput & {
     senderEmail?: string;
   },
 ) {
   const meta = getMailSecurityNotice(props);
-  const Icon =
-    meta.tone === "encrypted"
-      ? ShieldCheck
-      : meta.tone === "warning"
-        ? ShieldAlert
-        : Lock;
-  const iconClassName =
-    meta.tone === "encrypted"
-      ? "text-accent"
-      : meta.tone === "warning"
-        ? "text-destructive"
-        : "text-muted-foreground";
+  const readingLimit = props.readState === "read_limit";
+  if (meta.tone !== "warning" && !readingLimit) return null;
+  const Icon = readingLimit ? Info : ShieldAlert;
 
   return (
     <DropdownPanel
@@ -42,7 +34,14 @@ export function MailSecurityBadge(
           aria-label={meta.label}
           className="size-11 shrink-0 cursor-pointer"
         >
-          <Icon className={cn(iconClassName)} aria-hidden strokeWidth={2} />
+          <Icon
+            className={cn({
+              "text-muted-foreground": readingLimit,
+              "text-destructive": !readingLimit,
+            })}
+            aria-hidden
+            strokeWidth={2}
+          />
         </Button>
       }
     >

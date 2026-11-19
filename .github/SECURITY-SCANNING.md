@@ -6,7 +6,7 @@ Chainguard Guardener maintains the hardened Actions and container migrations in 
 | --- | --- |
 | CodeQL | Rust API and notifications, JavaScript/TypeScript web and Expo apps and shared packages, Python helpers, Actions workflows, and the Swift notification extension |
 | Bun audit | Every JavaScript workspace in `bun.lock`, including transitive and development dependencies |
-| Trivy repository | Cargo dependencies including development dependencies, and Dockerfile misconfigurations |
+| Trivy repository | Cargo dependencies including development dependencies, and Dockerfile and Kubernetes misconfigurations |
 | Trivy containers | Images built from the backend, notifications, Stalwart, and Gatus Dockerfiles |
 | GitHub secret protection | Repository secret scanning and push protection, enabled in repository settings |
 | Dependabot | Dependency alerts and security updates, plus weekly Bun, Cargo, and Actions update PRs |
@@ -15,6 +15,8 @@ Chainguard Guardener maintains the hardened Actions and container migrations in 
 CodeQL uses the `security-extended` queries. The Swift job compiles the checked-in notification extension on macOS; it does not build or publish an Expo app. The Rust analysis does not need a production build. Container jobs build locally on the runner and never push an image or deploy a service. Aikido is not required.
 
 Trivy 0.76.1 misidentifies nested Bun lockfile entries, so repository scanning skips `bun.lock` and the native `bun audit` command handles JavaScript instead. Bun does not install dependencies or run lifecycle scripts during its audit. No generated lockfile or custom parser is needed.
+
+The Kubernetes checks read the Solace image registry policy from [`.github/trivy-data/registries.yaml`](trivy-data/registries.yaml). Solace workload manifests pin the image digests in Git.
 
 Trivy publishes all severities, including unfixed vulnerabilities, to **Security → Code scanning** and adds inventory summaries to each job. Bun publishes its full advisory response in the job summary. These inventory scans report the existing backlog without failing unrelated pull requests; scanner, registry, build, malformed-report and upload errors still fail their jobs. No advisory IDs are ignored or automatically accepted.
 
@@ -26,7 +28,7 @@ To reproduce the dependency checks without installing packages:
 
 ```sh
 bun audit --json
-trivy fs --scanners vuln,misconfig --include-dev-deps --skip-files bun.lock --skip-dirs node_modules,target,.git,webmail --format json --output /tmp/solace-security.json .
+trivy fs --scanners vuln,misconfig --include-dev-deps --config-data .github/trivy-data --skip-files bun.lock --skip-dirs node_modules,target,.git,webmail --format json --output /tmp/solace-security.json .
 trivy convert --format table --scanners vuln,misconfig --table-mode summary /tmp/solace-security.json
 ```
 
