@@ -87,6 +87,8 @@ The application mail gateways still use a compatibility host alias for the priva
 
 The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. HTTPS on `mx.solace.onl` passes encrypted traffic through to the existing Stalwart listener with PROXY v2. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.
 
+Traefik copies the public Service’s load balancer addresses to the Ingress status. Zeabur uses that status and the pod port declarations to check each route against DNS. Manage these six existing routes through the Git manifests. cert-manager owns certificate issuance and renewal, and Cloudflare hosts the authoritative DNS records.
+
 Provision `solace-acme-dns` in `solace-mail` with the `api-token` key and DNS write and zone read access restricted to `solace.onl`. Flux reconciles the issuer and certificate. cert-manager renews the public certificate in `solace-public-tls`, which both Traefik replicas read. The DNS challenge works before changing the public HTTPS records. Alert on both the Certificate's readiness and the expiry served from each worker.
 
 A cluster administrator applies the networking manifests. On each Webdock worker set K3s `node-external-ip` to the public IPv4 already assigned directly to `eth0`. Keep the existing private `node-ip` for cluster communication. Restart one worker agent at a time and verify its advertised external address. Do not set an external address on the MacBook for this deployment.

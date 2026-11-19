@@ -170,6 +170,9 @@ spec:
             - containerPort: 8080
               name: edge
               protocol: TCP
+            - containerPort: 8085
+              name: public-direct
+              protocol: TCP
           readinessProbe:
             failureThreshold: 3
             httpGet:

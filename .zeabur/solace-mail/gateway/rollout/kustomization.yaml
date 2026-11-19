@@ -18,6 +18,25 @@ patches:
                     sleep:
                       seconds: 18
               - name: gateway
+                ports:
+                  - containerPort: 8081
+                    name: private-jmap
+                    protocol: TCP
+                  - containerPort: 8082
+                    name: public-jmap
+                    protocol: TCP
+                  - containerPort: 8085
+                    name: public-direct
+                    protocol: TCP
+                  - containerPort: 18080
+                    name: legacy-admin
+                    protocol: TCP
+                  - containerPort: 18443
+                    name: edge-https
+                    protocol: TCP
+                  - containerPort: 22525
+                    name: edge-smtp
+                    protocol: TCP
                 lifecycle:
                   preStop:
                     exec:
