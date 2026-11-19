@@ -16,11 +16,12 @@ kubectl apply --server-side -f .zeabur/bootstrap/ingress-rbac.yaml
 kubectl apply --server-side -f .zeabur/bootstrap/reconciler.yaml
 kubectl apply --server-side -f .zeabur/bootstrap/stalwart-rollout.yaml
 kubectl delete clusterrolebinding,clusterrole solace-project-bootstrap-resources --ignore-not-found
+kubectl apply --server-side -f .zeabur/bootstrap/release-image-policy.yaml
 kubectl apply --server-side -f .zeabur/bootstrap/production-releases.yaml
 kubectl apply --server-side -f .zeabur/bootstrap/sync.yaml
 ```
 
-All three workload stages start suspended. The release inputs are initialized from the current workload pins. On a clean cluster, the Git fallback pins allow Flux to create the workloads before the release controller records their digests. The separate release request stage reads the branch published by GitHub Actions. After the desired commit reaches `master`, review the [server-side diffs](../README.md#deploy-from-git), confirm field ownership and verify the reconciler lacks write access to namespaces and networking. Review the shared stage's API, Redis and PostgreSQL rollouts together. Schedule that first apply with the existing volumes and health checks in place.
+All three workload stages start suspended. The release inputs are initialized from the current workload pins. On a clean cluster, the Git fallback pins allow Flux to create the workloads before the release controller records their digests. Flux fetches the GitHub Actions request branch. The release controller reads the verified source artifact and can patch only the named image ConfigMap. Admission restricts that patch to the four approved digest references. After the desired commit reaches `master`, review the [server-side diffs](../README.md#deploy-from-git), confirm field ownership and verify the reconciler lacks write access to namespaces and networking. Review the shared stage's API, Redis and PostgreSQL rollouts together. Schedule that first apply with the existing volumes and health checks in place.
 
 Resume the shared stage and Stalwart A separately. Verify the applied revision, Stalwart A readiness, both MX STARTTLS endpoints and private and public JMAP before resuming Stalwart B.
 

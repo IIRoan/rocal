@@ -1,0 +1,52 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: solace-release-images
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: solace-gitops
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [UPDATE]
+        resources: [configmaps]
+        resourceNames: [solace-release-images]
+  matchConditions:
+    - name: release-controller
+      expression: request.userInfo.username == "system:serviceaccount:solace-mail:solace-release-controller"
+  validations:
+    - expression: >-
+        has(object.data) &&
+        object.data.size() == 4 &&
+        "SOLACE_API_IMAGE" in object.data &&
+        object.data.SOLACE_API_IMAGE.matches("^zot[.]zot[.]svc:5000/(solace-api|solace-mail)/api@sha256:[0-9a-f]{64}$") &&
+        "SOLACE_NOTIFICATIONS_IMAGE" in object.data &&
+        object.data.SOLACE_NOTIFICATIONS_IMAGE.matches("^zot[.]zot[.]svc:5000/(solace-api|solace-mail)/notifications@sha256:[0-9a-f]{64}$") &&
+        "SOLACE_STALWART_A_IMAGE" in object.data &&
+        object.data.SOLACE_STALWART_A_IMAGE.matches("^zot[.]zot[.]svc:5000/solace-mail/stalwart@sha256:[0-9a-f]{64}$") &&
+        "SOLACE_STALWART_B_IMAGE" in object.data &&
+        object.data.SOLACE_STALWART_B_IMAGE.matches("^zot[.]zot[.]svc:5000/solace-mail/stalwart@sha256:[0-9a-f]{64}$")
+      message: Release inputs must contain only the four immutable Solace image references from their approved Zot repositories.
+    - expression: >-
+        !has(object.binaryData) &&
+        !has(object.immutable) &&
+        (has(object.metadata.labels) ? object.metadata.labels : {}) ==
+          (has(oldObject.metadata.labels) ? oldObject.metadata.labels : {}) &&
+        (has(object.metadata.annotations) ? object.metadata.annotations : {}) ==
+          (has(oldObject.metadata.annotations) ? oldObject.metadata.annotations : {}) &&
+        (has(object.metadata.finalizers) ? object.metadata.finalizers : []) ==
+          (has(oldObject.metadata.finalizers) ? oldObject.metadata.finalizers : []) &&
+        (has(object.metadata.ownerReferences) ? object.metadata.ownerReferences : []) ==
+          (has(oldObject.metadata.ownerReferences) ? oldObject.metadata.ownerReferences : [])
+      message: The release controller can change image references only.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: solace-release-images
+spec:
+  policyName: solace-release-images
+  validationActions: [Deny]
