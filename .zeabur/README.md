@@ -65,7 +65,7 @@ The application mail gateways still use a compatibility host alias for the priva
 
 ## Direct public ingress
 
-The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. Cloudflared keeps using the original Traefik deployment and origin CA. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.
+The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. HTTPS on `mx.solace.onl` passes encrypted traffic through to the existing Stalwart listener with PROXY v2. Cloudflared keeps using the original Traefik deployment and origin CA. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.
 
 Provision `solace-acme-dns` in `solace-mail` with the `api-token` key and DNS write and zone read access restricted to `solace.onl`. Flux reconciles the issuer and certificate. cert-manager renews the public certificate in `solace-public-tls`, which both Traefik replicas read. The DNS challenge works before changing the public HTTPS records. Alert on both the Certificate's readiness and the expiry served from each worker.
 
@@ -88,7 +88,7 @@ python3 -B .zeabur/bootstrap/public-edge.py smtp mx mx2
 Run the protocol probes from outside the cluster. For a test listener, set `--https-port` and `--smtp-port` to the temporary public ports. `--skip-smtp` runs only the HTTPS checks before moving SMTP.
 
 ```sh
-python3 -B scripts/probe-solace-edge.py --public-dns
+python3 -B scripts/probe-solace-edge.py --public-dns --mx-https
 ```
 
 If HTTPS fails after the DNS switch, restore the previous DNS records while both connectors still serve. Use the bind helper with no MX argument to clear a Service's VIPs if it must stop intercepting traffic. If SMTP fails, omit the affected worker from the SMTP Service's VIPs with the bootstrap helper and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either rollback.

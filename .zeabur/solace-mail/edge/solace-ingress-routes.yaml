@@ -4,6 +4,12 @@ tcp:
       entryPoints: [smtp]
       rule: HostSNI(`*`)
       service: mail-inbound
+    mx-https:
+      entryPoints: [public]
+      rule: HostSNI(`mx.solace.onl`)
+      service: mx-https
+      tls:
+        passthrough: true
   services:
     mail-inbound:
       loadBalancer:
@@ -11,3 +17,9 @@ tcp:
           version: 2
         servers:
           - address: mail-inbound.solace-mail.svc.cluster.local:2525
+    mx-https:
+      loadBalancer:
+        proxyProtocol:
+          version: 2
+        servers:
+          - address: mail-live.solace-mail.svc.cluster.local:8443
