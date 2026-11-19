@@ -1,7 +1,11 @@
 """Regression checks for selective builds and staged mail rollout."""
 
+import hashlib
 import importlib.util
+from io import BytesIO
+import json
 from pathlib import Path
+import tarfile
 import unittest
 
 
@@ -52,6 +56,33 @@ def replica(pin, healthy=True):
 
 
 class SelectiveReleaseTests(unittest.TestCase):
+    def test_requests_require_the_flux_artifact_digest(self):
+        archive = BytesIO()
+        body = json.dumps({"data": {"notifications": REVISION}}).encode()
+        with tarfile.open(fileobj=archive, mode="w:gz") as tar:
+            member = tarfile.TarInfo("requests.json")
+            member.size = len(body)
+            tar.addfile(member, BytesIO(body))
+        data = archive.getvalue()
+        artifact = {
+            "path": controller.ARTIFACT_ROOT + REVISION + ".tar.gz",
+            "size": len(data),
+            "digest": "sha256:" + hashlib.sha256(data).hexdigest(),
+        }
+
+        def kube(path):
+            self.assertEqual(path, controller.SOURCE)
+            return {"status": {"artifact": artifact}}
+
+        def download(url, timeout):
+            self.assertEqual(url, "http://source-controller.solace-gitops.svc.cluster.local./" + artifact["path"])
+            return BytesIO(data)
+
+        self.assertEqual(controller.read_requests(kube, download), {"notifications": REVISION})
+        artifact["digest"] = "sha256:" + "0" * 64
+        with self.assertRaisesRegex(ValueError, "integrity check"):
+            controller.read_requests(kube, download)
+
     def test_build_inputs(self):
         for paths, expected in (
             (["apps/backend/src/main.rs"], {"api"}),
@@ -69,7 +100,6 @@ class SelectiveReleaseTests(unittest.TestCase):
     def reconcile(self, requests, pins=None, builds=None, a_healthy=True, b_healthy=True):
         pins = pins or PINS
         resources = {
-            controller.GITOPS + "solace-release-requests": {"data": requests},
             controller.GITOPS + "solace-release-images": {"metadata": {"resourceVersion": "4"}, "data": pins},
             controller.DEPLOYMENTS + "stalwart-a": replica(pins[A], a_healthy),
             controller.DEPLOYMENTS + "stalwart-b": replica(pins[B], b_healthy),
@@ -82,7 +112,7 @@ class SelectiveReleaseTests(unittest.TestCase):
                 return resources[path]
             writes.append((path, patch))
 
-        controller.promote(kubernetes)
+        controller.promote(kubernetes, requests_from=lambda _: requests)
         return writes
 
     def promoted(self, *args, **kwargs):
