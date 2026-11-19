@@ -84,10 +84,7 @@ export function LabelsSettingsContent() {
   return (
     <SettingsPage title="Labels">
       <SheetScroll>
-        <SheetSection
-          title="Labels"
-          footer="Label names and settings are encrypted on your device before syncing with web."
-        >
+        <SheetSection title="Labels">
           {!loaded && runtimeQuery.isLoading ? (
             <SheetCenteredState loading message="Loading labels…" />
           ) : labels.length === 0 ? (

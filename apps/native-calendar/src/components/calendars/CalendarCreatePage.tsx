@@ -38,6 +38,7 @@ export function CalendarCreatePage() {
       <SheetSection title="Name">
         <SheetGroup>
           <SheetTextField
+            testID="calendar-name"
             value={name}
             onChangeText={(value) => {
               setName(value);

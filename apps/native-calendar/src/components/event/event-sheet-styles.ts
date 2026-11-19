@@ -41,10 +41,6 @@ export function createEventSheetStyles(theme: ThemeTokens) {
       gap: 12,
       marginBottom: 12,
     },
-    titleIcon: {
-      height: 30,
-      justifyContent: "center" as const,
-    },
     cancelledBanner: {
       flexDirection: "row" as const,
       alignItems: "flex-start" as const,

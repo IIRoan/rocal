@@ -15,7 +15,8 @@ export function EncryptionStatusIcon({
   size?: number;
 }) {
   const meta = getCalendarEncryptionNotice(item);
-  const icon = meta.state === "encrypted" ? "shield" : "unlock";
+  if (meta.state === "encrypted") return null;
+
   const explanation = [
     meta.description,
     `Server can read: ${meta.visibleFields.join("; ")}.`,
@@ -31,7 +32,7 @@ export function EncryptionStatusIcon({
       accessibilityRole="button"
       accessibilityLabel={meta.label}
     >
-      <Feather name={icon} size={size} color={color} />
+      <Feather name="unlock" size={size} color={color} />
     </Pressable>
   );
 }

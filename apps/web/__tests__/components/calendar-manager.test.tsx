@@ -138,6 +138,7 @@ describe("CalendarManager", () => {
       calendars: [
         {
           color: "blue",
+          encryptionState: "encrypted",
           id: "cal-1",
           isDefault: true,
           isSyncOnly: false,
@@ -157,7 +158,7 @@ describe("CalendarManager", () => {
     jest.clearAllMocks();
   });
 
-  it("renders non-interactive encryption badges inside calendar row buttons", async () => {
+  it("renders calendar rows without encryption badges", async () => {
     await act(async () => {
       root.render(
         <QueryClientProvider client={queryClient}>
@@ -181,7 +182,7 @@ describe("CalendarManager", () => {
     expect(calendarRow?.querySelector("button")).toBeNull();
     expect(
       container.querySelector('[data-testid="badge-cal-1"]'),
-    ).not.toBeNull();
+    ).toBeNull();
   });
 
   it("asks before deleting a calendar and all of its events", async () => {
@@ -214,6 +215,8 @@ describe("CalendarManager", () => {
       renderView("calendar-edit");
       await Promise.resolve();
     });
+
+    expect(container.querySelector('[data-testid="badge-cal-1"]')).toBeNull();
 
     act(() => findButton("Delete")?.click());
     expect(handleCalendarDelete).not.toHaveBeenCalled();

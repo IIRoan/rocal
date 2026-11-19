@@ -103,26 +103,18 @@ describe("EncryptionStatusBadge", () => {
     expect(popover?.textContent).not.toContain("Encrypted on server");
   });
 
-  it("renders a non-interactive icon when asIcon is true", () => {
+  it.each([false, true])("hides routine encryption status with asIcon=%s", (asIcon) => {
     act(() => {
       root.render(
         <EncryptionStatusBadge
           item={{ encryptionState: "encrypted" }}
-          asIcon
-          className="custom-class"
+          asIcon={asIcon}
+          hidePlaintext={false}
         />,
       );
     });
 
-    const badge = container.querySelector(
-      "span[aria-label^='End-to-end encrypted']",
-    );
-    const button = container.querySelector("button");
-
-    expect(button).toBeNull();
-    expect(badge).not.toBeNull();
-    expect(badge?.className).toContain("custom-class");
-    expect(badge?.querySelector("[data-icon='shield-check']")).not.toBeNull();
+    expect(container.innerHTML).toBe("");
   });
 
   it("describes the readable name of a plaintext feed calendar", () => {

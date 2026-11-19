@@ -1,8 +1,5 @@
 import { useState, type Dispatch } from "react";
-import {
-  EncryptionStatusBadge,
-  getColorSwatchValue,
-} from "@workspace/ui/components/calendar";
+import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
@@ -157,17 +154,7 @@ export function CalendarEditorView({
 
   return (
     <div className="flex flex-col">
-      <CalendarManagerHeader title={copy.title} onBack={onBack}>
-        {editedCalendar && (
-          <EncryptionStatusBadge
-            item={editedCalendar}
-            kind="calendar"
-            hidePlaintext={false}
-            className="ml-auto"
-            showLabel
-          />
-        )}
-      </CalendarManagerHeader>
+      <CalendarManagerHeader title={copy.title} onBack={onBack} />
 
       <CalendarFormFields form={form} dispatch={dispatch} />
 
