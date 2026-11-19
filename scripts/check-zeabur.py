@@ -109,6 +109,7 @@ def check(flux, gateway_dir):
             check_gateway(deployments["solace-api"], configs, "edge")
             check_gateway(deployments["notifications"], configs, "mail-gate")
             validate_redis(docs, network)
+            check_public_ingress(network, docs)
         print(f"{name}: rendered {len(docs)} resources")
     assert fixtures[0] == fixtures[1]
     assert len(images) == 2 and all(re.fullmatch(r"[^@\s]+@sha256:[0-9a-f]{64}", image) for image in images)
@@ -120,6 +121,47 @@ def check(flux, gateway_dir):
         for key in ("haproxy.cfg", "admin-gate.lua"):
             (gateway_dir / key).write_text(fixtures[0][key])
         (gateway_dir / "images").write_text("\n".join(dict.fromkeys(images)) + "\n")
+
+
+
+def check_public_ingress(network, workloads):
+    namespace = "solace-mail"
+    public = find_resource(network, "Ingress", namespace, "solace-public")
+    private_host_routes = [
+        rule for doc in network
+        if doc["kind"] == "Ingress" and doc["metadata"]["name"] != "solace-public"
+        for rule in doc["spec"]["rules"]
+    ]
+    expected_public_rules = []
+    direct_services = {"solace-api": "solace-api-direct", "mail-live": "mail-public-direct"}
+    for rule in private_host_routes:
+        paths = [
+            {
+                **path,
+                "backend": {"service": {"name": direct_services[path["backend"]["service"]["name"]],
+                                         "port": {"number": 8085}}},
+            }
+            for path in rule["http"]["paths"]
+        ]
+        expected_public_rules.append({"host": rule["host"], "http": {"paths": paths}})
+    assert public["spec"]["rules"] == expected_public_rules
+    certificate = find_resource(workloads, "Certificate", namespace, "solace-public")
+    assert public["spec"]["tls"] == [{
+        "hosts": certificate["spec"]["dnsNames"],
+        "secretName": certificate["spec"]["secretName"],
+    }]
+    assert certificate["spec"]["dnsNames"] == [rule["host"] for rule in private_host_routes]
+    for name, port in (("solace-public", 443), ("solace-smtp", 25)):
+        service = find_resource(network, "Service", namespace, name)
+        assert service["spec"]["loadBalancerClass"] == "solace.onl/vps-ingress"
+        assert service["spec"]["allocateLoadBalancerNodePorts"] is False
+        assert service["spec"]["externalTrafficPolicy"] == "Local"
+        assert [item["port"] for item in service["spec"]["ports"]] == [port]
+    ingress = find_resource(workloads, "Deployment", namespace, "solace-public-ingress")
+    template = ingress["spec"]["template"]["spec"]
+    routes_name = next(vol["configMap"]["name"] for vol in template["volumes"] if vol["name"] == "ingress-routes")
+    routes = yaml.safe_load(find_resource(workloads, "ConfigMap", namespace, routes_name)["data"]["routes.yaml"])
+    assert routes["tcp"]["services"]["mail-inbound"]["loadBalancer"]["proxyProtocol"]["version"] == 2
 
 
 def check_gateway(deployment, configs, volume):

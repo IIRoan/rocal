@@ -4,3 +4,5 @@ resources:
   - ingress-class.yaml
   - solace-api.yaml
   - solace-mail.yaml
+  - solace-public.yaml
+  - solace-public-services.yaml

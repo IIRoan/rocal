@@ -146,11 +146,12 @@ class BackendGateTests(unittest.TestCase):
         cls.gate.terminate()
         cls.gate.wait(timeout=5)
 
-    def request(self, path, method="GET", key=KEY, headers=None, public=False):
+    def request(self, path, method="GET", key=KEY, headers=None, public=False, port=None):
         all_headers = dict(headers or {})
         if key is not None:
             all_headers["X-Solace-Gate"] = key
-        port = self.public_port if public else self.gate_port
+        if port is None:
+            port = self.public_port if public else self.gate_port
         req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", method=method,
                                      headers=all_headers, data=b"" if method == "POST" else None)
         try:
@@ -211,6 +212,23 @@ class BackendGateTests(unittest.TestCase):
         before = len(self.upstream.requests)
         self.assertEqual(self.request("/jmap/session", headers={PUBLIC_IP_HEADER: "2001:db8::9"}, public=True), 200)
         self.assertEqual(self.upstream.requests[before]["source"], "2001:db8::9")
+
+    @unittest.skipUnless(GATE_FIXTURE, "requires the deployed Zeabur gateway configuration")
+    def test_direct_public_port_uses_traefik_client_ip(self):
+        for client_ip in ("203.0.113.17", "2001:db8::17"):
+            with self.subTest(client_ip=client_ip):
+                headers = {"X-Forwarded-For": client_ip, "CF-Connecting-IP": "192.0.2.42",
+                           "X-Real-IP": "192.0.2.43"}
+                self.assertEqual(self.request("/jmap/session", key=None, headers=headers, port=8085), 200)
+                forwarded = self.upstream.requests[-1]
+                self.assertEqual(forwarded["source"], client_ip)
+                self.assertNotIn("cf-connecting-ip", forwarded["headers"])
+
+    @unittest.skipUnless(GATE_FIXTURE, "requires the deployed Zeabur gateway configuration")
+    def test_tunnel_public_port_keeps_cloudflare_client_ip(self):
+        headers = {"X-Forwarded-For": "192.0.2.44", "CF-Connecting-IP": "203.0.113.18"}
+        self.assertEqual(self.request("/jmap/session", key=None, headers=headers, public=True), 200)
+        self.assertEqual(self.upstream.requests[-1]["source"], "203.0.113.18")
 
     def test_unconfigured_session_gate_denies_direct_stalwart_login(self):
         for headers in ({}, {"X-Real-IP": "203.0.113.11"}, {"X-Real-IP": "2001:db8:1::9"},
