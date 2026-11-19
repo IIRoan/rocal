@@ -31,6 +31,10 @@ Preserve the original volume bindings on the live cluster. Use apply without pru
 
 Flux reads `.zeabur/` on the protected `master` branch and applies it with the `solace-reconciler` service account. It polls Git every minute and checks for drift every five minutes. An administrator owns [project prerequisites](bootstrap/project.yaml) and [networking manifests](bootstrap/networking/), including namespace admission policy. Use Git as the writer for managed fields. Stalwart A reconciles after the shared workloads, and Stalwart B waits for A's healthy deployment on the same Git revision. Gateway configuration is mounted from immutable ConfigMaps whose content hashes change the pod templates. Flux leaves existing objects in place when a manifest is removed.
 
+Each Stalwart Deployment keeps a single replica and a stable pod address for the host SMTP routes. The [admission policy](bootstrap/stalwart-rollout.yaml) requires its peer to be available before a pod template can change. A's gateway must serve JMAP discovery and see SMTP advertise STARTTLS on its own listener. A rejoins the Service once Ready and must stay Ready for 60 seconds before Flux updates B. If A fails the readiness gate, B keeps serving on its current release.
+
+On shutdown, the gateway closes the health listener checked by both MXs and pauses for 18 seconds while they switch to the healthy peer. Kubernetes removes the terminating pod from the JMAP Service while the application and SMTP listener are still running. Sessions that exceed the shutdown grace period reconnect through the remaining replica.
+
 Review the server-side diff against the production context before merging a config change.
 
 ```sh
@@ -44,8 +48,9 @@ kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur/solac
 After a merge, check the applied revision and workload health.
 
 ```sh
-kubectl -n solace-gitops get gitrepository,kustomization solace
-kubectl -n solace-mail get deployments
+kubectl -n solace-gitops get gitrepository,kustomizations
+kubectl -n solace-mail get deployments stalwart-a stalwart-b
+kubectl -n solace-mail get endpointslices -l kubernetes.io/service-name=mail-live
 ```
 
 The [bootstrap procedure](bootstrap/README.md) covers first adoption and recovery. Review storage and routing changes against the [production runbook](../apps/stalwart/README.md). Verify both mail endpoints, the public API and JMAP, and STARTTLS on both MXs after a rollout.

@@ -1,0 +1,70 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: solace-stalwart-rollout
+spec:
+  failurePolicy: Fail
+  paramKind:
+    apiVersion: apps/v1
+    kind: Deployment
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: solace-mail
+    resourceRules:
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [UPDATE]
+        resources: [deployments]
+        resourceNames: [stalwart-a, stalwart-b]
+  matchConditions:
+    - name: new-pod-template
+      expression: object.spec.template != oldObject.spec.template
+  validations:
+    - expression: >-
+        params != null &&
+        params.metadata.name != object.metadata.name &&
+        !has(params.metadata.deletionTimestamp) &&
+        has(params.status.observedGeneration) &&
+        params.status.observedGeneration == params.metadata.generation &&
+        has(params.status.availableReplicas) &&
+        params.status.availableReplicas >= 1
+      message: The other Solace Stalwart deployment must be available before replacing this pod template.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: solace-stalwart-a-rollout
+spec:
+  policyName: solace-stalwart-rollout
+  validationActions: [Deny]
+  matchResources:
+    resourceRules:
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [UPDATE]
+        resources: [deployments]
+        resourceNames: [stalwart-a]
+  paramRef:
+    name: stalwart-b
+    namespace: solace-mail
+    parameterNotFoundAction: Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: solace-stalwart-b-rollout
+spec:
+  policyName: solace-stalwart-rollout
+  validationActions: [Deny]
+  matchResources:
+    resourceRules:
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [UPDATE]
+        resources: [deployments]
+        resourceNames: [stalwart-b]
+  paramRef:
+    name: stalwart-a
+    namespace: solace-mail
+    parameterNotFoundAction: Deny

@@ -4,7 +4,9 @@ import hashlib
 import ipaddress
 import json
 import os
+import smtplib
 import socket
+import socketserver
 import struct
 import subprocess
 import threading
@@ -45,6 +47,7 @@ class ProxyV2Upstream:
     def __init__(self):
         self.requests = []
         self.response_headers = []
+        self.rollout_status = 200
         self.sock = socket.create_server(("127.0.0.1", 0))
         self.port = self.sock.getsockname()[1]
         threading.Thread(target=self.serve, daemon=True).start()
@@ -74,11 +77,43 @@ class ProxyV2Upstream:
             lines = raw.split(b"\r\n\r\n", 1)[0].decode().split("\r\n")
             headers = {k.strip().lower(): v.strip()
                        for k, v in (line.split(":", 1) for line in lines[1:])}
+            if headers.get("user-agent") == "solace-rollout-check":
+                conn.sendall(f"HTTP/1.1 {self.rollout_status} Test\r\nContent-Length: 0\r\n\r\n".encode())
+                return
             self.requests.append({"source": str(source), "path": lines[0].split(" ")[1],
                                   "headers": headers})
             extra_headers = "".join(f"{name}: {value}\r\n" for name, value in self.response_headers)
             conn.sendall(("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n"
                           + extra_headers + "\r\nok").encode())
+
+
+class SmtpHealthServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
+class SmtpHealthUpstream(socketserver.StreamRequestHandler):
+    def handle(self):
+        self.connection.settimeout(5)
+        header = self.rfile.read(16)
+        if header[:14] != PROXY_V2_SIGNATURE + b"\x21\x11":
+            return
+        self.rfile.read(struct.unpack("!H", header[14:])[0])
+        self.wfile.write(b"220 fixture ESMTP\r\n")
+        if self.rfile.readline().upper().startswith(b"EHLO "):
+            features = b"250-STARTTLS\r\n" if self.server.starttls else b""
+            self.wfile.write(b"250-fixture\r\n" + features + b"250 HELP\r\n")
+        if self.rfile.readline() == b"QUIT\r\n":
+            self.wfile.write(b"221 closing\r\n")
+
+
+def proxied_connection(port):
+    conn = socket.create_connection(("127.0.0.1", port), timeout=3)
+    caller = ipaddress.IPv4Address("192.0.2.123").packed
+    receiver = ipaddress.IPv4Address("192.0.2.25").packed
+    conn.sendall(PROXY_V2_SIGNATURE + struct.pack("!BBH", 0x21, 0x11, 12)
+                 + caller + receiver + struct.pack("!HH", 49000, port))
+    return conn
 
 
 @unittest.skipUnless(os.environ.get("HAPROXY_TEST_BINARY"), "set HAPROXY_TEST_BINARY for the gate test")
@@ -202,6 +237,64 @@ class BackendGateTests(unittest.TestCase):
                     addresses = read_exact(conn, struct.unpack("!H", header[14:])[0])
                     self.assertEqual(addresses[:4], source)
                     self.assertEqual(read_exact(conn, 19), b"EHLO test.example\r\n")
+
+    @unittest.skipUnless(GATE_FIXTURE, "requires the deployed Zeabur gateway configuration")
+    def test_zeabur_rollout_checks_both_protocols_and_drains_mx_health(self):
+        def readiness():
+            try:
+                with urllib.request.urlopen("http://127.0.0.1:8084/readyz", timeout=2) as response:
+                    return response.status
+            except urllib.error.HTTPError as error:
+                with error:
+                    return error.code
+
+        def wait_for_status(expected):
+            deadline = time.monotonic() + 9
+            while time.monotonic() < deadline:
+                status = readiness()
+                if status == expected:
+                    return
+                time.sleep(0.2)
+            self.fail(f"rollout readiness stayed {status}, expected {expected}")
+
+        wait_for_status(503)
+        with SmtpHealthServer(("127.0.0.1", 25), SmtpHealthUpstream) as upstream:
+            upstream.starttls = False
+            thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+            thread.start()
+            self.addCleanup(thread.join, 5)
+            self.addCleanup(upstream.shutdown)
+            wait_for_status(503)
+            upstream.starttls = True
+            wait_for_status(200)
+            upstream.starttls = False
+            wait_for_status(503)
+            upstream.starttls = True
+            wait_for_status(200)
+            self.upstream.rollout_status = 503
+            self.addCleanup(setattr, self.upstream, "rollout_status", 200)
+            wait_for_status(503)
+            self.upstream.rollout_status = 200
+            wait_for_status(200)
+
+            with proxied_connection(18080) as health_check:
+                health_check.sendall(b"GET /jmap/session HTTP/1.1\r\nHost: mail.solace.onl\r\n\r\n")
+                self.assertEqual(health_check.makefile("rb").readline().split()[1], b"200")
+
+            with proxied_connection(22525) as connection, smtplib.SMTP(timeout=3) as smtp:
+                smtp.sock = connection
+                self.assertEqual(smtp.getreply()[0], 220)
+                result = subprocess.run(["socat", "-T", "2", "-", "UNIX-CONNECT:/tmp/solace-haproxy.sock"],
+                                        input="shutdown frontend ft_rollout_ready; shutdown frontend ft_edge_admin\n",
+                                        capture_output=True, text=True, check=True)
+                self.assertFalse(result.stdout.strip(), result.stdout)
+                with self.assertRaises(ConnectionRefusedError):
+                    proxied_connection(18080)
+                with self.assertRaises(ConnectionRefusedError):
+                    socket.create_connection(("127.0.0.1", 8084), timeout=2)
+                self.assertEqual(smtp.ehlo("fixture.example")[0], 250)
+                self.assertTrue(smtp.has_extn("starttls"))
+                self.assertEqual(self.request("/jmap/session", key=None, public=True), 200)
 
 
 class RestrictedHttpsListenerPlanTests(unittest.TestCase):

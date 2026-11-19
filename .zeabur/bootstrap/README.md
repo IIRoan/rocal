@@ -14,6 +14,7 @@ kubectl diff --server-side -k .zeabur/bootstrap/networking
 kubectl apply --server-side -k .zeabur/bootstrap/networking
 kubectl apply --server-side -f .zeabur/bootstrap/ingress-rbac.yaml
 kubectl apply --server-side -f .zeabur/bootstrap/reconciler.yaml
+kubectl apply --server-side -f .zeabur/bootstrap/stalwart-rollout.yaml
 kubectl delete clusterrolebinding,clusterrole solace-project-bootstrap-resources --ignore-not-found
 kubectl apply --server-side -f .zeabur/bootstrap/sync.yaml
 ```
@@ -37,4 +38,6 @@ flux reconcile kustomization solace-stalwart-b --namespace=solace-gitops
 kubectl -n solace-gitops get gitrepository,kustomization
 ```
 
-On later revisions, Flux waits for the dependency to be healthy on the same source revision before advancing. Suspend all three stages to pause reconciliation. Revert a configuration change in Git to roll it back. Retain prior generated ConfigMaps while any live or rollback deployment references them.
+On later revisions, Flux waits for the dependency to be healthy on the same source revision before advancing. The admission policy checks for an available peer on changes to an existing Stalwart pod template. It allows the first creation of each Deployment during recovery.
+
+If A fails, confirm B still serves and revert the rollout in Git. If B fails, keep the available A running. If a revert would also change A's template, restore B's last working template first, then let the Git revert reconcile normally. Suspend the stage that manages any Deployment you need to repair directly, keep the current volumes, and retain the generated ConfigMaps referenced by the running and recovery templates.

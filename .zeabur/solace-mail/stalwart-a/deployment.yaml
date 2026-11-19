@@ -119,13 +119,6 @@ spec:
           image: docker.io/library/haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
           imagePullPolicy: IfNotPresent
           name: gateway
-          readinessProbe:
-            failureThreshold: 3
-            periodSeconds: 3
-            successThreshold: 1
-            tcpSocket:
-              port: 8082
-            timeoutSeconds: 1
           resources:
             limits:
               cpu: 400m
@@ -165,7 +158,6 @@ spec:
         sysctls:
           - name: net.ipv4.ip_unprivileged_port_start
             value: '0'
-      terminationGracePeriodSeconds: 30
       tolerations:
         - effect: NoSchedule
           key: roan.dev/apps-only
