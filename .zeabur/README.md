@@ -49,6 +49,8 @@ Solace builds run on the MacBook's build node with limits of eight CPUs and 16 G
 
 The workflow tags each requested source commit. The release CronJob verifies the Flux artifact before passing that exact Git ref to Zeabur Builder. It records successful image digests from Zot through the image admission policy. Flux applies the selected digest. Stalwart A must be available on the new digest for its full readiness window before B is updated. Third-party containers use the image pins in their Git manifests and change when their pod templates change.
 
+Solace uses Builder’s default Zot repository naming. Zeabur associates a Build with the running service once Builder publishes its first image. This keeps the status of an existing service accurate while its first Build is paused.
+
 Check the workflow for the selected services and Zeabur for their Build runs. A failed build leaves the current image in place. A healthy B lets the next Stalwart fix replace a failed rollout on A. If B fails after promotion, keep A serving and follow the [recovery procedure](bootstrap/README.md#recover-an-image-rollout).
 
 Review a server-side diff from the selected revision with the production image inputs resolved by Flux. Do this from a cluster context with read access to the live substitution ConfigMap and write permission for the dry run.

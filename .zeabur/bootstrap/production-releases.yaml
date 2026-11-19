@@ -95,8 +95,6 @@ spec:
       url: https://github.com/IIRoan/rocal.git
       ref: master
       dockerfile: apps/backend/Dockerfile
-  output:
-    image: zot.zot.svc:5000/solace-mail/api
 ---
 apiVersion: builder.zeabur.com/v1alpha1
 kind: Build
@@ -112,8 +110,6 @@ spec:
       url: https://github.com/IIRoan/rocal.git
       ref: master
       dockerfile: apps/notifications/Dockerfile
-  output:
-    image: zot.zot.svc:5000/solace-mail/notifications
 ---
 apiVersion: builder.zeabur.com/v1alpha1
 kind: Build
@@ -129,5 +125,3 @@ spec:
       url: https://github.com/IIRoan/rocal.git
       ref: master
       contextDir: apps/stalwart
-  output:
-    image: zot.zot.svc:5000/solace-mail/stalwart
