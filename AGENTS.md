@@ -86,7 +86,7 @@ Default stance: **the server should not be able to read user content, and we sho
 - Schema changes are SeaORM migrations in `db/migrations/` (`cargo xtask migrate new <name>`), applied in order at startup by the API and the worker under a Postgres advisory lock and recorded in `seaql_migrations`. Never edit one that has shipped. The previous deployment keeps serving the new schema during a deploy and after a rollback, so only add what it ignores; drop or tighten only after the code that used it is gone from production. `m20260928_150000_prisma_baseline` stands for the 53 Prisma migrations.
 - Entities in `db/entities/` are generated (`cargo xtask entities`, from the migrated schema) and never edited; ids, `created_at` and `updated_at` defaults live in `db/behavior.rs`.
 - Logging: `tracing` with opaque ids only; messages through `telemetry::redact_pii`.
-- Before every commit: `cargo xtask check` (fmt, clippy, tests, the whole suite on Rust in both modes, codegen diffs, Jest destinations, memory budgets).
+- Before committing changes that affect Rust code, dependencies, build tooling, API contracts, database migrations, or backend/worker runtime behavior, run `cargo xtask check` (fmt, clippy, tests, the whole suite on Rust in both modes, codegen diffs, Jest destinations, memory budgets). For documentation, frontend, or infrastructure/configuration-only changes with no such impact, run checks relevant to the changed files; do not compile Rust or run the full Rust suite solely because you are committing.
 
 ## 4. Data layer: TanStack Query (MUST)
 
