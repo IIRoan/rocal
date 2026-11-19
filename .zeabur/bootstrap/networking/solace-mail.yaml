@@ -218,6 +218,7 @@ spec:
                 values:
                   - solace-api
                   - notifications
+                  - app-postgres
     - ports:
         - port: 53
           protocol: UDP
@@ -239,6 +240,7 @@ spec:
                 values:
                   - solace-api
                   - notifications
+                  - app-postgres
     - from:
         - ipBlock:
             cidr: 192.168.2.106/32
@@ -256,6 +258,7 @@ spec:
         values:
           - solace-api
           - notifications
+          - app-postgres
   policyTypes:
     - Ingress
     - Egress
@@ -447,10 +450,7 @@ spec:
         - port: 5432
           protocol: TCP
       to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: solace-api
-          podSelector:
+        - podSelector:
             matchLabels:
               app: app-postgres
     - ports:
@@ -554,10 +554,7 @@ spec:
         - port: 5432
           protocol: TCP
       to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: solace-api
-          podSelector:
+        - podSelector:
             matchLabels:
               app: app-postgres
     - ports:

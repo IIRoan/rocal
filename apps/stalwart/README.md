@@ -11,7 +11,7 @@ Solace runs the API, notifications worker and two Stalwart replicas on Zeabur OS
 | `solace-mail` | `mail-database` | Two-instance CloudNativePG cluster for Stalwart metadata and queues. The write Service is `mail-database-rw`. The old `mail-pg` and `mail-pg-standby` StatefulSets are scaled to zero. |
 | `solace-mail` | `mail-redis`, `mail-redis-replica`, Sentinel | Shared ephemeral state and coordination. A Sentinel runs on each Webdock worker, with a third witness on `roan-server`. |
 | `solace-mail` | `mail-s3` | Solace's mail blob storage. The observed StatefulSet has one replica. |
-| `solace-api` | `app-postgres` | Application PostgreSQL on `webdock-1`. |
+| `solace-mail` | `app-postgres` | Application PostgreSQL on `webdock-1`. |
 
 `roan-server` is the control plane and runs the Builder controller. BuildKit limits are 4 CPU and 8 GiB. Build placement is currently unpinned. Verify the Job and BuildKit pod placement separately from the controller. Keep the API, notifications and both Stalwart replicas on the Webdock workers.
 
