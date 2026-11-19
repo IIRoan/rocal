@@ -8,3 +8,4 @@ resources:
   - solace-mail/public-certificate.yaml
   - solace-mail/app-postgres.yaml
   - solace-mail/public-ingress.yaml
+  - solace-mail/releases

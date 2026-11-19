@@ -32,6 +32,11 @@ spec:
   sourceRef:
     kind: GitRepository
     name: solace
+  postBuild:
+    substituteStrategy: Always
+    substituteFrom:
+      - kind: ConfigMap
+        name: solace-release-images
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment
@@ -61,6 +66,11 @@ spec:
   sourceRef:
     kind: GitRepository
     name: solace
+  postBuild:
+    substituteStrategy: Always
+    substituteFrom:
+      - kind: ConfigMap
+        name: solace-release-images
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment
@@ -86,6 +96,11 @@ spec:
   sourceRef:
     kind: GitRepository
     name: solace
+  postBuild:
+    substituteStrategy: Always
+    substituteFrom:
+      - kind: ConfigMap
+        name: solace-release-images
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment

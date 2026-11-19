@@ -3,6 +3,8 @@ kind: Kustomization
 namespace: solace-mail
 generatorOptions:
   immutable: true
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled
 configMapGenerator:
   - name: api-edge-upstream
     files: [haproxy.cfg=api-edge-upstream.haproxy.cfg]

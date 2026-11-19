@@ -23,7 +23,7 @@ def render(flux, spec, path):
         file.flush()
         output = subprocess.check_output([
             flux, "build", "kustomization", spec["metadata"]["name"], "--namespace", NAMESPACE,
-            "--dry-run", "--path", str(path), "--kustomization-file", file.name,
+            "--dry-run", "--strict-substitute", "--path", str(path), "--kustomization-file", file.name,
         ], text=True)
     return [doc for doc in yaml.safe_load_all(output) if doc]
 
@@ -89,6 +89,13 @@ def check(flux, gateway_dir):
         configs = {(doc["metadata"]["namespace"], doc["metadata"]["name"]): doc
                    for doc in docs if doc["kind"] == "ConfigMap"}
         deployments = {doc["metadata"]["name"]: doc for doc in docs if doc["kind"] == "Deployment"}
+        release_containers = {"stalwart-a": "stalwart", "stalwart-b": "stalwart",
+                              "solace-api": "api", "notifications": "worker"}
+        for deployment, container in release_containers.items():
+            if deployment in deployments:
+                containers = deployments[deployment]["spec"]["template"]["spec"]["containers"]
+                image = next(c["image"] for c in containers if c["name"] == container)
+                assert re.fullmatch(r"[^@\s]+@sha256:[0-9a-f]{64}", image), image
         if expected_dependencies:
             replica = name.removeprefix("solace-")
             assert deployments.keys() == {replica}

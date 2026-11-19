@@ -1,0 +1,52 @@
+name: Solace production images
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: solace-production-images
+  cancel-in-progress: false
+
+jobs:
+  request-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the protected revision
+        uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Publish affected image requests
+        env:
+          INITIAL_REVISION: 868422a26812f5ce634b9a53c5ac9ffb8de1d940
+        run: |
+          set -euo pipefail
+          requests_branch=solace-release-requests
+          release_tree="$RUNNER_TEMP/solace-release-requests"
+          if git ls-remote --exit-code --heads origin "$requests_branch" >/dev/null; then
+            git fetch origin "refs/heads/$requests_branch:refs/remotes/origin/$requests_branch"
+            git worktree add --detach "$release_tree" "origin/$requests_branch"
+          else
+            git worktree add --detach "$release_tree" HEAD
+            git -C "$release_tree" switch --orphan "$requests_branch"
+          fi
+          python3 scripts/solace-release-request.py "$INITIAL_REVISION" "$GITHUB_SHA" \
+            "$release_tree/requests.json"
+          printf 'apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources: [requests.json]\n' \
+            > "$release_tree/kustomization.yaml"
+          git -C "$release_tree" add requests.json kustomization.yaml
+          if git -C "$release_tree" diff --cached --quiet; then
+            exit 0
+          fi
+          git -C "$release_tree" -c user.name=github-actions -c 'user.email=41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Request Solace production images"
+          refs=("HEAD:refs/heads/$requests_branch")
+          if jq -e --arg revision "$GITHUB_SHA" '.data | [.api, .notifications, .stalwart] | index($revision) != null' \
+            "$release_tree/requests.json" >/dev/null; then
+            refs+=("$GITHUB_SHA:refs/tags/solace-build-$GITHUB_SHA")
+          fi
+          git -C "$release_tree" push --atomic origin "${refs[@]}"

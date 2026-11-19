@@ -64,7 +64,7 @@ spec:
                 secretKeyRef:
                   key: STALWART_WEBHOOK_SECRET
                   name: mail-live-auth
-          image: zot.zot.svc:5000/solace-mail/stalwart@sha256:46adef95786d6780258685ae326a3da3dfe1b13607a9950972f839554fd86cb1
+          image: ${SOLACE_STALWART_B_IMAGE:=zot.zot.svc:5000/solace-mail/stalwart@sha256:46adef95786d6780258685ae326a3da3dfe1b13607a9950972f839554fd86cb1}
           imagePullPolicy: IfNotPresent
           name: stalwart
           readinessProbe:
