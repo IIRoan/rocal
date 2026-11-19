@@ -1,0 +1,11 @@
+{
+  "apiVersion": "v1",
+  "kind": "ConfigMap",
+  "metadata": {
+    "name": "solace-release-requests",
+    "namespace": "solace-gitops"
+  },
+  "data": {
+    "sourceRevision": "32e9406549bb0d78ae254ebceaf9003eb17fbd5a"
+  }
+}
