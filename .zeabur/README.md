@@ -45,6 +45,8 @@ A push to protected `master` runs [Solace production images](../.github/workflow
 | Stalwart runtime Dockerfile, install scripts or packaged configuration | Stalwart |
 | Kubernetes config, docs, web or native code only | None |
 
+Solace builds run on the MacBook's build node with limits of eight CPUs and 16 GiB of RAM per build. Zeabur reads those limits from the project namespace when a build starts.
+
 The workflow tags each requested source commit. The release CronJob verifies the Flux artifact before passing that exact Git ref to Zeabur Builder. It records successful image digests from Zot through the image admission policy. Flux applies the selected digest. Stalwart A must be available on the new digest for its full readiness window before B is updated. Third-party containers use the image pins in their Git manifests and change when their pod templates change.
 
 Check the workflow for the selected services and Zeabur for their Build runs. A failed build leaves the current image in place. A healthy B lets the next Stalwart fix replace a failed rollout on A. If B fails after promotion, keep A serving and follow the [recovery procedure](bootstrap/README.md#recover-an-image-rollout).
