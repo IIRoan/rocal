@@ -111,6 +111,9 @@ def check(flux, gateway_dir):
                            if container["name"] == "gateway")
             assert gateway["readinessProbe"]["httpGet"] == {"path": "/readyz", "port": 8084, "scheme": "HTTP"}
             assert gateway["readinessProbe"]["failureThreshold"] == 1
+            stalwart = next(container for container in deployment["spec"]["template"]["spec"]["containers"]
+                            if container["name"] == "stalwart")
+            assert all(container["readinessProbe"]["initialDelaySeconds"] == 8 for container in (gateway, stalwart))
             images.append(gateway["image"])
         else:
             assert {"stalwart-a", "stalwart-b"}.isdisjoint(deployments)
