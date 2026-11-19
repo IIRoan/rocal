@@ -11,7 +11,7 @@ Read this whole plan and root `AGENTS.md` before implementing. Then:
 1. Branch from `master` after `ui/reduce-encryption-notices` merges, or rebase onto it.
 2. Run `git diff --stat ee7fb551..HEAD` and reconcile every `path:line` reference that moved.
 3. Keep changes unstaged until the owner asks for commits.
-4. Start no deploys, OTA publishes, store builds or Railway changes because of this document. The operator steps below are for the owner.
+4. Start no deploys, OTA publishes, store builds, Zeabur or Railway changes because of this document. The operator steps below are for the owner.
 
 ## Outcome and boundaries
 
@@ -229,8 +229,9 @@ Run all of the following and record their real output in the PR:
 1. Dispatch an internal build and a preview OTA, and confirm the signed update applies on the new binary.
 2. Schedule store builds of both apps early enough for the S3/S7 gate rules.
 3. Fetch `/.well-known/security.txt` from `solace.onl`, `api.solace.onl` and `mail.solace.onl`.
-4. Confirm that the Stalwart image deploy carried the `backend-gate.cfg` change.
-5. Check DKIM on a vacation auto-reply (M6).
+4. Confirm that Flux rolled the new gateway ConfigMap (`.zeabur/solace-mail/gateway/base/haproxy.cfg`) to both Stalwart replicas.
+5. Apply M7's two Stalwart objects, `MtaExtensions` (`30-mta.ndjson`) and `DataRetention` (`00-stores.ndjson`), with `apps/stalwart/scripts/stalwart-plan.sh` and `STALWART_PLAN_DIR` set to a directory holding only those two lines. `00-stores.ndjson` still names the Railway Redis, and the live cluster selects its own stores. Until then, a send scheduled more than 3 days out can no longer be canceled.
+6. Check DKIM on a vacation auto-reply (M6).
 
 **Before each gate date:** confirm its preconditions, or move the constant later.
 
@@ -736,12 +737,12 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
 - **Copies:**
   - Web: a static file `apps/web/public/.well-known/security.txt`, the simplest option (no route code). Next and Vercel serve `.txt` as `text/plain; charset=utf-8`; verify with `curl -I` after deploy.
   - API: `apps/backend/security.txt`, served by a new handler `health::security_txt` returning `include_str!("../security.txt")` with `Content-Type: text/plain; charset=utf-8` and `Cache-Control: public, max-age=86400`. Registered beside `/api` in `lib.rs:92` as `.route("/.well-known/security.txt", get(health::security_txt))`, outside OpenAPI like the root redirect.
-  - Mail: the `lf-string` at `backend-gate.cfg:47`, replaced by the same body; `postmaster@` stays the RFC 2142 mailbox but is not the security contact.
-  - Three copies sit in three deploy units. **One test fails on drift and on a near expiry**, so the file can never lapse silently.
+  - Mail: the `lf-string` at `backend-gate.cfg:47` and in the production Zeabur gateway (`.zeabur/solace-mail/gateway/base/haproxy.cfg`), replaced by the same body; `postmaster@` stays the RFC 2142 mailbox but is not the security contact.
+  - Four copies sit in three deploy units. **One test fails on drift and on a near expiry**, so the file can never lapse silently.
 - **`SECURITY.md` (repo root; GitHub's Security tab shows it).** Sections:
   - **Reporting:** email `support@solace.onl` with "Security" in the subject, or a GitHub private advisory. Never a public issue (`issuesUrl` is public). Include affected component, steps, impact, and whether you accessed anyone else's data.
   - **Scope:**
-    - `solace.onl` web app, `api.solace.onl`, public JMAP `mail.solace.onl`, and `mx.solace.onl` SMTP/relay;
+    - `solace.onl` web app, `api.solace.onl`, public JMAP `mail.solace.onl`, and SMTP at `mx.solace.onl` and `mx2.solace.onl`;
     - the Solace Calendar and Solace Mail iOS apps;
     - this repository's code, including E2EE design flaws (the server learning user content counts as in scope).
   - **Out of scope:**
@@ -752,7 +753,7 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
     - SPF/DMARC on non-mail domains;
     - self-XSS;
     - reports that only repeat the documented known gaps and accepted trade-offs in AGENTS.md §2 (plaintext `EventParticipant` email and name, and the listed "Known gaps");
-    - third-party services (Railway, Vercel, Expo, Apple);
+    - third-party services (Cloudflare, Webdock, Vercel, Railway, Expo, Apple);
   - **Response targets** (D2): acknowledge within 5 business days, assessment within 14 days, fix critical issues within 30 days. Coordinated disclosure after a fix or 90 days. Credit on request. No bounty.
   - **Safe harbour:** good-faith research under this policy is authorized and will not be pursued legally, provided you:
     - use only accounts you own or have permission to test;
@@ -766,18 +767,18 @@ Today some of these sit in jobs, or appear at steps, where `bun install` lifecyc
 - New `apps/backend/security.txt`.
 - `apps/backend/src/health.rs`: `security_txt`; update the module doc line 1 ("Health and root routes: …") to mention security.txt.
 - `apps/backend/src/lib.rs:92`: the route.
-- `apps/stalwart/backend-gate.cfg:47`: the new body as `lf-string` (with `\n` separators).
+- `apps/stalwart/backend-gate.cfg:47` and `.zeabur/solace-mail/gateway/base/haproxy.cfg`: the new body as `lf-string` (with `\n` separators).
 - New `scripts/tests/security-txt.test.ts` (bun test), wired in `pr-tests.yml` beside :72.
 
 **Compatibility.**
-- Purely additive. HAProxy picks the change up with the next Stalwart image deploy (`apps/stalwart/**` watch). The web and API copies deploy with their apps.
+- Purely additive. The production gateway picks the change up when Flux rolls its new immutable ConfigMap. The web and API copies deploy with their apps.
 
 **Tests.**
 - `scripts/tests/security-txt.test.ts`:
-  - reads the web and API files and extracts the HAProxy `lf-string` from `backend-gate.cfg` (regex on the `if { path /.well-known/security.txt }` line, `\n` unescaped);
-  - asserts all three are byte-identical;
+  - reads the web and API files and extracts the HAProxy `lf-string` from `backend-gate.cfg` and the Zeabur gateway (regex on the `if { path /.well-known/security.txt }` line, `\n` unescaped);
+  - asserts all four are byte-identical;
   - asserts `Contact`, `Expires` (exactly once), `Canonical` and `Policy` are present;
-  - asserts `Expires - Date.now() >= 60 days` (message: "security.txt expires within 60 days; move Expires forward in all three copies") and `<= 366 days`.
+  - asserts `Expires - Date.now() >= 60 days` (message: "security.txt expires within 60 days; move Expires forward in all four copies") and `<= 366 days`.
   - This deliberately fails CI 60 days before expiry.
 - API suite: new `security_txt_is_served_as_plain_text` in `crates/solace-api-tests/tests/api/edges.rs` (next to `health_and_root_routes`, :34). Anonymous `GET /.well-known/security.txt` → 200, `content-type: text/plain; charset=utf-8`, body starts with `Contact: `, and it carries the security headers (`assert_security_headers`, as at :65-86).
 - Rust unit test in `health.rs`: the body contains `Canonical: https://api.solace.onl/.well-known/security.txt`.

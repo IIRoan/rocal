@@ -9,11 +9,11 @@ function read(path: string): string {
   return readFileSync(join(root, path), "utf8");
 }
 
-function gateCopy(): string {
-  const match = read("apps/stalwart/backend-gate.cfg").match(
+function gateCopy(path: string): string {
+  const match = read(path).match(
     /lf-string "([^"]*)" if \{ path \/\.well-known\/security\.txt \}/,
   );
-  if (!match?.[1]) throw new Error("backend-gate.cfg has no security.txt lf-string");
+  if (!match?.[1]) throw new Error(`${path} has no security.txt lf-string`);
   return match[1].replaceAll("\\n", "\n");
 }
 
@@ -23,7 +23,8 @@ describe("security.txt", () => {
 
   it("is identical on the web, API and mail hosts", () => {
     expect(api).toBe(web);
-    expect(gateCopy()).toBe(web);
+    expect(gateCopy("apps/stalwart/backend-gate.cfg")).toBe(web);
+    expect(gateCopy(".zeabur/solace-mail/gateway/base/haproxy.cfg")).toBe(web);
   });
 
   it("names a contact, a policy and every canonical location", () => {
@@ -40,7 +41,7 @@ describe("security.txt", () => {
     expect(expires).toHaveLength(1);
     const remaining = Date.parse(expires[0]?.slice("Expires: ".length) ?? "") - Date.now();
     if (!(remaining >= 60 * DAY_MS)) {
-      throw new Error("security.txt expires within 60 days; move Expires forward in all three copies");
+      throw new Error("security.txt expires within 60 days; move Expires forward in all four copies");
     }
     expect(remaining).toBeLessThanOrEqual(366 * DAY_MS);
   });

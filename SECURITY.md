@@ -13,7 +13,7 @@ Please include:
 
 ## Scope
 
-- The web app at `solace.onl`, the API at `api.solace.onl`, public JMAP at `mail.solace.onl`, and SMTP and the outbound relay at `mx.solace.onl`.
+- The web app at `solace.onl`, the API at `api.solace.onl`, public JMAP at `mail.solace.onl`, and SMTP at `mx.solace.onl` and `mx2.solace.onl`.
 - The Solace Calendar and Solace Mail iOS apps.
 - The code in this repository, including flaws in the end-to-end encryption design. Any way for the server to learn user content is in scope.
 
@@ -26,7 +26,7 @@ Please include:
 - SPF or DMARC on domains that send no mail.
 - Self-XSS.
 - Reports that only repeat the known gaps and accepted trade-offs documented in `AGENTS.md` §2, such as the plaintext `EventParticipant` email and name and the listed "Known gaps".
-- Third-party services (Railway, Vercel, Expo, Apple).
+- Third-party services (Cloudflare, Webdock, Vercel, Railway, Expo, Apple).
 
 ## What to expect
 
