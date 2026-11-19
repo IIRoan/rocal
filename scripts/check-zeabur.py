@@ -84,7 +84,7 @@ def check(flux, gateway_dir):
         docs = render(flux, obj, spec["path"])
         for doc in docs:
             assert identity(doc) not in seen, identity(doc)
-            assert doc["metadata"].get("namespace") in {"solace-mail", "solace-api"}, identity(doc)
+            assert doc["metadata"].get("namespace") == "solace-mail", identity(doc)
             seen.add(identity(doc))
         configs = {(doc["metadata"]["namespace"], doc["metadata"]["name"]): doc
                    for doc in docs if doc["kind"] == "ConfigMap"}

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: app-postgres
-  namespace: solace-api
+  namespace: solace-mail
 spec:
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
@@ -53,11 +53,6 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: POSTGRES_PASSWORD
-                  name: app-pg-auth
-            - name: REPLICATION_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: REPLICATION_PASSWORD
                   name: app-pg-auth
             - name: POSTGRES_INITDB_ARGS
               value: --data-checksums
@@ -171,7 +166,23 @@ spec:
         resources:
           requests:
             storage: 2Gi
-        storageClassName: solace-app-pg-encrypted
+        storageClassName: solace-app-pg-project-encrypted
         volumeMode: Filesystem
       status:
         phase: Pending
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-pg-init
+  namespace: solace-mail
+data:
+  00-application.sh: |
+    #!/bin/sh
+    set -eu
+    case "$APP_PASSWORD" in solace-prod-*) ;; *) exit 1 ;; esac
+    printf "CREATE ROLE solace_app WITH LOGIN PASSWORD '%s';\n" "$APP_PASSWORD" |
+        psql -v ON_ERROR_STOP=1 -U dbadmin -d postgres >/dev/null
+    createdb -U dbadmin -O solace_app solace
+    createdb -U dbadmin -O solace_app app_baseline
+    sed -i '/^host[[:space:]]*all[[:space:]]*all[[:space:]]*all[[:space:]]/s/^host[[:space:]]/hostssl /' "$PGDATA/pg_hba.conf"

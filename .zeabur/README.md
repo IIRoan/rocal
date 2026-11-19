@@ -1,11 +1,10 @@
 # Solace on Zeabur
 
-This Kustomize root declares the active Solace project on Zeabur OSS. `solace-mail` is the labeled Zeabur project. `solace-api` holds its application PostgreSQL instance. The shared Zeabur installation and the Kubernetes platform have their own lifecycle. The [Railway Monitoring configuration](../.railway/README.md) covers Gatus.
+This Kustomize root declares the active Solace project on Zeabur OSS. `solace-mail` contains the API, its PostgreSQL database, and the mail stack. The shared Zeabur installation and the Kubernetes platform have their own lifecycle. The [Railway Monitoring configuration](../.railway/README.md) covers Gatus.
 
 | Path | What it manages |
 | --- | --- |
-| [solace-mail/](solace-mail/) | API and notifications, Stalwart and its gateways, public Traefik, issuers and certificates, mail PostgreSQL, Redis Sentinel, and mail object storage |
-| [solace-api/](solace-api/) | Application PostgreSQL and its trust and initialization config |
+| [solace-mail/](solace-mail/) | API, its PostgreSQL database and notifications, Stalwart and its gateways, public Traefik, issuers and certificates, mail PostgreSQL, Redis Sentinel, and mail object storage |
 | [bootstrap/](bootstrap/) | Namespaces with restricted Pod Security, encrypted StorageClasses, Flux setup, scoped deploy permissions, networking, and ingress RBAC |
 
 The live workloads drive the image digests, selectors, placement, probes, and storage settings in these manifests. Keep image changes here for the workloads this directory manages. Zeabur reads these objects and displays their live state.
@@ -16,8 +15,7 @@ The cluster provides K3s, Traefik, cert-manager, CloudNativePG and Longhorn. Kee
 
 | Namespace | Secrets supplied through the deployment or recovery process |
 | --- | --- |
-| `solace-mail` | `api-runtime`, `notifications-runtime`, `app-postgres-url`, `solace-acme-dns`, `mail-database-app`, `mail-live-auth`, `mail-object-auth`, `mail-pg-auth`, `mail-pg-crypto`, `mail-redis-sentinel-auth`, `mail-s3-crypto`, `mail-standby-relay-tls` |
-| `solace-api` | `app-pg-auth`, `app-pg-crypto`, `app-pg-tls` |
+| `solace-mail` | `api-runtime`, `notifications-runtime`, `app-postgres-url`, `solace-acme-dns`, `mail-database-app`, `mail-live-auth`, `mail-object-auth`, `mail-pg-auth`, `mail-pg-crypto`, `mail-redis-sentinel-auth`, `mail-s3-crypto`, `mail-standby-relay-tls`, `app-pg-auth`, `app-pg-crypto`, `app-pg-tls` |
 
 The CA ConfigMaps contain public trust certificates. CloudNativePG manages its instance Services, accounts and volumes. Kubernetes provisions the StatefulSet claims from their templates. The long-lived mail object claim is declared explicitly. Restore the database and object data, with their encryption keys, before routing production traffic to a replacement installation.
 
