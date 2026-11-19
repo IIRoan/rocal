@@ -98,6 +98,7 @@ def check(flux, gateway_dir):
             fixtures.append(check_gateway(deployment, configs, "config"))
             assert deployment["spec"]["minReadySeconds"] >= 60, replica
             assert deployment["spec"]["strategy"] == {"type": "Recreate"}, replica
+            check_stalwart_security(deployment)
             gateway = next(container for container in deployment["spec"]["template"]["spec"]["containers"]
                            if container["name"] == "gateway")
             assert gateway["readinessProbe"]["httpGet"] == {"path": "/readyz", "port": 8084, "scheme": "HTTP"}
@@ -128,6 +129,25 @@ def check_gateway(deployment, configs, volume):
     assert config.get("immutable") is True, config_name
     assert "haproxy.cfg" in config["data"], config_name
     return config["data"]
+
+
+def check_stalwart_security(deployment):
+    _, namespace, name = identity(deployment)
+    assert namespace == "solace-mail", name
+    template = deployment["spec"]["template"]["spec"]
+    pod_security = template["securityContext"]
+    for container in template["containers"]:
+        label = f"{name}/{container['name']}"
+        security = container["securityContext"]
+        effective = {**pod_security, **security}
+        assert effective["runAsNonRoot"] is True, label
+        assert effective["runAsUser"] > 10000 and effective["runAsGroup"] > 10000, label
+        assert effective["seccompProfile"]["type"] == "RuntimeDefault", label
+        assert security["allowPrivilegeEscalation"] is False, label
+        assert security["readOnlyRootFilesystem"] is True, label
+        assert "ALL" in security["capabilities"]["drop"], label
+        for workload_budget in ("requests", "limits"):
+            assert {"cpu", "memory"} <= container["resources"][workload_budget].keys(), label
 
 
 def validate_redis(docs, network):
