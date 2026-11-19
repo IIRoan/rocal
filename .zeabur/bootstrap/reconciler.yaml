@@ -69,17 +69,3 @@ subjects:
   - kind: ServiceAccount
     name: solace-reconciler
     namespace: solace-gitops
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: solace-project-resources
-  namespace: solace-api
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: solace-project-resources
-subjects:
-  - kind: ServiceAccount
-    name: solace-reconciler
-    namespace: solace-gitops

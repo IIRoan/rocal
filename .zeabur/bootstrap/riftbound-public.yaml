@@ -1,0 +1,200 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: rift-public-acme
+  namespace: riftbound
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: rift-public-acme-account
+    solvers:
+      - selector:
+          dnsNames: [rift.solace.onl, riftapi.solace.onl]
+        dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: rift-public-acme-dns
+              key: api-token
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: expo-public
+  namespace: riftbound
+spec:
+  dnsNames: [rift.solace.onl]
+  issuerRef:
+    kind: Issuer
+    name: rift-public-acme
+  secretName: expo-public-tls
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: solace-public-traefik
+  namespace: riftbound
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    resourceNames: [expo-web, rust-api]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: solace-public-traefik
+  namespace: riftbound
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: solace-public-traefik
+subjects:
+  - kind: ServiceAccount
+    name: solace-tunnel-ingress
+    namespace: solace-mail
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-from-solace-public-traefik
+  namespace: riftbound
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: expo-web
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: expo-web
+  namespace: riftbound
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public
+spec:
+  rules:
+    - host: rift.solace.onl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: expo-web
+                port:
+                  number: 8080
+  tls:
+    - hosts: [rift.solace.onl]
+      secretName: expo-public-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-traefik-to-riftbound
+  namespace: solace-mail
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: solace-public-ingress
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: riftbound
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: expo-web
+      ports:
+        - port: 8080
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: riftbound
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rust-api
+      ports:
+        - port: 7000
+          protocol: TCP
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: rust-public
+  namespace: riftbound
+spec:
+  dnsNames: [riftapi.solace.onl]
+  issuerRef:
+    kind: Issuer
+    name: rift-public-acme
+  secretName: rust-public-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rust-api
+  namespace: riftbound
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public
+spec:
+  rules:
+    - host: riftapi.solace.onl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rust-api
+                port:
+                  number: 7000
+  tls:
+    - hosts: [riftapi.solace.onl]
+      secretName: rust-public-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-from-solace-public-traefik
+  namespace: riftbound
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rust-api
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - port: 7000
+          protocol: TCP

@@ -23,7 +23,7 @@ def render(flux, spec, path):
         file.flush()
         output = subprocess.check_output([
             flux, "build", "kustomization", spec["metadata"]["name"], "--namespace", NAMESPACE,
-            "--dry-run", "--path", str(path), "--kustomization-file", file.name,
+            "--dry-run", "--strict-substitute", "--path", str(path), "--kustomization-file", file.name,
         ], text=True)
     return [doc for doc in yaml.safe_load_all(output) if doc]
 
@@ -84,11 +84,18 @@ def check(flux, gateway_dir):
         docs = render(flux, obj, spec["path"])
         for doc in docs:
             assert identity(doc) not in seen, identity(doc)
-            assert doc["metadata"].get("namespace") in {"solace-mail", "solace-api"}, identity(doc)
+            assert doc["metadata"].get("namespace") == "solace-mail", identity(doc)
             seen.add(identity(doc))
         configs = {(doc["metadata"]["namespace"], doc["metadata"]["name"]): doc
                    for doc in docs if doc["kind"] == "ConfigMap"}
         deployments = {doc["metadata"]["name"]: doc for doc in docs if doc["kind"] == "Deployment"}
+        release_containers = {"stalwart-a": "stalwart", "stalwart-b": "stalwart",
+                              "solace-api": "api", "notifications": "worker"}
+        for deployment, container in release_containers.items():
+            if deployment in deployments:
+                containers = deployments[deployment]["spec"]["template"]["spec"]["containers"]
+                image = next(c["image"] for c in containers if c["name"] == container)
+                assert re.fullmatch(r"[^@\s]+@sha256:[0-9a-f]{64}", image), image
         if expected_dependencies:
             replica = name.removeprefix("solace-")
             assert deployments.keys() == {replica}
@@ -99,14 +106,19 @@ def check(flux, gateway_dir):
             assert deployment["spec"]["minReadySeconds"] >= 60, replica
             assert deployment["spec"]["strategy"] == {"type": "Recreate"}, replica
             check_stalwart_security(deployment)
+            check_service_targets(network, deployment, ("mail-live", "mail-inbound", "mail-public-direct"))
             gateway = next(container for container in deployment["spec"]["template"]["spec"]["containers"]
                            if container["name"] == "gateway")
             assert gateway["readinessProbe"]["httpGet"] == {"path": "/readyz", "port": 8084, "scheme": "HTTP"}
             assert gateway["readinessProbe"]["failureThreshold"] == 1
+            stalwart = next(container for container in deployment["spec"]["template"]["spec"]["containers"]
+                            if container["name"] == "stalwart")
+            assert all(container["readinessProbe"]["initialDelaySeconds"] == 8 for container in (gateway, stalwart))
             images.append(gateway["image"])
         else:
             assert {"stalwart-a", "stalwart-b"}.isdisjoint(deployments)
             check_gateway(deployments["solace-api"], configs, "edge")
+            check_service_targets(network, deployments["solace-api"], ("solace-api", "solace-api-direct"))
             check_gateway(deployments["notifications"], configs, "mail-gate")
             validate_redis(docs, network)
             check_public_ingress(network, docs)
@@ -124,44 +136,79 @@ def check(flux, gateway_dir):
 
 
 
+def check_service_targets(network, deployment, service_names):
+    pod = deployment["spec"]["template"]
+    declared = {target for container in pod["spec"]["containers"] for port in container.get("ports", [])
+                for target in (port["containerPort"], port.get("name"))}
+    for name in service_names:
+        service = find_resource(network, "Service", "solace-mail", name)
+        assert service["spec"]["selector"].items() <= pod["metadata"]["labels"].items(), name
+        for port in service["spec"]["ports"]:
+            assert port["targetPort"] in declared, (name, port["targetPort"])
+
+
 def check_public_ingress(network, workloads):
     namespace = "solace-mail"
     public = find_resource(network, "Ingress", namespace, "solace-public")
-    private_host_routes = [
-        rule for doc in network
-        if doc["kind"] == "Ingress" and doc["metadata"]["name"] != "solace-public"
-        for rule in doc["spec"]["rules"]
-    ]
-    expected_public_rules = []
-    direct_services = {"solace-api": "solace-api-direct", "mail-live": "mail-public-direct"}
-    for rule in private_host_routes:
-        paths = [
-            {
-                **path,
-                "backend": {"service": {"name": direct_services[path["backend"]["service"]["name"]],
-                                         "port": {"number": 8085}}},
-            }
-            for path in rule["http"]["paths"]
-        ]
-        expected_public_rules.append({"host": rule["host"], "http": {"paths": paths}})
-    assert public["spec"]["rules"] == expected_public_rules
+    expected_paths = {
+        "api.solace.onl": [("/", "Prefix")],
+        "autodiscover.solace.onl": [
+            ("/autodiscover/autodiscover.xml", "Exact"),
+            ("/autodiscover/autodiscover.json", "Prefix"),
+        ],
+        "autoconfig.solace.onl": [
+            ("/mail/config-v1.1.xml", "Exact"),
+            ("/.well-known/autoconfig/mail/config-v1.1.xml", "Exact"),
+            ("/.well-known/mail-v1.xml", "Exact"),
+        ],
+        "ua-auto-config.solace.onl": [
+            ("/.well-known/user-agent-configuration.json", "Exact"),
+            ("/.well-known/mail-v1.xml", "Exact"),
+        ],
+        "mta-sts.solace.onl": [("/.well-known/mta-sts.txt", "Exact")],
+        "mail.solace.onl": [("/", "Prefix")],
+    }
+    rules = public["spec"]["rules"]
+    assert len(rules) == len(expected_paths)
+    assert {rule["host"]: [(p["path"], p["pathType"]) for p in rule["http"]["paths"]]
+            for rule in rules} == expected_paths
+    for rule in rules:
+        service = "solace-api-direct" if rule["host"] == "api.solace.onl" else "mail-public-direct"
+        for path in rule["http"]["paths"]:
+            assert path["backend"] == {"service": {"name": service, "port": {"number": 8085}}}
     certificate = find_resource(workloads, "Certificate", namespace, "solace-public")
     assert public["spec"]["tls"] == [{
         "hosts": certificate["spec"]["dnsNames"],
         "secretName": certificate["spec"]["secretName"],
     }]
-    assert certificate["spec"]["dnsNames"] == [rule["host"] for rule in private_host_routes]
-    for name, port in (("solace-public", 443), ("solace-smtp", 25)):
+    assert certificate["spec"]["dnsNames"] == [rule["host"] for rule in rules]
+    for name, port, pool in (("solace-public", 443, "solace-https"), ("solace-smtp", 25, "solace-smtp")):
         service = find_resource(network, "Service", namespace, name)
-        assert service["spec"]["loadBalancerClass"] == "solace.onl/vps-ingress"
-        assert service["spec"]["allocateLoadBalancerNodePorts"] is False
+        assert service["spec"]["type"] == "LoadBalancer"
+        assert "loadBalancerClass" not in service["spec"]
+        assert service["spec"].get("allocateLoadBalancerNodePorts", True) is True
+        assert service["metadata"]["labels"]["svccontroller.k3s.cattle.io/lbpool"] == pool
         assert service["spec"]["externalTrafficPolicy"] == "Local"
         assert [item["port"] for item in service["spec"]["ports"]] == [port]
     ingress = find_resource(workloads, "Deployment", namespace, "solace-public-ingress")
+    assert ingress["metadata"]["labels"]["app.kubernetes.io/name"] == "traefik"
     template = ingress["spec"]["template"]["spec"]
+    find_resource(workloads, "ServiceAccount", namespace, template["serviceAccountName"])
+    (controller,) = template["containers"]
+    assert "--providers.kubernetesingress.ingressendpoint.publishedservice=solace-mail/solace-public" in controller["args"]
     routes_name = next(vol["configMap"]["name"] for vol in template["volumes"] if vol["name"] == "ingress-routes")
     routes = yaml.safe_load(find_resource(workloads, "ConfigMap", namespace, routes_name)["data"]["routes.yaml"])
     assert routes["tcp"]["services"]["mail-inbound"]["loadBalancer"]["proxyProtocol"]["version"] == 2
+    assert routes["tcp"]["routers"]["mx-https"] == {
+        "entryPoints": ["public"],
+        "rule": "HostSNI(`mx.solace.onl`)",
+        "service": "mx-https",
+        "tls": {"passthrough": True},
+    }
+    assert routes["tcp"]["services"]["mx-https"]["loadBalancer"] == {
+        "proxyProtocol": {"version": 2},
+        "servers": [{"address": "mail-live.solace-mail.svc.cluster.local:8443"}],
+    }
 
 
 def check_gateway(deployment, configs, volume):

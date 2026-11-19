@@ -3,10 +3,14 @@ kind: Service
 metadata:
   name: solace-public
   namespace: solace-mail
+  labels:
+    svccontroller.k3s.cattle.io/lbpool: solace-https
+  annotations:
+    svccontroller.k3s.cattle.io/tolerations: >-
+      [{"key":"roan.dev/apps-only","operator":"Equal","value":"true","effect":"NoSchedule"},
+      {"key":"roan.dev/mail-only","operator":"Equal","value":"true","effect":"NoSchedule"}]
 spec:
   type: LoadBalancer
-  loadBalancerClass: solace.onl/vps-ingress
-  allocateLoadBalancerNodePorts: false
   externalTrafficPolicy: Local
   selector:
     app.kubernetes.io/name: solace-public-ingress
@@ -21,10 +25,14 @@ kind: Service
 metadata:
   name: solace-smtp
   namespace: solace-mail
+  labels:
+    svccontroller.k3s.cattle.io/lbpool: solace-smtp
+  annotations:
+    svccontroller.k3s.cattle.io/tolerations: >-
+      [{"key":"roan.dev/apps-only","operator":"Equal","value":"true","effect":"NoSchedule"},
+      {"key":"roan.dev/mail-only","operator":"Equal","value":"true","effect":"NoSchedule"}]
 spec:
   type: LoadBalancer
-  loadBalancerClass: solace.onl/vps-ingress
-  allocateLoadBalancerNodePorts: false
   externalTrafficPolicy: Local
   selector:
     app.kubernetes.io/name: solace-public-ingress
@@ -105,6 +113,8 @@ spec:
       ports:
         - port: 22525
           protocol: TCP
+        - port: 18443
+          protocol: TCP
         - port: 8085
           protocol: TCP
 ---
@@ -125,6 +135,8 @@ spec:
               app.kubernetes.io/name: solace-public-ingress
       ports:
         - port: 22525
+          protocol: TCP
+        - port: 18443
           protocol: TCP
         - port: 8085
           protocol: TCP

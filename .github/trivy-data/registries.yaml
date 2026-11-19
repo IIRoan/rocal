@@ -1,5 +1,6 @@
 ksv0125:
   trusted_registries:
+    - cgr.dev
     - docker.io
     - ghcr.io
     - zot.zot.svc:5000

@@ -11,13 +11,13 @@ Solace runs the API, notifications worker and two Stalwart replicas on Zeabur OS
 | `solace-mail` | `mail-database` | Two-instance CloudNativePG cluster for Stalwart metadata and queues. The write Service is `mail-database-rw`. The old `mail-pg` and `mail-pg-standby` StatefulSets are scaled to zero. |
 | `solace-mail` | `mail-redis`, `mail-redis-replica`, Sentinel | Shared ephemeral state and coordination. A Sentinel runs on each Webdock worker, with a third witness on `roan-server`. |
 | `solace-mail` | `mail-s3` | Solace's mail blob storage. The observed StatefulSet has one replica. |
-| `solace-api` | `app-postgres`, `app-postgres-standby` | Application PostgreSQL primary on `webdock-1` and standby on `webdock-mail`. |
+| `solace-mail` | `app-postgres` | Application PostgreSQL on `webdock-1`. |
 
 `roan-server` is the control plane and runs the Builder controller. BuildKit limits are 4 CPU and 8 GiB. Build placement is currently unpinned. Verify the Job and BuildKit pod placement separately from the controller. Keep the API, notifications and both Stalwart replicas on the Webdock workers.
 
 ## Request paths
 
-- **Public HTTPS.** Cloudflare tunnel connectors and ingress route `api.solace.onl` to `solace-api:8080`. They route `mail.solace.onl`, MTA-STS and discovery hosts to `mail-live:8082`, the public mail gateway. Web and native clients use the Solace API's JMAP proxy.
+- **Public HTTPS.** DNS-only records send traffic to Traefik on the two Webdock workers. Traefik routes `api.solace.onl` to `solace-api-direct:8085`. It routes `mail.solace.onl`, MTA-STS and discovery hosts to `mail-public-direct:8085`, the public mail gateway. Web and native clients use the Solace API's JMAP proxy.
 - **Private JMAP.** The API and worker send the shared `STALWART_GATE_KEY` through the origin-restricted `StalwartGate`. Their pods map the compatibility hostname `stalwart-gate.railway.internal` to the local HAProxy sidecar on port 8081. The sidecars forward to `mail-live.solace-mail.svc.cluster.local:8081`. The hostname keeps the client origin check compatible.
 - **SMTP.** Public port 25 goes to HAProxy on each MX host and then directly over TCP to Stalwart with PROXY v2. Stalwart presents the STARTTLS certificate. The VPS runbook covers MX order, outbound relays and routine checks.
 

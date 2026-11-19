@@ -1,196 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mail-cloudflared-a
-  namespace: solace-mail
-spec:
-  progressDeadlineSeconds: 600
-  replicas: 1
-  revisionHistoryLimit: 10
-  selector:
-    matchLabels:
-      app: mail-cf-tunnel
-      instance: mail-cloudflared-a
-  strategy:
-    rollingUpdate:
-      maxSurge: 25%
-      maxUnavailable: 25%
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app: mail-cf-tunnel
-        instance: mail-cloudflared-a
-    spec:
-      automountServiceAccountToken: false
-      containers:
-        - args:
-            - tunnel
-            - --no-autoupdate
-            - --metrics
-            - 0.0.0.0:2000
-            - --protocol
-            - http2
-            - run
-          envFrom:
-            - secretRef:
-                name: mail-cf-tunnel
-          image: docker.io/cloudflare/cloudflared@sha256:b94b96edf2c9c4360f8879c8580cfaa99077f19c849ec595ca2f711b27d4f344
-          imagePullPolicy: IfNotPresent
-          name: cloudflared
-          readinessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /ready
-              port: 2000
-              scheme: HTTP
-            periodSeconds: 4
-            successThreshold: 1
-            timeoutSeconds: 1
-          resources:
-            limits:
-              cpu: 350m
-              memory: 128Mi
-            requests:
-              cpu: 25m
-              memory: 32Mi
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: true
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-          volumeMounts:
-            - mountPath: /etc/solace-origin-ca
-              name: solace-origin-ca
-              readOnly: true
-      dnsPolicy: ClusterFirst
-      nodeSelector:
-        kubernetes.io/hostname: webdock-mail
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext:
-        runAsGroup: 65532
-        runAsNonRoot: true
-        runAsUser: 65532
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 30
-      tolerations:
-        - effect: NoSchedule
-          key: roan.dev/apps-only
-          operator: Equal
-          value: 'true'
-        - effect: NoSchedule
-          key: roan.dev/mail-only
-          operator: Equal
-          value: 'true'
-      volumes:
-        - configMap:
-            defaultMode: 420
-            name: solace-origin-ca
-          name: solace-origin-ca
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mail-cloudflared-b
-  namespace: solace-mail
-spec:
-  progressDeadlineSeconds: 600
-  replicas: 1
-  revisionHistoryLimit: 10
-  selector:
-    matchLabels:
-      app: mail-cf-tunnel
-      instance: mail-cloudflared-b
-  strategy:
-    rollingUpdate:
-      maxSurge: 25%
-      maxUnavailable: 25%
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app: mail-cf-tunnel
-        instance: mail-cloudflared-b
-    spec:
-      automountServiceAccountToken: false
-      containers:
-        - args:
-            - tunnel
-            - --no-autoupdate
-            - --metrics
-            - 0.0.0.0:2000
-            - --protocol
-            - http2
-            - run
-          envFrom:
-            - secretRef:
-                name: mail-cf-tunnel
-          image: docker.io/cloudflare/cloudflared@sha256:b94b96edf2c9c4360f8879c8580cfaa99077f19c849ec595ca2f711b27d4f344
-          imagePullPolicy: IfNotPresent
-          name: cloudflared
-          readinessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /ready
-              port: 2000
-              scheme: HTTP
-            periodSeconds: 4
-            successThreshold: 1
-            timeoutSeconds: 1
-          resources:
-            limits:
-              cpu: 350m
-              memory: 128Mi
-            requests:
-              cpu: 25m
-              memory: 32Mi
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: true
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-          volumeMounts:
-            - mountPath: /etc/solace-origin-ca
-              name: solace-origin-ca
-              readOnly: true
-      dnsPolicy: ClusterFirst
-      nodeSelector:
-        kubernetes.io/hostname: webdock-1
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext:
-        runAsGroup: 65532
-        runAsNonRoot: true
-        runAsUser: 65532
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 30
-      tolerations:
-        - effect: NoSchedule
-          key: roan.dev/apps-only
-          operator: Equal
-          value: 'true'
-        - effect: NoSchedule
-          key: roan.dev/mail-only
-          operator: Equal
-          value: 'true'
-      volumes:
-        - configMap:
-            defaultMode: 420
-            name: solace-origin-ca
-          name: solace-origin-ca
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
   labels:
     app.kubernetes.io/name: notifications
     app.kubernetes.io/part-of: solace
@@ -216,7 +26,7 @@ spec:
         - envFrom:
             - secretRef:
                 name: notifications-runtime
-          image: zot.zot.svc:5000/solace-api/notifications@sha256:ac23dcc1b86161328b69ccd26ebd0d11a5d208193e135730555c4358479944e3
+          image: ${SOLACE_NOTIFICATIONS_IMAGE:=zot.zot.svc:5000/solace-api/notifications@sha256:ac23dcc1b86161328b69ccd26ebd0d11a5d208193e135730555c4358479944e3}
           imagePullPolicy: IfNotPresent
           name: worker
           readinessProbe:
@@ -360,6 +170,9 @@ spec:
             - containerPort: 8080
               name: edge
               protocol: TCP
+            - containerPort: 8085
+              name: public-direct
+              protocol: TCP
           readinessProbe:
             failureThreshold: 3
             httpGet:
@@ -407,7 +220,7 @@ spec:
           envFrom:
             - secretRef:
                 name: api-runtime
-          image: zot.zot.svc:5000/solace-api/api@sha256:96c0ec8970441cfd0b2adabcf05a1eaebf2b75c4b0aff160098c80793d457679
+          image: ${SOLACE_API_IMAGE:=zot.zot.svc:5000/solace-api/api@sha256:96c0ec8970441cfd0b2adabcf05a1eaebf2b75c4b0aff160098c80793d457679}
           imagePullPolicy: IfNotPresent
           lifecycle:
             preStop:
@@ -474,115 +287,6 @@ spec:
             defaultMode: 420
             name: api-edge-upstream
           name: edge
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app.kubernetes.io/name: solace-tunnel-ingress
-  name: solace-tunnel-ingress
-  namespace: solace-mail
-spec:
-  progressDeadlineSeconds: 600
-  replicas: 2
-  revisionHistoryLimit: 10
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: solace-tunnel-ingress
-  strategy:
-    rollingUpdate:
-      maxSurge: 0
-      maxUnavailable: 1
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: solace-tunnel-ingress
-    spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: In
-                    values:
-                      - webdock-1
-                      - webdock-mail
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchLabels:
-                  app.kubernetes.io/name: solace-tunnel-ingress
-              topologyKey: kubernetes.io/hostname
-      containers:
-        - args:
-            - --entryPoints.tunnel.address=:8443/tcp
-            - --entryPoints.tunnel.http.tls=true
-            - --entryPoints.traefik.address=:8080/tcp
-            - --ping=true
-            - --api.dashboard=false
-            - --providers.kubernetesingress=true
-            - --providers.kubernetesingress.namespaces=solace-mail
-            - --providers.kubernetesingress.ingressclass=solace-tunnel
-            - --providers.kubernetesingress.disableClusterScopeResources=true
-            - --providers.kubernetesingress.ingressendpoint.hostname=ingress.solace.onl
-            - --log.level=WARN
-          image: docker.io/traefik:v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2
-          imagePullPolicy: IfNotPresent
-          name: traefik
-          ports:
-            - containerPort: 8443
-              name: tunnel
-              protocol: TCP
-            - containerPort: 8080
-              name: health
-              protocol: TCP
-          readinessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /ping
-              port: health
-              scheme: HTTP
-            periodSeconds: 3
-            successThreshold: 1
-            timeoutSeconds: 1
-          resources:
-            limits:
-              cpu: 300m
-              memory: 128Mi
-            requests:
-              cpu: 25m
-              memory: 48Mi
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: true
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext:
-        runAsGroup: 10001
-        runAsNonRoot: true
-        runAsUser: 10001
-        seccompProfile:
-          type: RuntimeDefault
-      serviceAccount: solace-tunnel-ingress
-      serviceAccountName: solace-tunnel-ingress
-      terminationGracePeriodSeconds: 30
-      tolerations:
-        - effect: NoSchedule
-          key: roan.dev/apps-only
-          operator: Equal
-          value: 'true'
-        - effect: NoSchedule
-          key: roan.dev/mail-only
-          operator: Equal
-          value: 'true'
 ---
 apiVersion: batch/v1
 kind: CronJob

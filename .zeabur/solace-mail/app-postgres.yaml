@@ -1,0 +1,188 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: app-postgres
+  namespace: solace-mail
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: app-postgres
+  serviceName: app-postgres
+  template:
+    metadata:
+      labels:
+        app: app-postgres
+        app.kubernetes.io/name: app-postgres
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - args:
+            - postgres
+            - -c
+            - listen_addresses=*
+            - -c
+            - shared_buffers=48MB
+            - -c
+            - io_method=sync
+            - -c
+            - wal_keep_size=64MB
+            - -c
+            - max_connections=32
+            - -c
+            - ssl=on
+            - -c
+            - ssl_cert_file=/etc/app-pg-tls/tls.crt
+            - -c
+            - ssl_key_file=/etc/app-pg-tls/tls.key
+          env:
+            - name: PGDATA
+              value: /var/lib/pg/pgdata
+            - name: HOME
+              value: /tmp
+            - name: POSTGRES_USER
+              value: dbadmin
+            - name: POSTGRES_DB
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: POSTGRES_PASSWORD
+                  name: app-pg-auth
+            - name: POSTGRES_INITDB_ARGS
+              value: --data-checksums
+            - name: APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: APP_PASSWORD
+                  name: app-pg-auth
+          image: docker.io/library/postgres@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
+          imagePullPolicy: IfNotPresent
+          name: postgres
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -h
+                - 127.0.0.1
+                - -U
+                - dbadmin
+                - -d
+                - postgres
+            failureThreshold: 3
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 700m
+              memory: 384Mi
+            requests:
+              cpu: 75m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsGroup: 70
+            runAsUser: 70
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/lib/pg
+              name: data
+            - mountPath: /docker-entrypoint-initdb.d
+              name: init
+              readOnly: true
+            - mountPath: /etc/app-pg-tls
+              name: postgres-tls
+              readOnly: true
+            - mountPath: /etc/app-pg-ca
+              name: postgres-ca
+              readOnly: true
+            - mountPath: /tmp
+              name: postgres-tmp
+            - mountPath: /var/run/postgresql
+              name: postgres-socket
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-1
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        appArmorProfile:
+          localhostProfile: solace-rehearsal-postgres
+          type: Localhost
+        fsGroup: 70
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: app-pg-init
+          name: init
+        - name: postgres-tls
+          secret:
+            defaultMode: 416
+            secretName: app-pg-tls
+        - configMap:
+            defaultMode: 420
+            name: app-pg-ca
+          name: postgres-ca
+        - name: postgres-tmp
+          emptyDir: {}
+        - name: postgres-socket
+          emptyDir: {}
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+        storageClassName: solace-app-pg-project-encrypted
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-pg-init
+  namespace: solace-mail
+data:
+  00-application.sh: |
+    #!/bin/sh
+    set -eu
+    case "$APP_PASSWORD" in solace-prod-*) ;; *) exit 1 ;; esac
+    printf "CREATE ROLE solace_app WITH LOGIN PASSWORD '%s';\n" "$APP_PASSWORD" |
+        psql -v ON_ERROR_STOP=1 -U dbadmin -d postgres >/dev/null
+    createdb -U dbadmin -O solace_app solace
+    createdb -U dbadmin -O solace_app app_baseline
+    sed -i '/^host[[:space:]]*all[[:space:]]*all[[:space:]]*all[[:space:]]/s/^host[[:space:]]/hostssl /' "$PGDATA/pg_hba.conf"

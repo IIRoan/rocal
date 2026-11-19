@@ -16,6 +16,7 @@ RUN cargo build --release --locked -p solace-notifications \
  && cp target/release/solace-notifications /solace-notifications
 
 FROM cgr.dev/chainguard/glibc-dynamic:latest@sha256:5bb932663cff4fb276186720e0357af55c5e47f12e4d9f44ea0060fa3e7bca88
+LABEL org.opencontainers.image.source="https://github.com/IIRoan/rocal"
 COPY --from=build /solace-notifications /usr/local/bin/solace-notifications
 USER 10001:10001
 ENTRYPOINT ["/usr/local/bin/solace-notifications"]

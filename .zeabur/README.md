@@ -1,29 +1,27 @@
 # Solace on Zeabur
 
-This Kustomize root declares the active Solace project on Zeabur OSS. `solace-mail` is the labeled Zeabur project. `solace-api` holds its application PostgreSQL primary and standby. The shared Zeabur installation and the Kubernetes platform have their own lifecycle.
+This Kustomize root declares the active Solace project on Zeabur OSS. `solace-mail` contains the API, its PostgreSQL database, and the mail stack. The shared Zeabur installation and the Kubernetes platform have their own lifecycle.
 
 | Path | What it manages |
 | --- | --- |
-| [solace-mail/](solace-mail/) | API and notifications, Stalwart and its gateways, Cloudflare tunnel workloads, issuer and certificate, mail PostgreSQL, Redis Sentinel, and mail object storage |
-| [solace-api/](solace-api/) | Application PostgreSQL primary and standby, their trust and initialization config |
+| [solace-mail/](solace-mail/) | API, its PostgreSQL database and notifications, Stalwart and its gateways, public Traefik, issuers and certificates, mail PostgreSQL, Redis Sentinel, and mail object storage |
 | [bootstrap/](bootstrap/) | Namespaces with restricted Pod Security, encrypted StorageClasses, Flux setup, scoped deploy permissions, networking, and ingress RBAC |
 
-The live workloads drive the image digests, selectors, placement, probes, and storage settings in these manifests. Keep image changes here for the workloads this directory manages. Zeabur reads these objects and displays their live state.
+These manifests declare workload placement, probes, storage and fallback image digests. Zeabur displays the resulting Kubernetes workloads and Builder runs.
 
 ## Dependencies and recovery
 
-The cluster provides K3s, Traefik, cert-manager, CloudNativePG and Longhorn. Keep the two Webdock worker names used by placement rules. Restore access to the pinned images, the Cloudflare tunnel and DNS, and the [host SMTP listeners and relays](../apps/stalwart/vps/README.md). The Kubernetes manifests reference the tunnel credentials supplied through the project Secret.
+The cluster provides K3s, Traefik, cert-manager, CloudNativePG, Longhorn, Zeabur Builder and the private Zot registry. Keep the two Webdock worker names used by placement rules. Restore access to the pinned images, Cloudflare DNS, and the [host SMTP listeners and relays](../apps/stalwart/vps/README.md).
 
 | Namespace | Secrets supplied through the deployment or recovery process |
 | --- | --- |
-| `solace-mail` | `api-runtime`, `notifications-runtime`, `app-postgres-url`, `mail-cf-tunnel`, `mail-database-app`, `mail-live-auth`, `mail-object-auth`, `mail-pg-auth`, `mail-pg-crypto`, `mail-redis-sentinel-auth`, `mail-s3-crypto`, `mail-standby-relay-tls`, `solace-origin-ca` |
-| `solace-api` | `app-pg-auth`, `app-pg-crypto`, `app-pg-tls` |
+| `solace-mail` | `api-runtime`, `notifications-runtime`, `app-postgres-url`, `solace-acme-dns`, `mail-database-app`, `mail-live-auth`, `mail-object-auth`, `mail-pg-auth`, `mail-pg-crypto`, `mail-redis-sentinel-auth`, `mail-s3-crypto`, `mail-standby-relay-tls`, `app-pg-auth`, `app-pg-crypto`, `app-pg-tls` |
 
-The CA ConfigMaps contain public trust certificates. cert-manager issues `solace-origin-tls` from the externally provisioned CA key. CloudNativePG manages its instance Services, accounts and volumes. Kubernetes provisions the StatefulSet claims from their templates. The long-lived mail object claim is declared explicitly. Restore the database and object data, with their encryption keys, before routing production traffic to a replacement installation.
+The CA ConfigMaps contain public trust certificates. CloudNativePG manages its instance Services, accounts and volumes. Kubernetes provisions the StatefulSet claims from their templates. The long-lived mail object claim is declared explicitly. Restore the database and object data, with their encryption keys, before routing production traffic to a replacement installation.
 
 The admin networking manifests reserve the five Service IPs advertised by this Redis and Sentinel installation. Create those Services before other workloads allocate addresses on a replacement cluster. The production manifests expect the K3s Service CIDR to contain those addresses. A different CIDR requires updating the Service and Sentinel addresses together and migrating the saved Sentinel state to the verified leader. The `mail-pg` alias follows the CloudNativePG primary.
 
-On each application PostgreSQL worker, load the `solace-rehearsal-postgres` AppArmor profile from platform provisioning and verify it permits the mounted data directory, scratch directory and socket directory. The standby's replication network must match the restricted TLS replication rule in [app-pg-init](solace-api/config.yaml). When rebuilding on another subnet, set the rule to the new standby subnet before initialization. When restoring an existing PGDATA, update its stored rule before starting the standby.
+On the application PostgreSQL worker, load the `solace-rehearsal-postgres` AppArmor profile from platform provisioning and verify it permits the mounted data directory, scratch directory and socket directory. When restoring existing PGDATA, check that `synchronous_standby_names` is empty so application commits can complete on the single instance.
 
 Preserve the original volume bindings on the live cluster. Use apply without pruning so dormant recovery resources and controller-managed objects remain available.
 
@@ -35,14 +33,36 @@ Each Stalwart Deployment keeps a single replica and a stable pod address for the
 
 On shutdown, the gateway closes the health listener checked by both MXs and pauses for 18 seconds while they switch to the healthy peer. Kubernetes removes the terminating pod from the JMAP Service while the application and SMTP listener are still running. Sessions that exceed the shutdown grace period reconnect through the remaining replica.
 
-Review the server-side diff against the production context before merging a config change.
+### Automatic image releases
+
+A push to protected `master` runs [Solace production images](../.github/workflows/solace-production.yml). The [release planner](../scripts/solace-release-request.py) compares the last requested revision with the new commit and records affected components on the generated `solace-release-requests` branch.
+
+| Change | Images requested |
+| --- | --- |
+| API entry point or Dockerfile | API |
+| Shared backend Rust code, API types or workspace dependency inputs | API and notifications |
+| Notifications worker or Dockerfile | Notifications |
+| Stalwart runtime Dockerfile, install scripts or packaged configuration | Stalwart |
+| Kubernetes config, docs, web or native code only | None |
+
+Solace builds run on the MacBook's build node with limits of eight CPUs and 16 GiB of RAM per build. Zeabur reads those limits from the project namespace when a build starts.
+
+The workflow tags each requested source commit. The release CronJob verifies the Flux artifact before passing that exact Git ref to Zeabur Builder. It records successful image digests from Zot through the image admission policy. Flux applies the selected digest. Stalwart A must be available on the new digest for its full readiness window before B is updated. Third-party containers use the image pins in their Git manifests and change when their pod templates change.
+
+Solace uses Builder’s default Zot repository naming. Zeabur associates a Build with the running service once Builder publishes its first image. This keeps the status of an existing service accurate while its first Build is paused.
+
+Check the workflow for the selected services and Zeabur for their Build runs. A failed build leaves the current image in place. A healthy B lets the next Stalwart fix replace a failed rollout on A. If B fails after promotion, keep A serving and follow the [recovery procedure](bootstrap/README.md#recover-an-image-rollout).
+
+Review a server-side diff from the selected revision with the production image inputs resolved by Flux. Do this from a cluster context with read access to the live substitution ConfigMap and write permission for the dry run.
 
 ```sh
 kubectl config current-context
-kubectl kustomize .zeabur
-kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur
-kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur/solace-mail/stalwart-a
-kubectl diff --server-side --field-manager=kustomize-controller -k .zeabur/solace-mail/stalwart-b
+flux build kustomization solace --namespace=solace-gitops --path .zeabur \
+  | kubectl diff --server-side --field-manager=kustomize-controller -f -
+flux build kustomization solace-stalwart-a --namespace=solace-gitops --path .zeabur/solace-mail/stalwart-a \
+  | kubectl diff --server-side --field-manager=kustomize-controller -f -
+flux build kustomization solace-stalwart-b --namespace=solace-gitops --path .zeabur/solace-mail/stalwart-b \
+  | kubectl diff --server-side --field-manager=kustomize-controller -f -
 ```
 
 After a merge, check the applied revision and workload health.
@@ -52,6 +72,8 @@ kubectl -n solace-gitops get gitrepository,kustomizations
 kubectl -n solace-mail get deployments stalwart-a stalwart-b
 kubectl -n solace-mail get endpointslices -l kubernetes.io/service-name=mail-live
 ```
+
+To investigate a Zeabur dashboard warning, run `zeaburctl doctor --output json` and read the service through the Zeabur OSS API using a loopback session started by `zeaburctl ui --no-browser`. Review the service response at `/api/v1/projects/solace-mail/services/deployment/<name>` and its `/trace` endpoint for networking. The service response includes recent probe failure events even after a pod becomes Ready.
 
 The [bootstrap procedure](bootstrap/README.md) covers first adoption and recovery. Review storage and routing changes against the [production runbook](../apps/stalwart/README.md). Verify both mail endpoints, the public API and JMAP, and STARTTLS on both MXs after a rollout.
 
@@ -65,30 +87,65 @@ The application mail gateways still use a compatibility host alias for the priva
 
 ## Direct public ingress
 
-The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. Cloudflared keeps using the original Traefik deployment and origin CA. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.
+The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. HTTPS on `mx.solace.onl` passes encrypted traffic through to the existing Stalwart listener with PROXY v2. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.
+
+Traefik copies the public Service’s load balancer addresses to the Ingress status. Zeabur uses that status and the pod port declarations to check each route against DNS. Manage these six existing routes through the Git manifests. cert-manager owns certificate issuance and renewal, and Cloudflare hosts the authoritative DNS records.
 
 Provision `solace-acme-dns` in `solace-mail` with the `api-token` key and DNS write and zone read access restricted to `solace.onl`. Flux reconciles the issuer and certificate. cert-manager renews the public certificate in `solace-public-tls`, which both Traefik replicas read. The DNS challenge works before changing the public HTTPS records. Alert on both the Certificate's readiness and the expiry served from each worker.
 
-A cluster administrator applies the networking manifests. The public Services use a dedicated LoadBalancer class so K3s does not create its source-NATing ServiceLB pods. Keep the Services' public addresses unset during setup. The bootstrap helper binds the selected MX host addresses as Kubernetes load balancer VIPs. kube-proxy routes the original connection directly to a local ready Traefik pod, preserving the client IP. This requires the public IP to be assigned directly to the worker's interface.
+A cluster administrator applies the networking manifests. On each Webdock worker set K3s `node-external-ip` to the public IPv4 already assigned directly to `eth0`. Keep the existing private `node-ip` for cluster communication. Restart one worker agent at a time and verify its advertised external address. Do not set an external address on the MacBook for this deployment.
 
-Allow the new forwarded paths in each worker's existing firewall before binding its VIP. Match the original public IPv4 destination and TCP port 443 or 25 and the corresponding post-DNAT target port 9443 or 2525. Validate the change with a source-restricted temporary rule before persisting it. Keep the shared Zeabur Traefik on its existing nodes.
+ServiceLB publishes the public address for each ready worker in the Service's pool. Keep both pools empty during setup. `externalTrafficPolicy: Local` makes kube-proxy forward the public connection to the local ready Traefik replica with its source address intact. This depends on the provider delivering packets directly to the public IPv4 on the worker. Test a source-restricted API route on each worker before DNS cutover.
+
+Before enrolling a worker, allow the forwarded paths in its existing firewall. Match the original public IPv4 destination and TCP port 443 or 25 and the corresponding post-DNAT target port 9443 or 2525. Keep the allocated NodePorts closed to external traffic. Validate the change with a source-restricted temporary rule before persisting it.
 
 ```sh
-python3 -B .zeabur/bootstrap/public-edge.py https mx mx2
-python3 -B .zeabur/bootstrap/public-edge.py smtp mx2
-python3 -B .zeabur/bootstrap/public-edge.py smtp mx mx2
+kubectl label node webdock-1 lbpool.svccontroller.k3s.cattle.io/solace-https=true
+kubectl label node webdock-mail lbpool.svccontroller.k3s.cattle.io/solace-https=true
+kubectl label node webdock-1 lbpool.svccontroller.k3s.cattle.io/solace-smtp=true
+kubectl label node webdock-mail lbpool.svccontroller.k3s.cattle.io/solace-smtp=true
 ```
 
-1. Bring up HTTPS on both workers. Keep the existing tunnel and DNS records until the direct HTTPS probe passes on each worker. Review the active Cloudflare security rules and confirm the new path preserves client-IP rate limits, operator authorization and compatible request size and streaming timeouts.
+1. Bring up HTTPS on both workers. Keep the existing DNS records until the direct HTTPS probe passes on each worker. Verify client-IP rate limits, operator authorization, request sizes and streaming timeouts.
 2. Verify authenticated web and native sign-in, read and send with a synthetic attachment, incoming mail, and JMAP event reconnect while one public ingress path is unavailable. Reissue a staging certificate and check that both replicas serve it without a restart.
-3. Set up health-checked DNS for the direct endpoints and save the previous records. Switch the HTTPS names to the direct path without changing the MX records. Verify the exact enforced MTA-STS policy through both origins and normal DNS.
-4. Move SMTP separately, one worker at a time. Migrate only the public HAProxy listener after verifying the owning process and preserving any private relay listeners in the same service. The TCP route carries the original client IP in PROXY v2 and Stalwart handles STARTTLS. Confirm the Kubernetes Service prefers a ready local gateway and uses its peer during drain. Send and receive through both MXs using a controlled external mailbox. Verify queued canary mail delivers after recovery.
-5. Update the host health check to match the migrated service. After the observation window, scale the old connectors to zero in Git. Retain the previous DNS, listener configuration and connector references for recovery.
+3. Save the previous HTTPS records. Point the six HTTPS names at the DNS-only `edge.solace.onl` alias, which has one A record per worker. Keep the MX records as they are. Verify the exact enforced MTA-STS policy through both origins and normal DNS. DNS advertises both addresses. If a worker fails, an operator can temporarily remove its address from the alias.
+4. Move SMTP separately, one worker at a time. Migrate only the public HAProxy listener after verifying the owning process and preserving any private relay listeners in the same service. The TCP route carries the original client IP in PROXY v2 and Stalwart handles STARTTLS. Confirm the Kubernetes Service prefers a ready local gateway and uses its peer during drain. Send and receive through both MXs using a controlled external mailbox. Verify queued canary mail delivers after recovery and update the host health check.
 
 Run the protocol probes from outside the cluster. For a test listener, set `--https-port` and `--smtp-port` to the temporary public ports. `--skip-smtp` runs only the HTTPS checks before moving SMTP.
 
 ```sh
-python3 -B scripts/probe-solace-edge.py --public-dns
+python3 -B scripts/probe-solace-edge.py --public-dns --mx-https
 ```
 
-If HTTPS fails after the DNS switch, restore the previous DNS records while both connectors still serve. Use the bind helper with no MX argument to clear a Service's VIPs if it must stop intercepting traffic. If SMTP fails, omit the affected worker from the SMTP Service's VIPs with the bootstrap helper and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either rollback.
+If one worker fails HTTPS checks, remove its address from the DNS alias until it can serve the API and mail routes again. Remove the corresponding ServiceLB pool label from a worker to withdraw its listener. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either change.
+
+### Public routes for other Zeabur projects
+
+The shared Webdock Traefik deployment serves the public routes below. The DNS-only records point to `edge.solace.onl`. Cloudflare flattens the `roan.dev` record at the zone apex. The two Webdock addresses can serve every route. Service placement still determines whether the backend remains available during a node outage.
+
+| Hostnames | Service |
+| --- | --- |
+| `rift.solace.onl` | `riftbound/expo-web:8080` |
+| `riftapi.solace.onl` | `riftbound/rust-api:7000` |
+| `roan.dev`, `www.roan.dev` | `portfolio/goport:8080` |
+| `demo.roan.dev` | `demo/web:8080` |
+| `objects.roan.dev` | `demo/files-s3:8333` |
+| `errors.roan.dev` | `errors/errex:8080` |
+| `builds.roan.dev` | `builder-system/zeabur-builder-webhooks:http` on `/hooks/` |
+
+cert-manager issues and renews the Let's Encrypt certificates using DNS-01. Provision `rift-public-acme-dns` in `riftbound` for `solace.onl` and `zeabur-roan-acme-dns` in `cert-manager` for `roan.dev`. Each Secret has one `api-token` key. Use separate Cloudflare tokens with DNS write and zone read on the corresponding zone. The issuers select the exact hostnames listed above.
+
+Set `TRUSTED_PROXY_CIDRS` in Riftbound's `rust-api-runtime` Secret to the Calico pod blocks assigned to the two Webdock workers. Riftbound's NetworkPolicies restrict the API port to its ingress and web proxies. Restart the API after updating the setting and verify both public routes.
+
+Apply the bootstrap manifests after the projects and their Services exist. The public Ingress objects use the `solace-public` class annotation and `public` entry point. Apply any new route's certificate and network policy before switching its public DNS record.
+
+```sh
+kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/riftbound-public.yaml
+kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/zeabur-project-public.yaml
+kubectl -n solace-gitops patch kustomization solace --field-manager=rocal-solace-bootstrap \
+  --type=merge --patch-file .zeabur/bootstrap/riftbound-traefik-patch.json
+```
+
+Use the Zeabur domain trace and probe each address with TLS hostname validation. Test the Riftbound API health and web CORS, anonymous S3 access denial, and GitHub webhook routing. `ingress.roan.dev` is a DNS target for the public ingress. The only public Cloudflare Tunnel routes are `zeabur.roan.dev` and `login.roan.dev`.
+
+The platform Traefik Helm release advertises `zeabur.roan.dev` with `providers.kubernetesIngress.ingressEndpoint.hostname`. The login and dashboard routes share the tunnel address. In the Builder Helm release, keep `webhooks.enabled=true` and set `webhooks.ingress.enabled=false`. The bootstrap manifests provide the Builder's public Ingress.

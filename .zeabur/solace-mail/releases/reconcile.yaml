@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: solace-release-controller
+  namespace: solace-mail
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 55
+  successfulJobsHistoryLimit: 0
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 50
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: solace-release-controller
+        spec:
+          serviceAccountName: solace-release-controller
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: reconcile
+              image: cgr.dev/chainguard/python:latest@sha256:d2711a21a494fa5c2efbfcf4226268395bad5d03406083ed0f3e7bed5199cfb2
+              args: ["-B", "/release/promote.py"]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 24Mi
+                limits:
+                  cpu: 100m
+                  memory: 64Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - name: script
+                  mountPath: /release
+                  readOnly: true
+          volumes:
+            - name: script
+              configMap:
+                name: solace-release-controller

@@ -32,6 +32,11 @@ spec:
   sourceRef:
     kind: GitRepository
     name: solace
+  postBuild:
+    substituteStrategy: Always
+    substituteFrom:
+      - kind: ConfigMap
+        name: solace-release-images
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment
@@ -40,6 +45,10 @@ spec:
     - apiVersion: apps/v1
       kind: Deployment
       name: notifications
+      namespace: solace-mail
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: solace-public-ingress
       namespace: solace-mail
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -61,6 +70,11 @@ spec:
   sourceRef:
     kind: GitRepository
     name: solace
+  postBuild:
+    substituteStrategy: Always
+    substituteFrom:
+      - kind: ConfigMap
+        name: solace-release-images
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment
@@ -86,6 +100,11 @@ spec:
   sourceRef:
     kind: GitRepository
     name: solace
+  postBuild:
+    substituteStrategy: Always
+    substituteFrom:
+      - kind: ConfigMap
+        name: solace-release-images
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment
