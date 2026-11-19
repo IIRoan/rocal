@@ -1,0 +1,93 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: solace
+  namespace: solace-gitops
+spec:
+  interval: 1m
+  url: https://github.com/IIRoan/rocal.git
+  ref:
+    branch: master
+  ignore: |
+    /*
+    !/.zeabur/
+    !/.zeabur/**
+    /.zeabur/bootstrap/
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: solace
+  namespace: solace-gitops
+spec:
+  interval: 5m
+  retryInterval: 1m
+  timeout: 3m
+  path: ./.zeabur
+  prune: false
+  force: false
+  deletionPolicy: Orphan
+  suspend: true
+  serviceAccountName: solace-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: solace
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: solace-api
+      namespace: solace-mail
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: notifications
+      namespace: solace-mail
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: solace-stalwart-a
+  namespace: solace-gitops
+spec:
+  dependsOn:
+    - name: solace
+  interval: 5m
+  retryInterval: 1m
+  timeout: 10m
+  path: ./.zeabur/solace-mail/stalwart-a
+  prune: false
+  deletionPolicy: Orphan
+  suspend: true
+  serviceAccountName: solace-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: solace
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: stalwart-a
+      namespace: solace-mail
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: solace-stalwart-b
+  namespace: solace-gitops
+spec:
+  dependsOn:
+    - name: solace-stalwart-a
+  interval: 5m
+  retryInterval: 1m
+  timeout: 10m
+  path: ./.zeabur/solace-mail/stalwart-b
+  prune: false
+  deletionPolicy: Orphan
+  suspend: true
+  serviceAccountName: solace-reconciler
+  sourceRef:
+    kind: GitRepository
+    name: solace
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: stalwart-b
+      namespace: solace-mail

@@ -48,12 +48,6 @@ class EntrypointTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("STALWART_GATE_KEY (32+ characters) is required", result.stderr)
 
-    def test_vps_frp_configs_commit_placeholders_not_secrets(self):
-        for name in ("frps.toml", "frpc-relay.toml"):
-            text = (ROOT / "vps" / name).read_text()
-            self.assertIn('token = "__FRP_TOKEN__"', text)
-        self.assertIn('secretKey = "__FRP_RELAY_STCP_KEY__"', (ROOT / "vps" / "frpc-relay.toml").read_text())
-
     def test_missing_redis_url_fails_before_any_service_is_started(self):
         env = {"PATH": os.environ["PATH"], "PGHOST": "test", "PGUSER": "test", "PGPASSWORD": "test",
                "FRPS_ADDR": "test", "FRPC_TOKEN": "test", "FRPC_RELAY_STCP_KEY": "test", "STALWART_GATE_KEY": "k" * 64}

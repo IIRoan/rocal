@@ -42,7 +42,14 @@ class StalwartMetricsTests(unittest.TestCase):
     def test_missing_exporter_families_never_passes(self):
         self.assertTrue(self.failures(""))
         body = (FIXTURES / "stalwart-1.1.0-healthy.prom").read_text()
-        self.assertTrue(self.failures(body.replace("stalwart_http_request_time_seconds_count", "retired_http_request_time_count")))
+        self.assertTrue(self.failures(body.replace("stalwart_http_active_connections", "retired_http_gauge")))
+
+    def test_idle_replica_does_not_require_activity_counters(self):
+        body = (FIXTURES / "stalwart-1.1.0-healthy.prom").read_text()
+        active_only = ("stalwart_smtp_request_time_seconds", "stalwart_http_request_time_seconds",
+                       "stalwart_store_data_write_total", "stalwart_store_blob_read_total")
+        scrape = "\n".join(line for line in body.splitlines() if not any(metric in line for metric in active_only))
+        self.assertEqual(self.failures(scrape), [])
 
 
 if __name__ == "__main__":

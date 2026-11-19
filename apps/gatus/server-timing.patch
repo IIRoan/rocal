@@ -1,0 +1,105 @@
+diff --git a/config/endpoint/endpoint.go b/config/endpoint/endpoint.go
+index 0e8c77b..e947deb 100644
+--- a/config/endpoint/endpoint.go
++++ b/config/endpoint/endpoint.go
+@@ -91,6 +91,9 @@ type Endpoint struct {
+ 	// URL to send the request to
+ 	URL string `yaml:"url"`
+ 
++	// ResponseTimeMetric records a named Server-Timing metric for an HTTP endpoint.
++	ResponseTimeMetric string `yaml:"response-time-metric,omitempty"`
++
+ 	// Method of the request made to the url of the endpoint
+ 	Method string `yaml:"method,omitempty"`
+ 
+@@ -241,6 +244,9 @@ func (e *Endpoint) ValidateAndSetDefaults() error {
+ 			return fmt.Errorf("%v: %w", ErrInvalidConditionFormat, err)
+ 		}
+ 	}
++	if e.ResponseTimeMetric != "" && e.Type() != TypeHTTP {
++		return errors.New("response-time-metric requires an HTTP endpoint")
++	}
+ 	if e.DNSConfig != nil {
+ 		return e.DNSConfig.ValidateAndSetDefault()
+ 	}
+@@ -325,6 +331,9 @@ func (e *Endpoint) EvaluateHealthWithContext(context *gontext.Gontext) *Result {
+ 			result.AddError(err.Error())
+ 		}
+ 	}
++	if processedEndpoint.ResponseTimeMetric != "" {
++		result.Duration = -1
++	}
+ 	// Call the endpoint (if there's no errors)
+ 	if len(result.Errors) == 0 {
+ 		processedEndpoint.call(result)
+@@ -545,8 +554,11 @@ func (e *Endpoint) call(result *Result) {
+ 		}
+ 	} else {
+ 		response, err = client.GetHTTPClient(e.ClientConfig).Do(request)
+-		result.Duration = time.Since(startTime)
++		if e.ResponseTimeMetric == "" {
++			result.Duration = time.Since(startTime)
++		}
+ 		if err != nil {
++			result.Success = false
+ 			result.AddError(err.Error())
+ 			return
+ 		}
+@@ -557,6 +569,15 @@ func (e *Endpoint) call(result *Result) {
+ 		}
+ 		result.HTTPStatus = response.StatusCode
+ 		result.Connected = response.StatusCode > 0
++		if e.ResponseTimeMetric != "" {
++			if duration, ok := serverTimingDuration(response.Header.Values("Server-Timing"), e.ResponseTimeMetric); ok {
++				result.Duration = duration
++				result.ServerTimingMeasured = true
++			} else {
++				result.Success = false
++				result.AddError("Server-Timing metric missing or invalid: " + e.ResponseTimeMetric)
++			}
++		}
+ 		// Only read the Body if there's a condition that uses the BodyPlaceholder
+ 		if e.needsToReadBody() {
+ 			result.Body, err = io.ReadAll(response.Body)
+@@ -567,6 +588,28 @@ func (e *Endpoint) call(result *Result) {
+ 	}
+ }
+ 
++func serverTimingDuration(headers []string, metric string) (time.Duration, bool) {
++	for _, header := range headers {
++		for _, item := range strings.Split(header, ",") {
++			name, params, _ := strings.Cut(item, ";")
++			if strings.TrimSpace(name) != metric {
++				continue
++			}
++			for _, param := range strings.Split(params, ";") {
++				key, value, _ := strings.Cut(param, "=")
++				if strings.TrimSpace(key) != "dur" {
++					continue
++				}
++				ms, err := strconv.ParseFloat(strings.Trim(strings.TrimSpace(value), `"`), 64)
++				if err == nil && ms >= 0 && ms < float64(1<<63)/float64(time.Millisecond) {
++					return time.Duration(ms * float64(time.Millisecond)), true
++				}
++			}
++		}
++	}
++	return 0, false
++}
++
+ func (e *Endpoint) buildHTTPRequest() *http.Request {
+ 	var bodyBuffer *bytes.Buffer
+ 	if e.GraphQL {
+diff --git a/config/endpoint/result.go b/config/endpoint/result.go
+index ca3fbdf..5a98db1 100644
+--- a/config/endpoint/result.go
++++ b/config/endpoint/result.go
+@@ -27,6 +27,8 @@ type Result struct {
+ 	// Duration time that the request took
+ 	Duration time.Duration `json:"duration"`
+ 
++	ServerTimingMeasured bool `json:"-"`
++
+ 	// Errors encountered during the evaluation of the Endpoint's health
+ 	Errors []string `json:"errors,omitempty"`
+ 

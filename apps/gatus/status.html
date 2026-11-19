@@ -275,13 +275,12 @@ footer a:hover { color: var(--fg); }
   const SERVICES = {
     "application_website": ["Website", "solace.onl"],
     "application_api-health": ["API", "api.solace.onl"],
-    "application_api-mail-jmap": ["API to mail server", "Private network link"],
-    "application_api-mail-policy": ["Mailbox policy check", "User metadata scan and encryption policy"],
-    "application_api-mail-key-expiry": ["Mailbox key expiry check", "User keys expire within 14 days"],
+    "application_api-mail-jmap-private": ["API to mail server", "Private JMAP request measured by the API"],
     "mail_jmap-session": ["Mail access", "JMAP at mail.solace.onl"],
     "mail_mta-sts": ["Mail server certificate", "MTA-STS at mta-sts.solace.onl"],
     "stalwart-metrics_stalwart-metrics": ["Storage and delivery", "Mail server error counters"],
-    "vps_vps-health": ["Mail relay", "SMTP relay and tunnels"],
+    "vps_vps-health": ["mx.solace.onl", ""],
+    "vps_vps-secondary-health": ["mx2.solace.onl", ""],
   };
   const GROUPS = { "Stalwart Metrics": "Mail server", VPS: "Mail relay" };
   const DAYS = 90;
@@ -360,7 +359,9 @@ footer a:hover { color: var(--fg); }
     return last ? (last.success ? "up" : "down") : "unknown";
   };
   const percent = (uptime) => (uptime >= 1 ? "100%" : `${(Math.floor(uptime * 10000) / 100).toFixed(2)}%`);
-  const ms = (value) => (value >= 1000 ? `${(value / 1000).toFixed(1)} s` : `${Math.round(value)} ms`);
+  const ms = (value) => value == null ? "unavailable" : value >= 1000
+    ? `${(value / 1000).toFixed(1)} s`
+    : `${value < 10 ? Number(value.toFixed(1)) : Math.round(value)} ms`;
 
   function duration(span) {
     const minutes = Math.max(1, Math.round(span / 60e3));
@@ -502,13 +503,18 @@ footer a:hover { color: var(--fg); }
   const checksText = (ok, total) => `${ok.toLocaleString()} of ${total.toLocaleString()} checks passed`;
 
   function totals(buckets) {
-    const sum = { ok: 0, total: 0, ms: 0 };
+    const sum = { ok: 0, total: 0, ms: 0, samples: 0 };
     for (const b of buckets) {
       sum.ok += b.ok;
       sum.total += b.total;
-      sum.ms += b.ms * b.total;
+      const samples = b.samples ?? b.total;
+      if (Number.isFinite(b.ms)) {
+        sum.ms += b.ms * samples;
+        sum.samples += samples;
+      }
     }
-    return sum.total ? { share: sum.ok / sum.total, ok: sum.ok, total: sum.total, ms: sum.ms / sum.total } : null;
+    return sum.total ? { share: sum.ok / sum.total, ok: sum.ok, total: sum.total,
+      ms: sum.samples ? sum.ms / sum.samples : null } : null;
   }
 
   function dayItems(data) {
@@ -541,7 +547,7 @@ footer a:hover { color: var(--fg); }
   const fromResult = (r) => ({
     at: Date.parse(r.timestamp),
     ok: r.success,
-    ms: r.duration / 1e6,
+    ms: r.duration >= 0 ? r.duration / 1e6 : null,
     status: r.status,
     errors: r.errors || [],
     conditions: (r.conditionResults || []).map((c) => [c.condition, c.success]),
@@ -550,7 +556,7 @@ footer a:hover { color: var(--fg); }
   const checkItem = (c) => ({
     cls: c.ok ? "up" : "down",
     at: c.at,
-    tip: `${esc(clockSeconds.format(c.at))}<span>${c.ok ? "Passed" : "Failed"} in ${ms(c.ms)}</span>${c.status ? `<span>HTTP ${c.status}</span>` : ""}`,
+    tip: `${esc(clockSeconds.format(c.at))}<span>${c.ok ? "Passed" : "Failed"}${Number.isFinite(c.ms) ? ` in ${ms(c.ms)}` : ""}</span>${c.status ? `<span>HTTP ${c.status}</span>` : ""}`,
   });
 
   function incidentsOf(e, events) {
@@ -707,8 +713,9 @@ footer a:hover { color: var(--fg); }
         return { note: since && since > p.from ? `Individual checks are kept for about a day; the oldest is from ${dayTime.format(since)}.` : "No checks were recorded in this hour." };
       }
       const passed = checks.filter((c) => c.ok);
-      const average = passed.length ? passed.reduce((sum, c) => sum + c.ms, 0) / passed.length : 0;
-      return { meta: `<strong class="${shareClass(passed.length / checks.length)}">${checksText(passed.length, checks.length)}</strong>${passed.length ? ` · average response ${ms(average)}` : ""}` };
+      const timed = passed.filter((c) => Number.isFinite(c.ms));
+      const average = timed.length ? timed.reduce((sum, c) => sum + c.ms, 0) / timed.length : null;
+      return { meta: `<strong class="${shareClass(passed.length / checks.length)}">${checksText(passed.length, checks.length)}</strong>${timed.length ? ` · average response ${ms(average)}` : ""}` };
     }
     const sum = totals(p.data.buckets);
     const meta = sum ? `<strong class="${shareClass(sum.share)}">${percent(sum.share)} uptime</strong> · ${checksText(sum.ok, sum.total)} · average response ${ms(sum.ms)}` : "No checks were recorded in this period.";
@@ -876,10 +883,10 @@ footer a:hover { color: var(--fg); }
     const checks = zoom.hour ? zoom.hour.checks || [] : [];
     const points = checks.map((c) => ({
       t: c.at,
-      v: Math.max(1, c.ms),
+      v: c.ms,
       failed: !c.ok,
       reach: 15 * 60e3,
-      tip: `${esc(clockSeconds.format(c.at))}<span>${c.ok ? "Passed" : "Failed"} in ${ms(c.ms)}</span>${c.status ? `<span>HTTP ${c.status}</span>` : ""}`,
+      tip: `${esc(clockSeconds.format(c.at))}<span>${c.ok ? "Passed" : "Failed"}${Number.isFinite(c.ms) ? ` in ${ms(c.ms)}` : ""}</span>${c.status ? `<span>HTTP ${c.status}</span>` : ""}`,
     }));
     const empty = zoom.error ? "Checks are unavailable right now." : zoom.hour ? "No individual checks were kept for this hour." : "Loading…";
     return { points, from: selectedHour, to: selectedHour + 36e5, label: `${dayTime.format(selectedHour)} – ${clock.format(selectedHour + 36e5)}`, ticks: { hour: "numeric", minute: "2-digit" }, unit: ["check", "checks"], empty };
@@ -889,7 +896,7 @@ footer a:hover { color: var(--fg); }
     const box = $("d-chart");
     for (const button of document.querySelectorAll("[data-range]")) button.setAttribute("aria-pressed", String(!selected && button.dataset.range === chart.range));
     const model = selectedHour !== null ? hourModel() : selected ? dayModel() : rangeModel();
-    const points = model.points;
+    const points = model.points.filter((p) => Number.isFinite(p.v));
     chart.valid = points;
     chart.index = null;
     box.toggleAttribute("data-zoomable", points.some((p) => p.open));

@@ -1,0 +1,195 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: stalwart-a
+    app.kubernetes.io/part-of: solace-mail
+  name: stalwart-a
+  namespace: solace-mail
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: stalwart-production
+      instance: stalwart-a
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        cni.projectcalico.org/ipAddrs: '["10.42.162.249"]'
+      labels:
+        app: stalwart-production
+        app.kubernetes.io/name: stalwart-a
+        app.kubernetes.io/part-of: solace-mail
+        instance: stalwart-a
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - args:
+            - --config
+            - /opt/mail/config.json
+          command:
+            - /usr/local/bin/stalwart
+          env:
+            - name: HOME
+              value: /tmp
+            - name: TOKIO_WORKER_THREADS
+              value: '2'
+            - name: STALWART_PUBLIC_URL
+              value: https://mail.solace.onl
+            - name: STALWART_HOSTNAME
+              value: mail-a.solace.internal
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: STALWART_PG_PASSWORD
+                  name: mail-pg-auth
+            - name: BUCKET_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: BUCKET_ACCESS_KEY_ID
+                  name: mail-object-auth
+            - name: BUCKET_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: BUCKET_SECRET_ACCESS_KEY
+                  name: mail-object-auth
+            - name: STALWART_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: STALWART_WEBHOOK_SECRET
+                  name: mail-live-auth
+          image: zot.zot.svc:5000/solace-mail/stalwart@sha256:46adef95786d6780258685ae326a3da3dfe1b13607a9950972f839554fd86cb1
+          imagePullPolicy: IfNotPresent
+          name: stalwart
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz/ready
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: '1'
+              memory: 768Mi
+            requests:
+              cpu: 50m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/log/stalwart
+              name: logs
+            - mountPath: /opt/mail
+              name: config
+              readOnly: true
+            - mountPath: /var/lib/stalwart
+              name: runtime
+            - mountPath: /tmp
+              name: tmp
+        - command:
+            - haproxy
+            - -db
+            - -f
+            - /opt/mail/haproxy.cfg
+          env:
+            - name: STALWART_GATE_PORT
+              value: '8081'
+            - name: STALWART_PUBLIC_PORT
+              value: '8082'
+            - name: STALWART_HTTP_PORT
+              value: '8080'
+            - name: STALWART_GATE_LUA_PATH
+              value: /opt/mail/admin-gate.lua
+          envFrom:
+            - secretRef:
+                name: mail-live-auth
+          image: docker.io/library/haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          imagePullPolicy: IfNotPresent
+          name: gateway
+          readinessProbe:
+            failureThreshold: 3
+            periodSeconds: 3
+            successThreshold: 1
+            tcpSocket:
+              port: 8082
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 400m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 48Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/relay-secondary
+              name: standby-relay
+              readOnly: true
+            - mountPath: /opt/mail
+              name: config
+              readOnly: true
+            - mountPath: /tmp
+              name: gateway-tmp
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: webdock-mail
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+        sysctls:
+          - name: net.ipv4.ip_unprivileged_port_start
+            value: '0'
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: roan.dev/apps-only
+          operator: Equal
+          value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
+      volumes:
+        - name: logs
+          persistentVolumeClaim:
+            claimName: stalwart-a-logs
+        - name: standby-relay
+          secret:
+            defaultMode: 288
+            secretName: mail-standby-relay-tls
+        - configMap:
+            defaultMode: 420
+            name: mail-live-config-a
+          name: config
+        - emptyDir: {}
+          name: runtime
+        - name: tmp
+          emptyDir: {}
+        - name: gateway-tmp
+          emptyDir: {}

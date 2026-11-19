@@ -60,7 +60,22 @@ The page skips refreshes while the tab is hidden:
 
 Display names and descriptions live in `SERVICES` at the top of the page script, keyed by
 the Gatus key (`group_name`, lowercased). Endpoint names and groups in the config are storage
-keys: renaming one drops its 90-day history, so rename in `SERVICES` instead.
+keys. For display-only changes, rename the label in `SERVICES`. To retire a monitor,
+list its old key in `storage.preserve-endpoint-keys` before deploying the new config.
+
+The historical `application_api-mail-jmap` series measured the full HTTP round trip.
+When available, read it at `/timeline/application_api-mail-jmap` with the usual range
+parameters. The overview shows the active `application_api-mail-jmap-private` monitor
+and its private upstream timings. Both JMAP history keys are protected across
+configuration changes in the current image, including full overrides. Use an image
+that preserves both keys for rollback. Before deploying an older incompatible image,
+take a consistent SQLite backup of the mounted database and restore it when returning
+to the current image. A copy from before pruning is required to recover already deleted
+history. For other retired monitors, keep the key in `storage.preserve-endpoint-keys`.
+
+The private JMAP chart stores measured nanoseconds and a separate sample count
+alongside uptime. Failed probes without a server timing still count as checks. Older
+buckets with expired raw samples may have uptime and no latency value.
 
 ## Railway variables
 
@@ -93,19 +108,28 @@ stays at 2m because each check is a Vercel invocation. About 8,800 checks a day 
 |-------|----------|----------|----------------|
 | Application | `website`: `solace.onl` (`HEAD`) | 2m | Web frontend reachable, TLS valid |
 | Application | `api-health`: `api.solace.onl/api/health` | 1m | API process up (primary signal) |
-| Application | `api-mail-jmap`: `api.solace.onl/api/health/mail-jmap` | 1m | API reaches Stalwart over the private network |
-| Mail | `jmap-session`: `mail.solace.onl/jmap/session` | 30s | Public JMAP through Railway HTTPS |
-| Mail | `mta-sts`: `mta-sts.solace.onl/.well-known/mta-sts.txt` | 10m | VPS `:443` passthrough to Stalwart serves the MTA-STS policy, and Stalwart's ACME certificate (the one SMTP STARTTLS presents) has > 14 days left. Not `starttls://`: Go's SMTP client sends `EHLO localhost`, which Stalwart rejects |
-| Stalwart Metrics | `stalwart-metrics`: `mail.solace.onl/metrics/prometheus` | 2m | Exporter alive, metric families registered, store I/O present, no error counters exported |
-| VPS | `vps-health` (SSH, optional) | 1m | HAProxy, frps, STCP relay, Postfix, tunnel group members, local JMAP |
+| Application | `api-mail-jmap-private`: `api.solace.onl/api/health/mail-jmap` | 1m | API reaches Stalwart and reports the private request duration in `Server-Timing` |
+| Mail | `jmap-session`: `mail.solace.onl/jmap/session` | 30s | Public JMAP through the Cloudflare tunnel |
+| Mail | `mta-sts`: `mta-sts.solace.onl/.well-known/mta-sts.txt` | 10m | Public MTA-STS policy lists both MX hosts and the HTTPS certificate has more than 14 days left |
+| Stalwart Metrics | `stalwart-metrics`: `mail.solace.onl/metrics/prometheus` | 2m | Exporter is reachable, expected gauges are present, and no monitored error counters are exported |
+| VPS | `vps-health`, `vps-secondary-health` (SSH) | 1m each | Each VPS independently checks its kubelet, HAProxy, outbound relay services, and SMTP STARTTLS certificate lifetime |
 
-The Prometheus check is a single scrape; counter **values** and thresholds are handled by
+Follow the [VPS monitoring setup](../stalwart/vps/README.md#provision-the-monitoring-account).
+Pin both host keys in `VPS_MONITOR_SSH_KNOWN_HOSTS` and set
+`VPS_MONITOR_SSH_SECONDARY_HOST` to enable the secondary check.
+
+The policy and key-expiry monitors remain available to internal alerting. The public status page omits their rows and history.
+
+The Prometheus check accepts idle replicas whose activity counters and histograms have yet to appear.
+Counter values and thresholds are handled by
 **Stalwart Enterprise Alerts** (email). Discord alert condition details are capped at 1024
 characters; the API retains the full results. Grafana
 ([dashboard #23498](https://grafana.com/grafana/dashboards/23498-service-stalwart/)) remains
 useful for rate graphs.
 
 ## Local test
+
+The Python tests use PyYAML to validate generated configuration.
 
 ```bash
 cd apps/gatus
@@ -119,6 +143,5 @@ Without `prometheus_*` the metrics monitor fails auth; without `DISCORD_WEBHOOK_
 ## Optional
 
 - **Status page auth:** `GATUS_ADMIN_USERNAME` / `GATUS_ADMIN_PASSWORD`
-- **VPS SSH monitor:** install `apps/stalwart/vps/gatus-monitor.sh` as root-owned mode 755, then run `sudo bash apps/stalwart/vps/setup-gatus-monitor.sh --check /path/to/monitor.pub` and `--apply` after review. Set the three `VPS_MONITOR_SSH_*` variables above; the account has no sudo, forwarding or arbitrary command access.
 - `ssh-known-hosts.patch` adds `GATUS_SSH_KNOWN_HOSTS` to the pinned Gatus source; the entrypoint requires a host-key pin for VPS monitoring and writes credential files with mode 600. The image build tests matching, changed, unknown and missing host keys, plus deadlines for stalled handshakes and commands.
 - SSH probes refuse connections when host pins are absent, including custom configurations. VPS service states use a fixed allowlist; raw command errors never enter monitor JSON.

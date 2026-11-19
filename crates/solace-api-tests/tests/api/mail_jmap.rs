@@ -638,6 +638,18 @@ async fn the_mail_health_route_uses_the_private_gate_without_the_public_edge() {
         .await
         .unwrap();
     let status = response.status();
+    assert_eq!(
+        response.headers()[reqwest::header::CACHE_CONTROL],
+        "no-store"
+    );
+    let duration = response.headers()["server-timing"]
+        .to_str()
+        .unwrap()
+        .strip_prefix("stalwart-jmap;dur=")
+        .unwrap()
+        .parse::<f64>()
+        .unwrap();
+    assert!(duration.is_finite() && duration >= 0.0, "{duration}");
     let body: Value = response.json().await.unwrap();
     server.abort();
     upstream_task.await.unwrap();

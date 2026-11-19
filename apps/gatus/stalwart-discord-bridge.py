@@ -36,6 +36,10 @@ STATUS_PAGE_HEADERS = {
 }
 GATUS_DB = "/data/gatus.db"
 TIMELINE_PATH = "/timeline/"
+STATUS_API_PATH = "/api/v1/endpoints/"
+INTERNAL_STATUS_KEYS = {"application_api-mail-policy", "application_api-mail-key-expiry"}
+RETIRED_JMAP_KEY = "application_api-mail-jmap"
+PRIVATE_JMAP_KEY = "application_api-mail-jmap-private"
 HOUR = 3600
 DAY = 24 * HOUR
 TIMELINE_MAX_WINDOW = 92 * DAY
@@ -80,6 +84,12 @@ def _local_day(at: int, zone: tzinfo) -> tuple[int, int]:
     return begin, int((midnight + timedelta(days=1)).timestamp()) - begin
 
 
+def _private_duration_ms(duration: int, status: int, errors: str) -> float | None:
+    if duration < 0 or not status or "Server-Timing metric missing or invalid:" in errors:
+        return None
+    return duration / 1_000_000
+
+
 def timeline(key: str, start: int, end: int, step: int = HOUR, zone: tzinfo | None = None) -> dict[str, Any] | None:
     """Uptime buckets of `step` seconds (days at `zone` midnight) for [start, end), plus checks for windows of two hours or less."""
     db = sqlite3.connect(f"file:{GATUS_DB}?mode=ro", uri=True, timeout=5)
@@ -87,14 +97,37 @@ def timeline(key: str, start: int, end: int, step: int = HOUR, zone: tzinfo | No
         found = db.execute("SELECT endpoint_id FROM endpoints WHERE endpoint_key = ?", (key,)).fetchone()
         if found is None:
             return None
+        private = key == PRIVATE_JMAP_KEY
+        has_timings = private and db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'solace_server_timings'"
+        ).fetchone()
+        timing_fields = ", timing.samples, timing.total_ns" if has_timings else ", NULL, NULL"
+        timing_join = (
+            " LEFT JOIN solace_server_timings AS timing"
+            " ON timing.endpoint_id = uptime.endpoint_id AND timing.hour_unix_timestamp = uptime.hour_unix_timestamp"
+            if has_timings else ""
+        )
         rows = db.execute(
-            "SELECT hour_unix_timestamp, total_executions, successful_executions, total_response_time FROM endpoint_uptimes"
-            " WHERE endpoint_id = ? AND hour_unix_timestamp >= ? AND hour_unix_timestamp < ? ORDER BY hour_unix_timestamp",
+            "SELECT uptime.hour_unix_timestamp, total_executions, successful_executions, total_response_time"
+            + timing_fields + " FROM endpoint_uptimes AS uptime" + timing_join
+            + " WHERE uptime.endpoint_id = ? AND uptime.hour_unix_timestamp >= ? AND uptime.hour_unix_timestamp < ?"
+            " ORDER BY uptime.hour_unix_timestamp",
             (found[0], start - 2 * DAY, end + 2 * DAY),
         ).fetchall()
-        sums: dict[int, list[int]] = {}
-        for i, (at, total, ok, total_ms) in enumerate(rows):
-            # Rows Gatus merged into days before hourly retention sit a day apart; hourly rows an hour apart.
+        retained_timings: dict[int, tuple[int, int]] = {}
+        if private and any(samples is None for *_, samples, total_ns in rows):
+            for stamp, duration, status, errors in db.execute(
+                "SELECT timestamp, duration, status, errors FROM endpoint_results WHERE endpoint_id = ?",
+                (found[0],),
+            ):
+                sample = _check_time_ms(stamp)
+                if sample is None or _private_duration_ms(duration, status, errors) is None:
+                    continue
+                hour = sample // (HOUR * 1000) * HOUR
+                count, total_ns = retained_timings.get(hour, (0, 0))
+                retained_timings[hour] = (count + 1, total_ns + duration)
+        sums: dict[int, list[int | float]] = {}
+        for i, (at, total, ok, total_ms, samples, total_ns) in enumerate(rows):
             span = DAY if i + 1 < len(rows) and rows[i + 1][0] - at >= 23 * HOUR else HOUR
             if at + span <= start or at >= end:
                 continue
@@ -104,16 +137,26 @@ def timeline(key: str, start: int, end: int, step: int = HOUR, zone: tzinfo | No
                 begin, size = _local_day(at, zone)
             else:
                 begin, size = at - at % step, step
-            bucket = sums.setdefault(begin, [size, 0, 0, 0])
+            bucket = sums.setdefault(begin, [size, 0, 0, 0, 0])
             bucket[1] += total
             bucket[2] += ok
-            bucket[3] += total_ms
-        data: dict[str, Any] = {
-            "buckets": [
-                {"at": at, "span": size, "total": total, "ok": ok, "ms": round(total_ms / total) if total else 0}
-                for at, (size, total, ok, total_ms) in sorted(sums.items())
-            ]
-        }
+            if private:
+                count, measured_ns = (samples, total_ns) if samples is not None else retained_timings.get(at, (0, 0))
+                bucket[3] += measured_ns / 1_000_000
+                bucket[4] += count
+            else:
+                bucket[3] += total_ms
+                bucket[4] += total
+        buckets: list[dict[str, Any]] = []
+        for at, (size, total, ok, total_ms, samples) in sorted(sums.items()):
+            bucket = {"at": at, "span": size, "total": total, "ok": ok}
+            if private:
+                bucket["samples"] = samples
+                bucket["ms"] = round(total_ms / samples, 3) if samples else None
+            else:
+                bucket["ms"] = round(total_ms / samples) if samples else 0
+            buckets.append(bucket)
+        data: dict[str, Any] = {"buckets": buckets}
         if end - start <= CHECKS_WINDOW:
             checks: dict[int, dict[str, Any]] = {}
             since = None
@@ -129,7 +172,7 @@ def timeline(key: str, start: int, end: int, step: int = HOUR, zone: tzinfo | No
                     checks[result_id] = {
                         "at": at,
                         "ok": bool(ok),
-                        "ms": duration // 1_000_000,
+                        "ms": _private_duration_ms(duration, status, errors) if private else duration / 1_000_000,
                         "status": status,
                         "errors": [error for error in errors.split(GATUS_LIST_SEPARATOR) if error],
                         "conditions": [],
@@ -174,9 +217,16 @@ def _proxy(handler: BaseHTTPRequestHandler) -> None:
             connection.request(handler.command, handler.path, body=body or None, headers=headers)
             resp = connection.getresponse()
             payload = resp.read()
+            path = urllib.parse.unquote(handler.path.split("?", 1)[0]).lower().rstrip("/")
+            public_statuses = path == STATUS_API_PATH + "statuses"
+            if public_statuses and resp.status == 200 and handler.command == "GET":
+                statuses = json.loads(payload)
+                hidden_keys = INTERNAL_STATUS_KEYS | {RETIRED_JMAP_KEY}
+                payload = json.dumps([row for row in statuses if row["key"] not in hidden_keys],
+                                     separators=(",", ":")).encode()
             handler.send_response(resp.status)
             for key, value in resp.headers.items():
-                if key.lower() in _SKIP_RESPONSE_HEADERS:
+                if key.lower() in _SKIP_RESPONSE_HEADERS or (public_statuses and key.lower() == "etag"):
                     continue
                 handler.send_header(key, value)
             handler.send_header("Content-Length", str(len(payload)))
@@ -291,6 +341,20 @@ class Handler(BaseHTTPRequestHandler):
         if path.rstrip("/") == HOOK_PATH.rstrip("/") and self.command == "POST":
             self._handle_stalwart()
             return
+        public_path = urllib.parse.unquote(path).lower()
+        for prefix in ("/endpoints/", STATUS_API_PATH, TIMELINE_PATH):
+            if public_path.startswith(prefix):
+                key = public_path[len(prefix):].split("/", 1)[0]
+                if key in INTERNAL_STATUS_KEYS:
+                    self._send_json(404, {"error": "unknown endpoint"})
+                    return
+                if path.startswith("/endpoints/") and key == RETIRED_JMAP_KEY:
+                    self.send_response(302)
+                    self.send_header("Location", "/endpoints/application_api-mail-jmap-private")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                break
         if self.command in ("GET", "HEAD") and _is_status_page(path):
             self._send_status_page()
             return
@@ -306,7 +370,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != "HEAD":
+            self.wfile.write(body)
 
     def _handle_timeline(self, key: str) -> None:
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
