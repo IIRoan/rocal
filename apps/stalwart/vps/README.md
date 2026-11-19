@@ -9,7 +9,7 @@ Each host runs `k3s-agent`, a Stalwart replica and the host SMTP listener. Inter
 
 Both MXs check JMAP discovery on each gateway's PROXY v2 health listener at port 18080. The [Stalwart rollout hook](../../../.zeabur/solace-mail/gateway/rollout/kustomization.yaml) closes that listener 18 seconds before shutdown so each MX can move new sessions to the peer. Keep the host health-check interval and failure threshold short enough to mark the draining gateway down within that window.
 
-The outbound relay units deliver from the Webdock hosts. Keep relay listeners private. HTTPS for API, JMAP, admin and discovery follows the [Cloudflare and Zeabur ingress](../README.md#request-paths).
+The outbound relay units deliver from the Webdock hosts. Keep relay listeners private. HTTPS for API, JMAP, admin and discovery follows the [public Traefik ingress](../README.md#request-paths).
 
 ## Verify
 
