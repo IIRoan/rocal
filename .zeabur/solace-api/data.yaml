@@ -212,6 +212,7 @@ spec:
                   until pg_isready -h app-postgres.solace-api.svc.cluster.local -U replicator; do sleep 2; done
                   pg_basebackup -h app-postgres.solace-api.svc.cluster.local -U replicator -D "$PGDATA" -X stream -R -s 2
               fi
+              chmod 0700 "$PGDATA"
               exec "$@"
             - --
             - postgres
