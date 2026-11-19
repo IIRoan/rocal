@@ -69,14 +69,17 @@ The public Traefik deployment has one replica per worker and serves the public L
 
 Provision `solace-acme-dns` in `solace-mail` with the `api-token` key and DNS write and zone read access restricted to `solace.onl`. Flux reconciles the issuer and certificate. cert-manager renews the public certificate in `solace-public-tls`, which both Traefik replicas read. The DNS challenge works before changing the public HTTPS records. Alert on both the Certificate's readiness and the expiry served from each worker.
 
-A cluster administrator applies the networking manifests. The public Services use a dedicated LoadBalancer class so K3s does not create its source-NATing ServiceLB pods. Keep the Services' public addresses unset during setup. The bootstrap helper binds the selected MX host addresses as Kubernetes load balancer VIPs. kube-proxy routes the original connection directly to a local ready Traefik pod, preserving the client IP. This requires the public IP to be assigned directly to the worker's interface.
+A cluster administrator applies the networking manifests. On each Webdock worker set K3s `node-external-ip` to the public IPv4 already assigned directly to `eth0`. Keep the existing private `node-ip` for cluster communication. Restart one worker agent at a time and verify its advertised external address. Do not set an external address on the MacBook for this deployment.
 
-Allow the new forwarded paths in each worker's existing firewall before binding its VIP. Match the original public IPv4 destination and TCP port 443 or 25 and the corresponding post-DNAT target port 9443 or 2525. Validate the change with a source-restricted temporary rule before persisting it. Keep the shared Zeabur Traefik on its existing nodes.
+ServiceLB publishes the public address for each ready worker in the Service's pool. Keep both pools empty during setup. `externalTrafficPolicy: Local` makes kube-proxy forward the public connection to the local ready Traefik replica with its source address intact. This depends on the provider delivering packets directly to the public IPv4 on the worker. Test a source-restricted API route on each worker before DNS cutover.
+
+Before enrolling a worker, allow the forwarded paths in its existing firewall. Match the original public IPv4 destination and TCP port 443 or 25 and the corresponding post-DNAT target port 9443 or 2525. Keep the allocated NodePorts closed to external traffic. Validate the change with a source-restricted temporary rule before persisting it.
 
 ```sh
-python3 -B .zeabur/bootstrap/public-edge.py https mx mx2
-python3 -B .zeabur/bootstrap/public-edge.py smtp mx2
-python3 -B .zeabur/bootstrap/public-edge.py smtp mx mx2
+kubectl label node webdock-1 lbpool.svccontroller.k3s.cattle.io/solace-https=true
+kubectl label node webdock-mail lbpool.svccontroller.k3s.cattle.io/solace-https=true
+kubectl label node webdock-1 lbpool.svccontroller.k3s.cattle.io/solace-smtp=true
+kubectl label node webdock-mail lbpool.svccontroller.k3s.cattle.io/solace-smtp=true
 ```
 
 1. Bring up HTTPS on both workers. Keep the existing tunnel and DNS records until the direct HTTPS probe passes on each worker. Review the active Cloudflare security rules and confirm the new path preserves client-IP rate limits, operator authorization and compatible request size and streaming timeouts.
@@ -91,4 +94,4 @@ Run the protocol probes from outside the cluster. For a test listener, set `--ht
 python3 -B scripts/probe-solace-edge.py --public-dns --mx-https
 ```
 
-If HTTPS fails after the DNS switch, restore the previous DNS records while both connectors still serve. Use the bind helper with no MX argument to clear a Service's VIPs if it must stop intercepting traffic. If SMTP fails, omit the affected worker from the SMTP Service's VIPs with the bootstrap helper and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either rollback.
+If HTTPS fails after the DNS switch, restore the previous DNS records while both connectors still serve. Remove the corresponding ServiceLB pool label from a worker to withdraw its listener. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either rollback.
