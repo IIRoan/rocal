@@ -13,6 +13,8 @@ patches:
             terminationGracePeriodSeconds: 50
             containers:
               - name: stalwart
+                readinessProbe:
+                  initialDelaySeconds: 8
                 lifecycle:
                   preStop:
                     sleep:
@@ -48,6 +50,7 @@ patches:
                             socat -T 2 - UNIX-CONNECT:/tmp/solace-haproxy.sock
                           sleep 18
                 readinessProbe:
+                  initialDelaySeconds: 8
                   httpGet:
                     path: /readyz
                     port: 8084

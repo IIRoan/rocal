@@ -73,6 +73,8 @@ kubectl -n solace-mail get deployments stalwart-a stalwart-b
 kubectl -n solace-mail get endpointslices -l kubernetes.io/service-name=mail-live
 ```
 
+To investigate a Zeabur dashboard warning, run `zeaburctl doctor --output json` and read the service through the Zeabur OSS API using a loopback session started by `zeaburctl ui --no-browser`. Review the service response at `/api/v1/projects/solace-mail/services/deployment/<name>` and its `/trace` endpoint for networking. The service response includes recent probe failure events even after a pod becomes Ready.
+
 The [bootstrap procedure](bootstrap/README.md) covers first adoption and recovery. Review storage and routing changes against the [production runbook](../apps/stalwart/README.md). Verify both mail endpoints, the public API and JMAP, and STARTTLS on both MXs after a rollout.
 
 ## Workload hardening
