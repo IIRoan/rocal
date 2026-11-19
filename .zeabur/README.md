@@ -119,15 +119,33 @@ python3 -B scripts/probe-solace-edge.py --public-dns --mx-https
 
 If one worker fails HTTPS checks, remove its address from the DNS alias until it can serve the API and mail routes again. Remove the corresponding ServiceLB pool label from a worker to withdraw its listener. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either change.
 
-### Riftbound web route
+### Public routes for other Zeabur projects
 
-`rift.solace.onl` uses the shared Webdock Traefik deployment and routes to `riftbound/expo-web:8080`. The DNS-only CNAME points to `edge.solace.onl`. The namespaced issuer renews `expo-public-tls` with Let's Encrypt DNS-01. Provision `rift-public-acme-dns` in `riftbound` with the `api-token` key through the cluster's credential process before applying the [routing and issuer manifests](bootstrap/riftbound-public.yaml). With the Riftbound namespace and role in place, enable its namespace on the shared Traefik deployment through Flux.
+The shared Webdock Traefik deployment serves the public routes below. The DNS-only records point to `edge.solace.onl`. Cloudflare flattens the `roan.dev` record at the zone apex. The two Webdock addresses can serve every route. Service placement still determines whether the backend remains available during a node outage.
+
+| Hostnames | Service |
+| --- | --- |
+| `rift.solace.onl` | `riftbound/expo-web:8080` |
+| `riftapi.solace.onl` | `riftbound/rust-api:7000` |
+| `roan.dev`, `www.roan.dev` | `portfolio/goport:8080` |
+| `demo.roan.dev` | `demo/web:8080` |
+| `objects.roan.dev` | `demo/files-s3:8333` |
+| `errors.roan.dev` | `errors/errex:8080` |
+| `builds.roan.dev` | `builder-system/zeabur-builder-webhooks:http` on `/hooks/` |
+
+cert-manager issues and renews the Let's Encrypt certificates using DNS-01. Provision `rift-public-acme-dns` in `riftbound` for `solace.onl` and `zeabur-roan-acme-dns` in `cert-manager` for `roan.dev`. Each Secret has one `api-token` key. Use separate Cloudflare tokens with DNS write and zone read on the corresponding zone. The issuers select the exact hostnames listed above.
+
+Set `TRUSTED_PROXY_CIDRS` in Riftbound's `rust-api-runtime` Secret to the Calico pod blocks assigned to the two Webdock workers. Riftbound's NetworkPolicies restrict the API port to its ingress and web proxies. Restart the API after updating the setting and verify both public routes.
+
+Apply the bootstrap manifests after the projects and their Services exist. The public Ingress objects use the `solace-public` class annotation and `public` entry point. Apply any new route's certificate and network policy before switching its public DNS record.
 
 ```sh
 kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/riftbound-public.yaml
-kubectl -n riftbound wait certificate/expo-public --for=condition=Ready --timeout=10m
+kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/zeabur-project-public.yaml
 kubectl -n solace-gitops patch kustomization solace --field-manager=rocal-solace-bootstrap \
   --type=merge --patch-file .zeabur/bootstrap/riftbound-traefik-patch.json
 ```
 
-Check the web route in the Zeabur API and probe both public addresses with the hostname and TLS verification. The separate `riftapi.solace.onl` backend uses the Riftbound tunnel.
+Use the Zeabur domain trace and probe each address with TLS hostname validation. Test the Riftbound API health and web CORS, anonymous S3 access denial, and GitHub webhook routing. `ingress.roan.dev` is a DNS target for the public ingress. The only public Cloudflare Tunnel routes are `zeabur.roan.dev` and `login.roan.dev`.
+
+The platform Traefik Helm release advertises `zeabur.roan.dev` with `providers.kubernetesIngress.ingressEndpoint.hostname`. The login and dashboard routes share the tunnel address. In the Builder Helm release, keep `webhooks.enabled=true` and set `webhooks.ingress.enabled=false`. The bootstrap manifests provide the Builder's public Ingress.

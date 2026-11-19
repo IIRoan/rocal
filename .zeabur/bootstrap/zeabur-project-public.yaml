@@ -1,0 +1,519 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: zeabur-roan-public
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: zeabur-roan-acme-account
+    solvers:
+      - selector:
+          dnsNames: [builds.roan.dev, demo.roan.dev, errors.roan.dev, objects.roan.dev, roan.dev, www.roan.dev]
+        dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: zeabur-roan-acme-dns
+              key: api-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: solace-public-traefik
+  namespace: builder-system
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    resourceNames: [builder-webhooks-public]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: solace-public-traefik
+  namespace: builder-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: solace-public-traefik
+subjects:
+  - kind: ServiceAccount
+    name: solace-tunnel-ingress
+    namespace: solace-mail
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: builder-webhooks-public-webdock
+  namespace: builder-system
+spec:
+  dnsNames: [builds.roan.dev]
+  issuerRef:
+    kind: ClusterIssuer
+    name: zeabur-roan-public
+  secretName: builder-webhooks-public-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: builder-webhooks-public
+  namespace: builder-system
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public
+spec:
+  rules:
+    - host: builds.roan.dev
+      http:
+        paths:
+          - path: /hooks/
+            pathType: Prefix
+            backend:
+              service:
+                name: zeabur-builder-webhooks
+                port:
+                  name: http
+  tls:
+    - hosts: [builds.roan.dev]
+      secretName: builder-webhooks-public-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: builder-webhooks-public-from-solace-public-traefik
+  namespace: builder-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: zeabur-builder
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: solace-public-traefik
+  namespace: demo
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    resourceNames: [web, files-s3-public]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: solace-public-traefik
+  namespace: demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: solace-public-traefik
+subjects:
+  - kind: ServiceAccount
+    name: solace-tunnel-ingress
+    namespace: solace-mail
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: web-webdock
+  namespace: demo
+spec:
+  dnsNames: [demo.roan.dev]
+  issuerRef:
+    kind: ClusterIssuer
+    name: zeabur-roan-public
+  secretName: web-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+  namespace: demo
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public
+spec:
+  rules:
+    - host: demo.roan.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8080
+  tls:
+    - hosts: [demo.roan.dev]
+      secretName: web-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-from-solace-public-traefik
+  namespace: demo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: files-s3-public-webdock
+  namespace: demo
+spec:
+  dnsNames: [objects.roan.dev]
+  issuerRef:
+    kind: ClusterIssuer
+    name: zeabur-roan-public
+  secretName: files-s3-public-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: files-s3-public
+  namespace: demo
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public
+spec:
+  rules:
+    - host: objects.roan.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: files-s3
+                port:
+                  number: 8333
+  tls:
+    - hosts: [objects.roan.dev]
+      secretName: files-s3-public-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: files-s3-public-from-solace-public-traefik
+  namespace: demo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: s3
+      app.kubernetes.io/instance: files
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - port: 8333
+          protocol: TCP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: solace-public-traefik
+  namespace: errors
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    resourceNames: [errex]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: solace-public-traefik
+  namespace: errors
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: solace-public-traefik
+subjects:
+  - kind: ServiceAccount
+    name: solace-tunnel-ingress
+    namespace: solace-mail
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: errex-webdock
+  namespace: errors
+spec:
+  dnsNames: [errors.roan.dev]
+  issuerRef:
+    kind: ClusterIssuer
+    name: zeabur-roan-public
+  secretName: errex-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: errex
+  namespace: errors
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public
+spec:
+  rules:
+    - host: errors.roan.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: errex
+                port:
+                  number: 8080
+  tls:
+    - hosts: [errors.roan.dev]
+      secretName: errex-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: errex-from-solace-public-traefik
+  namespace: errors
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: errex
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: solace-public-traefik
+  namespace: portfolio
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    resourceNames: [goport]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: solace-public-traefik
+  namespace: portfolio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: solace-public-traefik
+subjects:
+  - kind: ServiceAccount
+    name: solace-tunnel-ingress
+    namespace: solace-mail
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goport-webdock
+  namespace: portfolio
+spec:
+  dnsNames: [roan.dev, www.roan.dev]
+  issuerRef:
+    kind: ClusterIssuer
+    name: zeabur-roan-public
+  secretName: goport-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: goport
+  namespace: portfolio
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public
+spec:
+  rules:
+    - host: roan.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: goport
+                port:
+                  number: 8080
+    - host: www.roan.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: goport
+                port:
+                  number: 8080
+  tls:
+    - hosts: [roan.dev, www.roan.dev]
+      secretName: goport-webdock-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: goport-from-solace-public-traefik
+  namespace: portfolio
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: goport
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-traefik-to-zeabur-projects
+  namespace: solace-mail
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: solace-public-ingress
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: builder-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: zeabur-builder
+      ports:
+        - port: 8080
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: demo
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: web
+      ports:
+        - port: 8080
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: demo
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+              app.kubernetes.io/component: s3
+              app.kubernetes.io/instance: files
+      ports:
+        - port: 8333
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: errors
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: errex
+      ports:
+        - port: 8080
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: portfolio
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: goport
+      ports:
+        - port: 8080
+          protocol: TCP
