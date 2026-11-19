@@ -7,7 +7,7 @@
 
 Each host runs `k3s-agent`, a Stalwart replica and the host SMTP listener. Internet MTAs connect to HAProxy on TCP port 25. HAProxy forwards the original client address in one PROXY v2 header and passes the SMTP session through to Stalwart, which presents the STARTTLS certificate. The MX listener prefers its local replica and can use the peer. The secondary HAProxy config is `/etc/haproxy/solace-mx2.cfg`; discover the active config from the host's systemd unit before editing. Backend pod addresses can change on rescheduling. Any stable replacement targets must preserve the local-first order and the PROXY v2 contract.
 
-Both MXs check JMAP discovery on each gateway's PROXY v2 health listener at port 18080. The [Stalwart rollout hook](../../../.zeabur/solace-mail/gateway/rollout/deployment.yaml) closes that listener 18 seconds before shutdown so each MX can move new sessions to the peer. Keep the host health-check interval and failure threshold short enough to mark the draining gateway down within that window.
+Both MXs check JMAP discovery on each gateway's PROXY v2 health listener at port 18080. The [Stalwart rollout hook](../../../.zeabur/solace-mail/gateway/rollout/kustomization.yaml) closes that listener 18 seconds before shutdown so each MX can move new sessions to the peer. Keep the host health-check interval and failure threshold short enough to mark the draining gateway down within that window.
 
 The outbound relay units deliver from the Webdock hosts. Keep relay listeners private. HTTPS for API, JMAP, admin and discovery follows the [Cloudflare and Zeabur ingress](../README.md#request-paths).
 
