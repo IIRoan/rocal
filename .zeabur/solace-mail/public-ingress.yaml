@@ -2,7 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app.kubernetes.io/name: solace-public-ingress
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: solace-public-ingress
   name: solace-public-ingress
   namespace: solace-mail
 spec:
@@ -50,6 +51,7 @@ spec:
             - --providers.kubernetesingress=true
             - --providers.kubernetesingress.namespaces=solace-mail
             - --providers.kubernetesingress.ingressclass=solace-public
+            - --providers.kubernetesingress.ingressendpoint.publishedservice=solace-mail/solace-public
             - --providers.kubernetesingress.disableClusterScopeResources=true
             - --log.level=WARN
           image: docker.io/traefik:v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2

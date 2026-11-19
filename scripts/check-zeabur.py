@@ -106,6 +106,7 @@ def check(flux, gateway_dir):
             assert deployment["spec"]["minReadySeconds"] >= 60, replica
             assert deployment["spec"]["strategy"] == {"type": "Recreate"}, replica
             check_stalwart_security(deployment)
+            check_service_targets(network, deployment, ("mail-live", "mail-inbound", "mail-public-direct"))
             gateway = next(container for container in deployment["spec"]["template"]["spec"]["containers"]
                            if container["name"] == "gateway")
             assert gateway["readinessProbe"]["httpGet"] == {"path": "/readyz", "port": 8084, "scheme": "HTTP"}
@@ -114,6 +115,7 @@ def check(flux, gateway_dir):
         else:
             assert {"stalwart-a", "stalwart-b"}.isdisjoint(deployments)
             check_gateway(deployments["solace-api"], configs, "edge")
+            check_service_targets(network, deployments["solace-api"], ("solace-api", "solace-api-direct"))
             check_gateway(deployments["notifications"], configs, "mail-gate")
             validate_redis(docs, network)
             check_public_ingress(network, docs)
@@ -129,6 +131,17 @@ def check(flux, gateway_dir):
             (gateway_dir / key).write_text(fixtures[0][key])
         (gateway_dir / "images").write_text("\n".join(dict.fromkeys(images)) + "\n")
 
+
+
+def check_service_targets(network, deployment, service_names):
+    pod = deployment["spec"]["template"]
+    declared = {target for container in pod["spec"]["containers"] for port in container.get("ports", [])
+                for target in (port["containerPort"], port.get("name"))}
+    for name in service_names:
+        service = find_resource(network, "Service", "solace-mail", name)
+        assert service["spec"]["selector"].items() <= pod["metadata"]["labels"].items(), name
+        for port in service["spec"]["ports"]:
+            assert port["targetPort"] in declared, (name, port["targetPort"])
 
 
 def check_public_ingress(network, workloads):
@@ -175,8 +188,11 @@ def check_public_ingress(network, workloads):
         assert service["spec"]["externalTrafficPolicy"] == "Local"
         assert [item["port"] for item in service["spec"]["ports"]] == [port]
     ingress = find_resource(workloads, "Deployment", namespace, "solace-public-ingress")
+    assert ingress["metadata"]["labels"]["app.kubernetes.io/name"] == "traefik"
     template = ingress["spec"]["template"]["spec"]
     find_resource(workloads, "ServiceAccount", namespace, template["serviceAccountName"])
+    (controller,) = template["containers"]
+    assert "--providers.kubernetesingress.ingressendpoint.publishedservice=solace-mail/solace-public" in controller["args"]
     routes_name = next(vol["configMap"]["name"] for vol in template["volumes"] if vol["name"] == "ingress-routes")
     routes = yaml.safe_load(find_resource(workloads, "ConfigMap", namespace, routes_name)["data"]["routes.yaml"])
     assert routes["tcp"]["services"]["mail-inbound"]["loadBalancer"]["proxyProtocol"]["version"] == 2

@@ -46,6 +46,10 @@ spec:
       kind: Deployment
       name: notifications
       namespace: solace-mail
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: solace-public-ingress
+      namespace: solace-mail
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
