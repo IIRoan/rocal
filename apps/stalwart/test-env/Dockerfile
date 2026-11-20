@@ -6,7 +6,8 @@ ARG STALWART_CLI_VERSION=1.0.14
 USER root
 
 COPY scripts/install-stalwart.sh /tmp/install-stalwart.sh
-RUN sh /tmp/install-stalwart.sh && rm /tmp/install-stalwart.sh
+RUN sh /tmp/install-stalwart.sh && rm /tmp/install-stalwart.sh \
+    && setcap 'cap_net_bind_service=+ep' /usr/local/bin/stalwart
 
 RUN apt-get update \
     && apt-get install -yq --no-install-recommends curl haproxy python3 xz-utils \

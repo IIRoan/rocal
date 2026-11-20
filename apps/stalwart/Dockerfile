@@ -6,6 +6,7 @@ ARG BUILD_TIMESTAMP=2026-11-10-v1.1.0
 USER root
 
 COPY scripts/install-stalwart.sh /tmp/install-stalwart.sh
+# No file capabilities: the pods drop every capability and forbid privilege escalation, so the kernel would refuse to exec it.
 RUN sh /tmp/install-stalwart.sh && rm /tmp/install-stalwart.sh
 
 RUN apt-get -o Acquire::Retries=0 update \
@@ -24,7 +25,7 @@ COPY stalwart/cli-schema.json /usr/local/share/stalwart/cli-schema.json
 COPY stalwart/cli-schema.latest /usr/local/share/stalwart/cli-schema.latest
 RUN chown -R stalwart:stalwart /var/log/stalwart /etc/stalwart /usr/local/share/stalwart
 
-# The binary's network capability disables jemalloc environment configuration; eight arenas match the CPU quota, not the 48 host CPUs.
+# Eight jemalloc arenas match the CPU quota, not the 48 host CPUs.
 RUN ln -sfn 'background_thread:true,narenas:8' /etc/malloc.conf
 
 USER stalwart
