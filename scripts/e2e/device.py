@@ -21,9 +21,13 @@ def ios():
     if not runtimes:
         raise RuntimeError("The configured iOS simulator runtime is not installed")
     runtime = max(runtimes, key=lambda item: tuple(int(part) for part in item["version"].split(".")))
-    models = [model for model in available["devicetypes"] if "iPhone" in model["name"]]
-    model = next((model for model in models if model["name"] == "iPhone 17 Pro Max"), models[-1])
-    identifier = output(["xcrun", "simctl", "create", "Solace E2E", model["identifier"], runtime["identifier"]])
+    device_types = runtime.get("supportedDeviceTypes", available["devicetypes"])
+    models = {model["name"]: model["identifier"] for model in device_types if model["name"].startswith("iPhone")}
+    if not models:
+        raise RuntimeError(f"iOS {runtime['version']} has no supported iPhone simulator model")
+    model = models.get("iPhone 17 Pro Max") or models.get("iPhone 18 Pro Max") or next(iter(models.values()))
+    print(f"Creating {model} on iOS {runtime['version']}", flush=True)
+    identifier = output(["xcrun", "simctl", "create", "Solace E2E", model, runtime["identifier"]])
     (directory() / "private/device.json").write_text(json.dumps({"id": identifier, "platform": "ios"}))
     run(["defaults", "write", "com.apple.iphonesimulator", "ConnectHardwareKeyboard", "-bool", "false"])
     run(["xcrun", "simctl", "boot", identifier])

@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import directory
 from build import restore_binaries
 import connectivity
+import device
 
 specification = importlib.util.spec_from_file_location("native_journeys", Path(__file__).with_name("run.py"))
 journeys = importlib.util.module_from_spec(specification)
@@ -53,6 +54,31 @@ class HarnessTests(unittest.TestCase):
             command, cwd=journeys.REPO, env=environment, check=False, timeout=timeout, stdout=log, stderr=journeys.subprocess.STDOUT).returncode)
         routed.start()
         self.addCleanup(routed.stop)
+
+    def test_ios_uses_a_phone_supported_by_the_selected_runtime(self):
+        previous_phone = {"name": "iPhone 17 Pro Max", "identifier": "iPhone-17-Pro-Max"}
+        standard_phone = {"name": "iPhone 18 Pro Max", "identifier": "iPhone-18-Pro-Max"}
+        duo = {"name": "iPhone Duo", "identifier": "iPhone-Duo"}
+        tablet = {"name": "iPad Air", "identifier": "iPad-Air"}
+        simulators = {
+            "devicetypes": [previous_phone, standard_phone, duo, tablet],
+            "runtimes": [
+                {"version": "27.0", "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0", "isAvailable": True,
+                 "supportedDeviceTypes": [tablet, standard_phone]},
+                {"version": "27.1", "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-1", "isAvailable": True,
+                 "supportedDeviceTypes": [duo]},
+            ],
+        }
+        for runtime, phone in (("27.0", standard_phone), ("27.1", duo)):
+            with self.subTest(runtime=runtime), tempfile.TemporaryDirectory() as temporary:
+                work = Path(temporary)
+                (work / "private").mkdir()
+                with patch.dict(os.environ, {"DEVELOPER_DIR": temporary, "SOLACE_E2E_IOS_RUNTIME": runtime}), \
+                        patch.object(device, "directory", return_value=work), patch.object(device, "run"), \
+                        patch.object(device, "output", side_effect=[json.dumps(simulators), "test-device"]) as output:
+                    device.ios()
+                identifier = "com.apple.CoreSimulator.SimRuntime.iOS-" + runtime.replace(".", "-")
+                output.assert_called_with(["xcrun", "simctl", "create", "Solace E2E", phone["identifier"], identifier])
 
     def gated_maestro(self, mode, timeout):
         work = Path(tempfile.mkdtemp())

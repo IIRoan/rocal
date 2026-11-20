@@ -29,7 +29,8 @@ jobs:
       CARGO_BUILD_JOBS: "3"
       MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
       DEVELOPER_DIR: ${{ inputs.platform == 'ios' && '/Applications/Xcode_27.1.app/Contents/Developer' || '' }}
-      SOLACE_E2E_IOS_RUNTIME: "27.1"
+      # The runner's iOS 27.1 runtime serves iPhone Duo only.
+      SOLACE_E2E_IOS_RUNTIME: "27.0"
     steps:
       - name: Prepare isolated test directory
         shell: bash
