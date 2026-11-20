@@ -18,6 +18,9 @@ import connectivity
 
 CALENDAR_START = ("01-authentication", "02-calendar-management")
 CONVERSATION_JOURNEYS = frozenset(("07-conversation-first-message", "08-conversation-replies", "09-conversation-reader"))
+# Mail unlocks the account Calendar sets up, so its smoke run signs in through Calendar first.
+SMOKE = {"calendar": (("calendar", "01-authentication"), ("calendar", "02-calendar-management")),
+         "mail": (("calendar", "01-authentication"), ("mail", "01-unlock-and-draft"))}
 # Maestro 2.12.0's iOS driver startup and per-call timeout classes, and the fixed call names its DriverTimeout message can carry.
 STARTUP_TIMEOUT_CLASS = "xcuitest.installer.LocalXCTestInstaller$IOSDriverTimeoutException"
 CALL_TIMEOUT_CLASS = "maestro.MaestroException$DriverTimeout"
@@ -599,6 +602,19 @@ def run_mail_tail(platform, scenarios, results):
     run_journey(platform, "mail", scenarios / "mail/sign-out.yaml", results)
 
 
+def run_smoke(platform):
+    app = os.environ.get("E2E_APP")
+    if app not in SMOKE:
+        raise SystemExit("A smoke run needs E2E_APP calendar or mail")
+    results = []
+    for owner, name in SMOKE[app]:
+        if not run_journey(platform, owner, REPO / f"e2e/native/{owner}/{name}.yaml", results):
+            break
+    publish(results)
+    if len(results) != len(SMOKE[app]) or not all(result["passed"] for result in results):
+        raise SystemExit("Native smoke journeys failed")
+
+
 def main(platform, diagnostic=False, resume=False):
     apps = (os.environ["E2E_APP"],) if os.environ.get("E2E_APP") else APPS
     if not set(apps) <= set(APPS):
@@ -642,7 +658,7 @@ if __name__ == "__main__":
         ]
         publish(results, summary=True)
     elif (mode := {(): main, ("--calendar-start",): run_calendar_start, ("--diagnostic",): lambda platform: main(platform, diagnostic=True),
-                   ("--continue",): lambda platform: main(platform, resume=True)}.get(tuple(sys.argv[2:]))) is None:
+                   ("--continue",): lambda platform: main(platform, resume=True), ("--smoke",): run_smoke}.get(tuple(sys.argv[2:]))) is None:
         raise SystemExit("Unknown journey arguments")
     else:
         mode(sys.argv[1])

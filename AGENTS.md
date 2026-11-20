@@ -172,7 +172,7 @@ Verify only — **don't start dev servers, builds, tunnels, EAS builds, OTA publ
 
 CI (`.github/workflows/pr-tests.yml`) runs lint, both typechecks, the tests, and the Rust job (`cargo xtask check --skip-mem`) on every PR. Security workflows run CodeQL, Bun audit and Trivy on PRs, `master`, daily and manually; coverage and limitations are in `.github/SECURITY-SCANNING.md`.
 
-Native E2E (`.github/workflows/native-e2e.yml`, `e2e/README.md`) drives both release apps on iOS/Android against the real API and disposable local Postgres/Stalwart/S3. `cargo xtask e2e serve|seed|verify` owns only `solace_test_e2e`; the clients create real encryption keys and data. `SOLACE_E2E=1` requires a local preview build and loopback API, uses `.e2e` identities and disables OTA. Keep raw Maestro traces and credentials private; upload only reports and synthetic screenshots.
+Native E2E (`.github/workflows/native-e2e.yml`, `e2e/README.md`) drives both release apps on Android (every journey) and iOS (smoke journeys; `-f ios_full=true` dispatches all) against the real API and disposable local Postgres/Stalwart/S3. `cargo xtask e2e serve|seed|verify` owns only `solace_test_e2e`; the clients create real encryption keys and data. `SOLACE_E2E=1` requires a local preview build and loopback API, uses `.e2e` identities and disables OTA. Keep raw Maestro traces and credentials private; upload only reports and synthetic screenshots.
 
 Web E2E (`.github/workflows/web-e2e.yml`, `e2e/README.md`) serves the production web build on `localhost:4100` against the same disposable stack and fails on any serious or critical axe violation; traces stay under `private/`.
 

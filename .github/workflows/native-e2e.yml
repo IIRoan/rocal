@@ -32,6 +32,10 @@ on:
         description: Run only iOS authentication and calendar management for diagnosis
         type: boolean
         default: false
+      ios_full:
+        description: Run every iOS journey instead of the iOS smoke journeys
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -65,7 +69,7 @@ jobs:
       app: ${{ matrix.app }}
 
   ios:
-    name: ${{ inputs.diagnostic && 'iOS diagnostics' || format('iOS {0}', matrix.app) }}
+    name: ${{ inputs.diagnostic && 'iOS diagnostics' || format(inputs.ios_full && 'iOS {0}' || 'iOS {0} smoke', matrix.app) }}
     needs: build-ios
     if: ${{ always() && !cancelled() }}
     strategy:
@@ -76,6 +80,8 @@ jobs:
     with:
       platform: ios
       diagnostic: ${{ inputs.diagnostic || false }}
+      # iOS runs short smoke journeys; Android and a manual ios_full dispatch run the whole suite.
+      smoke: ${{ !inputs.ios_full }}
       app: ${{ matrix.app }}
 
   android:

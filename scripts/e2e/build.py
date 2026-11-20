@@ -1,6 +1,8 @@
+import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tarfile
 
@@ -29,6 +31,7 @@ def build(platform, app_names):
             if len(apps) != 1:
                 raise RuntimeError("Expected one release simulator app")
             shutil.copytree(apps[0], binaries / f"{app}.app", symlinks=True)
+            keep_native_layer(project, apps[0], app)
         else:
             environment = {**os.environ, "GRADLE_OPTS": '-Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" -Dorg.gradle.daemon=false'}
             run([project / "android/gradlew", "assembleRelease", "-PreactNativeArchitectures=x86_64", "--max-workers=2"], cwd=project / "android", env=environment)
@@ -37,6 +40,48 @@ def build(platform, app_names):
                 raise RuntimeError("Expected one release APK")
             shutil.copy2(apks[0], binaries / f"{app}.apk")
         print(f"Built {app}: release {platform} binary against the isolated loopback API", flush=True)
+
+
+def capture(command, cwd):
+    return run(command, cwd=cwd, text=True, stdout=subprocess.PIPE).stdout
+
+
+def fingerprint(platform, app):
+    project = REPO / f"apps/native-{app}"
+    cli = capture(["node", "-p", "require.resolve('expo-updates/bin/cli.js', {paths: [process.cwd()]})"], project).strip()
+    return json.loads(capture(["node", cli, "fingerprint:generate", "--platform", platform], project))["hash"]
+
+
+def keep_native_layer(project, built, app):
+    # The bytecode must come from the hermesc this app's Hermes VM was built with, or launch fails.
+    hermesc = next((project / "ios/Pods/hermes-engine").rglob("destroot/bin/hermesc"), None)
+    if hermesc is None:
+        raise RuntimeError("The iOS build has no hermesc to cache with its native layer")
+    layer = directory() / f"native/{app}"
+    shutil.rmtree(layer, ignore_errors=True)
+    layer.mkdir(parents=True)
+    shutil.copytree(built, layer / f"{app}.app", symlinks=True)
+    shutil.copy2(hermesc, layer / "hermesc")
+
+
+def refresh_javascript(app):
+    """Rebuild only the Hermes bundle and assets into the cached native app, as Expo's Xcode bundle phase does."""
+    project = REPO / f"apps/native-{app}"
+    layer = directory() / f"native/{app}"
+    target = directory() / f"binaries/{app}.app"
+    staging = directory() / f"private/bundle-{app}"
+    for path in (target, staging):
+        shutil.rmtree(path, ignore_errors=True)
+    target.parent.mkdir(exist_ok=True)
+    staging.mkdir(parents=True)
+    shutil.copytree(layer / f"{app}.app", target, symlinks=True)
+    entry = capture(["node", "-e", "require('expo/scripts/resolveAppEntry')", project, "ios", "absolute"], project).strip().splitlines()[-1]
+    cli = capture(["node", "-p", "require.resolve('@expo/cli', {paths: [require.resolve('expo/package.json')]})"], project).strip()
+    run(["node", cli, "export:embed", "--entry-file", entry, "--platform", "ios", "--dev", "false", "--reset-cache",
+         "--bundle-output", staging / "main.jsbundle", "--assets-dest", target, "--minify", "false"], cwd=project)
+    run([layer / "hermesc", "-emit-binary", "-O", "-out", target / "main.jsbundle", staging / "main.jsbundle"])
+    run(["codesign", "--force", "--sign", "-", "--preserve-metadata=identifier,entitlements,flags", "--timestamp=none", target])
+    print(f"Refreshed {app}: new JavaScript bundle in the cached native app", flush=True)
 
 
 def restore_binaries(platform):
@@ -56,7 +101,15 @@ def restore_binaries(platform):
 
 if __name__ == "__main__":
     target = sys.argv[1]
-    if target == "restore":
+    if target == "fingerprint":
+        if len(sys.argv) != 4 or sys.argv[2] not in ("ios", "android") or sys.argv[3] not in APPS:
+            raise RuntimeError("Choose a platform and calendar or mail to fingerprint")
+        print(fingerprint(sys.argv[2], sys.argv[3]))
+    elif target == "refresh":
+        if len(sys.argv) != 3 or sys.argv[2] not in APPS:
+            raise RuntimeError("Choose calendar or mail to refresh")
+        refresh_javascript(sys.argv[2])
+    elif target == "restore":
         if len(sys.argv) != 3 or sys.argv[2] not in ("ios", "android"):
             raise RuntimeError("Choose the ios or android archives to restore")
         restore_binaries(sys.argv[2])
