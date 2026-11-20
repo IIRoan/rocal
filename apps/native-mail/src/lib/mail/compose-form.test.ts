@@ -3,6 +3,14 @@ import { composeFormReducer, INITIAL_COMPOSE_FORM } from "./compose-form";
 const replyAll = { to: "ann@example.com", cc: "bo@example.com", bcc: "", subject: "Re: Plans", body: "> hi" };
 
 describe("composeFormReducer", () => {
+  it("advances the body source only for changes made outside the editor", () => {
+    const edited = composeFormReducer(INITIAL_COMPOSE_FORM, { type: "edit", field: "body", value: "Draft" });
+    expect(edited.bodySourceVersion).toBe(INITIAL_COMPOSE_FORM.bodySourceVersion);
+
+    const signed = composeFormReducer(edited, { type: "editBody", update: (body) => `${body}\nSignature` });
+    expect(signed).toMatchObject({ body: "Draft\nSignature", bodySourceVersion: edited.bodySourceVersion + 1 });
+  });
+
   it("seeds the fields as the baseline and opens Cc/Bcc when they hold recipients", () => {
     const state = composeFormReducer(INITIAL_COMPOSE_FORM, {
       type: "seed",

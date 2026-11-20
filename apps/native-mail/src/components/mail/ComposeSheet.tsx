@@ -356,6 +356,7 @@ function ComposeSession({
               <ComposeBodyEditor
                 ref={bodyEditorRef}
                 value={body}
+                bodySourceVersion={form.bodySourceVersion}
                 onChangeText={(value) =>
                   dispatch({ type: "edit", field: "body", value })
                 }

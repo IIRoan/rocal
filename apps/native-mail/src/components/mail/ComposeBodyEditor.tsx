@@ -53,6 +53,7 @@ export type ComposeBodyEditorHandle = {
 
 type ComposeBodyEditorProps = {
   value: string;
+  bodySourceVersion: number;
   onChangeText: (text: string) => void;
   placeholder: string;
   inputAccessoryViewID?: string;
@@ -206,7 +207,7 @@ export const ComposeBodyEditor = forwardRef<
   ComposeBodyEditorHandle,
   ComposeBodyEditorProps
 >(function ComposeBodyEditor(
-  { value, onChangeText, placeholder, inputAccessoryViewID, onFocusChange },
+  { value, bodySourceVersion, onChangeText, placeholder, inputAccessoryViewID, onFocusChange },
   ref,
 ) {
   const { theme } = useTheme();
@@ -214,6 +215,7 @@ export const ComposeBodyEditor = forwardRef<
   const styles = createStyles(theme, skin);
   const injectJavaScriptRef = useRef<((script: string) => void) | null>(null);
   const lastEmittedRef = useRef(value);
+  const appliedBodySourceVersion = useRef(bodySourceVersion);
   const [selection, setSelection] = useState<TextSelection>({
     start: 0,
     end: 0,
@@ -296,14 +298,17 @@ export const ComposeBodyEditor = forwardRef<
   );
 
   useEffect(() => {
-    if (!WebView || !editorReady || value === lastEmittedRef.current) {
+    // A React render can acknowledge older keystrokes after the WebView has already emitted newer ones.
+    if (!WebView || !editorReady || bodySourceVersion === appliedBodySourceVersion.current) {
       return;
     }
+    appliedBodySourceVersion.current = bodySourceVersion;
+    if (value === lastEmittedRef.current) return;
     lastEmittedRef.current = value;
     injectJavaScriptRef.current?.(
       `window.setHtml(${JSON.stringify(composeTextToHtml(value))}); true;`,
     );
-  }, [editorReady, value]);
+  }, [bodySourceVersion, editorReady, value]);
 
   const onMessage = (event: WebViewMessageEvent) => {
     const message = parseEditorMessage(event.nativeEvent.data);
@@ -322,10 +327,9 @@ export const ComposeBodyEditor = forwardRef<
     }
     const sanitizedHtml = sanitizeUntrustedEmailHtml(message.html);
     const next = htmlToComposeText(sanitizedHtml);
+    if (next === lastEmittedRef.current) return;
     lastEmittedRef.current = next;
-    if (next !== value) {
-      onChangeText(next);
-    }
+    onChangeText(next);
   };
 
   const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest) => {

@@ -70,10 +70,15 @@ appId: ${APP_ID}
 - assertVisible: Maestro renamed calendar
 - hideKeyboard
 - waitForAnimationToEnd
-- assertVisible:
+- scrollUntilVisible:
+    element:
+      text: Save changes
+      enabled: true
+    direction: DOWN
+- tapOn:
     text: Save changes
     enabled: true
-- tapOn: Save changes
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     notVisible: Save changes
     timeout: 30000
@@ -83,7 +88,9 @@ appId: ${APP_ID}
 - takeScreenshot: ${SCREENSHOT_DIR}/calendar-created-and-renamed
 - runFlow: ../common/close-sheet.yaml
 - runFlow: ../common/create-event.yaml
-- tapOn: Event title
+- tapOn:
+    text: Event title
+    retryTapIfNoChange: true
 - runFlow:
     file: ../common/type.yaml
     env:

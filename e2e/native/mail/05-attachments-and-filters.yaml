@@ -7,24 +7,42 @@ appId: ${APP_ID}
 - tapOn: Compose message
 - assertVisible: Send
 - waitForAnimationToEnd
-- tapOn:
-    text: Attach file
-    enabled: true
-    retryTapIfNoChange: false
 - runFlow:
     when:
       platform: iOS
     commands:
-      - extendedWaitUntil:
-          visible:
-            text: Cancel
-            enabled: true
-          timeout: 30000
+      - retry:
+          maxRetries: 1
+          commands:
+            - runFlow:
+                when:
+                  notVisible: Attach file
+                commands:
+                  # An unresponsive system sheet must close before another picker can open.
+                  - swipe:
+                      start: 50%,8%
+                      end: 50%,75%
+                  - extendedWaitUntil:
+                      visible: Attach file
+                      timeout: 30000
+            - tapOn:
+                text: Attach file
+                enabled: true
+                retryTapIfNoChange: false
+            - extendedWaitUntil:
+                visible:
+                  text: Cancel
+                  enabled: true
+                timeout: 30000
       - waitForAnimationToEnd
 - runFlow:
     when:
       platform: Android
     commands:
+      - tapOn:
+          text: Attach file
+          enabled: true
+          retryTapIfNoChange: false
       - extendedWaitUntil:
           visible: "(?i).*(browse|recents|recent|downloads|files).*"
           timeout: 30000
